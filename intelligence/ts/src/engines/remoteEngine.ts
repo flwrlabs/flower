@@ -28,16 +28,16 @@ import {
   ToolChoice,
 } from '../typing';
 import { BaseEngine } from './engine';
-import { ChatCompletionsResponse, EmbedResponse } from './remoteEngine/typing';
+import { chatStream, extractChatOutput } from './remoteEngine/chat';
 import { CryptographyHandler } from './remoteEngine/cryptoHandler';
+import { extractEmbedOutput } from './remoteEngine/embed';
 import {
   createChatRequestData,
   createEmbedRequestData,
   getHeaders,
   sendRequest,
 } from './remoteEngine/remoteUtils';
-import { chatStream, extractChatOutput } from './remoteEngine/chat';
-import { extractEmbedOutput } from './remoteEngine/embed';
+import { ChatCompletionsResponse, EmbedResponse } from './remoteEngine/typing';
 
 export class RemoteEngine extends BaseEngine {
   private baseUrl: string;

@@ -23,8 +23,9 @@ current global model parameters as input and return evaluation results:
 .. code-block:: python
 
     from flwr.app import Context
+    from flwr.compat.server import ServerAppComponents
     from flwr.common import NDArrays, Scalar
-    from flwr.server import ServerAppComponents, ServerConfig
+    from flwr.server import ServerConfig
     from flwr.server.strategy import FedAvg
     from flwr.serverapp import ServerApp
 
@@ -149,7 +150,8 @@ the following arguments:
 .. code-block:: python
 
     from flwr.app import Context
-    from flwr.server import ServerAppComponents, ServerConfig
+    from flwr.compat.server import ServerAppComponents
+    from flwr.server import ServerConfig
     from flwr.server.strategy import FedAvg
     from flwr.serverapp import ServerApp
 
@@ -231,6 +233,6 @@ arbitrary evaluation results as a dictionary:
 *******************
 
 For a full code example that uses both centralized and federated evaluation, see the
-`Advanced TensorFlow Example
-<https://github.com/adap/flower/tree/main/examples/advanced-tensorflow>`_ (the same
+`Advanced PyTorch Example
+<https://github.com/flwrlabs/flower/tree/main/examples/advanced-pytorch>`_ (the same
 approach can be applied to workloads implemented in any other framework).

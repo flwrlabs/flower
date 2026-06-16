@@ -1,0 +1,42 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Deprecated MetricRecord compatibility APIs."""
+
+from logging import WARN
+
+from flwr.app.message import MetricRecord
+from flwr.app.typing import MetricRecordValues
+from flwr.common.logger import log
+
+
+class MetricsRecord(MetricRecord):
+    """Deprecated class ``MetricsRecord``, use ``MetricRecord`` instead."""
+
+    _warning_logged = False
+
+    def __init__(
+        self,
+        metric_dict: dict[str, MetricRecordValues] | None = None,
+        keep_input: bool = True,
+    ) -> None:
+        if not MetricsRecord._warning_logged:
+            MetricsRecord._warning_logged = True
+            log(
+                WARN,
+                "The `MetricsRecord` class has been renamed to `MetricRecord`. "
+                "Support for `MetricsRecord` will be removed in a future release. "
+                "Please update your code accordingly.",
+            )
+        super().__init__(metric_dict, keep_input)

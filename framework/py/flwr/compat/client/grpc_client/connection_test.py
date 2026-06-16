@@ -16,19 +16,16 @@
 
 
 import concurrent.futures
-import socket
 from collections.abc import Iterator
-from contextlib import closing
-from typing import cast
 from unittest.mock import patch
 
 import grpc
 
-from flwr.common import ConfigRecord, Message, RecordDict
+from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.common import Code, GetPropertiesRes, Status
 from flwr.common import recorddict_compat as compat
 from flwr.common.constant import MessageTypeLegacy
 from flwr.common.retry_invoker import RetryInvoker, exponential
-from flwr.common.typing import Code, GetPropertiesRes, Status
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
     ServerMessage,
@@ -55,14 +52,6 @@ MESSAGE_DISCONNECT = Message(
     dst_node_id=0,
     message_type="reconnect",
 )
-
-
-def unused_tcp_port() -> int:
-    """Return an unused port."""
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-        sock.bind(("", 0))
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return cast(int, sock.getsockname()[1])
 
 
 def mock_join(  # type: ignore # pylint: disable=invalid-name
@@ -102,10 +91,8 @@ def test_integration_connection() -> None:
     roundtrips between server and client.
     """
     # Prepare
-    port = unused_tcp_port()
-
     server = start_grpc_server(
-        client_manager=SimpleClientManager(), server_address=f"[::]:{port}"
+        client_manager=SimpleClientManager(), server_address="[::]:0"
     )
 
     # Execute
@@ -114,7 +101,7 @@ def test_integration_connection() -> None:
         messages_received: int = 0
 
         with grpc_connection(
-            server_address=f"[::]:{port}",
+            server_address=server.bound_address,
             insecure=True,
             retry_invoker=RetryInvoker(
                 wait_gen_factory=exponential,

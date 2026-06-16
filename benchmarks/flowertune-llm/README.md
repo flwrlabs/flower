@@ -13,7 +13,7 @@ As the first step, please register for a Flower account on [flower.ai/login](htt
 Then, create a new Python environment and install Flower. 
 
 > [!TIP]
-> We recommend using `pyenv` with the `virtualenv` plugin to create your environment with Python >= 3.10.0. Other managers, such as Conda, will likely work as well. Check the [documentation](https://flower.ai/docs/framework/how-to-install-flower.html) for alternative ways to install Flower.
+> We recommend using `pyenv` with the `virtualenv` plugin to create your environment with Python >= 3.11.0. Other managers, such as Conda, will likely work as well. Check the [documentation](https://flower.ai/docs/framework/how-to-install-flower.html) for alternative ways to install Flower.
 
 ```shell
 pip install flwr
@@ -71,7 +71,7 @@ With a new project directory created, running a baseline challenge can be done b
 ## Evaluate fine-tuned LLMs
 
 Once the LLM fine-tuning finished, evaluate the performance of your fine-tuned LLM
-following the `README.md` in [`evaluation`](https://github.com/adap/flower/tree/main/benchmarks/flowertune-llm/evaluation) directory.
+following the `README.md` in [`evaluation`](https://github.com/flwrlabs/flower/tree/main/benchmarks/flowertune-llm/evaluation) directory.
 
 
 > [!NOTE]

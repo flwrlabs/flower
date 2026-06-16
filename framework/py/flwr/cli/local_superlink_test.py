@@ -15,48 +15,80 @@
 """Tests for local SuperLink runtime helpers."""
 
 
-from unittest.mock import patch
+import subprocess
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+from flwr.cli.constant import (
+    LOCAL_CONTROL_API_ADDRESS,
+    LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+    LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
+)
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
+from flwr.supercore.constant import FLWR_DISABLE_UPDATE_CHECK
 
-from .local_superlink import ensure_local_superlink
+from .local_superlink import _start_local_superlink, ensure_local_superlink
+
+_IS_STARTED_PATH = "flwr.cli.local_superlink._is_local_superlink_started"
+_START_PATH = "flwr.cli.local_superlink._start_local_superlink"
 
 
-def test_options_only_connection_uses_runtime_defaults() -> None:
-    """Options-only connections are mapped to managed local runtime."""
+def test_magic_address_connection_uses_local_superlink() -> None:
+    """Magic-address connections are mapped to the managed local SuperLink."""
     connection = SuperLinkConnection(
         name="local",
+        address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
         options=SuperLinkSimulationOptions(num_supernodes=2),
     )
 
-    with patch(
-        "flwr.cli.local_superlink._is_control_api_available", return_value=True
-    ) as mock_available:
-        with patch("flwr.cli.local_superlink._start_local_superlink") as mock_start:
+    with patch(_IS_STARTED_PATH, return_value=True) as mock_is_started:
+        with patch(_START_PATH) as mock_start:
             resolved = ensure_local_superlink(connection)
 
-    assert resolved.address == "127.0.0.1:9093"
+    assert resolved.address == LOCAL_CONTROL_API_ADDRESS
     assert resolved.insecure is True
     assert resolved.root_certificates is None
-    mock_available.assert_called_once()
+    mock_is_started.assert_called_once()
+    assert mock_is_started.call_args.args[0].address == LOCAL_CONTROL_API_ADDRESS
     mock_start.assert_not_called()
 
 
-def test_options_only_connection_starts_runtime_when_unavailable() -> None:
-    """Managed local runtime is started when Control API is unavailable."""
+def test_magic_address_connection_starts_local_superlink_when_unavailable() -> None:
+    """Local SuperLink is started when it is unavailable."""
     connection = SuperLinkConnection(
         name="local",
+        address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
         options=SuperLinkSimulationOptions(num_supernodes=2),
     )
 
-    with patch(
-        "flwr.cli.local_superlink._is_control_api_available", return_value=False
-    ), patch("flwr.cli.local_superlink._start_local_superlink") as mock_start:
-        resolved = ensure_local_superlink(connection)
+    with patch(_IS_STARTED_PATH, return_value=False):
+        with patch(_START_PATH) as mock_start:
+            resolved = ensure_local_superlink(connection)
 
-    assert resolved.address == "127.0.0.1:9093"
+    assert resolved.address == LOCAL_CONTROL_API_ADDRESS
     assert resolved.insecure is True
     mock_start.assert_called_once()
+    assert mock_start.call_args.args[0].address == LOCAL_CONTROL_API_ADDRESS
+    assert mock_start.call_args.kwargs["in_memory"] is False
+
+
+def test_in_memory_magic_address_starts_local_superlink_in_memory() -> None:
+    """The in-memory magic address starts the managed local SuperLink in memory."""
+    connection = SuperLinkConnection(
+        name="local",
+        address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
+        options=SuperLinkSimulationOptions(num_supernodes=2),
+    )
+
+    with patch(_IS_STARTED_PATH, return_value=False):
+        with patch(_START_PATH) as mock_start:
+            resolved = ensure_local_superlink(connection)
+
+    assert resolved.address == LOCAL_CONTROL_API_ADDRESS
+    assert resolved.insecure is True
+    mock_start.assert_called_once()
+    assert mock_start.call_args.args[0].address == LOCAL_CONTROL_API_ADDRESS
+    assert mock_start.call_args.kwargs["in_memory"] is True
 
 
 def test_local_config_is_preserved_when_endpoint_available() -> None:
@@ -68,12 +100,12 @@ def test_local_config_is_preserved_when_endpoint_available() -> None:
         options=SuperLinkSimulationOptions(num_supernodes=2),
     )
 
-    with patch("flwr.cli.local_superlink._is_control_api_available") as mock_available:
-        with patch("flwr.cli.local_superlink._start_local_superlink") as mock_start:
+    with patch(_IS_STARTED_PATH) as mock_is_started:
+        with patch(_START_PATH) as mock_start:
             resolved = ensure_local_superlink(connection)
 
     assert resolved is connection
-    mock_available.assert_not_called()
+    mock_is_started.assert_not_called()
     mock_start.assert_not_called()
 
 
@@ -86,13 +118,13 @@ def test_explicit_local_address_does_not_auto_start() -> None:
         options=SuperLinkSimulationOptions(num_supernodes=2),
     )
 
-    with patch("flwr.cli.local_superlink._is_control_api_available") as mock_available:
-        with patch("flwr.cli.local_superlink._start_local_superlink") as mock_start:
+    with patch(_IS_STARTED_PATH) as mock_is_started:
+        with patch(_START_PATH) as mock_start:
             resolved = ensure_local_superlink(connection)
 
     assert resolved.address == "localhost:9093"
     assert resolved.insecure is False
-    mock_available.assert_not_called()
+    mock_is_started.assert_not_called()
     mock_start.assert_not_called()
 
 
@@ -104,13 +136,13 @@ def test_explicit_bind_all_address_does_not_auto_start() -> None:
         options=SuperLinkSimulationOptions(num_supernodes=2),
     )
 
-    with patch("flwr.cli.local_superlink._is_control_api_available") as mock_available:
-        with patch("flwr.cli.local_superlink._start_local_superlink") as mock_start:
+    with patch(_IS_STARTED_PATH) as mock_is_started:
+        with patch(_START_PATH) as mock_start:
             resolved = ensure_local_superlink(connection)
 
     assert resolved.address == "0.0.0.0:9093"
     assert resolved.insecure is False
-    mock_available.assert_not_called()
+    mock_is_started.assert_not_called()
     mock_start.assert_not_called()
 
 
@@ -122,8 +154,116 @@ def test_remote_connection_is_untouched() -> None:
         options=SuperLinkSimulationOptions(num_supernodes=2),
     )
 
-    with patch("flwr.cli.local_superlink._is_control_api_available") as mock_probe:
+    with patch(_IS_STARTED_PATH) as mock_is_started:
         resolved = ensure_local_superlink(connection)
 
     assert resolved is connection
-    mock_probe.assert_not_called()
+    mock_is_started.assert_not_called()
+
+
+def test_options_only_connection_warns_and_uses_local_magic_address() -> None:
+    """Options-only local simulation config is deprecated and mapped to `:local:`."""
+    connection = SuperLinkConnection(
+        name="local",
+        options=SuperLinkSimulationOptions(num_supernodes=2),
+    )
+
+    with patch(_IS_STARTED_PATH, return_value=True) as mock_is_started:
+        with patch(_START_PATH) as mock_start:
+            resolved = ensure_local_superlink(connection)
+
+    assert connection.address == LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE
+    assert resolved.address == LOCAL_CONTROL_API_ADDRESS
+    assert resolved.insecure is True
+    assert resolved.root_certificates is None
+    mock_is_started.assert_called_once()
+    mock_start.assert_not_called()
+
+
+def test_options_only_connection_starts_runtime_when_unavailable() -> None:
+    """Deprecated options-only config starts the managed local runtime if needed."""
+    connection = SuperLinkConnection(
+        name="local",
+        options=SuperLinkSimulationOptions(num_supernodes=2),
+    )
+
+    with patch(_IS_STARTED_PATH, return_value=False):
+        with patch(_START_PATH) as mock_start:
+            resolved = ensure_local_superlink(connection)
+
+    assert resolved.address == LOCAL_CONTROL_API_ADDRESS
+    assert resolved.insecure is True
+    mock_start.assert_called_once()
+    assert mock_start.call_args.args[0].address == LOCAL_CONTROL_API_ADDRESS
+    assert mock_start.call_args.kwargs["in_memory"] is False
+
+
+def test_start_local_superlink_uses_builtin_log_rotation(tmp_path: Path) -> None:
+    """Start command should include built-in SuperLink log rotation flags."""
+    database = tmp_path / "flwr-local-superlink-state.db"
+    log_file = tmp_path / "flwr-local-superlink.log"
+    process = MagicMock()
+    process.poll.return_value = None
+    runtime_connection = SuperLinkConnection(
+        name="local",
+        address=LOCAL_CONTROL_API_ADDRESS,
+        insecure=True,
+    )
+
+    with (
+        patch(
+            "flwr.cli.local_superlink._runtime_paths_for_address",
+            return_value=(database, log_file),
+        ),
+        patch(_IS_STARTED_PATH, return_value=True),
+        patch(
+            "flwr.cli.local_superlink.subprocess.Popen", return_value=process
+        ) as popen,
+    ):
+        _start_local_superlink(runtime_connection)
+
+    cmd = popen.call_args.args[0]
+    assert "--log-file" in cmd
+    assert str(log_file) in cmd
+    assert "--serverappio-api-address" in cmd
+    assert "127.0.0.1:0" in cmd
+    assert "--database" in cmd
+    assert str(database) in cmd
+    assert "--log-rotation-interval-hours" in cmd
+    assert "24" in cmd
+    assert "--log-rotation-backup-count" in cmd
+    assert "7" in cmd
+    assert "--storage-dir" not in cmd
+    assert popen.call_args.kwargs["stdout"] is subprocess.DEVNULL
+    assert popen.call_args.kwargs["stderr"] is subprocess.DEVNULL
+    assert popen.call_args.kwargs["env"][FLWR_DISABLE_UPDATE_CHECK] == "1"
+
+
+def test_start_local_superlink_in_memory_skips_database_flag(
+    tmp_path: Path,
+) -> None:
+    """In-memory local SuperLink startup should not configure a database path."""
+    database = tmp_path / "flwr-local-superlink-state.db"
+    log_file = tmp_path / "flwr-local-superlink.log"
+    process = MagicMock()
+    process.poll.return_value = None
+    runtime_connection = SuperLinkConnection(
+        name="local",
+        address=LOCAL_CONTROL_API_ADDRESS,
+        insecure=True,
+    )
+
+    with (
+        patch(
+            "flwr.cli.local_superlink._runtime_paths_for_address",
+            return_value=(database, log_file),
+        ),
+        patch(_IS_STARTED_PATH, return_value=True),
+        patch(
+            "flwr.cli.local_superlink.subprocess.Popen", return_value=process
+        ) as popen,
+    ):
+        _start_local_superlink(runtime_connection, in_memory=True)
+
+    cmd = popen.call_args.args[0]
+    assert "--database" not in cmd

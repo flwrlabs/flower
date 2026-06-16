@@ -14,7 +14,8 @@
 # ==============================================================================
 """Flower command line interface `federation create` command."""
 
-from typing import Annotated
+
+from typing import Annotated, Literal
 
 import click
 import typer
@@ -32,12 +33,13 @@ from ..utils import (
     cli_output_handler,
     flwr_cli_grpc_exc_handler,
     init_channel_from_connection,
+    print_json_to_stdout,
 )
 
 
 def create(  # pylint: disable=R0914, R0913, R0917, R0912
     ctx: typer.Context,
-    federation_name: Annotated[
+    federation: Annotated[
         str,
         typer.Argument(help="Name of the federation to create."),
     ],
@@ -46,7 +48,7 @@ def create(  # pylint: disable=R0914, R0913, R0917, R0912
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,
@@ -61,6 +63,14 @@ def create(  # pylint: disable=R0914, R0913, R0917, R0912
             help="Description of the federation.",
         ),
     ] = None,
+    simulation: Annotated[
+        bool,
+        typer.Option(
+            "--simulation",
+            help="Create this federation for simulation use.",
+            is_flag=True,
+        ),
+    ] = False,
 ) -> None:
     """Create a new federation."""
     with cli_output_handler(output_format=output_format) as is_json:
@@ -76,8 +86,9 @@ def create(  # pylint: disable=R0914, R0913, R0917, R0912
             stub = ControlStub(channel)
 
             request = CreateFederationRequest(
-                name=federation_name,
+                federation_name=federation,
                 description=description if description else "",
+                simulation=simulation,
             )
             _create_federation(stub=stub, request=request, is_json=is_json)
 
@@ -91,6 +102,14 @@ def _create_federation(  # pylint: disable=W0613
 ) -> None:
     """Create a federation."""
     with flwr_cli_grpc_exc_handler():
-        _: CreateFederationResponse = stub.CreateFederation(request)
+        response: CreateFederationResponse = stub.CreateFederation(request)
 
-    raise click.ClickException("Command not fully implemented.")
+    if response.federation.name:
+        if is_json:
+            print_json_to_stdout({"success": True, "name": response.federation.name})
+        else:
+            click.echo(
+                f"✅ Federation '{response.federation.name}' created successfully."
+            )
+    else:
+        raise click.ClickException("Federation couldn't be created.")

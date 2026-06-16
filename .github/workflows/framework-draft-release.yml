@@ -10,7 +10,7 @@ env:
 
 jobs:
   publish:
-    if: ${{ github.repository == 'adap/flower' }}
+    if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Publish draft
     runs-on: ubuntu-22.04
     steps:

@@ -14,6 +14,7 @@
 // =============================================================================
 
 import getRandomValues from 'get-random-values';
+
 import { FailureCode, Message, Result } from '../../typing';
 import { KeyManager } from './keyManager';
 import { NetworkService } from './networkService';

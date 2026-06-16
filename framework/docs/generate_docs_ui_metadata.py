@@ -12,7 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Generate UI metadata for framework documentation."""
+"""Generate UI metadata for framework documentation.
+
+Example usage:
+
+    python ./framework/docs/generate_docs_ui_metadata.py \
+    --docs-ui-config ./dev/docs-ui-config.yml \
+    --output ./framework/docs/build/docs-ui-metadata.json
+"""
 
 
 import argparse
@@ -25,8 +32,7 @@ from typing import Any
 import yaml
 from packaging.version import Version
 
-MIN_VERSION = Version("1.8.0")
-MINOR_LABEL_FROM = Version("1.17.0")
+MIN_VERSION = Version("1.17.0")
 
 
 def _collect_versions() -> list[dict[str, str]]:
@@ -48,12 +54,8 @@ def _collect_versions() -> list[dict[str, str]]:
     added_names = {"main"}
     for version in versions:
         # Get display name and URL for the version
-        if version >= MINOR_LABEL_FROM:
-            name = f"v{version.release[0]}.{version.release[1]}.x"
-            url = f"{version.release[0]}.{version.release[1]}"
-        else:
-            name = f"v{version}"
-            url = f"v{version}"
+        name = f"v{version.release[0]}.{version.release[1]}.x"
+        url = f"{version.release[0]}.{version.release[1]}"
 
         if name not in added_names:
             added_names.add(name)

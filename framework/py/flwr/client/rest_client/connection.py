@@ -24,16 +24,11 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from google.protobuf.message import Message as GrpcMessage
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
+from flwr.app.message import Message, remove_content_from_message
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL
 from flwr.common.exit import ExitCode, flwr_exit
-from flwr.common.inflatable_protobuf_utils import (
-    make_confirm_message_received_fn_protobuf,
-    make_pull_object_fn_protobuf,
-    make_push_object_fn_protobuf,
-)
 from flwr.common.logger import log
-from flwr.common.message import Message, remove_content_from_message
 from flwr.common.retry_invoker import RetryInvoker
 from flwr.common.serde import (
     fab_from_proto,
@@ -41,7 +36,6 @@ from flwr.common.serde import (
     message_to_proto,
     run_from_proto,
 )
-from flwr.common.typing import Fab, Run
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -72,8 +66,15 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
+from flwr.supercore.fab import Fab
 from flwr.supercore.heartbeat import HeartbeatSender
+from flwr.supercore.inflatable.inflatable_protobuf_utils import (
+    make_confirm_message_received_fn_protobuf,
+    make_pull_object_fn_protobuf,
+    make_push_object_fn_protobuf,
+)
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.run import Run
 
 try:
     import requests
@@ -89,7 +90,7 @@ PATH_PULL_MESSAGES: str = "/api/v0/fleet/pull-messages"
 PATH_PUSH_MESSAGES: str = "/api/v0/fleet/push-messages"
 PATH_PULL_OBJECT: str = "/api/v0/fleet/pull-object"
 PATH_PUSH_OBJECT: str = "/api/v0/fleet/push-object"
-PATH_SEND_NODE_HEARTBEAT: str = "api/v0/fleet/send-node-heartbeat"
+PATH_SEND_NODE_HEARTBEAT: str = "/api/v0/fleet/send-node-heartbeat"
 PATH_GET_RUN: str = "/api/v0/fleet/get-run"
 PATH_GET_FAB: str = "/api/v0/fleet/get-fab"
 PATH_CONFIRM_MESSAGE_RECEIVED: str = "/api/v0/fleet/confirm-message-received"
@@ -208,7 +209,7 @@ def http_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         # Send the request
         def post() -> requests.Response:
             return requests.post(
-                f"{base_url}/{api_path}",
+                f"{base_url}{api_path}",
                 data=req_bytes,
                 headers={
                     "Accept": "application/protobuf",

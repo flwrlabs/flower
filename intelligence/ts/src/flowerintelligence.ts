@@ -13,8 +13,10 @@
 // limitations under the License.
 // =============================================================================
 
+import { ALLOWED_ROLES, DEFAULT_MODEL } from './constants';
 import { Engine } from './engines/engine';
 import { RemoteEngine } from './engines/remoteEngine';
+import { isNode } from './env';
 import {
   ChatOptions,
   ChatResponseResult,
@@ -26,8 +28,6 @@ import {
   Progress,
   Result,
 } from './typing';
-import { ALLOWED_ROLES, DEFAULT_MODEL } from './constants';
-import { isNode } from './env';
 
 /**
  * Class representing the core intelligence service for Flower Labs.

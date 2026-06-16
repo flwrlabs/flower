@@ -15,9 +15,8 @@
 """Tests for `flwr run` command."""
 
 
-from contextlib import contextmanager
 from collections.abc import Iterator
-from pathlib import Path
+from contextlib import contextmanager
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -38,17 +37,15 @@ class TestRun(unittest.TestCase):
     @patch("flwr.cli.run.run.load_and_validate")
     @patch("flwr.cli.run.run.read_superlink_connection")
     @patch("flwr.cli.run.run.migrate")
-    @patch("flwr.cli.run.run.warn_if_federation_config_overrides")
     def test_run_options_only_connection_uses_control_api(
         self,
-        mock_warn: MagicMock,
         mock_migrate: MagicMock,
         mock_read_superlink: MagicMock,
         mock_load_and_validate: MagicMock,
         mock_run_with_control_api: MagicMock,
     ) -> None:
         """`flwr run` should use Control API even for options-only local profiles."""
-        del mock_warn, mock_migrate
+        del mock_migrate
         connection = SuperLinkConnection(
             name="local",
             options=SuperLinkSimulationOptions(num_supernodes=2),
@@ -57,7 +54,7 @@ class TestRun(unittest.TestCase):
         mock_load_and_validate.return_value = ({}, [])
 
         with patch("flwr.cli.run.run.cli_output_handler", _mock_cli_output_handler):
-            run(app=Path("."), superlink="local")
+            run(app=".", superlink="local")
 
         mock_run_with_control_api.assert_called_once()
         assert mock_run_with_control_api.call_args.args[3] == connection

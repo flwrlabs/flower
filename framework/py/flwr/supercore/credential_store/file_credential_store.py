@@ -16,6 +16,8 @@
 
 
 import base64
+import binascii
+import tempfile
 from pathlib import Path
 from typing import cast
 
@@ -40,19 +42,49 @@ class FileCredentialStore(CredentialStore):
         """
         self.file_path = file_path or CREDENTIAL_FILE_PATH
 
+    def _write_credentials_atomically(self, credentials: dict[str, str]) -> None:
+        """Write credentials atomically by replacing the target file."""
+        temp_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=self.file_path.parent,
+                delete=False,
+            ) as temp_file:
+                temp_path = Path(temp_file.name)
+                yaml.safe_dump(credentials, temp_file)
+            temp_path.replace(self.file_path)
+        except (OSError, yaml.YAMLError):
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
+            raise
+
     def _load_credentials(self) -> dict[str, str]:
         """Load credentials from file."""
-        if not self.file_path.exists():
-            return {}
-        with self.file_path.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-            return cast(dict[str, str], data) if data else {}
+        try:
+            with self.file_path.open("r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            if isinstance(data, dict):
+                return cast(dict[str, str], data)
+        except (OSError, yaml.YAMLError):
+            pass
+        self.file_path.unlink(missing_ok=True)
+        return {}
 
     def _save_credentials(self, credentials: dict[str, str]) -> None:
         """Save credentials to file."""
-        self.file_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.file_path.open("w", encoding="utf-8") as f:
-            yaml.safe_dump(credentials, f)
+        try:
+            self.file_path.parent.mkdir(parents=True, exist_ok=True)
+            self._write_credentials_atomically(credentials)
+        except (OSError, yaml.YAMLError):
+            # Best-effort recovery: replace with an empty store and avoid raising.
+            self.file_path.unlink(missing_ok=True)
+            try:
+                self.file_path.parent.mkdir(parents=True, exist_ok=True)
+                self._write_credentials_atomically({})
+            except (OSError, yaml.YAMLError):
+                pass
 
     def set(self, key: str, value: bytes) -> None:
         """Set a credential in the store."""
@@ -66,7 +98,11 @@ class FileCredentialStore(CredentialStore):
         encoded_value = credentials.get(key)
         if encoded_value is None:
             return None
-        return base64.b64decode(encoded_value)
+        try:
+            return base64.b64decode(encoded_value, validate=True)
+        except (binascii.Error, ValueError):
+            self.file_path.unlink(missing_ok=True)
+            return None
 
     def delete(self, key: str) -> None:
         """Delete a credential from the store."""

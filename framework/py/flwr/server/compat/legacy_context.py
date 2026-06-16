@@ -17,7 +17,7 @@
 
 from dataclasses import dataclass
 
-from flwr.common import Context
+from flwr.app import Context
 
 from ..client_manager import ClientManager, SimpleClientManager
 from ..history import History

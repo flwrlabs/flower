@@ -6,30 +6,27 @@
  Install development versions of Flower
 ****************************************
 
-Using Poetry (recommended)
-==========================
+Using uv (recommended)
+======================
 
-Install a ``flwr`` pre-release from PyPI: update the ``flwr`` dependency in
-``pyproject.toml`` and then reinstall (don't forget to delete ``poetry.lock`` (``rm
-poetry.lock``) before running ``poetry install``).
+Install a ``flwr`` pre-release from PyPI with ``uv add``, which updates
+``pyproject.toml`` and syncs the environment:
 
-- ``flwr = { version = "1.0.0a0", allow-prereleases = true }`` (without extras)
-- ``flwr = { version = "1.0.0a0", allow-prereleases = true, extras = ["simulation"] }``
-  (with extras)
+- ``uv add --prerelease=allow "flwr==1.0.0a0"`` (without extras)
+- ``uv add --prerelease=allow "flwr[simulation]==1.0.0a0"`` (with extras)
 
-Install ``flwr`` from a local copy of the Flower source code via ``pyproject.toml``:
+Install ``flwr`` from a local copy of the Flower source code:
 
-- ``flwr = { path = "../../", develop = true }`` (without extras)
-- ``flwr = { path = "../../", develop = true, extras = ["simulation"] }`` (with extras)
+- ``uv add --editable "../../"`` (without extras)
+- ``uv add --editable "../../" --extra simulation`` (with extras)
 
-Install ``flwr`` from a local wheel file via ``pyproject.toml``:
+Install ``flwr`` from a local wheel file:
 
-- ``flwr = { path = "../../dist/flwr-1.8.0-py3-none-any.whl" }`` (without extras)
-- ``flwr = { path = "../../dist/flwr-1.8.0-py3-none-any.whl", extras = ["simulation"]
-  }`` (with extras)
+- ``uv add "../../dist/flwr-1.8.0-py3-none-any.whl"`` (without extras)
+- ``uv add "../../dist/flwr-1.8.0-py3-none-any.whl" --extra simulation`` (with extras)
 
-Please refer to the Poetry documentation for further details: `Poetry Dependency
-Specification <https://python-poetry.org/docs/dependency-specification/>`_
+Please refer to the uv documentation for further details: `Managing dependencies with uv
+<https://docs.astral.sh/uv/concepts/projects/dependencies/>`_
 
 Using pip (recommended on Colab)
 ================================
@@ -44,38 +41,17 @@ commands to install the Flower directly from GitHub.
 
 Install ``flwr`` from the default GitHub branch (``main``):
 
-- ``pip install flwr@git+https://github.com/adap/flower.git#subdirectory=framework``
+- ``pip install flwr@git+https://github.com/flwrlabs/flower.git#subdirectory=framework``
   (without extras)
 - ``pip install
-  'flwr[simulation]@git+https://github.com/adap/flower.git#subdirectory=framework'``
+  'flwr[simulation]@git+https://github.com/flwrlabs/flower.git#subdirectory=framework'``
   (with extras)
 
 Install ``flwr`` from a specific GitHub branch (``branch-name``):
 
 - ``pip install
-  flwr@git+https://github.com/adap/flower.git@branch-name#subdirectory=framework``
+  flwr@git+https://github.com/flwrlabs/flower.git@branch-name#subdirectory=framework``
   (without extras)
 - ``pip install
-  'flwr[simulation]@git+https://github.com/adap/flower.git@branch-name#subdirectory=framework'``
+  'flwr[simulation]@git+https://github.com/flwrlabs/flower.git@branch-name#subdirectory=framework'``
   (with extras)
-
-****************************************
- Open Jupyter Notebooks on Google Colab
-****************************************
-
-Open the notebook ``examples/flower-in-30-minutes/tutorial.ipynb``:
-
-- https://colab.research.google.com/github/adap/flower/blob/main/examples/flower-in-30-minutes/tutorial.ipynb
-
-Open a development version of the same notebook from branch `branch-name` by changing
-``main`` to ``branch-name`` (right after ``blob``):
-
-- https://colab.research.google.com/github/adap/flower/blob/branch-name/examples/flower-in-30-minutes/tutorial.ipynb
-
-Install a `whl` on Google Colab:
-
-1. In the vertical icon grid on the left hand side, select ``Files`` > ``Upload to
-   session storage``
-2. Upload the whl (e.g., ``flwr-1.8.0-py3-none-any.whl``)
-3. Change ``!pip install -q 'flwr[simulation]' torch torchvision matplotlib`` to ``!pip
-   install -q 'flwr-1.8.0-py3-none-any.whl[simulation]' torch torchvision matplotlib``

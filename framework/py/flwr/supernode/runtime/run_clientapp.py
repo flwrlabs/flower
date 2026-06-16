@@ -15,32 +15,21 @@
 """Flower ClientApp process."""
 
 
-from logging import DEBUG, ERROR, INFO
+from logging import DEBUG, ERROR
 
 import grpc
 
+from flwr.app import Context, Message
 from flwr.app.error import Error
+from flwr.app.message import remove_content_from_message
 from flwr.cli.install import install_from_fab
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
-from flwr.common import Context, Message
-from flwr.common.config import get_flwr_dir
-from flwr.common.constant import ErrorCode
+from flwr.common.config import get_project_dir
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
-from flwr.common.inflatable import (
-    get_all_nested_objects,
-    get_object_tree,
-    no_object_id_recompute,
-)
-from flwr.common.inflatable_protobuf_utils import (
-    make_confirm_message_received_fn_protobuf,
-    make_pull_object_fn_protobuf,
-    make_push_object_fn_protobuf,
-)
-from flwr.common.inflatable_utils import pull_and_inflate_object_from_tree, push_objects
 from flwr.common.logger import log
-from flwr.common.message import remove_content_from_message
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.common.serde import (
     context_from_proto,
@@ -50,29 +39,51 @@ from flwr.common.serde import (
     run_from_proto,
 )
 from flwr.common.telemetry import EventType, event
-from flwr.common.typing import Fab, Run
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    PullAppInputsRequest,
-    PullAppInputsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
     PushAppMessagesRequest,
-    PushAppOutputsRequest,
-    PushAppOutputsResponse,
+    PushTaskOutputRequest,
 )
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
-from flwr.supercore.utils import mask_string
+from flwr.supercore.fab import Fab
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_tree,
+    no_object_id_recompute,
+)
+from flwr.supercore.inflatable.inflatable_protobuf_utils import (
+    make_confirm_message_received_fn_protobuf,
+    make_pull_object_fn_protobuf,
+    make_push_object_fn_protobuf,
+)
+from flwr.supercore.inflatable.inflatable_utils import (
+    pull_and_inflate_object_from_tree,
+    push_objects,
+)
+from flwr.supercore.interceptors import (
+    AppIoTokenClientInterceptor,
+    RuntimeVersionClientInterceptor,
+)
+from flwr.supercore.run import Run
+from flwr.supercore.superexec.dependency_installer import (
+    cleanup_app_runtime_environment,
+    install_app_dependencies,
+)
 
 
-def run_clientapp(  # pylint: disable=R0913, R0914, R0917
+def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     clientappio_api_address: str,
     token: str,
-    flwr_dir: str | None = None,
+    insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
+    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower ClientApp process."""
     # Monitor the main process in case of SIGKILL
@@ -83,57 +94,86 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
 
     channel = create_channel(
         server_address=clientappio_api_address,
-        insecure=(certificates is None),
+        insecure=insecure,
         root_certificates=certificates,
+        interceptors=[
+            RuntimeVersionClientInterceptor(component_name="flwr-clientapp"),
+            AppIoTokenClientInterceptor(token),
+        ],
     )
     channel.subscribe(on_channel_state_change)
-    heartbeat_sender = None
+    stub = ClientAppIoStub(channel)
+    retry_invoker = make_simple_grpc_retry_invoker()
+    wrap_stub(stub, retry_invoker)
 
-    def on_exit() -> None:
-        if heartbeat_sender is not None and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-        channel.close()
+    # Initialize variables for exit handler
+    heartbeat_sender = None
+    message = None
+    reply_message = None
+    context: Context | None = None
+    sub_status = SubStatus.FAILED
+    details = "ClientApp task failed due to unknown reason"
+    runtime_env_dir = None
+    exit_code = ExitCode.SUCCESS
 
     register_signal_handlers(
         event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
-        exit_handlers=[on_exit],
+        exit_message="Task stopped by user.",
     )
 
-    # Resolve directory where FABs are installed
-    flwr_dir_ = get_flwr_dir(flwr_dir)
     try:
-        stub = ClientAppIoStub(channel)
-        wrap_stub(stub, make_simple_grpc_retry_invoker())
-
-        # Start app heartbeat
-        heartbeat_sender = HeartbeatSender(make_app_heartbeat_fn_grpc(stub, token))
+        # Start task heartbeat
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
         heartbeat_sender.start()
 
-        # Pull Message, Context, Run and (optional) FAB from SuperNode
-        message, context, run, fab = pull_appinputs(stub=stub, token=token)
+        # Pull Message, Context, Run and FAB from SuperNode
+        message, context, run, fab = pull_task_input(stub)
 
         try:
 
-            # Install FAB, if provided
-            if fab:
-                log(DEBUG, "[flwr-clientapp] Start FAB installation.")
-                install_from_fab(fab.content, flwr_dir=flwr_dir_, skip_prompt=True)
+            # Install FAB
+            log(DEBUG, "[flwr-clientapp] Start FAB installation.")
+            install_from_fab(fab.content, skip_prompt=True)
+
+            app_path = get_project_dir(run.fab_id, run.fab_version, fab.hash_str)
+            if runtime_dependency_install:
+                log(DEBUG, "[flwr-clientapp] Installing app dependencies.")
+                runtime_env_dir = install_app_dependencies(
+                    app_path,
+                    launch_id=token,
+                    run_id=run.run_id,
+                    index_context={
+                        "component": "clientapp",
+                        "project_dir": str(app_path),
+                        "run_id": run.run_id,
+                        "launch_id": token,
+                        "fab_id": run.fab_id,
+                        "fab_version": run.fab_version,
+                        "fab_hash": fab.hash_str,
+                    },
+                )
+            else:
+                log(
+                    DEBUG,
+                    "[flwr-clientapp] Runtime dependency installation is disabled.",
+                )
 
             load_client_app_fn = get_load_client_app_fn(
                 default_app_ref="",
                 app_path=None,
                 multi_app=True,
-                flwr_dir=str(flwr_dir_),
             )
 
             # Load ClientApp
             log(DEBUG, "[flwr-clientapp] Start `ClientApp` Loading.")
             client_app: ClientApp = load_client_app_fn(
-                run.fab_id, run.fab_version, fab.hash_str if fab else ""
+                run.fab_id, run.fab_version, fab.hash_str
             )
 
             # Execute ClientApp
             reply_message = client_app(message=message, context=context)
+            sub_status = SubStatus.COMPLETED
+            details = ""
 
         except Exception as ex:  # pylint: disable=broad-exception-caught
             # Don't update/change NodeState
@@ -150,39 +190,54 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
 
             # Create error message
             reply_message = Message(Error(code=e_code, reason=reason), reply_to=message)
+            sub_status = SubStatus.FAILED
+            details = reason
 
-        # Push Message and Context to SuperNode
-        _ = push_appoutputs(
-            stub=stub, token=token, message=reply_message, context=context
-        )
+        finally:
+            # Push reply message to SuperNode
+            if reply_message:
+                push_message(stub, reply_message, context)
 
     except grpc.RpcError as e:
-        log(ERROR, "GRPC error occurred: %s", str(e))
+        log(ERROR, "gRPC error occurred: %s", str(e))
+        exit_code = ExitCode.CLIENTAPP_COMMUNICATION_ERROR
+    finally:
+        # Set Grpc max retries to 1 to avoid blocking on exit
+        retry_invoker.max_tries = 1
+
+        # Push final status and context (if available)
+        push_task_output(
+            stub=stub,
+            context=context,
+            sub_status=sub_status,
+            details=details,
+        )
+
+        # Stop heartbeat sender
+        if heartbeat_sender is not None and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+        channel.close()
+
+        cleanup_app_runtime_environment(runtime_env_dir)
 
     flwr_exit(
-        code=ExitCode.SUCCESS,
+        code=exit_code,
         event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
     )
 
 
-def pull_appinputs(
-    stub: ClientAppIoStub, token: str
-) -> tuple[Message, Context, Run, Fab | None]:
-    """Pull AppInputs from SuperNode."""
-    masked_token = mask_string(token)
-    log(INFO, "[flwr-clientapp] Pull `AppInputs` for token %s", masked_token)
+def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
+    """Pull TaskInput from SuperNode."""
     try:
-        # Pull Context, Run and (optional) FAB
-        res: PullAppInputsResponse = stub.PullAppInputs(
-            PullAppInputsRequest(token=token)
-        )
+        # Pull Context, Run and FAB
+        res: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
-        fab = fab_from_proto(res.fab) if res.fab else None
+        fab = fab_from_proto(res.fab)
 
         # Pull and inflate the message
         pull_msg_res: PullAppMessagesResponse = stub.PullMessage(
-            PullAppMessagesRequest(token=token)
+            PullAppMessagesRequest()
         )
         run_id = context.run_id
         node = Node(node_id=context.node_id)
@@ -201,59 +256,61 @@ def pull_appinputs(
         message.metadata.__dict__["_message_id"] = object_tree.object_id
         return message, context, run, fab
     except grpc.RpcError as e:
-        log(ERROR, "[PullAppInputs] gRPC error occurred: %s", str(e))
+        log(ERROR, "[PullTaskInput] gRPC error occurred: %s", str(e))
         raise e
 
 
-def push_appoutputs(
-    stub: ClientAppIoStub, token: str, message: Message, context: Context
-) -> PushAppOutputsResponse:
-    """Push AppOutputs to SuperNode."""
-    masked_token = mask_string(token)
-    log(INFO, "[flwr-clientapp] Push `AppOutputs` for token %s", masked_token)
+def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> None:
+    """Push reply message to SuperNode."""
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
     proto_message = message_to_proto(remove_content_from_message(message))
-    proto_context = context_to_proto(context)
 
-    try:
+    with no_object_id_recompute():
+        # Get object tree and all objects to push
+        object_tree = get_object_tree(message)
 
-        with no_object_id_recompute():
-            # Get object tree and all objects to push
-            object_tree = get_object_tree(message)
-
-            # Push Message
-            # This is temporary. The message should not contain its content
-            push_msg_res = stub.PushMessage(
-                PushAppMessagesRequest(
-                    token=token,
-                    messages_list=[proto_message],
-                    message_object_trees=[object_tree],
-                )
+        # Push Message
+        # This is temporary. The message should not contain its content
+        push_msg_res = stub.PushMessage(
+            PushAppMessagesRequest(
+                messages_list=[proto_message], message_object_trees=[object_tree]
             )
-            del proto_message
-
-            # Retrieve the object IDs to push
-            object_ids_to_push = set(push_msg_res.objects_to_push)
-
-            # Push all objects
-            all_objects = get_all_nested_objects(message)
-            del message
-            push_objects(
-                all_objects,
-                make_push_object_fn_protobuf(
-                    stub.PushObject,
-                    Node(node_id=context.node_id),
-                    run_id=context.run_id,
-                ),
-                object_ids_to_push=object_ids_to_push,
-            )
-
-        # Push Context
-        res: PushAppOutputsResponse = stub.PushAppOutputs(
-            PushAppOutputsRequest(token=token, context=proto_context)
         )
-        return res
-    except grpc.RpcError as e:
-        log(ERROR, "[PushAppOutputs] gRPC error occurred: %s", str(e))
-        raise e
+        del proto_message
+
+        # Retrieve the object IDs to push
+        object_ids_to_push = set(push_msg_res.objects_to_push)
+
+        # Push all objects
+        all_objects = get_all_nested_objects(message)
+        del message
+        push_objects(
+            all_objects,
+            make_push_object_fn_protobuf(
+                stub.PushObject,
+                Node(node_id=context.node_id),
+                run_id=context.run_id,
+            ),
+            object_ids_to_push=object_ids_to_push,
+        )
+
+
+def push_task_output(  # pylint: disable=R0913, R0917
+    stub: ClientAppIoStub,
+    context: Context | None,
+    sub_status: str,
+    details: str,
+) -> None:
+    """Push TaskOutput to SuperNode."""
+    try:
+        # Push Context and final status
+        stub.PushTaskOutput(
+            PushTaskOutputRequest(
+                context=context_to_proto(context) if context else None,
+                sub_status=sub_status,
+                details=details,
+            )
+        )
+    except grpc.RpcError as err:
+        log(ERROR, "Failed to push task output: %s", str(err))

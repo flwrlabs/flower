@@ -6,12 +6,18 @@ on:
       - main
     paths:
       - "datasets/**"
+      - "dev/devtool/**"
+      - "dev/pyproject.toml"
+      - "dev/uv.lock"
       - ".github/workflows/datasets-*.yml"
   pull_request:
     branches:
       - main
     paths:
       - "datasets/**"
+      - "dev/devtool/**"
+      - "dev/pyproject.toml"
+      - "dev/uv.lock"
       - ".github/workflows/datasets-*.yml"
 
 concurrency:
@@ -20,6 +26,8 @@ concurrency:
 
 env:
   FLWR_TELEMETRY_ENABLED: 0
+  UV_NO_MANAGED_PYTHON: 1
+  UV_PYTHON_DOWNLOADS: never
 
 jobs:
   test_core:
@@ -30,7 +38,7 @@ jobs:
         # Latest version which comes cached in the host image can be found here:
         # https://github.com/actions/runner-images/blob/main/images/linux/Ubuntu2204-Readme.md#python
         # In case of a mismatch, the job has to download Python to install it.
-        python: ['3.10', '3.11', '3.12', '3.13']
+        python: ['3.11', '3.12', '3.13']
 
     name: Python ${{ matrix.python }}
 
@@ -56,10 +64,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-      - name: Install dependencies (mandatory only)
+      - name: Install dependencies
         run: |
           cd datasets
-          python -m poetry install --all-extras
+          uv sync --locked --all-extras
       - name: Cache Hugging Face datasets
         uses: actions/cache@v3
         with:
@@ -68,11 +76,14 @@ jobs:
           restore-keys: hf-datasets-
       - name: Set Hugging Face token
         run: |
+          cd datasets
           if [ -n "${{ secrets.HF_TOKEN }}" ]; then
             echo "Logging into Hugging Face..."
-            hf auth login --token ${{ secrets.HF_TOKEN }}
+            uv run --no-sync hf auth login --token ${{ secrets.HF_TOKEN }}
           else
             echo "Skipping Hugging Face login stage (HF_TOKEN not set)"
           fi
       - name: Test (formatting + unit tests)
-        run: ./datasets/dev/test.sh
+        run: |
+          cd datasets
+          uv run --no-sync ./dev/test.sh

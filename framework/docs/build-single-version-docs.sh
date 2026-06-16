@@ -1,4 +1,9 @@
 #!/bin/sh
+# Build Flower framework docs for a single docs version.
+# Usage: ./build-single-version-docs.sh [DOC_VERSION]
+# - Uses DOC_VERSION from environment, or from first positional argument.
+# - Builds English plus all languages found under `locales/`.
+# - Writes output to `build/html/${DOC_VERSION}/<language>/`.
 set -e
 
 if [ -n "$1" ]; then
@@ -13,8 +18,8 @@ fi
 # Move to the docs directory
 cd "$(git rev-parse --show-toplevel)/framework/docs"
 
-# Clean previous builds
-rm -rf build
+# Clean previous output for this version only
+rm -rf "build/html/${DOC_VERSION}"
 
 # Get a list of languages based on the folders in locales
 languages="en"

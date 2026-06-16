@@ -8,12 +8,12 @@ version = "1.0.0"
 description = "PyTorch Vertical FL with Flower"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.26.1",
+    "flwr[simulation]>=1.28.0",
     "flwr-datasets>=0.5.0",
     "pandas==2.3.3",
     "numpy>=1.26.0",
     "scikit-learn>=1.6.1",
-    "torch>=2.8.0",
+    "torch>=2.10.0",
 ]
 
 [tool.hatch.build.targets.wheel]
