@@ -28,7 +28,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
-from flwr.supercore.model_message import ModelRequest, ModelResponse
+from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 
