@@ -17,13 +17,15 @@
 
 import abc
 from collections.abc import Sequence
+from typing import Literal
 
+from flwr.app import Context, Message, RecordDict
 from flwr.app.user_config import UserConfig
-from flwr.common import Context, Message
-from flwr.common.record import ConfigRecord
-from flwr.common.typing import Run, RunStatus
+from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
+from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
 
 
@@ -134,6 +136,14 @@ class LinkState(CoreState):  # pylint: disable=R0904
     @abc.abstractmethod
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
+
+    @abc.abstractmethod
+    def stop_run(self, run_id: int) -> bool:
+        """Stop a run and clean up run-scoped messages and objects.
+
+        Returns True if at least one unfinished task in the run transitioned to
+        stopped, otherwise False.
+        """
 
     @abc.abstractmethod
     def create_node(
@@ -254,28 +264,35 @@ class LinkState(CoreState):  # pylint: disable=R0904
         fab_hash: str | None,
         override_config: UserConfig,
         federation: str,
-        federation_options: ConfigRecord,
+        federation_config: SimulationConfig | None,
         flwr_aid: str | None,
+        run_type: str,
+        series_id: int | None = None,
     ) -> int:
         """Create a new run.
 
         Parameters
         ----------
-        fab_id : Optional[str]
+        fab_id : str | None
             The ID of the FAB, of format `<publisher>/<app-name>`.
-        fab_version : Optional[str]
+        fab_version : str | None
             The version of the FAB.
-        fab_hash : Optional[str]
+        fab_hash : str | None
             The SHA256 hex hash of the FAB.
         override_config : UserConfig
             Configuration overrides for the run config.
         federation : str
             The federation this run belongs to.
-        federation_options : ConfigRecord
-            Federation configurations. For now, only `num-supernodes` for
-            the simulation runtime.
-        flwr_aid : Optional[str]
+        federation_config : SimulationConfig | None
+            Optional resolved federation configuration for the run.
+        flwr_aid : str | None
             Flower Account ID of the creator.
+        run_type : str
+            The type of run being created.
+        series_id : int | None (default: None)
+            Optional run series ID. If `None`, a new run series is created for
+            the federation. If set, the series must already exist and belong to
+            the federation.
 
         Returns
         -------
@@ -289,26 +306,49 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def get_run_ids(self, flwr_aid: str | None) -> set[int]:
-        """Retrieve all run IDs if `flwr_aid` is not specified.
+    def get_run_info(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        flwr_aids: Sequence[str] | None = None,
+        federations: Sequence[str] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+    ) -> Sequence[Run]:
+        """Retrieve information about runs based on the specified filters.
 
-        Otherwise, retrieve all run IDs for the specified `flwr_aid`.
-        """
-
-    @abc.abstractmethod
-    def get_run(self, run_id: int) -> Run | None:
-        """Retrieve information about the run with the specified `run_id`.
+        - If a filter is set to None, it is ignored.
+        - If multiple filters are provided, they are combined using AND logic.
+        - Within each filter, provided values are combined using OR logic.
 
         Parameters
         ----------
-        run_id : int
-            The identifier of the run.
+        run_ids : Optional[Sequence[int]] (default: None)
+            Sequence of run IDs to filter by.
+        statuses : Optional[Sequence[str]] (default: None)
+            Sequence of run status values to filter by.
+        flwr_aids : Optional[Sequence[str]] (default: None)
+            Sequence of Flower Account IDs to filter by.
+        federations : Optional[Sequence[str]] (default: None)
+            Sequence of federation names to filter by.
+        order_by : Optional[Literal["pending_at"]] (default: None)
+            Field used to order the result.
+        ascending : bool (default: True)
+            Whether sorting should be in ascending order.
+        limit : Optional[int] (default: None)
+            Maximum number of runs to return. If `None`, no limit is applied.
 
         Returns
         -------
-        Optional[Run]
-            The `Run` instance if found; otherwise, `None`.
+        Sequence[Run]
+            A sequence of Run objects representing runs matching the specified filters.
         """
+
+    @abc.abstractmethod
+    def get_federation_config(self, run_id: int) -> SimulationConfig | None:
+        """Get the resolved federation configuration for the specified `run_id`."""
 
     @abc.abstractmethod
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:
@@ -328,49 +368,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         -----
         Only valid run IDs that exist in the State will be included in the returned
         dictionary. If a run ID is not found, it will be omitted from the result.
-        """
-
-    @abc.abstractmethod
-    def update_run_status(self, run_id: int, new_status: RunStatus) -> bool:
-        """Update the status of the run with the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run.
-        new_status : RunStatus
-            The new status to be assigned to the run.
-
-        Returns
-        -------
-        bool
-            True if the status update is successful; False otherwise.
-        """
-
-    @abc.abstractmethod
-    def get_pending_run_id(self) -> int | None:
-        """Get the `run_id` of a run with `Status.PENDING` status.
-
-        Returns
-        -------
-        Optional[int]
-            The `run_id` of a `Run` that is pending to be started; None if
-            there is no Run pending.
-        """
-
-    @abc.abstractmethod
-    def get_federation_options(self, run_id: int) -> ConfigRecord | None:
-        """Retrieve the federation options for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run.
-
-        Returns
-        -------
-        Optional[ConfigRecord]
-            The federation options for the run if it exists; None otherwise.
         """
 
     @abc.abstractmethod
@@ -397,69 +394,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         -------
         is_acknowledged : bool
             True if the heartbeat is successfully acknowledged; otherwise, False.
-        """
-
-    @abc.abstractmethod
-    def get_serverapp_context(self, run_id: int) -> Context | None:
-        """Get the context for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to retrieve the context.
-
-        Returns
-        -------
-        Optional[Context]
-            The context associated with the specified `run_id`, or `None` if no context
-            exists for the given `run_id`.
-        """
-
-    @abc.abstractmethod
-    def set_serverapp_context(self, run_id: int, context: Context) -> None:
-        """Set the context for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to set the context.
-        context : Context
-            The context to be associated with the specified `run_id`.
-        """
-
-    @abc.abstractmethod
-    def add_serverapp_log(self, run_id: int, log_message: str) -> None:
-        """Add a log entry to the ServerApp logs for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to add a log entry.
-        log_message : str
-            The log entry to be added to the ServerApp logs.
-        """
-
-    @abc.abstractmethod
-    def get_serverapp_log(
-        self, run_id: int, after_timestamp: float | None
-    ) -> tuple[str, float]:
-        """Get the ServerApp logs for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to retrieve the ServerApp logs.
-
-        after_timestamp : Optional[float]
-            Retrieve logs after this timestamp. If set to `None`, retrieve all logs.
-
-        Returns
-        -------
-        tuple[str, float]
-            A tuple containing:
-            - The ServerApp logs associated with the specified `run_id`.
-            - The timestamp of the latest log entry in the returned logs.
-              Returns `0` if no logs are returned.
         """
 
     @abc.abstractmethod
@@ -493,3 +427,21 @@ class LinkState(CoreState):  # pylint: disable=R0904
         runtime : float
             The runtime in seconds to add to the `run_id`'s cumulative total.
         """
+
+    def _refresh_run_series_context(
+        self,
+        run_id: int,
+        series_id: int,
+    ) -> None:
+        """Initialize or refresh the Context for a run series."""
+        context = Context(
+            run_id=run_id,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={},
+            state=RecordDict(),
+            run_config={},
+            series_id=series_id,
+        )
+        if existing_context := self.get_run_series_context(series_id):
+            context.state = existing_context.state
+        self.set_run_series_context(series_id=series_id, context=context)

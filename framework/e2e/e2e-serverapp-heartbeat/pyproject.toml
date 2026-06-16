@@ -25,12 +25,13 @@ clientapp = "e2e_serverapp_heartbeat.client_app:app"
 [tool.flwr.app.config]
 
 [tool.flwr.federations]
-default = "local-simulation"
-
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 10
+default = "e2e"
 
 [tool.flwr.federations.e2e]
+address = "127.0.0.1:9093"
+insecure = true
+
+[tool.flwr.federations.e2e-sim]
 address = "127.0.0.1:9093"
 insecure = true
 options.num-supernodes = 1

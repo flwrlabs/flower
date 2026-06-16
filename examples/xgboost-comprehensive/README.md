@@ -8,7 +8,7 @@ framework: [xgboost]
 
 This example demonstrates a comprehensive federated learning setup using Flower with XGBoost.
 We use [HIGGS](https://archive.ics.uci.edu/dataset/280/higgs) dataset to perform a binary classification task. This examples uses [Flower Datasets](https://flower.ai/docs/datasets/) to retrieve, partition and preprocess the data for each Flower client.
-It differs from the [xgboost-quickstart](https://github.com/adap/flower/tree/main/examples/xgboost-quickstart) example in the following ways:
+It differs from the [xgboost-quickstart](https://github.com/flwrlabs/flower/tree/main/examples/xgboost-quickstart) example in the following ways:
 
 - Customised FL settings.
 - Customised partitioner type (uniform, linear, square, exponential).
@@ -48,7 +48,7 @@ The trained local XGBoost trees will be passed to the next client as an initiali
 Start by cloning the example project:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/xgboost-comprehensive . \
         && rm -rf _tmp \
         && cd xgboost-comprehensive
@@ -85,17 +85,17 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
-flwr run .
+flwr run . --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```bash
 # To run bagging aggregation for 5 rounds evaluated on centralised test set
-flwr run . --run-config "train-method='bagging' num-server-rounds=5 centralised-eval=true"
+flwr run . --run-config "train-method='bagging' num-server-rounds=5 centralised-eval=true" --stream
 
 # To run cyclic training with linear partitioner type evaluated on centralised test set:
-flwr run . --run-config "train-method='cyclic' partitioner-type='linear' centralised-eval-client=true"
+flwr run . --run-config "train-method='cyclic' partitioner-type='linear' centralised-eval-client=true" --stream
 ```
 
 ### Run with the Deployment Engine

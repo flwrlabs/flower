@@ -68,4 +68,4 @@ guide <https://docs.weblate.org/en/latest/user/translating.html>`_.
 
 If you want to add a new language, you will first have to contact us, either on `Slack
 <https://flower.ai/join-slack>`_, or by opening an issue on our `GitHub repo
-<https://github.com/adap/flower>`_.
+<https://github.com/flwrlabs/flower>`_.

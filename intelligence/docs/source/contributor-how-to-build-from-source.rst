@@ -20,14 +20,14 @@ You can install ``pnpm`` globally using npm. Open your terminal and run:
 
 .. code-block:: bash
 
-    npm install -g pnpm
+    npm install -g pnpm@10.25.0
 
 Alternatively, if you are using Corepack (bundled with recent Node.js versions), enable
 pnpm with:
 
 .. code-block:: bash
 
-    corepack enable pnpm
+    corepack prepare pnpm@10.25.0 --activate
 
 *********************
  Setting up the repo
@@ -40,7 +40,7 @@ navigate to it and run ``git pull``.
 
 .. code-block:: bash
 
-    git clone https://github.com/adap/flower.git
+    git clone https://github.com/flwrlabs/flower.git
     cd flower/
 
 **********************

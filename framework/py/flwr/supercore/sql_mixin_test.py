@@ -20,11 +20,15 @@ import unittest
 from sqlalchemy import Column, Integer, MetaData, Table
 from sqlalchemy.exc import IntegrityError
 
+from flwr.supercore.constant import SQL_ALLOWED_DIALECTS
+
 from .sql_mixin import SqlMixin
 
 
 class DummyDbSqlAlchemy(SqlMixin):
     """Simple subclass for testing SqlMixin behavior with SQLAlchemy."""
+
+    allowed_dialects = None  # type: ignore[assignment]
 
     def get_metadata(self) -> MetaData:
         """Return MetaData with test table definition."""
@@ -51,6 +55,12 @@ class DummyDbSqlAlchemy(SqlMixin):
             self.query("INSERT INTO test (value) VALUES (:value)", {"value": value})
             deleted = self.cleanup_negative_values()
         return deleted
+
+
+class SqliteOnlyDummyDb(DummyDbSqlAlchemy):
+    """SQLite-only SqlMixin subclass used for dialect allowlist tests."""
+
+    allowed_dialects = SQL_ALLOWED_DIALECTS
 
 
 class TestSqlMixin(unittest.TestCase):
@@ -244,3 +254,23 @@ class TestSqlMixin(unittest.TestCase):
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0]["value"], -1)  # Deletion was rolled back
         self.assertEqual(rows[1]["value"], 108)
+
+    def test_init_accepts_explicit_sqlalchemy_url(self) -> None:
+        """Explicit URLs should be preserved and dialect should be extracted."""
+        db = DummyDbSqlAlchemy("dummysql://localhost/flwr")
+        self.assertEqual(db.database_url, "dummysql://localhost/flwr")
+        self.assertEqual(db.database_backend, "dummysql")
+
+    def test_init_normalizes_file_path_to_sqlite_url(self) -> None:
+        """File paths should be normalized to SQLite URLs."""
+        db = DummyDbSqlAlchemy("state.db")
+        self.assertTrue(db.database_url.startswith("sqlite:///"))
+        self.assertEqual(db.database_backend, "sqlite")
+
+    def test_sqlite_allowlist_rejects_non_sqlite_url(self) -> None:
+        """SQLite-only classes should reject non-SQLite URLs."""
+        with self.assertRaisesRegex(
+            ValueError,
+            "Supported backends are in-memory and SQLite paths/URLs.",
+        ):
+            _ = SqliteOnlyDummyDb("dummysql://localhost/flwr")

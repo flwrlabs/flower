@@ -26,7 +26,7 @@ def test_rpc_completion() -> None:
     """Test if the GrpcAdapter servicer can handle all requests for Fleet API."""
     # Prepare
     all_method_names = (name for name in dir(FleetServicer) if name[0].isupper())
-    servicer = GrpcAdapterServicer(Mock(), Mock(), Mock(), Mock())
+    servicer = GrpcAdapterServicer(Mock(), Mock(), False)
 
     # Execute
     for method_name in all_method_names:

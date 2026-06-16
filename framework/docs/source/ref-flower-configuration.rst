@@ -13,6 +13,13 @@
     the `federations` section in the `pyproject.toml` file of Flower Apps in older
     versions.
 
+.. note::
+
+    From Flower 1.28.0 onwards, it isn't recommended to define Simulation Runtime
+    settings (i.e. fields starting with ``options.``) in the Flower Configuration. Check
+    the :doc:`Simulation Runtime documentation <how-to-run-simulations>` for the
+    recommended way to configure simulations.
+
 **What is it?**
 
 The Flower Configuration is a system for managing SuperLink connections, stored in a
@@ -28,7 +35,7 @@ you can reference by name when running ``flwr`` commands. For example, you can s
 configurations for local testing, staging servers, and production deployments, then
 easily switch between them.
 
-Most ``flwr`` commands (like ``flwr log``, ``flwr ls``, and ``flwr stop``) can use the
+Most ``flwr`` commands (like ``flwr log``, ``flwr list``, and ``flwr stop``) can use the
 Flower Configuration from anywhere on your system. The exception is ``flwr run``, which
 must be executed from within a Flower App directory to access the app code.
 
@@ -68,7 +75,7 @@ clearer naming.
     default = "local"
 
     [superlink.local]
-    options.num-supernodes = 10
+    address = ":local:"
 
     [superlink.local-poc]
     address = "127.0.0.1:9093"
@@ -79,14 +86,16 @@ clearer naming.
 - ``[superlink]`` section defines which connection configuration to use by default
 - ``default = "local"`` means the ``superlink.local`` configuration will be used when
   you don't specify a connection explicitly in your ``flwr`` commands
-- ``[superlink.local]`` defines a local simulation configuration with 10 virtual
-  SuperNodes
+- ``[superlink.local]`` defines a managed local SuperLink profile. The special address
+  value ``":local:"`` tells Flower to launch or reuse the background local SuperLink on
+  demand with its default on-disk state. The alternative value ``":local-in-memory:"``
+  starts the managed local SuperLink with an in-memory database instead. The SuperLink
+  will run simulations using the default configuration of the :doc:`Simulation Runtime
+  <how-to-run-simulations>`.
 - ``[superlink.local-poc]`` defines a configuration for connecting to a locally running
   SuperLink at address ``127.0.0.1:9093``
 
-Connection configuration names must be unique and use the ``superlink.`` prefix. The
-type of options you specify depends on whether you're configuring a simulation
-(``options.num-supernodes``) or a deployment (``address``, ``insecure``).
+Connection configuration names must be unique and use the ``superlink.`` prefix.
 
 **************************
  Listing your connections
@@ -120,33 +129,45 @@ testing before deploying to real distributed environments.
 .. code-block:: toml
 
     [superlink.local]
-    options.num-supernodes = 10
+    address = ":local:"
 
-This creates a simulation connection configuration with 10 virtual SuperNodes.
+This creates a managed local SuperLink profile using the default simulation
+configuration, which involves running 10 simulated SuperNodes through the simulation
+runtime. Check the :doc:`Simulation Runtime docs <how-to-run-simulations>` to learn how
+to customize the number of SuperNodes and resources (CPU/GPU) allocated to your
+simulations.
 
-**Simulation with custom resources**
+.. _flower-config-local-in-memory:
+
+**Simulation with in-memory local state**
 
 .. code-block:: toml
 
-    [superlink.local-custom-resources]
-    options.num-supernodes = 100
-    options.backend.client-resources.num-cpus = 1
-    options.backend.client-resources.num-gpus = 0.1
+    [superlink.local-in-memory]
+    address = ":local-in-memory:"
 
-This creates a simulation connection configuration with 100 virtual SuperNodes, where
-each is allocated 1 CPU and 10% of a GPU. This is useful when you want to control
-resource distribution or simulate resource-constrained environments.
+This creates a managed local SuperLink profile that keeps its database in memory instead
+of on disk. This can be useful on networked filesystems where SQLite locking or
+performance issues can occur. The tradeoff is that local run history and logs are lost
+when the managed local SuperLink is shut down.
 
 **When to use each**
 
-- Use the basic configuration for quick testing with default resource allocation
-- Use custom resources when you need to simulate specific hardware constraints or want
-  to control how many virtual SuperNodes can run in parallel based on your machine's
-  resources
+- Use the basic configuration for most local development and testing scenarios,
+  especially when you want to keep a history of your runs and logs on disk.
+- Use ``address = ":local-in-memory:"`` when the managed local SuperLink runs on a
+  filesystem where SQLite performs poorly, such as some network drives or HPC storage
 
 Learn more in the `How to Run Simulations
 <https://flower.ai/docs/framework/how-to-run-simulations.html>`_ guide about other
 optional parameters you can use to configure your local simulation.
+
+When you use a local simulation profile with ``address = ":local:"`` or ``address =
+":local-in-memory:"``, Flower CLI commands that communicate with SuperLink use the
+Control API. Flower starts a managed local SuperLink automatically when needed and
+reuses it across ``flwr run``, ``flwr list``, ``flwr log``, and ``flwr stop``. See
+:doc:`how-to-run-flower-locally` for the full local workflow, background process
+behavior, and runtime file locations.
 
 ***************************
  Remote Deployment Example
@@ -161,14 +182,14 @@ configure connections that point to a remote SuperLink.
 
     [superlink.remote-deployment]
     address = "<SUPERLINK-ADDRESS>:<PORT>"
-    root-certificate = "path/to/root/cert.pem"  # Optional, for TLS
+    root-certificates = "/absolute/path/to/root/cert.crt"  # Optional, for TLS
     # insecure = true  # Disable TLS (not recommended for production)
 
 **Explanation**
 
 - ``address`` (required): The address of the SuperLink Control API to connect to (e.g.,
   ``my-server.example.com:9093``).
-- ``root-certificate``: Path to the root certificate file for TLS encryption. This
+- ``root-certificates``: Path to the root certificate file for TLS encryption. This
   secures the communication between your CLI and the SuperLink. If omitted, Flower uses
   the default gRPC root certificate. This field is ignored if ``insecure`` is set to
   ``true``.
@@ -181,8 +202,8 @@ configure connections that point to a remote SuperLink.
 TLS encrypts the communication between your local machine and the remote SuperLink to
 prevent eavesdropping and tampering. In production, you should always use TLS by either:
 
-- Providing a ``root-certificate`` file (recommended for custom certificates)
-- Omitting both ``root-certificate`` and ``insecure`` to use default certificates
+- Providing a ``root-certificates`` file (recommended for custom certificates)
+- Omitting both ``root-certificates`` and ``insecure`` to use default certificates
 
 Only set ``insecure = true`` for local testing environments.
 

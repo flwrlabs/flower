@@ -1,0 +1,42 @@
+name: Framework Docs Dispatch to Release Branches
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - framework/docs/source/_static/docs-ui.js
+      - framework/docs/source/_static/custom.css
+      - framework/docs/source/conf_base.py
+      - framework/docs/source/_templates/**
+      - .github/workflows/framework-docs.yml
+      - .github/workflows/framework-docs-dispatch-release-branches.yml
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch-release-docs-builds:
+    if: ${{ github.repository == 'flwrlabs/flower' }}
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Dispatch framework-docs.yml to release branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+
+          # Strict mode: fail on errors, undefined vars, and pipeline failures
+          set -euo pipefail
+
+          # Fetch all branches and keep only release/framework-* ones
+          branches=$(gh api repos/flwrlabs/flower/branches \
+            --paginate \
+            --jq '.[].name' | grep '^release/framework-' || true)
+
+          # Dispatch docs workflow on each release branch
+          for branch in $branches; do
+            echo "Dispatching on $branch"
+            gh workflow run framework-docs.yml --repo flwrlabs/flower --ref "$branch"
+          done

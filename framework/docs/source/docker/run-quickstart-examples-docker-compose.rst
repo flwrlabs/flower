@@ -1,16 +1,16 @@
-:og:description: Beginner’s guide to running Flower quickstart examples with the Deployment Engine using Docker Compose, showcasing its powerful federated learning capabilities.
+:og:description: Beginner’s guide to running Flower quickstart examples with the Deployment Runtime using Docker Compose, showcasing its powerful federated learning capabilities.
 .. meta::
-    :description: Beginner’s guide to running Flower quickstart examples with the Deployment Engine using Docker Compose, showcasing its powerful federated learning capabilities.
+    :description: Beginner’s guide to running Flower quickstart examples with the Deployment Runtime using Docker Compose, showcasing its powerful federated learning capabilities.
 
 ####################################################
  Run Flower Quickstart Examples with Docker Compose
 ####################################################
 
 Flower provides a set of `quickstart examples
-<https://github.com/adap/flower/tree/main/examples>`_ to help you get started with the
-framework. These examples are designed to demonstrate the capabilities of Flower and by
-default run using the Simulation Engine. This guide demonstrates how to run them using
-Flower's Deployment Engine via Docker Compose.
+<https://github.com/flwrlabs/flower/tree/main/examples>`_ to help you get started with
+the framework. These examples are designed to demonstrate the capabilities of Flower and
+by default run using the Simulation Runtime. This guide demonstrates how to run them
+using Flower's Deployment Runtime via Docker Compose.
 
 .. important::
 
@@ -35,18 +35,18 @@ Before you start, make sure that:
 
    .. code-block:: bash
 
-       $ git clone --depth=1 https://github.com/adap/flower.git \
+       $ git clone --depth=1 https://github.com/flwrlabs/flower.git \
             && mv flower/examples/quickstart-pytorch . \
             && rm -rf flower && cd quickstart-pytorch
 
 2. Download the `compose.yml
-   <https://github.com/adap/flower/blob/main/framework/docker/complete/compose.yml>`_
+   <https://github.com/flwrlabs/flower/blob/main/framework/docker/complete/compose.yml>`_
    file into the example directory:
 
    .. code-block:: bash
        :substitutions:
 
-       $ curl https://raw.githubusercontent.com/adap/flower/refs/tags/v|stable_flwr_version|/framework/docker/complete/compose.yml \
+       $ curl https://raw.githubusercontent.com/flwrlabs/flower/refs/tags/v|stable_flwr_version|/framework/docker/complete/compose.yml \
            -o compose.yml
 
 3. Export the version of Flower that your environment uses. Then, build and start the

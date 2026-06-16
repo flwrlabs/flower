@@ -8,7 +8,7 @@ You can download the Flower project and integrate the package manually.
 
 ## Usage
 
-A comprehensive example is available in: [`examples/ios/`](https://github.com/adap/flower/tree/main/examples/ios). To give information about the usage structurally:
+A comprehensive example is available in: [`examples/ios/`](https://github.com/flwrlabs/flower/tree/main/examples/ios). To give information about the usage structurally:
 
 ```
 import flwr

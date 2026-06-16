@@ -16,6 +16,7 @@
 
 
 import os
+import re
 import sys
 import threading
 import time
@@ -23,16 +24,24 @@ from logging import ERROR, INFO
 from typing import Any, NoReturn
 
 from flwr.common import EventType, event
-from flwr.supercore.constant import FORCE_EXIT_TIMEOUT_SECONDS
+from flwr.supercore.constant import (
+    FORCE_EXIT_TIMEOUT_SECONDS,
+    TELEMETRY_TIMEOUT_SECONDS,
+)
 from flwr.supercore.version import package_version
 
 from ..logger import log
 from .exit_code import EXIT_CODE_HELP
 from .exit_handler import trigger_exit_handlers
 
-HELP_PAGE_URL = (
-    f"https://flower.ai/docs/framework/v{package_version}/en/ref-exit-codes/"
-)
+
+def _get_code_url(code: int) -> str:
+    """Get the help URL for a given exit code."""
+    if not (match := re.match(r"\d+\.\d+", package_version)):
+        doc_pth = f"ref-exit-codes/{code}.html"  # Fallback for non-standard versions
+    else:
+        doc_pth = f"{match.group(0)}/en/ref-exit-codes/{code}.html"
+    return f"https://flower.ai/docs/framework/{doc_pth}"
 
 
 def flwr_exit(
@@ -74,15 +83,15 @@ def flwr_exit(
 
     # Add help URL for non-successful/graceful exits
     if is_error:
-        help_url = f"{HELP_PAGE_URL}{code}.html"
-        exit_message += f"\n\nFor more information, visit: <{help_url}>"
+        exit_message += f"\n\nFor more information, visit: <{_get_code_url(code)}>"
 
     # Telemetry event
     event_type = event_type or _try_obtain_telemetry_event()
+    event_future = None
     if event_type:
         event_details = event_details or {}
         event_details["exit_code"] = code
-        event(event_type, event_details).result()
+        event_future = event(event_type, event_details)
 
     # Log the exit message
     log(log_level, exit_message)
@@ -97,6 +106,13 @@ def flwr_exit(
     # Trigger exit handlers
     trigger_exit_handlers()
 
+    # Wait for telemetry event to be sent before exiting
+    if event_future:
+        try:
+            event_future.result(timeout=TELEMETRY_TIMEOUT_SECONDS)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+
     # Exit
     sys.exit(sys_exit_code)
 
@@ -108,12 +124,16 @@ def _try_obtain_telemetry_event() -> EventType | None:
         return EventType.RUN_SUPERLINK_LEAVE
     if sys.argv[0].endswith("flower-supernode"):
         return EventType.RUN_SUPERNODE_LEAVE
+    if sys.argv[0].endswith("flwr-agentapp"):
+        return EventType.FLWR_AGENTAPP_RUN_LEAVE
+    if sys.argv[0].endswith("flwr-model"):
+        return EventType.FLWR_MODEL_RUN_LEAVE
+    if sys.argv[0].endswith("flwr-connector"):
+        return EventType.FLWR_CONNECTOR_RUN_LEAVE
     if sys.argv[0].endswith("flwr-serverapp"):
         return EventType.FLWR_SERVERAPP_RUN_LEAVE
     if sys.argv[0].endswith("flwr-clientapp"):
         return None  # Not yet implemented
     if sys.argv[0].endswith("flwr-simulation"):
         return EventType.FLWR_SIMULATION_RUN_LEAVE
-    if sys.argv[0].endswith("flower-simulation"):
-        return EventType.CLI_FLOWER_SIMULATION_LEAVE
     return None

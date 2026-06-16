@@ -26,6 +26,7 @@ from .address import parse_address, resolve_bind_address
         ("127.0.0.1:8080", ("127.0.0.1", 8080, False)),
         ("0.0.0.0:12", ("0.0.0.0", 12, False)),
         ("0.0.0.0:65535", ("0.0.0.0", 65535, False)),
+        ("0.0.0.0:0", ("0.0.0.0", 0, False)),
     ],
 )
 def test_ipv4_correct(address: str, expected: tuple[str, int, bool]) -> None:
@@ -44,7 +45,6 @@ def test_ipv4_correct(address: str, expected: tuple[str, int, bool]) -> None:
         "42.1.1.0:9988898",  # Port number out of range
         "0.0.0.0:-999999",  # Negative port number
         "0.0.0.0:-1",  # Negative port number
-        "0.0.0.0:0",  # Port number zero
         "0.0.0.0:65536",  # Port number out of range
     ],
 )
@@ -77,6 +77,10 @@ def test_ipv4_incorrect(address: str) -> None:
         ("[::]:123", ("::", 123, True)),
         ("[0:0:0:0:0:0:0:1]:80", ("0:0:0:0:0:0:0:1", 80, True)),
         ("[::1]:80", ("::1", 80, True)),
+        (
+            "[2001:db8:3333:4444:5555:6666:7777:8888]:0",
+            ("2001:db8:3333:4444:5555:6666:7777:8888", 0, True),
+        ),
     ],
 )
 def test_ipv6_correct(address: str, expected: tuple[str, int, bool]) -> None:
@@ -94,7 +98,6 @@ def test_ipv6_correct(address: str, expected: tuple[str, int, bool]) -> None:
         "[2001:db8:3333:4444:5555:6666:7777:8888]:9988898",  # Port number out of range
         "[2001:db8:3333:4444:5555:6666:7777:8888]:-9988898",  # Negative port number
         "[2001:db8:3333:4444:5555:6666:7777:8888]:-1",  # Negative port number
-        "[2001:db8:3333:4444:5555:6666:7777:8888]:0",  # Port number zero
         "[2001:db8:3333:4444:5555:6666:7777:8888]:65536",  # Port number out of range
     ],
 )

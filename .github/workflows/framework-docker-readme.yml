@@ -9,7 +9,7 @@ on:
 
 jobs:
     collect:
-      if: ${{ github.repository == 'adap/flower' }}
+      if: ${{ github.repository == 'flwrlabs/flower' }}
       name: Collect Docker READMEs
       runs-on: ubuntu-22.04
       timeout-minutes: 10
