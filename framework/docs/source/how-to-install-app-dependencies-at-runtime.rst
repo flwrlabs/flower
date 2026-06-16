@@ -20,7 +20,8 @@ installation.
     Automatic dependency installation is enabled by default in SuperLink for
     ``ServerApp`` processes, but disabled by default in SuperNode for ``ClientApp``
     processes. You may pass ``--disable-runtime-dependency-installation`` to your
-    SuperLink to disable dependency installation, and
+    SuperLink to disable dependency installation or set
+    ``FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1`` before starting it, and
     ``--allow-runtime-dependency-installation`` to enable it on SuperNodes.
 
 .. note::
