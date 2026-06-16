@@ -2,6 +2,7 @@
 
 import random
 
+import torch
 from datasets import Dataset, concatenate_datasets, load_from_disk
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import GroupedNaturalIdPartitioner
@@ -51,6 +52,20 @@ def load_data(
 def load_data_from_disk(data_path):
     """Load ddata from a partition explicitly saved to disk."""
     return load_from_disk(data_path)
+
+
+def _apply_torch_transform(batch):
+    """Convert encoded columns to torch tensors."""
+    if "data" in batch:
+        batch["data"] = torch.as_tensor(batch["data"], dtype=torch.float32)
+    if "targets" in batch:
+        batch["targets"] = torch.as_tensor(batch["targets"], dtype=torch.long)
+    return batch
+
+
+def with_torch_transform(dataset: Dataset) -> Dataset:
+    """Return a dataset that lazily converts encoded columns to torch tensors."""
+    return dataset.with_transform(_apply_torch_transform, columns=["data", "targets"])
 
 
 def get_encoding_fn(processor):
