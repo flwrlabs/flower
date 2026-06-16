@@ -114,7 +114,8 @@ def create_incluster_kubernetes_client() -> KubernetesClient:
             "credentials."
         ) from exc
 
-    return cast(KubernetesClient, cast(Any, kubernetes_client).CoreV1Api())
+    client: KubernetesClient = kubernetes_client.CoreV1API()  # type: ignore[attr-defined]
+    return client
 
 
 @dataclass
