@@ -106,7 +106,7 @@ def create_incluster_kubernetes_client() -> KubernetesClient:
         raise
 
     try:
-        cast(Any, kubernetes_config).load_incluster_config()
+        kubernetes_config.load_incluster_config()  # type: ignore[attr-defined]
     except Exception as exc:  # pylint: disable=broad-exception-caught
         raise RuntimeError(
             "Failed to load in-cluster Kubernetes configuration for the Kubernetes "
