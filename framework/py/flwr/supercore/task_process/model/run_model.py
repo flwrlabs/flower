@@ -47,7 +47,7 @@ from flwr.supercore.interceptors import (
 from .task import handle_task
 
 
-def run_model(
+def run_model(  # pylint: disable=too-many-locals
     serverappio_api_address: str,
     token: str,
     insecure: bool,
