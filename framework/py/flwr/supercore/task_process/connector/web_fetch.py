@@ -89,16 +89,15 @@ def invoke_web_fetch_provider(url: str) -> JSONObject:
             detail="Install the 'agent' extra to use the web fetch provider.",
         ) from exc
 
-    content = (
-        trafilatura.extract(
-            text,
-            url=final_url,
-            output_format="markdown",
-            include_comments=False,
-            include_tables=True,
-        )
-        or text
+    content = trafilatura.extract(
+        text,
+        url=final_url,
+        output_format="markdown",
+        include_comments=False,
+        include_tables=True,
     )
+    if content is None:
+        content = text
 
     return {
         "object": "web_fetch.response",
