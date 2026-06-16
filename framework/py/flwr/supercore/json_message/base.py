@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Base class for typed task-routed messages."""
+"""Base class for typed task-routed JSON messages."""
 
 from __future__ import annotations
 
@@ -25,14 +25,14 @@ from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.supercore.date import now
-from flwr.supercore.task_message.constant import DEFAULT_TASK_MESSAGE_TTL
-from flwr.supercore.typing import JSONObject, JSONValue
+from flwr.supercore.json_message.constant import DEFAULT_TASK_MESSAGE_TTL
+from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
 from .constant import TASK_MESSAGE_PAYLOAD_JSON_KEY, TASK_MESSAGE_PAYLOAD_RECORD_KEY
 
 
-class TaskMessage(Message, ABC):
+class JSONMessage(Message, ABC):
     """Task-routed message carrying one JSON object payload."""
 
     def __init__(
@@ -63,20 +63,8 @@ class TaskMessage(Message, ABC):
         return _payload_from_content(self.content)
 
     @classmethod
-    def _from_message(
-        cls,
-        message: Message,
-        *,
-        require_reply_to_message_id: bool = False,
-    ) -> Self:
+    def from_message(cls, message: Message) -> Self:
         """Parse a generic message into a typed task message."""
-        if message.metadata.message_type != MessageType.QUERY:
-            raise ValueError(
-                f"Expected message type {MessageType.QUERY}, "
-                f"got {message.metadata.message_type}."
-            )
-        if require_reply_to_message_id and not message.metadata.reply_to_message_id:
-            raise ValueError(f"{cls.__name__} requires reply_to_message_id.")
         if not message.has_content():
             raise ValueError("Expected a message with content.")
 
@@ -92,10 +80,9 @@ class TaskMessage(Message, ABC):
         """Validate this task message type's payload."""
 
     @staticmethod
-    def _set_optional(payload: JSONObject, field: str, value: JSONValue | None) -> None:
-        """Add an optional payload field only when the caller provided a value."""
-        if value is not None:
-            payload[field] = value
+    def _remove_none(payload: JSONObject) -> JSONObject:
+        """Return the payload without fields set to None."""
+        return {key: value for key, value in payload.items() if value is not None}
 
     @classmethod
     def _validate_non_empty_string(cls, payload: JSONObject, field: str) -> None:

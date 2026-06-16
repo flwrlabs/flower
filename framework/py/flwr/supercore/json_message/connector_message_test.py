@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Connector task message tests."""
+"""Connector JSON message tests."""
 
 
 import json
@@ -20,7 +20,7 @@ import json
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.supercore.corestate.utils_test import create_task_message
-from flwr.supercore.task_message.connector_message import (
+from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )

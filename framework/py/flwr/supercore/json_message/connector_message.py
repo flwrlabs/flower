@@ -17,13 +17,12 @@
 
 from __future__ import annotations
 
-from flwr.app.message import Message
-from flwr.supercore.task_message.base import TaskMessage
-from flwr.supercore.task_message.constant import DEFAULT_TASK_MESSAGE_TTL
+from flwr.supercore.json_message.base import JSONMessage
+from flwr.supercore.json_message.constant import DEFAULT_TASK_MESSAGE_TTL
 from flwr.supercore.typing import JSONObject, JSONValue
 
 
-class ConnectorRequest(TaskMessage):
+class ConnectorRequest(JSONMessage):
     """Task-routed connector request."""
 
     def __init__(
@@ -47,11 +46,6 @@ class ConnectorRequest(TaskMessage):
         )
 
     @classmethod
-    def from_message(cls, message: Message) -> ConnectorRequest:
-        """Parse a generic message into a connector request."""
-        return cls._from_message(message)
-
-    @classmethod
     def _validate_payload(cls, payload: JSONObject) -> None:
         """Validate the connector request payload shape."""
         cls._validate_non_empty_string(payload, "name")
@@ -62,7 +56,7 @@ class ConnectorRequest(TaskMessage):
             )
 
 
-class ConnectorResponse(TaskMessage):
+class ConnectorResponse(JSONMessage):
     """Task-routed connector response."""
 
     def __init__(
@@ -90,14 +84,6 @@ class ConnectorResponse(TaskMessage):
             payload=payload,
             reply_to_message_id=reply_to_message_id,
             ttl=ttl,
-        )
-
-    @classmethod
-    def from_message(cls, message: Message) -> ConnectorResponse:
-        """Parse a generic message into a connector response."""
-        return cls._from_message(
-            message,
-            require_reply_to_message_id=True,
         )
 
     @classmethod
