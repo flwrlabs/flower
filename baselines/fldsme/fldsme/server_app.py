@@ -132,9 +132,25 @@ class DSMEFedAvg(FedAvg):
             )
 
             if total_examples == 0:
-                # All clients energy-depleted: hold global model unchanged.
+                # All valid clients energy-depleted: hold global model unchanged.
                 # Models a DSME beacon interval with no successful transmissions.
+                # Log any error replies explicitly before returning so that
+                # failures are never silently swallowed by the depleted path.
                 n_valid = len(valid_replies)
+                if error_replies:
+                    from flwr.common.logger import log
+                    from logging import WARNING
+                    log(
+                        WARNING,
+                        "[Round %d] %d error reply/replies received alongside "
+                        "%d energy-depleted reply/replies. Logging failures "
+                        "before recording as all-depleted DSME round.",
+                        server_round,
+                        len(error_replies),
+                        n_valid,
+                    )
+                    for err_msg in error_replies:
+                        log(WARNING, "  Failed reply: %s", err_msg.error)
                 print(
                     f"\n[Round {server_round}] All {n_valid} valid clients "
                     "energy-depleted. Keeping current global model "
@@ -148,6 +164,7 @@ class DSMEFedAvg(FedAvg):
                     "active_clients":  0.0,
                     "skipped_clients": float(n_valid),
                     "total_sampled":   float(len(replies_list)),
+                    "error_replies":   float(len(error_replies)),
                 })
 
         return super().aggregate_train(server_round, iter(replies_list))
