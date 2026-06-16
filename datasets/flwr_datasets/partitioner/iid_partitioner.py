@@ -22,9 +22,9 @@ from flwr_datasets.partitioner.partitioner import Partitioner
 class IidPartitioner(Partitioner):
     """Partitioner creates IID partitions from a dataset.
 
-    By default, partitions are contiguous shards of the dataset to preserve historical
-    behavior. Set ``shuffle=True`` to shuffle the dataset once before sharding. This is
-    useful for local datasets sorted by class or another target column.
+    By default, partitions are contiguous shards of the dataset. Set ``shuffle=True``
+    to shuffle the dataset once before sharding. This is useful for local datasets
+    sorted by class or another target column.
 
     Parameters
     ----------

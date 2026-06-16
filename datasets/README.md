@@ -39,7 +39,7 @@ Thanks to using Hugging Face's `datasets` used under the hood, Flower Datasets i
 Create **custom partitioning schemes** or choose from the **implemented [partitioning schemes](https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.html#module-flwr_datasets.partitioner)**:
 
 * Partitioner (the abstract base class) `Partitioner`
-* IID partitioning `IidPartitioner(num_partitions, shuffle=False, seed=42)`
+* IID partitioning `IidPartitioner(num_partitions)`
 * Dirichlet partitioning `DirichletPartitioner(num_partitions, partition_by, alpha)`
 * Distribution partitioning `DistributionPartitioner(distribution_array, num_partitions, num_unique_labels_per_partition, partition_by, preassigned_num_samples_per_label, rescale)`
 * InnerDirichlet partitioning `InnerDirichletPartitioner(partition_sizes, partition_by, alpha)`
@@ -77,9 +77,5 @@ partition = fds.load_partition(0)
 
 centralized_data = fds.load_split("test")
 ```
-
-If a local dataset is sorted by label or another target column, use
-`IidPartitioner(num_partitions=100, shuffle=True, seed=42)` to shuffle the dataset
-once before sharding it.
 
 For more details, please refer to the specific how-to guides or tutorials. They showcase customization and more advanced features.
