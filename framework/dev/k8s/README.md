@@ -17,6 +17,12 @@ To reuse previously built images:
 ./framework/dev/k8s/test-real-launch-path.sh --skip-build
 ```
 
+To run the budget-1/two-task capacity and cleanup proof:
+
+```bash
+./framework/dev/k8s/test-real-launch-path.sh --capacity-cleanup-proof
+```
+
 The wrapper deletes the test namespace by default. To inspect resources after a
 run:
 
@@ -61,6 +67,10 @@ Evidence is written under the selected output directory:
 | `taskexecutor-secrets.redacted.json` | Redacted per-task Secret evidence with key names and byte lengths. |
 | `final-state.json` | Pre-cleanup resource counts and object summaries for the run selectors. |
 | `proof-checklist.json` | Reviewer-facing map from claims to artifact fields, with out-of-scope claims. |
+| `objects/capacity-blocked-pods.json` | Capacity-proof snapshot of the first active TaskExecutor Pod. |
+| `objects/secrets-before-cleanup.redacted.json` | Capacity-proof redacted Secret snapshot before executor cleanup. |
+| `objects/cleanup-pods.json` | Capacity-proof TaskExecutor Pod state after capacity opens. |
+| `objects/secrets-after-cleanup.redacted.json` | Capacity-proof redacted Secret snapshot after executor cleanup. |
 | `objects/real-launch.yaml` | Rendered SuperLink, executor config, and SuperExec objects. |
 | `objects/seed-job.yaml` | Rendered seed ConfigMap and Job. |
 | `objects/pods.json` | Observed TaskExecutor Pod list and phases. |
@@ -144,6 +154,17 @@ map in machine-readable form.
    counts, a `Succeeded` phase, and a successful cleanup command when cleanup
    was required.
 
+For `--capacity-cleanup-proof`, additionally confirm:
+
+1. `objects/executor-config.yaml` sets `active-pod-budget: 1`.
+2. `summary.json` lists two `seed_run_ids`.
+3. `events.jsonl` has a passing `capacity.wait_observed` event.
+4. `summary.json` has `cleanup_observed.observed: true` with removed Pod and
+   Secret names for the first task.
+5. `objects/cleanup-pods.json` and
+   `objects/secrets-after-cleanup.redacted.json` show the post-wait selector
+   state before broad namespace cleanup.
+
 ## What Is Tested
 
 | Area | Tested | Notes |
@@ -156,16 +177,15 @@ map in machine-readable form.
 | TaskExecutor Pod creation | Yes | Polls for a Pod matching the run selector before failing. |
 | TaskExecutor terminal phase | Yes | Waits for observed TaskExecutor Pods to reach `Succeeded`. |
 | ServerApp execution marker | Yes | Verifies `K8s launch probe ServerApp ran` in TaskExecutor logs. |
+| Capacity wait | Optional | `--capacity-cleanup-proof` seeds two runs with active Pod budget `1` and requires SuperExec wait evidence. |
+| Sweeper cleanup | Optional | `--capacity-cleanup-proof` requires the first completed TaskExecutor Pod and Secret to be removed before namespace cleanup. |
 | Wrapper cleanup | Yes | Default wrapper behavior deletes the namespace and verifies cleanup evidence. |
 
 ## Out Of Scope
 
 | Area | Tested | Notes |
 | --- | --- | --- |
-| Capacity waiting | No | No capacity queue or resource-pool wait behavior is asserted. |
-| Sweeper cleanup | No | No reconciler or orphan cleanup loop is validated. |
-| Executor-owned Pod deletion | No | Namespace cleanup removes resources; executor deletion behavior is not proven. |
-| Executor-owned Secret deletion | No | Secret RBAC is checked, but per-task Secret lifecycle is not asserted. |
+| Cardinality proof | No | The capacity proof uses budget `1` and two tasks; budget `2`/three-task cardinality is a later slice. |
 | AppIo result completion semantics | No | This slice observes launch and Pod success, not full result semantics. |
 | ClientApp execution | No | The probe includes a minimal ClientApp file only because the FAB schema expects it. |
 | TLS, CNI/NetworkPolicy, production RBAC | No | This is local/dev-only and uses insecure local AppIo. |

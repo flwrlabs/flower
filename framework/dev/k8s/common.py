@@ -22,7 +22,7 @@ import re
 import shlex
 import subprocess
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
@@ -158,6 +158,11 @@ class HarnessProfile:  # pylint: disable=too-many-instance-attributes
     executor_config_name: str = "flower-local-k8s-executor-config"
     appio_api_port: int = 9091
     control_api_port: int = 9093
+    active_pod_budget: int | None = None
+    capacity_poll_interval: float | None = None
+    capacity_log_interval: float | None = None
+    seed_run_count: int = 1
+    probe_hold_seconds: float = 0.0
 
     def to_mapping(self) -> dict[str, object]:
         """Return the profile as a JSON/YAML-ready mapping."""
@@ -171,6 +176,12 @@ class HarnessProfile:  # pylint: disable=too-many-instance-attributes
         }
         if self.executor_config_path is not None:
             executor_config["path"] = self.executor_config_path
+        if self.active_pod_budget is not None:
+            executor_config["active-pod-budget"] = self.active_pod_budget
+        if self.capacity_poll_interval is not None:
+            executor_config["capacity-poll-interval"] = self.capacity_poll_interval
+        if self.capacity_log_interval is not None:
+            executor_config["capacity-log-interval"] = self.capacity_log_interval
         return {
             "schema-version": SCHEMA_VERSION,
             "name": self.name,
@@ -197,6 +208,8 @@ class HarnessProfile:  # pylint: disable=too-many-instance-attributes
                 "superlink-name": self.superlink_name,
                 "superexec-name": self.superexec_name,
                 "seed-job-name": self.seed_job_name,
+                "seed-run-count": self.seed_run_count,
+                "probe-hold-seconds": self.probe_hold_seconds,
                 "appio-api-port": self.appio_api_port,
                 "control-api-port": self.control_api_port,
             },
@@ -314,6 +327,28 @@ def generic_k3d_profile() -> HarnessProfile:
             "flower.ai/harness": "local-k8s-launch-path",
             "flower.ai/profile": "generic-k3d",
         },
+    )
+
+
+def capacity_cleanup_profile(profile: HarnessProfile) -> HarnessProfile:
+    """Return profile defaults for the local capacity and cleanup proof."""
+    return replace(
+        profile,
+        active_pod_budget=(
+            profile.active_pod_budget if profile.active_pod_budget is not None else 1
+        ),
+        capacity_poll_interval=(
+            profile.capacity_poll_interval
+            if profile.capacity_poll_interval is not None
+            else 1.0
+        ),
+        capacity_log_interval=(
+            profile.capacity_log_interval
+            if profile.capacity_log_interval is not None
+            else 1.0
+        ),
+        seed_run_count=max(profile.seed_run_count, 2),
+        probe_hold_seconds=max(profile.probe_hold_seconds, 5.0),
     )
 
 

@@ -35,6 +35,9 @@ python_image="${PYTHON_IMAGE:-}"
 kubernetes_package="${KUBERNETES_PACKAGE:-}"
 build_images=true
 cleanup=true
+capacity_cleanup_proof=false
+seed_run_count="${SEED_RUN_COUNT:-1}"
+probe_hold_seconds="${PROBE_HOLD_SECONDS:-0.0}"
 
 usage() {
   cat <<EOF
@@ -59,6 +62,12 @@ Options:
   --cluster-name NAME       k3d cluster name (default: ${cluster_name})
   --namespace NAME          Kubernetes namespace (default: ${namespace})
   --timeout-seconds SECS    Harness wait timeout (default: ${timeout_seconds})
+  --capacity-cleanup-proof  Run the budget-1/two-task capacity and cleanup proof
+                            instead of the one-task launch-path proof
+  --seed-run-count COUNT    Deterministic ServerApp runs to seed
+                            (default: ${seed_run_count})
+  --probe-hold-seconds SECS Seconds each probe ServerApp should stay active
+                            (default: ${probe_hold_seconds})
   --platform PLATFORM       Optional docker build platform, for example linux/arm64
   --python-image IMAGE      Optional Python base image passed to the image builder
   --kubernetes-package SPEC Optional Kubernetes package spec passed to the image
@@ -130,6 +139,26 @@ while [[ "$#" -gt 0 ]]; do
       timeout_seconds="$2"
       shift 2
       ;;
+    --capacity-cleanup-proof)
+      capacity_cleanup_proof=true
+      if [[ "${seed_run_count}" == "1" ]]; then
+        seed_run_count="2"
+      fi
+      if [[ "${probe_hold_seconds}" == "0.0" ]]; then
+        probe_hold_seconds="5.0"
+      fi
+      shift
+      ;;
+    --seed-run-count)
+      require_value "$1" "${2:-}"
+      seed_run_count="$2"
+      shift 2
+      ;;
+    --probe-hold-seconds)
+      require_value "$1" "${2:-}"
+      probe_hold_seconds="$2"
+      shift 2
+      ;;
     --platform)
       require_value "$1" "${2:-}"
       platform="$2"
@@ -175,6 +204,7 @@ echo "Namespace: ${namespace}"
 echo "Evidence: ${output_dir}"
 echo "SuperLink image: ${superlink_image}"
 echo "SuperExec/TaskExecutor image: ${superexec_image}"
+echo "Capacity cleanup proof: ${capacity_cleanup_proof}"
 echo
 
 if [[ "${build_images}" == true ]]; then
@@ -213,8 +243,18 @@ harness_args=(
   --superlink-image "${superlink_image}"
   --superexec-image "${superexec_image}"
   --timeout-seconds "${timeout_seconds}"
+  --seed-run-count "${seed_run_count}"
+  --probe-hold-seconds "${probe_hold_seconds}"
 )
 verify_args=("${output_dir}")
+
+if [[ "${capacity_cleanup_proof}" == true ]]; then
+  harness_args[1]="capacity-cleanup-proof"
+  harness_args+=(--active-pod-budget "1")
+  harness_args+=(--capacity-poll-interval "1.0")
+  harness_args+=(--capacity-log-interval "1.0")
+  verify_args+=(--expected-result "local-k8s-capacity-cleanup-proof")
+fi
 
 if [[ "${cleanup}" == true ]]; then
   harness_args+=(--cleanup)

@@ -77,13 +77,20 @@ def render_kubernetes_executor_config(
     """Render the trusted root-mapping config consumed by SuperExec."""
     labels = dict(profile.labels)
     labels["flower.ai/harness-run"] = run_id
-    return {
+    config: dict[str, object] = {
         "namespace": profile.namespace,
         "image": profile.image,
         "image-pull-policy": profile.image_pull_policy,
         "resource-pool": profile.resource_pool,
         "labels": labels,
     }
+    if profile.active_pod_budget is not None:
+        config["active-pod-budget"] = profile.active_pod_budget
+    if profile.capacity_poll_interval is not None:
+        config["capacity-poll-interval"] = profile.capacity_poll_interval
+    if profile.capacity_log_interval is not None:
+        config["capacity-log-interval"] = profile.capacity_log_interval
+    return config
 
 
 def render_real_launch_manifests(
@@ -140,6 +147,8 @@ def render_appio_seed_manifests(
             "runtime_image_pull_policy": profile.runtime_image_pull_policy,
             "control_address": f"{profile.superlink_name}:{profile.control_api_port}",
             "local_k8s_root": _LOCAL_K8S_ROOT,
+            "seed_run_count": str(profile.seed_run_count),
+            "probe_hold_seconds": str(profile.probe_hold_seconds),
         },
     )
     seed_config, seed_job = manifests

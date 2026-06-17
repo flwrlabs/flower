@@ -12,11 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+"""Probe ServerApp used by the local k8s launch-path harness."""
+
+import time
+
 import flwr as fl
 
 app = fl.serverapp.ServerApp()
+_PROBE_HOLD_SECONDS_CONFIG_KEY = "local-k8s.probe-hold-seconds"
 
 
 @app.main()
 def main(grid, context):
+    """Run the probe ServerApp and optionally stay active for capacity tests."""
     print("K8s launch probe ServerApp ran")
+    hold_seconds = context.run_config.get(_PROBE_HOLD_SECONDS_CONFIG_KEY, 0.0)
+    if isinstance(hold_seconds, (float, int)) and hold_seconds > 0:
+        time.sleep(float(hold_seconds))

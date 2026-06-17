@@ -27,6 +27,10 @@ spec:
             - ${local_k8s_root}/seed_run.py
             - --control-api-address
             - ${control_address}
+            - --run-count
+            - "${seed_run_count}"
+            - --probe-hold-seconds
+            - "${probe_hold_seconds}"
           volumeMounts:
             - name: seed-assets
               mountPath: ${local_k8s_root}
