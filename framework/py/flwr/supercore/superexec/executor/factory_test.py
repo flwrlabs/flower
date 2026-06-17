@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for SuperExec executor factory."""
 
-# pylint: disable=protected-access
 
 from pathlib import Path
 from unittest.mock import Mock
@@ -61,8 +60,8 @@ def test_get_executor_builds_kubernetes_executor_from_config(
     )
 
     assert isinstance(executor, KubernetesExecutor)
-    assert executor._client is client
-    config = executor._config
+    assert executor._client is client  # pylint: disable=protected-access
+    config = executor._config  # pylint: disable=protected-access
     assert config.namespace == "flower-system"
     assert config.image == "ghcr.io/flwrlabs/taskexecutor:dev"
     assert config.image_pull_policy == "IfNotPresent"
