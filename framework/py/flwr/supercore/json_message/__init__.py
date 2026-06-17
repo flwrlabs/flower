@@ -12,17 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Executor factory for SuperExec TaskExecutor processes."""
-
-from flwr.supercore.constant import ExecutorType
-
-from .subprocess_executor import SubprocessExecutor
-from .types import Executor
-
-
-def get_executor(executor_type: ExecutorType) -> Executor:
-    """Return the executor for the configured executor type."""
-    if executor_type == ExecutorType.SUBPROCESS:
-        return SubprocessExecutor()
-
-    raise ValueError(f"Unsupported executor selection: {executor_type}")
+"""SuperCore task-routed JSON messages."""

@@ -17,10 +17,12 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from logging import ERROR
 from threading import Lock, RLock
 
 from flwr.app import Error, Message
 from flwr.common.constant import ErrorCode
+from flwr.common.logger import log
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
@@ -210,9 +212,12 @@ class InMemoryNodeState(
         """Record the end time of message processing based on the message ID."""
         with self.lock_time_store:
             if message_id not in self.time_store:
-                raise ValueError(
-                    f"Cannot record end time: Message ID {message_id} not found."
+                log(
+                    ERROR,
+                    "Cannot record end time: Message ID %s not found.",
+                    message_id,
                 )
+                return
             entry = self.time_store[message_id]
             entry.finished_at = now().timestamp()
 
@@ -222,13 +227,21 @@ class InMemoryNodeState(
         self._cleanup_old_message_times()
         with self.lock_time_store:
             if message_id not in self.time_store:
-                raise ValueError(f"Message ID {message_id} not found.")
+                log(
+                    ERROR,
+                    "Cannot get processing duration: Message ID %s not found.",
+                    message_id,
+                )
+                return 0.0
 
             entry = self.time_store[message_id]
             if entry.starting_at is None or entry.finished_at is None:
-                raise ValueError(
-                    f"Start time or end time for message ID {message_id} is missing."
+                log(
+                    ERROR,
+                    "Start time or end time for message ID %s is missing.",
+                    message_id,
                 )
+                return 0.0
 
             duration = entry.finished_at - entry.starting_at
             return duration

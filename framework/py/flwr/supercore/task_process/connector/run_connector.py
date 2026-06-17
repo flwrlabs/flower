@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower model task process."""
+"""Flower connector task process."""
 
 
 from __future__ import annotations
@@ -47,15 +47,14 @@ from flwr.supercore.interceptors import (
 from .task import handle_task
 
 
-def run_model(  # pylint: disable=too-many-locals
+def run_connector(  # pylint: disable=too-many-locals
     serverappio_api_address: str,
     token: str,
     insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
 ) -> None:
-    """Run Flower model task process."""
-    # Monitor the main process in case of SIGKILL
+    """Run Flower connector task process."""
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
 
@@ -66,27 +65,24 @@ def run_model(  # pylint: disable=too-many-locals
         certificates=certificates,
     )
 
-    # Initialize variables for exit handler
     heartbeat_sender = None
     sub_status = SubStatus.FAILED
-    details = "Model task failed with unknown error."
+    details = "Connector task failed with unknown error."
     exit_code = ExitCode.SUCCESS
 
     register_signal_handlers(
-        event_type=EventType.FLWR_MODEL_RUN_LEAVE,
-        exit_message="Run stopped by user.",
+        event_type=EventType.FLWR_CONNECTOR_RUN_LEAVE,
+        exit_message="Task stopped by user.",
     )
 
     try:
-        # Set up heartbeat sender
         heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
         heartbeat_sender.start()
 
-        # Pull task input from SuperLink
-        log(DEBUG, "[flwr-model] Pull task input")
+        log(DEBUG, "[flwr-connector] Pull task input")
         task_input: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
 
-        event(EventType.FLWR_MODEL_RUN_ENTER)
+        event(EventType.FLWR_CONNECTOR_RUN_ENTER)
 
         handle_task(
             stub=stub,
@@ -94,27 +90,22 @@ def run_model(  # pylint: disable=too-many-locals
             run_id=task_input.run.run_id,
         )
 
-        # Update sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED
         details = ""
 
     except Exception as ex:  # pylint: disable=broad-exception-caught
-        log(ERROR, "`flwr-model` failed", exc_info=ex)
+        log(ERROR, "`flwr-connector` failed", exc_info=ex)
 
-        # Update sub_status and details based on the exception
         sub_status = SubStatus.FAILED
-        details = f"Model task failed with exception: {str(ex)}"
+        details = f"Connector task failed with exception: {str(ex)}"
 
-        # Set exit code
         exit_code = ExitCode.TASK_PROC_EXCEPTION
 
     finally:
-        log(DEBUG, "[flwr-model] Will push Model task output")
+        log(DEBUG, "[flwr-connector] Will push Connector task output")
 
-        # Set Grpc max retries to 1 to avoid blocking on exit
         retry_invoker.max_tries = 1
 
-        # Push final status
         pushoutput_req = PushTaskOutputRequest(
             sub_status=sub_status,
             details=details,
@@ -124,14 +115,12 @@ def run_model(  # pylint: disable=too-many-locals
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
 
-        # Stop heartbeat sender
         if heartbeat_sender and heartbeat_sender.is_running:
             heartbeat_sender.stop()
 
-        # Close the Grpc connection
         channel.close()
 
-    flwr_exit(exit_code, event_type=EventType.FLWR_MODEL_RUN_LEAVE)
+    flwr_exit(exit_code, event_type=EventType.FLWR_CONNECTOR_RUN_LEAVE)
 
 
 def _create_serverappio_stub(
@@ -141,13 +130,13 @@ def _create_serverappio_stub(
     insecure: bool,
     certificates: bytes | None,
 ) -> tuple[grpc.Channel, ServerAppIoStub, RetryInvoker]:
-    """Create a ServerAppIo stub authenticated as the model task."""
+    """Create a ServerAppIo stub authenticated as the connector task."""
     channel = create_channel(
         server_address=serverappio_api_address,
         insecure=insecure,
         root_certificates=certificates,
         interceptors=[
-            RuntimeVersionClientInterceptor(component_name="flwr-model"),
+            RuntimeVersionClientInterceptor(component_name="flwr-connector"),
             AppIoTokenClientInterceptor(token),
         ],
     )

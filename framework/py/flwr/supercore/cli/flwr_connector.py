@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""`flwr-model` command."""
+"""`flwr-connector` command."""
 
 
 import argparse
@@ -21,22 +21,23 @@ from logging import DEBUG, INFO
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
 from flwr.common.logger import log, restore_output
-from flwr.supercore.task_process import run_model
+from flwr.supercore.task_process import run_connector
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 
-def flwr_model() -> None:
-    """Run process-isolated Flower model task."""
-    args = _parse_args_run_flwr_model().parse_args()
+def flwr_connector() -> None:
+    """Run process-isolated Flower connector task."""
+    args = _parse_args_run_flwr_connector().parse_args()
     token = try_obtain_flwr_app_token(args)
 
-    log(INFO, "Start `flwr-model` process")
+    log(INFO, "Start `flwr-connector` process")
     log(
         DEBUG,
-        "`flwr-model` will attempt to connect to SuperLink's ServerAppIo API at %s",
+        "`flwr-connector` will attempt to connect to SuperLink's "
+        "ServerAppIo API at %s",
         args.serverappio_api_address,
     )
-    run_model(
+    run_connector(
         serverappio_api_address=args.serverappio_api_address,
         token=token,
         insecure=args.insecure,
@@ -46,14 +47,13 @@ def flwr_model() -> None:
         parent_pid=args.parent_pid,
     )
 
-    # Restore stdout/stderr
     restore_output()
 
 
-def _parse_args_run_flwr_model() -> argparse.ArgumentParser:
-    """Parse `flwr-model` command line arguments."""
+def _parse_args_run_flwr_connector() -> argparse.ArgumentParser:
+    """Parse `flwr-connector` command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Run a Flower model task",
+        description="Run a Flower connector task",
     )
     parser.add_argument(
         "--serverappio-api-address",
