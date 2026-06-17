@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the F7a Kubernetes executor harness contract scaffold."""
+"""Tests for the local k8s launch-path harness."""
 
 from __future__ import annotations
 
@@ -30,9 +30,7 @@ import yaml
 
 def _load_harness_module() -> ModuleType:
     """Load the dev harness scaffold from its file path."""
-    harness_path = (
-        Path(__file__).resolve().parents[5] / "dev" / ("kubernetes_executor_harness.py")
-    )
+    harness_path = Path(__file__).resolve().parents[5] / "dev" / "k8s" / "harness.py"
     spec = importlib.util.spec_from_file_location(
         "kubernetes_executor_harness", harness_path
     )
@@ -44,7 +42,24 @@ def _load_harness_module() -> ModuleType:
     return module
 
 
+def _load_verifier_module() -> ModuleType:
+    """Load the dev harness verifier from its file path."""
+    verifier_path = (
+        Path(__file__).resolve().parents[5] / "dev" / "k8s" / "verify_evidence.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "verify_kubernetes_executor_harness", verifier_path
+    )
+    if spec is None or spec.loader is None:
+        raise AssertionError("Could not load Kubernetes executor verifier module")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 harness_module = _load_harness_module()
+verifier_module = _load_verifier_module()
 
 
 def test_run_contract_scaffold_writes_bundle_to_selected_output_dir(
@@ -84,8 +99,8 @@ def test_run_contract_scaffold_writes_bundle_to_selected_output_dir(
 
     config = yaml.safe_load((output_dir / "sanitized-config.yaml").read_text())
     assert config["name"] == "generic-k3d"
-    assert config["executor-config"]["namespace"] == "flower-f7"
-    assert config["executor-config"]["image"] == "ghcr.io/flwrlabs/taskexecutor:dev"
+    assert config["executor-config"]["namespace"] == "flower-local-k8s"
+    assert config["executor-config"]["image"] == "flwr/superexec:dev"
 
 
 def test_writer_redacts_events_summary_yaml_and_text(tmp_path: Path) -> None:
@@ -115,7 +130,7 @@ def test_writer_redacts_events_summary_yaml_and_text(tmp_path: Path) -> None:
             profile_name="generic-k3d",
             output_dir=str(tmp_path),
             started_at="2026-06-15T00:00:00Z",
-            namespace="flower-f7",
+            namespace="flower-local-k8s",
             resource_pool="generic-k3d",
             details={"task_token": "task-token"},
         )
@@ -219,7 +234,7 @@ def test_main_writes_json_summary(
 
 
 def test_render_superexec_rbac_manifests_scope_pods_and_secrets() -> None:
-    """Test F7b RBAC manifests grant only Pod and Secret access."""
+    """Test local k8s infra proof RBAC manifests grant only Pod and Secret access."""
     profile = harness_module.generic_k3d_profile()
 
     manifests = harness_module.render_superexec_rbac_manifests(profile)
@@ -238,7 +253,7 @@ def test_render_superexec_rbac_manifests_scope_pods_and_secrets() -> None:
         {
             "apiGroups": [""],
             "resources": ["pods", "secrets"],
-            "verbs": ["get", "list", "watch", "create", "delete"],
+            "verbs": ["get", "list", "create", "delete"],
         }
     ]
     assert "*" not in rules[0]["resources"]
@@ -247,7 +262,7 @@ def test_render_superexec_rbac_manifests_scope_pods_and_secrets() -> None:
         {
             "kind": "ServiceAccount",
             "name": "flower-superexec",
-            "namespace": "flower-f7",
+            "namespace": "flower-local-k8s",
         }
     ]
 
@@ -272,9 +287,11 @@ def test_tls_material_contract_records_fingerprint_without_pem(tmp_path: Path) -
     assert "root-ca" not in tls_text
 
 
-def test_run_infra_proof_dry_run_writes_f7b_evidence(tmp_path: Path) -> None:
-    """Test F7b dry-run writes infra, TLS, RBAC, and command evidence."""
-    output_dir = tmp_path / "f7b"
+def test_run_infra_proof_dry_run_writes_local_k8s_infra_evidence(
+    tmp_path: Path,
+) -> None:
+    """Test infra dry-run writes TLS, RBAC, and command evidence."""
+    output_dir = tmp_path / "k8s-infra"
 
     summary = harness_module.run_infra_proof(
         output_dir,
@@ -318,20 +335,22 @@ def test_run_infra_proof_dry_run_writes_f7b_evidence(tmp_path: Path) -> None:
     assert "host command execution" in summary_record["not_validated"]
 
     commands_text = (output_dir / "diagnostics" / "commands.txt").read_text()
-    assert "DRY-RUN $ k3d cluster list flower-f7" in commands_text
-    assert "DRY-RUN $ k3d cluster create flower-f7 --wait" in commands_text
-    assert "kubectl --context k3d-flower-f7 apply -f" in commands_text
-    assert "auth can-i create pods" in commands_text
+    assert "DRY-RUN $ k3d cluster list flower-local-k8s" in commands_text
+    assert "DRY-RUN $ k3d cluster create flower-local-k8s --wait" in commands_text
+    assert "kubectl --context k3d-flower-local-k8s apply -f" in commands_text
+    assert "auth can-i delete pods" in commands_text
+    assert "auth can-i get secrets" in commands_text
+    assert "auth can-i create pods --subresource=exec" in commands_text
 
 
 def test_run_infra_proof_fails_when_negative_rbac_check_allows_too_much(
     tmp_path: Path,
 ) -> None:
-    """Test F7b records a failure when broader RBAC access is allowed."""
+    """Test broader-than-expected RBAC access is recorded as a failure."""
     runner = _AllowEverythingRunner()
 
     summary = harness_module.run_infra_proof(
-        tmp_path / "f7b",
+        tmp_path / "k8s-infra",
         runner=runner,
         execute=True,
         apply_manifests=True,
@@ -339,7 +358,7 @@ def test_run_infra_proof_fails_when_negative_rbac_check_allows_too_much(
 
     assert summary.status == "failed"
     assert any("cannot-create-deployments" in item for item in summary.failures)
-    events = _read_jsonl(tmp_path / "f7b" / "events.jsonl")
+    events = _read_jsonl(tmp_path / "k8s-infra" / "events.jsonl")
     assert events[6]["event"] == "rbac.negative_check"
     assert events[6]["status"] == "failed"
 
@@ -347,7 +366,7 @@ def test_run_infra_proof_fails_when_negative_rbac_check_allows_too_much(
 def test_main_writes_infra_proof_json_summary(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Test the CLI can write F7b dry-run evidence explicitly."""
+    """Test the CLI can write local k8s infra proof dry-run evidence explicitly."""
     output_dir = tmp_path / "from-main"
 
     exit_code = harness_module.main(
@@ -371,6 +390,360 @@ def test_main_writes_infra_proof_json_summary(
     assert (output_dir / "objects" / "rbac.yaml").is_file()
 
 
+def test_render_real_launch_manifests_use_superexec_kubernetes_executor() -> None:
+    """Test launch manifests run real SuperExec with the Kubernetes executor."""
+    profile = harness_module.generic_k3d_profile()
+
+    manifests = harness_module.render_real_launch_manifests(profile, "k8s-launch-test")
+
+    assert [manifest["kind"] for manifest in manifests] == [
+        "Service",
+        "Pod",
+        "ConfigMap",
+        "Pod",
+    ]
+    superlink_service, superlink_pod, executor_config, superexec_pod = manifests
+    assert superlink_service["metadata"]["name"] == "flower-superlink"
+    assert [port["name"] for port in superlink_service["spec"]["ports"]] == [
+        "serverappio",
+        "control",
+    ]
+    assert (
+        superlink_pod["metadata"]["labels"]["flower.ai/harness-run"]
+        == "k8s-launch-test"
+    )
+    assert superlink_pod["spec"]["automountServiceAccountToken"] is False
+    assert superlink_pod["spec"]["containers"][0]["args"] == [
+        "--insecure",
+        "--isolation",
+        "process",
+        "--serverappio-api-address",
+        "0.0.0.0:9091",
+        "--control-api-address",
+        "0.0.0.0:9093",
+    ]
+
+    config_yaml = executor_config["data"]["executor-config.yaml"]
+    config = yaml.safe_load(config_yaml)
+    assert config["namespace"] == "flower-local-k8s"
+    assert config["image"] == "flwr/superexec:dev"
+    assert config["labels"]["flower.ai/harness-run"] == "k8s-launch-test"
+
+    assert superexec_pod["spec"]["serviceAccountName"] == "flower-superexec"
+    superexec_container = superexec_pod["spec"]["containers"][0]
+    assert superexec_container["args"] == [
+        "--insecure",
+        "--appio-api-address",
+        "flower-superlink:9091",
+        "--plugin-type",
+        "serverapp",
+        "--executor",
+        "kubernetes",
+        "--executor-config",
+        "/etc/flower/executor-config.yaml",
+    ]
+
+
+def test_render_appio_seed_manifests_create_control_api_job() -> None:
+    """Test seed manifests create one Control API StartRun Job."""
+    profile = harness_module.generic_k3d_profile()
+
+    manifests = harness_module.render_appio_seed_manifests(profile, "k8s-launch-test")
+
+    assert [manifest["kind"] for manifest in manifests] == ["ConfigMap", "Job"]
+    seed_config, seed_job = manifests
+    seed_script = seed_config["data"]["seed_run.py"]
+    assert sorted(seed_config["data"]) == [
+        "launch_probe_client_app.py",
+        "launch_probe_init.py",
+        "launch_probe_server_app.py",
+        "probe_pyproject.toml",
+        "seed_run.py",
+    ]
+    assert "StartRunRequest" in seed_script
+    assert "build_fab_from_disk(_PROBE_APP_DIR)" in seed_script
+    assert "K8s launch seed created run_id=" in seed_script
+    assert "launch_probe.server_app:app" in seed_config["data"]["probe_pyproject.toml"]
+    assert (
+        "K8s launch probe ServerApp ran"
+        in seed_config["data"]["launch_probe_server_app.py"]
+    )
+    container = seed_job["spec"]["template"]["spec"]["containers"][0]
+    assert container["command"] == ["python"]
+    assert container["args"] == [
+        "/opt/flower-local-k8s/seed_run.py",
+        "--control-api-address",
+        "flower-superlink:9093",
+    ]
+    assert container["volumeMounts"] == [
+        {
+            "name": "seed-assets",
+            "mountPath": "/opt/flower-local-k8s",
+            "readOnly": True,
+        }
+    ]
+    items = seed_job["spec"]["template"]["spec"]["volumes"][0]["configMap"]["items"]
+    assert [item["path"] for item in items] == [
+        "seed_run.py",
+        "probe_app/pyproject.toml",
+        "probe_app/launch_probe/__init__.py",
+        "probe_app/launch_probe/server_app.py",
+        "probe_app/launch_probe/client_app.py",
+    ]
+    assert seed_job["spec"]["template"]["spec"]["automountServiceAccountToken"] is False
+
+
+def test_rendered_local_k8s_outputs_do_not_use_sprint_identifiers() -> None:
+    """Test rendered launch objects do not expose sprint-local identifiers."""
+    profile = harness_module.generic_k3d_profile()
+
+    rendered = yaml.safe_dump(
+        {
+            "profile": profile.to_mapping(),
+            "runtime": harness_module.render_real_launch_manifests(
+                profile, "k8s-launch-test"
+            ),
+            "seed": harness_module.render_appio_seed_manifests(
+                profile, "k8s-launch-test"
+            ),
+        }
+    )
+
+    forbidden_identifiers = (
+        "F" + "7",
+        "f" + "7c",
+        "flower-" + "f" + "7",
+        "f" + "7_probe",
+        "F" + "7 probe",
+    )
+    for forbidden in forbidden_identifiers:
+        assert forbidden not in rendered
+
+
+def test_run_local_k8s_launch_path_dry_run_writes_evidence(tmp_path: Path) -> None:
+    """Test dry-run writes launch manifests, events, and commands."""
+    output_dir = tmp_path / "k8s-launch"
+
+    summary = harness_module.run_local_k8s_launch_path(
+        output_dir,
+        create_cluster=True,
+        apply_manifests=True,
+    )
+
+    assert summary.status == "passed"
+    assert summary.result == "local-k8s-launch-path-dry-run"
+    assert summary.event_count == 15
+    assert (output_dir / "objects" / "real-launch.yaml").is_file()
+    assert (output_dir / "objects" / "seed-job.yaml").is_file()
+    assert (output_dir / "objects" / "executor-config.yaml").is_file()
+
+    events = _read_jsonl(output_dir / "events.jsonl")
+    assert [event["event"] for event in events] == [
+        "harness.start",
+        "profile.loaded",
+        "cluster.detected",
+        "namespace.ready",
+        "tls.material.ready",
+        "rbac.applied",
+        "rbac.negative_check",
+        "superlink.pod.ready",
+        "superexec.pod.ready",
+        "appio.seeded",
+        "superexec.claim_observed",
+        "kubernetes_executor.pod_created",
+        "taskexecutor.pod_phase",
+        "taskexecutor.appio_connectivity",
+        "harness.result",
+    ]
+    assert events[7]["status"] == "planned"
+    assert events[9]["status"] == "planned"
+    assert events[11]["status"] == "planned"
+    assert events[13]["status"] == "not_validated"
+
+    commands_text = (output_dir / "diagnostics" / "commands.txt").read_text()
+    assert "kubectl --context k3d-flower-local-k8s apply -f" in commands_text
+    assert "docker image inspect flwr/superlink:dev flwr/superexec:dev" in commands_text
+    assert "delete pod flower-superlink flower-superexec" in commands_text
+    assert "wait --for=condition=Ready pod/flower-superlink" in commands_text
+    assert "wait --for=condition=Ready pod/flower-superexec" in commands_text
+    assert "delete job flower-local-k8s-seed-run" in commands_text
+    assert (
+        "wait --for=condition=Complete job/flower-local-k8s-seed-run" in commands_text
+    )
+    assert "app.kubernetes.io/component=taskexecutor" in commands_text
+    assert (output_dir / "diagnostics" / "image-preflight.txt").is_file()
+    assert (output_dir / "diagnostics" / "cleanup.txt").is_file()
+    assert (output_dir / "diagnostics" / "taskexecutor-logs.txt").is_file()
+    cleanup_text = (output_dir / "diagnostics" / "cleanup.txt").read_text()
+    assert "Cleanup requested for this run: no" in cleanup_text
+    assert "One-command wrapper default: pass --cleanup" in cleanup_text
+
+
+def test_run_local_k8s_launch_path_records_terminal_pod_logs_and_cleanup(
+    tmp_path: Path,
+) -> None:
+    """Test execute-mode evidence captures terminal Pod state and logs."""
+    runner = _RealLaunchRunner()
+    output_dir = tmp_path / "k8s-launch-real"
+
+    summary = harness_module.run_local_k8s_launch_path(
+        output_dir,
+        runner=runner,
+        execute=True,
+        apply_manifests=True,
+        import_images=True,
+        cleanup=True,
+    )
+
+    assert summary.status == "passed"
+    assert summary.result == "local-k8s-launch-path"
+    assert summary.details["seed_run_id"] == 123
+    assert summary.details["pods"][0]["phase"] == "Succeeded"
+    assert summary.details["cleanup"]["requested"] is True
+    assert summary.details["cleanup"]["result"]["returncode"] == 0
+    cleanup_text = (output_dir / "diagnostics" / "cleanup.txt").read_text()
+    assert "Cleanup requested for this run: yes" in cleanup_text
+
+    pods = json.loads((output_dir / "objects" / "pods.json").read_text())
+    assert pods["phases"] == ["Succeeded"]
+
+    taskexecutor_logs = (
+        output_dir / "diagnostics" / "taskexecutor-logs.txt"
+    ).read_text()
+    assert "K8s launch probe ServerApp ran" in taskexecutor_logs
+
+    commands = [" ".join(command) for command in runner.commands]
+    assert any(command.startswith("docker image inspect ") for command in commands)
+    assert any(command.startswith("k3d image import ") for command in commands)
+    assert any(
+        "delete pod flower-superlink flower-superexec" in command
+        for command in commands
+    )
+    assert any(
+        "wait --for=jsonpath={.status.phase}=Succeeded pod/flwr-taskexecutor-123-abc"
+        in command
+        for command in commands
+    )
+    assert any(
+        "delete job flower-local-k8s-seed-run" in command for command in commands
+    )
+    assert any("logs pod/flwr-taskexecutor-123-abc" in command for command in commands)
+    assert any("delete namespace flower-local-k8s" in command for command in commands)
+
+
+def test_run_local_k8s_launch_path_polls_until_taskexecutor_pod_appears(
+    tmp_path: Path,
+) -> None:
+    """Test delayed TaskExecutor Pod creation is polled before phase wait."""
+    runner = _RealLaunchRunner(empty_pod_gets=2)
+    output_dir = tmp_path / "k8s-launch-real"
+    original_interval = (
+        harness_module.real_launch._TASKEXECUTOR_POD_POLL_INTERVAL_SECONDS
+    )
+    harness_module.real_launch._TASKEXECUTOR_POD_POLL_INTERVAL_SECONDS = 0.0
+    try:
+        summary = harness_module.run_local_k8s_launch_path(
+            output_dir,
+            runner=runner,
+            execute=True,
+            apply_manifests=True,
+        )
+    finally:
+        harness_module.real_launch._TASKEXECUTOR_POD_POLL_INTERVAL_SECONDS = (
+            original_interval
+        )
+
+    assert summary.status == "passed"
+    assert summary.details["pods"][0]["phase"] == "Succeeded"
+    assert runner.pod_get_count == 4
+
+    events = _read_jsonl(output_dir / "events.jsonl")
+    pod_created = next(
+        event for event in events if event["event"] == "kubernetes_executor.pod_created"
+    )
+    assert pod_created["status"] == "passed"
+    attempts = pod_created["details"]["data"]["creation_attempts"]
+    assert len(attempts) == 3
+
+
+def test_run_local_k8s_launch_path_fails_when_taskexecutor_is_not_succeeded(
+    tmp_path: Path,
+) -> None:
+    """Test execute-mode fails if the terminal Pod phase is not Succeeded."""
+    runner = _RealLaunchRunner(terminal_phase="Running")
+    output_dir = tmp_path / "k8s-launch-real"
+
+    summary = harness_module.run_local_k8s_launch_path(
+        output_dir,
+        runner=runner,
+        execute=True,
+        apply_manifests=True,
+    )
+
+    assert summary.status == "failed"
+    assert any("did not reach Succeeded phase" in item for item in summary.failures)
+
+    events = _read_jsonl(output_dir / "events.jsonl")
+    phase_event = next(
+        event for event in events if event["event"] == "taskexecutor.pod_phase"
+    )
+    assert phase_event["status"] == "failed"
+
+
+def test_main_writes_local_k8s_launch_path_json_summary(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """Test the CLI can write launch dry-run evidence explicitly."""
+    output_dir = tmp_path / "from-main"
+
+    exit_code = harness_module.main(
+        [
+            "--mode",
+            "local-k8s-launch-path",
+            "--output-dir",
+            str(output_dir),
+            "--namespace",
+            "flower-dev",
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    summary = json.loads(captured.out)
+    assert exit_code == 0
+    assert summary["status"] == "passed"
+    assert summary["result"] == "local-k8s-launch-path-dry-run"
+    assert summary["namespace"] == "flower-dev"
+    assert (output_dir / "objects" / "real-launch.yaml").is_file()
+
+
+def test_verify_local_k8s_launch_evidence_accepts_passing_bundle(
+    tmp_path: Path,
+) -> None:
+    """Test the verifier accepts a passing real-run evidence bundle."""
+    output_dir = tmp_path / "evidence"
+    _write_verifier_evidence(output_dir)
+
+    failures, report = verifier_module.verify_evidence(output_dir)
+
+    assert failures == []
+    assert "Verification: PASSED" in report
+    assert "TaskExecutor Pods: 1" in report
+
+
+def test_verify_local_k8s_launch_evidence_rejects_missing_serverapp_marker(
+    tmp_path: Path,
+) -> None:
+    """Test the verifier requires the probe ServerApp log marker."""
+    output_dir = tmp_path / "evidence"
+    _write_verifier_evidence(output_dir, taskexecutor_log_text="no marker\n")
+
+    failures, report = verifier_module.verify_evidence(output_dir)
+
+    assert any("K8s launch probe ServerApp ran" in failure for failure in failures)
+    assert "Verification: FAILED" in report
+
+
 class _AllowEverythingRunner:
     """Fake command runner that reports yes for every RBAC can-i check."""
 
@@ -386,6 +759,141 @@ class _AllowEverythingRunner:
             returncode=0,
             stdout=stdout,
         )
+
+
+class _RealLaunchRunner:
+    """Fake command runner for an execute-mode local k8s launch path."""
+
+    def __init__(
+        self, *, terminal_phase: str = "Succeeded", empty_pod_gets: int = 0
+    ) -> None:
+        self.commands: list[list[str]] = []
+        self.pod_get_count = 0
+        self.terminal_phase = terminal_phase
+        self.empty_pod_gets = empty_pod_gets
+
+    def run(self, args: list[str]) -> Any:
+        """Return realistic command output for the real-launch harness."""
+        self.commands.append(list(args))
+        if args[:3] == ["docker", "image", "inspect"]:
+            return self._result(args)
+        if args[:3] == ["k3d", "cluster", "list"]:
+            return self._result(args, stdout="NAME\nflower-local-k8s\n")
+        if args[:3] == ["k3d", "image", "import"]:
+            return self._result(args, stdout="imported\n")
+        if "auth" in args and "can-i" in args:
+            allowed = self._rbac_allowed(args)
+            return self._result(
+                args,
+                returncode=0 if allowed else 1,
+                stdout="yes\n" if allowed else "no\n",
+            )
+        if "wait" in args and "--for=jsonpath={.status.phase}=Succeeded" in args:
+            return self._result(
+                args,
+                returncode=0 if self.terminal_phase == "Succeeded" else 1,
+                stderr=(
+                    ""
+                    if self.terminal_phase == "Succeeded"
+                    else "timed out waiting for the condition\n"
+                ),
+            )
+        if "get" in args and "pods" in args and "-o" in args and "json" in args:
+            self.pod_get_count += 1
+            if self.pod_get_count <= self.empty_pod_gets:
+                return self._result(args, stdout=json.dumps({"items": []}))
+            phase = (
+                "Running"
+                if self.pod_get_count == self.empty_pod_gets + 1
+                else self.terminal_phase
+            )
+            return self._result(args, stdout=json.dumps(_pod_list(phase)))
+        if "logs" in args and "job/flower-local-k8s-seed-run" in args:
+            return self._result(args, stdout="K8s launch seed created run_id=123\n")
+        if "logs" in args and "pod/flower-superexec" in args:
+            return self._result(args, stdout="claim launch task_id taskexecutor\n")
+        if "logs" in args and "pod/flwr-taskexecutor-123-abc" in args:
+            return self._result(args, stdout="K8s launch probe ServerApp ran\n")
+        return self._result(args)
+
+    @staticmethod
+    def _result(
+        args: list[str], *, returncode: int = 0, stdout: str = "", stderr: str = ""
+    ) -> Any:
+        return harness_module.CommandResult(
+            args=list(args),
+            returncode=returncode,
+            stdout=stdout,
+            stderr=stderr,
+        )
+
+    @staticmethod
+    def _rbac_allowed(args: list[str]) -> bool:
+        if "--subresource=exec" in args:
+            return False
+        allowed_specs = {
+            ("get", "pods"),
+            ("list", "pods"),
+            ("create", "pods"),
+            ("delete", "pods"),
+            ("get", "secrets"),
+            ("list", "secrets"),
+            ("create", "secrets"),
+            ("delete", "secrets"),
+        }
+        try:
+            index = args.index("can-i")
+        except ValueError:
+            return False
+        spec = tuple(args[index + 1 : index + 3])
+        return spec in allowed_specs and "-n" in args and "flower-local-k8s" in args
+
+
+def _pod_list(phase: str) -> dict[str, Any]:
+    return {
+        "items": [
+            {
+                "metadata": {
+                    "name": "flwr-taskexecutor-123-abc",
+                    "namespace": "flower-local-k8s",
+                    "labels": {
+                        "app.kubernetes.io/name": "flower",
+                        "app.kubernetes.io/component": "taskexecutor",
+                    },
+                },
+                "status": {"phase": phase},
+            }
+        ]
+    }
+
+
+def _write_verifier_evidence(
+    output_dir: Path, *, taskexecutor_log_text: str = "K8s launch probe ServerApp ran\n"
+) -> None:
+    (output_dir / "diagnostics").mkdir(parents=True)
+    summary = {
+        "status": "passed",
+        "result": "local-k8s-launch-path",
+        "failures": [],
+        "details": {
+            "run_id": "k8s-launch-test",
+            "seed_run_id": 123,
+            "dry_run": False,
+            "image_preflight": {
+                "docker_inspect": {"returncode": 0},
+                "k3d_import": {"returncode": 0},
+            },
+            "rbac": {"status": "passed"},
+            "pods": [{"name": "flwr-taskexecutor-test", "phase": "Succeeded"}],
+            "taskexecutor_logs": [{"returncode": 0}],
+            "cleanup": {"requested": True, "result": {"returncode": 0}},
+        },
+    }
+    (output_dir / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
+    (output_dir / "diagnostics" / "taskexecutor-logs.txt").write_text(
+        taskexecutor_log_text,
+        encoding="utf-8",
+    )
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:

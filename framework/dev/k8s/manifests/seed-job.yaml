@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${seed_config_name}
+  namespace: ${namespace}
+data: {}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${seed_job_name}
+  namespace: ${namespace}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels: {}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      containers:
+        - name: seed-run
+          image: ${superlink_image}
+          imagePullPolicy: ${runtime_image_pull_policy}
+          command: ["python"]
+          args:
+            - ${local_k8s_root}/seed_run.py
+            - --control-api-address
+            - ${control_address}
+          volumeMounts:
+            - name: seed-assets
+              mountPath: ${local_k8s_root}
+              readOnly: true
+      volumes:
+        - name: seed-assets
+          configMap:
+            name: ${seed_config_name}
+            items:
+              - key: seed_run.py
+                path: seed_run.py
+              - key: probe_pyproject.toml
+                path: probe_app/pyproject.toml
+              - key: launch_probe_init.py
+                path: probe_app/launch_probe/__init__.py
+              - key: launch_probe_server_app.py
+                path: probe_app/launch_probe/server_app.py
+              - key: launch_probe_client_app.py
+                path: probe_app/launch_probe/client_app.py

@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${superlink_name}
+  namespace: ${namespace}
+spec:
+  selector: {}
+  ports:
+    - name: serverappio
+      port: ${appio_api_port}
+      targetPort: serverappio
+    - name: control
+      port: ${control_api_port}
+      targetPort: control
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${superlink_name}
+  namespace: ${namespace}
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  containers:
+    - name: superlink
+      image: ${superlink_image}
+      imagePullPolicy: ${runtime_image_pull_policy}
+      args:
+        - --insecure
+        - --isolation
+        - process
+        - --serverappio-api-address
+        - 0.0.0.0:${appio_api_port}
+        - --control-api-address
+        - 0.0.0.0:${control_api_port}
+      ports:
+        - name: serverappio
+          containerPort: ${appio_api_port}
+        - name: control
+          containerPort: ${control_api_port}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${executor_config_name}
+  namespace: ${namespace}
+data: {}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${superexec_name}
+  namespace: ${namespace}
+spec:
+  serviceAccountName: ${service_account}
+  restartPolicy: Never
+  containers:
+    - name: superexec
+      image: ${superexec_image}
+      imagePullPolicy: ${runtime_image_pull_policy}
+      args:
+        - --insecure
+        - --appio-api-address
+        - ${appio_address}
+        - --plugin-type
+        - serverapp
+        - --executor
+        - kubernetes
+        - --executor-config
+        - ${executor_config_path}
+      volumeMounts:
+        - name: executor-config
+          mountPath: ${executor_config_path}
+          subPath: executor-config.yaml
+          readOnly: true
+  volumes:
+    - name: executor-config
+      configMap:
+        name: ${executor_config_name}
