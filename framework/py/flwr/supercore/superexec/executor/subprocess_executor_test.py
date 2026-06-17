@@ -121,8 +121,9 @@ def test_launch_suppresses_output_when_requested() -> None:
         (TaskType.SIMULATION, "flwr-simulation"),
         (TaskType.AGENT_APP, "flwr-agentapp"),
         (TaskType.MODEL, "flwr-model"),
+        (TaskType.CONNECTOR, "flwr-connector"),
     ],
-    ids=["serverapp", "simulation", "agentapp", "model"],
+    ids=["serverapp", "simulation", "agentapp", "model", "connector"],
 )
 def test_launch_renders_serverappio_task_args(
     task_type: TaskType, command: str
@@ -159,12 +160,3 @@ def test_launch_raises_when_subprocess_cannot_start() -> None:
     with patch.object(subprocess, "Popen", side_effect=OSError("missing binary")):
         with pytest.raises(OSError, match="missing binary"):
             SubprocessExecutor().launch(_execution_spec())
-
-
-def test_launch_raises_for_unsupported_task_type() -> None:
-    """Test subprocess executor preserves unsupported task type failures."""
-    with patch.object(subprocess, "Popen") as popen_mock:
-        with pytest.raises(KeyError):
-            SubprocessExecutor().launch(_execution_spec(task_type=TaskType.CONNECTOR))
-
-    popen_mock.assert_not_called()

@@ -40,6 +40,11 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.constant import EXEC_PLUGIN_SECTION, ExecutorType
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.superexec.executor.config import (
+    ExecutorConfig,
+    ExecutorConfigError,
+    load_executor_config,
+)
 from flwr.supercore.superexec.plugin import (
     ClientAppExecPlugin,
     ExecPlugin,
@@ -84,6 +89,10 @@ def flower_superexec() -> None:
                 ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG,
                 f"Failed to load plugin config from '{plugin_config_path}': {e!r}",
             )
+
+    executor_config = _load_executor_config(
+        getattr(args, "executor_config", None), args.executor
+    )
 
     # Get the plugin class and stub class based on the plugin type
     if args.plugin_type == ExecPluginType.SIMULATION:
@@ -140,6 +149,7 @@ def flower_superexec() -> None:
         health_server_address=args.health_server_address,
         runtime_dependency_install=args.runtime_dependency_install,
         executor_type=args.executor,
+        executor_config=executor_config,
     )
 
 
@@ -242,6 +252,12 @@ def _build_parser(plugin_type: str | None) -> argparse.ArgumentParser:
         help="The executor used to run task processes, for example as local "
         "subprocesses.",
     )
+    parser.add_argument(
+        "--executor-config",
+        metavar="PATH",
+        type=str,
+        help="Path to a YAML config file for the selected executor.",
+    )
     add_superexec_auth_secret_args(parser)
     add_args_health(parser)
     if plugin_type is None:
@@ -282,6 +298,19 @@ def _build_parser(plugin_type: str | None) -> argparse.ArgumentParser:
     else:
         add_args_runtime_dependency_install(parser)
     return parser
+
+
+def _load_executor_config(
+    executor_config_path: str | None, executor_type: ExecutorType
+) -> ExecutorConfig | None:
+    """Load executor config from a YAML file if needed."""
+    if executor_config_path is None:
+        return None
+
+    try:
+        return load_executor_config(executor_config_path, executor_type)
+    except ExecutorConfigError as err:
+        flwr_exit(ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG, str(err))
 
 
 def _get_plugin_and_stub_class(

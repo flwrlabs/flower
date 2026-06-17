@@ -45,6 +45,25 @@ def test_parse_superexec_version_flag(
     assert captured.out == f"Flower version: {package_version}\n"
 
 
+def test_parse_superexec_accepts_kubernetes_executor_config() -> None:
+    """SuperExec should accept Kubernetes executor selection and config path."""
+    args = _parse_args().parse_args(
+        [
+            "--appio-api-address",
+            "127.0.0.1:9091",
+            "--plugin-type",
+            ExecPluginType.CLIENT_APP,
+            "--executor",
+            "kubernetes",
+            "--executor-config",
+            "executor.yaml",
+        ]
+    )
+
+    assert args.executor == ExecutorType.KUBERNETES
+    assert args.executor_config == "executor.yaml"
+
+
 def test_parse_superexec_help_shows_serverapp_dependency_flags(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -276,3 +295,4 @@ def test_flower_superexec_passes_executor_to_run_superexec(
     assert (
         run_superexec_mock.call_args.kwargs["executor_type"] == ExecutorType.SUBPROCESS
     )
+    assert run_superexec_mock.call_args.kwargs["executor_config"] is None

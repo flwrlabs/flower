@@ -12,17 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Executor factory for SuperExec TaskExecutor processes."""
-
-from flwr.supercore.constant import ExecutorType
-
-from .subprocess_executor import SubprocessExecutor
-from .types import Executor
+"""Handle connector tasks."""
 
 
-def get_executor(executor_type: ExecutorType) -> Executor:
-    """Return the executor for the configured executor type."""
-    if executor_type == ExecutorType.SUBPROCESS:
-        return SubprocessExecutor()
+from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 
-    raise ValueError(f"Unsupported executor selection: {executor_type}")
+
+def handle_task(
+    stub: ServerAppIoStub,
+    task_id: int,
+    run_id: int,
+) -> None:
+    """Run one connector task request."""
+    del stub, task_id, run_id

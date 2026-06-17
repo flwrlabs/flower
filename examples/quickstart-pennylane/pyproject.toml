@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-pennylane"
-version = "1.1.4"
+version = "1.1.5"
 description = "Quantum Federated Learning with PennyLane and Flower"
 license = {file = "LICENSE"}
 authors = [
@@ -16,8 +16,8 @@ authors = [
 dependencies = [
     "flwr[simulation]>=1.28.0",
     "flwr-datasets[vision]>=0.6.0",
-    "torch==2.8.0",
-    "torchvision==0.23.0",
+    "torch==2.10.0",
+    "torchvision==0.25.0",
     "pennylane==0.41.1",
     "autoray>=0.6,<0.7",
 ]
