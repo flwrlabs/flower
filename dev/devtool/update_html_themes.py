@@ -73,6 +73,83 @@ def _dict_entry_str(key: str, value: str) -> str:
     return f"{json.dumps(key, ensure_ascii=False)}: {json.dumps(value, ensure_ascii=False)},"
 
 
+def _brace_delta(line: str) -> int:
+    """Return the dictionary brace depth change for a line."""
+    return line.count("{") - line.count("}")
+
+
+def _copy_fields(
+    fields: dict[str, Optional[Union[dict[str, str], str]]],
+) -> dict[str, Optional[Union[dict[str, str], str]]]:
+    """Copy generated fields so per-file updates do not mutate NEW_FIELDS."""
+    return {
+        key: value.copy() if isinstance(value, dict) else value
+        for key, value in fields.items()
+    }
+
+
+def _merge_fields(
+    fields: dict[str, Optional[Union[dict[str, str], str]]],
+) -> dict[str, dict[str, str]]:
+    """Return generated theme variable dictionaries that can be merged."""
+    return {
+        key: value.copy()
+        for key, value in fields.items()
+        if key in MERGE_THEME_VARIABLE_FIELDS and isinstance(value, dict)
+    }
+
+
+def _append_indented_fields(
+    updated_content: list[str],
+    line: str,
+    fields: dict[str, Optional[Union[dict[str, str], str]]],
+) -> bool:
+    """Insert generated fields before the html_theme_options closing brace."""
+    indent_match = re.match(r"^(\s*)}", line)
+    indent = indent_match.group(1) if indent_match else ""
+    new_fields_str = dict_to_fields_str(fields)
+    new_fields_indented = "\n".join(
+        indent + "    " + new_field_line
+        for new_field_line in new_fields_str.splitlines()
+    )
+    if new_fields_indented:
+        updated_content.insert(-1, new_fields_indented + ",")
+    return bool(new_fields_indented)
+
+
+def _process_merge_field_line(
+    updated_content: list[str],
+    line: str,
+    brace_depth: int,
+    merge_field: str,
+    merge_fields: dict[str, dict[str, str]],
+) -> tuple[int, Optional[str], bool]:
+    """Update one line while scanning an existing theme variable dictionary."""
+    next_merge_field: Optional[str] = merge_field
+    variable_match = re.match(r'^(\s*)"([^"]+)"\s*:', line)
+    merge_variables = merge_fields[merge_field]
+    if variable_match:
+        variable_name = variable_match.group(2)
+        if variable_name in merge_variables:
+            updated_content.append(
+                variable_match.group(1)
+                + _dict_entry_str(variable_name, merge_variables[variable_name])
+            )
+            del merge_variables[variable_name]
+            return brace_depth, next_merge_field, True
+
+    brace_depth += _brace_delta(line)
+    if brace_depth == 1:
+        indent_match = re.match(r"^(\s*)}", line)
+        indent = indent_match.group(1) if indent_match else ""
+        for key, value in merge_variables.items():
+            updated_content.append(indent + "    " + _dict_entry_str(key, value))
+        next_merge_field = None
+
+    updated_content.append(line)
+    return brace_depth, next_merge_field, bool(merge_variables)
+
+
 def update_conf_file(
     file_path: Path, new_fields: dict[str, Optional[Union[dict[str, str], str]]]
 ) -> None:
@@ -85,81 +162,39 @@ def update_conf_file(
         print(f"Skipping {file_path} (no new fields to insert)")
         return
 
-    content = file_path.read_text(encoding="utf-8").splitlines()
     updated_content: list[str] = []
-    fields_to_append = {
-        key: value.copy() if isinstance(value, dict) else value
-        for key, value in new_fields.items()
-    }
-    merge_fields = {
-        key: value.copy()
-        for key, value in new_fields.items()
-        if key in MERGE_THEME_VARIABLE_FIELDS and isinstance(value, dict)
-    }
+    fields_to_append = _copy_fields(new_fields)
+    merge_fields = _merge_fields(new_fields)
     inside_options = False
     brace_depth = 0
     merge_field: Optional[str] = None
     modified = False
 
-    for line in content:
+    for line in file_path.read_text(encoding="utf-8").splitlines():
         if merge_field:
-            variable_match = re.match(r'^(\s*)"([^"]+)"\s*:', line)
-            merge_variables = merge_fields[merge_field]
-            if variable_match:
-                variable_name = variable_match.group(2)
-                if variable_name in merge_variables:
-                    updated_content.append(
-                        variable_match.group(1)
-                        + _dict_entry_str(variable_name, merge_variables[variable_name])
-                    )
-                    del merge_variables[variable_name]
-                    modified = True
-                    continue
-
-            next_brace_depth = brace_depth + line.count("{") - line.count("}")
-            if next_brace_depth == 1:
-                indent_match = re.match(r"^(\s*)}", line)
-                indent = indent_match.group(1) if indent_match else ""
-                merge_variables = merge_fields[merge_field]
-                for key, value in merge_variables.items():
-                    updated_content.append(
-                        indent + "    " + _dict_entry_str(key, value)
-                    )
-                    modified = True
-                merge_field = None
-
-            updated_content.append(line)
-            brace_depth = next_brace_depth
+            brace_depth, merge_field, line_modified = _process_merge_field_line(
+                updated_content, line, brace_depth, merge_field, merge_fields
+            )
+            modified |= line_modified
             continue
 
         updated_content.append(line)
         # Look for the start of html_theme_options.
         if re.match(r"^\s*html_theme_options\s*=\s*{", line):
             inside_options = True
-        theme_variable_match = re.match(
+        variable_match = re.match(
             r'^\s*"(?P<key>light_css_variables|dark_css_variables)"\s*:\s*{', line
         )
-        if inside_options and brace_depth == 1 and theme_variable_match:
-            theme_variable_key = theme_variable_match.group("key")
+        if inside_options and brace_depth == 1 and variable_match:
+            theme_variable_key = variable_match.group("key")
             if theme_variable_key in merge_fields:
                 merge_field = theme_variable_key
                 fields_to_append.pop(merge_field, None)
         if inside_options:
-            brace_depth += line.count("{") - line.count("}")
+            brace_depth += _brace_delta(line)
         # When inside html_theme_options, insert new fields before the closing brace.
         if inside_options and brace_depth == 0:
-            # Determine the indentation from the closing brace line.
-            indent_match = re.match(r"^(\s*)}", line)
-            indent = indent_match.group(1) if indent_match else ""
-            # Indent each line of the new fields.
-            new_fields_str = dict_to_fields_str(fields_to_append)
-            new_fields_indented = "\n".join(
-                indent + "    " + new_field_line
-                for new_field_line in new_fields_str.splitlines()
-            )
-            # Insert before the closing brace.
-            if new_fields_indented:
-                updated_content.insert(-1, new_fields_indented + ",")
+            _append_indented_fields(updated_content, line, fields_to_append)
             inside_options = False
             modified = True
 
