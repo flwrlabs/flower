@@ -35,6 +35,7 @@ def start_simulation(*args: Any, **kwargs: Any) -> Any:
     if importlib.util.find_spec("ray") is None:
         raise ImportError(RAY_IMPORT_ERROR)
 
+    # pylint: disable-next=import-outside-toplevel
     from flwr.simulation.legacy_app import start_simulation as start_simulation_legacy
 
     return start_simulation_legacy(*args, **kwargs)
