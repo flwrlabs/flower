@@ -648,6 +648,7 @@ def test_run_local_k8s_launch_path_dry_run_writes_evidence(tmp_path: Path) -> No
     assert "app.kubernetes.io/component=taskexecutor" in commands_text
     assert (output_dir / "diagnostics" / "image-preflight.txt").is_file()
     assert (output_dir / "diagnostics" / "cleanup.txt").is_file()
+    assert (output_dir / "diagnostics" / "superexec-logs.txt").is_file()
     assert (output_dir / "diagnostics" / "taskexecutor-logs.txt").is_file()
     cleanup_text = (output_dir / "diagnostics" / "cleanup.txt").read_text()
     assert "Cleanup requested for this run: no" in cleanup_text
@@ -748,6 +749,9 @@ def test_run_local_k8s_launch_path_records_terminal_pod_logs_and_cleanup(
     ).read_text()
     assert "K8s launch probe ServerApp ran" in taskexecutor_logs
 
+    superexec_logs = (output_dir / "diagnostics" / "superexec-logs.txt").read_text()
+    assert "claim launch task_id taskexecutor" in superexec_logs
+
     command_text = (output_dir / "diagnostics" / "commands.txt").read_text()
     assert "task-token" not in command_text
     assert "dGFzay10b2tlbg==" not in command_text
@@ -822,6 +826,9 @@ def test_run_capacity_cleanup_proof_records_wait_cleanup_and_second_launch(
     assert summary.details["seed_run_ids"] == [123, 456]
     assert summary.details["active_pod_budget"] == 1
     assert summary.details["capacity_wait"]["observed"] is True
+    assert summary.details["artifacts"]["superexec_logs"] == (
+        "diagnostics/superexec-logs.txt"
+    )
     assert summary.details["cleanup_observed"]["removed_pods"] == [
         "flwr-taskexecutor-123-abc"
     ]
@@ -845,10 +852,17 @@ def test_run_capacity_cleanup_proof_records_wait_cleanup_and_second_launch(
         "flwr-taskexecutor-123-abc",
         "flwr-taskexecutor-456-def",
     ]
+    superexec_logs = (output_dir / "diagnostics" / "superexec-logs.txt").read_text()
+    assert "claim launch task_id taskexecutor" in superexec_logs
+    assert "Waiting for Kubernetes TaskExecutor capacity" in superexec_logs
 
     checklist = json.loads((output_dir / "proof-checklist.json").read_text())
     assert not any(item == "capacity wait proof" for item in checklist["out_of_scope"])
     assert any("capacity was full" in claim["claim"] for claim in checklist["claims"])
+    assert any(
+        claim["artifact"] == "diagnostics/superexec-logs.txt"
+        for claim in checklist["claims"]
+    )
 
 
 def test_run_local_k8s_launch_path_polls_until_taskexecutor_pod_appears(

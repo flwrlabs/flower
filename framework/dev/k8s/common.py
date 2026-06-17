@@ -85,6 +85,8 @@ _ROOT_CERT_ARG_NAMES = {
     "--root-certificates",
     "--root-certificates-bytes",
 }
+
+
 @dataclass
 class HarnessEvent:
     """One JSONL event emitted by the local k8s harness."""
@@ -618,6 +620,28 @@ def _format_taskexecutor_logs(results: Sequence[CommandResult]) -> str:
     return "\n\n".join(sections) + "\n"
 
 
+def _format_superexec_logs(results: Sequence[CommandResult]) -> str:
+    if not results:
+        return "No SuperExec logs were captured.\n"
+    sections: list[str] = []
+    for result in results:
+        command = shlex.join(result.args)
+        sections.append(
+            "\n".join(
+                [
+                    f"$ {command}",
+                    f"returncode={result.returncode}",
+                    f"dry_run={str(result.dry_run).lower()}",
+                    "stdout:",
+                    result.stdout.rstrip() or "<empty>",
+                    "stderr:",
+                    result.stderr.rstrip() or "<empty>",
+                ]
+            )
+        )
+    return "\n\n".join(sections) + "\n"
+
+
 def _unique_values(values: Sequence[str]) -> list[str]:
     unique: list[str] = []
     for value in values:
@@ -632,8 +656,7 @@ def _run_rbac_checks(
     command_results: list[CommandResult],
 ) -> dict[str, object]:
     subject = (
-        f"system:serviceaccount:{profile.namespace}:"
-        f"{profile.superexec_service_account}"
+        f"system:serviceaccount:{profile.namespace}:{profile.superexec_service_account}"
     )
     checks: list[dict[str, object]] = []
     failures: list[str] = []
@@ -832,9 +855,7 @@ def _status_from_command(result: CommandResult, *, planned_status: str) -> str:
     return "failed"
 
 
-def _combined_status(
-    results: Sequence[CommandResult], *, planned_status: str
-) -> str:
+def _combined_status(results: Sequence[CommandResult], *, planned_status: str) -> str:
     if any(result.returncode != 0 and not result.dry_run for result in results):
         return "failed"
     if any(result.dry_run for result in results):

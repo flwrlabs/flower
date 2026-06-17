@@ -39,6 +39,7 @@ from common import (
     _combined_status,
     _format_cleanup_plan,
     _format_image_preflight,
+    _format_superexec_logs,
     _format_taskexecutor_logs,
     _kubectl_args,
     _kubectl_context,
@@ -781,6 +782,7 @@ def run_local_k8s_launch_path(
         )
         for pod_name in taskexecutor_pod_names
     ]
+    superexec_log_results = [superexec_logs_result, *capacity_wait_results]
     taskexecutor_pod_snapshot = _json_list_snapshot(taskexecutor_pods_result)
     lineage_pod_snapshot = (
         _merge_object_list_snapshots(blocked_pod_snapshot, taskexecutor_pod_snapshot)
@@ -792,6 +794,10 @@ def run_local_k8s_launch_path(
     writer.write_text(
         "diagnostics/taskexecutor-logs.txt",
         _format_taskexecutor_logs(taskexecutor_log_results),
+    )
+    writer.write_text(
+        "diagnostics/superexec-logs.txt",
+        _format_superexec_logs(superexec_log_results),
     )
     write_event(
         "kubernetes_executor.pod_created",
@@ -982,6 +988,7 @@ def run_local_k8s_launch_path(
                 "task_lineage": "task-lineage.json",
                 "taskexecutor_pods": "taskexecutor-pods.json",
                 "taskexecutor_secrets": "taskexecutor-secrets.redacted.json",
+                "superexec_logs": "diagnostics/superexec-logs.txt",
                 "final_state": "final-state.json",
                 "proof_checklist": "proof-checklist.json",
                 "capacity_blocked_pods": (
@@ -1016,6 +1023,9 @@ def run_local_k8s_launch_path(
             },
             "taskexecutor_logs": [
                 _command_record(result) for result in taskexecutor_log_results
+            ],
+            "superexec_logs": [
+                _command_record(result) for result in superexec_log_results
             ],
             "capacity_wait": {
                 "observed": bool(capacity_wait_results)
@@ -1539,6 +1549,15 @@ def _proof_checklist(
                     "status": proof_status,
                     "artifact": "events.jsonl",
                     "fields": ["capacity.wait_observed"],
+                },
+                {
+                    "claim": (
+                        "SuperExec logs used for capacity wait evidence are "
+                        "persisted for manual review."
+                    ),
+                    "status": proof_status,
+                    "artifact": "diagnostics/superexec-logs.txt",
+                    "fields": ["waiting for kubernetes taskexecutor capacity"],
                 },
                 {
                     "claim": (
