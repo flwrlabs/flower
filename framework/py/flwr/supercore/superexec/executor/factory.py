@@ -28,7 +28,6 @@ from .kubernetes_executor import (
 from .subprocess_executor import SubprocessExecutor
 from .types import Executor
 
-
 _KUBERNETES_CONFIG_FIELD_MAP = {
     "image-pull-policy": "image_pull_policy",
     "resource-pool": "resource_pool",
