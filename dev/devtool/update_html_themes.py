@@ -68,15 +68,16 @@ def find_conf_files(root_dir: Path) -> list[Path]:
 def update_conf_file(file_path: Path, new_fields_str: str) -> None:
     """
     Insert new_fields_str into the html_theme_options block of file_path.
-    The new fields are inserted just before the closing brace.
+    The new fields are inserted just before the top-level closing brace.
     """
     if not new_fields_str.strip():
         print(f"Skipping {file_path} (no new fields to insert)")
         return
 
     content = file_path.read_text(encoding="utf-8").splitlines()
-    updated_content = []
+    updated_content: list[str] = []
     inside_options = False
+    brace_depth = 0
     modified = False
 
     for line in content:
@@ -84,14 +85,17 @@ def update_conf_file(file_path: Path, new_fields_str: str) -> None:
         # Look for the start of html_theme_options.
         if re.match(r"^\s*html_theme_options\s*=\s*{", line):
             inside_options = True
+        if inside_options:
+            brace_depth += line.count("{") - line.count("}")
         # When inside html_theme_options, insert new fields before the closing brace.
-        if inside_options and re.match(r"^\s*}", line):
+        if inside_options and brace_depth == 0:
             # Determine the indentation from the closing brace line.
             indent_match = re.match(r"^(\s*)}", line)
             indent = indent_match.group(1) if indent_match else ""
             # Indent each line of the new fields.
             new_fields_indented = "\n".join(
-                indent + "    " + l for l in new_fields_str.splitlines()
+                indent + "    " + new_field_line
+                for new_field_line in new_fields_str.splitlines()
             )
             # Insert before the closing brace.
             updated_content.insert(-1, new_fields_indented + ",")
