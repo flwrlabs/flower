@@ -200,6 +200,7 @@ class ExecutorType(StrEnum):
     """Supported SuperExec executor types."""
 
     SUBPROCESS = "subprocess"
+    KUBERNETES = "kubernetes"
 
 
 class TaskType(StrEnum):
