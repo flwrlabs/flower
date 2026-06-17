@@ -30,11 +30,13 @@ def add_args_runtime_dependency_install(
     parser: argparse.ArgumentParser,
     default: bool = RUNTIME_DEPENDENCY_INSTALL,
     include_disable_flag: bool = False,
+    allow_flag_help: str | None = None,
 ) -> None:
     """Add arguments controlling runtime dependency installation.
 
     Ensure only enable or disable flags are present. For SuperLink, also include
-    the argument to disable runtime dependency installation.
+    the argument to disable runtime dependency installation and a deprecation
+    notice for `--allow-runtime-dependency-installation`.
     """
     default_state = "enabled" if default else "disabled"
     add_argument = (
@@ -56,8 +58,10 @@ def add_args_runtime_dependency_install(
         action="store_true",
         dest="runtime_dependency_install",
         default=default,
-        help="Allow runtime installation of app dependencies via `uv sync`. "
-        f"By default, runtime dependency installation is {default_state}.",
+        help=(
+            allow_flag_help
+            or "Allow runtime installation of app dependencies via `uv sync`."
+        ),
     )
 
 

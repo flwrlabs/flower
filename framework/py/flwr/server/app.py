@@ -870,6 +870,10 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         parser,
         default=_runtime_dependency_install_default(),
         include_disable_flag=True,
+        allow_flag_help=(
+            "Deprecated. Runtime dependency installation is enabled by "
+            "default. Use `--disable-runtime-dependency-installation` to disable it."
+        ),
     )
     parser.add_argument(
         "--log-file",
