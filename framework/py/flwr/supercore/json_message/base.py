@@ -20,12 +20,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Self, cast
 
+from flwr.app.constants import DEFAULT_TTL
 from flwr.app.message import ConfigRecord, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.supercore.date import now
-from flwr.supercore.json_message.constant import DEFAULT_TASK_MESSAGE_TTL
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
@@ -41,7 +41,7 @@ class JSONMessage(Message, ABC):
         dst_task_id: int,
         payload: JSONObject,
         reply_to_message_id: str = "",
-        ttl: float = DEFAULT_TASK_MESSAGE_TTL,
+        ttl: float = DEFAULT_TTL,
     ) -> None:
         type(self)._validate_payload(payload)
         metadata, content = _build_metadata_and_content(
