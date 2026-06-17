@@ -148,7 +148,12 @@ def _fetch_url(url: str) -> requests.Response:
 
 
 def _validate_url(url: str) -> str:
-    """Return a validated URL."""
+    """Return a URL allowed by the web-fetch safety policy.
+
+    Only HTTP(S) URLs with a resolvable, globally routable host are accepted.
+    Localhost names, private/reserved IP literals, and hostnames that resolve to
+    non-public addresses are rejected before any request is made.
+    """
     url = url.strip()
     if not url:
         raise WebFetchProviderError(
@@ -157,6 +162,7 @@ def _validate_url(url: str) -> str:
         )
 
     try:
+        # Parse once up front so malformed hosts are rejected before any network I/O.
         parsed = urlparse(url)
         hostname = parsed.hostname.rstrip(".").lower() if parsed.hostname else None
     except ValueError as exc:
@@ -170,6 +176,7 @@ def _validate_url(url: str) -> str:
             detail="URL must use the http or https scheme.",
         )
 
+    # Block localhost aliases explicitly; they should never reach DNS resolution.
     if hostname == "localhost" or hostname.endswith(".localhost"):
         raise WebFetchProviderError(
             code="blocked_url",
@@ -195,6 +202,7 @@ def _validate_url(url: str) -> str:
                 detail=f"Could not resolve URL host: {hostname}",
             ) from exc
 
+    # Allow only public, globally routable targets to avoid SSRF-style fetches.
     if any(ip_addr.is_multicast or not ip_addr.is_global for ip_addr in ip_addresses):
         raise WebFetchProviderError(
             code="blocked_url",
