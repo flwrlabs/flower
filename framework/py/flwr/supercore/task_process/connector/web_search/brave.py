@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Brave-backed websearch adapter."""
+"""Brave-backed web_search adapter."""
 
 
 import os
@@ -39,9 +39,9 @@ class BraveWebSearchProvider:
         self._api_key = api_key
 
     def search(self, query: str) -> JSONObject:
-        """Execute one Brave websearch request."""
+        """Execute one Brave web_search request."""
         if not query.strip():
-            raise ValueError("websearch requires a non-empty query.")
+            raise ValueError("web_search requires a non-empty query.")
         query = query.strip()
 
         try:
@@ -57,7 +57,7 @@ class BraveWebSearchProvider:
             )
         except requests.RequestException as exc:
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} websearch request failed: {exc}"
+                f"{BRAVE_WEB_SEARCH_PROVIDER} web_search request failed: {exc}"
             ) from exc
         if response.status_code >= 400:
             try:
@@ -65,7 +65,7 @@ class BraveWebSearchProvider:
             except ValueError:
                 detail = response.text
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} websearch request failed: "
+                f"{BRAVE_WEB_SEARCH_PROVIDER} web_search request failed: "
                 f"{response.status_code} {detail}"
             )
 
@@ -73,11 +73,11 @@ class BraveWebSearchProvider:
             payload = response.json()
         except ValueError as exc:
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} websearch returned invalid JSON."
+                f"{BRAVE_WEB_SEARCH_PROVIDER} web_search returned invalid JSON."
             ) from exc
         if not isinstance(payload, dict):
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} websearch returned invalid JSON."
+                f"{BRAVE_WEB_SEARCH_PROVIDER} web_search returned invalid JSON."
             )
 
         return {

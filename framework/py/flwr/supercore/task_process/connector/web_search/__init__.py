@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Built-in websearch connector."""
+"""Built-in web_search connector."""
 
 
 import os
@@ -23,8 +23,8 @@ from .brave import BRAVE_API_KEY_ENV, BraveWebSearchProvider
 from .exa import EXA_API_KEY_ENV, ExaWebSearchProvider
 from .tavily import TAVILY_API_KEY_ENV, TavilyWebSearchProvider
 
-WEBSEARCH_CONNECTOR_NAME = "websearch"
-_WEBSEARCH_API_KEY_ENV_VARS = (
+WEB_SEARCH_CONNECTOR_NAME = "web_search"
+_WEB_SEARCH_API_KEY_ENV_VARS = (
     BRAVE_API_KEY_ENV,
     TAVILY_API_KEY_ENV,
     EXA_API_KEY_ENV,
@@ -32,7 +32,7 @@ _WEBSEARCH_API_KEY_ENV_VARS = (
 
 
 def search(query: str) -> JSONObject:
-    """Execute one websearch request."""
+    """Execute one web_search request."""
     if os.getenv(BRAVE_API_KEY_ENV, "").strip():
         return BraveWebSearchProvider().search(query)
     if os.getenv(TAVILY_API_KEY_ENV, "").strip():
@@ -41,9 +41,9 @@ def search(query: str) -> JSONObject:
         return ExaWebSearchProvider().search(query)
 
     raise RuntimeError(
-        "At least one websearch API key environment variable is required: "
-        f"{', '.join(_WEBSEARCH_API_KEY_ENV_VARS)}."
+        "At least one web_search API key environment variable is required: "
+        f"{', '.join(_WEB_SEARCH_API_KEY_ENV_VARS)}."
     )
 
 
-__all__ = ["WEBSEARCH_CONNECTOR_NAME", "search"]
+__all__ = ["WEB_SEARCH_CONNECTOR_NAME", "search"]

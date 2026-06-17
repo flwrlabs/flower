@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the Brave websearch provider."""
+"""Tests for the Brave web_search provider."""
 
 from __future__ import annotations
 

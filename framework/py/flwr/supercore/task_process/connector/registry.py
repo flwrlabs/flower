@@ -23,7 +23,7 @@ from . import web_search
 ConnectorHandler = Callable[..., JSONValue]
 
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
-    web_search.WEBSEARCH_CONNECTOR_NAME: web_search.search,
+    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
 }
 
 

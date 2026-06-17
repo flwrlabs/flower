@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the Exa websearch provider."""
+"""Tests for the Exa web_search provider."""
 
 from unittest.mock import Mock
 
