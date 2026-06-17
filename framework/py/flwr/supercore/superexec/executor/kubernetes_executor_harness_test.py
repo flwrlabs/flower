@@ -16,8 +16,8 @@
 
 from __future__ import annotations
 
-import importlib.util
 import hashlib
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -30,9 +30,7 @@ import yaml
 
 def _load_harness_module() -> ModuleType:
     """Load the dev harness scaffold from its file path."""
-    harness_path = (
-        Path(__file__).resolve().parents[5] / "dev" / "k8s" / "harness.py"
-    )
+    harness_path = Path(__file__).resolve().parents[5] / "dev" / "k8s" / "harness.py"
     spec = importlib.util.spec_from_file_location(
         "kubernetes_executor_harness", harness_path
     )
@@ -348,7 +346,7 @@ def test_run_infra_proof_dry_run_writes_local_k8s_infra_evidence(
 def test_run_infra_proof_fails_when_negative_rbac_check_allows_too_much(
     tmp_path: Path,
 ) -> None:
-    """Test local k8s infra proof records a failure when broader RBAC access is allowed."""
+    """Test broader-than-expected RBAC access is recorded as a failure."""
     runner = _AllowEverythingRunner()
 
     summary = harness_module.run_infra_proof(
@@ -569,7 +567,9 @@ def test_run_local_k8s_launch_path_dry_run_writes_evidence(tmp_path: Path) -> No
     assert "wait --for=condition=Ready pod/flower-superlink" in commands_text
     assert "wait --for=condition=Ready pod/flower-superexec" in commands_text
     assert "delete job flower-local-k8s-seed-run" in commands_text
-    assert "wait --for=condition=Complete job/flower-local-k8s-seed-run" in commands_text
+    assert (
+        "wait --for=condition=Complete job/flower-local-k8s-seed-run" in commands_text
+    )
     assert "app.kubernetes.io/component=taskexecutor" in commands_text
     assert (output_dir / "diagnostics" / "image-preflight.txt").is_file()
     assert (output_dir / "diagnostics" / "cleanup.txt").is_file()
@@ -624,7 +624,9 @@ def test_run_local_k8s_launch_path_records_terminal_pod_logs_and_cleanup(
         in command
         for command in commands
     )
-    assert any("delete job flower-local-k8s-seed-run" in command for command in commands)
+    assert any(
+        "delete job flower-local-k8s-seed-run" in command for command in commands
+    )
     assert any("logs pod/flwr-taskexecutor-123-abc" in command for command in commands)
     assert any("delete namespace flower-local-k8s" in command for command in commands)
 
