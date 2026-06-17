@@ -24,6 +24,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ROOT_DIR = REPO_ROOT
+MERGE_THEME_VARIABLE_FIELDS = {"light_css_variables", "dark_css_variables"}
 
 # Define new fields to be added to the `html_theme_options` dictionary in `conf.py`.
 # If no fields are needed, set to an empty dictionary.
@@ -56,7 +57,9 @@ def dict_to_fields_str(fields: dict[str, Optional[Union[dict[str, str], str]]]) 
     s_lines = s.splitlines()
     # Remove the first and last lines (the outer braces).
     if len(s_lines) >= 2 and s_lines[0].strip() == "{" and s_lines[-1].strip() == "}":
-        s = "\n".join(s_lines[1:-1])
+        s = "\n".join(
+            line[4:] if line.startswith("    ") else line for line in s_lines[1:-1]
+        )
     return s
 
 
@@ -65,26 +68,82 @@ def find_conf_files(root_dir: Path) -> list[Path]:
     return list(root_dir.rglob("conf.py"))
 
 
-def update_conf_file(file_path: Path, new_fields_str: str) -> None:
+def _dict_entry_str(key: str, value: str) -> str:
+    """Convert one dictionary entry to a formatted string."""
+    return f"{json.dumps(key, ensure_ascii=False)}: {json.dumps(value, ensure_ascii=False)},"
+
+
+def update_conf_file(
+    file_path: Path, new_fields: dict[str, Optional[Union[dict[str, str], str]]]
+) -> None:
     """
-    Insert new_fields_str into the html_theme_options block of file_path.
-    The new fields are inserted just before the top-level closing brace.
+    Insert new_fields into the html_theme_options block of file_path.
+    Theme variable dictionaries are merged when they already exist.
     """
+    new_fields_str = dict_to_fields_str(new_fields)
     if not new_fields_str.strip():
         print(f"Skipping {file_path} (no new fields to insert)")
         return
 
     content = file_path.read_text(encoding="utf-8").splitlines()
     updated_content: list[str] = []
+    fields_to_append = {
+        key: value.copy() if isinstance(value, dict) else value
+        for key, value in new_fields.items()
+    }
+    merge_fields = {
+        key: value.copy()
+        for key, value in new_fields.items()
+        if key in MERGE_THEME_VARIABLE_FIELDS and isinstance(value, dict)
+    }
     inside_options = False
     brace_depth = 0
+    merge_field: Optional[str] = None
     modified = False
 
     for line in content:
+        if merge_field:
+            variable_match = re.match(r'^(\s*)"([^"]+)"\s*:', line)
+            merge_variables = merge_fields[merge_field]
+            if variable_match:
+                variable_name = variable_match.group(2)
+                if variable_name in merge_variables:
+                    updated_content.append(
+                        variable_match.group(1)
+                        + _dict_entry_str(variable_name, merge_variables[variable_name])
+                    )
+                    del merge_variables[variable_name]
+                    modified = True
+                    continue
+
+            next_brace_depth = brace_depth + line.count("{") - line.count("}")
+            if next_brace_depth == 1:
+                indent_match = re.match(r"^(\s*)}", line)
+                indent = indent_match.group(1) if indent_match else ""
+                merge_variables = merge_fields[merge_field]
+                for key, value in merge_variables.items():
+                    updated_content.append(
+                        indent + "    " + _dict_entry_str(key, value)
+                    )
+                    modified = True
+                merge_field = None
+
+            updated_content.append(line)
+            brace_depth = next_brace_depth
+            continue
+
         updated_content.append(line)
         # Look for the start of html_theme_options.
         if re.match(r"^\s*html_theme_options\s*=\s*{", line):
             inside_options = True
+        theme_variable_match = re.match(
+            r'^\s*"(?P<key>light_css_variables|dark_css_variables)"\s*:\s*{', line
+        )
+        if inside_options and brace_depth == 1 and theme_variable_match:
+            theme_variable_key = theme_variable_match.group("key")
+            if theme_variable_key in merge_fields:
+                merge_field = theme_variable_key
+                fields_to_append.pop(merge_field, None)
         if inside_options:
             brace_depth += line.count("{") - line.count("}")
         # When inside html_theme_options, insert new fields before the closing brace.
@@ -93,12 +152,14 @@ def update_conf_file(file_path: Path, new_fields_str: str) -> None:
             indent_match = re.match(r"^(\s*)}", line)
             indent = indent_match.group(1) if indent_match else ""
             # Indent each line of the new fields.
+            new_fields_str = dict_to_fields_str(fields_to_append)
             new_fields_indented = "\n".join(
                 indent + "    " + new_field_line
                 for new_field_line in new_fields_str.splitlines()
             )
             # Insert before the closing brace.
-            updated_content.insert(-1, new_fields_indented + ",")
+            if new_fields_indented:
+                updated_content.insert(-1, new_fields_indented + ",")
             inside_options = False
             modified = True
 
@@ -111,7 +172,6 @@ def update_conf_file(file_path: Path, new_fields_str: str) -> None:
 
 def main() -> None:
     """."""
-    new_fields_str = dict_to_fields_str(NEW_FIELDS)
     conf_files = find_conf_files(ROOT_DIR)
     if not conf_files:
         print("No conf.py files found.")
@@ -120,7 +180,7 @@ def main() -> None:
     for conf_file in conf_files:
         if "framework/docs/source/conf.py" in str(conf_file):
             continue  # Skip updating conf.py for framework docs
-        update_conf_file(conf_file, new_fields_str)
+        update_conf_file(conf_file, NEW_FIELDS.copy())
 
 
 if __name__ == "__main__":
