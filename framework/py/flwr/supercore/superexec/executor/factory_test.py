@@ -109,7 +109,7 @@ def test_get_executor_rejects_missing_required_kubernetes_field(
     field_name: str,
 ) -> None:
     """Test required Kubernetes construction fields fail clearly."""
-    executor_config: dict[object, object] = {
+    executor_config: dict[str, object] = {
         "namespace": "flower-system",
         "image": "ghcr.io/flwrlabs/taskexecutor:dev",
     }

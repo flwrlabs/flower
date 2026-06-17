@@ -120,7 +120,10 @@ def test_run_superexec_passes_executor_config_to_factory(
     channel = Mock()
     stub = Mock()
     stub.PullPendingTasks.side_effect = KeyboardInterrupt()
-    executor_config = {"namespace": "flower-system", "image": "taskexecutor:dev"}
+    executor_config: dict[str, object] = {
+        "namespace": "flower-system",
+        "image": "taskexecutor:dev",
+    }
     get_executor = Mock(return_value=Mock())
 
     monkeypatch.setattr(
