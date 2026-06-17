@@ -29,9 +29,9 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
-from flwr.supercore.typing import JSONObject, JSONValue
+from flwr.supercore.typing import JSONObject
 
-from .web_search import WEBSEARCH_CONNECTOR_NAME, search
+from .registry import invoke_connector
 
 
 def handle_task(
@@ -62,7 +62,10 @@ def handle_task(
     response = None
     try:
         response = {
-            "output": _invoke_connector(request_message.payload),
+            "output": invoke_connector(
+                name=cast(str, request_message.payload["name"]),
+                arguments=cast(JSONObject, request_message.payload["arguments"]),
+            ),
             "error": None,
         }
     except Exception as ex:
@@ -84,23 +87,6 @@ def _pull_connector_request(stub: ServerAppIoStub) -> ConnectorRequest:
         if messages:
             return ConnectorRequest.from_message(messages[0])
         time.sleep(1)  # Wait for 1 second before trying again.
-
-
-def _invoke_connector(payload: JSONObject) -> JSONValue:
-    """Invoke one built-in connector."""
-    name = payload["name"]
-    if name != WEBSEARCH_CONNECTOR_NAME:
-        raise ValueError(f"Unsupported connector '{name}'.")
-
-    arguments = payload["arguments"]
-    if not isinstance(arguments, dict):
-        raise ValueError("Connector request arguments must be a JSON object.")
-
-    query = arguments.get("query")
-    if not isinstance(query, str) or not query.strip():
-        raise ValueError("websearch requires a non-empty string query.")
-
-    return search(query.strip())
 
 
 def _make_error_response(ex: Exception) -> JSONObject:
