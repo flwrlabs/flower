@@ -36,6 +36,20 @@ APPIO_TOKEN_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/token"
 APPIO_ROOT_CERTIFICATES_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/ca.crt"
 LAUNCH_ATTEMPT_LABEL = "flower.ai/launch-attempt"
 _TASK_ID_LABEL = "flower.ai/superexec-task-id"
+_NAME_LABEL = "app.kubernetes.io/name"
+_COMPONENT_LABEL = "app.kubernetes.io/component"
+_TASK_TYPE_LABEL = "flower.ai/task-type"
+_RESOURCE_POOL_LABEL = "flower.ai/resource-pool"
+_EXECUTOR_OWNED_LABELS = frozenset(
+    {
+        _NAME_LABEL,
+        _COMPONENT_LABEL,
+        _TASK_ID_LABEL,
+        _TASK_TYPE_LABEL,
+        LAUNCH_ATTEMPT_LABEL,
+        _RESOURCE_POOL_LABEL,
+    }
+)
 _APPIO_CREDENTIAL_SECRET_SUFFIX = "-appio"
 _COMPLETED_POD_SWEEP_INTERVAL_SECONDS = 60.0
 
@@ -501,20 +515,19 @@ def _labels(
 ) -> JSONObject:
     """Return stable labels for Kubernetes objects."""
     labels: JSONObject = {}
-    if config.labels is not None:
-        labels.update(config.labels)
+    labels.update(_caller_labels(config))
     # Apply executor-owned labels last; selectors and cleanup rely on them.
     labels.update(
         {
-            "app.kubernetes.io/name": "flower",
-            "app.kubernetes.io/component": "taskexecutor",
+            _NAME_LABEL: "flower",
+            _COMPONENT_LABEL: "taskexecutor",
             _TASK_ID_LABEL: str(spec.task_id),
-            "flower.ai/task-type": spec.task_type.value,
+            _TASK_TYPE_LABEL: spec.task_type.value,
             LAUNCH_ATTEMPT_LABEL: launch_attempt_id,
         }
     )
     if config.resource_pool is not None:
-        labels["flower.ai/resource-pool"] = config.resource_pool
+        labels[_RESOURCE_POOL_LABEL] = config.resource_pool
     return labels
 
 
@@ -530,16 +543,25 @@ def _taskexecutor_pool_label_selector(config: KubernetesExecutorConfig) -> str:
 
 def _taskexecutor_pool_labels(config: KubernetesExecutorConfig) -> dict[str, str]:
     """Return labels identifying a scoped TaskExecutor pool."""
-    labels = dict(config.labels or {})
+    labels = _caller_labels(config)
     labels.update(
         {
-            "app.kubernetes.io/name": "flower",
-            "app.kubernetes.io/component": "taskexecutor",
+            _NAME_LABEL: "flower",
+            _COMPONENT_LABEL: "taskexecutor",
         }
     )
     if config.resource_pool is not None:
-        labels["flower.ai/resource-pool"] = config.resource_pool
+        labels[_RESOURCE_POOL_LABEL] = config.resource_pool
     return labels
+
+
+def _caller_labels(config: KubernetesExecutorConfig) -> dict[str, str]:
+    """Return caller-provided labels that are not owned by the executor."""
+    return {
+        key: value
+        for key, value in (config.labels or {}).items()
+        if key not in _EXECUTOR_OWNED_LABELS
+    }
 
 
 def _label_selector(labels: dict[str, str]) -> str:
