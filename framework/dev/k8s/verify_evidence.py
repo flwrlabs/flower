@@ -31,6 +31,8 @@ def verify_evidence(
     *,
     require_cleanup: bool = True,
     expected_result: str = "local-k8s-launch-path",
+    expected_active_pod_budget: int | None = None,
+    expected_seed_run_count: int | None = None,
 ) -> tuple[list[str], str]:
     """Verify a local k8s launch-path evidence bundle."""
     evidence_path = Path(evidence_dir)
@@ -239,6 +241,14 @@ def verify_evidence(
     capacity_wait = _mapping(details.get("capacity_wait"))
     cleanup_observed = _mapping(details.get("cleanup_observed"))
     if expected_result == "local-k8s-capacity-cleanup-proof":
+        required_active_pod_budget = (
+            expected_active_pod_budget
+            if expected_active_pod_budget is not None
+            else 1
+        )
+        required_seed_run_count = (
+            expected_seed_run_count if expected_seed_run_count is not None else 2
+        )
         removed_pods = _sequence(cleanup_observed.get("removed_pods"))
         remaining_pods = _sequence(cleanup_observed.get("remaining_pods"))
         removed_pod_names = {str(name) for name in removed_pods}
@@ -249,18 +259,27 @@ def verify_evidence(
             if _mapping(pod).get("name") is not None
         }
         _expect(
-            details.get("active_pod_budget") == 1,
-            "active Pod budget is not 1",
+            details.get("active_pod_budget") == required_active_pod_budget,
+            f"active Pod budget is not {required_active_pod_budget}",
+            failures,
+        )
+        recorded_seed_run_count = details.get("expected_seed_run_count")
+        if recorded_seed_run_count is not None:
+            _expect(
+                recorded_seed_run_count == required_seed_run_count,
+                f"expected seed run count is not {required_seed_run_count}",
+                failures,
+            )
+        _expect(
+            len(lineage_seed_run_ids) >= required_seed_run_count,
+            "capacity proof did not record at least "
+            f"{required_seed_run_count} seeded run IDs",
             failures,
         )
         _expect(
-            len(lineage_seed_run_ids) >= 2,
-            "capacity proof did not record at least two seeded run IDs",
-            failures,
-        )
-        _expect(
-            len(task_lineage_tasks) >= 2,
-            "capacity proof did not record at least two observed TaskExecutor tasks",
+            len(task_lineage_tasks) >= required_seed_run_count,
+            "capacity proof did not record at least "
+            f"{required_seed_run_count} observed TaskExecutor tasks",
             failures,
         )
         _expect(
@@ -298,6 +317,16 @@ def verify_evidence(
             "remaining cleanup Pods overlap removed Pods",
             failures,
         )
+        if (
+            required_active_pod_budget >= 2
+            and required_seed_run_count > required_active_pod_budget
+        ):
+            _verify_cardinality_evidence(
+                details=details,
+                capacity_wait=capacity_wait,
+                expected_active_pod_budget=required_active_pod_budget,
+                failures=failures,
+            )
 
     return failures, _format_report(
         evidence_path=evidence_path,
@@ -313,6 +342,55 @@ def verify_evidence(
         cleanup_observed=cleanup_observed,
         failures=failures,
     )
+
+
+def _verify_cardinality_evidence(
+    *,
+    details: Mapping[str, object],
+    capacity_wait: Mapping[str, object],
+    expected_active_pod_budget: int,
+    failures: list[str],
+) -> None:
+    cardinality = _mapping(details.get("cardinality"))
+    first_active_pods = _sequence(cardinality.get("first_active_pods"))
+    launched_after_capacity_opened = _sequence(
+        cardinality.get("launched_after_capacity_opened")
+    )
+    _expect(
+        cardinality.get("observed") is True,
+        "budget-2/three-task cardinality was not observed",
+        failures,
+    )
+    _expect(
+        len(first_active_pods) >= expected_active_pod_budget,
+        "cardinality proof did not record the active Pod budget full before wait",
+        failures,
+    )
+    _expect(
+        bool(launched_after_capacity_opened),
+        "cardinality proof did not record a new Pod after capacity opened",
+        failures,
+    )
+    wait_text = _command_text(_sequence(capacity_wait.get("commands"))).lower()
+    _expect(
+        (
+            f"{expected_active_pod_budget} active pods" in wait_text
+            and f"budget {expected_active_pod_budget}" in wait_text
+        ),
+        "capacity wait logs do not show the expected active Pod budget was full",
+        failures,
+    )
+
+
+def _command_text(records: Sequence[object]) -> str:
+    parts: list[str] = []
+    for record in records:
+        mapping = _mapping(record)
+        for key in ("stdout", "stderr"):
+            value = mapping.get(key)
+            if isinstance(value, str):
+                parts.append(value)
+    return "\n".join(parts)
 
 
 def _read_json(path: Path, failures: list[str]) -> dict[str, object]:
@@ -354,6 +432,10 @@ def _format_report(
 ) -> str:
     pods = [_mapping(pod) for pod in _sequence(details.get("pods"))]
     taskexecutor_logs = _sequence(details.get("taskexecutor_logs"))
+    seed_run_ids = ", ".join(
+        str(item) for item in _sequence(details.get("seed_run_ids"))
+    )
+    cardinality = _mapping(details.get("cardinality"))
     removed_pods = ", ".join(
         str(item) for item in _sequence(cleanup_observed.get("removed_pods"))
     )
@@ -372,6 +454,8 @@ def _format_report(
         f"Result: {summary.get('result')}",
         f"Run ID: {details.get('run_id')}",
         f"Seed run ID: {details.get('seed_run_id')}",
+        f"Seed run IDs: {seed_run_ids or '<none>'}",
+        f"Active Pod budget: {details.get('active_pod_budget')}",
         f"TaskExecutor Pods: {len(pods)}",
     ]
     for pod in pods:
@@ -388,6 +472,7 @@ def _format_report(
             f"TaskExecutor log captures: {len(taskexecutor_logs)}",
             f"TaskExecutor phases: {', '.join(pod_phases) or '<none>'}",
             f"Capacity wait observed: {capacity_wait.get('observed')}",
+            f"Cardinality observed: {cardinality.get('observed')}",
             f"Removed Pods: {removed_pods or '<none>'}",
             f"Removed Secrets: {removed_secrets or '<none>'}",
             f"Cleanup required: {str(require_cleanup).lower()}",
@@ -438,6 +523,18 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default="local-k8s-launch-path",
         help="Expected harness result to verify.",
     )
+    parser.add_argument(
+        "--expected-active-pod-budget",
+        type=int,
+        default=None,
+        help="Expected active Pod budget for capacity cleanup proof evidence.",
+    )
+    parser.add_argument(
+        "--expected-seed-run-count",
+        type=int,
+        default=None,
+        help="Expected seeded ServerApp run count for capacity cleanup proof evidence.",
+    )
     return parser.parse_args(argv)
 
 
@@ -448,6 +545,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.evidence_dir,
         require_cleanup=not args.no_require_cleanup,
         expected_result=args.expected_result,
+        expected_active_pod_budget=args.expected_active_pod_budget,
+        expected_seed_run_count=args.expected_seed_run_count,
     )
     print(report, end="")
     return 1 if failures else 0

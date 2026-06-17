@@ -562,6 +562,24 @@ def test_render_appio_seed_manifests_can_create_two_held_runs() -> None:
     assert "K8s launch seed created run_ids=" in seed_script
 
 
+def test_render_appio_seed_manifests_can_create_three_demo_runs() -> None:
+    """Test seed manifests can create three deterministic held ServerApp tasks."""
+    profile = harness_module.generic_k3d_profile()
+    profile.seed_run_count = 3
+    profile.probe_hold_seconds = 30.0
+
+    manifests = harness_module.render_appio_seed_manifests(profile, "k8s-test")
+
+    seed_config, seed_job = manifests
+    seed_script = seed_config["data"]["seed_run.py"]
+    container = seed_job["spec"]["template"]["spec"]["containers"][0]
+    assert "--run-count" in container["args"]
+    assert "3" in container["args"]
+    assert "--probe-hold-seconds" in container["args"]
+    assert "30.0" in container["args"]
+    assert "K8s launch seed created run_ids=" in seed_script
+
+
 def test_rendered_local_k8s_outputs_do_not_use_sprint_identifiers() -> None:
     """Test rendered launch objects do not expose sprint-local identifiers."""
     profile = harness_module.generic_k3d_profile()
@@ -865,6 +883,73 @@ def test_run_capacity_cleanup_proof_records_wait_cleanup_and_second_launch(
     )
 
 
+def test_run_capacity_cleanup_proof_records_budget_two_cardinality(
+    tmp_path: Path,
+) -> None:
+    """Test budget-2/three-task evidence captures cardinality."""
+    runner = _CardinalityRunner()
+    output_dir = tmp_path / "cardinality-real"
+    profile = harness_module.generic_k3d_profile()
+    profile.active_pod_budget = 2
+    profile.seed_run_count = 3
+    profile.probe_hold_seconds = 30.0
+
+    summary = harness_module.run_local_k8s_launch_path(
+        output_dir,
+        profile=profile,
+        runner=runner,
+        execute=True,
+        apply_manifests=True,
+        import_images=True,
+        capacity_cleanup_proof=True,
+    )
+
+    assert summary.status == "passed"
+    assert summary.result == "local-k8s-capacity-cleanup-proof"
+    assert summary.details["seed_run_ids"] == [123, 456, 789]
+    assert summary.details["active_pod_budget"] == 2
+    assert summary.details["capacity_wait"]["observed"] is True
+    assert summary.details["cardinality"] == {
+        "required": True,
+        "observed": True,
+        "active_pod_budget": 2,
+        "seed_run_count": 3,
+        "seed_run_ids": [123, 456, 789],
+        "first_active_pods": [
+            "flwr-taskexecutor-123-abc",
+            "flwr-taskexecutor-456-def",
+        ],
+        "first_observed_pods": [
+            "flwr-taskexecutor-123-abc",
+            "flwr-taskexecutor-456-def",
+        ],
+        "post_capacity_pods": [
+            "flwr-taskexecutor-456-def",
+            "flwr-taskexecutor-789-ghi",
+        ],
+        "removed_pods": ["flwr-taskexecutor-123-abc"],
+        "launched_after_capacity_opened": ["flwr-taskexecutor-789-ghi"],
+        "reason": "observed",
+    }
+
+    lineage = json.loads((output_dir / "task-lineage.json").read_text())
+    assert lineage["seeded_run_ids"] == [123, 456, 789]
+    assert lineage["seeded_task_count"] == 3
+    assert lineage["observed_task_count"] == 3
+    assert [task["pod_name"] for task in lineage["tasks"]] == [
+        "flwr-taskexecutor-123-abc",
+        "flwr-taskexecutor-456-def",
+        "flwr-taskexecutor-789-ghi",
+    ]
+    checklist = json.loads((output_dir / "proof-checklist.json").read_text())
+    assert not any("cardinality" in item for item in checklist["out_of_scope"])
+    assert any("active concurrently" in claim["claim"] for claim in checklist["claims"])
+    assert any(
+        "waiting third TaskExecutor Pod launched" in claim["claim"]
+        for claim in checklist["claims"]
+    )
+
+
 def test_run_local_k8s_launch_path_polls_until_taskexecutor_pod_appears(
     tmp_path: Path,
 ) -> None:
@@ -996,6 +1081,31 @@ def test_verify_capacity_cleanup_evidence_accepts_passing_bundle(
     assert "Removed Pods: flwr-taskexecutor-123-abc" in report
 
 
+def test_verify_capacity_cleanup_evidence_accepts_cardinality_bundle(
+    tmp_path: Path,
+) -> None:
+    """Test the verifier accepts budget-2/three-task cardinality evidence."""
+    output_dir = tmp_path / "evidence"
+    _write_verifier_evidence(
+        output_dir,
+        result="local-k8s-capacity-cleanup-proof",
+        active_pod_budget=2,
+        seed_run_ids=[123, 456, 789],
+    )
+
+    failures, report = verifier_module.verify_evidence(
+        output_dir,
+        expected_result="local-k8s-capacity-cleanup-proof",
+        expected_active_pod_budget=2,
+        expected_seed_run_count=3,
+    )
+
+    assert failures == []
+    assert "Verification: PASSED" in report
+    assert "Active Pod budget: 2" in report
+    assert "Cardinality observed: True" in report
+
+
 def test_verify_capacity_cleanup_evidence_rejects_single_task_record(
     tmp_path: Path,
 ) -> None:
@@ -1014,7 +1124,7 @@ def test_verify_capacity_cleanup_evidence_rejects_single_task_record(
     )
 
     assert any(
-        "at least two observed TaskExecutor tasks" in failure for failure in failures
+        "at least 2 observed TaskExecutor tasks" in failure for failure in failures
     )
     assert "Verification: FAILED" in report
 
@@ -1262,6 +1372,135 @@ class _CapacityCleanupRunner:
         )
 
 
+class _CardinalityRunner:
+    """Fake command runner for execute-mode budget-2 cardinality evidence."""
+
+    def __init__(self) -> None:
+        self.commands: list[list[str]] = []
+        self.pod_get_count = 0
+        self.secret_get_count = 0
+        self.superexec_log_count = 0
+
+    def run(self, args: list[str]) -> Any:
+        """Return realistic command output for the cardinality proof."""
+        self.commands.append(list(args))
+        if args[:3] == ["docker", "image", "inspect"]:
+            return self._result(args)
+        if args[:3] == ["k3d", "cluster", "list"]:
+            return self._result(args, stdout="NAME\nflower-local-k8s\n")
+        if args[:3] == ["k3d", "image", "import"]:
+            return self._result(args, stdout="imported\n")
+        if "auth" in args and "can-i" in args:
+            allowed = _RealLaunchRunner._rbac_allowed(args)
+            return self._result(
+                args,
+                returncode=0 if allowed else 1,
+                stdout="yes\n" if allowed else "no\n",
+            )
+        if "wait" in args and "--for=jsonpath={.status.phase}=Succeeded" in args:
+            return self._result(args)
+        if "get" in args and "pods" in args and "-o" in args and "json" in args:
+            self.pod_get_count += 1
+            if self.pod_get_count == 1:
+                return self._result(
+                    args,
+                    stdout=json.dumps(
+                        _pod_list_items(
+                            _taskexecutor_pod("flwr-taskexecutor-123-abc", "Running"),
+                            _taskexecutor_pod("flwr-taskexecutor-456-def", "Running"),
+                        )
+                    ),
+                )
+            if self.pod_get_count == 2:
+                return self._result(
+                    args,
+                    stdout=json.dumps(
+                        _pod_list_items(
+                            _taskexecutor_pod("flwr-taskexecutor-456-def", "Running"),
+                            _taskexecutor_pod("flwr-taskexecutor-789-ghi", "Running"),
+                        )
+                    ),
+                )
+            return self._result(
+                args,
+                stdout=json.dumps(
+                    _pod_list_items(
+                        _taskexecutor_pod("flwr-taskexecutor-456-def", "Succeeded"),
+                        _taskexecutor_pod("flwr-taskexecutor-789-ghi", "Succeeded"),
+                    )
+                ),
+            )
+        if "get" in args and "secrets" in args and "-o" in args and "json" in args:
+            self.secret_get_count += 1
+            if self.secret_get_count == 1:
+                return self._result(
+                    args,
+                    stdout=json.dumps(
+                        _secret_list_for_names(
+                            "flwr-taskexecutor-123-abc-appio",
+                            "flwr-taskexecutor-456-def-appio",
+                        )
+                    ),
+                )
+            return self._result(
+                args,
+                stdout=json.dumps(
+                    _secret_list_for_names(
+                        "flwr-taskexecutor-456-def-appio",
+                        "flwr-taskexecutor-789-ghi-appio",
+                    )
+                ),
+            )
+        if "get" in args and "jobs" in args and "-o" in args and "json" in args:
+            return self._result(args, stdout=json.dumps(_object_list("Job")))
+        if "get" in args and "services" in args and "-o" in args and "json" in args:
+            return self._result(args, stdout=json.dumps(_object_list("Service")))
+        if "get" in args and "namespace" in args and "-o" in args and "json" in args:
+            return self._result(args, stdout=json.dumps(_namespace()))
+        if "logs" in args and "job/flower-local-k8s-seed-run" in args:
+            return self._result(
+                args,
+                stdout=(
+                    "K8s launch seed created run_id=123\n"
+                    "K8s launch seed created run_id=456\n"
+                    "K8s launch seed created run_id=789\n"
+                    "K8s launch seed created run_ids=123,456,789\n"
+                ),
+            )
+        if "logs" in args and "pod/flower-superexec" in args:
+            self.superexec_log_count += 1
+            stdout = "claim launch task_id taskexecutor\n"
+            if self.superexec_log_count > 1:
+                stdout += (
+                    "Waiting for Kubernetes TaskExecutor capacity: "
+                    "2 active Pods, budget 2, selector app.kubernetes.io/name=flower\n"
+                )
+            return self._result(args, stdout=stdout)
+        if (
+            "logs" in args
+            and (
+                "pod/flwr-taskexecutor-456-def" in args
+                or "pod/flwr-taskexecutor-789-ghi" in args
+            )
+        ):
+            return self._result(
+                args,
+                stdout="K8s launch probe ServerApp ran run_id=456\n",
+            )
+        return self._result(args)
+
+    @staticmethod
+    def _result(
+        args: list[str], *, returncode: int = 0, stdout: str = "", stderr: str = ""
+    ) -> Any:
+        return harness_module.CommandResult(
+            args=list(args),
+            returncode=returncode,
+            stdout=stdout,
+            stderr=stderr,
+        )
+
+
 def _pod_list(phase: str) -> dict[str, Any]:
     return {
         "items": [
@@ -1408,6 +1647,13 @@ def _secret_list_for_name(name: str) -> dict[str, Any]:
     }
 
 
+def _secret_list_for_names(*names: str) -> dict[str, Any]:
+    items: list[dict[str, Any]] = []
+    for name in names:
+        items.extend(_secret_list_for_name(name)["items"])
+    return {"items": items}
+
+
 def _object_list(kind: str) -> dict[str, Any]:
     return {
         "items": [
@@ -1433,35 +1679,41 @@ def _namespace() -> dict[str, Any]:
     }
 
 
+def _pod_name_for_run_id(run_id: int) -> str:
+    suffixes = {123: "abc", 456: "def", 789: "ghi"}
+    return f"flwr-taskexecutor-{run_id}-{suffixes.get(run_id, 'xyz')}"
+
+
 def _write_verifier_evidence(
     output_dir: Path,
     *,
     taskexecutor_log_text: str = "K8s launch probe ServerApp ran\n",
     result: str = "local-k8s-launch-path",
+    active_pod_budget: int | None = None,
+    seed_run_ids: list[int] | None = None,
 ) -> None:
     (output_dir / "diagnostics").mkdir(parents=True)
     capacity_proof = result == "local-k8s-capacity-cleanup-proof"
-    final_pod_name = (
-        "flwr-taskexecutor-456-def" if capacity_proof else "flwr-taskexecutor-test"
-    )
-    lineage_tasks = (
-        [
-            {
-                "pod_name": "flwr-taskexecutor-123-abc",
-                "credential_secret_name": "flwr-taskexecutor-123-abc-appio",
-            },
-            {
-                "pod_name": final_pod_name,
-                "credential_secret_name": f"{final_pod_name}-appio",
-            },
-        ]
-        if capacity_proof
-        else [
-            {
-                "pod_name": final_pod_name,
-                "credential_secret_name": f"{final_pod_name}-appio",
-            }
-        ]
+    if capacity_proof:
+        active_pod_budget = active_pod_budget if active_pod_budget is not None else 1
+        seed_run_ids = seed_run_ids or [123, 456]
+    else:
+        seed_run_ids = seed_run_ids or [123]
+    pod_names = [_pod_name_for_run_id(run_id) for run_id in seed_run_ids]
+    final_pod_name = pod_names[-1] if capacity_proof else "flwr-taskexecutor-test"
+    if not capacity_proof:
+        pod_names = [final_pod_name]
+    lineage_tasks = [
+        {
+            "pod_name": pod_name,
+            "credential_secret_name": f"{pod_name}-appio",
+        }
+        for pod_name in pod_names
+    ]
+    first_active_pods = pod_names[: active_pod_budget or 1]
+    launched_after_capacity_opened = pod_names[active_pod_budget or 1 :]
+    cardinality_observed = (
+        capacity_proof and active_pod_budget == 2 and len(pod_names) >= 3
     )
     summary = {
         "status": "passed",
@@ -1470,8 +1722,9 @@ def _write_verifier_evidence(
         "details": {
             "run_id": "k8s-launch-test",
             "seed_run_id": 123,
-            "seed_run_ids": [123, 456] if capacity_proof else [123],
-            "active_pod_budget": 1 if capacity_proof else None,
+            "seed_run_ids": seed_run_ids,
+            "expected_seed_run_count": len(seed_run_ids),
+            "active_pod_budget": active_pod_budget if capacity_proof else None,
             "dry_run": False,
             "image_preflight": {
                 "docker_inspect": {"returncode": 0},
@@ -1480,7 +1733,22 @@ def _write_verifier_evidence(
             "rbac": {"status": "passed"},
             "pods": [{"name": final_pod_name, "phase": "Succeeded"}],
             "taskexecutor_logs": [{"returncode": 0}],
-            "capacity_wait": {"observed": capacity_proof},
+            "capacity_wait": {
+                "observed": capacity_proof,
+                "commands": (
+                    [
+                        {
+                            "stdout": (
+                                "Waiting for Kubernetes TaskExecutor capacity: "
+                                f"{active_pod_budget} active Pods, "
+                                f"budget {active_pod_budget}\n"
+                            )
+                        }
+                    ]
+                    if capacity_proof
+                    else []
+                ),
+            },
             "cleanup_observed": {
                 "observed": capacity_proof,
                 "removed_pods": (
@@ -1490,6 +1758,14 @@ def _write_verifier_evidence(
                     ["flwr-taskexecutor-123-abc-appio"] if capacity_proof else []
                 ),
                 "remaining_pods": [final_pod_name] if capacity_proof else [],
+            },
+            "cardinality": {
+                "required": cardinality_observed,
+                "observed": cardinality_observed,
+                "active_pod_budget": active_pod_budget,
+                "seed_run_count": len(seed_run_ids),
+                "first_active_pods": first_active_pods,
+                "launched_after_capacity_opened": launched_after_capacity_opened,
             },
             "cleanup": {"requested": True, "result": {"returncode": 0}},
         },
@@ -1512,8 +1788,8 @@ def _write_verifier_evidence(
         json.dumps(
             {
                 "seeded_run_id": 123,
-                "seeded_run_ids": [123, 456] if capacity_proof else [123],
-                "seeded_task_count": 2 if capacity_proof else 1,
+                "seeded_run_ids": seed_run_ids,
+                "seeded_task_count": len(seed_run_ids),
                 "observed_task_count": len(lineage_tasks),
                 "tasks": lineage_tasks,
             }
@@ -1553,9 +1829,13 @@ def _write_verifier_evidence(
             {
                 "claims": [{"claim": "TaskExecutor Pod observed"}],
                 "out_of_scope": (
-                    ["budget-2/three-task cardinality behavior"]
-                    if capacity_proof
-                    else ["capacity wait proof"]
+                    []
+                    if cardinality_observed
+                    else (
+                        ["budget-2/three-task cardinality behavior"]
+                        if capacity_proof
+                        else ["capacity wait proof"]
+                    )
                 ),
             }
         ),

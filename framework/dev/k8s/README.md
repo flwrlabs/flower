@@ -5,12 +5,15 @@ cluster, starts SuperLink and SuperExec, seeds deterministic ServerApp runs
 through the Control API, and verifies that the Kubernetes executor creates
 TaskExecutor Pods that reach `Succeeded`.
 
-It has two main modes:
+It has three common modes:
 
 - the default one-task launch-path proof; and
 - the `--capacity-cleanup-proof` mode, which uses active Pod budget `1`, seeds
   two tasks, observes SuperExec waiting for capacity, and verifies completed
-  TaskExecutor Pod/Secret cleanup before broad namespace cleanup.
+  TaskExecutor Pod/Secret cleanup before broad namespace cleanup; and
+- the `--demo` preset, which uses active Pod budget `2`, seeds three tasks,
+  keeps probe ServerApps active for inspection, leaves resources in place, and
+  proves the budget-2/three-task cardinality case.
 
 ## Prerequisites
 
@@ -57,6 +60,26 @@ python framework/dev/k8s/verify_evidence.py "${output_dir}" \
   --expected-result local-k8s-capacity-cleanup-proof
 ```
 
+To run the demo-friendly budget-2/three-task cardinality proof:
+
+```bash
+output_dir=/private/tmp/f7e-demo-cardinality-proof-$(date +%Y%m%d-%H%M%S)
+./framework/dev/k8s/test-real-launch-path.sh \
+  --demo \
+  --output-dir "${output_dir}"
+```
+
+The demo preset leaves namespace resources in place for live inspection. Verify
+the saved bundle with the explicit demo expectations:
+
+```bash
+python framework/dev/k8s/verify_evidence.py "${output_dir}" \
+  --expected-result local-k8s-capacity-cleanup-proof \
+  --expected-active-pod-budget 2 \
+  --expected-seed-run-count 3 \
+  --no-require-cleanup
+```
+
 `/private/tmp` is only an example local scratch location. For handoff or review,
 choose a durable writable directory, or archive the completed evidence directory
 after saving the verifier report.
@@ -98,6 +121,9 @@ python framework/dev/k8s/verify_evidence.py "${output_dir}" \
 | Capacity-proof seeded runs | `2` |
 | Capacity-proof active Pod budget | `1` |
 | Capacity-proof probe hold | `5.0` seconds |
+| Demo seeded runs | `3` |
+| Demo active Pod budget | `2` |
+| Demo probe hold | `30` seconds |
 | ServerApp marker | `K8s launch probe ServerApp ran` |
 
 ## Output
@@ -180,8 +206,9 @@ map in machine-readable form.
 
    For the default proof, `seed_run_id` and `seeded_run_id` should be present
    and should match. For the capacity cleanup proof, `summary.json` should list
-   two `seed_run_ids`, `task-lineage.json` should list the same
-   `seeded_run_ids`, and `seeded_task_count` should be `2`.
+   the expected `seed_run_ids`, `task-lineage.json` should list the same
+   `seeded_run_ids`, and `seeded_task_count` should match the expected run
+   count. The `--demo` preset expects three seeded runs.
 
 4. Confirm the Kubernetes executor created the TaskExecutor Pod.
 
@@ -230,9 +257,10 @@ map in machine-readable form.
 
 For `--capacity-cleanup-proof`, additionally confirm:
 
-1. `objects/executor-config.yaml` sets `active-pod-budget: 1`.
-2. `summary.json` lists two `seed_run_ids`, and `task-lineage.json` records at
-   least two observed TaskExecutor task records.
+1. `objects/executor-config.yaml` sets the selected `active-pod-budget`.
+2. `summary.json` lists the expected `seed_run_ids`, and
+   `task-lineage.json` records at least that many observed TaskExecutor task
+   records.
 3. `events.jsonl` has a passing `capacity.wait_observed` event. Also open
    `diagnostics/superexec-logs.txt`; it should include the specific SuperExec
    wait marker
@@ -249,9 +277,24 @@ For `--capacity-cleanup-proof`, additionally confirm:
    `Capacity wait observed: True`, include non-empty removed Pod/Secret lines,
    and end with `Verification: PASSED`.
 
-   In this mode, `TaskExecutor Pods: 1` in the verifier report is expected
-   after cleanup: it is the remaining/new TaskExecutor Pod. The two-task
-   evidence comes from `Task lineage records: 2` and `task-lineage.json`.
+   In the budget-1/two-task mode, `TaskExecutor Pods: 1` in the verifier report
+   is expected after cleanup: it is the remaining/new TaskExecutor Pod. The
+   full task-count evidence comes from `Task lineage records` and
+   `task-lineage.json`.
+
+For `--demo`, additionally confirm:
+
+1. `objects/executor-config.yaml` sets `active-pod-budget: 2`.
+2. `summary.json` has `expected_seed_run_count: 3`,
+   `active_pod_budget: 2`, and `cardinality.observed: true`.
+3. `summary.json` lists two `cardinality.first_active_pods`, proving the
+   budget was full before the third launch.
+4. `summary.json` lists `cardinality.launched_after_capacity_opened`, proving a
+   waiting TaskExecutor launched after one slot opened.
+5. `diagnostics/superexec-logs.txt` includes the capacity wait marker with
+   `2 active Pods` and `budget 2`.
+6. `proof-checklist.json` does not list budget-2/three-task cardinality as
+   out of scope.
 
 ## What Is Tested
 
@@ -267,13 +310,13 @@ For `--capacity-cleanup-proof`, additionally confirm:
 | ServerApp execution marker | Yes | Verifies `K8s launch probe ServerApp ran` in TaskExecutor logs. |
 | Capacity wait | Optional | `--capacity-cleanup-proof` seeds two runs with active Pod budget `1` and requires SuperExec wait evidence. |
 | Sweeper cleanup | Optional | `--capacity-cleanup-proof` requires the first completed TaskExecutor Pod and Secret to be removed before namespace cleanup. |
+| Cardinality proof | Optional | `--demo` seeds three runs with active Pod budget `2` and requires two active Pods before the third waits and launches after a slot opens. |
 | Wrapper cleanup | Yes | Default wrapper behavior deletes the namespace and verifies cleanup evidence. |
 
 ## Out Of Scope
 
 | Area | Tested | Notes |
 | --- | --- | --- |
-| Cardinality proof | No | The capacity proof uses budget `1` and two tasks; budget `2`/three-task cardinality is a later slice. |
 | AppIo result completion semantics | No | This slice observes launch and Pod success, not full result semantics. |
 | ClientApp execution | No | The probe includes a minimal ClientApp file only because the FAB schema expects it. |
 | TLS, CNI/NetworkPolicy, production RBAC | No | This is local/dev-only and uses insecure local AppIo. |
@@ -288,6 +331,26 @@ kubectl --context k3d-flower-local-k8s get pods -n flower-local-k8s
 kubectl --context k3d-flower-local-k8s get jobs,secrets -n flower-local-k8s
 kubectl --context k3d-flower-local-k8s logs pod/flower-superlink -n flower-local-k8s
 kubectl --context k3d-flower-local-k8s logs pod/flower-superexec -n flower-local-k8s
+```
+
+Live demo watch commands:
+
+```bash
+watch -n 1 'kubectl get pods -n flower-local-k8s -o wide --sort-by=.metadata.creationTimestamp'
+```
+
+```bash
+watch -n 1 'kubectl get pods -n flower-local-k8s -l app.kubernetes.io/component=taskexecutor -L flower.ai/resource-pool,flower.ai/superexec-task-id,flower.ai/launch-attempt --sort-by=.metadata.creationTimestamp'
+```
+
+```bash
+kubectl logs -n flower-local-k8s -f pod/flower-superexec --tail=200
+```
+
+On macOS without `watch`, use a loop:
+
+```bash
+while true; do clear; date; kubectl get pods -n flower-local-k8s -o wide --sort-by=.metadata.creationTimestamp; sleep 1; done
 ```
 
 Verify an existing default launch-path bundle:
