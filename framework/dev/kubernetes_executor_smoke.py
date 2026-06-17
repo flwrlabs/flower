@@ -22,7 +22,8 @@ namespace.
 
 The smoke only proves config loading, client construction, RBAC/admission, and
 create/list/delete for executor-rendered Kubernetes objects. It does not require
-TaskExecutor completion or AppIo connectivity.
+TaskExecutor completion or AppIo connectivity. Real in-cluster runs are optional
+deployment evidence, not a Flower PR merge requirement.
 
 Usage:
     python dev/kubernetes_executor_smoke.py --executor-config executor.yaml
@@ -334,7 +335,8 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             create, and delete Pods and Secrets in the configured namespace.
             It proves executor config/client/RBAC/admission/create/list/delete
             only; TaskExecutor completion and AppIo connectivity are out of
-            scope.
+            scope. Real in-cluster runs are optional deployment evidence, not
+            a Flower PR merge requirement.
             """
         ).strip(),
         formatter_class=argparse.RawDescriptionHelpFormatter,

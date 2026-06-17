@@ -17,7 +17,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from textwrap import dedent
 from types import ModuleType
@@ -175,6 +177,78 @@ def test_run_smoke_cleans_up_secret_if_pod_creation_fails(
     assert summary.error is not None
     assert "flower-kubernetes-executor-smoke-token" not in summary.error
     assert "<redacted>" in summary.error
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_exit_code"), [("passed", 0), ("failed", 1)]
+)
+def test_main_emits_json_summary_and_uses_status_exit_code(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    status: str,
+    expected_exit_code: int,
+) -> None:
+    """Test command output shape and exit status without Kubernetes access."""
+    config_path = _write_executor_config(tmp_path)
+
+    def _run_smoke(
+        executor_config_path: str,
+        *,
+        smoke_run: str | None = None,
+        log: Callable[[str], None] = print,
+    ) -> object:
+        del smoke_run
+        assert executor_config_path == str(config_path)
+        log("human-readable smoke log")
+        return smoke_module.SmokeSummary(
+            status=status,
+            config_path=executor_config_path,
+            smoke_run="smoke-test",
+            namespace="flower-system",
+        )
+
+    monkeypatch.setattr(smoke_module, "run_smoke", _run_smoke)
+
+    exit_code = smoke_module.main(["--executor-config", str(config_path), "--json"])
+
+    captured = capsys.readouterr()
+    assert exit_code == expected_exit_code
+    assert captured.err == "human-readable smoke log\n"
+    assert json.loads(captured.out) == {
+        "cleanup_errors": [],
+        "config_path": str(config_path),
+        "error": None,
+        "namespace": "flower-system",
+        "pod_created": False,
+        "pod_deleted": False,
+        "pod_name": None,
+        "pod_visible": False,
+        "pool_selector": None,
+        "resource_pool": None,
+        "secret_created": False,
+        "secret_deleted": False,
+        "secret_name": None,
+        "secret_visible": False,
+        "smoke_run": "smoke-test",
+        "smoke_selector": None,
+        "status": status,
+    }
+
+
+def test_help_documents_incluster_scope_without_running_smoke(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test help text makes the non-gate in-cluster scope discoverable."""
+    with pytest.raises(SystemExit) as exc_info:
+        smoke_module.main(["--help"])
+
+    assert exc_info.value.code == 0
+    captured = capsys.readouterr()
+    assert "not a stable flwr-* command" in captured.out
+    assert "production in-cluster auth" in captured.out
+    assert "runner ServiceAccount permissions" in captured.out
+    assert "Flower PR merge requirement" in captured.out
 
 
 def _write_executor_config(tmp_path: Path) -> Path:
