@@ -15,7 +15,7 @@
 """Flower exit functionality."""
 
 
-from .exit import flwr_exit
+from .exit import flwr_exit, format_exit_message
 from .exit_code import ExitCode
 from .exit_handler import add_exit_handler
 from .signal_handler import register_signal_handlers
@@ -24,5 +24,6 @@ __all__ = [
     "ExitCode",
     "add_exit_handler",
     "flwr_exit",
+    "format_exit_message",
     "register_signal_handlers",
 ]

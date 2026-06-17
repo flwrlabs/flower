@@ -28,7 +28,12 @@ from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common.app_import_error import format_app_import_error_message
 from flwr.common.config import get_project_dir
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatus
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.common.exit import (
+    ExitCode,
+    flwr_exit,
+    format_exit_message,
+    register_signal_handlers,
+)
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
@@ -192,6 +197,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
             details = reason
             exit_message = reason
             exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
+            log(ERROR, format_exit_message(exit_code, exit_message))
 
         except Exception as ex:  # pylint: disable=broad-exception-caught
             # Don't update/change NodeState

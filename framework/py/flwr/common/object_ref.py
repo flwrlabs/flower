@@ -161,10 +161,8 @@ def load_app(  # pylint: disable= too-many-branches
             else:
                 module = sys.modules[module_str]
 
-        except ModuleNotFoundError as err:
-            raise error_type(
-                f"Unable to load module {module_str}{OBJECT_REF_HELP_STR}",
-            ) from err
+        except ModuleNotFoundError:
+            raise
 
         # Recursively load attribute
         attribute = module

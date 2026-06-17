@@ -39,7 +39,12 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SubStatus,
 )
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.common.exit import (
+    ExitCode,
+    flwr_exit,
+    format_exit_message,
+    register_signal_handlers,
+)
 from flwr.common.logger import (
     flush_logs,
     log,
@@ -299,6 +304,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
         exit_message = details
         exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
+        log(ERROR, format_exit_message(exit_code, exit_message))
 
     except Exception as ex:  # pylint: disable=broad-exception-caught
         exc_entity = "Simulation"
