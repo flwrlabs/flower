@@ -165,6 +165,7 @@ def update_conf_file(
     inside_options = False
     brace_depth = 0
     merge_field: Optional[str] = None
+    found_options = False
     modified = False
 
     for line in file_path.read_text(encoding="utf-8").splitlines():
@@ -179,6 +180,7 @@ def update_conf_file(
         # Look for the start of html_theme_options.
         if re.match(r"^\s*html_theme_options\s*=\s*{", line):
             inside_options = True
+            found_options = True
         variable_match = re.match(
             r'^\s*"(?P<key>light_css_variables|dark_css_variables)"\s*:\s*{', line
         )
@@ -191,13 +193,14 @@ def update_conf_file(
             brace_depth += _brace_delta(line)
         # When inside html_theme_options, insert new fields before the closing brace.
         if inside_options and brace_depth == 0:
-            _append_indented_fields(updated_content, line, fields_to_append)
+            modified |= _append_indented_fields(updated_content, line, fields_to_append)
             inside_options = False
-            modified = True
 
     if modified:
         file_path.write_text("\n".join(updated_content) + "\n", encoding="utf-8")
         print(f"Updated: {file_path}")
+    elif found_options:
+        print(f"No changes needed in: {file_path}")
     else:
         print(f"No html_theme_options block found in: {file_path}")
 
