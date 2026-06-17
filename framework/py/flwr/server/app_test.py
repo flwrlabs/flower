@@ -29,11 +29,7 @@ from flwr.supercore.version import package_version
 from flwr.superlink.federation import NoOpFederationManager
 
 from . import app as app_module
-from .app import (
-    _get_superexec_command,
-    _obtain_superlink_certificates,
-    _parse_args_run_superlink,
-)
+from .app import _obtain_superlink_certificates, _parse_args_run_superlink
 from .superlink.linkstate import LinkStateFactory
 
 
@@ -84,46 +80,6 @@ def test_parse_superlink_appio_tls_args() -> None:
     assert args.appio_ssl_certfile == "appio-cert.pem"
     assert args.appio_ssl_keyfile == "appio-key.pem"
     assert args.appio_ssl_ca_certfile == "appio-ca.pem"
-
-
-@pytest.mark.parametrize(
-    ("cli_args", "expected"),
-    [
-        ([], True),
-        (["--disable-runtime-dependency-installation"], False),
-        (["--allow-runtime-dependency-installation"], True),
-    ],
-)
-def test_parse_superlink_runtime_dependency_install_args(
-    cli_args: list[str], expected: bool
-) -> None:
-    """SuperLink should parse runtime dependency installation args."""
-    args = _parse_args_run_superlink().parse_args(cli_args)
-
-    assert args.runtime_dependency_install is expected
-
-
-@pytest.mark.parametrize(
-    ("runtime_dependency_install", "expected"),
-    [
-        (True, False),
-        (False, True),
-    ],
-)
-def test_get_superexec_command_renders_runtime_dependency_install_flag(
-    runtime_dependency_install: bool, expected: bool
-) -> None:
-    """Auto-launched SuperExec should receive dependency installation config."""
-    command = _get_superexec_command(
-        appio_address="127.0.0.1:9091",
-        appio_certificates=None,
-        appio_root_certificates_path=None,
-        parent_pid=123,
-        runtime_dependency_install=runtime_dependency_install,
-    )
-
-    assert ("--disable-runtime-dependency-installation" in command) is expected
-    assert "--allow-runtime-dependency-installation" not in command
 
 
 @pytest.mark.parametrize("flag", ["--version", "-V"])

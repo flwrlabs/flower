@@ -32,7 +32,6 @@ import yaml
 
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
 from flwr.common.args import (
-    RuntimeDependencyInstallHelp,
     add_args_runtime_dependency_install,
     try_obtain_server_certificates,
 )
@@ -242,15 +241,6 @@ def run_superlink() -> None:
             explicit_args.add(
                 arg.split("=")[0]
             )  # handles both `--arg val` and `--arg=val`
-
-    # The old opt-in flag is accepted for compatibility, but no longer needed.
-    if "--allow-runtime-dependency-installation" in explicit_args:
-        log(
-            WARN,
-            "The `--allow-runtime-dependency-installation` argument is deprecated. "
-            "Runtime dependency installation is now enabled by default for SuperLink. "
-            "Use `--disable-runtime-dependency-installation` to disable it.",
-        )
 
     control_api_set = "--control-api-address" in explicit_args
     exec_api_set = "--exec-api-address" in explicit_args
@@ -581,9 +571,8 @@ def _get_superexec_command(
     command += ["--appio-api-address", appio_address]
     command += ["--plugin-type", ExecPluginType.SERVER_APP]
     command += ["--parent-pid", str(parent_pid)]
-    # SuperExec defaults ServerApp dependency installation on; pass only opt-out.
-    if not runtime_dependency_install:
-        command += ["--disable-runtime-dependency-installation"]
+    if runtime_dependency_install:
+        command += ["--allow-runtime-dependency-installation"]
     return command
 
 
@@ -861,18 +850,7 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Enable supernode authentication.",
     )
-    # SuperLink enables ServerApp dependency installation unless users opt out.
-    add_args_runtime_dependency_install(
-        parser,
-        default=True,
-        include_disable_flag=True,
-        help_texts=RuntimeDependencyInstallHelp(
-            allow_flag=(
-                "Deprecated. Use `--disable-runtime-dependency-installation` to "
-                "disable runtime dependency installation."
-            ),
-        ),
-    )
+    add_args_runtime_dependency_install(parser)
     parser.add_argument(
         "--log-file",
         type=str,

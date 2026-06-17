@@ -16,8 +16,6 @@
 
 
 import argparse
-import sys
-from collections.abc import Sequence
 from logging import INFO, WARN
 from pathlib import Path
 from typing import Any
@@ -25,10 +23,7 @@ from typing import Any
 import yaml
 
 from flwr.common import EventType, event
-from flwr.common.args import (
-    RuntimeDependencyInstallHelp,
-    add_args_runtime_dependency_install,
-)
+from flwr.common.args import add_args_runtime_dependency_install
 from flwr.common.constant import ExecPluginType
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
@@ -50,13 +45,6 @@ from flwr.supercore.superexec.run_superexec import run_superexec
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import disable_process_dumping
 from flwr.supercore.version import package_version
-
-# Plugin types that install dependencies by default
-_SERVERAPP_PLUGIN_TYPES = {
-    ExecPluginType.SERVER_APP,
-    ExecPluginType.SIMULATION,
-    ExecPluginType.SERVER_APP_EPHEMERAL,
-}
 
 
 def flower_superexec() -> None:
@@ -143,57 +131,8 @@ def flower_superexec() -> None:
     )
 
 
-class _SuperExecArgumentParser:
-    """Plugin-aware argument parser for `flower-superexec`."""
-
-    def parse_args(
-        self,
-        args: Sequence[str] | None = None,
-        namespace: argparse.Namespace | None = None,
-    ) -> argparse.Namespace:
-        """Parse arguments after selecting plugin-specific runtime flags."""
-        args_to_parse = list(args) if args is not None else sys.argv[1:]
-        # Runtime dependency flags differ by plugin, so inspect plugin type first.
-        parser = _build_parser(_parse_plugin_type(args_to_parse))
-        parsed = parser.parse_args(args_to_parse, namespace)
-        _warn_deprecated_serverapp_runtime_dependency_install(parsed, args_to_parse)
-        return parsed
-
-
-def _parse_args() -> _SuperExecArgumentParser:
-    """Return a plugin-aware `flower-superexec` argument parser."""
-    return _SuperExecArgumentParser()
-
-
-def _warn_deprecated_serverapp_runtime_dependency_install(
-    parsed: argparse.Namespace, args_to_parse: Sequence[str]
-) -> None:
-    """Warn if the deprecated ServerApp dependency installation flag is passed."""
-    if (
-        parsed.plugin_type in _SERVERAPP_PLUGIN_TYPES
-        and "--allow-runtime-dependency-installation"
-        in {arg.split("=")[0] for arg in args_to_parse if arg.startswith("--")}
-    ):
-        log(
-            WARN,
-            "The `--allow-runtime-dependency-installation` argument is "
-            "deprecated for ServerApp plugins. Runtime dependency installation "
-            "is now enabled by default. Use "
-            "`--disable-runtime-dependency-installation` to disable it.",
-        )
-
-
-def _parse_plugin_type(args: Sequence[str]) -> str | None:
-    """Parse the plugin type without validating the full command line."""
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--plugin-type", type=str, choices=ExecPluginType.all())
-    parsed, _ = parser.parse_known_args(args)
-    plugin_type = parsed.plugin_type
-    return plugin_type if isinstance(plugin_type, str) else None
-
-
-def _build_parser(plugin_type: str | None) -> argparse.ArgumentParser:
-    """Build the `flower-superexec` parser for the selected plugin type."""
+def _parse_args() -> argparse.ArgumentParser:
+    """Parse `flower-superexec` command line arguments."""
     parser = argparse.ArgumentParser(
         description="Run Flower SuperExec.",
     )
@@ -244,43 +183,7 @@ def _build_parser(plugin_type: str | None) -> argparse.ArgumentParser:
     )
     add_superexec_auth_secret_args(parser)
     add_args_health(parser)
-    if plugin_type is None:
-        # Generic help should explain the plugin-dependent defaults.
-        add_args_runtime_dependency_install(
-            parser,
-            default=True,
-            include_disable_flag=True,
-            help_texts=RuntimeDependencyInstallHelp(
-                allow_flag=(
-                    "Allow runtime installation of app dependencies via `uv sync`. "
-                    "This enables installation for `clientapp`. For `serverapp`, "
-                    "`simulation`, and `serverapp-ephemeral`, installation is already "
-                    "enabled by default, so this flag is deprecated."
-                ),
-                disable_flag=(
-                    "Disable runtime installation of app dependencies via `uv sync`. "
-                    "Only valid for `serverapp`, `simulation`, and "
-                    "`serverapp-ephemeral`, where installation is enabled by default."
-                ),
-                default="",
-            ),
-        )
-    elif plugin_type in _SERVERAPP_PLUGIN_TYPES:
-        # ServerApp plugins install dependencies by default and expose opt-out.
-        add_args_runtime_dependency_install(
-            parser,
-            default=True,
-            include_disable_flag=True,
-            help_texts=RuntimeDependencyInstallHelp(
-                allow_flag=(
-                    "Deprecated for ServerApp plugins. Use "
-                    "`--disable-runtime-dependency-installation` to disable runtime "
-                    "dependency installation."
-                ),
-            ),
-        )
-    else:
-        add_args_runtime_dependency_install(parser)
+    add_args_runtime_dependency_install(parser)
     return parser
 
 

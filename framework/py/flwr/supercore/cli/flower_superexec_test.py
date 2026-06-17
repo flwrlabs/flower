@@ -45,68 +45,6 @@ def test_parse_superexec_version_flag(
     assert captured.out == f"Flower version: {package_version}\n"
 
 
-def test_parse_superexec_help_shows_serverapp_dependency_flags(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Generic help should show ServerApp dependency installation flags."""
-    with pytest.raises(SystemExit) as exc_info:
-        _parse_args().parse_args(["--help"])
-
-    assert exc_info.value.code == 0
-    captured = capsys.readouterr()
-    assert "--allow-runtime-dependency-installation" in captured.out
-    assert "--disable-runtime-dependency-installation" in captured.out
-    assert "This enables installation for `clientapp`" in captured.out
-    assert "Only valid for `serverapp`, `simulation`" in captured.out
-
-
-@pytest.mark.parametrize(
-    ("plugin_type", "extra_args", "expected"),
-    [
-        (ExecPluginType.SERVER_APP, [], True),
-        (ExecPluginType.SIMULATION, [], True),
-        (ExecPluginType.SERVER_APP_EPHEMERAL, [], True),
-        (
-            ExecPluginType.SERVER_APP,
-            ["--disable-runtime-dependency-installation"],
-            False,
-        ),
-        (ExecPluginType.SERVER_APP, ["--allow-runtime-dependency-installation"], True),
-        (ExecPluginType.CLIENT_APP, [], False),
-        (ExecPluginType.CLIENT_APP, ["--allow-runtime-dependency-installation"], True),
-    ],
-)
-def test_parse_superexec_runtime_dependency_install_args(
-    plugin_type: str, extra_args: list[str], expected: bool
-) -> None:
-    """SuperExec should parse plugin-specific dependency installation args."""
-    args = _parse_args().parse_args(
-        [
-            "--appio-api-address",
-            "127.0.0.1:9091",
-            "--plugin-type",
-            plugin_type,
-            *extra_args,
-        ]
-    )
-
-    assert args.runtime_dependency_install is expected
-
-
-def test_parse_superexec_clientapp_rejects_disable_dependency_install_arg() -> None:
-    """ClientApp dependency installation should remain opt-in only."""
-    with pytest.raises(SystemExit):
-        _parse_args().parse_args(
-            [
-                "--appio-api-address",
-                "127.0.0.1:9091",
-                "--plugin-type",
-                ExecPluginType.CLIENT_APP,
-                "--disable-runtime-dependency-installation",
-            ]
-        )
-
-
 def test_flower_superexec_checks_for_update(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

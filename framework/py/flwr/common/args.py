@@ -17,7 +17,6 @@
 
 import argparse
 import sys
-from dataclasses import dataclass
 from logging import DEBUG, ERROR, INFO, WARN
 from os.path import isfile
 from pathlib import Path
@@ -27,60 +26,15 @@ from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, TRANSPORT_TYPE_REST
 from flwr.common.logger import log
 
 
-@dataclass(frozen=True)
-class RuntimeDependencyInstallHelp:
-    """Help text overrides for runtime dependency installation flags."""
-
-    allow_flag: str | None = None
-    disable_flag: str | None = None
-    default: str | None = None
-
-
-def add_args_runtime_dependency_install(
-    parser: argparse.ArgumentParser,
-    *,
-    default: bool = RUNTIME_DEPENDENCY_INSTALL,
-    include_disable_flag: bool = False,
-    help_texts: RuntimeDependencyInstallHelp | None = None,
-) -> None:
+def add_args_runtime_dependency_install(parser: argparse.ArgumentParser) -> None:
     """Add arguments controlling runtime dependency installation."""
-    help_texts = help_texts or RuntimeDependencyInstallHelp()
-    default_help = (
-        (
-            "By default, runtime dependency installation is "
-            f"{'enabled' if default else 'disabled'}."
-        )
-        if help_texts.default is None
-        else help_texts.default
-    )
-    default_help = f" {default_help}" if default_help else ""
-    add_argument = (
-        parser.add_mutually_exclusive_group().add_argument
-        if include_disable_flag
-        else parser.add_argument
-    )
-    if include_disable_flag:
-        add_argument(
-            "--disable-runtime-dependency-installation",
-            action="store_false",
-            dest="runtime_dependency_install",
-            default=default,
-            help=(
-                help_texts.disable_flag
-                or "Disable runtime installation of app dependencies via `uv sync`."
-            )
-            + default_help,
-        )
-    add_argument(
+    parser.add_argument(
         "--allow-runtime-dependency-installation",
         action="store_true",
         dest="runtime_dependency_install",
-        default=default,
-        help=(
-            help_texts.allow_flag
-            or "Allow runtime installation of app dependencies via `uv sync`."
-        )
-        + default_help,
+        default=RUNTIME_DEPENDENCY_INSTALL,
+        help="Allow runtime installation of app dependencies via `uv sync`. "
+        "By default, runtime dependency installation is disabled.",
     )
 
 
