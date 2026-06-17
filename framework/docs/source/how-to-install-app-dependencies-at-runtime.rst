@@ -17,17 +17,18 @@ installation.
 
 .. note::
 
-    Automatic dependency installation is enabled by default in SuperLink for
-    ``ServerApp`` processes, but disabled by default in SuperNode for ``ClientApp``
-    processes. You may pass ``--disable-runtime-dependency-installation`` to your
-    SuperLink to disable dependency installation or set
-    ``FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1`` before starting it, and
-    ``--allow-runtime-dependency-installation`` to enable it on SuperNodes.
+    SuperLink enables automatic dependency installation for Flower Apps by
+    default. SuperNode disables it by default.
+    
+    To disable this behavior in SuperLink, pass
+    ``--disable-runtime-dependency-installation`` or set
+    ``FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1`` before starting it. To
+    enable it in SuperNode, pass ``--allow-runtime-dependency-installation``.
 
 .. note::
 
-    In SuperGrid, automatic dependency installation is enabled. For :doc:`SuperNodes you
-    connect to SuperGrid <how-to-connect-supernodes-to-supergrid>`, runtime dependency
+    In SuperGrid, automatic dependency installation is enabled. For :doc:`SuperNodes
+    connected to SuperGrid <how-to-connect-supernodes-to-supergrid>`, runtime dependency
     installation remains disabled by default, but you can decide whether to enable it.
 
 **************************
