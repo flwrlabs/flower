@@ -14,8 +14,24 @@
 # ==============================================================================
 """Handle connector tasks."""
 
+from __future__ import annotations
 
+import time
+from typing import cast
+
+from flwr.common.serde import message_from_proto, message_to_proto
+from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    PullTaskMessageRequest,
+    PushTaskMessageRequest,
+)
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.supercore.json_message.connector_message import (
+    ConnectorRequest,
+    ConnectorResponse,
+)
+from flwr.supercore.typing import JSONObject, JSONValue
+
+from .web_search import WEBSEARCH_CONNECTOR_NAME, search
 
 
 def handle_task(
@@ -24,4 +40,75 @@ def handle_task(
     run_id: int,
 ) -> None:
     """Run one connector task request."""
-    del stub, task_id, run_id
+    request_message = _pull_connector_request(stub)
+    if request_message.metadata.src_task_id is None:
+        raise RuntimeError("Connector request source task is not set.")
+
+    def _push_connector_response(response: JSONObject) -> None:
+        """Push a ConnectorResponse back to the requesting task."""
+        message = ConnectorResponse(
+            dst_task_id=cast(int, request_message.metadata.src_task_id),
+            name=cast(str, request_message.payload["name"]),
+            call_id=cast(str, request_message.payload["call_id"]),
+            output=response["output"],
+            error=cast(JSONObject | None, response["error"]),
+            reply_to_message_id=request_message.metadata.message_id,
+        )
+        message.metadata.__dict__["_run_id"] = run_id
+        message.metadata.src_task_id = task_id
+        message.metadata.__dict__["_message_id"] = message.object_id
+        stub.PushTaskMessage(PushTaskMessageRequest(message=message_to_proto(message)))
+
+    response = None
+    try:
+        response = {
+            "output": _invoke_connector(request_message.payload),
+            "error": None,
+        }
+    except Exception as ex:
+        response = _make_error_response(ex)
+        raise
+    finally:
+        # Push the response
+        if response is not None:
+            _push_connector_response(response)
+
+
+def _pull_connector_request(stub: ServerAppIoStub) -> ConnectorRequest:
+    """Pull one connector request, waiting until it becomes available."""
+    # Keep polling until flwr-agentapp produces a request. If it exits, cleanup
+    # forces flwr-connector to stop, with auth handling revoked tokens.
+    while True:
+        pull_response = stub.PullTaskMessage(PullTaskMessageRequest(limit=1))
+        messages = [message_from_proto(message) for message in pull_response.messages]
+        if messages:
+            return ConnectorRequest.from_message(messages[0])
+        time.sleep(1)  # Wait for 1 second before trying again.
+
+
+def _invoke_connector(payload: JSONObject) -> JSONValue:
+    """Invoke one built-in connector."""
+    name = payload["name"]
+    if name != WEBSEARCH_CONNECTOR_NAME:
+        raise ValueError(f"Unsupported connector '{name}'.")
+
+    arguments = payload["arguments"]
+    if not isinstance(arguments, dict):
+        raise ValueError("Connector request arguments must be a JSON object.")
+
+    query = arguments.get("query")
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("websearch requires a non-empty string query.")
+
+    return search(query.strip())
+
+
+def _make_error_response(ex: Exception) -> JSONObject:
+    """Create a JSON error response from an exception."""
+    return {
+        "output": None,
+        "error": {
+            "code": "connector_error",
+            "message": str(ex),
+        },
+    }

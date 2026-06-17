@@ -25,8 +25,7 @@ from flwr.supercore.typing import JSONObject, JSONValue
 
 BRAVE_WEB_SEARCH_PROVIDER = "brave"
 BRAVE_WEB_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
-BRAVE_SEARCH_API_KEY_ENV = "BRAVE_SEARCH_API_KEY"
-BRAVE_FALLBACK_API_KEY_ENV = "BRAVE_API_KEY"
+BRAVE_API_KEY = "BRAVE_API_KEY"
 REQUEST_TIMEOUT = 60.0
 
 
@@ -34,14 +33,9 @@ class BraveWebSearchProvider:
     """Brave Search API adapter."""
 
     def __init__(self) -> None:
-        api_key = os.getenv(BRAVE_SEARCH_API_KEY_ENV, "").strip()
+        api_key = os.getenv(BRAVE_API_KEY, "").strip()
         if not api_key:
-            api_key = os.getenv(BRAVE_FALLBACK_API_KEY_ENV, "").strip()
-        if not api_key:
-            raise RuntimeError(
-                f"Environment variable {BRAVE_SEARCH_API_KEY_ENV} is required "
-                f"({BRAVE_FALLBACK_API_KEY_ENV} is also accepted)."
-            )
+            raise RuntimeError(f"Environment variable {BRAVE_API_KEY} is required.")
         self._api_key = api_key
 
     def search(self, query: str) -> JSONObject:

@@ -13,3 +13,36 @@
 # limitations under the License.
 # ==============================================================================
 """Built-in web-search connector."""
+
+import os
+
+from flwr.supercore.typing import JSONObject
+
+from .brave import BRAVE_API_KEY, BraveWebSearchProvider
+from .exa import EXA_API_KEY, ExaWebSearchProvider
+from .tavily import TAVILY_API_KEY, TavilyWebSearchProvider
+
+WEBSEARCH_CONNECTOR_NAME = "websearch"
+_WEBSEARCH_API_KEY_ENV_VARS = (
+    BRAVE_API_KEY,
+    TAVILY_API_KEY,
+    EXA_API_KEY,
+)
+
+
+def search(query: str) -> JSONObject:
+    """Execute one websearch request."""
+    if os.getenv(BRAVE_API_KEY, "").strip():
+        return BraveWebSearchProvider().search(query)
+    if os.getenv(TAVILY_API_KEY, "").strip():
+        return TavilyWebSearchProvider().search(query)
+    if os.getenv(EXA_API_KEY, "").strip():
+        return ExaWebSearchProvider().search(query)
+
+    raise RuntimeError(
+        "At least one websearch API key environment variable is required: "
+        f"{', '.join(_WEBSEARCH_API_KEY_ENV_VARS)}."
+    )
+
+
+__all__ = ["WEBSEARCH_CONNECTOR_NAME", "search"]

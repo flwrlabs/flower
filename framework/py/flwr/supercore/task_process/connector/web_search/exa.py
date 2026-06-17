@@ -25,7 +25,7 @@ from flwr.supercore.typing import JSONObject, JSONValue
 
 EXA_WEB_SEARCH_PROVIDER = "exa"
 EXA_SEARCH_URL = "https://api.exa.ai/search"
-EXA_API_KEY_ENV = "EXA_API_KEY"
+EXA_API_KEY = "EXA_API_KEY"
 REQUEST_TIMEOUT = 60.0
 
 
@@ -33,9 +33,9 @@ class ExaWebSearchProvider:
     """Exa Search API adapter."""
 
     def __init__(self) -> None:
-        api_key = os.getenv(EXA_API_KEY_ENV, "").strip()
+        api_key = os.getenv(EXA_API_KEY, "").strip()
         if not api_key:
-            raise RuntimeError(f"Environment variable {EXA_API_KEY_ENV} is required.")
+            raise RuntimeError(f"Environment variable {EXA_API_KEY} is required.")
         self._api_key = api_key
 
     def search(self, query: str) -> JSONObject:
