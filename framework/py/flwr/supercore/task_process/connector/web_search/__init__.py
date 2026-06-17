@@ -46,7 +46,4 @@ def search(query: str) -> JSONObject:
     )
 
 
-__all__ = [
-    "WEBSEARCH_CONNECTOR_NAME",
-    "search"
-]
+__all__ = ["WEBSEARCH_CONNECTOR_NAME", "search"]
