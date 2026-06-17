@@ -14,6 +14,5 @@
 # ==============================================================================
 """Constants for task-routed messages."""
 
-DEFAULT_TASK_MESSAGE_TTL = 3600.0
 TASK_MESSAGE_PAYLOAD_RECORD_KEY = "payload"
 TASK_MESSAGE_PAYLOAD_JSON_KEY = "json"
