@@ -15,7 +15,11 @@
 """Executor abstractions and implementations for SuperExec."""
 
 from .factory import get_executor
-from .kubernetes_executor import KubernetesExecutor, KubernetesExecutorConfig
+from .kubernetes_executor import (
+    KubernetesExecutor,
+    KubernetesExecutorConfig,
+    create_incluster_kubernetes_client,
+)
 from .subprocess_executor import SubprocessExecutor
 from .types import ExecutionSpec, Executor, LaunchResult, LaunchResultStatus
 
@@ -27,5 +31,6 @@ __all__ = [
     "LaunchResult",
     "LaunchResultStatus",
     "SubprocessExecutor",
+    "create_incluster_kubernetes_client",
     "get_executor",
 ]
