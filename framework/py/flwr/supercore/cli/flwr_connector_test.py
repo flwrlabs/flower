@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for ModelApp process CLI parsing and wiring."""
+"""Tests for connector process CLI parsing and wiring."""
 
 
 import importlib
@@ -22,34 +22,26 @@ from unittest.mock import Mock, patch
 import pytest
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+from flwr.supercore.cli.flwr_connector import _parse_args_run_flwr_connector
 
-from .flwr_model import _parse_args_run_flwr_model
-
-flwr_model_module = importlib.import_module("flwr.supercore.cli.flwr_model")
+flwr_connector_module = importlib.import_module("flwr.supercore.cli.flwr_connector")
 
 
-def test_parse_flwr_model_requires_token() -> None:
-    """The ModelApp process CLI should require a token."""
+def test_parse_flwr_connector_requires_token() -> None:
+    """The connector process CLI should require a token."""
     with pytest.raises(SystemExit):
-        _parse_args_run_flwr_model().parse_args([])
+        _parse_args_run_flwr_connector().parse_args([])
 
 
-def test_parse_flwr_model_rejects_run_once() -> None:
-    """The removed deprecated flag should no longer parse."""
-    with pytest.raises(SystemExit):
-        _parse_args_run_flwr_model().parse_args(["--token", "test-token", "--run-once"])
-
-
-def test_parse_flwr_model_parses_tokenized_invocation() -> None:
-    """The ModelApp process CLI should still parse the supported flags."""
-    args = _parse_args_run_flwr_model().parse_args(
+def test_parse_flwr_connector_parses_tokenized_invocation() -> None:
+    """The connector process CLI should parse supported flags."""
+    args = _parse_args_run_flwr_connector().parse_args(
         [
             "--token",
             "test-token",
             "--insecure",
             "--parent-pid",
             "1234",
-            "--allow-runtime-dependency-installation",
         ]
     )
 
@@ -57,18 +49,36 @@ def test_parse_flwr_model_parses_tokenized_invocation() -> None:
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
-    assert args.runtime_dependency_install is True
 
 
-def test_flwr_model_forwards_cli_args() -> None:
-    """The ModelApp CLI should forward parsed args to the runtime."""
+def test_flwr_connector_parses_args_before_runtime_side_effects() -> None:
+    """Argument parsing should happen before runtime side effects."""
+
+    class _Parser:
+        def parse_args(self) -> SimpleNamespace:
+            """Raise a parser error before any side effects happen."""
+            raise SystemExit(2)
+
+    run_connector = Mock()
+
+    with (
+        patch.object(flwr_connector_module, "_parse_args_run_flwr_connector", _Parser),
+        patch.object(flwr_connector_module, "run_connector", run_connector),
+        pytest.raises(SystemExit),
+    ):
+        flwr_connector_module.flwr_connector()
+
+    run_connector.assert_not_called()
+
+
+def test_flwr_connector_forwards_cli_args() -> None:
+    """The connector CLI should forward parsed args to the runtime."""
     args = SimpleNamespace(
         insecure=True,
         serverappio_api_address="127.0.0.1:9091",
         token="test-token",
         root_certificates=None,
         parent_pid=321,
-        runtime_dependency_install=True,
     )
 
     class _Parser:
@@ -76,16 +86,19 @@ def test_flwr_model_forwards_cli_args() -> None:
             """Return a fixed namespace for CLI forwarding tests."""
             return args
 
-    run_model = Mock()
+    restore_output = Mock()
+    run_connector = Mock()
 
     with (
-        patch.object(flwr_model_module, "_parse_args_run_flwr_model", _Parser),
-        patch.object(flwr_model_module, "run_model", run_model),
+        patch.object(flwr_connector_module, "_parse_args_run_flwr_connector", _Parser),
+        patch.object(flwr_connector_module, "restore_output", restore_output),
+        patch.object(flwr_connector_module, "run_connector", run_connector),
     ):
-        flwr_model_module.flwr_model()
+        flwr_connector_module.flwr_connector()
 
-    run_model.assert_called_once()
-    kwargs = run_model.call_args.kwargs
+    restore_output.assert_called_once_with()
+    run_connector.assert_called_once()
+    kwargs = run_connector.call_args.kwargs
     assert kwargs["serverappio_api_address"] == "127.0.0.1:9091"
     assert kwargs["token"] == "test-token"
     assert kwargs["insecure"] is True

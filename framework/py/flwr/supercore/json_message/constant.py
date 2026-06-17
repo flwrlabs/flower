@@ -12,15 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower task process components."""
+"""Constants for task-routed messages."""
 
-
-from .agent import run_agentapp
-from .connector import run_connector
-from .model import run_model
-
-__all__ = [
-    "run_agentapp",
-    "run_connector",
-    "run_model",
-]
+DEFAULT_TASK_MESSAGE_TTL = 3600.0
+TASK_MESSAGE_PAYLOAD_RECORD_KEY = "payload"
+TASK_MESSAGE_PAYLOAD_JSON_KEY = "json"

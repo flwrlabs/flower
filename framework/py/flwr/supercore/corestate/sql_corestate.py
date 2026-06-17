@@ -544,16 +544,24 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         with self.session():
             self._cleanup_expired_task_tokens()
+            activated_at = now()
+            active_until = activated_at + timedelta(
+                seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+            )
 
             # Activation is a strict STARTING -> RUNNING transition.
             rows = self.query(
                 f"""
                 UPDATE task
-                SET running_at = :running_at
+                SET running_at = :running_at, active_until = :active_until
                 WHERE task_id = :task_id AND {STATUS_CONDITIONS[Status.STARTING]}
                 RETURNING task_id
                 """,
-                {"task_id": uint64_to_int64(task_id), "running_at": now()},
+                {
+                    "task_id": uint64_to_int64(task_id),
+                    "running_at": activated_at,
+                    "active_until": active_until,
+                },
             )
         return len(rows) > 0
 
