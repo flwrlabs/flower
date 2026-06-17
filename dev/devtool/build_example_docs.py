@@ -20,12 +20,14 @@ import shutil
 import subprocess
 from pathlib import Path
 
+CategoryContent = dict[str, str]
+
 ROOT = Path(__file__).resolve().parents[2]
 INDEX = ROOT / "examples" / "docs" / "source" / "index.rst"
 
 INITIAL_TEXT = """
 Flower Examples Documentation
-=============================
+-----------------------------
 
 Welcome to Flower Examples' documentation. `Flower <https://flower.ai>`_ is
 a friendly federated AI framework.
@@ -42,22 +44,24 @@ engineers, students, professionals, academics, and other enthusiasts.
 
     Join us on Slack
 
-Flower Examples
----------------
+Quickstart Examples
+-------------------
 
-Flower Examples are a collection of example projects written with Flower that
-explore different domains and features. You can check which examples already
-exist and/or contribute your own example.
+Flower Quickstart Examples are a collection of demo projects that show how you
+can use Flower in combination with other existing frameworks or technologies.
 
 """
 
 TABLE_HEADERS = (
-    "\n.. list-table::\n   :widths: 45 20 15 20\n   "
+    "\n.. list-table::\n   :widths: 50 15 15 15\n   "
     ":header-rows: 1\n\n   * - Title\n     - Framework\n     - Dataset\n     - Tags\n\n"
 )
 
-EXAMPLES_TABLE = TABLE_HEADERS
-TOCTREES = {"quickstart": "", "advanced": "", "other": ""}
+CATEGORIES: dict[str, CategoryContent] = {
+    "quickstart": {"table": TABLE_HEADERS, "list": ""},
+    "advanced": {"table": TABLE_HEADERS, "list": ""},
+    "other": {"table": TABLE_HEADERS, "list": ""},
+}
 
 URLS: dict[str, str] = {
     # Frameworks
@@ -160,17 +164,16 @@ def _read_metadata(example: str) -> tuple[str, str, str, str]:
     return title, tags, dataset, framework
 
 
-def _add_table_entry(example: str, tag: str, category: str) -> bool:
-    global EXAMPLES_TABLE  # pylint: disable=global-statement
+def _add_table_entry(example: str, tag: str, table_var: str) -> bool:
     title, tags, dataset, framework = _read_metadata(example)
     example_name = Path(example).stem
     table_entry = (
         f"   * - `{title} <{example_name}.html>`_ \n     "
         f"- {framework} \n     - {dataset} \n     - {tags}\n\n"
     )
-    if tag == "" or tag in tags:
-        EXAMPLES_TABLE += table_entry
-        TOCTREES[category] += f"  {example_name}\n"
+    if tag in tags:
+        CATEGORIES[table_var]["table"] += table_entry
+        CATEGORIES[table_var]["list"] += f"  {example_name}\n"
         return True
     return False
 
@@ -217,14 +220,19 @@ def _copy_images(example: str) -> None:
                 )
 
 
-def _main() -> None:
-    global EXAMPLES_TABLE, TOCTREES  # pylint: disable=global-statement
+def _add_all_entries() -> None:
+    examples_dir = os.path.join(ROOT, "examples")
+    for example in sorted(os.listdir(examples_dir)):
+        example_path = os.path.join(examples_dir, example)
+        if os.path.isdir(example_path) and example != "docs":
+            _copy_markdown_files(example_path)
+            _add_gh_button(example)
+            _copy_images(example)
 
+
+def _main() -> None:
     if INDEX.exists():
         INDEX.unlink()
-
-    EXAMPLES_TABLE = TABLE_HEADERS
-    TOCTREES = {"quickstart": "", "advanced": "", "other": ""}
 
     with INDEX.open("w", encoding="utf-8") as index_file:
         index_file.write(INITIAL_TEXT)
@@ -236,43 +244,46 @@ def _main() -> None:
             _copy_markdown_files(example_path)
             _add_gh_button(example)
             _copy_images(example_path)
-            if _add_table_entry(example_path, "quickstart", "quickstart"):
-                continue
-            if _add_table_entry(example_path, "advanced", "advanced"):
-                continue
-            _add_table_entry(example_path, "", "other")
+            if not _add_table_entry(example_path, "quickstart", "quickstart"):
+                if not _add_table_entry(example_path, "comprehensive", "comprehensive"):
+                    if not _add_table_entry(example_path, "advanced", "advanced"):
+                        _add_table_entry(example_path, "", "other")
 
     with INDEX.open("a", encoding="utf-8") as index_file:
-        index_file.write(EXAMPLES_TABLE)
+        index_file.write(CATEGORIES["quickstart"]["table"])
 
-        index_file.write("\nTutorials\n~~~~~~~~~\n\n")
+        index_file.write("\nAdvanced Examples\n-----------------\n")
         index_file.write(
-            "A learning-oriented series of tutorials, the best place to start.\n"
+            "Advanced Examples are mostly for users that are both familiar with "
+            "Federated Learning but also somewhat familiar with Flower's main "
+            "features.\n"
         )
-        index_file.write("\n.. toctree::\n  :maxdepth: 1\n  :caption: Tutorials\n\n")
-        index_file.write(TOCTREES["quickstart"])
+        index_file.write(CATEGORIES["advanced"]["table"])
 
-        index_file.write("\nHow-to guides\n~~~~~~~~~~~~~\n\n")
+        index_file.write("\nOther Examples\n--------------\n")
         index_file.write(
-            "Problem-oriented how-to guides show step-by-step how to achieve a "
-            "specific goal.\n\n"
+            "Flower Examples are a collection of example projects written with "
+            "Flower that explore different domains and features. You can check "
+            "which examples already exist and/or contribute your own example.\n"
         )
-        index_file.write(".. note::\n  Coming soon\n")
+        index_file.write(CATEGORIES["other"]["table"])
 
-        index_file.write("\n\nExplanations\n~~~~~~~~~~~~\n\n")
-        index_file.write(
-            "Understanding-oriented concept guides explain and discuss key topics "
-            "and underlying ideas behind Flower and collaborative AI.\n\n"
-        )
-        index_file.write(".. note::\n  Coming soon\n")
+        _add_all_entries()
 
-        index_file.write("\nReferences\n~~~~~~~~~~\n\n")
         index_file.write(
-            "Information-oriented API reference and other reference material.\n"
+            "\n.. toctree::\n  :maxdepth: 1\n  :caption: Quickstart\n  :hidden:\n\n"
         )
-        index_file.write("\n.. toctree::\n  :maxdepth: 1\n  :caption: References\n\n")
-        index_file.write(TOCTREES["advanced"])
-        index_file.write(TOCTREES["other"])
+        index_file.write(CATEGORIES["quickstart"]["list"])
+
+        index_file.write(
+            "\n.. toctree::\n  :maxdepth: 1\n  :caption: Advanced\n  :hidden:\n\n"
+        )
+        index_file.write(CATEGORIES["advanced"]["list"])
+
+        index_file.write(
+            "\n.. toctree::\n  :maxdepth: 1\n  :caption: Others\n  :hidden:\n\n"
+        )
+        index_file.write(CATEGORIES["other"]["list"])
 
         index_file.write("\n")
 
