@@ -21,7 +21,7 @@ import pytest
 from flwr.supercore.typing import JSONObject
 
 from .exa import (
-    EXA_API_KEY,
+    EXA_API_KEY_ENV,
     EXA_SEARCH_URL,
     REQUEST_TIMEOUT,
     ExaWebSearchProvider,
@@ -33,7 +33,7 @@ def test_search_calls_exa_and_returns_parsed_results(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Search requests should call Exa and return normalized results."""
-    monkeypatch.setenv(EXA_API_KEY, "exa_test_key")
+    monkeypatch.setenv(EXA_API_KEY_ENV, "exa_test_key")
     payload: JSONObject = {
         "results": [
             {

@@ -23,7 +23,7 @@ import pytest
 from flwr.supercore.typing import JSONObject
 
 from .brave import (
-    BRAVE_API_KEY,
+    BRAVE_API_KEY_ENV,
     BRAVE_WEB_SEARCH_URL,
     REQUEST_TIMEOUT,
     BraveWebSearchProvider,
@@ -35,7 +35,7 @@ def test_search_calls_brave_and_returns_parsed_results(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Search requests should call Brave and return normalized results."""
-    monkeypatch.setenv(BRAVE_API_KEY, "brave_test_key")
+    monkeypatch.setenv(BRAVE_API_KEY_ENV, "brave_test_key")
     payload: JSONObject = {
         "web": {
             "results": [

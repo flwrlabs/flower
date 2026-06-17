@@ -22,7 +22,7 @@ from flwr.supercore.typing import JSONObject
 
 from .tavily import (
     REQUEST_TIMEOUT,
-    TAVILY_API_KEY,
+    TAVILY_API_KEY_ENV,
     TAVILY_SEARCH_URL,
     TavilyWebSearchProvider,
     _parse_results,
@@ -33,7 +33,7 @@ def test_search_calls_tavily_and_returns_parsed_results(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Search requests should call Tavily and return normalized results."""
-    monkeypatch.setenv(TAVILY_API_KEY, "tavily_test_key")
+    monkeypatch.setenv(TAVILY_API_KEY_ENV, "tavily_test_key")
     payload: JSONObject = {
         "results": [
             {

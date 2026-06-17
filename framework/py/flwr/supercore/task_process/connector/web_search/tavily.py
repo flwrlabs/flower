@@ -25,7 +25,7 @@ from flwr.supercore.typing import JSONObject, JSONValue
 
 TAVILY_WEB_SEARCH_PROVIDER = "tavily"
 TAVILY_SEARCH_URL = "https://api.tavily.com/search"
-TAVILY_API_KEY = "TAVILY_API_KEY"
+TAVILY_API_KEY_ENV = "TAVILY_API_KEY"
 REQUEST_TIMEOUT = 60.0
 
 
@@ -33,9 +33,11 @@ class TavilyWebSearchProvider:
     """Tavily Search API adapter."""
 
     def __init__(self) -> None:
-        api_key = os.getenv(TAVILY_API_KEY, "").strip()
+        api_key = os.getenv(TAVILY_API_KEY_ENV, "").strip()
         if not api_key:
-            raise RuntimeError(f"Environment variable {TAVILY_API_KEY} is required.")
+            raise RuntimeError(
+                f"Environment variable {TAVILY_API_KEY_ENV} is required."
+            )
         self._api_key = api_key
 
     def search(self, query: str) -> JSONObject:

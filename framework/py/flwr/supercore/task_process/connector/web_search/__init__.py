@@ -19,25 +19,25 @@ import os
 
 from flwr.supercore.typing import JSONObject
 
-from .brave import BRAVE_API_KEY, BraveWebSearchProvider
-from .exa import EXA_API_KEY, ExaWebSearchProvider
-from .tavily import TAVILY_API_KEY, TavilyWebSearchProvider
+from .brave import BRAVE_API_KEY_ENV, BraveWebSearchProvider
+from .exa import EXA_API_KEY_ENV, ExaWebSearchProvider
+from .tavily import TAVILY_API_KEY_ENV, TavilyWebSearchProvider
 
 WEBSEARCH_CONNECTOR_NAME = "websearch"
 _WEBSEARCH_API_KEY_ENV_VARS = (
-    BRAVE_API_KEY,
-    TAVILY_API_KEY,
-    EXA_API_KEY,
+    BRAVE_API_KEY_ENV,
+    TAVILY_API_KEY_ENV,
+    EXA_API_KEY_ENV,
 )
 
 
 def search(query: str) -> JSONObject:
     """Execute one websearch request."""
-    if os.getenv(BRAVE_API_KEY, "").strip():
+    if os.getenv(BRAVE_API_KEY_ENV, "").strip():
         return BraveWebSearchProvider().search(query)
-    if os.getenv(TAVILY_API_KEY, "").strip():
+    if os.getenv(TAVILY_API_KEY_ENV, "").strip():
         return TavilyWebSearchProvider().search(query)
-    if os.getenv(EXA_API_KEY, "").strip():
+    if os.getenv(EXA_API_KEY_ENV, "").strip():
         return ExaWebSearchProvider().search(query)
 
     raise RuntimeError(
