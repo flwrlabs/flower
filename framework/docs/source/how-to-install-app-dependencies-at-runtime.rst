@@ -17,19 +17,19 @@ installation.
 
 .. note::
 
-    SuperLink enables automatic dependency installation for Flower Apps by
-    default. SuperNode disables it by default.
-    
+    SuperLink enables automatic dependency installation by default; SuperNodes do not.
+
     To disable this behavior in SuperLink, pass
     ``--disable-runtime-dependency-installation`` or set
-    ``FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1`` before starting it. To
-    enable it in SuperNode, pass ``--allow-runtime-dependency-installation``.
+    ``FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1`` before starting it. To enable it
+    in SuperNode, pass ``--allow-runtime-dependency-installation``.
 
 .. note::
 
-    In SuperGrid, automatic dependency installation is enabled. For :doc:`SuperNodes
-    connected to SuperGrid <how-to-connect-supernodes-to-supergrid>`, runtime dependency
-    installation remains disabled by default, but you can decide whether to enable it.
+    In SuperGrid, automatic dependency installation is enabled. This does not change the
+    default for :doc:`SuperNodes connected to SuperGrid
+    <how-to-connect-supernodes-to-supergrid>`; SuperNode operators decide separately
+    whether to enable it.
 
 **************************
  Declare app dependencies
@@ -80,6 +80,23 @@ prototyping:
 Use this when the SuperNode host is allowed to install Python packages at runtime. If
 the host has no package index access, or if you want stricter control over installed
 packages, preinstall the ClientApp dependencies in the SuperNode environment instead.
+
+************************************************
+ Enable dependency installation in process mode
+************************************************
+
+When running SuperLink or SuperNode with ``--isolation=process``, the runtime dependency
+installation flags passed to ``flower-superlink`` or ``flower-supernode`` do not affect
+the app process. In this mode, SuperExec is started separately. Enable dependency
+installation on ``flower-superexec`` instead:
+
+.. code-block:: shell
+    :emphasize-lines: 4
+
+    $ flower-superexec \
+        --appio-api-address <appio-api-address> \
+        --plugin-type <choice-of-plugin> \
+        --allow-runtime-dependency-installation
 
 ************************
  How installation works
