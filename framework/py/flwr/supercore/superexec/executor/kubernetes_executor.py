@@ -21,7 +21,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from logging import INFO, WARNING
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Protocol, cast
 from uuid import uuid4
 
 from flwr.common.logger import log
@@ -106,7 +106,7 @@ def create_incluster_kubernetes_client() -> KubernetesClient:
         raise
 
     try:
-        kubernetes_config.load_incluster_config()  # type: ignore[attr-defined]
+        kubernetes_config.load_incluster_config()
     except Exception as exc:  # pylint: disable=broad-exception-caught
         raise RuntimeError(
             "Failed to load in-cluster Kubernetes configuration for the Kubernetes "
@@ -114,7 +114,7 @@ def create_incluster_kubernetes_client() -> KubernetesClient:
             "credentials."
         ) from exc
 
-    client: KubernetesClient = kubernetes_client.CoreV1API()  # type: ignore[attr-defined]
+    client: KubernetesClient = kubernetes_client.CoreV1Api()
     return client
 
 
