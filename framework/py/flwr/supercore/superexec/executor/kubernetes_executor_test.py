@@ -607,7 +607,13 @@ def test_sweeper_deletes_terminal_pod_and_matching_secret(phase: str) -> None:
         "items": [_secret(_SECRET_NAME, labels)]
     }
     config = _executor_config(
-        labels={"flower.ai/team": "platform"},
+        labels={
+            _TASK_ID_LABEL: "fake-task",
+            "flower.ai/task-type": "fake-task-type",
+            LAUNCH_ATTEMPT_LABEL: "fake-launch-attempt",
+            "flower.ai/resource-pool": "fake-pool",
+            "flower.ai/team": "platform",
+        },
         resource_pool="gpu-pool",
     )
 

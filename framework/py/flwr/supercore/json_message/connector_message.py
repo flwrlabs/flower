@@ -17,8 +17,8 @@
 
 from __future__ import annotations
 
+from flwr.app.constants import DEFAULT_TTL
 from flwr.supercore.json_message.base import JSONMessage
-from flwr.supercore.json_message.constant import DEFAULT_TASK_MESSAGE_TTL
 from flwr.supercore.typing import JSONObject, JSONValue
 
 
@@ -32,7 +32,7 @@ class ConnectorRequest(JSONMessage):
         name: str,
         call_id: str,
         arguments: JSONObject,
-        ttl: float = DEFAULT_TASK_MESSAGE_TTL,
+        ttl: float = DEFAULT_TTL,
     ) -> None:
         payload: JSONObject = {
             "name": name,
@@ -68,7 +68,7 @@ class ConnectorResponse(JSONMessage):
         output: JSONValue,
         error: JSONObject | None,
         reply_to_message_id: str,
-        ttl: float = DEFAULT_TASK_MESSAGE_TTL,
+        ttl: float = DEFAULT_TTL,
     ) -> None:
         if not reply_to_message_id:
             raise ValueError("ConnectorResponse requires reply_to_message_id.")
@@ -105,4 +105,9 @@ class ConnectorResponse(JSONMessage):
             raise ValueError(
                 f"{cls.__name__} payload field 'output' must be null when "
                 "'error' is set."
+            )
+        if error is None and payload["output"] is None:
+            raise ValueError(
+                f"{cls.__name__} payload field 'output' must not be null when "
+                "'error' is null."
             )
