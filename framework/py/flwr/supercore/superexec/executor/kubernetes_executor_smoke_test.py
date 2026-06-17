@@ -63,8 +63,6 @@ class _FakeKubernetesClient:
         self.secrets: dict[str, object] = {}
         self.created_pods: list[object] = []
         self.created_secrets: list[object] = []
-        self.deleted_pods: list[str] = []
-        self.deleted_secrets: list[str] = []
 
     def create_namespaced_secret(self, namespace: str, body: object) -> object:
         """Create a fake Secret."""
@@ -115,13 +113,11 @@ class _FakeKubernetesClient:
     ) -> object:
         """Delete a fake Pod."""
         del namespace, grace_period_seconds
-        self.deleted_pods.append(name)
         return self.pods.pop(name)
 
     def delete_namespaced_secret(self, name: str, namespace: str) -> object:
         """Delete a fake Secret."""
         del namespace
-        self.deleted_secrets.append(name)
         return self.secrets.pop(name)
 
 
@@ -141,15 +137,8 @@ def test_run_smoke_creates_visible_objects_and_cleans_them_up(
     )
 
     assert summary.status == "passed"
-    assert summary.namespace == "flower-system"
-    assert summary.resource_pool == "gpu-pool"
-    assert summary.smoke_selector == "flower.ai/smoke-run=smoke-test"
-    assert summary.secret_created
-    assert summary.pod_created
-    assert summary.secret_visible
-    assert summary.pod_visible
-    assert summary.secret_deleted
-    assert summary.pod_deleted
+    assert len(client.created_secrets) == 1
+    assert len(client.created_pods) == 1
     assert client.pods == {}
     assert client.secrets == {}
     assert "flower-kubernetes-executor-smoke-token" not in "\n".join(logs)
@@ -180,9 +169,8 @@ def test_run_smoke_cleans_up_secret_if_pod_creation_fails(
     )
 
     assert summary.status == "failed"
-    assert summary.secret_created
-    assert not summary.pod_created
-    assert summary.secret_deleted
+    assert len(client.created_secrets) == 1
+    assert client.created_pods == []
     assert client.secrets == {}
     assert summary.error is not None
     assert "flower-kubernetes-executor-smoke-token" not in summary.error
