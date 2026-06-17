@@ -249,9 +249,7 @@ def _main() -> None:
         index_file.write(
             "A learning-oriented series of tutorials, the best place to start.\n"
         )
-        index_file.write(
-            "\n.. toctree::\n  :maxdepth: 1\n  :caption: Tutorials\n\n"
-        )
+        index_file.write("\n.. toctree::\n  :maxdepth: 1\n  :caption: Tutorials\n\n")
         index_file.write(TOCTREES["quickstart"])
 
         index_file.write("\nHow-to guides\n~~~~~~~~~~~~~\n\n")
@@ -272,9 +270,7 @@ def _main() -> None:
         index_file.write(
             "Information-oriented API reference and other reference material.\n"
         )
-        index_file.write(
-            "\n.. toctree::\n  :maxdepth: 1\n  :caption: References\n\n"
-        )
+        index_file.write("\n.. toctree::\n  :maxdepth: 1\n  :caption: References\n\n")
         index_file.write(TOCTREES["advanced"])
         index_file.write(TOCTREES["other"])
 
