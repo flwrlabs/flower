@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from flwr.app.constants import DEFAULT_TTL
 from flwr.supercore.json_message.base import JSONMessage
-from flwr.supercore.json_message.constant import DEFAULT_TASK_MESSAGE_TTL
 from flwr.supercore.typing import JSONObject, JSONValue
 
 
@@ -42,7 +42,7 @@ class ModelRequest(JSONMessage):
         max_output_tokens: int | None = None,
         metadata: JSONObject | None = None,
         text: JSONObject | None = None,
-        ttl: float = DEFAULT_TASK_MESSAGE_TTL,
+        ttl: float = DEFAULT_TTL,
     ) -> None:
         payload: JSONObject = {
             "model": model,
@@ -102,7 +102,7 @@ class ModelResponse(JSONMessage):
         dst_task_id: int,
         response: JSONObject,
         reply_to_message_id: str,
-        ttl: float = DEFAULT_TASK_MESSAGE_TTL,
+        ttl: float = DEFAULT_TTL,
     ) -> None:
         if not reply_to_message_id:
             raise ValueError("ModelResponse requires reply_to_message_id.")
