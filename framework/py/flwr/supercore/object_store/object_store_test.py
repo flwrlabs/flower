@@ -368,6 +368,35 @@ class ObjectStoreTest(unittest.TestCase):
         # Assert: The object can now be removed
         self.assertIsNone(object_store.get(obj.object_id))
 
+    def test_delete_objects_in_run_preserves_shared_descendant_as_standalone(
+        self,
+    ) -> None:
+        """Deleting one run should preserve a child object used by another run."""
+        # Prepare: Register an object as a child in one run and standalone in another
+        object_store = self.object_store_factory()
+        child = CustomDataClass(data=b"shared_child")
+        parent = CustomDataClass(data=b"parent", children=[child])
+        child_content = child.deflate()
+        parent_content = parent.deflate()
+
+        object_store.preregister(run_id=1, object_tree=get_object_tree(parent))
+        object_store.preregister(run_id=2, object_tree=get_object_tree(child))
+        object_store.put(child.object_id, child_content)
+        object_store.put(parent.object_id, parent_content)
+
+        # Execute: Delete the run owning the parent
+        object_store.delete_objects_in_run(run_id=1)
+
+        # Assert: The child remains available for the second run
+        self.assertEqual(object_store.get(child.object_id), child_content)
+        self.assertIsNone(object_store.get(parent.object_id))
+
+        # Execute: Delete the remaining run
+        object_store.delete_objects_in_run(run_id=2)
+
+        # Assert: The shared child can now be removed
+        self.assertIsNone(object_store.get(child.object_id))
+
 
 def _create_object_hierarchy() -> tuple[list[CustomDataClass], dict[str, bytes]]:
     """Create a hierarchy of objects for testing.
