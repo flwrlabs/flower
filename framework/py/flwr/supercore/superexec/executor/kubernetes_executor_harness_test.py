@@ -16,8 +16,8 @@
 
 from __future__ import annotations
 
-import importlib.util
 import hashlib
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -847,12 +847,8 @@ def test_run_capacity_cleanup_proof_records_wait_cleanup_and_second_launch(
     ]
 
     checklist = json.loads((output_dir / "proof-checklist.json").read_text())
-    assert not any(
-        item == "capacity wait proof" for item in checklist["out_of_scope"]
-    )
-    assert any(
-        "capacity was full" in claim["claim"] for claim in checklist["claims"]
-    )
+    assert not any(item == "capacity wait proof" for item in checklist["out_of_scope"])
+    assert any("capacity was full" in claim["claim"] for claim in checklist["claims"])
 
 
 def test_run_local_k8s_launch_path_polls_until_taskexecutor_pod_appears(
@@ -973,9 +969,7 @@ def test_verify_capacity_cleanup_evidence_accepts_passing_bundle(
 ) -> None:
     """Test the verifier accepts a passing capacity cleanup bundle."""
     output_dir = tmp_path / "evidence"
-    _write_verifier_evidence(
-        output_dir, result="local-k8s-capacity-cleanup-proof"
-    )
+    _write_verifier_evidence(output_dir, result="local-k8s-capacity-cleanup-proof")
 
     failures, report = verifier_module.verify_evidence(
         output_dir,
