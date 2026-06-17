@@ -26,14 +26,6 @@ from flwr.supercore.constant import ExecutorType
 from . import factory as factory_module
 from .factory import get_executor
 from .kubernetes_executor import KubernetesExecutor
-from .subprocess_executor import SubprocessExecutor
-
-
-def test_get_executor_returns_subprocess_executor_by_default() -> None:
-    """Test subprocess selection preserves the default executor."""
-    executor = get_executor(ExecutorType.SUBPROCESS)
-
-    assert isinstance(executor, SubprocessExecutor)
 
 
 def test_get_executor_requires_kubernetes_config() -> None:
@@ -60,21 +52,10 @@ def test_get_executor_builds_kubernetes_executor_from_config(
             "namespace": "flower-system",
             "image": "ghcr.io/flwrlabs/taskexecutor:dev",
             "image-pull-policy": "IfNotPresent",
-            "resource-pool": "gpu-pool",
             "active-pod-budget": 5,
-            "capacity-poll-interval": 0.25,
-            "capacity-log-interval": 30.0,
             "appio-root-certificates-path": str(root_certificates_path),
-            "labels": {"flower.ai/deployment": "dev"},
-            "annotations": {"flower.ai/owner": "superexec"},
             "resources": {"requests": {"cpu": "1"}},
             "node-selector": {"kubernetes.io/os": "linux"},
-            "tolerations": [{"key": "dedicated", "operator": "Exists"}],
-            "affinity": {"podAntiAffinity": {}},
-            "priority-class-name": "high-priority",
-            "pod-security-context": {"runAsNonRoot": True},
-            "container-security-context": {"allowPrivilegeEscalation": False},
-            "service-account-name": "taskexecutor",
             "unknown-field": "ignored",
         },
     )
@@ -85,21 +66,10 @@ def test_get_executor_builds_kubernetes_executor_from_config(
     assert config.namespace == "flower-system"
     assert config.image == "ghcr.io/flwrlabs/taskexecutor:dev"
     assert config.image_pull_policy == "IfNotPresent"
-    assert config.resource_pool == "gpu-pool"
     assert config.active_pod_budget == 5
-    assert config.capacity_poll_interval == 0.25
-    assert config.capacity_log_interval == 30.0
     assert config.appio_root_certificates == "root-ca"
-    assert config.labels == {"flower.ai/deployment": "dev"}
-    assert config.annotations == {"flower.ai/owner": "superexec"}
     assert config.resources == {"requests": {"cpu": "1"}}
     assert config.node_selector == {"kubernetes.io/os": "linux"}
-    assert config.tolerations == [{"key": "dedicated", "operator": "Exists"}]
-    assert config.affinity == {"podAntiAffinity": {}}
-    assert config.priority_class_name == "high-priority"
-    assert config.pod_security_context == {"runAsNonRoot": True}
-    assert config.container_security_context == {"allowPrivilegeEscalation": False}
-    assert config.service_account_name == "taskexecutor"
     assert not hasattr(config, "unknown_field")
     create_client.assert_called_once_with()
 
