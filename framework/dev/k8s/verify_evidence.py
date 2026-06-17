@@ -42,6 +42,18 @@ def verify_evidence(
 
     summary = _read_json(summary_path, failures)
     details = _mapping(summary.get("details"))
+    invocation = _read_required_json(evidence_path, "invocation.json", failures)
+    task_lineage = _read_required_json(evidence_path, "task-lineage.json", failures)
+    taskexecutor_pods = _read_required_json(
+        evidence_path, "taskexecutor-pods.json", failures
+    )
+    taskexecutor_secrets = _read_required_json(
+        evidence_path, "taskexecutor-secrets.redacted.json", failures
+    )
+    final_state = _read_required_json(evidence_path, "final-state.json", failures)
+    proof_checklist = _read_required_json(
+        evidence_path, "proof-checklist.json", failures
+    )
 
     _expect(summary.get("status") == "passed", "summary status is not passed", failures)
     _expect(
@@ -50,7 +62,21 @@ def verify_evidence(
         failures,
     )
     _expect(not summary.get("failures"), "summary contains failures", failures)
-    _expect(details.get("dry_run") is False, "harness did not execute host commands", failures)
+    _expect(
+        details.get("dry_run") is False,
+        "harness did not execute host commands",
+        failures,
+    )
+    _expect(
+        invocation.get("mode") == "local-k8s-launch-path",
+        "invocation.json mode is not local-k8s-launch-path",
+        failures,
+    )
+    _expect(
+        invocation.get("dry_run") is False,
+        "invocation.json does not record a real execution",
+        failures,
+    )
 
     image_preflight = _mapping(details.get("image_preflight"))
     docker_inspect = _mapping(image_preflight.get("docker_inspect"))
@@ -60,7 +86,9 @@ def verify_evidence(
         "Docker image inspection did not pass",
         failures,
     )
-    _expect(k3d_import.get("returncode") == 0, "k3d image import did not pass", failures)
+    _expect(
+        k3d_import.get("returncode") == 0, "k3d image import did not pass", failures
+    )
 
     rbac = _mapping(details.get("rbac"))
     _expect(rbac.get("status") == "passed", "RBAC verification did not pass", failures)
@@ -76,6 +104,71 @@ def verify_evidence(
     _expect(
         all(phase == "Succeeded" for phase in pod_phases),
         f"TaskExecutor Pod phases were not all Succeeded: {', '.join(pod_phases)}",
+        failures,
+    )
+    task_lineage_tasks = _sequence(task_lineage.get("tasks"))
+    _expect(bool(task_lineage_tasks), "task-lineage.json contains no tasks", failures)
+    _expect(
+        task_lineage.get("seeded_run_id") == details.get("seed_run_id"),
+        "task-lineage.json seeded_run_id does not match summary",
+        failures,
+    )
+    _expect(
+        bool(_sequence(taskexecutor_pods.get("items"))),
+        "taskexecutor-pods.json contains no Pod items",
+        failures,
+    )
+
+    secret_items = _sequence(taskexecutor_secrets.get("items"))
+    _expect(
+        taskexecutor_secrets.get("redacted") is True,
+        "taskexecutor-secrets.redacted.json does not declare redaction",
+        failures,
+    )
+    _expect(
+        bool(secret_items),
+        "taskexecutor-secrets.redacted.json contains no Secret items",
+        failures,
+    )
+    _expect(
+        all(_mapping(secret).get("redacted") is True for secret in secret_items),
+        "one or more Secret evidence records are not marked redacted",
+        failures,
+    )
+    _expect(
+        all(
+            "token" in _sequence(_mapping(secret).get("data_keys"))
+            for secret in secret_items
+        ),
+        "Secret evidence does not include the token key name",
+        failures,
+    )
+
+    final_counts = _mapping(final_state.get("counts"))
+    _expect(
+        final_state.get("captured_before_namespace_cleanup") is True,
+        "final-state.json was not marked as pre-cleanup state",
+        failures,
+    )
+    _expect(
+        _int_value(final_counts.get("taskexecutor_pods")) >= 1,
+        "final-state.json does not count TaskExecutor Pods",
+        failures,
+    )
+    _expect(
+        _int_value(final_counts.get("taskexecutor_secrets")) >= 1,
+        "final-state.json does not count TaskExecutor Secrets",
+        failures,
+    )
+
+    checklist_claims = _sequence(proof_checklist.get("claims"))
+    out_of_scope = [
+        str(item) for item in _sequence(proof_checklist.get("out_of_scope"))
+    ]
+    _expect(bool(checklist_claims), "proof-checklist.json contains no claims", failures)
+    _expect(
+        any("capacity" in item for item in out_of_scope),
+        "proof-checklist.json does not keep capacity claims out of scope",
         failures,
     )
 
@@ -116,6 +209,9 @@ def verify_evidence(
         evidence_path=evidence_path,
         summary=summary,
         details=details,
+        task_lineage_tasks=task_lineage_tasks,
+        secret_items=secret_items,
+        final_counts=final_counts,
         pod_phases=pod_phases,
         cleanup_result=cleanup_result,
         require_cleanup=require_cleanup,
@@ -135,11 +231,24 @@ def _read_json(path: Path, failures: list[str]) -> dict[str, object]:
     return value
 
 
+def _read_required_json(
+    evidence_path: Path, relative_path: str, failures: list[str]
+) -> dict[str, object]:
+    path = evidence_path / relative_path
+    if not path.is_file():
+        failures.append(f"{relative_path} not found under {evidence_path}")
+        return {}
+    return _read_json(path, failures)
+
+
 def _format_report(
     *,
     evidence_path: Path,
     summary: Mapping[str, object],
     details: Mapping[str, object],
+    task_lineage_tasks: Sequence[object],
+    secret_items: Sequence[object],
+    final_counts: Mapping[str, object],
     pod_phases: Sequence[str],
     cleanup_result: Mapping[str, object],
     require_cleanup: bool,
@@ -165,6 +274,13 @@ def _format_report(
         lines.append(f"  - {pod.get('name')} phase={pod.get('phase')}")
     lines.extend(
         [
+            f"Task lineage records: {len(task_lineage_tasks)}",
+            f"Credential Secret records: {len(secret_items)}",
+            (
+                "Final state counts: "
+                f"pods={final_counts.get('taskexecutor_pods')} "
+                f"secrets={final_counts.get('taskexecutor_secrets')}"
+            ),
             f"TaskExecutor log captures: {len(taskexecutor_logs)}",
             f"TaskExecutor phases: {', '.join(pod_phases) or '<none>'}",
             f"Cleanup required: {str(require_cleanup).lower()}",
@@ -190,6 +306,10 @@ def _mapping(value: object) -> Mapping[str, object]:
 
 def _sequence(value: object) -> Sequence[object]:
     return value if isinstance(value, list) else []
+
+
+def _int_value(value: object) -> int:
+    return value if isinstance(value, int) else 0
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

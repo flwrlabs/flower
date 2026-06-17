@@ -16,8 +16,8 @@
 
 from __future__ import annotations
 
-import importlib.util
 import hashlib
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -30,9 +30,7 @@ import yaml
 
 def _load_harness_module() -> ModuleType:
     """Load the dev harness scaffold from its file path."""
-    harness_path = (
-        Path(__file__).resolve().parents[5] / "dev" / "k8s" / "harness.py"
-    )
+    harness_path = Path(__file__).resolve().parents[5] / "dev" / "k8s" / "harness.py"
     spec = importlib.util.spec_from_file_location(
         "kubernetes_executor_harness", harness_path
     )
@@ -348,7 +346,7 @@ def test_run_infra_proof_dry_run_writes_local_k8s_infra_evidence(
 def test_run_infra_proof_fails_when_negative_rbac_check_allows_too_much(
     tmp_path: Path,
 ) -> None:
-    """Test local k8s infra proof records a failure when broader RBAC access is allowed."""
+    """Test local k8s infra proof rejects broader RBAC access."""
     runner = _AllowEverythingRunner()
 
     summary = harness_module.run_infra_proof(
@@ -538,6 +536,12 @@ def test_run_local_k8s_launch_path_dry_run_writes_evidence(tmp_path: Path) -> No
     assert (output_dir / "objects" / "real-launch.yaml").is_file()
     assert (output_dir / "objects" / "seed-job.yaml").is_file()
     assert (output_dir / "objects" / "executor-config.yaml").is_file()
+    assert (output_dir / "invocation.json").is_file()
+    assert (output_dir / "task-lineage.json").is_file()
+    assert (output_dir / "taskexecutor-pods.json").is_file()
+    assert (output_dir / "taskexecutor-secrets.redacted.json").is_file()
+    assert (output_dir / "final-state.json").is_file()
+    assert (output_dir / "proof-checklist.json").is_file()
 
     events = _read_jsonl(output_dir / "events.jsonl")
     assert [event["event"] for event in events] == [
@@ -569,7 +573,9 @@ def test_run_local_k8s_launch_path_dry_run_writes_evidence(tmp_path: Path) -> No
     assert "wait --for=condition=Ready pod/flower-superlink" in commands_text
     assert "wait --for=condition=Ready pod/flower-superexec" in commands_text
     assert "delete job flower-local-k8s-seed-run" in commands_text
-    assert "wait --for=condition=Complete job/flower-local-k8s-seed-run" in commands_text
+    assert (
+        "wait --for=condition=Complete job/flower-local-k8s-seed-run" in commands_text
+    )
     assert "app.kubernetes.io/component=taskexecutor" in commands_text
     assert (output_dir / "diagnostics" / "image-preflight.txt").is_file()
     assert (output_dir / "diagnostics" / "cleanup.txt").is_file()
@@ -599,6 +605,11 @@ def test_run_local_k8s_launch_path_records_terminal_pod_logs_and_cleanup(
     assert summary.result == "local-k8s-launch-path"
     assert summary.details["seed_run_id"] == 123
     assert summary.details["pods"][0]["phase"] == "Succeeded"
+    assert summary.details["credential_secrets"][0]["name"] == (
+        "flwr-taskexecutor-123-abc-appio"
+    )
+    assert summary.details["final_state_counts"]["taskexecutor_pods"] == 1
+    assert summary.details["final_state_counts"]["taskexecutor_secrets"] == 1
     assert summary.details["cleanup"]["requested"] is True
     assert summary.details["cleanup"]["result"]["returncode"] == 0
     cleanup_text = (output_dir / "diagnostics" / "cleanup.txt").read_text()
@@ -606,11 +617,70 @@ def test_run_local_k8s_launch_path_records_terminal_pod_logs_and_cleanup(
 
     pods = json.loads((output_dir / "objects" / "pods.json").read_text())
     assert pods["phases"] == ["Succeeded"]
+    taskexecutor_pods = json.loads((output_dir / "taskexecutor-pods.json").read_text())
+    assert taskexecutor_pods["items"][0]["metadata"]["uid"] == "pod-uid-123"
+
+    secret_text = (output_dir / "taskexecutor-secrets.redacted.json").read_text()
+    assert "task-token" not in secret_text
+    assert "dGFzay10b2tlbg==" not in secret_text
+    taskexecutor_secrets = json.loads(secret_text)
+    assert taskexecutor_secrets["redacted"] is True
+    assert taskexecutor_secrets["command"]["stdout"] == (
+        f"{harness_module.REDACTED} Secret list JSON; see summarized items"
+    )
+    assert taskexecutor_secrets["items"][0]["data_keys"] == ["token"]
+    assert taskexecutor_secrets["items"][0]["data_byte_lengths"] == [
+        {"bytes": 10, "key": "token"}
+    ]
+
+    lineage = json.loads((output_dir / "task-lineage.json").read_text())
+    assert lineage["seeded_run_id"] == 123
+    assert lineage["tasks"] == [
+        {
+            "credential_secret_name": "flwr-taskexecutor-123-abc-appio",
+            "credential_secret_uid": "secret-uid-123",
+            "launch_attempt": "abc",
+            "pod_name": "flwr-taskexecutor-123-abc",
+            "pod_phase": "Succeeded",
+            "pod_uid": "pod-uid-123",
+            "resource_pool": "generic-k3d",
+            "seeded_run_id": 123,
+            "task_id": "123",
+            "task_type": "flwr-serverapp",
+            "terminal_phase": "Succeeded",
+        }
+    ]
+
+    final_state_text = (output_dir / "final-state.json").read_text()
+    assert "task-token" not in final_state_text
+    assert "dGFzay10b2tlbg==" not in final_state_text
+    final_state = json.loads((output_dir / "final-state.json").read_text())
+    assert final_state["captured_before_namespace_cleanup"] is True
+    assert final_state["cleanup_requested"] is True
+    assert final_state["commands"]["taskexecutor_secrets"]["stdout"] == (
+        f"{harness_module.REDACTED} Secret list JSON; see summarized items"
+    )
+    assert final_state["counts"] == {
+        "jobs": 1,
+        "namespace": 1,
+        "services": 1,
+        "taskexecutor_pods": 1,
+        "taskexecutor_secrets": 1,
+    }
+
+    checklist = json.loads((output_dir / "proof-checklist.json").read_text())
+    assert any("capacity" in item for item in checklist["out_of_scope"])
+    assert checklist["claims"][4]["artifact"] == "taskexecutor-secrets.redacted.json"
 
     taskexecutor_logs = (
         output_dir / "diagnostics" / "taskexecutor-logs.txt"
     ).read_text()
     assert "K8s launch probe ServerApp ran" in taskexecutor_logs
+
+    command_text = (output_dir / "diagnostics" / "commands.txt").read_text()
+    assert "task-token" not in command_text
+    assert "dGFzay10b2tlbg==" not in command_text
+    assert f"stdout: {harness_module.REDACTED} Secret list JSON" in command_text
 
     commands = [" ".join(command) for command in runner.commands]
     assert any(command.startswith("docker image inspect ") for command in commands)
@@ -624,7 +694,9 @@ def test_run_local_k8s_launch_path_records_terminal_pod_logs_and_cleanup(
         in command
         for command in commands
     )
-    assert any("delete job flower-local-k8s-seed-run" in command for command in commands)
+    assert any(
+        "delete job flower-local-k8s-seed-run" in command for command in commands
+    )
     assert any("logs pod/flwr-taskexecutor-123-abc" in command for command in commands)
     assert any("delete namespace flower-local-k8s" in command for command in commands)
 
@@ -806,6 +878,14 @@ class _RealLaunchRunner:
                 else self.terminal_phase
             )
             return self._result(args, stdout=json.dumps(_pod_list(phase)))
+        if "get" in args and "secrets" in args and "-o" in args and "json" in args:
+            return self._result(args, stdout=json.dumps(_secret_list()))
+        if "get" in args and "jobs" in args and "-o" in args and "json" in args:
+            return self._result(args, stdout=json.dumps(_object_list("Job")))
+        if "get" in args and "services" in args and "-o" in args and "json" in args:
+            return self._result(args, stdout=json.dumps(_object_list("Service")))
+        if "get" in args and "namespace" in args and "-o" in args and "json" in args:
+            return self._result(args, stdout=json.dumps(_namespace()))
         if "logs" in args and "job/flower-local-k8s-seed-run" in args:
             return self._result(args, stdout="K8s launch seed created run_id=123\n")
         if "logs" in args and "pod/flower-superexec" in args:
@@ -854,14 +934,92 @@ def _pod_list(phase: str) -> dict[str, Any]:
                 "metadata": {
                     "name": "flwr-taskexecutor-123-abc",
                     "namespace": "flower-local-k8s",
+                    "uid": "pod-uid-123",
                     "labels": {
                         "app.kubernetes.io/name": "flower",
                         "app.kubernetes.io/component": "taskexecutor",
+                        "flower.ai/harness-run": "k8s-launch-test",
+                        "flower.ai/launch-attempt": "abc",
+                        "flower.ai/resource-pool": "generic-k3d",
+                        "flower.ai/superexec-task-id": "123",
+                        "flower.ai/task-type": "flwr-serverapp",
                     },
+                },
+                "spec": {
+                    "containers": [
+                        {
+                            "name": "taskexecutor",
+                            "image": "flwr/superexec:dev",
+                            "args": [
+                                "--serverappio-api-address",
+                                "flower-superlink:9091",
+                                "--token-file",
+                                "/run/flwr/appio/token",
+                                "--insecure",
+                            ],
+                        }
+                    ],
+                    "volumes": [
+                        {
+                            "name": "appio-credentials",
+                            "secret": {"secretName": "flwr-taskexecutor-123-abc-appio"},
+                        }
+                    ],
                 },
                 "status": {"phase": phase},
             }
         ]
+    }
+
+
+def _secret_list() -> dict[str, Any]:
+    return {
+        "items": [
+            {
+                "kind": "Secret",
+                "metadata": {
+                    "name": "flwr-taskexecutor-123-abc-appio",
+                    "namespace": "flower-local-k8s",
+                    "uid": "secret-uid-123",
+                    "labels": {
+                        "app.kubernetes.io/name": "flower",
+                        "app.kubernetes.io/component": "taskexecutor",
+                        "flower.ai/harness-run": "k8s-launch-test",
+                        "flower.ai/launch-attempt": "abc",
+                        "flower.ai/resource-pool": "generic-k3d",
+                        "flower.ai/superexec-task-id": "123",
+                        "flower.ai/task-type": "flwr-serverapp",
+                    },
+                },
+                "type": "Opaque",
+                "data": {"token": "dGFzay10b2tlbg=="},
+            }
+        ]
+    }
+
+
+def _object_list(kind: str) -> dict[str, Any]:
+    return {
+        "items": [
+            {
+                "kind": kind,
+                "metadata": {
+                    "name": f"flower-local-k8s-{kind.lower()}",
+                    "namespace": "flower-local-k8s",
+                    "uid": f"{kind.lower()}-uid",
+                    "labels": {"flower.ai/harness-run": "k8s-launch-test"},
+                },
+                "status": {},
+            }
+        ]
+    }
+
+
+def _namespace() -> dict[str, Any]:
+    return {
+        "kind": "Namespace",
+        "metadata": {"name": "flower-local-k8s", "uid": "namespace-uid"},
+        "status": {"phase": "Active"},
     }
 
 
@@ -888,6 +1046,61 @@ def _write_verifier_evidence(
         },
     }
     (output_dir / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
+    (output_dir / "invocation.json").write_text(
+        json.dumps({"mode": "local-k8s-launch-path", "dry_run": False}),
+        encoding="utf-8",
+    )
+    (output_dir / "task-lineage.json").write_text(
+        json.dumps(
+            {
+                "seeded_run_id": 123,
+                "tasks": [
+                    {
+                        "pod_name": "flwr-taskexecutor-test",
+                        "credential_secret_name": "flwr-taskexecutor-test-appio",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (output_dir / "taskexecutor-pods.json").write_text(
+        json.dumps({"items": [{"metadata": {"name": "flwr-taskexecutor-test"}}]}),
+        encoding="utf-8",
+    )
+    (output_dir / "taskexecutor-secrets.redacted.json").write_text(
+        json.dumps(
+            {
+                "redacted": True,
+                "items": [
+                    {
+                        "name": "flwr-taskexecutor-test-appio",
+                        "data_keys": ["token"],
+                        "redacted": True,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (output_dir / "final-state.json").write_text(
+        json.dumps(
+            {
+                "captured_before_namespace_cleanup": True,
+                "counts": {"taskexecutor_pods": 1, "taskexecutor_secrets": 1},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (output_dir / "proof-checklist.json").write_text(
+        json.dumps(
+            {
+                "claims": [{"claim": "TaskExecutor Pod observed"}],
+                "out_of_scope": ["capacity wait proof"],
+            }
+        ),
+        encoding="utf-8",
+    )
     (output_dir / "diagnostics" / "taskexecutor-logs.txt").write_text(
         taskexecutor_log_text,
         encoding="utf-8",

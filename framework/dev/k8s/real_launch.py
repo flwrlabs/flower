@@ -16,10 +16,13 @@
 
 from __future__ import annotations
 
+import base64
+import json
+import subprocess
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import cast
+from typing import Protocol, cast
 from uuid import uuid4
 
 from common import (
@@ -29,6 +32,8 @@ from common import (
     HarnessProfile,
     HarnessSummary,
     HostCommandRunner,
+    REDACTED,
+    SCHEMA_VERSION,
     _command_error,
     _command_record,
     _combined_status,
@@ -46,6 +51,7 @@ from common import (
     build_image_preflight,
     build_tls_material_contract,
     generic_k3d_profile,
+    redact_command_args,
 )
 from manifests import (
     render_appio_seed_manifests,
@@ -69,6 +75,8 @@ from observations import (
 )
 
 _TASKEXECUTOR_POD_POLL_INTERVAL_SECONDS = 1.0
+_TASK_ID_LABEL = "flower.ai/superexec-task-id"
+_LAUNCH_ATTEMPT_LABEL = "flower.ai/launch-attempt"
 
 
 def run_local_k8s_launch_path(
@@ -105,6 +113,19 @@ def run_local_k8s_launch_path(
     image_preflight = build_image_preflight(profile)
     cleanup_plan = build_cleanup_plan(profile)
 
+    writer.write_json(
+        "invocation.json",
+        _invocation_record(
+            profile=profile,
+            writer=writer,
+            run_id=run_id,
+            execute=execute,
+            create_cluster=create_cluster,
+            apply_manifests=apply_manifests,
+            import_images=import_images,
+            cleanup=cleanup,
+        ),
+    )
     writer.write_yaml("sanitized-config.yaml", profile.to_mapping())
     writer.write_json("diagnostics/image-preflight.json", image_preflight)
     writer.write_text(
@@ -234,7 +255,10 @@ def run_local_k8s_launch_path(
     write_event(
         "tls.material.ready",
         tls_status,
-        "TLS material contract recorded; local k8s launch-path uses insecure AppIo unless supplied.",
+        (
+            "TLS material contract recorded; local k8s launch-path uses insecure "
+            "AppIo unless supplied."
+        ),
         tls_contract,
     )
 
@@ -422,7 +446,9 @@ def run_local_k8s_launch_path(
             "delete_previous": (
                 _command_record(seed_prune_result) if seed_prune_result.args else None
             ),
-            "apply": _command_record(seed_apply_result) if seed_apply_result.args else None,
+            "apply": (
+                _command_record(seed_apply_result) if seed_apply_result.args else None
+            ),
             "wait": _command_record(seed_wait_result),
             "logs": _command_record(seed_logs_result),
         },
@@ -540,7 +566,9 @@ def run_local_k8s_launch_path(
         )
         for pod_name in taskexecutor_pod_names
     ]
+    taskexecutor_pod_snapshot = _json_list_snapshot(taskexecutor_pods_result)
     writer.write_json("objects/pods.json", taskexecutor_observation)
+    writer.write_json("taskexecutor-pods.json", taskexecutor_pod_snapshot)
     writer.write_text(
         "diagnostics/taskexecutor-logs.txt",
         _format_taskexecutor_logs(taskexecutor_log_results),
@@ -581,6 +609,65 @@ def run_local_k8s_launch_path(
         },
     )
 
+    taskexecutor_secrets_result = run_command(
+        _kubectl_args(
+            profile,
+            [
+                "get",
+                "secrets",
+                "-n",
+                profile.namespace,
+                "-l",
+                taskexecutor_selector,
+                "-o",
+                "json",
+            ],
+        ),
+        "TaskExecutor credential Secret observation",
+    )
+    taskexecutor_secret_snapshot = _json_list_snapshot(taskexecutor_secrets_result)
+    _redact_secret_observation_stdout(taskexecutor_secrets_result)
+    taskexecutor_secret_evidence = _taskexecutor_secret_evidence(
+        taskexecutor_secret_snapshot,
+        selector=taskexecutor_selector,
+        command=_command_record(taskexecutor_secrets_result),
+    )
+    writer.write_json(
+        "taskexecutor-secrets.redacted.json", taskexecutor_secret_evidence
+    )
+    if (
+        execute
+        and taskexecutor_observation["items"]
+        and not taskexecutor_secret_evidence["items"]
+    ):
+        failures.append(
+            "No TaskExecutor credential Secret was observed through the local k8s "
+            "selector before namespace cleanup."
+        )
+
+    task_lineage = _task_lineage(
+        profile=profile,
+        run_id=run_id,
+        seed_run_id=seed_observation["run_id"],
+        selector=taskexecutor_selector,
+        pod_snapshot=taskexecutor_pod_snapshot,
+        secret_evidence=taskexecutor_secret_evidence,
+    )
+    writer.write_json("task-lineage.json", task_lineage)
+
+    final_state = _final_state_record(
+        profile=profile,
+        run_id=run_id,
+        cleanup_requested=cleanup,
+        taskexecutor_selector=taskexecutor_selector,
+        pod_snapshot=taskexecutor_pod_snapshot,
+        pod_result=taskexecutor_pods_result,
+        secret_evidence=taskexecutor_secret_evidence,
+        secret_result=taskexecutor_secrets_result,
+        run_command=run_command,
+    )
+    writer.write_json("final-state.json", final_state)
+
     cleanup_result = CommandResult(args=[], returncode=0, dry_run=not execute)
     if cleanup:
         cleanup_result = run_command(
@@ -590,6 +677,15 @@ def run_local_k8s_launch_path(
 
     result = "local-k8s-launch-path" if execute else "local-k8s-launch-path-dry-run"
     status = "failed" if failures else "passed"
+    writer.write_json(
+        "proof-checklist.json",
+        _proof_checklist(
+            status=status,
+            dry_run=not execute,
+            run_id=run_id,
+            cleanup_requested=cleanup,
+        ),
+    )
     write_event(
         "harness.result",
         status,
@@ -643,6 +739,16 @@ def run_local_k8s_launch_path(
             "selector": taskexecutor_selector,
             "seed_run_id": seed_observation["run_id"],
             "pods": taskexecutor_observation["items"],
+            "credential_secrets": taskexecutor_secret_evidence["items"],
+            "final_state_counts": final_state["counts"],
+            "artifacts": {
+                "invocation": "invocation.json",
+                "task_lineage": "task-lineage.json",
+                "taskexecutor_pods": "taskexecutor-pods.json",
+                "taskexecutor_secrets": "taskexecutor-secrets.redacted.json",
+                "final_state": "final-state.json",
+                "proof_checklist": "proof-checklist.json",
+            },
             "rbac": rbac_check,
             "image_preflight": {
                 "required_images": image_preflight["required_images"],
@@ -668,3 +774,518 @@ def run_local_k8s_launch_path(
     )
     writer.write_summary(summary)
     return summary
+
+
+def _invocation_record(
+    *,
+    profile: HarnessProfile,
+    writer: EvidenceBundleWriter,
+    run_id: str,
+    execute: bool,
+    create_cluster: bool,
+    apply_manifests: bool,
+    import_images: bool,
+    cleanup: bool,
+) -> dict[str, object]:
+    """Return reviewer-facing inputs for one local k8s launch-path run."""
+    cwd = Path.cwd()
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "mode": "local-k8s-launch-path",
+        "run_id": run_id,
+        "dry_run": not execute,
+        "cwd": str(cwd),
+        "repo": _git_context(cwd),
+        "output_dir": str(writer.output_dir),
+        "profile_name": profile.name,
+        "profile": profile.to_mapping(),
+        "settings": {
+            "execute": execute,
+            "create_cluster": create_cluster,
+            "apply_manifests": apply_manifests,
+            "import_images": import_images,
+            "cleanup_requested": cleanup,
+        },
+        "equivalent_argv": _equivalent_argv(
+            profile=profile,
+            output_dir=writer.output_dir,
+            execute=execute,
+            create_cluster=create_cluster,
+            apply_manifests=apply_manifests,
+            import_images=import_images,
+            cleanup=cleanup,
+        ),
+    }
+
+
+def _equivalent_argv(
+    *,
+    profile: HarnessProfile,
+    output_dir: Path,
+    execute: bool,
+    create_cluster: bool,
+    apply_manifests: bool,
+    import_images: bool,
+    cleanup: bool,
+) -> list[str]:
+    args = [
+        "python",
+        "framework/dev/k8s/harness.py",
+        "--mode",
+        "local-k8s-launch-path",
+        "--output-dir",
+        str(output_dir),
+        "--cluster-name",
+        profile.cluster_name,
+        "--namespace",
+        profile.namespace,
+        "--resource-pool",
+        profile.resource_pool,
+        "--image",
+        profile.image,
+        "--superlink-image",
+        profile.superlink_image,
+        "--superexec-image",
+        profile.superexec_image,
+        "--timeout-seconds",
+        str(profile.timeout_seconds),
+    ]
+    if execute:
+        args.append("--execute")
+    if create_cluster:
+        args.append("--create-cluster")
+    if apply_manifests:
+        args.append("--apply-manifests")
+    if import_images:
+        args.append("--import-images")
+    if cleanup:
+        args.append("--cleanup")
+    return redact_command_args(args)
+
+
+def _git_context(cwd: Path) -> dict[str, object]:
+    return {
+        "root": _git_output(cwd, "rev-parse", "--show-toplevel"),
+        "branch": _git_output(cwd, "rev-parse", "--abbrev-ref", "HEAD"),
+        "sha": _git_output(cwd, "rev-parse", "HEAD"),
+    }
+
+
+def _git_output(cwd: Path, *args: str) -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+    except OSError:
+        return None
+    if completed.returncode != 0:
+        return None
+    value = completed.stdout.strip()
+    return value or None
+
+
+def _json_list_snapshot(result: CommandResult) -> dict[str, object]:
+    snapshot = _json_snapshot(result)
+    items = snapshot.get("items")
+    if not isinstance(items, list):
+        snapshot["items"] = []
+    return snapshot
+
+
+def _json_snapshot(result: CommandResult) -> dict[str, object]:
+    if result.dry_run or not result.stdout.strip():
+        return {"items": []}
+    try:
+        parsed = json.loads(result.stdout)
+    except json.JSONDecodeError as err:
+        return {"items": [], "parse_error": f"invalid JSON: {err}"}
+    if isinstance(parsed, Mapping):
+        return dict(parsed)
+    return {"items": [], "parse_error": "JSON output was not an object"}
+
+
+def _taskexecutor_secret_evidence(
+    secret_snapshot: Mapping[str, object],
+    *,
+    selector: str,
+    command: Mapping[str, object],
+) -> dict[str, object]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "redacted": True,
+        "selector": selector,
+        "command": dict(command),
+        "items": [_secret_summary(secret) for secret in _object_items(secret_snapshot)],
+    }
+
+
+def _redact_secret_observation_stdout(result: CommandResult) -> None:
+    if result.stdout.strip():
+        result.stdout = f"{REDACTED} Secret list JSON; see summarized items"
+
+
+def _secret_summary(secret: Mapping[str, object]) -> dict[str, object]:
+    metadata = _mapping(secret.get("metadata"))
+    data = _mapping(secret.get("data"))
+    string_data = _mapping(secret.get("stringData"))
+    binary_data = _mapping(secret.get("binaryData"))
+    return {
+        "name": _string_or_none(metadata.get("name")),
+        "namespace": _string_or_none(metadata.get("namespace")),
+        "uid": _string_or_none(metadata.get("uid")),
+        "labels": _string_mapping(metadata.get("labels")),
+        "annotations": _string_mapping(metadata.get("annotations")),
+        "type": _string_or_none(secret.get("type")),
+        "data_keys": sorted(str(key) for key in data),
+        "data_byte_lengths": _base64_byte_lengths(data),
+        "stringData_keys": sorted(str(key) for key in string_data),
+        "binaryData_keys": sorted(str(key) for key in binary_data),
+        "redacted": True,
+    }
+
+
+def _task_lineage(
+    *,
+    profile: HarnessProfile,
+    run_id: str,
+    seed_run_id: object,
+    selector: str,
+    pod_snapshot: Mapping[str, object],
+    secret_evidence: Mapping[str, object],
+) -> dict[str, object]:
+    secrets_by_name = {
+        str(secret["name"]): secret
+        for secret in _object_items(secret_evidence)
+        if isinstance(secret.get("name"), str)
+    }
+    tasks: list[dict[str, object]] = []
+    for pod in _object_items(pod_snapshot):
+        metadata = _mapping(pod.get("metadata"))
+        labels = _string_mapping(metadata.get("labels"))
+        status = _mapping(pod.get("status"))
+        pod_name = _string_or_none(metadata.get("name"))
+        secret_name = _pod_secret_name(pod)
+        secret = secrets_by_name.get(secret_name or "")
+        if secret is None:
+            secret = _secret_matching_task(
+                secret_evidence,
+                task_id=labels.get(_TASK_ID_LABEL),
+                launch_attempt=labels.get(_LAUNCH_ATTEMPT_LABEL),
+            )
+            if isinstance(secret.get("name"), str):
+                secret_name = str(secret["name"])
+        tasks.append(
+            {
+                "seeded_run_id": seed_run_id,
+                "task_id": labels.get(_TASK_ID_LABEL),
+                "task_type": labels.get("flower.ai/task-type"),
+                "pod_name": pod_name,
+                "pod_uid": _string_or_none(metadata.get("uid")),
+                "pod_phase": _string_or_none(status.get("phase")),
+                "terminal_phase": _string_or_none(status.get("phase")),
+                "launch_attempt": labels.get(_LAUNCH_ATTEMPT_LABEL),
+                "resource_pool": labels.get("flower.ai/resource-pool"),
+                "credential_secret_name": secret_name,
+                "credential_secret_uid": _string_or_none(secret.get("uid")),
+            }
+        )
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "mode": "local-k8s-launch-path",
+        "run_id": run_id,
+        "seeded_run_id": seed_run_id,
+        "resource_pool": profile.resource_pool,
+        "selector": selector,
+        "tasks": tasks,
+    }
+
+
+def _final_state_record(
+    *,
+    profile: HarnessProfile,
+    run_id: str,
+    cleanup_requested: bool,
+    taskexecutor_selector: str,
+    pod_snapshot: Mapping[str, object],
+    pod_result: CommandResult,
+    secret_evidence: Mapping[str, object],
+    secret_result: CommandResult,
+    run_command: object,
+) -> dict[str, object]:
+    command_runner = cast(
+        CallableCommand,
+        run_command,
+    )
+    run_selector = f"flower.ai/harness-run={run_id}"
+    jobs_result = command_runner(
+        _kubectl_args(
+            profile,
+            ["get", "jobs", "-n", profile.namespace, "-l", run_selector, "-o", "json"],
+        ),
+        "final-state Job observation",
+    )
+    services_result = command_runner(
+        _kubectl_args(
+            profile,
+            [
+                "get",
+                "services",
+                "-n",
+                profile.namespace,
+                "-l",
+                run_selector,
+                "-o",
+                "json",
+            ],
+        ),
+        "final-state Service observation",
+    )
+    namespace_result = command_runner(
+        _kubectl_args(profile, ["get", "namespace", profile.namespace, "-o", "json"]),
+        "final-state namespace observation",
+    )
+
+    jobs_snapshot = _json_list_snapshot(jobs_result)
+    services_snapshot = _json_list_snapshot(services_result)
+    namespace_snapshot = _json_snapshot(namespace_result)
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "mode": "local-k8s-launch-path",
+        "run_id": run_id,
+        "captured_before_namespace_cleanup": True,
+        "cleanup_requested": cleanup_requested,
+        "selectors": {
+            "taskexecutor": taskexecutor_selector,
+            "run": run_selector,
+        },
+        "commands": {
+            "taskexecutor_pods": _command_record(pod_result),
+            "taskexecutor_secrets": _command_record(secret_result),
+            "jobs": _command_record(jobs_result),
+            "services": _command_record(services_result),
+            "namespace": _command_record(namespace_result),
+        },
+        "counts": {
+            "taskexecutor_pods": len(_object_items(pod_snapshot)),
+            "taskexecutor_secrets": len(_object_items(secret_evidence)),
+            "jobs": len(_object_items(jobs_snapshot)),
+            "services": len(_object_items(services_snapshot)),
+            "namespace": 1 if namespace_snapshot.get("metadata") else 0,
+        },
+        "resources": {
+            "pods": _pod_summaries(pod_snapshot),
+            "secrets": list(_object_items(secret_evidence)),
+            "jobs": _object_summaries(jobs_snapshot),
+            "services": _object_summaries(services_snapshot),
+            "namespace": _namespace_summary(namespace_snapshot),
+        },
+    }
+
+
+def _proof_checklist(
+    *,
+    status: str,
+    dry_run: bool,
+    run_id: str,
+    cleanup_requested: bool,
+) -> dict[str, object]:
+    proof_status = "planned" if dry_run else status
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "mode": "local-k8s-launch-path",
+        "run_id": run_id,
+        "claims": [
+            {
+                "claim": "Harness invocation and selected inputs are inspectable.",
+                "status": "proved",
+                "artifact": "invocation.json",
+                "fields": ["equivalent_argv", "repo", "profile", "settings"],
+            },
+            {
+                "claim": "SuperExec is configured to use the Kubernetes executor.",
+                "status": proof_status,
+                "artifact": "objects/real-launch.yaml",
+                "fields": [
+                    "SuperExec container args include --executor kubernetes",
+                    "executor config is mounted at /etc/flower/executor-config.yaml",
+                ],
+            },
+            {
+                "claim": (
+                    "One seeded ServerApp run maps to observed TaskExecutor objects."
+                ),
+                "status": proof_status,
+                "artifact": "task-lineage.json",
+                "fields": [
+                    "seeded_run_id",
+                    "tasks[].pod_name",
+                    "tasks[].credential_secret_name",
+                ],
+            },
+            {
+                "claim": (
+                    "The executor-created TaskExecutor Pod is captured as a full "
+                    "redacted object snapshot."
+                ),
+                "status": proof_status,
+                "artifact": "taskexecutor-pods.json",
+                "fields": ["items[].metadata", "items[].spec", "items[].status"],
+            },
+            {
+                "claim": (
+                    "The per-task credential Secret existed without exposing "
+                    "credential values."
+                ),
+                "status": proof_status,
+                "artifact": "taskexecutor-secrets.redacted.json",
+                "fields": [
+                    "items[].name",
+                    "items[].data_keys",
+                    "items[].data_byte_lengths",
+                    "items[].redacted",
+                ],
+            },
+            {
+                "claim": (
+                    "Pre-cleanup resource state is captured before namespace deletion."
+                ),
+                "status": proof_status,
+                "artifact": "final-state.json",
+                "fields": ["counts", "resources", "captured_before_namespace_cleanup"],
+            },
+        ],
+        "out_of_scope": [
+            "active Pod budget behavior",
+            "two-task capacity waiting",
+            "executor-owned completed Pod cleanup proof",
+            "executor-owned per-task Secret cleanup proof",
+            "F7e cardinality behavior",
+            "AppIo TLS proof",
+            "production deployment readiness",
+        ],
+        "cleanup_requested": cleanup_requested,
+    }
+
+
+class CallableCommand(Protocol):
+    """Callable shape for the local run_command closure."""
+
+    def __call__(
+        self, args: Sequence[str], failure_context: str, *, record_failure: bool = True
+    ) -> CommandResult:
+        """Run a command and return its result."""
+
+
+def _pod_summaries(snapshot: Mapping[str, object]) -> list[dict[str, object]]:
+    summaries: list[dict[str, object]] = []
+    for pod in _object_items(snapshot):
+        metadata = _mapping(pod.get("metadata"))
+        status = _mapping(pod.get("status"))
+        summaries.append(
+            {
+                "name": _string_or_none(metadata.get("name")),
+                "namespace": _string_or_none(metadata.get("namespace")),
+                "uid": _string_or_none(metadata.get("uid")),
+                "labels": _string_mapping(metadata.get("labels")),
+                "phase": _string_or_none(status.get("phase")),
+                "deletionTimestamp": _string_or_none(metadata.get("deletionTimestamp")),
+            }
+        )
+    return summaries
+
+
+def _object_summaries(snapshot: Mapping[str, object]) -> list[dict[str, object]]:
+    summaries: list[dict[str, object]] = []
+    for item in _object_items(snapshot):
+        metadata = _mapping(item.get("metadata"))
+        status = _mapping(item.get("status"))
+        summaries.append(
+            {
+                "kind": _string_or_none(item.get("kind")),
+                "name": _string_or_none(metadata.get("name")),
+                "namespace": _string_or_none(metadata.get("namespace")),
+                "uid": _string_or_none(metadata.get("uid")),
+                "labels": _string_mapping(metadata.get("labels")),
+                "phase": _string_or_none(status.get("phase")),
+            }
+        )
+    return summaries
+
+
+def _namespace_summary(snapshot: Mapping[str, object]) -> dict[str, object]:
+    metadata = _mapping(snapshot.get("metadata"))
+    status = _mapping(snapshot.get("status"))
+    return {
+        "name": _string_or_none(metadata.get("name")),
+        "uid": _string_or_none(metadata.get("uid")),
+        "phase": _string_or_none(status.get("phase")),
+    }
+
+
+def _secret_matching_task(
+    secret_evidence: Mapping[str, object],
+    *,
+    task_id: str | None,
+    launch_attempt: str | None,
+) -> Mapping[str, object]:
+    for secret in _object_items(secret_evidence):
+        labels = _string_mapping(secret.get("labels"))
+        if labels.get(_TASK_ID_LABEL) != task_id:
+            continue
+        if labels.get(_LAUNCH_ATTEMPT_LABEL) == launch_attempt:
+            return secret
+    return {}
+
+
+def _pod_secret_name(pod: Mapping[str, object]) -> str | None:
+    spec = _mapping(pod.get("spec"))
+    volumes = spec.get("volumes", [])
+    if not isinstance(volumes, Sequence) or isinstance(volumes, str):
+        return None
+    for volume in volumes:
+        if not isinstance(volume, Mapping):
+            continue
+        secret = _mapping(volume.get("secret"))
+        secret_name = _string_or_none(secret.get("secretName"))
+        if secret_name is not None:
+            return secret_name
+    return None
+
+
+def _object_items(snapshot: Mapping[str, object]) -> list[Mapping[str, object]]:
+    items = snapshot.get("items", [])
+    if not isinstance(items, Sequence) or isinstance(items, str):
+        return []
+    return [item for item in items if isinstance(item, Mapping)]
+
+
+def _mapping(value: object) -> Mapping[str, object]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _string_mapping(value: object) -> dict[str, str]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(key): str(item) for key, item in value.items() if isinstance(item, str)}
+
+
+def _base64_byte_lengths(data: Mapping[str, object]) -> list[dict[str, object]]:
+    lengths: list[dict[str, object]] = []
+    for key, value in data.items():
+        if not isinstance(value, str):
+            lengths.append({"key": str(key), "bytes": None})
+            continue
+        try:
+            byte_length = len(base64.b64decode(value, validate=True))
+        except ValueError:
+            byte_length = len(value.encode("utf-8"))
+        lengths.append({"key": str(key), "bytes": byte_length})
+    return lengths
+
+
+def _string_or_none(value: object) -> str | None:
+    return value if isinstance(value, str) else None
