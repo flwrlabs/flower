@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the Tavily web-search provider."""
+"""Tests for the Tavily websearch provider."""
 
 from unittest.mock import Mock
 
 import pytest
+import requests
 
 from flwr.supercore.typing import JSONObject
 
@@ -47,10 +48,7 @@ def test_search_calls_tavily_and_returns_parsed_results(
     response = Mock(status_code=200, text="")
     response.json.return_value = payload
     post_mock = Mock(return_value=response)
-    monkeypatch.setattr(
-        "flwr.supercore.task_process.connector.web_search.tavily.requests.post",
-        post_mock,
-    )
+    monkeypatch.setattr(requests, "post", post_mock)
 
     result = TavilyWebSearchProvider().search(" flower federated learning ")
 
