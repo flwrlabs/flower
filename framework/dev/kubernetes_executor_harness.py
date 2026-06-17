@@ -12,23 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""F7a evidence contract scaffold for the integrated k3d launch-path harness.
+"""Evidence tooling for the integrated k3d launch-path harness.
 
-This dev-maintained module defines the portable event, summary, redaction, and
-evidence-bundle shape for a future integrated harness. It does not create a k3d
-cluster, talk to Kubernetes, start SuperLink, start SuperExec, or launch a
-TaskExecutor Pod.
+This dev-maintained module defines the portable event, summary, redaction,
+evidence-bundle, and infrastructure-proof shape for the future integrated
+harness. The default command only writes the F7a contract scaffold. F7b
+infrastructure checks are explicit and dry-run host commands unless ``--execute``
+is passed.
 
 Usage:
     python dev/kubernetes_executor_harness.py --output-dir ./f7a-evidence
     python dev/kubernetes_executor_harness.py --output-dir ./f7a-evidence --json
+    python dev/kubernetes_executor_harness.py --mode infra-proof \
+        --output-dir ./f7b-evidence
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
+import shlex
+import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -141,6 +147,7 @@ class HarnessProfile:  # pylint: disable=too-many-instance-attributes
     """Portable profile sketch for a future integrated k3d harness run."""
 
     name: str
+    cluster_name: str
     namespace: str
     resource_pool: str
     image: str
@@ -152,6 +159,11 @@ class HarnessProfile:  # pylint: disable=too-many-instance-attributes
     appio_tls_mode: str = "test-ca-secret"
     expected_cni: str = "not-validated-locally"
     executor_config_path: str | None = None
+    kubectl_context: str | None = None
+    appio_root_certificates_path: str | None = None
+    tls_secret_name: str = "flower-appio-root-certificates"
+    superexec_service_account: str = "flower-superexec"
+    rbac_name: str = "flower-superexec-kubernetes-executor"
 
     def to_mapping(self) -> dict[str, object]:
         """Return the profile as a JSON/YAML-ready mapping."""
@@ -168,6 +180,11 @@ class HarnessProfile:  # pylint: disable=too-many-instance-attributes
         return {
             "schema-version": SCHEMA_VERSION,
             "name": self.name,
+            "cluster": {
+                "type": "k3d",
+                "name": self.cluster_name,
+                "kubectl-context": _kubectl_context(self),
+            },
             "executor-config": executor_config,
             "harness": {
                 "timeout-seconds": self.timeout_seconds,
@@ -175,7 +192,52 @@ class HarnessProfile:  # pylint: disable=too-many-instance-attributes
                 "appio-tls-mode": self.appio_tls_mode,
                 "expected-cni": self.expected_cni,
             },
+            "tls": {
+                "appio-root-certificates-path": self.appio_root_certificates_path,
+                "secret-name": self.tls_secret_name,
+            },
+            "rbac": {
+                "name": self.rbac_name,
+                "superexec-service-account": self.superexec_service_account,
+                "resources": ["pods", "secrets"],
+            },
         }
+
+
+@dataclass
+class CommandResult:
+    """Result of one host command used by the optional F7b proof."""
+
+    args: list[str]
+    returncode: int
+    stdout: str = ""
+    stderr: str = ""
+    dry_run: bool = False
+
+
+class HostCommandRunner:
+    """Run host commands, or report them without execution in dry-run mode."""
+
+    def __init__(self, *, dry_run: bool = True) -> None:
+        self.dry_run = dry_run
+
+    def run(self, args: Sequence[str]) -> CommandResult:
+        """Run one command and return a captured result."""
+        command = [str(arg) for arg in args]
+        if self.dry_run:
+            return CommandResult(args=command, returncode=0, dry_run=True)
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        return CommandResult(
+            args=command,
+            returncode=completed.returncode,
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+        )
 
 
 class EvidenceBundleWriter:
@@ -239,6 +301,7 @@ def generic_k3d_profile() -> HarnessProfile:
     """Return the default OSS-friendly profile sketch for future k3d runs."""
     return HarnessProfile(
         name="generic-k3d",
+        cluster_name="flower-f7",
         namespace="flower-f7",
         resource_pool="generic-k3d",
         image="ghcr.io/flwrlabs/taskexecutor:dev",
@@ -338,6 +401,332 @@ def run_contract_scaffold(
     )
     writer.write_summary(summary)
     return summary
+
+
+def run_infra_proof(
+    output_dir: str | Path,
+    *,
+    profile: HarnessProfile | None = None,
+    runner: HostCommandRunner | None = None,
+    execute: bool = False,
+    create_cluster: bool = False,
+    apply_manifests: bool = False,
+) -> HarnessSummary:
+    """Write F7b infra/TLS/RBAC evidence with optional host command execution."""
+    profile = profile or generic_k3d_profile()
+    runner = runner or HostCommandRunner(dry_run=not execute)
+    writer = EvidenceBundleWriter(output_dir)
+    writer.initialize()
+    run_id = f"f7b-{uuid4().hex[:12]}"
+    started_at = _utc_now()
+    command_results: list[CommandResult] = []
+    failures: list[str] = []
+
+    namespace_manifest = render_namespace_manifest(profile)
+    rbac_manifests = render_superexec_rbac_manifests(profile)
+    rbac_manifest_list = {
+        "apiVersion": "v1",
+        "kind": "List",
+        "items": rbac_manifests,
+    }
+    tls_contract = build_tls_material_contract(profile)
+    writer.write_yaml("sanitized-config.yaml", profile.to_mapping())
+    writer.write_json("objects/namespace.json", namespace_manifest)
+    writer.write_yaml("objects/namespace.yaml", namespace_manifest)
+    writer.write_json("objects/rbac.json", rbac_manifest_list)
+    writer.write_yaml("objects/rbac.yaml", rbac_manifest_list)
+    writer.write_json("objects/tls.json", tls_contract)
+    writer.write_json("objects/pods.json", {"items": []})
+    writer.write_json("objects/services.json", {"items": []})
+
+    def write_event(event: str, status: str, message: str, details: object) -> None:
+        writer.write_event(
+            HarnessEvent(
+                event=event,
+                status=status,
+                message=message,
+                details={
+                    "run_id": run_id,
+                    "mode": "f7b-infra-proof",
+                    "dry_run": not execute,
+                    "data": details,
+                },
+            )
+        )
+
+    def run_command(
+        args: Sequence[str], failure_context: str, *, record_failure: bool = True
+    ) -> CommandResult:
+        result = runner.run(args)
+        command_results.append(result)
+        if result.returncode != 0 and not result.dry_run and record_failure:
+            failures.append(f"{failure_context}: {_command_error(result)}")
+        return result
+
+    write_event(
+        "harness.start",
+        "passed",
+        "F7b infrastructure proof started.",
+        {
+            "output_dir": str(writer.output_dir),
+            "execute": execute,
+            "create_cluster": create_cluster,
+            "apply_manifests": apply_manifests,
+        },
+    )
+    write_event(
+        "profile.loaded",
+        "passed",
+        "Generic harness profile loaded.",
+        profile.to_mapping(),
+    )
+
+    cluster_result = run_command(
+        ["k3d", "cluster", "list", profile.cluster_name],
+        "k3d cluster detection",
+        record_failure=False,
+    )
+    if cluster_result.returncode != 0 and not cluster_result.dry_run and create_cluster:
+        cluster_result = run_command(
+            ["k3d", "cluster", "create", profile.cluster_name, "--wait"],
+            "k3d cluster creation",
+        )
+    elif cluster_result.dry_run and create_cluster:
+        cluster_result = run_command(
+            ["k3d", "cluster", "create", profile.cluster_name, "--wait"],
+            "k3d cluster creation",
+        )
+    elif cluster_result.returncode != 0 and not cluster_result.dry_run:
+        failures.append(f"k3d cluster detection: {_command_error(cluster_result)}")
+    write_event(
+        "cluster.detected",
+        _status_from_command(cluster_result, planned_status="planned"),
+        "k3d cluster detection command recorded.",
+        {
+            "cluster_name": profile.cluster_name,
+            "kubectl_context": _kubectl_context(profile),
+            "command": _command_record(cluster_result),
+        },
+    )
+
+    namespace_file = writer.output_dir / "objects" / "namespace.yaml"
+    namespace_command = (
+        _kubectl_args(profile, ["apply", "-f", str(namespace_file)])
+        if apply_manifests
+        else _kubectl_args(profile, ["get", "namespace", profile.namespace])
+    )
+    namespace_result = run_command(namespace_command, "namespace readiness")
+    write_event(
+        "namespace.ready",
+        _status_from_command(namespace_result, planned_status="planned"),
+        "Namespace manifest rendered and readiness command recorded.",
+        {
+            "namespace": profile.namespace,
+            "manifest": "objects/namespace.yaml",
+            "command": _command_record(namespace_result),
+        },
+    )
+
+    tls_status = "passed" if tls_contract["ready"] else "not_validated"
+    if profile.appio_root_certificates_path is not None and not tls_contract["ready"]:
+        tls_status = "failed"
+        failures.append(
+            "TLS material path was configured but could not be read: "
+            f"{profile.appio_root_certificates_path}"
+        )
+    write_event(
+        "tls.material.ready",
+        tls_status,
+        "TLS material contract recorded without PEM content.",
+        tls_contract,
+    )
+
+    rbac_file = writer.output_dir / "objects" / "rbac.yaml"
+    rbac_result = CommandResult(args=[], returncode=0, dry_run=not execute)
+    if apply_manifests:
+        rbac_result = run_command(
+            _kubectl_args(profile, ["apply", "-f", str(rbac_file)]),
+            "RBAC manifest apply",
+        )
+    rbac_status = (
+        _status_from_command(rbac_result, planned_status="planned")
+        if apply_manifests
+        else "planned"
+    )
+    write_event(
+        "rbac.applied",
+        rbac_status,
+        "SuperExec RBAC manifests rendered and apply command recorded.",
+        {
+            "manifest": "objects/rbac.yaml",
+            "service_account": profile.superexec_service_account,
+            "command": _command_record(rbac_result) if rbac_result.args else None,
+        },
+    )
+
+    rbac_check = _run_rbac_checks(profile, runner, command_results)
+    if rbac_check["status"] == "failed":
+        failures.extend(str(failure) for failure in rbac_check["failures"])
+    write_event(
+        "rbac.negative_check",
+        str(rbac_check["status"]),
+        "RBAC positive and negative authorization checks recorded.",
+        rbac_check,
+    )
+
+    write_event(
+        "policy.not_validated_locally",
+        "not_validated",
+        "NetworkPolicy/CNI enforcement is not validated by F7b.",
+        {
+            "expected_cni": profile.expected_cni,
+            "reason": "F7b only proves infrastructure/TLS/RBAC readiness",
+        },
+    )
+
+    result = "infra-proof" if execute else "infra-proof-dry-run"
+    status = "failed" if failures else "passed"
+    write_event(
+        "harness.result",
+        status,
+        "F7b infrastructure proof evidence written.",
+        {"result": result, "failures": failures},
+    )
+    _write_command_log(writer, command_results)
+    writer.write_text("diagnostics/failures.txt", "\n".join(failures))
+    writer.write_text(
+        "harness.log",
+        (
+            f"F7b {result} wrote infra/TLS/RBAC evidence for "
+            f"namespace {profile.namespace}.\n"
+        ),
+    )
+
+    not_validated = [
+        "SuperLink AppIo",
+        "SuperExec task claim",
+        "TaskExecutor Pod launch",
+        "TaskExecutor AppIo connectivity",
+        "capacity wait proof",
+        "completed Pod and Secret cleanup proof",
+        "NetworkPolicy/CNI enforcement",
+    ]
+    if not execute:
+        not_validated.append("host command execution")
+    summary = HarnessSummary(
+        status=status,
+        result=result,
+        profile_name=profile.name,
+        output_dir=str(writer.output_dir),
+        started_at=started_at,
+        completed_at=_utc_now(),
+        namespace=profile.namespace,
+        resource_pool=profile.resource_pool,
+        event_count=writer.event_count,
+        failures=failures,
+        not_validated=not_validated,
+        details={
+            "run_id": run_id,
+            "dry_run": not execute,
+            "cluster_name": profile.cluster_name,
+            "kubectl_context": _kubectl_context(profile),
+            "tls": tls_contract,
+            "rbac": rbac_check,
+        },
+    )
+    writer.write_summary(summary)
+    return summary
+
+
+def render_namespace_manifest(profile: HarnessProfile) -> dict[str, object]:
+    """Render the namespace manifest for the optional local k3d proof."""
+    return {
+        "apiVersion": "v1",
+        "kind": "Namespace",
+        "metadata": {
+            "name": profile.namespace,
+            "labels": _harness_object_labels(profile),
+        },
+    }
+
+
+def render_superexec_rbac_manifests(
+    profile: HarnessProfile,
+) -> list[dict[str, object]]:
+    """Render minimal SuperExec ServiceAccount, Role, and RoleBinding objects."""
+    labels = _harness_object_labels(profile)
+    subject = {
+        "kind": "ServiceAccount",
+        "name": profile.superexec_service_account,
+        "namespace": profile.namespace,
+    }
+    return [
+        {
+            "apiVersion": "v1",
+            "kind": "ServiceAccount",
+            "metadata": {
+                "name": profile.superexec_service_account,
+                "namespace": profile.namespace,
+                "labels": labels,
+            },
+            "automountServiceAccountToken": True,
+        },
+        {
+            "apiVersion": "rbac.authorization.k8s.io/v1",
+            "kind": "Role",
+            "metadata": {
+                "name": profile.rbac_name,
+                "namespace": profile.namespace,
+                "labels": labels,
+            },
+            "rules": [
+                {
+                    "apiGroups": [""],
+                    "resources": ["pods", "secrets"],
+                    "verbs": ["get", "list", "watch", "create", "delete"],
+                }
+            ],
+        },
+        {
+            "apiVersion": "rbac.authorization.k8s.io/v1",
+            "kind": "RoleBinding",
+            "metadata": {
+                "name": profile.rbac_name,
+                "namespace": profile.namespace,
+                "labels": labels,
+            },
+            "subjects": [subject],
+            "roleRef": {
+                "apiGroup": "rbac.authorization.k8s.io",
+                "kind": "Role",
+                "name": profile.rbac_name,
+            },
+        },
+    ]
+
+
+def build_tls_material_contract(profile: HarnessProfile) -> dict[str, object]:
+    """Return sanitized TLS material evidence without storing PEM contents."""
+    path = (
+        Path(profile.appio_root_certificates_path).expanduser()
+        if profile.appio_root_certificates_path is not None
+        else None
+    )
+    ready = path is not None and path.is_file()
+    root_certificates: dict[str, object] = {
+        "source": "configured-path" if path is not None else "planned-test-ca",
+        "path": str(path) if path is not None else None,
+        "ready": ready,
+        "sha256": _sha256_file(path) if ready and path is not None else None,
+        "pem_redacted": True,
+    }
+    return {
+        "ready": ready,
+        "appio_tls_mode": profile.appio_tls_mode,
+        "secret_name": profile.tls_secret_name,
+        "root_certificates": root_certificates,
+        "taskexecutor_mount_path": "/run/flwr/appio/ca.crt",
+    }
 
 
 def redact_sensitive_data(value: object) -> object:
@@ -440,6 +829,179 @@ def _contains_pem(value: str) -> bool:
     return "-----BEGIN " in value and "-----END " in value
 
 
+def _kubectl_context(profile: HarnessProfile) -> str:
+    if profile.kubectl_context is not None:
+        return profile.kubectl_context
+    return f"k3d-{profile.cluster_name}"
+
+
+def _kubectl_args(profile: HarnessProfile, args: Sequence[str]) -> list[str]:
+    return ["kubectl", "--context", _kubectl_context(profile), *args]
+
+
+def _harness_object_labels(profile: HarnessProfile) -> dict[str, str]:
+    labels = dict(profile.labels)
+    labels["flower.ai/harness"] = "f7"
+    labels["flower.ai/profile"] = profile.name
+    labels["flower.ai/resource-pool"] = profile.resource_pool
+    return labels
+
+
+def _run_rbac_checks(
+    profile: HarnessProfile,
+    runner: HostCommandRunner,
+    command_results: list[CommandResult],
+) -> dict[str, object]:
+    subject = (
+        f"system:serviceaccount:{profile.namespace}:"
+        f"{profile.superexec_service_account}"
+    )
+    checks: list[dict[str, object]] = []
+    failures: list[str] = []
+    planned = False
+
+    for name, expect_allowed, args in _rbac_check_specs(profile, subject):
+        result = runner.run(args)
+        command_results.append(result)
+        if result.dry_run:
+            planned = True
+            check_status = "planned"
+            allowed: bool | None = None
+        else:
+            allowed = _is_yes_result(result)
+            check_status = "passed" if allowed is expect_allowed else "failed"
+            if check_status == "failed":
+                expectation = "allowed" if expect_allowed else "denied"
+                failures.append(f"{name} expected {expectation}.")
+        checks.append(
+            {
+                "name": name,
+                "expected_allowed": expect_allowed,
+                "allowed": allowed,
+                "status": check_status,
+                "command": _command_record(result),
+            }
+        )
+
+    if failures:
+        status = "failed"
+    elif planned:
+        status = "planned"
+    else:
+        status = "passed"
+    return {
+        "status": status,
+        "subject": subject,
+        "checks": checks,
+        "failures": failures,
+    }
+
+
+def _rbac_check_specs(
+    profile: HarnessProfile, subject: str
+) -> list[tuple[str, bool, list[str]]]:
+    namespace_args = ["--as", subject, "-n", profile.namespace]
+    return [
+        (
+            "can-create-pods",
+            True,
+            _kubectl_args(
+                profile, ["auth", "can-i", "create", "pods", *namespace_args]
+            ),
+        ),
+        (
+            "can-create-secrets",
+            True,
+            _kubectl_args(
+                profile, ["auth", "can-i", "create", "secrets", *namespace_args]
+            ),
+        ),
+        (
+            "can-list-pods",
+            True,
+            _kubectl_args(profile, ["auth", "can-i", "list", "pods", *namespace_args]),
+        ),
+        (
+            "can-delete-secrets",
+            True,
+            _kubectl_args(
+                profile, ["auth", "can-i", "delete", "secrets", *namespace_args]
+            ),
+        ),
+        (
+            "cannot-create-deployments",
+            False,
+            _kubectl_args(
+                profile,
+                ["auth", "can-i", "create", "deployments.apps", *namespace_args],
+            ),
+        ),
+        (
+            "cannot-read-nodes",
+            False,
+            _kubectl_args(profile, ["auth", "can-i", "get", "nodes", "--as", subject]),
+        ),
+    ]
+
+
+def _is_yes_result(result: CommandResult) -> bool:
+    if result.returncode != 0:
+        return False
+    return result.stdout.strip().lower().splitlines()[:1] == ["yes"]
+
+
+def _status_from_command(result: CommandResult, *, planned_status: str) -> str:
+    if result.dry_run:
+        return planned_status
+    if result.returncode == 0:
+        return "passed"
+    return "failed"
+
+
+def _command_record(result: CommandResult) -> dict[str, object]:
+    return {
+        "args": redact_command_args(result.args),
+        "command": _format_command(result.args),
+        "returncode": result.returncode,
+        "dry_run": result.dry_run,
+        "stdout": redact_text(result.stdout.strip()),
+        "stderr": redact_text(result.stderr.strip()),
+    }
+
+
+def _command_error(result: CommandResult) -> str:
+    stderr = redact_text(result.stderr.strip())
+    stdout = redact_text(result.stdout.strip())
+    detail = stderr or stdout or "no output"
+    return f"{_format_command(result.args)} exited {result.returncode}: {detail}"
+
+
+def _write_command_log(
+    writer: EvidenceBundleWriter, command_results: Sequence[CommandResult]
+) -> None:
+    lines: list[str] = []
+    if not command_results:
+        lines.append("No external commands were executed or planned.")
+    for result in command_results:
+        prefix = "DRY-RUN " if result.dry_run else ""
+        lines.append(f"{prefix}$ {_format_command(result.args)}")
+        if not result.dry_run:
+            lines.append(f"returncode: {result.returncode}")
+            if result.stdout.strip():
+                lines.append(f"stdout: {redact_text(result.stdout.strip())}")
+            if result.stderr.strip():
+                lines.append(f"stderr: {redact_text(result.stderr.strip())}")
+    writer.write_text("diagnostics/commands.txt", "\n".join(lines) + "\n")
+
+
+def _format_command(args: Sequence[str]) -> str:
+    return " ".join(shlex.quote(arg) for arg in redact_command_args(args))
+
+
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def _utc_now() -> str:
     return datetime.now(tz=UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -447,11 +1009,21 @@ def _utc_now() -> str:
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Write the F7a integrated k3d harness contract scaffold. This does "
-            "not start k3d, Kubernetes, SuperLink, SuperExec, or TaskExecutor."
+            "Write F7 integrated k3d harness evidence. The default mode writes "
+            "the F7a contract scaffold; infra-proof mode writes F7b "
+            "infra/TLS/RBAC evidence and only runs host commands with "
+            "--execute."
         )
     )
     default_profile = generic_k3d_profile()
+    parser.add_argument(
+        "--mode",
+        choices=("contract-scaffold", "infra-proof"),
+        default="contract-scaffold",
+        help=(
+            "Write the F7a contract scaffold or the F7b infra/TLS/RBAC proof bundle."
+        ),
+    )
     parser.add_argument(
         "--output-dir",
         required=True,
@@ -462,6 +1034,16 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         choices=("generic-k3d",),
         default=default_profile.name,
         help="Harness profile sketch to write.",
+    )
+    parser.add_argument(
+        "--cluster-name",
+        default=default_profile.cluster_name,
+        help="k3d cluster name planned or used by infra-proof mode.",
+    )
+    parser.add_argument(
+        "--kubectl-context",
+        default=None,
+        help="kubectl context for infra-proof mode; defaults to k3d-<cluster>.",
     )
     parser.add_argument(
         "--namespace",
@@ -495,6 +1077,47 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Future harness cleanup mode recorded in the profile sketch.",
     )
     parser.add_argument(
+        "--appio-root-certificates-path",
+        default=None,
+        help=(
+            "Optional local AppIo root certificate PEM path. The evidence "
+            "records only path and SHA-256, never PEM content."
+        ),
+    )
+    parser.add_argument(
+        "--tls-secret-name",
+        default=default_profile.tls_secret_name,
+        help="Planned local Kubernetes Secret name for AppIo root certificates.",
+    )
+    parser.add_argument(
+        "--superexec-service-account",
+        default=default_profile.superexec_service_account,
+        help="ServiceAccount name rendered for the SuperExec infra proof.",
+    )
+    parser.add_argument(
+        "--rbac-name",
+        default=default_profile.rbac_name,
+        help="Role and RoleBinding name rendered for the SuperExec infra proof.",
+    )
+    parser.add_argument(
+        "--execute",
+        action="store_true",
+        help=(
+            "Run host k3d/kubectl commands in infra-proof mode. Without this, "
+            "commands are only recorded as dry-run evidence."
+        ),
+    )
+    parser.add_argument(
+        "--create-cluster",
+        action="store_true",
+        help="Create the k3d cluster if detection fails in infra-proof mode.",
+    )
+    parser.add_argument(
+        "--apply-manifests",
+        action="store_true",
+        help="Apply namespace and RBAC manifests in infra-proof mode.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit compact JSON summary on stdout.",
@@ -505,12 +1128,18 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def _profile_from_args(args: argparse.Namespace) -> HarnessProfile:
     return HarnessProfile(
         name=args.profile,
+        cluster_name=args.cluster_name,
         namespace=args.namespace,
         resource_pool=args.resource_pool,
         image=args.image,
         image_pull_policy=args.image_pull_policy,
         timeout_seconds=args.timeout_seconds,
         cleanup_mode=args.cleanup_mode,
+        kubectl_context=args.kubectl_context,
+        appio_root_certificates_path=args.appio_root_certificates_path,
+        tls_secret_name=args.tls_secret_name,
+        superexec_service_account=args.superexec_service_account,
+        rbac_name=args.rbac_name,
         labels={
             "flower.ai/harness": "f7",
             "flower.ai/profile": args.profile,
@@ -519,12 +1148,21 @@ def _profile_from_args(args: argparse.Namespace) -> HarnessProfile:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Write the F7a contract scaffold evidence bundle."""
+    """Write the requested F7 evidence bundle."""
     args = _parse_args(argv)
-    summary = run_contract_scaffold(
-        args.output_dir,
-        profile=_profile_from_args(args),
-    )
+    if args.mode == "infra-proof":
+        summary = run_infra_proof(
+            args.output_dir,
+            profile=_profile_from_args(args),
+            execute=args.execute,
+            create_cluster=args.create_cluster,
+            apply_manifests=args.apply_manifests,
+        )
+    else:
+        summary = run_contract_scaffold(
+            args.output_dir,
+            profile=_profile_from_args(args),
+        )
     if args.json:
         print(
             json.dumps(
@@ -534,8 +1172,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         )
     else:
-        print(f"Wrote F7a harness contract bundle to {summary.output_dir}")
-    return 0
+        print(f"Wrote {summary.result} harness bundle to {summary.output_dir}")
+    return 0 if summary.status == "passed" else 1
 
 
 if __name__ == "__main__":

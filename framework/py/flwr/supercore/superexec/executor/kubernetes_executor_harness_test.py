@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import sys
@@ -215,6 +216,176 @@ def test_main_writes_json_summary(
     assert summary["namespace"] == "flower-dev"
     assert summary["resource_pool"] == "pool-a"
     assert (output_dir / "summary.json").is_file()
+
+
+def test_render_superexec_rbac_manifests_scope_pods_and_secrets() -> None:
+    """Test F7b RBAC manifests grant only Pod and Secret access."""
+    profile = harness_module.generic_k3d_profile()
+
+    manifests = harness_module.render_superexec_rbac_manifests(profile)
+
+    assert [manifest["kind"] for manifest in manifests] == [
+        "ServiceAccount",
+        "Role",
+        "RoleBinding",
+    ]
+    service_account, role, role_binding = manifests
+    assert service_account["metadata"]["name"] == "flower-superexec"
+    assert service_account["automountServiceAccountToken"] is True
+
+    rules = role["rules"]
+    assert rules == [
+        {
+            "apiGroups": [""],
+            "resources": ["pods", "secrets"],
+            "verbs": ["get", "list", "watch", "create", "delete"],
+        }
+    ]
+    assert "*" not in rules[0]["resources"]
+    assert "deployments" not in rules[0]["resources"]
+    assert role_binding["subjects"] == [
+        {
+            "kind": "ServiceAccount",
+            "name": "flower-superexec",
+            "namespace": "flower-f7",
+        }
+    ]
+
+
+def test_tls_material_contract_records_fingerprint_without_pem(tmp_path: Path) -> None:
+    """Test TLS evidence records fingerprint and never writes PEM content."""
+    pem = "-----BEGIN CERTIFICATE-----\nroot-ca\n-----END CERTIFICATE-----\n"
+    ca_path = tmp_path / "appio-ca.pem"
+    ca_path.write_text(pem, encoding="utf-8")
+    profile = harness_module.generic_k3d_profile()
+    profile.appio_root_certificates_path = str(ca_path)
+
+    summary = harness_module.run_infra_proof(tmp_path / "evidence", profile=profile)
+
+    expected_sha256 = hashlib.sha256(pem.encode()).hexdigest()
+    tls_text = (tmp_path / "evidence" / "objects" / "tls.json").read_text()
+    tls = json.loads(tls_text)
+    assert summary.status == "passed"
+    assert tls["ready"] is True
+    assert tls["root_certificates"]["sha256"] == expected_sha256
+    assert "BEGIN CERTIFICATE" not in tls_text
+    assert "root-ca" not in tls_text
+
+
+def test_run_infra_proof_dry_run_writes_f7b_evidence(tmp_path: Path) -> None:
+    """Test F7b dry-run writes infra, TLS, RBAC, and command evidence."""
+    output_dir = tmp_path / "f7b"
+
+    summary = harness_module.run_infra_proof(
+        output_dir,
+        create_cluster=True,
+        apply_manifests=True,
+    )
+
+    assert summary.status == "passed"
+    assert summary.result == "infra-proof-dry-run"
+    assert summary.event_count == 9
+    assert (output_dir / "objects" / "namespace.yaml").is_file()
+    assert (output_dir / "objects" / "rbac.yaml").is_file()
+    assert (output_dir / "objects" / "tls.json").is_file()
+    rbac_apply_document = yaml.safe_load(
+        (output_dir / "objects" / "rbac.yaml").read_text()
+    )
+    assert rbac_apply_document["kind"] == "List"
+    assert [item["kind"] for item in rbac_apply_document["items"]] == [
+        "ServiceAccount",
+        "Role",
+        "RoleBinding",
+    ]
+
+    events = _read_jsonl(output_dir / "events.jsonl")
+    assert [event["event"] for event in events] == [
+        "harness.start",
+        "profile.loaded",
+        "cluster.detected",
+        "namespace.ready",
+        "tls.material.ready",
+        "rbac.applied",
+        "rbac.negative_check",
+        "policy.not_validated_locally",
+        "harness.result",
+    ]
+    assert events[2]["status"] == "planned"
+    assert events[5]["status"] == "planned"
+    assert events[6]["status"] == "planned"
+
+    summary_record = json.loads((output_dir / "summary.json").read_text())
+    assert "host command execution" in summary_record["not_validated"]
+
+    commands_text = (output_dir / "diagnostics" / "commands.txt").read_text()
+    assert "DRY-RUN $ k3d cluster list flower-f7" in commands_text
+    assert "DRY-RUN $ k3d cluster create flower-f7 --wait" in commands_text
+    assert "kubectl --context k3d-flower-f7 apply -f" in commands_text
+    assert "auth can-i create pods" in commands_text
+
+
+def test_run_infra_proof_fails_when_negative_rbac_check_allows_too_much(
+    tmp_path: Path,
+) -> None:
+    """Test F7b records a failure when broader RBAC access is allowed."""
+    runner = _AllowEverythingRunner()
+
+    summary = harness_module.run_infra_proof(
+        tmp_path / "f7b",
+        runner=runner,
+        execute=True,
+        apply_manifests=True,
+    )
+
+    assert summary.status == "failed"
+    assert any("cannot-create-deployments" in item for item in summary.failures)
+    events = _read_jsonl(tmp_path / "f7b" / "events.jsonl")
+    assert events[6]["event"] == "rbac.negative_check"
+    assert events[6]["status"] == "failed"
+
+
+def test_main_writes_infra_proof_json_summary(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """Test the CLI can write F7b dry-run evidence explicitly."""
+    output_dir = tmp_path / "from-main"
+
+    exit_code = harness_module.main(
+        [
+            "--mode",
+            "infra-proof",
+            "--output-dir",
+            str(output_dir),
+            "--namespace",
+            "flower-dev",
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    summary = json.loads(captured.out)
+    assert exit_code == 0
+    assert summary["status"] == "passed"
+    assert summary["result"] == "infra-proof-dry-run"
+    assert summary["namespace"] == "flower-dev"
+    assert (output_dir / "objects" / "rbac.yaml").is_file()
+
+
+class _AllowEverythingRunner:
+    """Fake command runner that reports yes for every RBAC can-i check."""
+
+    def __init__(self) -> None:
+        self.commands: list[list[str]] = []
+
+    def run(self, args: list[str]) -> Any:
+        """Return success for all commands and broad allow for RBAC checks."""
+        self.commands.append(list(args))
+        stdout = "yes\n" if "can-i" in args else ""
+        return harness_module.CommandResult(
+            args=list(args),
+            returncode=0,
+            stdout=stdout,
+        )
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
