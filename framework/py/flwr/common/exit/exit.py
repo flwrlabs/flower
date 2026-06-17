@@ -44,6 +44,18 @@ def _get_code_url(code: int) -> str:
     return f"https://flower.ai/docs/framework/{doc_pth}"
 
 
+def format_exit_message(code: int, message: str | None = None) -> str:
+    """Format the exit message for a given exit code."""
+    is_error = not 0 <= code < 100  # 0-99 are success exit codes
+    exit_message = f"Exit Code: {code}\n" if is_error else ""
+    exit_message += message or ""
+    if short_help_message := EXIT_CODE_HELP.get(code, ""):
+        exit_message += f"\n{short_help_message}"
+    if is_error:
+        exit_message += f"\n\nFor more information, visit: <{_get_code_url(code)}>"
+    return exit_message
+
+
 def flwr_exit(
     code: int,
     message: str | None = None,
@@ -72,18 +84,11 @@ def flwr_exit(
     is_error = not 0 <= code < 100  # 0-99 are success exit codes
 
     # Construct exit message
-    exit_message = f"Exit Code: {code}\n" if is_error else ""
-    exit_message += message or ""
-    if short_help_message := EXIT_CODE_HELP.get(code, ""):
-        exit_message += f"\n{short_help_message}"
+    exit_message = format_exit_message(code, message)
 
     # Set log level and system exit code
     log_level = ERROR if is_error else INFO
     sys_exit_code = 1 if is_error else 0
-
-    # Add help URL for non-successful/graceful exits
-    if is_error:
-        exit_message += f"\n\nFor more information, visit: <{_get_code_url(code)}>"
 
     # Telemetry event
     event_type = event_type or _try_obtain_telemetry_event()
@@ -128,8 +133,6 @@ def _try_obtain_telemetry_event() -> EventType | None:
         return EventType.FLWR_AGENTAPP_RUN_LEAVE
     if sys.argv[0].endswith("flwr-model"):
         return EventType.FLWR_MODEL_RUN_LEAVE
-    if sys.argv[0].endswith("flwr-connector"):
-        return EventType.FLWR_CONNECTOR_RUN_LEAVE
     if sys.argv[0].endswith("flwr-serverapp"):
         return EventType.FLWR_SERVERAPP_RUN_LEAVE
     if sys.argv[0].endswith("flwr-clientapp"):
