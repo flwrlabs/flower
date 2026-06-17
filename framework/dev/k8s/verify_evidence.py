@@ -27,7 +27,10 @@ _SERVERAPP_MARKER = "K8s launch probe ServerApp ran"
 
 
 def verify_evidence(
-    evidence_dir: str | Path, *, require_cleanup: bool = True
+    evidence_dir: str | Path,
+    *,
+    require_cleanup: bool = True,
+    expected_result: str = "local-k8s-launch-path",
 ) -> tuple[list[str], str]:
     """Verify a local k8s launch-path evidence bundle."""
     evidence_path = Path(evidence_dir)
@@ -57,8 +60,8 @@ def verify_evidence(
 
     _expect(summary.get("status") == "passed", "summary status is not passed", failures)
     _expect(
-        summary.get("result") == "local-k8s-launch-path",
-        "summary result is not local-k8s-launch-path",
+        summary.get("result") == expected_result,
+        f"summary result is not {expected_result}",
         failures,
     )
     _expect(not summary.get("failures"), "summary contains failures", failures)
@@ -67,9 +70,14 @@ def verify_evidence(
         "harness did not execute host commands",
         failures,
     )
+    expected_mode = (
+        "local-k8s-capacity-cleanup-proof"
+        if expected_result == "local-k8s-capacity-cleanup-proof"
+        else "local-k8s-launch-path"
+    )
     _expect(
-        invocation.get("mode") == "local-k8s-launch-path",
-        "invocation.json mode is not local-k8s-launch-path",
+        invocation.get("mode") == expected_mode,
+        f"invocation.json mode is not {expected_mode}",
         failures,
     )
     _expect(
@@ -111,6 +119,22 @@ def verify_evidence(
     _expect(
         task_lineage.get("seeded_run_id") == details.get("seed_run_id"),
         "task-lineage.json seeded_run_id does not match summary",
+        failures,
+    )
+    lineage_seed_run_ids = _sequence(task_lineage.get("seeded_run_ids"))
+    _expect(
+        list(lineage_seed_run_ids) == list(_sequence(details.get("seed_run_ids"))),
+        "task-lineage.json seeded_run_ids does not match summary",
+        failures,
+    )
+    _expect(
+        task_lineage.get("seeded_task_count") == len(lineage_seed_run_ids),
+        "task-lineage.json seeded_task_count does not match seeded_run_ids",
+        failures,
+    )
+    _expect(
+        task_lineage.get("observed_task_count") == len(task_lineage_tasks),
+        "task-lineage.json observed_task_count does not match tasks",
         failures,
     )
     _expect(
@@ -166,11 +190,18 @@ def verify_evidence(
         str(item) for item in _sequence(proof_checklist.get("out_of_scope"))
     ]
     _expect(bool(checklist_claims), "proof-checklist.json contains no claims", failures)
-    _expect(
-        any("capacity" in item for item in out_of_scope),
-        "proof-checklist.json does not keep capacity claims out of scope",
-        failures,
-    )
+    if expected_result == "local-k8s-capacity-cleanup-proof":
+        _expect(
+            not any("capacity wait proof" == item for item in out_of_scope),
+            "proof-checklist.json incorrectly keeps capacity wait proof out of scope",
+            failures,
+        )
+    else:
+        _expect(
+            any("capacity" in item for item in out_of_scope),
+            "proof-checklist.json does not keep capacity claims out of scope",
+            failures,
+        )
 
     taskexecutor_logs = _sequence(details.get("taskexecutor_logs"))
     _expect(
@@ -205,6 +236,69 @@ def verify_evidence(
             failures,
         )
 
+    capacity_wait = _mapping(details.get("capacity_wait"))
+    cleanup_observed = _mapping(details.get("cleanup_observed"))
+    if expected_result == "local-k8s-capacity-cleanup-proof":
+        removed_pods = _sequence(cleanup_observed.get("removed_pods"))
+        remaining_pods = _sequence(cleanup_observed.get("remaining_pods"))
+        removed_pod_names = {str(name) for name in removed_pods}
+        remaining_pod_names = {str(name) for name in remaining_pods}
+        final_pod_names = {
+            str(_mapping(pod).get("name"))
+            for pod in pods
+            if _mapping(pod).get("name") is not None
+        }
+        _expect(
+            details.get("active_pod_budget") == 1,
+            "active Pod budget is not 1",
+            failures,
+        )
+        _expect(
+            len(lineage_seed_run_ids) >= 2,
+            "capacity proof did not record at least two seeded run IDs",
+            failures,
+        )
+        _expect(
+            len(task_lineage_tasks) >= 2,
+            "capacity proof did not record at least two observed TaskExecutor tasks",
+            failures,
+        )
+        _expect(
+            capacity_wait.get("observed") is True,
+            "capacity wait was not observed",
+            failures,
+        )
+        _expect(
+            cleanup_observed.get("observed") is True,
+            "completed Pod/Secret cleanup was not observed",
+            failures,
+        )
+        _expect(
+            bool(removed_pods),
+            "capacity proof did not record removed Pods",
+            failures,
+        )
+        _expect(
+            bool(_sequence(cleanup_observed.get("removed_secrets"))),
+            "capacity proof did not record removed Secrets",
+            failures,
+        )
+        _expect(
+            bool(remaining_pods),
+            "capacity proof did not record a remaining TaskExecutor Pod after cleanup",
+            failures,
+        )
+        _expect(
+            remaining_pod_names.issubset(final_pod_names),
+            "remaining cleanup Pods are not present in final TaskExecutor pod records",
+            failures,
+        )
+        _expect(
+            remaining_pod_names.isdisjoint(removed_pod_names),
+            "remaining cleanup Pods overlap removed Pods",
+            failures,
+        )
+
     return failures, _format_report(
         evidence_path=evidence_path,
         summary=summary,
@@ -215,6 +309,8 @@ def verify_evidence(
         pod_phases=pod_phases,
         cleanup_result=cleanup_result,
         require_cleanup=require_cleanup,
+        capacity_wait=capacity_wait,
+        cleanup_observed=cleanup_observed,
         failures=failures,
     )
 
@@ -252,10 +348,18 @@ def _format_report(
     pod_phases: Sequence[str],
     cleanup_result: Mapping[str, object],
     require_cleanup: bool,
+    capacity_wait: Mapping[str, object],
+    cleanup_observed: Mapping[str, object],
     failures: Sequence[str],
 ) -> str:
     pods = [_mapping(pod) for pod in _sequence(details.get("pods"))]
     taskexecutor_logs = _sequence(details.get("taskexecutor_logs"))
+    removed_pods = ", ".join(
+        str(item) for item in _sequence(cleanup_observed.get("removed_pods"))
+    )
+    removed_secrets = ", ".join(
+        str(item) for item in _sequence(cleanup_observed.get("removed_secrets"))
+    )
     cleanup_status = (
         f"returncode={cleanup_result.get('returncode')}"
         if cleanup_result
@@ -283,6 +387,9 @@ def _format_report(
             ),
             f"TaskExecutor log captures: {len(taskexecutor_logs)}",
             f"TaskExecutor phases: {', '.join(pod_phases) or '<none>'}",
+            f"Capacity wait observed: {capacity_wait.get('observed')}",
+            f"Removed Pods: {removed_pods or '<none>'}",
+            f"Removed Secrets: {removed_secrets or '<none>'}",
             f"Cleanup required: {str(require_cleanup).lower()}",
             f"Cleanup: {cleanup_status}",
         ]
@@ -325,6 +432,12 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Do not require the final namespace cleanup command to have run.",
     )
+    parser.add_argument(
+        "--expected-result",
+        choices=("local-k8s-launch-path", "local-k8s-capacity-cleanup-proof"),
+        default="local-k8s-launch-path",
+        help="Expected harness result to verify.",
+    )
     return parser.parse_args(argv)
 
 
@@ -334,6 +447,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     failures, report = verify_evidence(
         args.evidence_dir,
         require_cleanup=not args.no_require_cleanup,
+        expected_result=args.expected_result,
     )
     print(report, end="")
     return 1 if failures else 0

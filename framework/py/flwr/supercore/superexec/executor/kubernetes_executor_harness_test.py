@@ -463,7 +463,9 @@ def test_render_appio_seed_manifests_create_control_api_job() -> None:
     assert "StartRunRequest" in seed_script
     assert "build_fab_from_disk(_PROBE_APP_DIR)" in seed_script
     assert "K8s launch seed created run_id=" in seed_script
-    assert "launch_probe.server_app:app" in seed_config["data"]["probe_pyproject.toml"]
+    probe_pyproject = seed_config["data"]["probe_pyproject.toml"]
+    assert "launch_probe.server_app:app" in probe_pyproject
+    assert "local-k8s.probe-hold-seconds = 0.0" in probe_pyproject
     assert (
         "K8s launch probe ServerApp ran"
         in seed_config["data"]["launch_probe_server_app.py"]
@@ -474,6 +476,10 @@ def test_render_appio_seed_manifests_create_control_api_job() -> None:
         "/opt/flower-local-k8s/seed_run.py",
         "--control-api-address",
         "flower-superlink:9093",
+        "--run-count",
+        "1",
+        "--probe-hold-seconds",
+        "0.0",
     ]
     assert container["volumeMounts"] == [
         {
@@ -491,6 +497,69 @@ def test_render_appio_seed_manifests_create_control_api_job() -> None:
         "probe_app/launch_probe/client_app.py",
     ]
     assert seed_job["spec"]["template"]["spec"]["automountServiceAccountToken"] is False
+
+
+def test_render_kubernetes_executor_config_can_set_capacity_budget() -> None:
+    """Test rendered config includes optional active Pod budget knobs."""
+    profile = harness_module.generic_k3d_profile()
+    profile.active_pod_budget = 1
+    profile.capacity_poll_interval = 0.5
+    profile.capacity_log_interval = 1.0
+
+    config = harness_module.render_kubernetes_executor_config(profile, "k8s-test")
+
+    assert config["active-pod-budget"] == 1
+    assert config["capacity-poll-interval"] == 0.5
+    assert config["capacity-log-interval"] == 1.0
+
+
+@pytest.mark.parametrize(
+    ("log_text", "expected_observed"),
+    [
+        (
+            "Waiting for Kubernetes TaskExecutor capacity: "
+            "1 active Pods, budget 1, selector app.kubernetes.io/name=flower",
+            True,
+        ),
+        ("TaskExecutor capacity budget 1 reached", False),
+        ("1 active Pods currently running", False),
+    ],
+)
+def test_capacity_wait_observation_requires_wait_marker(
+    log_text: str, expected_observed: bool
+) -> None:
+    """Test capacity wait evidence requires the explicit SuperExec wait marker."""
+    result = harness_module.CommandResult(
+        args=["kubectl", "logs"],
+        returncode=0,
+        stdout=log_text,
+        stderr="",
+        dry_run=False,
+    )
+
+    observation = harness_module.real_launch._superexec_capacity_wait_observation(
+        result
+    )
+
+    assert observation["observed"] is expected_observed
+
+
+def test_render_appio_seed_manifests_can_create_two_held_runs() -> None:
+    """Test seed manifests can create two deterministic held ServerApp tasks."""
+    profile = harness_module.generic_k3d_profile()
+    profile.seed_run_count = 2
+    profile.probe_hold_seconds = 5.0
+
+    manifests = harness_module.render_appio_seed_manifests(profile, "k8s-test")
+
+    seed_config, seed_job = manifests
+    seed_script = seed_config["data"]["seed_run.py"]
+    container = seed_job["spec"]["template"]["spec"]["containers"][0]
+    assert "--run-count" in container["args"]
+    assert "2" in container["args"]
+    assert "--probe-hold-seconds" in container["args"]
+    assert "5.0" in container["args"]
+    assert "K8s launch seed created run_ids=" in seed_script
 
 
 def test_rendered_local_k8s_outputs_do_not_use_sprint_identifiers() -> None:
@@ -579,6 +648,7 @@ def test_run_local_k8s_launch_path_dry_run_writes_evidence(tmp_path: Path) -> No
     assert "app.kubernetes.io/component=taskexecutor" in commands_text
     assert (output_dir / "diagnostics" / "image-preflight.txt").is_file()
     assert (output_dir / "diagnostics" / "cleanup.txt").is_file()
+    assert (output_dir / "diagnostics" / "superexec-logs.txt").is_file()
     assert (output_dir / "diagnostics" / "taskexecutor-logs.txt").is_file()
     cleanup_text = (output_dir / "diagnostics" / "cleanup.txt").read_text()
     assert "Cleanup requested for this run: no" in cleanup_text
@@ -635,6 +705,9 @@ def test_run_local_k8s_launch_path_records_terminal_pod_logs_and_cleanup(
 
     lineage = json.loads((output_dir / "task-lineage.json").read_text())
     assert lineage["seeded_run_id"] == 123
+    assert lineage["seeded_task_count"] == 1
+    assert lineage["observed_task_count"] == 1
+    assert "without claiming a per-Pod run-ID mapping" in lineage["lineage_note"]
     assert lineage["tasks"] == [
         {
             "credential_secret_name": "flwr-taskexecutor-123-abc-appio",
@@ -644,7 +717,6 @@ def test_run_local_k8s_launch_path_records_terminal_pod_logs_and_cleanup(
             "pod_phase": "Succeeded",
             "pod_uid": "pod-uid-123",
             "resource_pool": "generic-k3d",
-            "seeded_run_id": 123,
             "task_id": "123",
             "task_type": "flwr-serverapp",
             "terminal_phase": "Succeeded",
@@ -677,6 +749,9 @@ def test_run_local_k8s_launch_path_records_terminal_pod_logs_and_cleanup(
     ).read_text()
     assert "K8s launch probe ServerApp ran" in taskexecutor_logs
 
+    superexec_logs = (output_dir / "diagnostics" / "superexec-logs.txt").read_text()
+    assert "claim launch task_id taskexecutor" in superexec_logs
+
     command_text = (output_dir / "diagnostics" / "commands.txt").read_text()
     assert "task-token" not in command_text
     assert "dGFzay10b2tlbg==" not in command_text
@@ -699,6 +774,95 @@ def test_run_local_k8s_launch_path_records_terminal_pod_logs_and_cleanup(
     )
     assert any("logs pod/flwr-taskexecutor-123-abc" in command for command in commands)
     assert any("delete namespace flower-local-k8s" in command for command in commands)
+
+
+def test_run_capacity_cleanup_proof_dry_run_writes_evidence(tmp_path: Path) -> None:
+    """Test capacity-cleanup dry-run writes proof events and config."""
+    output_dir = tmp_path / "capacity-cleanup"
+
+    summary = harness_module.run_local_k8s_launch_path(
+        output_dir,
+        create_cluster=True,
+        apply_manifests=True,
+        capacity_cleanup_proof=True,
+    )
+
+    assert summary.status == "passed"
+    assert summary.result == "local-k8s-capacity-cleanup-proof-dry-run"
+    assert summary.event_count == 17
+    assert "capacity wait proof" in summary.not_validated
+    assert "completed Pod and Secret cleanup proof" in summary.not_validated
+
+    config = yaml.safe_load(
+        (output_dir / "objects" / "executor-config.yaml").read_text()
+    )
+    assert config["active-pod-budget"] == 1
+    assert config["capacity-poll-interval"] == 1.0
+    assert config["capacity-log-interval"] == 1.0
+
+    events = _read_jsonl(output_dir / "events.jsonl")
+    assert "capacity.wait_observed" in [event["event"] for event in events]
+    assert "cleanup.observed" in [event["event"] for event in events]
+
+
+def test_run_capacity_cleanup_proof_records_wait_cleanup_and_second_launch(
+    tmp_path: Path,
+) -> None:
+    """Test execute-mode evidence captures wait, cleanup, and second launch."""
+    runner = _CapacityCleanupRunner()
+    output_dir = tmp_path / "capacity-cleanup-real"
+
+    summary = harness_module.run_local_k8s_launch_path(
+        output_dir,
+        runner=runner,
+        execute=True,
+        apply_manifests=True,
+        import_images=True,
+        capacity_cleanup_proof=True,
+    )
+
+    assert summary.status == "passed"
+    assert summary.result == "local-k8s-capacity-cleanup-proof"
+    assert summary.details["seed_run_ids"] == [123, 456]
+    assert summary.details["active_pod_budget"] == 1
+    assert summary.details["capacity_wait"]["observed"] is True
+    assert summary.details["artifacts"]["superexec_logs"] == (
+        "diagnostics/superexec-logs.txt"
+    )
+    assert summary.details["cleanup_observed"]["removed_pods"] == [
+        "flwr-taskexecutor-123-abc"
+    ]
+    assert summary.details["cleanup_observed"]["removed_secrets"] == [
+        "flwr-taskexecutor-123-abc-appio"
+    ]
+    assert summary.details["pods"][0]["name"] == "flwr-taskexecutor-456-def"
+    assert summary.details["pods"][0]["phase"] == "Succeeded"
+
+    cleanup_pods = json.loads(
+        (output_dir / "objects" / "cleanup-pods.json").read_text()
+    )
+    assert [pod["name"] for pod in cleanup_pods["items"]] == [
+        "flwr-taskexecutor-456-def"
+    ]
+    lineage = json.loads((output_dir / "task-lineage.json").read_text())
+    assert lineage["seeded_run_ids"] == [123, 456]
+    assert lineage["seeded_task_count"] == 2
+    assert lineage["observed_task_count"] == 2
+    assert [task["pod_name"] for task in lineage["tasks"]] == [
+        "flwr-taskexecutor-123-abc",
+        "flwr-taskexecutor-456-def",
+    ]
+    superexec_logs = (output_dir / "diagnostics" / "superexec-logs.txt").read_text()
+    assert "claim launch task_id taskexecutor" in superexec_logs
+    assert "Waiting for Kubernetes TaskExecutor capacity" in superexec_logs
+
+    checklist = json.loads((output_dir / "proof-checklist.json").read_text())
+    assert not any(item == "capacity wait proof" for item in checklist["out_of_scope"])
+    assert any("capacity was full" in claim["claim"] for claim in checklist["claims"])
+    assert any(
+        claim["artifact"] == "diagnostics/superexec-logs.txt"
+        for claim in checklist["claims"]
+    )
 
 
 def test_run_local_k8s_launch_path_polls_until_taskexecutor_pod_appears(
@@ -811,6 +975,67 @@ def test_verify_local_k8s_launch_evidence_rejects_missing_serverapp_marker(
     failures, report = verifier_module.verify_evidence(output_dir)
 
     assert any("K8s launch probe ServerApp ran" in failure for failure in failures)
+    assert "Verification: FAILED" in report
+
+
+def test_verify_capacity_cleanup_evidence_accepts_passing_bundle(
+    tmp_path: Path,
+) -> None:
+    """Test the verifier accepts a passing capacity cleanup bundle."""
+    output_dir = tmp_path / "evidence"
+    _write_verifier_evidence(output_dir, result="local-k8s-capacity-cleanup-proof")
+
+    failures, report = verifier_module.verify_evidence(
+        output_dir,
+        expected_result="local-k8s-capacity-cleanup-proof",
+    )
+
+    assert failures == []
+    assert "Verification: PASSED" in report
+    assert "Capacity wait observed: True" in report
+    assert "Removed Pods: flwr-taskexecutor-123-abc" in report
+
+
+def test_verify_capacity_cleanup_evidence_rejects_single_task_record(
+    tmp_path: Path,
+) -> None:
+    """Test capacity cleanup verification requires two observed task records."""
+    output_dir = tmp_path / "evidence"
+    _write_verifier_evidence(output_dir, result="local-k8s-capacity-cleanup-proof")
+    lineage_path = output_dir / "task-lineage.json"
+    lineage = json.loads(lineage_path.read_text(encoding="utf-8"))
+    lineage["tasks"] = lineage["tasks"][:1]
+    lineage["observed_task_count"] = 1
+    lineage_path.write_text(json.dumps(lineage), encoding="utf-8")
+
+    failures, report = verifier_module.verify_evidence(
+        output_dir,
+        expected_result="local-k8s-capacity-cleanup-proof",
+    )
+
+    assert any(
+        "at least two observed TaskExecutor tasks" in failure for failure in failures
+    )
+    assert "Verification: FAILED" in report
+
+
+def test_verify_capacity_cleanup_evidence_rejects_missing_remaining_pod(
+    tmp_path: Path,
+) -> None:
+    """Test capacity cleanup verification requires a remaining post-cleanup Pod."""
+    output_dir = tmp_path / "evidence"
+    _write_verifier_evidence(output_dir, result="local-k8s-capacity-cleanup-proof")
+    summary_path = output_dir / "summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["details"]["cleanup_observed"]["remaining_pods"] = []
+    summary_path.write_text(json.dumps(summary), encoding="utf-8")
+
+    failures, report = verifier_module.verify_evidence(
+        output_dir,
+        expected_result="local-k8s-capacity-cleanup-proof",
+    )
+
+    assert any("remaining TaskExecutor Pod" in failure for failure in failures)
     assert "Verification: FAILED" in report
 
 
@@ -927,6 +1152,116 @@ class _RealLaunchRunner:
         return spec in allowed_specs and "-n" in args and "flower-local-k8s" in args
 
 
+class _CapacityCleanupRunner:
+    """Fake command runner for execute-mode capacity cleanup proof evidence."""
+
+    def __init__(self) -> None:
+        self.commands: list[list[str]] = []
+        self.pod_get_count = 0
+        self.secret_get_count = 0
+        self.superexec_log_count = 0
+
+    def run(self, args: list[str]) -> Any:
+        """Return realistic command output for the capacity proof."""
+        self.commands.append(list(args))
+        if args[:3] == ["docker", "image", "inspect"]:
+            return self._result(args)
+        if args[:3] == ["k3d", "cluster", "list"]:
+            return self._result(args, stdout="NAME\nflower-local-k8s\n")
+        if args[:3] == ["k3d", "image", "import"]:
+            return self._result(args, stdout="imported\n")
+        if "auth" in args and "can-i" in args:
+            allowed = _RealLaunchRunner._rbac_allowed(args)
+            return self._result(
+                args,
+                returncode=0 if allowed else 1,
+                stdout="yes\n" if allowed else "no\n",
+            )
+        if "wait" in args and "--for=jsonpath={.status.phase}=Succeeded" in args:
+            return self._result(args)
+        if "get" in args and "pods" in args and "-o" in args and "json" in args:
+            self.pod_get_count += 1
+            if self.pod_get_count == 1:
+                return self._result(
+                    args,
+                    stdout=json.dumps(
+                        _pod_list_items(
+                            _taskexecutor_pod("flwr-taskexecutor-123-abc", "Running")
+                        )
+                    ),
+                )
+            if self.pod_get_count == 2:
+                return self._result(
+                    args,
+                    stdout=json.dumps(
+                        _pod_list_items(
+                            _taskexecutor_pod("flwr-taskexecutor-456-def", "Running")
+                        )
+                    ),
+                )
+            return self._result(
+                args,
+                stdout=json.dumps(
+                    _pod_list_items(
+                        _taskexecutor_pod("flwr-taskexecutor-456-def", "Succeeded")
+                    )
+                ),
+            )
+        if "get" in args and "secrets" in args and "-o" in args and "json" in args:
+            self.secret_get_count += 1
+            if self.secret_get_count == 1:
+                return self._result(
+                    args,
+                    stdout=json.dumps(
+                        _secret_list_for_name("flwr-taskexecutor-123-abc-appio")
+                    ),
+                )
+            return self._result(
+                args,
+                stdout=json.dumps(
+                    _secret_list_for_name("flwr-taskexecutor-456-def-appio")
+                ),
+            )
+        if "get" in args and "jobs" in args and "-o" in args and "json" in args:
+            return self._result(args, stdout=json.dumps(_object_list("Job")))
+        if "get" in args and "services" in args and "-o" in args and "json" in args:
+            return self._result(args, stdout=json.dumps(_object_list("Service")))
+        if "get" in args and "namespace" in args and "-o" in args and "json" in args:
+            return self._result(args, stdout=json.dumps(_namespace()))
+        if "logs" in args and "job/flower-local-k8s-seed-run" in args:
+            return self._result(
+                args,
+                stdout=(
+                    "K8s launch seed created run_id=123\n"
+                    "K8s launch seed created run_id=456\n"
+                    "K8s launch seed created run_ids=123,456\n"
+                ),
+            )
+        if "logs" in args and "pod/flower-superexec" in args:
+            self.superexec_log_count += 1
+            stdout = "claim launch task_id taskexecutor\n"
+            if self.superexec_log_count > 1:
+                stdout += (
+                    "Waiting for Kubernetes TaskExecutor capacity: "
+                    "1 active Pods, budget 1, selector app.kubernetes.io/name=flower\n"
+                )
+            return self._result(args, stdout=stdout)
+        if "logs" in args and "pod/flwr-taskexecutor-456-def" in args:
+            return self._result(args, stdout="K8s launch probe ServerApp ran\n")
+        return self._result(args)
+
+    @staticmethod
+    def _result(
+        args: list[str], *, returncode: int = 0, stdout: str = "", stderr: str = ""
+    ) -> Any:
+        return harness_module.CommandResult(
+            args=list(args),
+            returncode=returncode,
+            stdout=stdout,
+            stderr=stderr,
+        )
+
+
 def _pod_list(phase: str) -> dict[str, Any]:
     return {
         "items": [
@@ -972,6 +1307,53 @@ def _pod_list(phase: str) -> dict[str, Any]:
     }
 
 
+def _pod_list_items(*pods: dict[str, Any]) -> dict[str, Any]:
+    return {"items": list(pods)}
+
+
+def _taskexecutor_pod(name: str, phase: str) -> dict[str, Any]:
+    task_id = name.split("-")[2]
+    launch_attempt = name.rsplit("-", maxsplit=1)[1]
+    return {
+        "metadata": {
+            "name": name,
+            "namespace": "flower-local-k8s",
+            "uid": f"pod-uid-{task_id}",
+            "labels": {
+                "app.kubernetes.io/name": "flower",
+                "app.kubernetes.io/component": "taskexecutor",
+                "flower.ai/harness-run": "k8s-launch-test",
+                "flower.ai/launch-attempt": launch_attempt,
+                "flower.ai/resource-pool": "generic-k3d",
+                "flower.ai/superexec-task-id": task_id,
+                "flower.ai/task-type": "flwr-serverapp",
+            },
+        },
+        "spec": {
+            "containers": [
+                {
+                    "name": "taskexecutor",
+                    "image": "flwr/superexec:dev",
+                    "args": [
+                        "--serverappio-api-address",
+                        "flower-superlink:9091",
+                        "--token-file",
+                        "/run/flwr/appio/token",
+                        "--insecure",
+                    ],
+                }
+            ],
+            "volumes": [
+                {
+                    "name": "appio-credentials",
+                    "secret": {"secretName": f"{name}-appio"},
+                }
+            ],
+        },
+        "status": {"phase": phase},
+    }
+
+
 def _secret_list() -> dict[str, Any]:
     return {
         "items": [
@@ -988,6 +1370,34 @@ def _secret_list() -> dict[str, Any]:
                         "flower.ai/launch-attempt": "abc",
                         "flower.ai/resource-pool": "generic-k3d",
                         "flower.ai/superexec-task-id": "123",
+                        "flower.ai/task-type": "flwr-serverapp",
+                    },
+                },
+                "type": "Opaque",
+                "data": {"token": "dGFzay10b2tlbg=="},
+            }
+        ]
+    }
+
+
+def _secret_list_for_name(name: str) -> dict[str, Any]:
+    task_id = name.split("-")[2]
+    launch_attempt = name.removesuffix("-appio").rsplit("-", maxsplit=1)[1]
+    return {
+        "items": [
+            {
+                "kind": "Secret",
+                "metadata": {
+                    "name": name,
+                    "namespace": "flower-local-k8s",
+                    "uid": f"secret-uid-{task_id}",
+                    "labels": {
+                        "app.kubernetes.io/name": "flower",
+                        "app.kubernetes.io/component": "taskexecutor",
+                        "flower.ai/harness-run": "k8s-launch-test",
+                        "flower.ai/launch-attempt": launch_attempt,
+                        "flower.ai/resource-pool": "generic-k3d",
+                        "flower.ai/superexec-task-id": task_id,
                         "flower.ai/task-type": "flwr-serverapp",
                     },
                 },
@@ -1024,48 +1434,94 @@ def _namespace() -> dict[str, Any]:
 
 
 def _write_verifier_evidence(
-    output_dir: Path, *, taskexecutor_log_text: str = "K8s launch probe ServerApp ran\n"
+    output_dir: Path,
+    *,
+    taskexecutor_log_text: str = "K8s launch probe ServerApp ran\n",
+    result: str = "local-k8s-launch-path",
 ) -> None:
     (output_dir / "diagnostics").mkdir(parents=True)
+    capacity_proof = result == "local-k8s-capacity-cleanup-proof"
+    final_pod_name = (
+        "flwr-taskexecutor-456-def" if capacity_proof else "flwr-taskexecutor-test"
+    )
+    lineage_tasks = (
+        [
+            {
+                "pod_name": "flwr-taskexecutor-123-abc",
+                "credential_secret_name": "flwr-taskexecutor-123-abc-appio",
+            },
+            {
+                "pod_name": final_pod_name,
+                "credential_secret_name": f"{final_pod_name}-appio",
+            },
+        ]
+        if capacity_proof
+        else [
+            {
+                "pod_name": final_pod_name,
+                "credential_secret_name": f"{final_pod_name}-appio",
+            }
+        ]
+    )
     summary = {
         "status": "passed",
-        "result": "local-k8s-launch-path",
+        "result": result,
         "failures": [],
         "details": {
             "run_id": "k8s-launch-test",
             "seed_run_id": 123,
+            "seed_run_ids": [123, 456] if capacity_proof else [123],
+            "active_pod_budget": 1 if capacity_proof else None,
             "dry_run": False,
             "image_preflight": {
                 "docker_inspect": {"returncode": 0},
                 "k3d_import": {"returncode": 0},
             },
             "rbac": {"status": "passed"},
-            "pods": [{"name": "flwr-taskexecutor-test", "phase": "Succeeded"}],
+            "pods": [{"name": final_pod_name, "phase": "Succeeded"}],
             "taskexecutor_logs": [{"returncode": 0}],
+            "capacity_wait": {"observed": capacity_proof},
+            "cleanup_observed": {
+                "observed": capacity_proof,
+                "removed_pods": (
+                    ["flwr-taskexecutor-123-abc"] if capacity_proof else []
+                ),
+                "removed_secrets": (
+                    ["flwr-taskexecutor-123-abc-appio"] if capacity_proof else []
+                ),
+                "remaining_pods": [final_pod_name] if capacity_proof else [],
+            },
             "cleanup": {"requested": True, "result": {"returncode": 0}},
         },
     }
     (output_dir / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
     (output_dir / "invocation.json").write_text(
-        json.dumps({"mode": "local-k8s-launch-path", "dry_run": False}),
+        json.dumps(
+            {
+                "mode": (
+                    "local-k8s-capacity-cleanup-proof"
+                    if capacity_proof
+                    else "local-k8s-launch-path"
+                ),
+                "dry_run": False,
+            }
+        ),
         encoding="utf-8",
     )
     (output_dir / "task-lineage.json").write_text(
         json.dumps(
             {
                 "seeded_run_id": 123,
-                "tasks": [
-                    {
-                        "pod_name": "flwr-taskexecutor-test",
-                        "credential_secret_name": "flwr-taskexecutor-test-appio",
-                    }
-                ],
+                "seeded_run_ids": [123, 456] if capacity_proof else [123],
+                "seeded_task_count": 2 if capacity_proof else 1,
+                "observed_task_count": len(lineage_tasks),
+                "tasks": lineage_tasks,
             }
         ),
         encoding="utf-8",
     )
     (output_dir / "taskexecutor-pods.json").write_text(
-        json.dumps({"items": [{"metadata": {"name": "flwr-taskexecutor-test"}}]}),
+        json.dumps({"items": [{"metadata": {"name": final_pod_name}}]}),
         encoding="utf-8",
     )
     (output_dir / "taskexecutor-secrets.redacted.json").write_text(
@@ -1074,7 +1530,7 @@ def _write_verifier_evidence(
                 "redacted": True,
                 "items": [
                     {
-                        "name": "flwr-taskexecutor-test-appio",
+                        "name": f"{final_pod_name}-appio",
                         "data_keys": ["token"],
                         "redacted": True,
                     }
@@ -1096,7 +1552,11 @@ def _write_verifier_evidence(
         json.dumps(
             {
                 "claims": [{"claim": "TaskExecutor Pod observed"}],
-                "out_of_scope": ["capacity wait proof"],
+                "out_of_scope": (
+                    ["budget-2/three-task cardinality behavior"]
+                    if capacity_proof
+                    else ["capacity wait proof"]
+                ),
             }
         ),
         encoding="utf-8",

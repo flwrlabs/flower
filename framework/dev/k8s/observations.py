@@ -103,9 +103,10 @@ def _taskexecutor_phase_status(
 
 
 def _seed_observation(result: CommandResult) -> dict[str, object]:
-    match = re.search(r"\brun_id=(\d+)\b", result.stdout)
+    run_ids = [int(run_id) for run_id in re.findall(r"\brun_id=(\d+)\b", result.stdout)]
     return {
-        "run_id": int(match.group(1)) if match is not None else None,
+        "run_id": run_ids[0] if run_ids else None,
+        "run_ids": run_ids,
         "dry_run": result.dry_run,
     }
 
@@ -118,6 +119,21 @@ def _superexec_claim_observation(result: CommandResult) -> dict[str, object]:
         if marker in combined
     ]
     return {"observed": bool(markers), "markers": markers}
+
+
+def _superexec_capacity_wait_observation(result: CommandResult) -> dict[str, object]:
+    combined = f"{result.stdout}\n{result.stderr}".lower()
+    wait_marker = "waiting for kubernetes taskexecutor capacity"
+    markers = [
+        marker
+        for marker in (
+            wait_marker,
+            "active pods",
+            "budget",
+        )
+        if marker in combined
+    ]
+    return {"observed": wait_marker in markers, "markers": markers}
 
 
 def _pod_observation(result: CommandResult) -> dict[str, object]:
@@ -152,7 +168,46 @@ def _pod_observation(result: CommandResult) -> dict[str, object]:
     return {"items": items, "phases": phases}
 
 
+def _secret_observation(result: CommandResult) -> dict[str, object]:
+    if result.dry_run or not result.stdout.strip():
+        return {"items": []}
+    try:
+        raw = json.loads(result.stdout)
+    except json.JSONDecodeError as err:
+        return {"items": [], "error": f"invalid Secret JSON: {err}"}
+    items: list[dict[str, object]] = []
+    for secret in raw.get("items", []):
+        if not isinstance(secret, Mapping):
+            continue
+        metadata = secret.get("metadata", {})
+        if not isinstance(metadata, Mapping):
+            continue
+        items.append(
+            {
+                "name": metadata.get("name"),
+                "namespace": metadata.get("namespace"),
+                "labels": metadata.get("labels", {}),
+                "type": secret.get("type"),
+            }
+        )
+    return {"items": items}
+
+
 def _pod_names(observation: Mapping[str, object]) -> list[str]:
+    names: list[str] = []
+    raw_items = observation.get("items", [])
+    if not isinstance(raw_items, Sequence):
+        return names
+    for item in raw_items:
+        if not isinstance(item, Mapping):
+            continue
+        name = item.get("name")
+        if isinstance(name, str) and name:
+            names.append(name)
+    return names
+
+
+def _secret_names(observation: Mapping[str, object]) -> list[str]:
     names: list[str] = []
     raw_items = observation.get("items", [])
     if not isinstance(raw_items, Sequence):

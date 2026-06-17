@@ -17,3 +17,4 @@ serverapp = "launch_probe.server_app:app"
 clientapp = "launch_probe.client_app:app"
 
 [tool.flwr.app.config]
+local-k8s.probe-hold-seconds = 0.0

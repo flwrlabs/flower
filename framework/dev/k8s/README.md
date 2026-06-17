@@ -1,9 +1,33 @@
 # Local k8s Launch-Path Harness
 
 This dev-only harness builds local Flower runtime images, configures a k3d
-cluster, starts SuperLink and SuperExec, seeds one ServerApp run through the
-Control API, and verifies that the Kubernetes executor creates a TaskExecutor
-Pod that reaches `Succeeded`.
+cluster, starts SuperLink and SuperExec, seeds deterministic ServerApp runs
+through the Control API, and verifies that the Kubernetes executor creates
+TaskExecutor Pods that reach `Succeeded`.
+
+It has two main modes:
+
+- the default one-task launch-path proof; and
+- the `--capacity-cleanup-proof` mode, which uses active Pod budget `1`, seeds
+  two tasks, observes SuperExec waiting for capacity, and verifies completed
+  TaskExecutor Pod/Secret cleanup before broad namespace cleanup.
+
+## Prerequisites
+
+Run commands from the repository root. The wrapper expects these tools on
+`PATH`:
+
+- `docker`;
+- `k3d`;
+- `kubectl`;
+- `uv`;
+- `python`.
+
+The Docker daemon must already be running. If `--skip-build` is used, the local
+runtime images selected by the wrapper must already exist and be importable into
+k3d.
+
+## Quick Runs
 
 Run the full local smoke test from the repository root:
 
@@ -17,11 +41,47 @@ To reuse previously built images:
 ./framework/dev/k8s/test-real-launch-path.sh --skip-build
 ```
 
+To run the budget-1/two-task capacity and cleanup proof:
+
+```bash
+output_dir=/private/tmp/f7d-v2-capacity-cleanup-proof-$(date +%Y%m%d-%H%M%S)
+./framework/dev/k8s/test-real-launch-path.sh \
+  --capacity-cleanup-proof \
+  --output-dir "${output_dir}"
+```
+
+To verify the saved capacity evidence manually after the wrapper finishes:
+
+```bash
+python framework/dev/k8s/verify_evidence.py "${output_dir}" \
+  --expected-result local-k8s-capacity-cleanup-proof
+```
+
+`/private/tmp` is only an example local scratch location. For handoff or review,
+choose a durable writable directory, or archive the completed evidence directory
+after saving the verifier report.
+
+The wrapper prints verifier output to stdout. To make the verifier report part
+of an evidence bundle for review, rerun the verifier and save the output:
+
+```bash
+python framework/dev/k8s/verify_evidence.py "${output_dir}" \
+  --expected-result local-k8s-capacity-cleanup-proof \
+  > "${output_dir}/diagnostics/verifier-output.txt"
+```
+
 The wrapper deletes the test namespace by default. To inspect resources after a
 run:
 
 ```bash
-./framework/dev/k8s/test-real-launch-path.sh --skip-cleanup
+output_dir=/private/tmp/f7d-v2-capacity-cleanup-proof-live-$(date +%Y%m%d-%H%M%S)
+./framework/dev/k8s/test-real-launch-path.sh \
+  --capacity-cleanup-proof \
+  --skip-cleanup \
+  --output-dir "${output_dir}"
+python framework/dev/k8s/verify_evidence.py "${output_dir}" \
+  --expected-result local-k8s-capacity-cleanup-proof \
+  --no-require-cleanup
 ```
 
 ## Defaults
@@ -32,7 +92,12 @@ run:
 | Namespace | `flower-local-k8s` |
 | Seed Job | `flower-local-k8s-seed-run` |
 | Executor ConfigMap | `flower-local-k8s-executor-config` |
-| Result | `local-k8s-launch-path` |
+| Default result | `local-k8s-launch-path` |
+| Capacity-proof result | `local-k8s-capacity-cleanup-proof` |
+| Default seeded runs | `1` |
+| Capacity-proof seeded runs | `2` |
+| Capacity-proof active Pod budget | `1` |
+| Capacity-proof probe hold | `5.0` seconds |
 | ServerApp marker | `K8s launch probe ServerApp ran` |
 
 ## Output
@@ -61,12 +126,26 @@ Evidence is written under the selected output directory:
 | `taskexecutor-secrets.redacted.json` | Redacted per-task Secret evidence with key names and byte lengths. |
 | `final-state.json` | Pre-cleanup resource counts and object summaries for the run selectors. |
 | `proof-checklist.json` | Reviewer-facing map from claims to artifact fields, with out-of-scope claims. |
+| `harness.log` | Short harness result log. |
+| `sanitized-config.yaml` | Sanitized copy of the selected harness profile. |
+| `objects/capacity-blocked-pods.json` | Capacity-proof snapshot of the first active TaskExecutor Pod. |
+| `objects/executor-config.yaml` | Rendered Kubernetes executor config, including capacity settings. |
+| `objects/executor-config.json` | JSON form of the rendered Kubernetes executor config. |
+| `objects/secrets-before-cleanup.redacted.json` | Capacity-proof redacted Secret snapshot before executor cleanup. |
+| `objects/cleanup-pods.json` | Capacity-proof TaskExecutor Pod state after capacity opens. |
+| `objects/secrets-after-cleanup.redacted.json` | Capacity-proof redacted Secret snapshot after executor cleanup. |
 | `objects/real-launch.yaml` | Rendered SuperLink, executor config, and SuperExec objects. |
 | `objects/seed-job.yaml` | Rendered seed ConfigMap and Job. |
 | `objects/pods.json` | Observed TaskExecutor Pod list and phases. |
 | `diagnostics/commands.txt` | Planned or executed host commands. |
+| `diagnostics/failures.txt` | Failure messages when the harness records failures. |
+| `diagnostics/image-preflight.json` | Docker image inspection and k3d import plan/results. |
+| `diagnostics/image-preflight.txt` | Docker image inspection and k3d import command output. |
+| `diagnostics/cleanup.json` | Namespace cleanup command plan/results. |
+| `diagnostics/superexec-logs.txt` | Captured SuperExec logs used for claim and capacity-wait evidence. |
 | `diagnostics/taskexecutor-logs.txt` | Captured TaskExecutor logs. |
 | `diagnostics/cleanup.txt` | Cleanup defaults and the namespace delete command. |
+| `diagnostics/verifier-output.txt` | Optional saved verifier report when rerun manually with shell redirection. |
 
 ## How The Evidence Proves Correctness
 
@@ -78,7 +157,8 @@ map in machine-readable form.
 
    Open `invocation.json` and check:
 
-   - `mode` is `local-k8s-launch-path`;
+   - `mode` is `local-k8s-launch-path` for the default proof or
+     `local-k8s-capacity-cleanup-proof` for the capacity cleanup proof;
    - `dry_run` is `false`;
    - `repo.branch` and `repo.sha` match the checkout under review;
    - `equivalent_argv` shows the harness mode, output directory, namespace,
@@ -92,12 +172,16 @@ map in machine-readable form.
    contain the executor config used to render TaskExecutor Pods, including the
    namespace, image, resource pool, and harness-run label.
 
-3. Confirm one deterministic ServerApp task was seeded through AppIo.
+3. Confirm deterministic ServerApp tasks were seeded through AppIo.
 
    Open `objects/seed-job.yaml` and check that the Job runs
    `/opt/flower-local-k8s/seed_run.py` against the SuperLink Control API.
-   Then check `summary.json` and `task-lineage.json`: `seed_run_id` and
-   `seeded_run_id` should be present and should match.
+   Then check `summary.json` and `task-lineage.json`.
+
+   For the default proof, `seed_run_id` and `seeded_run_id` should be present
+   and should match. For the capacity cleanup proof, `summary.json` should list
+   two `seed_run_ids`, `task-lineage.json` should list the same
+   `seeded_run_ids`, and `seeded_task_count` should be `2`.
 
 4. Confirm the Kubernetes executor created the TaskExecutor Pod.
 
@@ -133,8 +217,8 @@ map in machine-readable form.
    Open `final-state.json`. It records the Pod, Secret, Job, Service, and
    Namespace observation commands plus resource counts before namespace
    deletion. This proves what remained at the end of the proof stage. It does
-   not claim executor-owned completed Pod or Secret cleanup; that is deliberately
-   out of scope for this slice.
+   not claim completed Pod or Secret cleanup for the default one-task proof;
+   that cleanup assertion belongs to the capacity cleanup proof.
 
 8. Confirm the verifier accepted the bundle.
 
@@ -143,6 +227,31 @@ map in machine-readable form.
    one lineage record, one credential Secret record, final state Pod/Secret
    counts, a `Succeeded` phase, and a successful cleanup command when cleanup
    was required.
+
+For `--capacity-cleanup-proof`, additionally confirm:
+
+1. `objects/executor-config.yaml` sets `active-pod-budget: 1`.
+2. `summary.json` lists two `seed_run_ids`, and `task-lineage.json` records at
+   least two observed TaskExecutor task records.
+3. `events.jsonl` has a passing `capacity.wait_observed` event. Also open
+   `diagnostics/superexec-logs.txt`; it should include the specific SuperExec
+   wait marker
+   `waiting for kubernetes taskexecutor capacity`; `active pods` and `budget`
+   are useful context, but they are not sufficient evidence on their own.
+4. `summary.json` has `cleanup_observed.observed: true`, removed Pod and Secret
+   names for the completed task, and at least one remaining/new TaskExecutor Pod
+   after cleanup. Removed and remaining Pod names should be disjoint.
+5. `objects/cleanup-pods.json` and
+   `objects/secrets-after-cleanup.redacted.json` show the post-wait selector
+   state before broad namespace cleanup.
+6. The capacity verifier report should identify the result as
+   `local-k8s-capacity-cleanup-proof`, show `Task lineage records: 2`, show
+   `Capacity wait observed: True`, include non-empty removed Pod/Secret lines,
+   and end with `Verification: PASSED`.
+
+   In this mode, `TaskExecutor Pods: 1` in the verifier report is expected
+   after cleanup: it is the remaining/new TaskExecutor Pod. The two-task
+   evidence comes from `Task lineage records: 2` and `task-lineage.json`.
 
 ## What Is Tested
 
@@ -156,20 +265,19 @@ map in machine-readable form.
 | TaskExecutor Pod creation | Yes | Polls for a Pod matching the run selector before failing. |
 | TaskExecutor terminal phase | Yes | Waits for observed TaskExecutor Pods to reach `Succeeded`. |
 | ServerApp execution marker | Yes | Verifies `K8s launch probe ServerApp ran` in TaskExecutor logs. |
+| Capacity wait | Optional | `--capacity-cleanup-proof` seeds two runs with active Pod budget `1` and requires SuperExec wait evidence. |
+| Sweeper cleanup | Optional | `--capacity-cleanup-proof` requires the first completed TaskExecutor Pod and Secret to be removed before namespace cleanup. |
 | Wrapper cleanup | Yes | Default wrapper behavior deletes the namespace and verifies cleanup evidence. |
 
 ## Out Of Scope
 
 | Area | Tested | Notes |
 | --- | --- | --- |
-| Capacity waiting | No | No capacity queue or resource-pool wait behavior is asserted. |
-| Sweeper cleanup | No | No reconciler or orphan cleanup loop is validated. |
-| Executor-owned Pod deletion | No | Namespace cleanup removes resources; executor deletion behavior is not proven. |
-| Executor-owned Secret deletion | No | Secret RBAC is checked, but per-task Secret lifecycle is not asserted. |
+| Cardinality proof | No | The capacity proof uses budget `1` and two tasks; budget `2`/three-task cardinality is a later slice. |
 | AppIo result completion semantics | No | This slice observes launch and Pod success, not full result semantics. |
 | ClientApp execution | No | The probe includes a minimal ClientApp file only because the FAB schema expects it. |
 | TLS, CNI/NetworkPolicy, production RBAC | No | This is local/dev-only and uses insecure local AppIo. |
-| Concurrency, retry, failure behavior | No | The harness starts one deterministic run. |
+| Concurrency, retry, failure behavior | No | The default proof starts one deterministic run; the capacity proof starts two deterministic runs only to exercise budget waiting and cleanup. |
 
 ## Useful Commands
 
@@ -177,8 +285,30 @@ Inspect resources after `--skip-cleanup`:
 
 ```bash
 kubectl --context k3d-flower-local-k8s get pods -n flower-local-k8s
+kubectl --context k3d-flower-local-k8s get jobs,secrets -n flower-local-k8s
 kubectl --context k3d-flower-local-k8s logs pod/flower-superlink -n flower-local-k8s
 kubectl --context k3d-flower-local-k8s logs pod/flower-superexec -n flower-local-k8s
+```
+
+Verify an existing default launch-path bundle:
+
+```bash
+python framework/dev/k8s/verify_evidence.py "${output_dir}"
+```
+
+Verify an existing capacity cleanup bundle:
+
+```bash
+python framework/dev/k8s/verify_evidence.py "${output_dir}" \
+  --expected-result local-k8s-capacity-cleanup-proof
+```
+
+Verify a bundle from a run that used `--skip-cleanup`:
+
+```bash
+python framework/dev/k8s/verify_evidence.py "${output_dir}" \
+  --expected-result local-k8s-capacity-cleanup-proof \
+  --no-require-cleanup
 ```
 
 Remove the namespace manually:
@@ -186,4 +316,14 @@ Remove the namespace manually:
 ```bash
 kubectl --context k3d-flower-local-k8s delete namespace flower-local-k8s \
   --ignore-not-found=true --wait=true
+```
+
+If Docker was restarted and an existing local k3d cluster appears stale, recreate
+only the local harness cluster and rerun:
+
+```bash
+k3d cluster delete flower-local-k8s
+./framework/dev/k8s/test-real-launch-path.sh \
+  --capacity-cleanup-proof \
+  --output-dir "${output_dir}"
 ```

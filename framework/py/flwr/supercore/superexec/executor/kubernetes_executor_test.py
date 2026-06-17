@@ -554,6 +554,7 @@ def test_wait_for_capacity_sleeps_and_polls_again_at_budget() -> None:
         {"items": []},
         {"items": [_pod("Pending")]},
         {"items": []},
+        {"items": []},
     ]
     client.list_namespaced_secret.return_value = {"items": []}
     sleep = Mock()
@@ -566,7 +567,7 @@ def test_wait_for_capacity_sleeps_and_polls_again_at_budget() -> None:
 
     KubernetesExecutor(client=client, config=config).wait_for_capacity()
 
-    assert client.list_namespaced_pod.call_count == 3
+    assert client.list_namespaced_pod.call_count == 4
     sleep.assert_called_once_with(3.0)
 
 
@@ -583,6 +584,7 @@ def test_wait_for_capacity_counts_pending_running_and_terminating_pods() -> None
                 _pod("Failed", deletion_timestamp="2026-05-26T18:31:00Z"),
             ]
         },
+        {"items": []},
         {"items": []},
     ]
     client.list_namespaced_secret.return_value = {"items": []}
@@ -633,6 +635,41 @@ def test_wait_for_capacity_sweeps_terminal_pods_before_capacity_check() -> None:
 
     KubernetesExecutor(client=client, config=config).wait_for_capacity()
 
+    client.delete_namespaced_pod.assert_called_once_with(
+        name=_POD_NAME,
+        namespace="flower-system",
+        grace_period_seconds=0,
+    )
+    client.delete_namespaced_secret.assert_called_once_with(
+        name=_SECRET_NAME, namespace="flower-system"
+    )
+
+
+def test_wait_for_capacity_sweeps_after_blocked_wait_opens() -> None:
+    """Test cleanup runs again after a blocked wait opens capacity."""
+    client = Mock()
+    labels = _task_labels(123)
+    client.list_namespaced_pod.side_effect = [
+        {"items": []},
+        {"items": [_pod("Running", labels=labels)]},
+        {"items": [_pod("Succeeded", labels=labels)]},
+        {"items": [_pod("Succeeded", labels=labels)]},
+    ]
+    client.list_namespaced_secret.side_effect = [
+        {"items": []},
+        {"items": [_secret(_SECRET_NAME, labels)]},
+    ]
+    sleep = Mock()
+    config = _executor_config(
+        resource_pool="gpu-pool",
+        active_pod_budget=1,
+        capacity_poll_interval=3.0,
+        sleep=sleep,
+    )
+
+    KubernetesExecutor(client=client, config=config).wait_for_capacity()
+
+    sleep.assert_called_once_with(3.0)
     client.delete_namespaced_pod.assert_called_once_with(
         name=_POD_NAME,
         namespace="flower-system",

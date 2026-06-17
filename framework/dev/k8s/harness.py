@@ -27,8 +27,8 @@ _THIS_DIR = Path(__file__).resolve().parent
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
 
-import real_launch
-from common import (
+import real_launch  # noqa: E402,F401
+from common import (  # noqa: E402,F401
     CommandResult,
     EvidenceBundleWriter,
     HarnessEvent,
@@ -49,14 +49,14 @@ from common import (
     redact_command_args,
     redact_sensitive_data,
 )
-from manifests import (
+from manifests import (  # noqa: E402,F401
     render_appio_seed_manifests,
     render_kubernetes_executor_config,
     render_namespace_manifest,
     render_real_launch_manifests,
     render_superexec_rbac_manifests,
 )
-from real_launch import run_local_k8s_launch_path
+from real_launch import run_local_k8s_launch_path  # noqa: E402
 
 
 def run_contract_scaffold(
@@ -94,7 +94,10 @@ def run_contract_scaffold(
         HarnessEvent(
             event="policy.not_validated_locally",
             status="not_validated",
-            message="The local k8s contract scaffold does not validate CNI, RBAC, or Kubernetes runtime policy.",
+            message=(
+                "The local k8s contract scaffold does not validate CNI, RBAC, "
+                "or Kubernetes runtime policy."
+            ),
             details={
                 "expected_cni": profile.expected_cni,
                 "reason": "contract scaffold only",
@@ -390,18 +393,24 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "Write local k8s harness evidence. The default mode writes "
             "the contract scaffold; infra-proof mode writes "
             "infra/TLS/RBAC evidence; local-k8s-launch-path mode writes "
-            "SuperLink/SuperExec/TaskExecutor evidence. Host commands only run "
-            "with --execute."
+            "SuperLink/SuperExec/TaskExecutor evidence; capacity-cleanup-proof "
+            "mode writes the budget-1/two-task capacity and cleanup proof. "
+            "Host commands only run with --execute."
         )
     )
     default_profile = generic_k3d_profile()
     parser.add_argument(
         "--mode",
-        choices=("contract-scaffold", "infra-proof", "local-k8s-launch-path"),
+        choices=(
+            "contract-scaffold",
+            "infra-proof",
+            "local-k8s-launch-path",
+            "capacity-cleanup-proof",
+        ),
         default="contract-scaffold",
         help=(
             "Write the contract scaffold, infra/TLS/RBAC proof bundle, "
-            "or local k8s launch-path bundle."
+            "local k8s launch-path bundle, or capacity/cleanup proof bundle."
         ),
     )
     parser.add_argument(
@@ -505,6 +514,36 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Control API seed Job name rendered for local-k8s-launch-path mode.",
     )
     parser.add_argument(
+        "--seed-run-count",
+        type=int,
+        default=default_profile.seed_run_count,
+        help="Number of deterministic ServerApp runs created by the seed Job.",
+    )
+    parser.add_argument(
+        "--probe-hold-seconds",
+        type=float,
+        default=default_profile.probe_hold_seconds,
+        help="Seconds each probe ServerApp should stay active before returning.",
+    )
+    parser.add_argument(
+        "--active-pod-budget",
+        type=int,
+        default=None,
+        help="Optional Kubernetes executor active Pod budget.",
+    )
+    parser.add_argument(
+        "--capacity-poll-interval",
+        type=float,
+        default=None,
+        help="Optional Kubernetes executor capacity poll interval.",
+    )
+    parser.add_argument(
+        "--capacity-log-interval",
+        type=float,
+        default=None,
+        help="Optional Kubernetes executor capacity log interval.",
+    )
+    parser.add_argument(
         "--rbac-name",
         default=default_profile.rbac_name,
         help="Role and RoleBinding name rendered for the SuperExec infra proof.",
@@ -513,8 +552,9 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--execute",
         action="store_true",
         help=(
-            "Run host k3d/kubectl commands in infra-proof or local-k8s-launch-path "
-            "mode. Without this, commands are only recorded as dry-run evidence."
+            "Run host k3d/kubectl commands in infra-proof, local-k8s-launch-path, "
+            "or capacity-cleanup-proof mode. Without this, commands are only "
+            "recorded as dry-run evidence."
         ),
     )
     parser.add_argument(
@@ -575,6 +615,11 @@ def _profile_from_args(args: argparse.Namespace) -> HarnessProfile:
         superlink_name=args.superlink_name,
         superexec_name=args.superexec_name,
         seed_job_name=args.seed_job_name,
+        seed_run_count=args.seed_run_count,
+        probe_hold_seconds=args.probe_hold_seconds,
+        active_pod_budget=args.active_pod_budget,
+        capacity_poll_interval=args.capacity_poll_interval,
+        capacity_log_interval=args.capacity_log_interval,
         rbac_name=args.rbac_name,
         labels={
             "flower.ai/harness": "local-k8s-launch-path",
@@ -586,7 +631,7 @@ def _profile_from_args(args: argparse.Namespace) -> HarnessProfile:
 def main(argv: Sequence[str] | None = None) -> int:
     """Write the requested local k8s evidence bundle."""
     args = _parse_args(argv)
-    if args.mode == "local-k8s-launch-path":
+    if args.mode in {"local-k8s-launch-path", "capacity-cleanup-proof"}:
         summary = run_local_k8s_launch_path(
             args.output_dir,
             profile=_profile_from_args(args),
@@ -595,6 +640,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             apply_manifests=args.apply_manifests,
             import_images=args.import_images,
             cleanup=args.cleanup,
+            capacity_cleanup_proof=args.mode == "capacity-cleanup-proof",
         )
     elif args.mode == "infra-proof":
         summary = run_infra_proof(

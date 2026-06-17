@@ -39,6 +39,7 @@ from common import (
     _combined_status,
     _format_cleanup_plan,
     _format_image_preflight,
+    _format_superexec_logs,
     _format_taskexecutor_logs,
     _kubectl_args,
     _kubectl_context,
@@ -50,6 +51,7 @@ from common import (
     build_cleanup_plan,
     build_image_preflight,
     build_tls_material_contract,
+    capacity_cleanup_profile,
     generic_k3d_profile,
     redact_command_args,
 )
@@ -67,6 +69,9 @@ from observations import (
     _pod_observation,
     _pod_phases,
     _seed_observation,
+    _secret_names,
+    _secret_observation,
+    _superexec_capacity_wait_observation,
     _superexec_claim_observation,
     _taskexecutor_phase_status,
     _taskexecutor_pods_args,
@@ -89,9 +94,12 @@ def run_local_k8s_launch_path(
     apply_manifests: bool = False,
     import_images: bool = False,
     cleanup: bool = False,
+    capacity_cleanup_proof: bool = False,
 ) -> HarnessSummary:
     """Write local k8s AppIo/SuperExec/TaskExecutor launch-path evidence."""
     profile = profile or generic_k3d_profile()
+    if capacity_cleanup_proof:
+        profile = capacity_cleanup_profile(profile)
     runner = runner or HostCommandRunner(dry_run=not execute)
     writer = EvidenceBundleWriter(output_dir)
     writer.initialize()
@@ -99,6 +107,11 @@ def run_local_k8s_launch_path(
     started_at = _utc_now()
     command_results: list[CommandResult] = []
     failures: list[str] = []
+    mode_name = (
+        "local-k8s-capacity-cleanup-proof"
+        if capacity_cleanup_proof
+        else "local-k8s-launch-path"
+    )
 
     namespace_manifest = render_namespace_manifest(profile)
     rbac_manifest_list = {
@@ -124,6 +137,7 @@ def run_local_k8s_launch_path(
             apply_manifests=apply_manifests,
             import_images=import_images,
             cleanup=cleanup,
+            capacity_cleanup_proof=capacity_cleanup_proof,
         ),
     )
     writer.write_yaml("sanitized-config.yaml", profile.to_mapping())
@@ -158,7 +172,7 @@ def run_local_k8s_launch_path(
                 message=message,
                 details={
                     "run_id": run_id,
-                    "mode": "local-k8s-launch-path",
+                    "mode": mode_name,
                     "dry_run": not execute,
                     "data": details,
                 },
@@ -433,15 +447,21 @@ def run_local_k8s_launch_path(
         record_failure=False,
     )
     seed_observation = _seed_observation(seed_logs_result)
-    if execute and seed_observation["run_id"] is None:
-        failures.append("AppIo seed Job did not report a run_id.")
+    seed_run_ids = cast(list[int], seed_observation["run_ids"])
+    if execute and len(seed_run_ids) < profile.seed_run_count:
+        failures.append(
+            "AppIo seed Job reported "
+            f"{len(seed_run_ids)} run IDs, expected {profile.seed_run_count}."
+        )
     write_event(
         "appio.seeded",
         _appio_seed_status(seed_apply_result, seed_wait_result, seed_observation),
-        "Control API seed Job recorded one deterministic ServerApp run.",
+        "Control API seed Job recorded deterministic ServerApp runs.",
         {
             "job": profile.seed_job_name,
             "run_id": seed_observation["run_id"],
+            "run_ids": seed_run_ids,
+            "expected_run_count": profile.seed_run_count,
             "manifest": "objects/seed-job.yaml",
             "delete_previous": (
                 _command_record(seed_prune_result) if seed_prune_result.args else None
@@ -484,6 +504,27 @@ def run_local_k8s_launch_path(
     taskexecutor_pod_attempts: list[CommandResult] = []
     taskexecutor_pods_result = CommandResult(args=[], returncode=0, dry_run=not execute)
     taskexecutor_observation: dict[str, object] = {"items": [], "phases": []}
+    taskexecutor_wait_results: list[CommandResult] = []
+    capacity_wait_results: list[CommandResult] = []
+    before_cleanup_secret_evidence: dict[str, object] = {
+        "schema_version": SCHEMA_VERSION,
+        "redacted": True,
+        "selector": taskexecutor_selector,
+        "items": [],
+    }
+    after_cleanup_secret_evidence: dict[str, object] = {
+        "schema_version": SCHEMA_VERSION,
+        "redacted": True,
+        "selector": taskexecutor_selector,
+        "items": [],
+    }
+    cleanup_observation: dict[str, object] = {
+        "observed": False,
+        "removed_pods": [],
+        "removed_secrets": [],
+        "remaining_pods": [],
+        "remaining_secrets": [],
+    }
     taskexecutor_deadline = time.monotonic() + profile.timeout_seconds
     while True:
         taskexecutor_pods_result = run_command(
@@ -516,7 +557,182 @@ def run_local_k8s_launch_path(
                 max(0.0, taskexecutor_deadline - time.monotonic()),
             )
         )
-    taskexecutor_wait_results: list[CommandResult] = []
+    first_taskexecutor_observation = taskexecutor_observation
+    first_taskexecutor_pod_names = _pod_names(first_taskexecutor_observation)
+    blocked_pod_snapshot = _json_list_snapshot(taskexecutor_pods_result)
+    if capacity_cleanup_proof:
+        before_cleanup_secrets_result = run_command(
+            _taskexecutor_secrets_args(profile, taskexecutor_selector),
+            "TaskExecutor credential Secret before cleanup observation",
+            record_failure=False,
+        )
+        before_cleanup_secret_snapshot = _json_list_snapshot(
+            before_cleanup_secrets_result
+        )
+        before_cleanup_secret_observation = _secret_observation(
+            before_cleanup_secrets_result
+        )
+        _redact_secret_observation_stdout(before_cleanup_secrets_result)
+        before_cleanup_secret_evidence = _taskexecutor_secret_evidence(
+            before_cleanup_secret_snapshot,
+            selector=taskexecutor_selector,
+            command=_command_record(before_cleanup_secrets_result),
+        )
+
+        capacity_wait_observation: dict[str, object] = {
+            "observed": False,
+            "markers": [],
+        }
+        capacity_wait_result = CommandResult(args=[], returncode=0, dry_run=not execute)
+        capacity_deadline = time.monotonic() + profile.timeout_seconds
+        while True:
+            capacity_wait_result = run_command(
+                _kubectl_args(
+                    profile,
+                    [
+                        "logs",
+                        f"pod/{profile.superexec_name}",
+                        "-n",
+                        profile.namespace,
+                        "--tail=400",
+                    ],
+                ),
+                "SuperExec capacity wait observation",
+                record_failure=False,
+            )
+            capacity_wait_results.append(capacity_wait_result)
+            capacity_wait_observation = _superexec_capacity_wait_observation(
+                capacity_wait_result
+            )
+            if (
+                capacity_wait_observation["observed"]
+                or not execute
+                or capacity_wait_result.dry_run
+            ):
+                break
+            if time.monotonic() >= capacity_deadline:
+                failures.append("SuperExec capacity wait was not observed.")
+                break
+            time.sleep(
+                min(
+                    _TASKEXECUTOR_POD_POLL_INTERVAL_SECONDS,
+                    max(0.0, capacity_deadline - time.monotonic()),
+                )
+            )
+        write_event(
+            "capacity.wait_observed",
+            _observation_status(
+                capacity_wait_result, capacity_wait_observation["observed"]
+            ),
+            "SuperExec logs inspected for Kubernetes capacity waiting.",
+            {
+                "active_pod_budget": profile.active_pod_budget,
+                "seed_run_ids": seed_run_ids,
+                "first_pods": first_taskexecutor_observation["items"],
+                "markers": capacity_wait_observation["markers"],
+                "commands": [
+                    _command_record(result) for result in capacity_wait_results
+                ],
+            },
+        )
+
+        observed_pod_names = set(first_taskexecutor_pod_names)
+        second_pod_attempts: list[CommandResult] = []
+        second_deadline = time.monotonic() + profile.timeout_seconds
+        while True:
+            taskexecutor_pods_result = run_command(
+                _taskexecutor_pods_args(profile, taskexecutor_selector),
+                "Second TaskExecutor Pod observation",
+                record_failure=False,
+            )
+            taskexecutor_pod_attempts.append(taskexecutor_pods_result)
+            second_pod_attempts.append(taskexecutor_pods_result)
+            taskexecutor_observation = _pod_observation(taskexecutor_pods_result)
+            current_pod_names = _pod_names(taskexecutor_observation)
+            observed_pod_names.update(current_pod_names)
+            new_pod_names = [
+                name
+                for name in current_pod_names
+                if name not in first_taskexecutor_pod_names
+            ]
+            if (
+                new_pod_names
+                or len(observed_pod_names) >= profile.seed_run_count
+                or not execute
+                or taskexecutor_pods_result.dry_run
+            ):
+                break
+            if time.monotonic() >= second_deadline:
+                failures.append(
+                    "Second TaskExecutor Pod was not observed after capacity opened."
+                )
+                break
+            time.sleep(
+                min(
+                    _TASKEXECUTOR_POD_POLL_INTERVAL_SECONDS,
+                    max(0.0, second_deadline - time.monotonic()),
+                )
+            )
+
+        after_cleanup_secrets_result = run_command(
+            _taskexecutor_secrets_args(profile, taskexecutor_selector),
+            "TaskExecutor credential Secret after cleanup observation",
+            record_failure=False,
+        )
+        after_cleanup_secret_snapshot = _json_list_snapshot(
+            after_cleanup_secrets_result
+        )
+        after_cleanup_secret_observation = _secret_observation(
+            after_cleanup_secrets_result
+        )
+        _redact_secret_observation_stdout(after_cleanup_secrets_result)
+        after_cleanup_secret_evidence = _taskexecutor_secret_evidence(
+            after_cleanup_secret_snapshot,
+            selector=taskexecutor_selector,
+            command=_command_record(after_cleanup_secrets_result),
+        )
+        cleanup_observation = _cleanup_observation(
+            first_pod_names=first_taskexecutor_pod_names,
+            before_cleanup_secrets=before_cleanup_secret_observation,
+            after_cleanup_pods=taskexecutor_observation,
+            after_cleanup_secrets=after_cleanup_secret_observation,
+        )
+        if execute and not cleanup_observation["observed"]:
+            failures.append(
+                "Completed TaskExecutor Pod and credential Secret cleanup was "
+                "not observed before namespace cleanup."
+            )
+        writer.write_json("objects/capacity-blocked-pods.json", blocked_pod_snapshot)
+        writer.write_json(
+            "objects/secrets-before-cleanup.redacted.json",
+            before_cleanup_secret_evidence,
+        )
+        writer.write_json("objects/cleanup-pods.json", taskexecutor_observation)
+        writer.write_json(
+            "objects/secrets-after-cleanup.redacted.json",
+            after_cleanup_secret_evidence,
+        )
+        write_event(
+            "cleanup.observed",
+            (
+                "planned"
+                if not execute or taskexecutor_pods_result.dry_run
+                else ("passed" if cleanup_observation["observed"] else "failed")
+            ),
+            "Completed TaskExecutor Pod and Secret cleanup inspected.",
+            {
+                "selector": taskexecutor_selector,
+                "observation": cleanup_observation,
+                "first_pods": first_taskexecutor_observation["items"],
+                "pods_after_cleanup": taskexecutor_observation["items"],
+                "secrets_before_cleanup": before_cleanup_secret_observation["items"],
+                "secrets_after_cleanup": after_cleanup_secret_observation["items"],
+                "second_pod_attempts": [
+                    _command_record(result) for result in second_pod_attempts
+                ],
+            },
+        )
+
     taskexecutor_pod_names = _pod_names(taskexecutor_observation)
     if execute and taskexecutor_pod_names:
         for pod_name in taskexecutor_pod_names:
@@ -566,12 +782,22 @@ def run_local_k8s_launch_path(
         )
         for pod_name in taskexecutor_pod_names
     ]
+    superexec_log_results = [superexec_logs_result, *capacity_wait_results]
     taskexecutor_pod_snapshot = _json_list_snapshot(taskexecutor_pods_result)
+    lineage_pod_snapshot = (
+        _merge_object_list_snapshots(blocked_pod_snapshot, taskexecutor_pod_snapshot)
+        if capacity_cleanup_proof
+        else taskexecutor_pod_snapshot
+    )
     writer.write_json("objects/pods.json", taskexecutor_observation)
-    writer.write_json("taskexecutor-pods.json", taskexecutor_pod_snapshot)
+    writer.write_json("taskexecutor-pods.json", lineage_pod_snapshot)
     writer.write_text(
         "diagnostics/taskexecutor-logs.txt",
         _format_taskexecutor_logs(taskexecutor_log_results),
+    )
+    writer.write_text(
+        "diagnostics/superexec-logs.txt",
+        _format_superexec_logs(superexec_log_results),
     )
     write_event(
         "kubernetes_executor.pod_created",
@@ -610,19 +836,7 @@ def run_local_k8s_launch_path(
     )
 
     taskexecutor_secrets_result = run_command(
-        _kubectl_args(
-            profile,
-            [
-                "get",
-                "secrets",
-                "-n",
-                profile.namespace,
-                "-l",
-                taskexecutor_selector,
-                "-o",
-                "json",
-            ],
-        ),
+        _taskexecutor_secrets_args(profile, taskexecutor_selector),
         "TaskExecutor credential Secret observation",
     )
     taskexecutor_secret_snapshot = _json_list_snapshot(taskexecutor_secrets_result)
@@ -631,6 +845,13 @@ def run_local_k8s_launch_path(
         taskexecutor_secret_snapshot,
         selector=taskexecutor_selector,
         command=_command_record(taskexecutor_secrets_result),
+    )
+    lineage_secret_evidence = (
+        _merge_secret_evidence(
+            before_cleanup_secret_evidence, taskexecutor_secret_evidence
+        )
+        if capacity_cleanup_proof
+        else taskexecutor_secret_evidence
     )
     writer.write_json(
         "taskexecutor-secrets.redacted.json", taskexecutor_secret_evidence
@@ -648,16 +869,19 @@ def run_local_k8s_launch_path(
     task_lineage = _task_lineage(
         profile=profile,
         run_id=run_id,
+        mode=mode_name,
         seed_run_id=seed_observation["run_id"],
+        seed_run_ids=seed_run_ids,
         selector=taskexecutor_selector,
-        pod_snapshot=taskexecutor_pod_snapshot,
-        secret_evidence=taskexecutor_secret_evidence,
+        pod_snapshot=lineage_pod_snapshot,
+        secret_evidence=lineage_secret_evidence,
     )
     writer.write_json("task-lineage.json", task_lineage)
 
     final_state = _final_state_record(
         profile=profile,
         run_id=run_id,
+        mode=mode_name,
         cleanup_requested=cleanup,
         taskexecutor_selector=taskexecutor_selector,
         pod_snapshot=taskexecutor_pod_snapshot,
@@ -675,7 +899,14 @@ def run_local_k8s_launch_path(
             "harness namespace cleanup",
         )
 
-    result = "local-k8s-launch-path" if execute else "local-k8s-launch-path-dry-run"
+    if capacity_cleanup_proof:
+        result = (
+            "local-k8s-capacity-cleanup-proof"
+            if execute
+            else "local-k8s-capacity-cleanup-proof-dry-run"
+        )
+    else:
+        result = "local-k8s-launch-path" if execute else "local-k8s-launch-path-dry-run"
     status = "failed" if failures else "passed"
     writer.write_json(
         "proof-checklist.json",
@@ -684,6 +915,9 @@ def run_local_k8s_launch_path(
             dry_run=not execute,
             run_id=run_id,
             cleanup_requested=cleanup,
+            capacity_cleanup_proof=capacity_cleanup_proof,
+            active_pod_budget=profile.active_pod_budget,
+            seed_run_count=profile.seed_run_count,
         ),
     )
     write_event(
@@ -704,11 +938,16 @@ def run_local_k8s_launch_path(
 
     not_validated = [
         "TaskExecutor AppIo RPC completion",
-        "capacity wait proof",
-        "completed Pod and Secret cleanup proof",
         "NetworkPolicy/CNI enforcement",
         "production RBAC posture",
     ]
+    if not capacity_cleanup_proof or not execute:
+        not_validated.extend(
+            [
+                "capacity wait proof",
+                "completed Pod and Secret cleanup proof",
+            ]
+        )
     if not execute:
         not_validated.append("host command execution")
     if tls_status != "passed":
@@ -738,6 +977,9 @@ def run_local_k8s_launch_path(
             },
             "selector": taskexecutor_selector,
             "seed_run_id": seed_observation["run_id"],
+            "seed_run_ids": seed_run_ids,
+            "expected_seed_run_count": profile.seed_run_count,
+            "active_pod_budget": profile.active_pod_budget,
             "pods": taskexecutor_observation["items"],
             "credential_secrets": taskexecutor_secret_evidence["items"],
             "final_state_counts": final_state["counts"],
@@ -746,8 +988,27 @@ def run_local_k8s_launch_path(
                 "task_lineage": "task-lineage.json",
                 "taskexecutor_pods": "taskexecutor-pods.json",
                 "taskexecutor_secrets": "taskexecutor-secrets.redacted.json",
+                "superexec_logs": "diagnostics/superexec-logs.txt",
                 "final_state": "final-state.json",
                 "proof_checklist": "proof-checklist.json",
+                "capacity_blocked_pods": (
+                    "objects/capacity-blocked-pods.json"
+                    if capacity_cleanup_proof
+                    else None
+                ),
+                "secrets_before_cleanup": (
+                    "objects/secrets-before-cleanup.redacted.json"
+                    if capacity_cleanup_proof
+                    else None
+                ),
+                "cleanup_pods": (
+                    "objects/cleanup-pods.json" if capacity_cleanup_proof else None
+                ),
+                "secrets_after_cleanup": (
+                    "objects/secrets-after-cleanup.redacted.json"
+                    if capacity_cleanup_proof
+                    else None
+                ),
             },
             "rbac": rbac_check,
             "image_preflight": {
@@ -763,6 +1024,24 @@ def run_local_k8s_launch_path(
             "taskexecutor_logs": [
                 _command_record(result) for result in taskexecutor_log_results
             ],
+            "superexec_logs": [
+                _command_record(result) for result in superexec_log_results
+            ],
+            "capacity_wait": {
+                "observed": bool(capacity_wait_results)
+                and any(
+                    _superexec_capacity_wait_observation(result)["observed"]
+                    for result in capacity_wait_results
+                ),
+                "commands": [
+                    _command_record(result) for result in capacity_wait_results
+                ],
+            },
+            "cleanup_observed": cleanup_observation,
+            "secrets": {
+                "before_cleanup": before_cleanup_secret_evidence["items"],
+                "after_cleanup": after_cleanup_secret_evidence["items"],
+            },
             "cleanup": {
                 "requested": cleanup,
                 "command": cleanup_plan["command"],
@@ -786,12 +1065,18 @@ def _invocation_record(
     apply_manifests: bool,
     import_images: bool,
     cleanup: bool,
+    capacity_cleanup_proof: bool,
 ) -> dict[str, object]:
     """Return reviewer-facing inputs for one local k8s launch-path run."""
     cwd = Path.cwd()
+    mode_name = (
+        "local-k8s-capacity-cleanup-proof"
+        if capacity_cleanup_proof
+        else "local-k8s-launch-path"
+    )
     return {
         "schema_version": SCHEMA_VERSION,
-        "mode": "local-k8s-launch-path",
+        "mode": mode_name,
         "run_id": run_id,
         "dry_run": not execute,
         "cwd": str(cwd),
@@ -805,6 +1090,10 @@ def _invocation_record(
             "apply_manifests": apply_manifests,
             "import_images": import_images,
             "cleanup_requested": cleanup,
+            "capacity_cleanup_proof": capacity_cleanup_proof,
+            "active_pod_budget": profile.active_pod_budget,
+            "seed_run_count": profile.seed_run_count,
+            "probe_hold_seconds": profile.probe_hold_seconds,
         },
         "equivalent_argv": _equivalent_argv(
             profile=profile,
@@ -814,6 +1103,7 @@ def _invocation_record(
             apply_manifests=apply_manifests,
             import_images=import_images,
             cleanup=cleanup,
+            capacity_cleanup_proof=capacity_cleanup_proof,
         ),
     }
 
@@ -827,12 +1117,17 @@ def _equivalent_argv(
     apply_manifests: bool,
     import_images: bool,
     cleanup: bool,
+    capacity_cleanup_proof: bool,
 ) -> list[str]:
     args = [
         "python",
         "framework/dev/k8s/harness.py",
         "--mode",
-        "local-k8s-launch-path",
+        (
+            "capacity-cleanup-proof"
+            if capacity_cleanup_proof
+            else "local-k8s-launch-path"
+        ),
         "--output-dir",
         str(output_dir),
         "--cluster-name",
@@ -849,7 +1144,17 @@ def _equivalent_argv(
         profile.superexec_image,
         "--timeout-seconds",
         str(profile.timeout_seconds),
+        "--seed-run-count",
+        str(profile.seed_run_count),
+        "--probe-hold-seconds",
+        str(profile.probe_hold_seconds),
     ]
+    if profile.active_pod_budget is not None:
+        args.extend(["--active-pod-budget", str(profile.active_pod_budget)])
+    if profile.capacity_poll_interval is not None:
+        args.extend(["--capacity-poll-interval", str(profile.capacity_poll_interval)])
+    if profile.capacity_log_interval is not None:
+        args.extend(["--capacity-log-interval", str(profile.capacity_log_interval)])
     if execute:
         args.append("--execute")
     if create_cluster:
@@ -908,6 +1213,26 @@ def _json_snapshot(result: CommandResult) -> dict[str, object]:
     return {"items": [], "parse_error": "JSON output was not an object"}
 
 
+def _merge_object_list_snapshots(
+    *snapshots: Mapping[str, object],
+) -> dict[str, object]:
+    """Merge Kubernetes List snapshots by object name, preserving first-seen order."""
+    merged: dict[str, object] = {"items": []}
+    item_by_name: dict[str, Mapping[str, object]] = {}
+    order: list[str] = []
+    for snapshot in snapshots:
+        for item in _object_items(snapshot):
+            metadata = _mapping(item.get("metadata"))
+            name = _string_or_none(metadata.get("name"))
+            if name is None:
+                continue
+            if name not in item_by_name:
+                order.append(name)
+            item_by_name[name] = item
+    merged["items"] = [dict(item_by_name[name]) for name in order]
+    return merged
+
+
 def _taskexecutor_secret_evidence(
     secret_snapshot: Mapping[str, object],
     *,
@@ -921,6 +1246,31 @@ def _taskexecutor_secret_evidence(
         "command": dict(command),
         "items": [_secret_summary(secret) for secret in _object_items(secret_snapshot)],
     }
+
+
+def _merge_secret_evidence(
+    *evidence_records: Mapping[str, object],
+) -> dict[str, object]:
+    """Merge Secret evidence summaries by name."""
+    merged: dict[str, object] = {
+        "schema_version": SCHEMA_VERSION,
+        "redacted": True,
+        "items": [],
+    }
+    item_by_name: dict[str, Mapping[str, object]] = {}
+    order: list[str] = []
+    for evidence in evidence_records:
+        if "selector" not in merged and evidence.get("selector") is not None:
+            merged["selector"] = evidence["selector"]
+        for item in _object_items(evidence):
+            name = _string_or_none(item.get("name"))
+            if name is None:
+                continue
+            if name not in item_by_name:
+                order.append(name)
+            item_by_name[name] = item
+    merged["items"] = [dict(item_by_name[name]) for name in order]
+    return merged
 
 
 def _redact_secret_observation_stdout(result: CommandResult) -> None:
@@ -952,7 +1302,9 @@ def _task_lineage(
     *,
     profile: HarnessProfile,
     run_id: str,
+    mode: str,
     seed_run_id: object,
+    seed_run_ids: Sequence[int],
     selector: str,
     pod_snapshot: Mapping[str, object],
     secret_evidence: Mapping[str, object],
@@ -970,18 +1322,18 @@ def _task_lineage(
         pod_name = _string_or_none(metadata.get("name"))
         secret_name = _pod_secret_name(pod)
         secret = secrets_by_name.get(secret_name or "")
+        task_id = labels.get(_TASK_ID_LABEL)
         if secret is None:
             secret = _secret_matching_task(
                 secret_evidence,
-                task_id=labels.get(_TASK_ID_LABEL),
+                task_id=task_id,
                 launch_attempt=labels.get(_LAUNCH_ATTEMPT_LABEL),
             )
             if isinstance(secret.get("name"), str):
                 secret_name = str(secret["name"])
         tasks.append(
             {
-                "seeded_run_id": seed_run_id,
-                "task_id": labels.get(_TASK_ID_LABEL),
+                "task_id": task_id,
                 "task_type": labels.get("flower.ai/task-type"),
                 "pod_name": pod_name,
                 "pod_uid": _string_or_none(metadata.get("uid")),
@@ -995,9 +1347,17 @@ def _task_lineage(
         )
     return {
         "schema_version": SCHEMA_VERSION,
-        "mode": "local-k8s-launch-path",
+        "mode": mode,
         "run_id": run_id,
         "seeded_run_id": seed_run_id,
+        "seeded_run_ids": list(seed_run_ids),
+        "seeded_task_count": len(seed_run_ids),
+        "observed_task_count": len(tasks),
+        "lineage_note": (
+            "TaskExecutor Pod labels expose executor task IDs, not ServerApp run IDs; "
+            "this record captures seeded run IDs and observed TaskExecutor objects "
+            "without claiming a per-Pod run-ID mapping."
+        ),
         "resource_pool": profile.resource_pool,
         "selector": selector,
         "tasks": tasks,
@@ -1008,6 +1368,7 @@ def _final_state_record(
     *,
     profile: HarnessProfile,
     run_id: str,
+    mode: str,
     cleanup_requested: bool,
     taskexecutor_selector: str,
     pod_snapshot: Mapping[str, object],
@@ -1054,7 +1415,7 @@ def _final_state_record(
     namespace_snapshot = _json_snapshot(namespace_result)
     return {
         "schema_version": SCHEMA_VERSION,
-        "mode": "local-k8s-launch-path",
+        "mode": mode,
         "run_id": run_id,
         "captured_before_namespace_cleanup": True,
         "cleanup_requested": cleanup_requested,
@@ -1092,81 +1453,153 @@ def _proof_checklist(
     dry_run: bool,
     run_id: str,
     cleanup_requested: bool,
+    capacity_cleanup_proof: bool,
+    active_pod_budget: int | None,
+    seed_run_count: int,
 ) -> dict[str, object]:
     proof_status = "planned" if dry_run else status
+    claims: list[dict[str, object]] = [
+        {
+            "claim": "Harness invocation and selected inputs are inspectable.",
+            "status": "proved",
+            "artifact": "invocation.json",
+            "fields": ["equivalent_argv", "repo", "profile", "settings"],
+        },
+        {
+            "claim": "SuperExec is configured to use the Kubernetes executor.",
+            "status": proof_status,
+            "artifact": "objects/real-launch.yaml",
+            "fields": [
+                "SuperExec container args include --executor kubernetes",
+                "executor config is mounted at /etc/flower/executor-config.yaml",
+            ],
+        },
+        {
+            "claim": (
+                "Seeded ServerApp run count and observed TaskExecutor objects are "
+                "captured together."
+            ),
+            "status": proof_status,
+            "artifact": "task-lineage.json",
+            "fields": [
+                "seeded_run_id",
+                "seeded_run_ids",
+                "seeded_task_count",
+                "observed_task_count",
+                "tasks[].pod_name",
+                "tasks[].credential_secret_name",
+            ],
+        },
+        {
+            "claim": (
+                "The executor-created TaskExecutor Pod is captured as a full "
+                "redacted object snapshot."
+            ),
+            "status": proof_status,
+            "artifact": "taskexecutor-pods.json",
+            "fields": ["items[].metadata", "items[].spec", "items[].status"],
+        },
+        {
+            "claim": (
+                "The per-task credential Secret existed without exposing "
+                "credential values."
+            ),
+            "status": proof_status,
+            "artifact": "taskexecutor-secrets.redacted.json",
+            "fields": [
+                "items[].name",
+                "items[].data_keys",
+                "items[].data_byte_lengths",
+                "items[].redacted",
+            ],
+        },
+        {
+            "claim": (
+                "Pre-cleanup resource state is captured before namespace deletion."
+            ),
+            "status": proof_status,
+            "artifact": "final-state.json",
+            "fields": ["counts", "resources", "captured_before_namespace_cleanup"],
+        },
+    ]
+    out_of_scope = [
+        "budget-2/three-task cardinality behavior",
+        "AppIo TLS proof",
+        "production deployment readiness",
+    ]
+    if capacity_cleanup_proof:
+        claims.extend(
+            [
+                {
+                    "claim": "The Kubernetes executor active Pod budget is one.",
+                    "status": proof_status,
+                    "artifact": "objects/executor-config.yaml",
+                    "fields": ["active-pod-budget"],
+                    "expected": {"active-pod-budget": active_pod_budget},
+                },
+                {
+                    "claim": "Two deterministic ServerApp tasks were seeded.",
+                    "status": proof_status,
+                    "artifact": "summary.json",
+                    "fields": ["details.seed_run_ids"],
+                    "expected": {"seed_run_count": seed_run_count},
+                },
+                {
+                    "claim": "SuperExec waited because TaskExecutor capacity was full.",
+                    "status": proof_status,
+                    "artifact": "events.jsonl",
+                    "fields": ["capacity.wait_observed"],
+                },
+                {
+                    "claim": (
+                        "SuperExec logs used for capacity wait evidence are "
+                        "persisted for manual review."
+                    ),
+                    "status": proof_status,
+                    "artifact": "diagnostics/superexec-logs.txt",
+                    "fields": ["waiting for kubernetes taskexecutor capacity"],
+                },
+                {
+                    "claim": (
+                        "A second TaskExecutor Pod launched after capacity opened."
+                    ),
+                    "status": proof_status,
+                    "artifact": "objects/cleanup-pods.json",
+                    "fields": ["items[].name", "items[].phase"],
+                },
+                {
+                    "claim": (
+                        "The completed first TaskExecutor Pod and credential Secret "
+                        "were removed before namespace cleanup."
+                    ),
+                    "status": proof_status,
+                    "artifact": "summary.json",
+                    "fields": [
+                        "details.cleanup_observed.removed_pods",
+                        "details.cleanup_observed.removed_secrets",
+                    ],
+                },
+            ]
+        )
+    else:
+        out_of_scope.extend(
+            [
+                "active Pod budget behavior",
+                "two-task capacity waiting",
+                "executor-owned completed Pod cleanup proof",
+                "executor-owned per-task Secret cleanup proof",
+            ]
+        )
     return {
         "schema_version": SCHEMA_VERSION,
-        "mode": "local-k8s-launch-path",
+        "mode": (
+            "local-k8s-capacity-cleanup-proof"
+            if capacity_cleanup_proof
+            else "local-k8s-launch-path"
+        ),
         "run_id": run_id,
-        "claims": [
-            {
-                "claim": "Harness invocation and selected inputs are inspectable.",
-                "status": "proved",
-                "artifact": "invocation.json",
-                "fields": ["equivalent_argv", "repo", "profile", "settings"],
-            },
-            {
-                "claim": "SuperExec is configured to use the Kubernetes executor.",
-                "status": proof_status,
-                "artifact": "objects/real-launch.yaml",
-                "fields": [
-                    "SuperExec container args include --executor kubernetes",
-                    "executor config is mounted at /etc/flower/executor-config.yaml",
-                ],
-            },
-            {
-                "claim": (
-                    "One seeded ServerApp run maps to observed TaskExecutor objects."
-                ),
-                "status": proof_status,
-                "artifact": "task-lineage.json",
-                "fields": [
-                    "seeded_run_id",
-                    "tasks[].pod_name",
-                    "tasks[].credential_secret_name",
-                ],
-            },
-            {
-                "claim": (
-                    "The executor-created TaskExecutor Pod is captured as a full "
-                    "redacted object snapshot."
-                ),
-                "status": proof_status,
-                "artifact": "taskexecutor-pods.json",
-                "fields": ["items[].metadata", "items[].spec", "items[].status"],
-            },
-            {
-                "claim": (
-                    "The per-task credential Secret existed without exposing "
-                    "credential values."
-                ),
-                "status": proof_status,
-                "artifact": "taskexecutor-secrets.redacted.json",
-                "fields": [
-                    "items[].name",
-                    "items[].data_keys",
-                    "items[].data_byte_lengths",
-                    "items[].redacted",
-                ],
-            },
-            {
-                "claim": (
-                    "Pre-cleanup resource state is captured before namespace deletion."
-                ),
-                "status": proof_status,
-                "artifact": "final-state.json",
-                "fields": ["counts", "resources", "captured_before_namespace_cleanup"],
-            },
-        ],
-        "out_of_scope": [
-            "active Pod budget behavior",
-            "two-task capacity waiting",
-            "executor-owned completed Pod cleanup proof",
-            "executor-owned per-task Secret cleanup proof",
-            "F7e cardinality behavior",
-            "AppIo TLS proof",
-            "production deployment readiness",
-        ],
+        "claims": claims,
+        "out_of_scope": out_of_scope,
         "cleanup_requested": cleanup_requested,
     }
 
@@ -1178,6 +1611,45 @@ class CallableCommand(Protocol):
         self, args: Sequence[str], failure_context: str, *, record_failure: bool = True
     ) -> CommandResult:
         """Run a command and return its result."""
+
+
+def _taskexecutor_secrets_args(profile: HarnessProfile, selector: str) -> list[str]:
+    return _kubectl_args(
+        profile,
+        [
+            "get",
+            "secrets",
+            "-n",
+            profile.namespace,
+            "-l",
+            selector,
+            "-o",
+            "json",
+        ],
+    )
+
+
+def _cleanup_observation(
+    *,
+    first_pod_names: Sequence[str],
+    before_cleanup_secrets: Mapping[str, object],
+    after_cleanup_pods: Mapping[str, object],
+    after_cleanup_secrets: Mapping[str, object],
+) -> dict[str, object]:
+    after_pod_names = set(_pod_names(after_cleanup_pods))
+    before_secret_names = set(_secret_names(before_cleanup_secrets))
+    after_secret_names = set(_secret_names(after_cleanup_secrets))
+    removed_pods = [
+        pod_name for pod_name in first_pod_names if pod_name not in after_pod_names
+    ]
+    removed_secrets = sorted(before_secret_names - after_secret_names)
+    return {
+        "observed": bool(removed_pods) and bool(removed_secrets),
+        "removed_pods": removed_pods,
+        "removed_secrets": removed_secrets,
+        "remaining_pods": sorted(after_pod_names),
+        "remaining_secrets": sorted(after_secret_names),
+    }
 
 
 def _pod_summaries(snapshot: Mapping[str, object]) -> list[dict[str, object]]:
