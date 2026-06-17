@@ -8,7 +8,7 @@ from devtool import update_html_themes
 def test_update_conf_file_merges_nested_theme_variables(
     tmp_path: Path,
 ) -> None:
-    """Generated theme variables should merge into existing theme dictionaries."""
+    """Generated theme variables should not overwrite existing values."""
     conf_file = tmp_path / "conf.py"
     conf_file.write_text(
         """html_theme_options = {
@@ -45,7 +45,7 @@ def test_update_conf_file_merges_nested_theme_variables(
         == """html_theme_options = {
     "light_logo": "examples-light-mode.png",
     "light_css_variables": {
-        "color-announcement-background": "#292f36",
+        "color-announcement-background": "#17222d",
         "color-sidebar-background": "#f2f2f2",
         "color-announcement-text": "#ffffff",
     },
