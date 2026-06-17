@@ -106,8 +106,8 @@ def test_parse_superlink_runtime_dependency_install_args(
 @pytest.mark.parametrize(
     ("runtime_dependency_install", "expected"),
     [
-        (True, False),
-        (False, True),
+        (True, True),
+        (False, False),
     ],
 )
 def test_get_superexec_command_renders_runtime_dependency_install_flag(
@@ -122,8 +122,7 @@ def test_get_superexec_command_renders_runtime_dependency_install_flag(
         runtime_dependency_install=runtime_dependency_install,
     )
 
-    assert ("--disable-runtime-dependency-installation" in command) is expected
-    assert "--allow-runtime-dependency-installation" not in command
+    assert ("--allow-runtime-dependency-installation" in command) is expected
 
 
 @pytest.mark.parametrize("flag", ["--version", "-V"])

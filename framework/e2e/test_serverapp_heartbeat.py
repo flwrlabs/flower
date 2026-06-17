@@ -35,13 +35,7 @@ def run_superlink() -> subprocess.Popen:
 
 def run_superexec() -> subprocess.Popen:
     """Run the SuperExec."""
-    cmd = [
-        "flower-superexec",
-        "--insecure",
-        # Use preinstalled dependencies (to avoid heartbeat delays due
-        # to installation of dependencies)
-        "--disable-runtime-dependency-installation",
-    ]
+    cmd = ["flower-superexec", "--insecure"]
     cmd += ["--appio-api-address", SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS]
     cmd += ["--plugin-type", plugin_type_arg]
     cmd += ["--superexec-auth-secret-file", SUPEREXEC_AUTH_SECRET_FILE]
