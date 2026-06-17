@@ -31,7 +31,11 @@ def add_args_runtime_dependency_install(
     default: bool = RUNTIME_DEPENDENCY_INSTALL,
     include_disable_flag: bool = False,
 ) -> None:
-    """Add arguments controlling runtime dependency installation."""
+    """Add arguments controlling runtime dependency installation.
+
+    Ensure only enable or disable flags are present. For SuperLink, also include
+    the argument to disable runtime dependency installation.
+    """
     default_state = "enabled" if default else "disabled"
     add_argument = (
         parser.add_mutually_exclusive_group().add_argument
