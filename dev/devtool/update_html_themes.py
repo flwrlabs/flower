@@ -131,12 +131,9 @@ def _process_merge_field_line(
     if variable_match:
         variable_name = variable_match.group(2)
         if variable_name in merge_variables:
-            updated_content.append(
-                variable_match.group(1)
-                + _dict_entry_str(variable_name, merge_variables[variable_name])
-            )
+            updated_content.append(line)
             del merge_variables[variable_name]
-            return brace_depth, next_merge_field, True
+            return brace_depth, next_merge_field, False
 
     brace_depth += _brace_delta(line)
     if brace_depth == 1:
