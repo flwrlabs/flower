@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the Tavily web_search provider."""
+"""Tests for the Tavily web search provider."""
 
 from unittest.mock import Mock
 

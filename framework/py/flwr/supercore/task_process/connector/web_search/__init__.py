@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Built-in web_search connector."""
+"""Built-in web search connector."""
 
 
 import os
@@ -32,7 +32,7 @@ _WEB_SEARCH_API_KEY_ENV_VARS = (
 
 
 def search(query: str) -> JSONObject:
-    """Execute one web_search request."""
+    """Execute one web search request."""
     if os.getenv(BRAVE_API_KEY_ENV, "").strip():
         return BraveWebSearchProvider().search(query)
     if os.getenv(TAVILY_API_KEY_ENV, "").strip():
@@ -41,7 +41,7 @@ def search(query: str) -> JSONObject:
         return ExaWebSearchProvider().search(query)
 
     raise RuntimeError(
-        "At least one web_search API key environment variable is required: "
+        "At least one web search API key environment variable is required: "
         f"{', '.join(_WEB_SEARCH_API_KEY_ENV_VARS)}."
     )
 
