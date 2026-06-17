@@ -25,4 +25,4 @@ def get_executor(executor_type: ExecutorType) -> Executor:
     if executor_type == ExecutorType.SUBPROCESS:
         return SubprocessExecutor()
 
-    raise ValueError(f"Unsupported executor: {executor_type}")
+    raise ValueError(f"Unsupported executor selection: {executor_type}")

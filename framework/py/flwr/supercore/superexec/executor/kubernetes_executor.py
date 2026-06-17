@@ -14,6 +14,8 @@
 # ==============================================================================
 """Kubernetes executor for SuperExec TaskExecutor processes."""
 
+
+import importlib
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -36,6 +38,20 @@ APPIO_TOKEN_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/token"
 APPIO_ROOT_CERTIFICATES_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/ca.crt"
 LAUNCH_ATTEMPT_LABEL = "flower.ai/launch-attempt"
 _TASK_ID_LABEL = "flower.ai/superexec-task-id"
+_NAME_LABEL = "app.kubernetes.io/name"
+_COMPONENT_LABEL = "app.kubernetes.io/component"
+_TASK_TYPE_LABEL = "flower.ai/task-type"
+_RESOURCE_POOL_LABEL = "flower.ai/resource-pool"
+_EXECUTOR_OWNED_LABELS = frozenset(
+    {
+        _NAME_LABEL,
+        _COMPONENT_LABEL,
+        _TASK_ID_LABEL,
+        _TASK_TYPE_LABEL,
+        LAUNCH_ATTEMPT_LABEL,
+        _RESOURCE_POOL_LABEL,
+    }
+)
 _APPIO_CREDENTIAL_SECRET_SUFFIX = "-appio"
 _COMPLETED_POD_SWEEP_INTERVAL_SECONDS = 60.0
 
@@ -72,6 +88,34 @@ class KubernetesClient(Protocol):
         self, namespace: str, label_selector: str
     ) -> KubernetesList:
         """List Kubernetes Pods in the selected namespace."""
+
+
+def create_incluster_kubernetes_client() -> KubernetesClient:
+    """Create a KubernetesClient backed by in-cluster ServiceAccount auth."""
+    try:
+        kubernetes_client = importlib.import_module("kubernetes.client")
+        kubernetes_config = importlib.import_module("kubernetes.config")
+    except ModuleNotFoundError as exc:
+        missing_module = exc.name
+        if missing_module in {"kubernetes", "kubernetes.client", "kubernetes.config"}:
+            raise RuntimeError(
+                "Kubernetes Python client package is required for the Kubernetes "
+                "executor. Install the official 'kubernetes' package in the "
+                "SuperExec environment."
+            ) from exc
+        raise
+
+    try:
+        kubernetes_config.load_incluster_config()
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        raise RuntimeError(
+            "Failed to load in-cluster Kubernetes configuration for the Kubernetes "
+            "executor. Run SuperExec in a Kubernetes Pod with ServiceAccount "
+            "credentials."
+        ) from exc
+
+    client: KubernetesClient = kubernetes_client.CoreV1Api()
+    return client
 
 
 @dataclass
@@ -501,20 +545,19 @@ def _labels(
 ) -> JSONObject:
     """Return stable labels for Kubernetes objects."""
     labels: JSONObject = {}
-    if config.labels is not None:
-        labels.update(config.labels)
+    labels.update(_caller_labels(config))
     # Apply executor-owned labels last; selectors and cleanup rely on them.
     labels.update(
         {
-            "app.kubernetes.io/name": "flower",
-            "app.kubernetes.io/component": "taskexecutor",
+            _NAME_LABEL: "flower",
+            _COMPONENT_LABEL: "taskexecutor",
             _TASK_ID_LABEL: str(spec.task_id),
-            "flower.ai/task-type": spec.task_type.value,
+            _TASK_TYPE_LABEL: spec.task_type.value,
             LAUNCH_ATTEMPT_LABEL: launch_attempt_id,
         }
     )
     if config.resource_pool is not None:
-        labels["flower.ai/resource-pool"] = config.resource_pool
+        labels[_RESOURCE_POOL_LABEL] = config.resource_pool
     return labels
 
 
@@ -530,16 +573,25 @@ def _taskexecutor_pool_label_selector(config: KubernetesExecutorConfig) -> str:
 
 def _taskexecutor_pool_labels(config: KubernetesExecutorConfig) -> dict[str, str]:
     """Return labels identifying a scoped TaskExecutor pool."""
-    labels = dict(config.labels or {})
+    labels = _caller_labels(config)
     labels.update(
         {
-            "app.kubernetes.io/name": "flower",
-            "app.kubernetes.io/component": "taskexecutor",
+            _NAME_LABEL: "flower",
+            _COMPONENT_LABEL: "taskexecutor",
         }
     )
     if config.resource_pool is not None:
-        labels["flower.ai/resource-pool"] = config.resource_pool
+        labels[_RESOURCE_POOL_LABEL] = config.resource_pool
     return labels
+
+
+def _caller_labels(config: KubernetesExecutorConfig) -> dict[str, str]:
+    """Return caller-provided labels that are not owned by the executor."""
+    return {
+        key: value
+        for key, value in (config.labels or {}).items()
+        if key not in _EXECUTOR_OWNED_LABELS
+    }
 
 
 def _label_selector(labels: dict[str, str]) -> str:
