@@ -12,17 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Executor factory for SuperExec TaskExecutor processes."""
+"""Constants for task-routed messages."""
 
-from flwr.supercore.constant import ExecutorType
-
-from .subprocess_executor import SubprocessExecutor
-from .types import Executor
-
-
-def get_executor(executor_type: ExecutorType) -> Executor:
-    """Return the executor for the configured executor type."""
-    if executor_type == ExecutorType.SUBPROCESS:
-        return SubprocessExecutor()
-
-    raise ValueError(f"Unsupported executor selection: {executor_type}")
+TASK_MESSAGE_PAYLOAD_RECORD_KEY = "payload"
+TASK_MESSAGE_PAYLOAD_JSON_KEY = "json"
