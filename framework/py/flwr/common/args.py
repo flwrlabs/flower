@@ -61,8 +61,7 @@ def add_args_runtime_dependency_install(
         help=(
             allow_flag_help
             or "Allow runtime installation of app dependencies via `uv sync`."
-        )
-        + f" By default, runtime dependency installation is {default_state}.",
+        ),
     )
 
 
