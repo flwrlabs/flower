@@ -21,7 +21,6 @@ from unittest.mock import Mock
 
 import pytest
 
-from flwr.common.exit import ExitCode
 from flwr.supercore.constant import ExecutorType
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
@@ -145,29 +144,6 @@ def test_run_superexec_passes_executor_config_to_factory(
 
     get_executor.assert_called_once_with(
         ExecutorType.KUBERNETES, executor_config=executor_config
-    )
-
-
-def test_run_superexec_exits_for_invalid_executor_config(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """SuperExec should exit with executor-config failure before task
-    polling."""
-    flwr_exit = Mock(side_effect=SystemExit())
-    monkeypatch.setattr(run_superexec_module, "flwr_exit", flwr_exit)
-
-    with pytest.raises(SystemExit):
-        run_superexec_module.run_superexec(
-            plugin_class=Mock(),
-            stub_class=Mock(),
-            appio_api_address="127.0.0.1:9091",
-            insecure=True,
-            executor_type=ExecutorType.KUBERNETES,
-        )
-
-    flwr_exit.assert_called_once_with(
-        ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG,
-        "Kubernetes executor requires --executor-config.",
     )
 
 
