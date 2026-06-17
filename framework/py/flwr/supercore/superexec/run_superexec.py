@@ -150,9 +150,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     executor_config : Optional[ExecutorConfig] (default: None)
         Parsed executor configuration.
     """
-    _ = executor_config
     try:
-        executor = get_executor(executor_type)
+        executor = get_executor(executor_type, executor_config=executor_config)
     except ValueError as err:
         flwr_exit(ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG, str(err))
 

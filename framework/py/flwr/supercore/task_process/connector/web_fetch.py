@@ -1,0 +1,236 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Trafilatura-backed web fetch provider."""
+
+from __future__ import annotations
+
+import codecs
+import ipaddress
+import socket
+from urllib.parse import urljoin, urlparse
+
+import requests
+
+from flwr.supercore.typing import JSONObject
+
+_MAX_RESPONSE_BYTES = 1024 * 1024
+_TIMEOUT = 30.0
+_MAX_REDIRECTS = 10
+_READ_CHUNK_SIZE = 64 * 1024
+_REDIRECT_STATUS_CODES = frozenset({301, 302, 303, 307, 308})
+
+
+class WebFetchProviderError(RuntimeError):
+    """Error returned by the web fetch provider."""
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        detail: str,
+        status_code: int | None = None,
+    ) -> None:
+        """Initialize the provider error."""
+        self.code = code
+        self.status_code = status_code
+        self.detail = detail
+        formatted_detail = detail
+        if status_code is not None:
+            formatted_detail = f"{status_code} {formatted_detail}"
+
+        super().__init__(f"Web fetch provider request failed: {formatted_detail}")
+
+
+def invoke_web_fetch_provider(url: str) -> JSONObject:
+    """Fetch a URL and extract web page content with trafilatura.
+
+    The provider validates every redirect target before requesting it and rejects
+    local/private hosts before DNS-resolved requests are made.
+    """
+    url = _validate_url(url)
+    response = _fetch_url(url)
+    final_url = url
+    try:
+        final_url = _validate_url(response.url or url)
+        body = _read_response_body(response)
+        encoding = response.encoding or "utf-8"
+        try:
+            codecs.lookup(encoding)
+        except LookupError:
+            encoding = "utf-8"
+        text = body.decode(encoding, errors="replace")
+        if response.status_code >= 400:
+            raise WebFetchProviderError(
+                code="http_error",
+                status_code=response.status_code,
+                detail=text,
+            )
+    finally:
+        response.close()
+
+    try:
+        import trafilatura  # pylint: disable=import-outside-toplevel
+    except ImportError as exc:
+        raise WebFetchProviderError(
+            code="missing_dependency",
+            detail="Install the 'agent' extra to use the web fetch provider.",
+        ) from exc
+
+    content = trafilatura.extract(
+        text,
+        url=final_url,
+        output_format="markdown",
+        include_comments=False,
+        include_tables=True,
+    )
+    if content is None:
+        content = text
+
+    return {
+        "object": "web_fetch.response",
+        "status": "completed",
+        "url": url,
+        "final_url": final_url,
+        "status_code": response.status_code,
+        "content_type": response.headers.get("Content-Type", ""),
+        "content": content,
+    }
+
+
+def _fetch_url(url: str) -> requests.Response:
+    """Fetch a URL while validating each redirect target before following it."""
+    current_url = url
+    for redirect_count in range(_MAX_REDIRECTS + 1):
+        current_url = _validate_url(current_url)
+        try:
+            # Follow redirects manually so every hop is validated before connect.
+            response = requests.get(
+                current_url,
+                timeout=_TIMEOUT,
+                stream=True,
+                allow_redirects=False,
+            )
+        except requests.RequestException as exc:
+            raise WebFetchProviderError(
+                code="fetch_failed",
+                detail=str(exc),
+            ) from exc
+
+        if response.status_code not in _REDIRECT_STATUS_CODES:
+            return response
+
+        location = response.headers.get("Location")
+        if not location:
+            return response
+
+        response_url = response.url or current_url
+        response.close()
+        if redirect_count == _MAX_REDIRECTS:
+            raise WebFetchProviderError(
+                code="too_many_redirects",
+                detail=f"Web fetch exceeded {_MAX_REDIRECTS} redirects.",
+            )
+        current_url = urljoin(response_url, location)
+
+    raise RuntimeError("This line should never be reached.")
+
+
+def _validate_url(url: str) -> str:
+    """Return a URL allowed by the web-fetch safety policy.
+
+    Only HTTP(S) URLs with a resolvable, globally routable host are accepted.
+    Localhost names, private/reserved IP literals, and hostnames that resolve to
+    non-public addresses are rejected before any request is made.
+    """
+    url = url.strip()
+    if not url:
+        raise WebFetchProviderError(
+            code="invalid_request",
+            detail="URL must not be empty.",
+        )
+
+    try:
+        # Parse once up front so malformed hosts are rejected before any network I/O.
+        parsed = urlparse(url)
+        hostname = parsed.hostname.rstrip(".").lower() if parsed.hostname else None
+    except ValueError as exc:
+        raise WebFetchProviderError(
+            code="invalid_request",
+            detail="URL must use the http or https scheme.",
+        ) from exc
+    if parsed.scheme not in {"http", "https"} or hostname is None:
+        raise WebFetchProviderError(
+            code="invalid_request",
+            detail="URL must use the http or https scheme.",
+        )
+
+    # Block localhost aliases explicitly; they should never reach DNS resolution.
+    if hostname == "localhost" or hostname.endswith(".localhost"):
+        raise WebFetchProviderError(
+            code="blocked_url",
+            detail="URL host is not allowed.",
+        )
+
+    try:
+        ip_addresses = {ipaddress.ip_address(hostname)}
+    except ValueError:
+        try:
+            # DNS can hide private targets behind public-looking hostnames.
+            ip_addresses = {
+                ipaddress.ip_address(addr[4][0])
+                for addr in socket.getaddrinfo(
+                    hostname,
+                    None,
+                    type=socket.SOCK_STREAM,
+                )
+            }
+        except socket.gaierror as exc:
+            raise WebFetchProviderError(
+                code="fetch_failed",
+                detail=f"Could not resolve URL host: {hostname}",
+            ) from exc
+
+    # Allow only public, globally routable targets to avoid SSRF-style fetches.
+    if any(ip_addr.is_multicast or not ip_addr.is_global for ip_addr in ip_addresses):
+        raise WebFetchProviderError(
+            code="blocked_url",
+            detail="URL host is not allowed.",
+        )
+    return url
+
+
+def _read_response_body(response: requests.Response) -> bytes:
+    """Read a bounded response body."""
+    body = bytearray()
+    try:
+        chunks = response.iter_content(chunk_size=_READ_CHUNK_SIZE)
+        for chunk in chunks:
+            if not chunk:
+                continue
+            if len(body) + len(chunk) > _MAX_RESPONSE_BYTES:
+                raise WebFetchProviderError(
+                    code="response_too_large",
+                    status_code=response.status_code,
+                    detail=(
+                        f"Response body exceeds maximum size ({_MAX_RESPONSE_BYTES})."
+                    ),
+                )
+            body.extend(chunk)
+    except requests.RequestException as exc:
+        raise WebFetchProviderError(
+            code="fetch_failed",
+            detail=str(exc),
+        ) from exc
+    return bytes(body)
