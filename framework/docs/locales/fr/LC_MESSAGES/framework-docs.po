@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-06-09 00:26+0000\n"
+"POT-Creation-Date: 2026-06-18 00:36+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -478,12 +478,13 @@ msgstr "Argument de construction"
 #: ../../source/ref-exit-codes/3.rst:7 ../../source/ref-exit-codes/300.rst:7
 #: ../../source/ref-exit-codes/302.rst:7 ../../source/ref-exit-codes/303.rst:7
 #: ../../source/ref-exit-codes/304.rst:7 ../../source/ref-exit-codes/400.rst:7
-#: ../../source/ref-exit-codes/401.rst:7 ../../source/ref-exit-codes/500.rst:7
-#: ../../source/ref-exit-codes/600.rst:7 ../../source/ref-exit-codes/601.rst:7
-#: ../../source/ref-exit-codes/602.rst:7 ../../source/ref-exit-codes/603.rst:7
-#: ../../source/ref-exit-codes/604.rst:7 ../../source/ref-exit-codes/605.rst:7
-#: ../../source/ref-exit-codes/606.rst:7 ../../source/ref-exit-codes/700.rst:7
-#: ../../source/ref-exit-codes/701.rst:7 ../../source/ref-exit-codes/800.rst:7
+#: ../../source/ref-exit-codes/401.rst:7 ../../source/ref-exit-codes/402.rst:7
+#: ../../source/ref-exit-codes/500.rst:7 ../../source/ref-exit-codes/600.rst:7
+#: ../../source/ref-exit-codes/601.rst:7 ../../source/ref-exit-codes/602.rst:7
+#: ../../source/ref-exit-codes/603.rst:7 ../../source/ref-exit-codes/604.rst:7
+#: ../../source/ref-exit-codes/605.rst:7 ../../source/ref-exit-codes/606.rst:7
+#: ../../source/ref-exit-codes/700.rst:7 ../../source/ref-exit-codes/701.rst:7
+#: ../../source/ref-exit-codes/800.rst:7
 msgid "Description"
 msgstr "Description"
 
@@ -1241,7 +1242,7 @@ msgstr "Si vous préférez utiliser le CLI Alembic directement :"
 
 #: ../../source/contributor-how-to-migrate-database.rst:63
 #: ../../source/how-to-migrate-from-openfl.rst:566
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:471
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:473
 msgid "Important"
 msgstr "Important"
 
@@ -2470,7 +2471,7 @@ msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:354
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:382
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:367
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:371
 #: ../../source/tutorial-series-get-started-with-flower.rst:148
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:363
 #: ../../source/tutorial-series-what-is-federated-learning.rst:362
@@ -5841,11 +5842,11 @@ msgstr ""
 "prendre les paramètres du modèle global actuel comme entrée et renvoyer "
 "les résultats de l'évaluation :"
 
-#: ../../source/explanation-federated-evaluation.rst:78
+#: ../../source/explanation-federated-evaluation.rst:79
 msgid "Custom Strategies"
 msgstr "Stratégies personnalisées"
 
-#: ../../source/explanation-federated-evaluation.rst:80
+#: ../../source/explanation-federated-evaluation.rst:81
 msgid ""
 "The ``Strategy`` abstraction provides a method called ``evaluate`` that "
 "can directly be used to evaluate the current global model parameters. The"
@@ -5858,16 +5859,16 @@ msgstr ""
 "après l'agrégation des paramètres et avant l'évaluation fédérée (voir le "
 "paragraphe suivant)."
 
-#: ../../source/explanation-federated-evaluation.rst:87
+#: ../../source/explanation-federated-evaluation.rst:88
 #: ../../source/tutorial-series-what-is-federated-learning.rst:300
 msgid "Federated Evaluation"
 msgstr "Federated Evaluation (évaluation fédérée)"
 
-#: ../../source/explanation-federated-evaluation.rst:90
+#: ../../source/explanation-federated-evaluation.rst:91
 msgid "Implementing Federated Evaluation"
 msgstr "Mise en œuvre de l'évaluation fédérée"
 
-#: ../../source/explanation-federated-evaluation.rst:92
+#: ../../source/explanation-federated-evaluation.rst:93
 msgid ""
 "Client-side evaluation happens in the ``Client.evaluate`` method and can "
 "be configured from the server side."
@@ -5875,11 +5876,11 @@ msgstr ""
 "L'évaluation côté client se produit dans la méthode ``Client.evaluate`` "
 "et peut être configurée depuis le serveur."
 
-#: ../../source/explanation-federated-evaluation.rst:125
+#: ../../source/explanation-federated-evaluation.rst:126
 msgid "Configuring Federated Evaluation"
 msgstr "Configuration de l'évaluation fédérée"
 
-#: ../../source/explanation-federated-evaluation.rst:127
+#: ../../source/explanation-federated-evaluation.rst:128
 msgid ""
 "Federated evaluation can be configured from the server side. Built-in "
 "strategies support the following arguments:"
@@ -5887,7 +5888,7 @@ msgstr ""
 "L'évaluation fédérée peut être configurée du côté du serveur. Les "
 "stratégies intégrées prennent en charge les arguments suivants :"
 
-#: ../../source/explanation-federated-evaluation.rst:130
+#: ../../source/explanation-federated-evaluation.rst:131
 msgid ""
 "``fraction_evaluate``: a ``float`` defining the fraction of clients that "
 "will be selected for evaluation. If ``fraction_evaluate`` is set to "
@@ -5902,7 +5903,7 @@ msgstr ""
 "``fraction_evaluate`` est fixé à ``0.0``, l'évaluation fédérée sera "
 "désactivée."
 
-#: ../../source/explanation-federated-evaluation.rst:135
+#: ../../source/explanation-federated-evaluation.rst:136
 msgid ""
 "``min_evaluate_clients``: an ``int``: the minimum number of clients to be"
 " selected for evaluation. If ``fraction_evaluate`` is set to ``0.1``, "
@@ -5915,7 +5916,7 @@ msgstr ""
 "clients sont connectés au serveur, alors ``20`` clients seront "
 "sélectionnés pour l'évaluation."
 
-#: ../../source/explanation-federated-evaluation.rst:139
+#: ../../source/explanation-federated-evaluation.rst:140
 msgid ""
 "``min_available_clients``: an ``int`` that defines the minimum number of "
 "clients which need to be connected to the server before a round of "
@@ -5930,7 +5931,7 @@ msgstr ""
 "clients soient connectés avant de continuer à sélectionner des clients "
 "pour l'évaluation."
 
-#: ../../source/explanation-federated-evaluation.rst:144
+#: ../../source/explanation-federated-evaluation.rst:145
 msgid ""
 "``on_evaluate_config_fn``: a function that returns a configuration "
 "dictionary which will be sent to the selected clients. The function will "
@@ -5944,11 +5945,11 @@ msgstr ""
 "personnaliser l'évaluation côté client depuis le serveur, par exemple "
 "pour configurer le nombre d'étapes de validation effectuées."
 
-#: ../../source/explanation-federated-evaluation.rst:187
+#: ../../source/explanation-federated-evaluation.rst:189
 msgid "Evaluating Local Model Updates During Training"
 msgstr "Évaluer les mises à jour du modèle local pendant la formation"
 
-#: ../../source/explanation-federated-evaluation.rst:189
+#: ../../source/explanation-federated-evaluation.rst:191
 msgid ""
 "Model parameters can also be evaluated during training. ``Client.fit`` "
 "can return arbitrary evaluation results as a dictionary:"
@@ -5957,11 +5958,11 @@ msgstr ""
 "l'entraînement. ``Client.fit`` peut retourner des résultats d'évaluation "
 "arbitraires sous forme de dictionnaire :"
 
-#: ../../source/explanation-federated-evaluation.rst:231
+#: ../../source/explanation-federated-evaluation.rst:233
 msgid "Full Code Example"
 msgstr "Exemple de code complet"
 
-#: ../../source/explanation-federated-evaluation.rst:233
+#: ../../source/explanation-federated-evaluation.rst:235
 msgid ""
 "For a full code example that uses both centralized and federated "
 "evaluation, see the `Advanced PyTorch Example "
@@ -14472,7 +14473,7 @@ msgstr ""
 
 #: ../../source/how-to-migrate-from-openfl.rst:553
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:138
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:462
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:464
 msgid "Further help"
 msgstr "Aide supplémentaire"
 
@@ -14512,7 +14513,7 @@ msgstr ""
 "avec nous !"
 
 #: ../../source/how-to-migrate-from-openfl.rst:571
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:476
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:478
 msgid "Happy migrating! 🚀"
 msgstr "Joyeux migrateur ! 🚀"
 
@@ -19553,11 +19554,11 @@ msgstr ""
 "Enveloppez votre stratégie existante avec |serverapp_link|_ au lieu de "
 "démarrer le serveur via ``start_server()``. Voici un exemple :"
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:194
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:195
 msgid "Deployment"
 msgstr "Deployment"
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:196
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:197
 msgid ""
 "In a terminal window, start the SuperLink using |flower_superlink_link|_."
 " Then, in two additional terminal windows, start two SuperNodes using "
@@ -19570,7 +19571,7 @@ msgstr ""
 "|flower_supernode_link|_ (2x). Il n'est pas nécessaire de démarrer "
 "directement ``client.py`` et ``server.py`` comme scripts Python."
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:199
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:200
 msgid ""
 "Here's an example to start the server without HTTPS (insecure mode, only "
 "for prototyping):"
@@ -19578,7 +19579,7 @@ msgstr ""
 "Voici un exemple pour démarrer le serveur sans HTTPS (mode non sécurisé, "
 "uniquement pour la prototypage) :"
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:204
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:205
 msgid ""
 "For a comprehensive walk-through on how to deploy Flower using Docker, "
 "please refer to the :doc:`docker/index` guide."
@@ -19586,7 +19587,7 @@ msgstr ""
 "Pour une passerelle complète sur comment déployer Flower à l'aide de "
 "Docker, veuillez vous référer au guide :doc:`docker/index` ."
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:227
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:228
 msgid ""
 "Here's another example to start both SuperLink and SuperNodes with HTTPS."
 " Use the ``--ssl-ca-certfile``, ``--ssl-certfile``, and ``--ssl-keyfile``"
@@ -19598,11 +19599,11 @@ msgstr ""
 "``--ssl-certfile``, et ``--ssl-keyfile`` pour passer des chemins à "
 "(certificat CA, certificat serveur, et clé privée serveur)."
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:255
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:256
 msgid "Simulation (CLI)"
 msgstr "Simulation (CLI)"
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:257
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:258
 msgid ""
 "Wrap your existing client and strategy with |clientapp_link|_ and "
 "|serverapp_link|_, respectively. There is no need to use "
@@ -19612,8 +19613,8 @@ msgstr ""
 "|serverapp_link|_, respectivement. Il n'est plus nécessaire d'utiliser "
 "``start_simulation()``. Voici un exemple :"
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:262
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:399
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:263
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:401
 msgid ""
 "For a comprehensive guide on how to setup and run Flower simulations "
 "please read the |flower_how_to_run_simulations_link|_ guide."
@@ -19622,13 +19623,13 @@ msgstr ""
 "simulations Flower, veuillez lire le guide "
 "|flower_how_to_run_simulations_link|_ ."
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:320
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:322
 msgid "Depending on your Flower version, you can run your simulation as follows:"
 msgstr ""
 "En fonction de votre version de Flower, vous pouvez lancer votre "
 "simulation comme suit :"
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:322
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:324
 msgid ""
 "For Flower 1.11 and later, run ``flwr run`` in the terminal. This is the "
 "recommended way to start simulations, other ways are deprecated and no "
@@ -19638,7 +19639,7 @@ msgstr ""
 " de terminal. C'est la méthode recommandée pour lancer les simulations, "
 "les autres méthodes sont obsolètes et plus recommandées."
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:324
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:326
 msgid ""
 "DEPRECATED For Flower versions between 1.8 and 1.10, run ``flower-"
 "simulation`` in the terminal and point to the ``server_app`` / "
@@ -19653,13 +19654,13 @@ msgstr ""
 "supposant que les objets ``server_app`` et ``client_app`` sont dans un "
 "module ``sim.py``)."
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:328
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:330
 msgid "DEPRECATED For Flower versions before 1.8, run the Python script directly."
 msgstr ""
 "DEPRECATED Pour les versions de Flower avant 1.8, exécutez directement le"
 " script Python."
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:347
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:349
 msgid ""
 "Depending on your Flower version, you can also define the default "
 "resources as follows:"
@@ -19667,7 +19668,7 @@ msgstr ""
 "En fonction de votre version de Flower, vous pouvez également définir les"
 " ressources par défaut comme suit :"
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:349
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:351
 msgid ""
 "For Flower 1.11 and later, you can edit your ``pyproject.toml`` file and "
 "then run ``flwr run`` in the terminal as shown in the example below."
@@ -19676,7 +19677,7 @@ msgstr ""
 "``pyproject.toml`` puis exécuter ``flwr run`` dans la fenêtre de terminal"
 " comme montré dans l'exemple ci-dessous."
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:351
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:353
 msgid ""
 "DEPRECATED For Flower versions between 1.8 and 1.10, you can adjust the "
 "resources for each |clientapp_link|_ using the ``--backend-config`` "
@@ -19688,8 +19689,8 @@ msgstr ""
 "l'argument de ligne de commande ``--backend-config`` au lieu de définir "
 "l'argument ``client_resources`` dans ``start_simulation()``."
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:354
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:394
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:356
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:396
 msgid ""
 "DEPRECATED For Flower versions before 1.8, you need to run "
 "``start_simulation()`` and pass a dictionary of the required resources to"
@@ -19699,11 +19700,11 @@ msgstr ""
 "``start_simulation()`` et passer un dictionnaire des ressources requises "
 "comme argument à ``client_resources``."
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:385
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:387
 msgid "Simulation (Notebook)"
 msgstr "Simulation (Notebook)"
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:387
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:389
 msgid ""
 "To run your simulation from within a notebook, please consider the "
 "following examples depending on your Flower version:"
@@ -19711,7 +19712,7 @@ msgstr ""
 "Pour lancer votre simulation à partir d'un notebook, veuillez considérer "
 "les exemples suivants en fonction de votre version de Flower :"
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:390
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:392
 msgid ""
 "For Flower 1.11 and later, you need to run |runsim_link|_ in your "
 "notebook instead of ``start_simulation()``."
@@ -19719,7 +19720,7 @@ msgstr ""
 "Pour Flower 1.11 et ultérieurement, vous devez exécuter |runsim_link|_ "
 "dans votre bloc-notes au lieu de ``start_simulation()``."
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:392
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:394
 msgid ""
 "DEPRECATED For Flower versions between 1.8 and 1.10, you need to run "
 "|runsim_link|_ in your notebook instead of ``start_simulation()`` and "
@@ -19729,7 +19730,7 @@ msgstr ""
 "exécuter |runsim_link|_ dans votre bloc-notes au lieu de "
 "``start_simulation()`` et configurer les ressources."
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:464
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:466
 msgid ""
 "Most official `Flower code examples <https://flower.ai/docs/examples/>`_ "
 "are already updated to Flower 1.13 so they can serve as a reference for "
@@ -19748,7 +19749,7 @@ msgstr ""
 "<https://discuss.flower.ai/>`_ où vous pouvez trouver la communauté qui "
 "répond et pose des questions."
 
-#: ../../source/how-to-upgrade-to-flower-1.13.rst:473
+#: ../../source/how-to-upgrade-to-flower-1.13.rst:475
 msgid ""
 "As we continuously enhance Flower at a rapid pace, we'll be periodically "
 "updating this guide. Please feel free to share any feedback with us!"
@@ -20192,7 +20193,7 @@ msgstr ""
 "``flwr.serverapp``. L'importation d'eux depuis ``flwr.common`` ou "
 "``flwr.server`` est obsolète."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:201
+#: ../../source/how-to-upgrade-to-message-api.rst:202
 msgid ""
 "With Flower 1.21 and later, the equivalent ``ServerApp`` using the new "
 "Message API would look as shown below after following these steps:"
@@ -20201,7 +20202,7 @@ msgstr ""
 "utilisant le nouveau message API ressemblerait à celui-ci après avoir "
 "suivi ces étapes :"
 
-#: ../../source/how-to-upgrade-to-message-api.rst:204
+#: ../../source/how-to-upgrade-to-message-api.rst:205
 msgid ""
 "Define the ``main`` method under the ``@app.main()`` decorator. If your "
 "``server_fn`` was reading config values from the ``Context`` you can "
@@ -20213,7 +20214,7 @@ msgstr ""
 "vous pouvez toujours procéder ainsi (considérez copier ces lignes "
 "directement depuis votre fonction ``server_fn``)"
 
-#: ../../source/how-to-upgrade-to-message-api.rst:207
+#: ../../source/how-to-upgrade-to-message-api.rst:208
 msgid ""
 "Instantiate your model as usual and construct an ``ArrayRecord`` out of "
 "its parameters."
@@ -20221,7 +20222,7 @@ msgstr ""
 "Instanciez votre modèle comme d'habitude et construisez un objet "
 "``ArrayRecord`` à partir de ses paramètres."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:209
+#: ../../source/how-to-upgrade-to-message-api.rst:210
 msgid ""
 "Replace your existing strategy with one from the "
 "``flwr.serverapp.strategy`` module. For example with |fedavg_link|_. Pass"
@@ -20233,7 +20234,7 @@ msgstr ""
 " arguments liés au échantillonnage de nœud à la constructeur de votre "
 "stratégie."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:212
+#: ../../source/how-to-upgrade-to-message-api.rst:213
 msgid ""
 "Call the ``start`` method of the new strategy passing to it the "
 "``ArrayRecord`` representing the initial state of your global model, the "
@@ -20245,7 +20246,7 @@ msgstr ""
 "global, le nombre de tours FL et l'objet ``Grid`` (qui est utilisé "
 "internement pour communiquer avec les nœuds exécutant la ``ClientApp``)."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:217
+#: ../../source/how-to-upgrade-to-message-api.rst:218
 msgid ""
 "Note how we no longer need the ``server_fn`` function. The ``Context`` is"
 " still accessible, allowing you to customize how the ``ServerApp`` "
@@ -20272,7 +20273,7 @@ msgstr ""
 " fédérées et, éventuellement, les métriques des étapes d'évaluation "
 "effectuées dans le ``ServerApp``."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:229
+#: ../../source/how-to-upgrade-to-message-api.rst:230
 msgid ""
 "In addition to helper methods for working with PyTorch models, the "
 "|arrayrecord_link|_ class comes with a pair of methods to convert such "
@@ -20286,7 +20287,7 @@ msgstr ""
 "``to_numpy_ndarrays`` et ``from_numpy_ndarrays``). Vous pouvez choisir "
 "ces méthodes si vous ne travaillez pas avec des modèles PyTorch."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:237
+#: ../../source/how-to-upgrade-to-message-api.rst:238
 msgid ""
 "Note that the new strategies have renamed several arguments related to "
 "node/client sampling, replacing the term `\"fit\"` with `\"train\"` and "
@@ -20297,27 +20298,27 @@ msgstr ""
 "train » et « clients » par « nodes ». Les arguments suivants ont été "
 "renommés :"
 
-#: ../../source/how-to-upgrade-to-message-api.rst:241
+#: ../../source/how-to-upgrade-to-message-api.rst:242
 msgid "``fraction_fit`` → ``fraction_train``"
 msgstr "``fraction_fit`` → ``fraction_train``"
 
-#: ../../source/how-to-upgrade-to-message-api.rst:242
+#: ../../source/how-to-upgrade-to-message-api.rst:243
 msgid "``min_fit_clients`` → ``min_train_nodes``"
 msgstr "``min_fit_clients`` → ``min_train_nodes``"
 
-#: ../../source/how-to-upgrade-to-message-api.rst:243
+#: ../../source/how-to-upgrade-to-message-api.rst:244
 msgid "``min_evaluate_clients`` → ``min_evaluate_nodes``"
 msgstr "``min_evaluate_clients`` → ``min_evaluate_nodes``"
 
-#: ../../source/how-to-upgrade-to-message-api.rst:244
+#: ../../source/how-to-upgrade-to-message-api.rst:245
 msgid "``min_available_clients`` → ``min_available_nodes``"
 msgstr "``min_available_clients`` → ``min_available_nodes``"
 
-#: ../../source/how-to-upgrade-to-message-api.rst:277
+#: ../../source/how-to-upgrade-to-message-api.rst:278
 msgid "Update your ClientApp"
 msgstr "Mettez à jour votre ClientApp"
 
-#: ../../source/how-to-upgrade-to-message-api.rst:279
+#: ../../source/how-to-upgrade-to-message-api.rst:280
 msgid ""
 "Similar to the ``ServerApp``, the ``ClientApp`` no longer requires a "
 "helper function (i.e. ``client_fn`` ) that instantiates a "
@@ -20332,7 +20333,7 @@ msgstr ""
 "ClientApp opère sur les objets ``Message`` reçus à partir du "
 "``ServerApp``."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:284
+#: ../../source/how-to-upgrade-to-message-api.rst:285
 msgid ""
 "Remember ``NumPyClient`` came with two key built-in methods, ``fit`` and "
 "``evaluate``, that were respectively designed for doing federated "
@@ -20347,7 +20348,7 @@ msgstr ""
 " similaires directement sur le ``ClientApp`` via des décorateurs pour "
 "gérer les objets ``Message`` entrants."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:289
+#: ../../source/how-to-upgrade-to-message-api.rst:290
 msgid ""
 "Let's see a basic example showing first a minimal ``NumPyClient``-based "
 "``ClientApp`` and then the upgraded design using the Message API."
@@ -20356,7 +20357,7 @@ msgstr ""
 "basée sur ``NumPyClient`` et puis la conception améliorée utilisant l'API"
 " Message."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:294
+#: ../../source/how-to-upgrade-to-message-api.rst:295
 msgid ""
 "``Context`` has moved to ``flwr.app`` and ``ClientApp`` to "
 "``flwr.clientapp``. Importing them from ``flwr.common`` or "
@@ -20366,7 +20367,7 @@ msgstr ""
 "``flwr.clientapp``. L'importation de ceux-ci depuis ``flwr.common`` ou "
 "``flwr.client`` est obsolète."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:338
+#: ../../source/how-to-upgrade-to-message-api.rst:339
 msgid ""
 "Upgrading a ClientApp designed around the ``NumPyClient`` and "
 "``client_fn`` abstractions to the Message API would result in the "
@@ -20380,7 +20381,7 @@ msgstr ""
 "est défini directement dans ses méthodes (c'est-à-dire une classe "
 "secondaire basée sur ``NumPyClient`` n'est plus nécessaire)."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:343
+#: ../../source/how-to-upgrade-to-message-api.rst:344
 msgid ""
 "The |clientapp_link|_ abstraction comes with built-in ``@app.train`` and "
 "``@app.evaluate`` decorators. The arguments the associated methods "
@@ -20403,7 +20404,7 @@ msgstr ""
 "sont représentées par ``train_fn`` et ``test_fn``. Suivez ces étapes pour"
 " migrer votre application existante ``ClientApp`` :"
 
-#: ../../source/how-to-upgrade-to-message-api.rst:352
+#: ../../source/how-to-upgrade-to-message-api.rst:353
 msgid ""
 "Introduce the ``@app.train`` and ``@app.evaluate`` decorators and "
 "respective methods."
@@ -20411,7 +20412,7 @@ msgstr ""
 "Introduisez les décorateurs ``@app.train`` et ``@app.evaluate``, ainsi "
 "que leurs méthodes respectives."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:353
+#: ../../source/how-to-upgrade-to-message-api.rst:354
 msgid ""
 "Copy the lines of code you had in your ``client_fn`` reading config "
 "values from the ``Context`` into your ``train`` and ``evaluate`` methods "
@@ -20421,7 +20422,7 @@ msgstr ""
 "lire des valeurs de configuration à partir du ``Context`` dans vos "
 "méthodes d'implémentation ``train`` et ``evaluate`` (crées à l'étape 1)."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:356
+#: ../../source/how-to-upgrade-to-message-api.rst:357
 msgid ""
 "From the ``Message`` object, extract the relevant items (e.g. an "
 "``ArrayRecord`` defining the global model, a ``ConfigRecord`` containing "
@@ -20433,7 +20434,7 @@ msgstr ""
 "``ConfigRecord`` contenant des configurations pour le tour actuelle) à "
 "utiliser dans votre logique d'entraînement et d'évaluation."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:359
+#: ../../source/how-to-upgrade-to-message-api.rst:360
 msgid ""
 "Copy the lines calling the functions that do the actual "
 "training/evaluation (in the code snippet below we named those "
@@ -20443,7 +20444,7 @@ msgstr ""
 "l'entraînement/évaluation réel (dans le code snippet ci-dessous, nous "
 "avons nommé celles-ci ``train_fn`` et ``test_fn``)."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:361
+#: ../../source/how-to-upgrade-to-message-api.rst:362
 msgid ""
 "Based on the method, construct a ``RecordDict`` and use it to construct "
 "the reply ``Message``."
@@ -20451,7 +20452,7 @@ msgstr ""
 "Sur la base de la méthode, construisez un ``RecordDict`` et utilisez-le "
 "pour construire la réponse ``Message``."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:366
+#: ../../source/how-to-upgrade-to-message-api.rst:367
 msgid ""
 "The payload that ``Message`` objects carry is of type |recorddict_link|_ "
 "which can contain records of type ``ArrayRecord``, ``MetricRecord`` and "
@@ -20461,7 +20462,7 @@ msgstr ""
 "|recorddict_link|_ qui peut contenir des enregistrements de type "
 "``ArrayRecord``, ``MetricRecord`` et ``ConfigRecord``."
 
-#: ../../source/how-to-upgrade-to-message-api.rst:439
+#: ../../source/how-to-upgrade-to-message-api.rst:440
 msgid ""
 "This concludes the migration guide, we hope you found it useful! Happy "
 "federating!"
@@ -24639,7 +24640,7 @@ msgstr ""
 "\\(msg\\, ctxt\\, call\\_next\\)"
 
 #: ../../source/ref-api/flwr.clientapp.mod.rst:25:<autosummary>:1
-#: flwr.client.mod.comms_mods.arrays_size_mod:1 of
+#: flwr.clientapp.mod.comms_mods.arrays_size_mod:1 of
 msgid "Arrays size mod."
 msgstr "Mise en forme des tailles d'array."
 
@@ -24665,7 +24666,7 @@ msgstr ""
 "\\(msg\\, ctxt\\, call\\_next\\)"
 
 #: ../../source/ref-api/flwr.clientapp.mod.rst:25:<autosummary>:1
-#: flwr.client.mod.comms_mods.message_size_mod:1 of
+#: flwr.clientapp.mod.comms_mods.message_size_mod:1 of
 msgid "Message size mod."
 msgstr "Taille du message mod."
 
@@ -24793,7 +24794,7 @@ msgstr ""
 msgid "arrays\\_size\\_mod"
 msgstr "arrays\\_size\\_mod"
 
-#: flwr.client.mod.comms_mods.arrays_size_mod:3 of
+#: flwr.clientapp.mod.comms_mods.arrays_size_mod:3 of
 msgid ""
 "This mod logs the number of array elements transmitted in ``ArrayRecord``"
 " objects of the message as well as their sizes in bytes."
@@ -24824,7 +24825,7 @@ msgstr ""
 msgid "message\\_size\\_mod"
 msgstr "message\\_size\\_mod"
 
-#: flwr.client.mod.comms_mods.message_size_mod:3 of
+#: flwr.clientapp.mod.comms_mods.message_size_mod:3 of
 msgid "This mod logs the size in bytes of the message being transmited."
 msgstr "Cette modifie enregistre la taille en octets du message transmis."
 
@@ -44823,6 +44824,7 @@ msgstr ""
 #: ../../source/ref-exit-codes/304.rst:15
 #: ../../source/ref-exit-codes/400.rst:14
 #: ../../source/ref-exit-codes/401.rst:13
+#: ../../source/ref-exit-codes/402.rst:14
 #: ../../source/ref-exit-codes/500.rst:17
 #: ../../source/ref-exit-codes/600.rst:14
 #: ../../source/ref-exit-codes/601.rst:13
@@ -45473,6 +45475,47 @@ msgstr "Assurez-vous que le fichier de secret n'est pas vide."
 msgid ""
 "Check the accompanying error message for the exact file access/validation"
 " failure."
+msgstr ""
+"Vérifiez le message d'erreur accompagnant pour l'échec exact de l'accès "
+"au fichier ou de la validation."
+
+#: ../../source/ref-exit-codes/402.rst:3
+#, fuzzy
+msgid "[402] SUPEREXEC_INVALID_EXECUTOR_CONFIG"
+msgstr "[400] SUPEREXEC_INVALID_PLUGIN_CONFIG"
+
+#: ../../source/ref-exit-codes/402.rst:9
+msgid ""
+"The SuperExec executor could not be selected, or its configuration could "
+"not be loaded, parsed, or applied."
+msgstr ""
+
+#: ../../source/ref-exit-codes/402.rst:16
+msgid ""
+"Confirm that the selected ``--executor`` is supported by the running "
+"Flower version."
+msgstr ""
+
+#: ../../source/ref-exit-codes/402.rst:17
+#, fuzzy
+msgid "Confirm that the ``--executor-config`` path exists and is readable."
+msgstr ""
+"Confirmez que le chemin ``--superexec-auth-secret-file`` existe et est "
+"lisible."
+
+#: ../../source/ref-exit-codes/402.rst:18
+#, fuzzy
+msgid "Ensure the file is valid YAML."
+msgstr "Assurez-vous que le fichier est un document YAML valide."
+
+#: ../../source/ref-exit-codes/402.rst:19
+#, fuzzy
+msgid "Ensure the YAML document is a mapping."
+msgstr "Assurez-vous que le fichier est un document YAML valide."
+
+#: ../../source/ref-exit-codes/402.rst:20
+#, fuzzy
+msgid "Review the accompanying error message for the exact failure."
 msgstr ""
 "Vérifiez le message d'erreur accompagnant pour l'échec exact de l'accès "
 "au fichier ou de la validation."
@@ -50075,7 +50118,7 @@ msgstr ""
 " résultats."
 
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:352
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:335
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:339
 msgid ""
 "Plain ``flwr run . local`` submits the run, prints the run ID, and "
 "returns without streaming logs. See :doc:`how-to-run-flower-locally` for "
@@ -50126,7 +50169,7 @@ msgstr ""
 "et à sauvegarder les checkpoints de modèle sur le disque."
 
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:370
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:356
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:360
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:350
 msgid "Recap"
 msgstr "Récapitulation"
@@ -50157,7 +50200,7 @@ msgstr ""
 "sérialisant et en les envoyant dans un ``Message``."
 
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:384
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:369
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:373
 #: ../../source/tutorial-series-get-started-with-flower.rst:150
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:365
 #: ../../source/tutorial-series-what-is-federated-learning.rst:364
@@ -50173,7 +50216,7 @@ msgstr ""
 "Slack (`Join Slack <https://flower.ai/join-slack/>`__)."
 
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:388
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:373
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:377
 #: ../../source/tutorial-series-get-started-with-flower.rst:154
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:369
 #: ../../source/tutorial-series-what-is-federated-learning.rst:368
@@ -50483,11 +50526,11 @@ msgstr ""
 " chaque client et imprimer le temps d'entraînement et l'état de "
 "convergence:"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:329
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:333
 msgid "Finally, we run the Flower App."
 msgstr "Finalement, nous exécutons l'application Flower."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:338
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:342
 msgid ""
 "You will observe that the training metadata from each client is logged to"
 " the console of the ``ServerApp``. If you finish embedding the creation "
@@ -50499,7 +50542,7 @@ msgstr ""
 "l'implémentation de la création de l'objet ``TrainProcessMetadata`` dans "
 "le ``ClientApp``, vous devriez voir un sortie similaire à celui-ci :"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:350
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:354
 msgid ""
 "You can now use this information in your strategy logic as needed. For "
 "example, to implement a custom aggregation method based on convergence "
@@ -50510,7 +50553,7 @@ msgstr ""
 " d'agrégation personnalisée sur la base de l'état de convergence ou pour "
 "logger des métriques supplémentaires."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:358
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:362
 msgid ""
 "In this part of the tutorial, we've seen how to communicate arbitrary "
 "Python objects between the ``ClientApp`` and the ``ServerApp`` by "
@@ -50529,7 +50572,7 @@ msgstr ""
 "identiques si vous avez besoin de sérialiser des objets dans la stratégie"
 " pour les envoyer aux clients."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:376
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:380
 msgid ""
 "This is the final part of the Flower tutorial (for now!), "
 "congratulations! You're now well equipped to understand the rest of the "
@@ -50541,15 +50584,15 @@ msgstr ""
 "la documentation. Il y a de nombreux sujets que nous n'avons pas abordés "
 "dans le tutoriel, nous te recommandons les ressources suivantes :"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:380
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:384
 msgid "`Read Flower Docs <https://flower.ai/docs/>`__"
 msgstr "`Lire la documentation sur Flower <https://flower.ai/docs/>`__"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:381
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:385
 msgid "`Check out Flower Code Examples <https://flower.ai/docs/examples/>`__"
 msgstr "`Check out Flower Code Examples <https://flower.ai/docs/examples/>`__"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:382
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:386
 msgid ""
 "`Watch Flower AI Summit 2026 videos <https://flower.ai/events/flower-ai-"
 "summit-2026/>`__"
