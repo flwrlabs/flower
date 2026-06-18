@@ -17,11 +17,12 @@
 
 import argparse
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import grpc
 import pytest
 
+from flwr.common.constant import FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.interceptors import RuntimeVersionServerInterceptor
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -80,6 +81,26 @@ def test_parse_superlink_appio_tls_args() -> None:
     assert args.appio_ssl_certfile == "appio-cert.pem"
     assert args.appio_ssl_keyfile == "appio-key.pem"
     assert args.appio_ssl_ca_certfile == "appio-ca.pem"
+
+
+@pytest.mark.parametrize(
+    ("env_value", "cli_args", "expected"),
+    [
+        ("1", [], False),
+        ("1", ["--allow-runtime-dependency-installation"], True),
+        ("0", [], True),
+    ],
+)
+def test_parse_superlink_runtime_dependency_install_env_var(
+    env_value: str, cli_args: list[str], expected: bool
+) -> None:
+    """SuperLink should allow disabling dependency installation via env var."""
+    with patch.dict(
+        "os.environ", {FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION: env_value}
+    ):
+        args = _parse_args_run_superlink().parse_args(cli_args)
+
+    assert args.runtime_dependency_install is expected
 
 
 @pytest.mark.parametrize("flag", ["--version", "-V"])
