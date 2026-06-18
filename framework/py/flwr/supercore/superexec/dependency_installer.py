@@ -25,12 +25,18 @@ import sys
 import uuid
 from logging import DEBUG, ERROR, INFO, WARNING
 from pathlib import Path
+from urllib.error import HTTPError
+from urllib.parse import urlsplit, urlunsplit
+from urllib.request import Request, urlopen
 
 from flwr.common.config import get_project_config
 from flwr.common.logger import log
 from flwr.supercore.utils import get_flwr_home
 
 _RUNTIME_ENV_DIR = "runtime-envs"
+_FLWR_UV_DEFAULT_INDEX = "FLWR_UV_DEFAULT_INDEX"
+_UV_DEFAULT_INDEX = "UV_DEFAULT_INDEX"
+_INDEX_REACHABILITY_TIMEOUT_SECONDS = 10.0
 RuntimeDependencyIndexContext = dict[str, str | int | None]
 
 
@@ -92,6 +98,7 @@ def install_app_dependencies(
         if index_context is not None
         else None
     )
+    uv_default_index_name, uv_default_index_url = _get_uv_index_url()
 
     _ensure_uv_available(dependency_index_url)
 
@@ -133,10 +140,33 @@ def install_app_dependencies(
 
     if dependency_index_url is not None:
         sync_cmd += ["--index-url", dependency_index_url]
+    if uv_default_index_name == _FLWR_UV_DEFAULT_INDEX:
+        assert uv_default_index_url is not None
+        sync_cmd += ["--default-index", uv_default_index_url]
 
     sync_env = os.environ.copy()
     sync_env["UV_PROJECT_ENVIRONMENT"] = str(runtime_env_dir)
     log(DEBUG, "Using UV_PROJECT_ENVIRONMENT=%s", sync_env["UV_PROJECT_ENVIRONMENT"])
+    if uv_default_index_url is not None:
+        log(
+            INFO,
+            "  Using uv default package index from %s: %s",
+            uv_default_index_name,
+            _redact_url(uv_default_index_url),
+        )
+        _log_index_reachability(uv_default_index_url)
+    else:
+        log(
+            INFO,
+            "  Using uv default package index from uv configuration",
+        )
+        log(
+            INFO,
+            "  Checking reachability of uv package index: SKIPPED "
+            "(index URL not set in %s)",
+            _UV_DEFAULT_INDEX,
+        )
+    log(INFO, "  Starting uv sync for application dependencies.")
 
     installed_packages: set[str] = set()
     sync_error = _run_cmd(
@@ -170,6 +200,64 @@ def _get_project_dependencies(project_dir: Path) -> list[str]:
             "Invalid pyproject.toml: [project].dependencies is not a list"
         )
     return [str(dep) for dep in deps]
+
+
+def _get_uv_index_url() -> tuple[str | None, str | None]:
+    """Return the uv default index URL Flower can infer."""
+    if flwr_uv_default_index := os.getenv(_FLWR_UV_DEFAULT_INDEX, "").strip():
+        return _FLWR_UV_DEFAULT_INDEX, flwr_uv_default_index
+    if uv_default_index := os.getenv(_UV_DEFAULT_INDEX, "").strip():
+        return _UV_DEFAULT_INDEX, uv_default_index
+    return None, None
+
+
+def _log_index_reachability(index_url: str) -> None:
+    """Log whether the configured package index responds before running uv sync."""
+    request = Request(
+        index_url,
+        headers={"User-Agent": "flwr-runtime-dependency-installer"},
+        method="HEAD",
+    )
+    try:
+        with urlopen(  # nosec B310
+            request,
+            timeout=_INDEX_REACHABILITY_TIMEOUT_SECONDS,
+        ) as response:
+            _ = response
+            log(
+                INFO,
+                "  Checking reachability of uv package index: OK",
+            )
+    except HTTPError as exc:
+        log(
+            INFO,
+            "  Checking reachability of uv package index: ERROR (HTTP %s)",
+            exc.code,
+        )
+    except (OSError, ValueError) as exc:
+        log(
+            WARNING,
+            "  Checking reachability of uv package index: ERROR (%s). "
+            "Attempting uv sync anyway.",
+            exc,
+        )
+
+
+def _redact_url(url: str) -> str:
+    """Return URL with credentials removed for logs."""
+    split_url = urlsplit(url)
+    if split_url.username is None and split_url.password is None:
+        return url
+    host = split_url.netloc.rsplit("@", maxsplit=1)[-1]
+    return urlunsplit(
+        (
+            split_url.scheme,
+            host,
+            split_url.path,
+            split_url.query,
+            split_url.fragment,
+        )
+    )
 
 
 def _exclude_flwr_dependencies(dependencies: list[str]) -> list[str]:

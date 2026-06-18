@@ -78,6 +78,51 @@ def test_create_runtime_env_dir_uses_run_id_when_provided(tmp_path: Path) -> Non
     assert runtime_env_dir == tmp_path / "runtime-envs" / "123"
 
 
+@pytest.mark.parametrize(
+    ("env", "expected"),
+    [
+        (
+            {"FLWR_UV_DEFAULT_INDEX": "https://flower.example/simple"},
+            ("FLWR_UV_DEFAULT_INDEX", "https://flower.example/simple"),
+        ),
+        (
+            {"UV_DEFAULT_INDEX": "https://uv.example/simple"},
+            ("UV_DEFAULT_INDEX", "https://uv.example/simple"),
+        ),
+        (
+            {
+                "FLWR_UV_DEFAULT_INDEX": "https://flower.example/simple",
+                "UV_DEFAULT_INDEX": "https://uv.example/simple",
+            },
+            ("FLWR_UV_DEFAULT_INDEX", "https://flower.example/simple"),
+        ),
+        (
+            {
+                "FLWR_UV_DEFAULT_INDEX": " ",
+                "UV_DEFAULT_INDEX": "https://uv.example/simple",
+            },
+            ("UV_DEFAULT_INDEX", "https://uv.example/simple"),
+        ),
+        (
+            {
+                "FLWR_UV_DEFAULT_INDEX": "https://flower.example/simple",
+                "UV_DEFAULT_INDEX": " ",
+            },
+            ("FLWR_UV_DEFAULT_INDEX", "https://flower.example/simple"),
+        ),
+        ({"FLWR_UV_DEFAULT_INDEX": "", "UV_DEFAULT_INDEX": ""}, (None, None)),
+        ({}, (None, None)),
+    ],
+)
+def test_get_uv_index_url(
+    env: dict[str, str],
+    expected: tuple[str | None, str | None],
+) -> None:
+    """Ensure uv index URL resolution handles env var precedence."""
+    with patch.dict(os.environ, env, clear=True):
+        assert dependency_installer._get_uv_index_url() == expected
+
+
 def test_install_app_dependencies_uses_resolved_index_url(tmp_path: Path) -> None:
     """Ensure resolver output is forwarded to uv sync and uv bootstrap."""
     resolved_index_url = "http://127.0.0.1:3141/root/pypi/+simple/"
@@ -92,7 +137,15 @@ def test_install_app_dependencies_uses_resolved_index_url(tmp_path: Path) -> Non
     }
 
     with (
-        patch.dict(os.environ, {"FLWR_HOME": str(tmp_path)}, clear=False),
+        patch.dict(
+            os.environ,
+            {
+                "FLWR_HOME": str(tmp_path),
+                "FLWR_UV_DEFAULT_INDEX": "",
+                "UV_DEFAULT_INDEX": "",
+            },
+            clear=False,
+        ),
         patch.object(dependency_installer, "_ensure_uv_available") as ensure_uv,
         patch.object(
             dependency_installer,
@@ -104,6 +157,7 @@ def test_install_app_dependencies_uses_resolved_index_url(tmp_path: Path) -> Non
             "_get_project_dependencies",
             return_value=["numpy>=1.26.0"],
         ),
+        patch.object(dependency_installer, "_log_index_reachability") as log_index,
         patch.object(
             dependency_installer, "_run_cmd", side_effect=_fake_run_cmd
         ) as run_cmd,
@@ -117,6 +171,7 @@ def test_install_app_dependencies_uses_resolved_index_url(tmp_path: Path) -> Non
 
     resolve_index.assert_called_once_with(index_context)
     ensure_uv.assert_called_once_with(resolved_index_url)
+    log_index.assert_not_called()
     sync_cmd = run_cmd.call_args.args[0]
     sync_env = run_cmd.call_args.kwargs["env"]
     assert sync_cmd == [
@@ -174,6 +229,7 @@ def test_same_host_superlink_and_supernode_share_run_scoped_env(tmp_path: Path) 
             "_get_project_dependencies",
             return_value=["numpy>=1.26.0"],
         ),
+        patch.object(dependency_installer, "_log_index_reachability"),
         patch.object(
             dependency_installer, "_run_cmd", side_effect=fake_run_cmd_with_delay
         ),

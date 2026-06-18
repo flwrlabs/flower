@@ -81,6 +81,25 @@ Use this when the SuperNode host is allowed to install Python packages at runtim
 the host has no package index access, or if you want stricter control over installed
 packages, preinstall the ClientApp dependencies in the SuperNode environment instead.
 
+***********************************
+ Use a custom Python package index
+***********************************
+
+Runtime dependency installation uses uv's default package index configuration. To make
+Flower direct uv to a different default index for runtime dependency installation, set
+``FLWR_UV_DEFAULT_INDEX`` before starting the Flower process:
+
+.. code-block:: shell
+
+    $ export FLWR_UV_DEFAULT_INDEX=https://pypi.example.com/simple
+
+Flower passes this value to uv as ``--default-index`` when running ``uv sync``. If
+``FLWR_UV_DEFAULT_INDEX`` is not set, Flower will not pass ``--default-index``. In that
+case, normal uv configuration continues to apply, including ``UV_DEFAULT_INDEX``,
+user-level uv config files, and the default PyPI index. This gives users and
+organizations a clear Flower-level configuration option while preserving compatibility
+with native uv configuration.
+
 ************************************************
  Enable dependency installation in process mode
 ************************************************
