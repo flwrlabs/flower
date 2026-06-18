@@ -30,7 +30,7 @@ from typing import TypeVar, cast
 import grpc
 import yaml
 
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
+from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.args import (
     add_args_runtime_dependency_install,
     try_obtain_server_certificates,
@@ -71,6 +71,7 @@ from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import create_fleet_runtime_version_server_interceptor
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import (
     get_client_tls_args,
     try_obtain_optional_appio_server_certificates,
