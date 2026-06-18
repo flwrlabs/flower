@@ -213,6 +213,8 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
         # Set exit code
         exit_code = ExitCode.TASK_PROC_EXCEPTION
+        if isinstance(ex, ModuleNotFoundError):
+            exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
     finally:
         # Push reply message to SuperNode
         if reply_message and context:

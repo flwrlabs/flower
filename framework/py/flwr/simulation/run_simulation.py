@@ -187,6 +187,7 @@ def run_serverapp_th(
     app_dir: str,
     f_stop: threading.Event,
     has_exception: threading.Event,
+    exception_queue: "Queue[BaseException]",
     enable_tf_gpu_growth: bool,
     ctx_queue: "Queue[Context]",
 ) -> threading.Thread:
@@ -196,6 +197,7 @@ def run_serverapp_th(
         tf_gpu_growth: bool,
         stop_event: threading.Event,
         exception_event: threading.Event,
+        _exception_queue: "Queue[BaseException]",
         _grid: Grid,
         _server_app_dir: str,
         _server_app_attr: str | None,
@@ -221,8 +223,7 @@ def run_serverapp_th(
             )
             _ctx_queue.put(updated_context)
         except Exception as ex:  # pylint: disable=broad-exception-caught
-            log(ERROR, "ServerApp thread raised an exception: %s", ex)
-            log(ERROR, traceback.format_exc())
+            _exception_queue.put(ex)
             exception_event.set()
             raise
         finally:
@@ -238,6 +239,7 @@ def run_serverapp_th(
             enable_tf_gpu_growth,
             f_stop,
             has_exception,
+            exception_queue,
             grid,
             app_dir,
             server_app_attr,
@@ -275,6 +277,7 @@ def _main_loop(
     f_stop = threading.Event()
     # A Threading event to indicate if an exception was raised in the ServerApp thread
     server_app_thread_has_exception = threading.Event()
+    server_app_exception_queue: Queue[BaseException] = Queue()
     serverapp_th = None
     success = True
     if metrics is None:
@@ -312,6 +315,7 @@ def _main_loop(
             app_dir=app_dir,
             f_stop=f_stop,
             has_exception=server_app_thread_has_exception,
+            exception_queue=server_app_exception_queue,
             enable_tf_gpu_growth=enable_tf_gpu_growth,
             ctx_queue=output_context_queue,
         )
@@ -336,6 +340,11 @@ def _main_loop(
     except Empty:
         log(DEBUG, "Queue timeout. No context received.")
 
+    except ImportError:
+        success = False
+        # Let app import failures reach the process-level exit-code handler.
+        raise
+
     except Exception as ex:
         log(ERROR, "An exception occurred !! %s", ex)
         log(ERROR, traceback.format_exc())
@@ -354,6 +363,8 @@ def _main_loop(
         )
         if serverapp_th:
             if server_app_thread_has_exception.is_set():
+                if not server_app_exception_queue.empty():
+                    raise server_app_exception_queue.get()
                 raise RuntimeError("Exception in ServerApp thread")
 
     log(DEBUG, "Stopping Simulation Runtime now.")

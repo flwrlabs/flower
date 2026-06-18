@@ -281,8 +281,11 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
 
         # Set exit code
         exit_code = ExitCode.SERVERAPP_EXCEPTION  # General exit code
+        print("here")
         if isinstance(ex, AppExitException):
             exit_code = ex.exit_code
+        elif isinstance(ex, ModuleNotFoundError):
+            exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
 
     flwr_exit(
         code=exit_code,
