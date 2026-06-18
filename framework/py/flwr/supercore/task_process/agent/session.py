@@ -96,11 +96,7 @@ class RuntimeAgentResponses(AgentResponses):
                     {
                         "type": "function_call_output",
                         "call_id": tool_call.call_id,
-                        "output": (
-                            output
-                            if isinstance(output, str)
-                            else strict_json_dumps(output, compact=True)
-                        ),
+                        "output": strict_json_dumps(output, compact=True),
                     }
                 )
 
