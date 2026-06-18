@@ -174,7 +174,7 @@ def test_install_app_dependencies_uses_resolved_index_url(tmp_path: Path) -> Non
 
     resolve_index.assert_called_once_with(index_context)
     ensure_uv.assert_called_once_with(resolved_index_url)
-    log_index.assert_called_once_with("https://pypi.org/simple")
+    log_index.assert_not_called()
     sync_cmd = run_cmd.call_args.args[0]
     sync_env = run_cmd.call_args.kwargs["env"]
     assert sync_cmd == [
