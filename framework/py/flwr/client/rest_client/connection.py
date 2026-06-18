@@ -29,7 +29,6 @@ from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
-from flwr.common.retry_invoker import RetryInvoker
 from flwr.common.serde import (
     fab_from_proto,
     message_from_proto,
@@ -74,6 +73,7 @@ from flwr.supercore.inflatable.inflatable_protobuf_utils import (
     make_push_object_fn_protobuf,
 )
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.retry import RetryInvoker
 from flwr.supercore.run import Run
 
 try:

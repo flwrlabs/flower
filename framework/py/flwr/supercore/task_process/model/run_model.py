@@ -25,11 +25,6 @@ from flwr.common.constant import SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
-from flwr.common.retry_invoker import (
-    RetryInvoker,
-    make_simple_grpc_retry_invoker,
-    wrap_stub,
-)
 from flwr.common.telemetry import EventType, event
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
@@ -43,6 +38,7 @@ from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
+from flwr.supercore.retry import RetryInvoker, make_simple_grpc_retry_invoker, wrap_stub
 
 from .task import handle_task
 

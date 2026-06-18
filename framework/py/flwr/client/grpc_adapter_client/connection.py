@@ -26,9 +26,9 @@ from flwr.client.grpc_rere_client.connection import grpc_request_response
 from flwr.client.grpc_rere_client.grpc_adapter import GrpcAdapter
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.logger import log
-from flwr.common.retry_invoker import RetryInvoker
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
+from flwr.supercore.retry import RetryInvoker
 from flwr.supercore.run import Run
 
 
