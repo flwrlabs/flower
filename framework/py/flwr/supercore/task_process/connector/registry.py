@@ -21,14 +21,15 @@ from flwr.supercore.typing import JSONObject, JSONValue
 from . import web_fetch, web_search
 
 ConnectorHandler = Callable[..., JSONValue]
+ConnectorToolFactory = Callable[[], JSONObject]
 
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
 }
-_BUILTIN_CONNECTOR_TOOLS: dict[str, JSONObject] = {
-    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.WEB_SEARCH_TOOL,
-    web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.WEB_FETCH_TOOL,
+_BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
+    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.make_web_search_tool,
+    web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.make_web_fetch_tool,
 }
 
 
@@ -42,7 +43,7 @@ def invoke_connector(name: str, arguments: JSONObject) -> JSONValue:
 
 def get_builtin_connector_tools() -> list[JSONObject]:
     """Return function tools for built-in connectors."""
-    return list(_BUILTIN_CONNECTOR_TOOLS.values())
+    return [make_tool() for make_tool in _BUILTIN_CONNECTOR_TOOL_FACTORIES.values()]
 
 
 def has_builtin_connector(name: str) -> bool:

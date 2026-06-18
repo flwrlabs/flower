@@ -104,7 +104,7 @@ class RuntimeAgentResponses(AgentResponses):
                     }
                 )
 
-            # Keep the prepared model request, but replace user input with tool output.
+            # Keep the prepared model request, but replace input for the continuation.
             followup_request = dict(model_request)
             followup_request.pop("tool_choice", None)
             previous_response_id = response_payload.get("id")
@@ -116,7 +116,23 @@ class RuntimeAgentResponses(AgentResponses):
                 prior_output: list[JSONObject] = []
                 if _is_json_object_list(output):
                     prior_output = cast(list[JSONObject], output)
-                followup_request["input"] = [*prior_output, *followup_input]
+                original_input = model_request.get("input")
+                original_input_items: list[JSONObject] = []
+                if isinstance(original_input, str):
+                    original_input_items = [
+                        {
+                            "type": "message",
+                            "role": "user",
+                            "content": original_input,
+                        }
+                    ]
+                elif isinstance(original_input, Sequence):
+                    original_input_items = cast(list[JSONObject], list(original_input))
+                followup_request["input"] = [
+                    *original_input_items,
+                    *prior_output,
+                    *followup_input,
+                ]
             model_request = followup_request
             response_payload = self._create_model_response(model_request)
 
