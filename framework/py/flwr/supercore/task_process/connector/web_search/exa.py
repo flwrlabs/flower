@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Exa-backed web-search adapter."""
+"""Exa-backed web search adapter."""
 
 
 import os
@@ -39,9 +39,9 @@ class ExaWebSearchProvider:
         self._api_key = api_key
 
     def search(self, query: str) -> JSONObject:
-        """Execute one Exa web-search request."""
+        """Execute one Exa web search request."""
         if not query.strip():
-            raise ValueError("web-search requires a non-empty query.")
+            raise ValueError("web search requires a non-empty query.")
         query = query.strip()
 
         try:
@@ -56,7 +56,7 @@ class ExaWebSearchProvider:
             )
         except requests.RequestException as exc:
             raise RuntimeError(
-                f"{EXA_WEB_SEARCH_PROVIDER} web-search request failed: {exc}"
+                f"{EXA_WEB_SEARCH_PROVIDER} web search request failed: {exc}"
             ) from exc
         if response.status_code >= 400:
             try:
@@ -64,7 +64,7 @@ class ExaWebSearchProvider:
             except ValueError:
                 detail = response.text
             raise RuntimeError(
-                f"{EXA_WEB_SEARCH_PROVIDER} web-search request failed: "
+                f"{EXA_WEB_SEARCH_PROVIDER} web search request failed: "
                 f"{response.status_code} {detail}"
             )
 
@@ -72,11 +72,11 @@ class ExaWebSearchProvider:
             payload = response.json()
         except ValueError as exc:
             raise RuntimeError(
-                f"{EXA_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+                f"{EXA_WEB_SEARCH_PROVIDER} web search returned invalid JSON."
             ) from exc
         if not isinstance(payload, dict):
             raise RuntimeError(
-                f"{EXA_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+                f"{EXA_WEB_SEARCH_PROVIDER} web search returned invalid JSON."
             )
 
         return {
