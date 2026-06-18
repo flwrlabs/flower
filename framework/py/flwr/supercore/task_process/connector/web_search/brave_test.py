@@ -12,17 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the Brave web-search provider."""
+"""Tests for the Brave web search provider."""
 
 from __future__ import annotations
 
 from unittest.mock import Mock
 
 import pytest
+import requests
 
 from flwr.supercore.typing import JSONObject
 
 from .brave import (
+    BRAVE_API_KEY_ENV,
     BRAVE_WEB_SEARCH_URL,
     REQUEST_TIMEOUT,
     BraveWebSearchProvider,
@@ -34,7 +36,7 @@ def test_search_calls_brave_and_returns_parsed_results(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Search requests should call Brave and return normalized results."""
-    monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "brave_test_key")
+    monkeypatch.setenv(BRAVE_API_KEY_ENV, "brave_test_key")
     payload: JSONObject = {
         "web": {
             "results": [
@@ -50,10 +52,7 @@ def test_search_calls_brave_and_returns_parsed_results(
     response = Mock(status_code=200, text="")
     response.json.return_value = payload
     get_mock = Mock(return_value=response)
-    monkeypatch.setattr(
-        "flwr.supercore.task_process.connector.web_search.brave.requests.get",
-        get_mock,
-    )
+    monkeypatch.setattr(requests, "get", get_mock)
 
     result = BraveWebSearchProvider().search(" flower federated learning ")
 

@@ -340,7 +340,7 @@ workload, any ML framework, and any programming language.
 
     <div style="max-width:50%; margin-left: auto; margin-right: auto;">
     <img
-    src="_static/tutorial/flower-any.jpeg"
+    src="_static/tutorial/flower-any.png"
     alt="Flower federated learning server and client nodes (car, scooter, personal
     computer, roomba, and phone)"
     />
