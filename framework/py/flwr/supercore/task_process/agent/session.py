@@ -96,16 +96,27 @@ class RuntimeAgentResponses(AgentResponses):
                     {
                         "type": "function_call_output",
                         "call_id": tool_call.call_id,
-                        "output": strict_json_dumps(output, compact=True),
+                        "output": (
+                            output
+                            if isinstance(output, str)
+                            else strict_json_dumps(output, compact=True)
+                        ),
                     }
                 )
 
             # Keep the prepared model request, but replace user input with tool output.
             followup_request = dict(model_request)
-            followup_request["input"] = followup_input
+            followup_request.pop("tool_choice", None)
             previous_response_id = response_payload.get("id")
             if isinstance(previous_response_id, str) and previous_response_id:
+                followup_request["input"] = followup_input
                 followup_request["previous_response_id"] = previous_response_id
+            else:
+                output = response_payload.get("output")
+                prior_output: list[JSONObject] = []
+                if _is_json_object_list(output):
+                    prior_output = cast(list[JSONObject], output)
+                followup_request["input"] = [*prior_output, *followup_input]
             model_request = followup_request
             response_payload = self._create_model_response(model_request)
 
