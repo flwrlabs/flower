@@ -287,6 +287,28 @@ def test_tls_material_contract_records_fingerprint_without_pem(tmp_path: Path) -
     assert "root-ca" not in tls_text
 
 
+def test_tls_material_contract_can_hash_local_ca_for_pod_mount_path(
+    tmp_path: Path,
+) -> None:
+    """Test TLS evidence can separate in-Pod path from host fingerprint path."""
+    pem = "-----BEGIN CERTIFICATE-----\nroot-ca\n-----END CERTIFICATE-----\n"
+    ca_path = tmp_path / "appio-ca.pem"
+    ca_path.write_text(pem, encoding="utf-8")
+    profile = harness_module.generic_k3d_profile()
+    profile.appio_root_certificates_path = "/etc/flower/tls/ca.crt"
+    profile.appio_root_certificates_local_path = str(ca_path)
+
+    summary = harness_module.run_infra_proof(tmp_path / "evidence", profile=profile)
+
+    expected_sha256 = hashlib.sha256(pem.encode()).hexdigest()
+    tls = json.loads((tmp_path / "evidence" / "objects" / "tls.json").read_text())
+    assert summary.status == "passed"
+    assert tls["ready"] is True
+    assert tls["root_certificates"]["path"] == "/etc/flower/tls/ca.crt"
+    assert tls["root_certificates"]["local_path"] == str(ca_path)
+    assert tls["root_certificates"]["sha256"] == expected_sha256
+
+
 def test_run_infra_proof_dry_run_writes_local_k8s_infra_evidence(
     tmp_path: Path,
 ) -> None:
@@ -1180,6 +1202,32 @@ def test_verify_local_k8s_launch_evidence_accepts_passing_bundle(
     assert "TaskExecutor Pods: 1" in report
 
 
+def test_verify_local_k8s_launch_evidence_accepts_tls_bundle(
+    tmp_path: Path,
+) -> None:
+    """Test the verifier accepts TLS evidence when required."""
+    output_dir = tmp_path / "evidence"
+    _write_verifier_evidence(output_dir, tls=True)
+
+    failures, report = verifier_module.verify_evidence(output_dir, require_tls=True)
+
+    assert failures == []
+    assert "Verification: PASSED" in report
+
+
+def test_verify_local_k8s_launch_evidence_rejects_missing_tls(
+    tmp_path: Path,
+) -> None:
+    """Test the verifier rejects missing TLS evidence when required."""
+    output_dir = tmp_path / "evidence"
+    _write_verifier_evidence(output_dir)
+
+    failures, report = verifier_module.verify_evidence(output_dir, require_tls=True)
+
+    assert any("objects/tls.json not found" in failure for failure in failures)
+    assert "Verification: FAILED" in report
+
+
 def test_verify_local_k8s_launch_evidence_rejects_missing_serverapp_marker(
     tmp_path: Path,
 ) -> None:
@@ -1871,6 +1919,7 @@ def _write_verifier_evidence(
     result: str = "local-k8s-launch-path",
     active_pod_budget: int | None = None,
     seed_run_ids: list[int] | None = None,
+    tls: bool = False,
 ) -> None:
     (output_dir / "diagnostics").mkdir(parents=True)
     capacity_proof = result == "local-k8s-capacity-cleanup-proof"
@@ -1902,6 +1951,7 @@ def _write_verifier_evidence(
         "status": "passed",
         "result": result,
         "failures": [],
+        "not_validated": [],
         "details": {
             "run_id": "k8s-launch-test",
             "seed_run_id": 123,
@@ -2031,6 +2081,88 @@ def _write_verifier_evidence(
         taskexecutor_log_text,
         encoding="utf-8",
     )
+    if tls:
+        tls_path = "/etc/flower/tls/ca.crt"
+        (output_dir / "objects").mkdir()
+        (output_dir / "objects" / "tls.json").write_text(
+            json.dumps(
+                {
+                    "ready": True,
+                    "root_certificates": {
+                        "path": tls_path,
+                        "sha256": "test-sha256",
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        (output_dir / "objects" / "executor-config.json").write_text(
+            json.dumps({"appio-root-certificates-path": tls_path}),
+            encoding="utf-8",
+        )
+        (output_dir / "objects" / "real-launch.json").write_text(
+            json.dumps(
+                {
+                    "items": [
+                        {
+                            "kind": "Pod",
+                            "spec": {
+                                "containers": [
+                                    {
+                                        "name": "superlink",
+                                        "args": [
+                                            "--ssl-certfile",
+                                            "/etc/flower/tls/tls.crt",
+                                            "--appio-ssl-certfile",
+                                            "/etc/flower/tls/tls.crt",
+                                        ],
+                                    }
+                                ]
+                            },
+                        },
+                        {
+                            "kind": "Pod",
+                            "spec": {
+                                "containers": [
+                                    {
+                                        "name": "superexec",
+                                        "args": ["--root-certificates", tls_path],
+                                    }
+                                ]
+                            },
+                        },
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        (output_dir / "objects" / "seed-job.json").write_text(
+            json.dumps(
+                {
+                    "items": [
+                        {
+                            "kind": "Job",
+                            "spec": {
+                                "template": {
+                                    "spec": {
+                                        "containers": [
+                                            {
+                                                "name": "seed-run",
+                                                "args": [
+                                                    "--control-root-certificates",
+                                                    tls_path,
+                                                ],
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:

@@ -44,12 +44,39 @@ To reuse previously built images:
 ./framework/dev/k8s/test-real-launch-path.sh --skip-build
 ```
 
+Add `--tls` to any canned run to enable local server-auth TLS for SuperLink,
+SuperExec, the seed Job, and TaskExecutor AppIo. The wrapper generates a local
+test CA/server certificate under the evidence directory, applies a Kubernetes
+Secret, and verifies TLS evidence after the run.
+
+Default launch-path proof with TLS:
+
+```bash
+./framework/dev/k8s/test-real-launch-path.sh --tls
+```
+
+Skip-build launch-path proof with TLS:
+
+```bash
+./framework/dev/k8s/test-real-launch-path.sh --skip-build --tls
+```
+
 To run the budget-1/two-task capacity and cleanup proof:
 
 ```bash
 output_dir=/private/tmp/f7d-v2-capacity-cleanup-proof-$(date +%Y%m%d-%H%M%S)
 ./framework/dev/k8s/test-real-launch-path.sh \
   --capacity-cleanup-proof \
+  --output-dir "${output_dir}"
+```
+
+Capacity and cleanup proof with TLS:
+
+```bash
+output_dir=/private/tmp/f7d-v2-capacity-cleanup-proof-tls-$(date +%Y%m%d-%H%M%S)
+./framework/dev/k8s/test-real-launch-path.sh \
+  --capacity-cleanup-proof \
+  --tls \
   --output-dir "${output_dir}"
 ```
 
@@ -69,6 +96,16 @@ output_dir=/private/tmp/f7e-demo-cardinality-proof-$(date +%Y%m%d-%H%M%S)
   --output-dir "${output_dir}"
 ```
 
+Demo-friendly cardinality proof with TLS:
+
+```bash
+output_dir=/private/tmp/f7e-demo-cardinality-proof-tls-$(date +%Y%m%d-%H%M%S)
+./framework/dev/k8s/test-real-launch-path.sh \
+  --demo \
+  --tls \
+  --output-dir "${output_dir}"
+```
+
 The demo preset leaves namespace resources in place for live inspection. Verify
 the saved bundle with the explicit demo expectations:
 
@@ -78,6 +115,17 @@ python framework/dev/k8s/verify_evidence.py "${output_dir}" \
   --expected-active-pod-budget 4 \
   --expected-seed-run-count 8 \
   --no-require-cleanup
+```
+
+For the TLS demo preset, add `--require-tls`:
+
+```bash
+python framework/dev/k8s/verify_evidence.py "${output_dir}" \
+  --expected-result local-k8s-capacity-cleanup-proof \
+  --expected-active-pod-budget 4 \
+  --expected-seed-run-count 8 \
+  --no-require-cleanup \
+  --require-tls
 ```
 
 `/private/tmp` is only an example local scratch location. For handoff or review,
@@ -101,10 +149,12 @@ output_dir=/private/tmp/f7d-v2-capacity-cleanup-proof-live-$(date +%Y%m%d-%H%M%S
 ./framework/dev/k8s/test-real-launch-path.sh \
   --capacity-cleanup-proof \
   --skip-cleanup \
+  --tls \
   --output-dir "${output_dir}"
 python framework/dev/k8s/verify_evidence.py "${output_dir}" \
   --expected-result local-k8s-capacity-cleanup-proof \
-  --no-require-cleanup
+  --no-require-cleanup \
+  --require-tls
 ```
 
 ## Release Testing Toolkit
@@ -201,6 +251,40 @@ Inspect TaskExecutor logs:
 
 This prints logs for TaskExecutor Pods selected by the harness labels. Add `-f`
 to follow active Pods.
+
+macOS watch and tmux setup:
+
+```bash
+brew install watch tmux
+```
+
+This installs the `watch` command used by the live Pod views and `tmux` for
+keeping watch and log panes open during a release-test run.
+
+Two-pane tmux demo layout:
+
+```bash
+tmux new-session -d -s flower-k8s-demo -n release './framework/dev/k8s/harnessctl.sh watch-taskexecutors'
+tmux split-window -h -t flower-k8s-demo:release './framework/dev/k8s/harnessctl.sh logs-superexec -f --tail=200'
+tmux attach -t flower-k8s-demo
+```
+
+This opens TaskExecutor Pod status on the left and SuperExec logs on the right.
+Detach with `Ctrl-b d`; reattach with `tmux attach -t flower-k8s-demo`.
+
+Four-pane tmux demo layout:
+
+```bash
+tmux new-session -d -s flower-k8s-demo4 -n release './framework/dev/k8s/harnessctl.sh watch-pods'
+tmux split-window -h -t flower-k8s-demo4:release './framework/dev/k8s/harnessctl.sh watch-taskexecutors'
+tmux split-window -v -t flower-k8s-demo4:release.0 './framework/dev/k8s/harnessctl.sh logs-superexec -f --tail=200'
+tmux split-window -v -t flower-k8s-demo4:release.1 './framework/dev/k8s/harnessctl.sh logs-taskexecutors -f --tail=200 --prefix'
+tmux select-layout -t flower-k8s-demo4:release tiled
+tmux attach -t flower-k8s-demo4
+```
+
+This opens all Pod status, TaskExecutor-only status, SuperExec logs, and
+TaskExecutor logs in one terminal window.
 
 Stop currently observed TaskExecutors:
 
@@ -482,7 +566,8 @@ For `--demo`, additionally confirm:
 | ServerApp execution marker | Yes | Verifies `K8s launch probe ServerApp ran` in TaskExecutor logs. |
 | Capacity wait | Optional | `--capacity-cleanup-proof` seeds two runs with active Pod budget `1` and requires SuperExec wait evidence. |
 | Sweeper cleanup | Optional | `--capacity-cleanup-proof` requires the first completed TaskExecutor Pod and Secret to be removed before namespace cleanup. |
-| Cardinality proof | Optional | `--demo` seeds three runs with active Pod budget `2` and requires two active Pods before the third waits and launches after a slot opens. |
+| Cardinality proof | Optional | `--demo` seeds eight runs with active Pod budget `4` and requires four active Pods before waiting work launches after slots open. |
+| AppIo TLS | Optional | `--tls` configures local server-auth TLS and `verify_evidence.py --require-tls` checks the saved TLS evidence. |
 | Wrapper cleanup | Yes | Default wrapper behavior deletes the namespace and verifies cleanup evidence. |
 
 ## Out Of Scope
@@ -491,7 +576,7 @@ For `--demo`, additionally confirm:
 | --- | --- | --- |
 | AppIo result completion semantics | No | This slice observes launch and Pod success, not full result semantics. |
 | ClientApp execution | No | The probe includes a minimal ClientApp file only because the FAB schema expects it. |
-| TLS, CNI/NetworkPolicy, production RBAC | No | This is local/dev-only and uses insecure local AppIo. |
+| CNI/NetworkPolicy, production RBAC | No | This is local/dev-only and does not validate production deployment policy. |
 | Concurrency, retry, failure behavior | No | The default proof starts one deterministic run; the capacity proof starts two deterministic runs only to exercise budget waiting and cleanup. |
 
 ## Useful Commands

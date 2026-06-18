@@ -30,6 +30,7 @@ def verify_evidence(
     evidence_dir: str | Path,
     *,
     require_cleanup: bool = True,
+    require_tls: bool = False,
     expected_result: str = "local-k8s-launch-path",
     expected_active_pod_budget: int | None = None,
     expected_seed_run_count: int | None = None,
@@ -228,6 +229,13 @@ def verify_evidence(
         failures,
     )
 
+    if require_tls:
+        _verify_tls_evidence(
+            evidence_path=evidence_path,
+            summary=summary,
+            failures=failures,
+        )
+
     cleanup = _mapping(details.get("cleanup"))
     cleanup_result = _mapping(cleanup.get("result"))
     if require_cleanup:
@@ -345,6 +353,72 @@ def verify_evidence(
     )
 
 
+def _verify_tls_evidence(
+    *,
+    evidence_path: Path,
+    summary: Mapping[str, object],
+    failures: list[str],
+) -> None:
+    tls = _read_required_json(evidence_path, "objects/tls.json", failures)
+    executor_config = _read_required_json(
+        evidence_path, "objects/executor-config.json", failures
+    )
+    real_launch = _read_required_json(
+        evidence_path, "objects/real-launch.json", failures
+    )
+    seed_job = _read_required_json(evidence_path, "objects/seed-job.json", failures)
+    root_certificates = _mapping(tls.get("root_certificates"))
+    tls_path = str(root_certificates.get("path") or "")
+    not_validated = [str(item) for item in _sequence(summary.get("not_validated"))]
+
+    _expect(tls.get("ready") is True, "TLS material is not ready", failures)
+    _expect(bool(tls_path), "TLS root certificate path was not recorded", failures)
+    _expect(
+        bool(root_certificates.get("sha256")),
+        "TLS root certificate fingerprint was not recorded",
+        failures,
+    )
+    _expect(
+        "AppIo TLS handshake" not in not_validated,
+        "summary still marks AppIo TLS handshake as not validated",
+        failures,
+    )
+    _expect(
+        executor_config.get("appio-root-certificates-path") == tls_path,
+        "executor config does not use the expected AppIo root certificates path",
+        failures,
+    )
+
+    superlink_args = _container_args(real_launch, "superlink")
+    superexec_args = _container_args(real_launch, "superexec")
+    seed_args = _container_args(seed_job, "seed-run")
+    _expect(
+        "--insecure" not in superlink_args,
+        "SuperLink still uses --insecure",
+        failures,
+    )
+    _expect(
+        "--appio-ssl-certfile" in superlink_args,
+        "SuperLink AppIo TLS certificate flag is missing",
+        failures,
+    )
+    _expect(
+        "--insecure" not in superexec_args,
+        "SuperExec still uses --insecure",
+        failures,
+    )
+    _expect(
+        _args_include_value(superexec_args, "--root-certificates", tls_path),
+        "SuperExec does not use the expected AppIo root certificates path",
+        failures,
+    )
+    _expect(
+        _args_include_value(seed_args, "--control-root-certificates", tls_path),
+        "seed Job does not use the expected Control API root certificates path",
+        failures,
+    )
+
+
 def _verify_cardinality_evidence(
     *,
     details: Mapping[str, object],
@@ -398,6 +472,31 @@ def _command_text(records: Sequence[object]) -> str:
             if isinstance(value, str):
                 parts.append(value)
     return "\n".join(parts)
+
+
+def _container_args(
+    manifest_list: Mapping[str, object], container_name: str
+) -> list[str]:
+    for item in _sequence(manifest_list.get("items")):
+        item_mapping = _mapping(item)
+        if item_mapping.get("kind") == "Pod":
+            containers = _sequence(_mapping(item_mapping.get("spec")).get("containers"))
+        else:
+            template = _mapping(_mapping(item_mapping.get("spec")).get("template"))
+            template_spec = _mapping(template.get("spec"))
+            containers = _sequence(template_spec.get("containers"))
+        for container in containers:
+            container_mapping = _mapping(container)
+            if container_mapping.get("name") == container_name:
+                return [str(arg) for arg in _sequence(container_mapping.get("args"))]
+    return []
+
+
+def _args_include_value(args: Sequence[str], flag: str, value: str) -> bool:
+    return any(
+        arg == flag and index + 1 < len(args) and args[index + 1] == value
+        for index, arg in enumerate(args)
+    )
 
 
 def _read_json(path: Path, failures: list[str]) -> dict[str, object]:
@@ -525,6 +624,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Do not require the final namespace cleanup command to have run.",
     )
     parser.add_argument(
+        "--require-tls",
+        action="store_true",
+        help="Require evidence that the run used local AppIo TLS.",
+    )
+    parser.add_argument(
         "--expected-result",
         choices=("local-k8s-launch-path", "local-k8s-capacity-cleanup-proof"),
         default="local-k8s-launch-path",
@@ -551,6 +655,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     failures, report = verify_evidence(
         args.evidence_dir,
         require_cleanup=not args.no_require_cleanup,
+        require_tls=args.require_tls,
         expected_result=args.expected_result,
         expected_active_pod_budget=args.expected_active_pod_budget,
         expected_seed_run_count=args.expected_seed_run_count,

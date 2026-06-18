@@ -1195,6 +1195,19 @@ def _equivalent_argv(
         args.extend(["--capacity-poll-interval", str(profile.capacity_poll_interval)])
     if profile.capacity_log_interval is not None:
         args.extend(["--capacity-log-interval", str(profile.capacity_log_interval)])
+    if profile.appio_root_certificates_path is not None:
+        args.extend(
+            ["--appio-root-certificates-path", profile.appio_root_certificates_path]
+        )
+    if profile.appio_root_certificates_local_path is not None:
+        args.extend(
+            [
+                "--appio-root-certificates-local-path",
+                profile.appio_root_certificates_local_path,
+            ]
+        )
+    if profile.tls_secret_name != generic_k3d_profile().tls_secret_name:
+        args.extend(["--tls-secret-name", profile.tls_secret_name])
     if execute:
         args.append("--execute")
     if create_cluster:

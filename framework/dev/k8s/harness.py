@@ -279,9 +279,13 @@ def run_infra_proof(
     tls_status = "passed" if tls_contract["ready"] else "not_validated"
     if profile.appio_root_certificates_path is not None and not tls_contract["ready"]:
         tls_status = "failed"
+        fingerprint_path = (
+            profile.appio_root_certificates_local_path
+            or profile.appio_root_certificates_path
+        )
         failures.append(
             "TLS material path was configured but could not be read: "
-            f"{profile.appio_root_certificates_path}"
+            f"{fingerprint_path}"
         )
     write_event(
         "tls.material.ready",
@@ -484,8 +488,18 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--appio-root-certificates-path",
         default=None,
         help=(
-            "Optional local AppIo root certificate PEM path. The evidence "
-            "records only path and SHA-256, never PEM content."
+            "Optional AppIo root certificate PEM path used inside Kubernetes "
+            "Pods. The evidence records only path and SHA-256, never PEM "
+            "content."
+        ),
+    )
+    parser.add_argument(
+        "--appio-root-certificates-local-path",
+        default=None,
+        help=(
+            "Optional host-local AppIo root certificate PEM path used only for "
+            "evidence fingerprinting when the Kubernetes path is an in-Pod "
+            "mount."
         ),
     )
     parser.add_argument(
@@ -610,6 +624,7 @@ def _profile_from_args(args: argparse.Namespace) -> HarnessProfile:
         cleanup_mode=args.cleanup_mode,
         kubectl_context=args.kubectl_context,
         appio_root_certificates_path=args.appio_root_certificates_path,
+        appio_root_certificates_local_path=args.appio_root_certificates_local_path,
         tls_secret_name=args.tls_secret_name,
         superexec_service_account=args.superexec_service_account,
         superlink_name=args.superlink_name,

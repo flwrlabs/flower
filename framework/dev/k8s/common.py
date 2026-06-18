@@ -147,6 +147,7 @@ class HarnessProfile:  # pylint: disable=too-many-instance-attributes
     executor_config_path: str | None = None
     kubectl_context: str | None = None
     appio_root_certificates_path: str | None = None
+    appio_root_certificates_local_path: str | None = None
     superlink_image: str = "flwr/superlink:dev"
     superexec_image: str = "flwr/superexec:dev"
     runtime_image_pull_policy: str = "IfNotPresent"
@@ -201,6 +202,9 @@ class HarnessProfile:  # pylint: disable=too-many-instance-attributes
             },
             "tls": {
                 "appio-root-certificates-path": self.appio_root_certificates_path,
+                "appio-root-certificates-local-path": (
+                    self.appio_root_certificates_local_path
+                ),
                 "secret-name": self.tls_secret_name,
             },
             "runtime": {
@@ -356,17 +360,27 @@ def capacity_cleanup_profile(profile: HarnessProfile) -> HarnessProfile:
 
 def build_tls_material_contract(profile: HarnessProfile) -> dict[str, object]:
     """Return sanitized TLS material evidence without storing PEM contents."""
-    path = (
-        Path(profile.appio_root_certificates_path).expanduser()
-        if profile.appio_root_certificates_path is not None
+    configured_path = profile.appio_root_certificates_path
+    local_path = profile.appio_root_certificates_local_path or configured_path
+    fingerprint_path = (
+        Path(local_path).expanduser()
+        if local_path is not None
         else None
     )
-    ready = path is not None and path.is_file()
+    ready = fingerprint_path is not None and fingerprint_path.is_file()
+    source = (
+        "configured-path" if configured_path is not None else "planned-test-ca"
+    )
     root_certificates: dict[str, object] = {
-        "source": "configured-path" if path is not None else "planned-test-ca",
-        "path": str(path) if path is not None else None,
+        "source": source,
+        "path": configured_path,
+        "local_path": str(fingerprint_path) if fingerprint_path is not None else None,
         "ready": ready,
-        "sha256": _sha256_file(path) if ready and path is not None else None,
+        "sha256": (
+            _sha256_file(fingerprint_path)
+            if ready and fingerprint_path is not None
+            else None
+        ),
         "pem_redacted": True,
     }
     return {
