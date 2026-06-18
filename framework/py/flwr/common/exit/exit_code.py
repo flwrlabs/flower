@@ -197,10 +197,10 @@ To use the REST API, install `flwr` with the `rest` extra:
         "administrator."
     ),
     ExitCode.COMMON_APP_IMPORT_ERROR: (
-        "A ServerApp or ClientApp failed to import a required module. Add the "
-        "missing package to the app's `pyproject.toml` dependencies, then install "
-        "the dependencies manually unless automatic runtime dependency installation "
-        "is enabled."
+        "A ServerApp, ClientApp or AgentApp failed to import a required module. Add "
+        "the missing package to the app's `pyproject.toml` dependencies, then "
+        "install the dependencies manually unless automatic runtime dependency "
+        "installation is enabled."
     ),
     # Simulation exit codes (700-799)
     ExitCode.SIMULATION_EXCEPTION: (
