@@ -94,9 +94,7 @@ def extract_builtin_connector_tool_calls(
                 )
             parsed_arguments = cast(JSONObject, parsed)
         else:
-            raise ValueError(
-                "Function-call arguments must be a JSON object or string."
-            )
+            raise ValueError("Function-call arguments must be a JSON object or string.")
         tool_calls.append(
             ConnectorToolCall(name=name, call_id=call_id, arguments=parsed_arguments)
         )
