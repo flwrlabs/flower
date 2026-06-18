@@ -20,6 +20,7 @@ import importlib
 import json
 import logging
 import platform
+import sys
 import threading
 import traceback
 from dataclasses import dataclass
@@ -187,9 +188,9 @@ def run_serverapp_th(
     app_dir: str,
     f_stop: threading.Event,
     has_exception: threading.Event,
-    exception_queue: "Queue[BaseException]",
+    exception_queue: Queue[BaseException],
     enable_tf_gpu_growth: bool,
-    ctx_queue: "Queue[Context]",
+    ctx_queue: Queue[Context],
 ) -> threading.Thread:
     """Run SeverApp in a thread."""
 
@@ -197,12 +198,12 @@ def run_serverapp_th(
         tf_gpu_growth: bool,
         stop_event: threading.Event,
         exception_event: threading.Event,
-        _exception_queue: "Queue[BaseException]",
+        _exception_queue: Queue[BaseException],
         _grid: Grid,
         _server_app_dir: str,
         _server_app_attr: str | None,
         _server_app: ServerApp | None,
-        _ctx_queue: "Queue[Context]",
+        _ctx_queue: Queue[Context],
     ) -> None:
         """Run SeverApp, after check if GPU memory growth has to be set.
 
@@ -365,8 +366,6 @@ def _main_loop(
         )
         if serverapp_th and server_app_thread_has_exception.is_set():
             # Don't mask an exception already being propagated from the main thread.
-            import sys  # pylint: disable=import-outside-toplevel
-
             if sys.exc_info()[0] is None:
                 try:
                     thread_ex = server_app_exception_queue.get_nowait()
