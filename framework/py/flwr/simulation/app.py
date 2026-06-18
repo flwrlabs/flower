@@ -329,7 +329,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         # General exit code
         exit_code = ExitCode.SIMULATION_EXCEPTION
-        if isinstance(ex, ModuleNotFoundError):
+        if isinstance(ex, ImportError):
             exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
 
     flwr_exit(

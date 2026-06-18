@@ -6,14 +6,15 @@
  Description
 *************
 
-A ServerApp, ClientApp or AgentApp failed to import a required module. This can happen
-because a dependency is missing, or because a module from your app could not be found.
+A ServerApp, ClientApp or AgentApp failed while importing app code. This can happen
+because a dependency is missing, a module from your app could not be found, or an
+imported name such as a function or class does not exist.
 
 ****************
  How to Resolve
 ****************
 
-Check the error message to identify the missing module.
+Check the error message to identify the failed import.
 
 App module or file
 ==================
@@ -22,6 +23,9 @@ If the missing import refers to a module or ``.py`` file in your app, make sure 
 
 - the file is included in the app
 - the import name is correct
+
+If the import refers to a name from an existing module, make sure that the function,
+class, or variable exists and is exported by that module.
 
 Library dependency
 ==================

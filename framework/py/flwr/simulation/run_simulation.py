@@ -333,7 +333,7 @@ def _main_loop(
     except Empty:
         log(DEBUG, "Queue timeout. No context received.")
 
-    except ModuleNotFoundError:
+    except ImportError:
         success = False
         # Let app import failures reach the process-level exit-code handler.
         raise
