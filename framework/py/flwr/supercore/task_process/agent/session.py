@@ -104,13 +104,12 @@ class RuntimeAgentResponses(AgentResponses):
                     }
                 )
 
-            # Keep the prepared model request, but replace input for the continuation.
-            followup_request = dict(model_request)
-            followup_request.pop("tool_choice", None)
+            # Reuse the prepared model request, but replace input for continuation.
+            model_request.pop("tool_choice", None)
             previous_response_id = response_payload.get("id")
             if isinstance(previous_response_id, str) and previous_response_id:
-                followup_request["input"] = followup_input
-                followup_request["previous_response_id"] = previous_response_id
+                model_request["input"] = followup_input
+                model_request["previous_response_id"] = previous_response_id
             else:
                 output = response_payload.get("output")
                 prior_output: list[JSONObject] = []
@@ -128,12 +127,11 @@ class RuntimeAgentResponses(AgentResponses):
                     ]
                 elif isinstance(original_input, Sequence):
                     original_input_items = cast(list[JSONObject], list(original_input))
-                followup_request["input"] = [
+                model_request["input"] = [
                     *original_input_items,
                     *prior_output,
                     *followup_input,
                 ]
-            model_request = followup_request
             response_payload = self._create_model_response(model_request)
 
         output = response_payload.get("output")
