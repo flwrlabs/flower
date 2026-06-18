@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tavily-backed web-search adapter."""
+"""Tavily-backed web search adapter."""
 
 
 import os
@@ -41,9 +41,9 @@ class TavilyWebSearchProvider:
         self._api_key = api_key
 
     def search(self, query: str) -> JSONObject:
-        """Execute one Tavily web-search request."""
+        """Execute one Tavily web search request."""
         if not query.strip():
-            raise ValueError("web-search requires a non-empty query.")
+            raise ValueError("web search requires a non-empty query.")
         query = query.strip()
 
         try:
@@ -58,7 +58,7 @@ class TavilyWebSearchProvider:
             )
         except requests.RequestException as exc:
             raise RuntimeError(
-                f"{TAVILY_WEB_SEARCH_PROVIDER} web-search request failed: {exc}"
+                f"{TAVILY_WEB_SEARCH_PROVIDER} web search request failed: {exc}"
             ) from exc
         if response.status_code >= 400:
             try:
@@ -66,7 +66,7 @@ class TavilyWebSearchProvider:
             except ValueError:
                 detail = response.text
             raise RuntimeError(
-                f"{TAVILY_WEB_SEARCH_PROVIDER} web-search request failed: "
+                f"{TAVILY_WEB_SEARCH_PROVIDER} web search request failed: "
                 f"{response.status_code} {detail}"
             )
 
@@ -74,11 +74,11 @@ class TavilyWebSearchProvider:
             payload = response.json()
         except ValueError as exc:
             raise RuntimeError(
-                f"{TAVILY_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+                f"{TAVILY_WEB_SEARCH_PROVIDER} web search returned invalid JSON."
             ) from exc
         if not isinstance(payload, dict):
             raise RuntimeError(
-                f"{TAVILY_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+                f"{TAVILY_WEB_SEARCH_PROVIDER} web search returned invalid JSON."
             )
 
         return {
