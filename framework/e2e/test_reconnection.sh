@@ -22,6 +22,10 @@ case "$1" in
     ;;
 esac
 
+# This reconnection harness uses a preinstalled e2e app, so SuperLink should not
+# create per-run dependency environments.
+runtime_dependency_install_arg="--disable-runtime-dependency-installation"
+
 # Define the function
 check_and_kill() {
   local pids=$1  # Get the PID as the first argument to the function
@@ -42,7 +46,8 @@ sed -i '/^\[tool\.flwr\.federations\.e2e\]/,/^$/d' pyproject.toml
 echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:9093\"\ninsecure = true" >> pyproject.toml
 sleep 1
 
-timeout 10m flower-superlink --insecure $db_arg $rest_arg &
+timeout 10m flower-superlink \
+  --insecure $db_arg $rest_arg $runtime_dependency_install_arg &
 sl_pids=$(pgrep -f "flower-superlink")
 echo "Starting SuperLink"
 sleep 3
@@ -65,7 +70,8 @@ echo "Killing Superlink"
 sleep 3
 
 # Restart superlink, the clients should now be able to reconnect to it
-timeout 10m flower-superlink --insecure $db_arg $rest_arg &
+timeout 10m flower-superlink \
+  --insecure $db_arg $rest_arg $runtime_dependency_install_arg &
 sl_pids=$(pgrep -f "flower-superlink")
 echo "Restarting Superlink"
 sleep 20

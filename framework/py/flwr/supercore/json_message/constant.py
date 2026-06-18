@@ -12,25 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Executor abstractions and implementations for SuperExec."""
+"""Constants for task-routed messages."""
 
-from .factory import get_executor
-from .kubernetes_executor import (
-    KubernetesExecutor,
-    KubernetesExecutorConfig,
-    create_incluster_kubernetes_client,
-)
-from .subprocess_executor import SubprocessExecutor
-from .types import ExecutionSpec, Executor, LaunchResult, LaunchResultStatus
-
-__all__ = [
-    "ExecutionSpec",
-    "Executor",
-    "KubernetesExecutor",
-    "KubernetesExecutorConfig",
-    "LaunchResult",
-    "LaunchResultStatus",
-    "SubprocessExecutor",
-    "create_incluster_kubernetes_client",
-    "get_executor",
-]
+TASK_MESSAGE_PAYLOAD_RECORD_KEY = "payload"
+TASK_MESSAGE_PAYLOAD_JSON_KEY = "json"

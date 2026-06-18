@@ -26,15 +26,42 @@ from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, TRANSPORT_TYPE_REST
 from flwr.common.logger import log
 
 
-def add_args_runtime_dependency_install(parser: argparse.ArgumentParser) -> None:
-    """Add arguments controlling runtime dependency installation."""
-    parser.add_argument(
+def add_args_runtime_dependency_install(
+    parser: argparse.ArgumentParser,
+    default: bool = RUNTIME_DEPENDENCY_INSTALL,
+    include_disable_flag: bool = False,
+    allow_flag_help: str | None = None,
+) -> None:
+    """Add arguments controlling runtime dependency installation.
+
+    Ensure only enable or disable flags are present. For SuperLink, also include
+    the argument to disable runtime dependency installation and a deprecation
+    notice for `--allow-runtime-dependency-installation`.
+    """
+    default_state = "enabled" if default else "disabled"
+    add_argument = (
+        parser.add_mutually_exclusive_group().add_argument
+        if include_disable_flag
+        else parser.add_argument
+    )
+    if include_disable_flag:
+        add_argument(
+            "--disable-runtime-dependency-installation",
+            action="store_false",
+            dest="runtime_dependency_install",
+            default=default,
+            help="Disable runtime installation of app dependencies via `uv sync`. "
+            f"By default, runtime dependency installation is {default_state}.",
+        )
+    add_argument(
         "--allow-runtime-dependency-installation",
         action="store_true",
         dest="runtime_dependency_install",
-        default=RUNTIME_DEPENDENCY_INSTALL,
-        help="Allow runtime installation of app dependencies via `uv sync`. "
-        "By default, runtime dependency installation is disabled.",
+        default=default,
+        help=(
+            allow_flag_help
+            or "Allow runtime installation of app dependencies via `uv sync`."
+        ),
     )
 
 
