@@ -25,9 +25,7 @@ import sys
 import uuid
 from logging import DEBUG, ERROR, INFO, WARNING
 from pathlib import Path
-from urllib.error import HTTPError
 from urllib.parse import urlsplit, urlunsplit
-from urllib.request import Request, urlopen
 
 from flwr.common.config import get_project_config
 from flwr.common.logger import log
@@ -38,7 +36,6 @@ _FLWR_UV_DEFAULT_INDEX = "FLWR_UV_DEFAULT_INDEX"
 _UV_DEFAULT_INDEX = "UV_DEFAULT_INDEX"
 _DEFAULT_UV_INDEX = "default"
 _DEFAULT_UV_INDEX_URL = "https://pypi.org/simple"
-_INDEX_REACHABILITY_TIMEOUT_SECONDS = 10.0
 RuntimeDependencyIndexContext = dict[str, str | int | None]
 
 
@@ -151,7 +148,8 @@ def install_app_dependencies(
     if uv_default_index_name == _DEFAULT_UV_INDEX:
         log(
             INFO,
-            "  uv default index not explicitly set; uv will use its configured default.",
+            "  uv default index not explicitly set; uv will use its configured "
+            "default.",
         )
     else:
         log(
@@ -160,7 +158,6 @@ def install_app_dependencies(
             uv_default_index_name,
             _redact_url(uv_default_index_url),
         )
-        _log_index_reachability(uv_default_index_url)
     log(INFO, "  Starting uv sync for application dependencies.")
 
     installed_packages: set[str] = set()
@@ -175,14 +172,14 @@ def install_app_dependencies(
         raise RuntimeError(f"uv sync failed: {sync_error}")
 
     if installed_packages:
-        log(INFO, "Installed: [%s]", ", ".join(sorted(installed_packages)))
+        log(INFO, "  Installed: [%s]", ", ".join(sorted(installed_packages)))
     else:
-        log(INFO, "No additional application dependencies needed installation.")
+        log(INFO, "  No additional application dependencies needed installation.")
 
     _activate_runtime_env(runtime_env_dir)
     if run_id is not None:
         _register_runtime_env_cleanup(runtime_env_dir)
-    log(INFO, "App dependencies installed successfully via uv sync.")
+    log(INFO, "  App dependencies installed successfully via uv sync.")
     return runtime_env_dir
 
 
@@ -204,46 +201,6 @@ def _get_uv_index_url() -> tuple[str, str]:
     if uv_default_index := os.getenv(_UV_DEFAULT_INDEX, "").strip():
         return _UV_DEFAULT_INDEX, uv_default_index
     return _DEFAULT_UV_INDEX, _DEFAULT_UV_INDEX_URL
-
-
-def _log_index_reachability(index_url: str) -> None:
-    """Log whether the configured package index responds before running uv sync."""
-    request = Request(
-        index_url,
-        headers={"User-Agent": "flwr-runtime-dependency-installer"},
-        method="HEAD",
-    )
-    try:
-        with urlopen(  # nosec B310
-            request,
-            timeout=_INDEX_REACHABILITY_TIMEOUT_SECONDS,
-        ) as response:
-            _ = response
-            log(
-                INFO,
-                "  Checking reachability of uv package index: OK",
-            )
-    except HTTPError as exc:
-        if exc.code < 500:
-            log(
-                INFO,
-                "  Checking reachability of uv package index: OK (HTTP %s)",
-                exc.code,
-            )
-        else:
-            log(
-                WARNING,
-                "  Checking reachability of uv package index: ERROR (HTTP %s). "
-                "Attempting uv sync anyway.",
-                exc.code,
-            )
-    except (OSError, ValueError) as exc:
-        log(
-            WARNING,
-            "  Checking reachability of uv package index: ERROR (%s). "
-            "Attempting uv sync anyway.",
-            exc,
-        )
 
 
 def _redact_url(url: str) -> str:

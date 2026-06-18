@@ -160,7 +160,6 @@ def test_install_app_dependencies_uses_resolved_index_url(tmp_path: Path) -> Non
             "_get_project_dependencies",
             return_value=["numpy>=1.26.0"],
         ),
-        patch.object(dependency_installer, "_log_index_reachability") as log_index,
         patch.object(
             dependency_installer, "_run_cmd", side_effect=_fake_run_cmd
         ) as run_cmd,
@@ -174,7 +173,6 @@ def test_install_app_dependencies_uses_resolved_index_url(tmp_path: Path) -> Non
 
     resolve_index.assert_called_once_with(index_context)
     ensure_uv.assert_called_once_with(resolved_index_url)
-    log_index.assert_not_called()
     sync_cmd = run_cmd.call_args.args[0]
     sync_env = run_cmd.call_args.kwargs["env"]
     assert sync_cmd == [
@@ -232,7 +230,6 @@ def test_same_host_superlink_and_supernode_share_run_scoped_env(tmp_path: Path) 
             "_get_project_dependencies",
             return_value=["numpy>=1.26.0"],
         ),
-        patch.object(dependency_installer, "_log_index_reachability"),
         patch.object(
             dependency_installer, "_run_cmd", side_effect=fake_run_cmd_with_delay
         ),
