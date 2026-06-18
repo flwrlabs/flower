@@ -187,7 +187,6 @@ def run_serverapp_th(
     grid: Grid,
     app_dir: str,
     f_stop: threading.Event,
-    has_exception: threading.Event,
     exception_queue: Queue[BaseException],
     enable_tf_gpu_growth: bool,
     ctx_queue: Queue[Context],
@@ -197,7 +196,6 @@ def run_serverapp_th(
     def server_th_with_start_checks(
         tf_gpu_growth: bool,
         stop_event: threading.Event,
-        exception_event: threading.Event,
         _exception_queue: Queue[BaseException],
         _grid: Grid,
         _server_app_dir: str,
@@ -225,8 +223,6 @@ def run_serverapp_th(
             _ctx_queue.put(updated_context)
         except Exception as ex:  # pylint: disable=broad-exception-caught
             _exception_queue.put(ex)
-            exception_event.set()
-            raise
         finally:
             log(DEBUG, "ServerApp finished running.")
             # Upon completion, trigger stop event if one was passed
@@ -239,7 +235,6 @@ def run_serverapp_th(
         args=(
             enable_tf_gpu_growth,
             f_stop,
-            has_exception,
             exception_queue,
             grid,
             app_dir,
@@ -276,8 +271,6 @@ def _main_loop(
     )
 
     f_stop = threading.Event()
-    # A Threading event to indicate if an exception was raised in the ServerApp thread
-    server_app_thread_has_exception = threading.Event()
     server_app_exception_queue: Queue[BaseException] = Queue()
     serverapp_th = None
     success = True
@@ -315,7 +308,6 @@ def _main_loop(
             grid=grid,
             app_dir=app_dir,
             f_stop=f_stop,
-            has_exception=server_app_thread_has_exception,
             exception_queue=server_app_exception_queue,
             enable_tf_gpu_growth=enable_tf_gpu_growth,
             ctx_queue=output_context_queue,
@@ -355,7 +347,12 @@ def _main_loop(
     finally:
         # Trigger stop event
         f_stop.set()
-        if server_app_thread_has_exception.is_set():
+        thread_ex: BaseException | None = None
+        try:
+            thread_ex = server_app_exception_queue.get_nowait()
+        except Empty:
+            pass
+        if thread_ex is not None:
             success = False
         event(
             exit_event,
@@ -364,13 +361,9 @@ def _main_loop(
                 "success": success,
             },
         )
-        if serverapp_th and server_app_thread_has_exception.is_set():
+        if serverapp_th and thread_ex is not None:
             # Don't mask an exception already being propagated from the main thread.
             if sys.exc_info()[0] is None:
-                try:
-                    thread_ex = server_app_exception_queue.get_nowait()
-                except Empty as exc:
-                    raise RuntimeError("Exception in ServerApp thread") from exc
                 raise thread_ex.with_traceback(thread_ex.__traceback__)
 
     log(DEBUG, "Stopping Simulation Runtime now.")
