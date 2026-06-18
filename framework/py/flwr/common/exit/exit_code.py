@@ -197,8 +197,8 @@ To use the REST API, install `flwr` with the `rest` extra:
         "administrator."
     ),
     ExitCode.COMMON_APP_IMPORT_ERROR: (
-        "A FlowerApp failed to import a required module. Add "
-        "the missing package to the app's `pyproject.toml` dependencies, then "
+        "A Flower App failed to import a required module. Ensure "
+        "the missing package is in the app's `pyproject.toml` dependencies, then "
         "install the dependencies manually unless automatic runtime dependency "
         "installation is enabled."
     ),
