@@ -36,6 +36,8 @@ from flwr.supercore.utils import get_flwr_home
 _RUNTIME_ENV_DIR = "runtime-envs"
 _FLWR_UV_DEFAULT_INDEX = "FLWR_UV_DEFAULT_INDEX"
 _UV_DEFAULT_INDEX = "UV_DEFAULT_INDEX"
+_DEFAULT_UV_INDEX = "default"
+_DEFAULT_UV_INDEX_URL = "https://pypi.org/simple"
 _INDEX_REACHABILITY_TIMEOUT_SECONDS = 10.0
 RuntimeDependencyIndexContext = dict[str, str | int | None]
 
@@ -141,31 +143,24 @@ def install_app_dependencies(
     if dependency_index_url is not None:
         sync_cmd += ["--index-url", dependency_index_url]
     if uv_default_index_name == _FLWR_UV_DEFAULT_INDEX:
-        assert uv_default_index_url is not None
         sync_cmd += ["--default-index", uv_default_index_url]
 
     sync_env = os.environ.copy()
     sync_env["UV_PROJECT_ENVIRONMENT"] = str(runtime_env_dir)
     log(DEBUG, "Using UV_PROJECT_ENVIRONMENT=%s", sync_env["UV_PROJECT_ENVIRONMENT"])
-    if uv_default_index_url is not None:
+    if uv_default_index_name == _DEFAULT_UV_INDEX:
         log(
             INFO,
-            "  Using uv default package index from %s: %s",
-            uv_default_index_name,
+            "  Using uv package index (default): %s",
             _redact_url(uv_default_index_url),
         )
-        _log_index_reachability(uv_default_index_url)
     else:
         log(
             INFO,
-            "  Using uv default package index from uv configuration",
+            "  Using uv package index from: %s",
+            _redact_url(uv_default_index_url),
         )
-        log(
-            INFO,
-            "  Checking reachability of uv package index: SKIPPED "
-            "(index URL not set in %s)",
-            _UV_DEFAULT_INDEX,
-        )
+    _log_index_reachability(uv_default_index_url)
     log(INFO, "  Starting uv sync for application dependencies.")
 
     installed_packages: set[str] = set()
@@ -202,13 +197,13 @@ def _get_project_dependencies(project_dir: Path) -> list[str]:
     return [str(dep) for dep in deps]
 
 
-def _get_uv_index_url() -> tuple[str | None, str | None]:
+def _get_uv_index_url() -> tuple[str, str]:
     """Return the uv default index URL Flower can infer."""
     if flwr_uv_default_index := os.getenv(_FLWR_UV_DEFAULT_INDEX, "").strip():
         return _FLWR_UV_DEFAULT_INDEX, flwr_uv_default_index
     if uv_default_index := os.getenv(_UV_DEFAULT_INDEX, "").strip():
         return _UV_DEFAULT_INDEX, uv_default_index
-    return None, None
+    return _DEFAULT_UV_INDEX, _DEFAULT_UV_INDEX_URL
 
 
 def _log_index_reachability(index_url: str) -> None:

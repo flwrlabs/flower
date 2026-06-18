@@ -110,13 +110,16 @@ def test_create_runtime_env_dir_uses_run_id_when_provided(tmp_path: Path) -> Non
             },
             ("FLWR_UV_DEFAULT_INDEX", "https://flower.example/simple"),
         ),
-        ({"FLWR_UV_DEFAULT_INDEX": "", "UV_DEFAULT_INDEX": ""}, (None, None)),
-        ({}, (None, None)),
+        (
+            {"FLWR_UV_DEFAULT_INDEX": "", "UV_DEFAULT_INDEX": ""},
+            ("default", "https://pypi.org/simple"),
+        ),
+        ({}, ("default", "https://pypi.org/simple")),
     ],
 )
 def test_get_uv_index_url(
     env: dict[str, str],
-    expected: tuple[str | None, str | None],
+    expected: tuple[str, str],
 ) -> None:
     """Ensure uv index URL resolution handles env var precedence."""
     with patch.dict(os.environ, env, clear=True):
@@ -171,7 +174,7 @@ def test_install_app_dependencies_uses_resolved_index_url(tmp_path: Path) -> Non
 
     resolve_index.assert_called_once_with(index_context)
     ensure_uv.assert_called_once_with(resolved_index_url)
-    log_index.assert_not_called()
+    log_index.assert_called_once_with("https://pypi.org/simple")
     sync_cmd = run_cmd.call_args.args[0]
     sync_env = run_cmd.call_args.kwargs["env"]
     assert sync_cmd == [
