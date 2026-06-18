@@ -325,6 +325,7 @@ def verify_evidence(
                 details=details,
                 capacity_wait=capacity_wait,
                 expected_active_pod_budget=required_active_pod_budget,
+                expected_seed_run_count=required_seed_run_count,
                 failures=failures,
             )
 
@@ -349,6 +350,7 @@ def _verify_cardinality_evidence(
     details: Mapping[str, object],
     capacity_wait: Mapping[str, object],
     expected_active_pod_budget: int,
+    expected_seed_run_count: int,
     failures: list[str],
 ) -> None:
     cardinality = _mapping(details.get("cardinality"))
@@ -356,9 +358,12 @@ def _verify_cardinality_evidence(
     launched_after_capacity_opened = _sequence(
         cardinality.get("launched_after_capacity_opened")
     )
+    expected_launched_after_capacity_opened = max(
+        1, expected_seed_run_count - expected_active_pod_budget
+    )
     _expect(
         cardinality.get("observed") is True,
-        "budget-2/three-task cardinality was not observed",
+        "TaskExecutor capacity cardinality was not observed",
         failures,
     )
     _expect(
@@ -367,8 +372,10 @@ def _verify_cardinality_evidence(
         failures,
     )
     _expect(
-        bool(launched_after_capacity_opened),
-        "cardinality proof did not record a new Pod after capacity opened",
+        len(launched_after_capacity_opened)
+        >= expected_launched_after_capacity_opened,
+        "cardinality proof did not record "
+        f"{expected_launched_after_capacity_opened} new Pod(s) after capacity opened",
         failures,
     )
     wait_text = _command_text(_sequence(capacity_wait.get("commands"))).lower()

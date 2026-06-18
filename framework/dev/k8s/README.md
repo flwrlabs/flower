@@ -11,9 +11,9 @@ It has three common modes:
 - the `--capacity-cleanup-proof` mode, which uses active Pod budget `1`, seeds
   two tasks, observes SuperExec waiting for capacity, and verifies completed
   TaskExecutor Pod/Secret cleanup before broad namespace cleanup; and
-- the `--demo` preset, which uses active Pod budget `2`, seeds three tasks,
+- the `--demo` preset, which uses active Pod budget `4`, seeds eight tasks,
   keeps probe ServerApps active for inspection, leaves resources in place, and
-  proves the budget-2/three-task cardinality case.
+  proves the capacity cardinality case.
 
 ## Prerequisites
 
@@ -60,7 +60,7 @@ python framework/dev/k8s/verify_evidence.py "${output_dir}" \
   --expected-result local-k8s-capacity-cleanup-proof
 ```
 
-To run the demo-friendly budget-2/three-task cardinality proof:
+To run the demo-friendly budget-4/eight-task cardinality proof:
 
 ```bash
 output_dir=/private/tmp/f7e-demo-cardinality-proof-$(date +%Y%m%d-%H%M%S)
@@ -75,8 +75,8 @@ the saved bundle with the explicit demo expectations:
 ```bash
 python framework/dev/k8s/verify_evidence.py "${output_dir}" \
   --expected-result local-k8s-capacity-cleanup-proof \
-  --expected-active-pod-budget 2 \
-  --expected-seed-run-count 3 \
+  --expected-active-pod-budget 4 \
+  --expected-seed-run-count 8 \
   --no-require-cleanup
 ```
 
@@ -121,9 +121,9 @@ python framework/dev/k8s/verify_evidence.py "${output_dir}" \
 | Capacity-proof seeded runs | `2` |
 | Capacity-proof active Pod budget | `1` |
 | Capacity-proof probe hold | `5.0` seconds |
-| Demo seeded runs | `3` |
-| Demo active Pod budget | `2` |
-| Demo probe hold | `30` seconds |
+| Demo seeded runs | `8` |
+| Demo active Pod budget | `4` |
+| Demo probe hold | `45` seconds |
 | ServerApp marker | `K8s launch probe ServerApp ran` |
 
 ## Output
@@ -284,17 +284,16 @@ For `--capacity-cleanup-proof`, additionally confirm:
 
 For `--demo`, additionally confirm:
 
-1. `objects/executor-config.yaml` sets `active-pod-budget: 2`.
-2. `summary.json` has `expected_seed_run_count: 3`,
-   `active_pod_budget: 2`, and `cardinality.observed: true`.
-3. `summary.json` lists two `cardinality.first_active_pods`, proving the
-   budget was full before the third launch.
-4. `summary.json` lists `cardinality.launched_after_capacity_opened`, proving a
-   waiting TaskExecutor launched after one slot opened.
+1. `objects/executor-config.yaml` sets `active-pod-budget: 4`.
+2. `summary.json` has `expected_seed_run_count: 8`,
+   `active_pod_budget: 4`, and `cardinality.observed: true`.
+3. `summary.json` lists four `cardinality.first_active_pods`, proving the
+   budget was full before additional launches.
+4. `summary.json` lists four `cardinality.launched_after_capacity_opened`
+   entries, proving waiting TaskExecutors launched after capacity opened.
 5. `diagnostics/superexec-logs.txt` includes the capacity wait marker with
-   `2 active Pods` and `budget 2`.
-6. `proof-checklist.json` does not list budget-2/three-task cardinality as
-   out of scope.
+   `4 active Pods` and `budget 4`.
+6. `proof-checklist.json` does not list capacity cardinality as out of scope.
 
 ## What Is Tested
 

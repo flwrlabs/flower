@@ -929,6 +929,7 @@ def test_run_capacity_cleanup_proof_records_budget_two_cardinality(
         ],
         "removed_pods": ["flwr-taskexecutor-123-abc"],
         "launched_after_capacity_opened": ["flwr-taskexecutor-789-ghi"],
+        "expected_launched_after_capacity_opened": 1,
         "reason": "observed",
     }
 
@@ -945,9 +946,63 @@ def test_run_capacity_cleanup_proof_records_budget_two_cardinality(
     assert not any("cardinality" in item for item in checklist["out_of_scope"])
     assert any("active concurrently" in claim["claim"] for claim in checklist["claims"])
     assert any(
-        "waiting third TaskExecutor Pod launched" in claim["claim"]
+        "waiting TaskExecutor Pods launched" in claim["claim"]
         for claim in checklist["claims"]
     )
+
+
+def test_run_capacity_cleanup_proof_waits_for_all_seeded_large_cardinality(
+    tmp_path: Path,
+) -> None:
+    """Test a 4/8 proof polls until all seeded TaskExecutor Pods are observed."""
+    seed_run_ids = [101, 202, 303, 404, 505, 606, 707, 808]
+    pod_names = [_pod_name_for_run_id(run_id) for run_id in seed_run_ids]
+    runner = _CardinalityRunner(
+        active_pod_budget=4,
+        seed_run_ids=seed_run_ids,
+        pod_waves=[
+            pod_names[:4],
+            pod_names[1:5],
+            pod_names[1:6],
+            pod_names[1:7],
+            pod_names[1:8],
+        ],
+        final_pod_names=pod_names[1:],
+    )
+    output_dir = tmp_path / "large-cardinality-real"
+    profile = harness_module.generic_k3d_profile()
+    profile.active_pod_budget = 4
+    profile.seed_run_count = 8
+    profile.probe_hold_seconds = 30.0
+
+    summary = harness_module.run_local_k8s_launch_path(
+        output_dir,
+        profile=profile,
+        runner=runner,
+        execute=True,
+        apply_manifests=True,
+        import_images=True,
+        capacity_cleanup_proof=True,
+    )
+
+    assert summary.status == "passed"
+    assert summary.details["seed_run_ids"] == seed_run_ids
+    assert summary.details["cardinality"]["first_active_pods"] == pod_names[:4]
+    assert summary.details["cardinality"]["launched_after_capacity_opened"] == (
+        pod_names[4:]
+    )
+    assert (
+        summary.details["cardinality"]["expected_launched_after_capacity_opened"] == 4
+    )
+    assert summary.details["cardinality"]["post_capacity_pods"] == pod_names[1:]
+    assert summary.details["cleanup_observed"]["removed_pods"] == [pod_names[0]]
+    assert [pod["phase"] for pod in summary.details["pods"]] == ["Succeeded"] * 7
+
+    lineage = json.loads((output_dir / "task-lineage.json").read_text())
+    assert lineage["seeded_run_ids"] == seed_run_ids
+    assert lineage["seeded_task_count"] == 8
+    assert lineage["observed_task_count"] == 8
+    assert [task["pod_name"] for task in lineage["tasks"]] == pod_names
 
 
 def test_run_local_k8s_launch_path_polls_until_taskexecutor_pod_appears(
@@ -1104,6 +1159,60 @@ def test_verify_capacity_cleanup_evidence_accepts_cardinality_bundle(
     assert "Verification: PASSED" in report
     assert "Active Pod budget: 2" in report
     assert "Cardinality observed: True" in report
+
+
+def test_verify_capacity_cleanup_evidence_accepts_large_cardinality_bundle(
+    tmp_path: Path,
+) -> None:
+    """Test the verifier accepts budget-4/eight-task cardinality evidence."""
+    output_dir = tmp_path / "evidence"
+    _write_verifier_evidence(
+        output_dir,
+        result="local-k8s-capacity-cleanup-proof",
+        active_pod_budget=4,
+        seed_run_ids=[101, 202, 303, 404, 505, 606, 707, 808],
+    )
+
+    failures, report = verifier_module.verify_evidence(
+        output_dir,
+        expected_result="local-k8s-capacity-cleanup-proof",
+        expected_active_pod_budget=4,
+        expected_seed_run_count=8,
+    )
+
+    assert failures == []
+    assert "Verification: PASSED" in report
+    assert "Active Pod budget: 4" in report
+    assert "Task lineage records: 8" in report
+
+
+def test_verify_capacity_cleanup_evidence_rejects_incomplete_cardinality_count(
+    tmp_path: Path,
+) -> None:
+    """Test larger cardinality verification counts post-capacity launches."""
+    output_dir = tmp_path / "evidence"
+    _write_verifier_evidence(
+        output_dir,
+        result="local-k8s-capacity-cleanup-proof",
+        active_pod_budget=4,
+        seed_run_ids=[101, 202, 303, 404, 505, 606, 707, 808],
+    )
+    summary_path = output_dir / "summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["details"]["cardinality"]["launched_after_capacity_opened"] = [
+        _pod_name_for_run_id(505)
+    ]
+    summary_path.write_text(json.dumps(summary), encoding="utf-8")
+
+    failures, report = verifier_module.verify_evidence(
+        output_dir,
+        expected_result="local-k8s-capacity-cleanup-proof",
+        expected_active_pod_budget=4,
+        expected_seed_run_count=8,
+    )
+
+    assert any("4 new Pod(s) after capacity opened" in failure for failure in failures)
+    assert "Verification: FAILED" in report
 
 
 def test_verify_capacity_cleanup_evidence_rejects_single_task_record(
@@ -1373,13 +1482,28 @@ class _CapacityCleanupRunner:
 
 
 class _CardinalityRunner:
-    """Fake command runner for execute-mode budget-2 cardinality evidence."""
+    """Fake command runner for execute-mode cardinality evidence."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        active_pod_budget: int = 2,
+        seed_run_ids: list[int] | None = None,
+        pod_waves: list[list[str]] | None = None,
+        final_pod_names: list[str] | None = None,
+    ) -> None:
         self.commands: list[list[str]] = []
         self.pod_get_count = 0
         self.secret_get_count = 0
         self.superexec_log_count = 0
+        self.active_pod_budget = active_pod_budget
+        self.seed_run_ids = seed_run_ids or [123, 456, 789]
+        self.pod_names = [_pod_name_for_run_id(run_id) for run_id in self.seed_run_ids]
+        self.final_pod_names = final_pod_names or self.pod_names[1:]
+        self.pod_waves = pod_waves or [
+            self.pod_names[:active_pod_budget],
+            self.final_pod_names,
+        ]
 
     def run(self, args: list[str]) -> Any:
         """Return realistic command output for the cardinality proof."""
@@ -1401,53 +1525,34 @@ class _CardinalityRunner:
             return self._result(args)
         if "get" in args and "pods" in args and "-o" in args and "json" in args:
             self.pod_get_count += 1
-            if self.pod_get_count == 1:
-                return self._result(
-                    args,
-                    stdout=json.dumps(
-                        _pod_list_items(
-                            _taskexecutor_pod("flwr-taskexecutor-123-abc", "Running"),
-                            _taskexecutor_pod("flwr-taskexecutor-456-def", "Running"),
-                        )
-                    ),
-                )
-            if self.pod_get_count == 2:
-                return self._result(
-                    args,
-                    stdout=json.dumps(
-                        _pod_list_items(
-                            _taskexecutor_pod("flwr-taskexecutor-456-def", "Running"),
-                            _taskexecutor_pod("flwr-taskexecutor-789-ghi", "Running"),
-                        )
-                    ),
-                )
+            if self.pod_get_count <= len(self.pod_waves):
+                pod_names = self.pod_waves[self.pod_get_count - 1]
+                phase = "Running"
+            else:
+                pod_names = self.final_pod_names
+                phase = "Succeeded"
             return self._result(
                 args,
                 stdout=json.dumps(
                     _pod_list_items(
-                        _taskexecutor_pod("flwr-taskexecutor-456-def", "Succeeded"),
-                        _taskexecutor_pod("flwr-taskexecutor-789-ghi", "Succeeded"),
+                        *[
+                            _taskexecutor_pod(pod_name, phase)
+                            for pod_name in pod_names
+                        ]
                     )
                 ),
             )
         if "get" in args and "secrets" in args and "-o" in args and "json" in args:
             self.secret_get_count += 1
             if self.secret_get_count == 1:
-                return self._result(
-                    args,
-                    stdout=json.dumps(
-                        _secret_list_for_names(
-                            "flwr-taskexecutor-123-abc-appio",
-                            "flwr-taskexecutor-456-def-appio",
-                        )
-                    ),
-                )
+                secret_names = self.pod_names[: self.active_pod_budget]
+            else:
+                secret_names = self.final_pod_names
             return self._result(
                 args,
                 stdout=json.dumps(
                     _secret_list_for_names(
-                        "flwr-taskexecutor-456-def-appio",
-                        "flwr-taskexecutor-789-ghi-appio",
+                        *[f"{pod_name}-appio" for pod_name in secret_names]
                     )
                 ),
             )
@@ -1458,14 +1563,17 @@ class _CardinalityRunner:
         if "get" in args and "namespace" in args and "-o" in args and "json" in args:
             return self._result(args, stdout=json.dumps(_namespace()))
         if "logs" in args and "job/flower-local-k8s-seed-run" in args:
+            seed_log_lines = [
+                f"K8s launch seed created run_id={run_id}\n"
+                for run_id in self.seed_run_ids
+            ]
+            seed_log_lines.append(
+                "K8s launch seed created run_ids="
+                f"{','.join(str(run_id) for run_id in self.seed_run_ids)}\n"
+            )
             return self._result(
                 args,
-                stdout=(
-                    "K8s launch seed created run_id=123\n"
-                    "K8s launch seed created run_id=456\n"
-                    "K8s launch seed created run_id=789\n"
-                    "K8s launch seed created run_ids=123,456,789\n"
-                ),
+                stdout="".join(seed_log_lines),
             )
         if "logs" in args and "pod/flower-superexec" in args:
             self.superexec_log_count += 1
@@ -1473,19 +1581,19 @@ class _CardinalityRunner:
             if self.superexec_log_count > 1:
                 stdout += (
                     "Waiting for Kubernetes TaskExecutor capacity: "
-                    "2 active Pods, budget 2, selector app.kubernetes.io/name=flower\n"
+                    f"{self.active_pod_budget} active Pods, "
+                    f"budget {self.active_pod_budget}, "
+                    "selector app.kubernetes.io/name=flower\n"
                 )
             return self._result(args, stdout=stdout)
-        if (
-            "logs" in args
-            and (
-                "pod/flwr-taskexecutor-456-def" in args
-                or "pod/flwr-taskexecutor-789-ghi" in args
-            )
-        ):
+        matching_pod_names = [
+            pod_name for pod_name in self.final_pod_names if f"pod/{pod_name}" in args
+        ]
+        if "logs" in args and matching_pod_names:
+            task_id = matching_pod_names[0].split("-")[2]
             return self._result(
                 args,
-                stdout="K8s launch probe ServerApp ran run_id=456\n",
+                stdout=f"K8s launch probe ServerApp ran run_id={task_id}\n",
             )
         return self._result(args)
 
@@ -1713,7 +1821,10 @@ def _write_verifier_evidence(
     first_active_pods = pod_names[: active_pod_budget or 1]
     launched_after_capacity_opened = pod_names[active_pod_budget or 1 :]
     cardinality_observed = (
-        capacity_proof and active_pod_budget == 2 and len(pod_names) >= 3
+        capacity_proof
+        and active_pod_budget is not None
+        and active_pod_budget >= 2
+        and len(pod_names) > active_pod_budget
     )
     summary = {
         "status": "passed",
@@ -1766,6 +1877,9 @@ def _write_verifier_evidence(
                 "seed_run_count": len(seed_run_ids),
                 "first_active_pods": first_active_pods,
                 "launched_after_capacity_opened": launched_after_capacity_opened,
+                "expected_launched_after_capacity_opened": max(
+                    1, len(seed_run_ids) - (active_pod_budget or 1)
+                ),
             },
             "cleanup": {"requested": True, "result": {"returncode": 0}},
         },
@@ -1832,7 +1946,7 @@ def _write_verifier_evidence(
                     []
                     if cardinality_observed
                     else (
-                        ["budget-2/three-task cardinality behavior"]
+                        ["capacity cardinality behavior"]
                         if capacity_proof
                         else ["capacity wait proof"]
                     )

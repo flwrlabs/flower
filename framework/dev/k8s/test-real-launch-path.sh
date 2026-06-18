@@ -72,8 +72,8 @@ Options:
   --probe-hold-seconds SECS Seconds each probe ServerApp should stay active
                             (default: ${probe_hold_seconds})
   --demo                    Demo preset: --capacity-cleanup-proof,
-                            --active-pod-budget 2, --seed-run-count 3,
-                            --probe-hold-seconds 30, and --skip-cleanup
+                            --active-pod-budget 4, --seed-run-count 8,
+                            --probe-hold-seconds 45, and --skip-cleanup
   --platform PLATFORM       Optional docker build platform, for example linux/arm64
   --python-image IMAGE      Optional Python base image passed to the image builder
   --kubernetes-package SPEC Optional Kubernetes package spec passed to the image
@@ -166,9 +166,9 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     --demo)
       capacity_cleanup_proof=true
-      active_pod_budget="2"
-      seed_run_count="3"
-      probe_hold_seconds="30"
+      active_pod_budget="4"
+      seed_run_count="8"
+      probe_hold_seconds="45"
       cleanup=false
       shift
       ;;
