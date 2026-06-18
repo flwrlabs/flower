@@ -224,9 +224,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             # bundled locally and submitted through the regular `flwr run` path.
             components = fab_config["tool"]["flwr"]["app"].get("components", {})
             is_agentapp_bundle = "agentapp" in components
-            run_type = (
-                RunType.AGENT_APP if is_agentapp_bundle else RunType.SERVER_APP
-            )
+            run_type = RunType.AGENT_APP if is_agentapp_bundle else RunType.SERVER_APP
             resolved_federation_config = None
             runtime = RunTime.DEPLOYMENT
             with rpc_error_translator(context, rpc_name):
