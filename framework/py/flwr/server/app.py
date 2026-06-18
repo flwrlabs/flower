@@ -41,6 +41,7 @@ from flwr.common.constant import (
     CONTROL_API_DEFAULT_SERVER_ADDRESS,
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     FLEET_API_REST_DEFAULT_ADDRESS,
+    FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
@@ -586,6 +587,11 @@ def _get_superexec_command(
     return command
 
 
+def _runtime_dependency_install_default() -> bool:
+    """Return default runtime dependency installation setting."""
+    return os.getenv(FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION) != "1"
+
+
 def _load_control_auth_plugins(
     config_path: str | None, verify_tls_cert: bool
 ) -> tuple[ControlAuthnPlugin, ControlAuthzPlugin]:
@@ -862,7 +868,7 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
     )
     add_args_runtime_dependency_install(
         parser,
-        default=True,
+        default=_runtime_dependency_install_default(),
         include_disable_flag=True,
         allow_flag_help=(
             "Deprecated. Runtime dependency installation is enabled by "
