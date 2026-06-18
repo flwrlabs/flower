@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Model task message tests."""
+"""Model JSON message tests."""
 
 
 import json
@@ -25,7 +25,7 @@ from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.supercore.corestate.utils_test import create_task_message
-from flwr.supercore.model_message import ModelRequest, ModelResponse
+from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.typing import JSONObject
 
 
@@ -165,6 +165,23 @@ def test_model_request_accepts_string_input_and_default_stream() -> None:
             },
         ),
         (
+            ModelRequest.from_message,
+            _message_with_payload(
+                {
+                    "model": "gpt-5",
+                    "input": [],
+                    "stream": True,
+                },
+                message_type="train",
+            ),
+            ModelRequest,
+            {
+                "model": "gpt-5",
+                "input": [],
+                "stream": True,
+            },
+        ),
+        (
             ModelResponse.from_message,
             _message_with_payload(
                 {"object": "response", "id": "resp_123"},
@@ -173,6 +190,15 @@ def test_model_request_accepts_string_input_and_default_stream() -> None:
             ),
             ModelResponse,
             {"object": "response", "id": "resp_123"},
+        ),
+        (
+            ModelResponse.from_message,
+            _message_with_payload(
+                {"object": "response"},
+                message_type=MessageType.QUERY,
+            ),
+            ModelResponse,
+            {"object": "response"},
         ),
     ],
 )
@@ -198,15 +224,6 @@ def test_from_message_wraps_plain_message(
                 reply_to_message_id="",
             ),
             "reply_to_message_id",
-        ),
-        (
-            lambda: ModelRequest.from_message(
-                _message_with_payload(
-                    {"model": "gpt-5", "input": [], "stream": True},
-                    message_type="train",
-                )
-            ),
-            "Expected message type",
         ),
         (
             lambda: ModelRequest.from_message(
@@ -262,15 +279,6 @@ def test_from_message_wraps_plain_message(
                 )
             ),
             "malformed",
-        ),
-        (
-            lambda: ModelResponse.from_message(
-                _message_with_payload(
-                    {"object": "response"},
-                    message_type=MessageType.QUERY,
-                )
-            ),
-            "reply_to_message_id",
         ),
     ],
 )
