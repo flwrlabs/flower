@@ -363,11 +363,16 @@ def _main_loop(
                 "success": success,
             },
         )
-        if serverapp_th:
-            if server_app_thread_has_exception.is_set():
-                if not server_app_exception_queue.empty():
-                    raise server_app_exception_queue.get()
-                raise RuntimeError("Exception in ServerApp thread")
+        if serverapp_th and server_app_thread_has_exception.is_set():
+            # Don't mask an exception already being propagated from the main thread.
+            import sys  # pylint: disable=import-outside-toplevel
+
+            if sys.exc_info()[0] is None:
+                try:
+                    thread_ex = server_app_exception_queue.get_nowait()
+                except Empty as exc:
+                    raise RuntimeError("Exception in ServerApp thread") from exc
+                raise thread_ex
 
     log(DEBUG, "Stopping Simulation Runtime now.")
     return SimulationRunResult(context=updated_context, metrics=metrics)
