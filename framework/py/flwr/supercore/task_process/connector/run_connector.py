@@ -70,9 +70,29 @@ def run_connector(  # pylint: disable=too-many-locals
     details = "Connector task failed with unknown error."
     exit_code = ExitCode.SUCCESS
 
+    def on_exit() -> None:
+        log(DEBUG, "[flwr-connector] Will push Connector task output")
+
+        retry_invoker.max_tries = 1
+
+        pushoutput_req = PushTaskOutputRequest(
+            sub_status=sub_status,
+            details=details,
+        )
+        try:
+            stub.PushTaskOutput(pushoutput_req)
+        except grpc.RpcError as err:
+            log(ERROR, "Failed to push task output: %s", str(err))
+
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
+        channel.close()
+
     register_signal_handlers(
         event_type=EventType.FLWR_CONNECTOR_RUN_LEAVE,
         exit_message="Task stopped by user.",
+        exit_handlers=[on_exit],
     )
 
     try:
@@ -100,25 +120,6 @@ def run_connector(  # pylint: disable=too-many-locals
         details = f"Connector task failed with exception: {str(ex)}"
 
         exit_code = ExitCode.TASK_PROC_EXCEPTION
-
-    finally:
-        log(DEBUG, "[flwr-connector] Will push Connector task output")
-
-        retry_invoker.max_tries = 1
-
-        pushoutput_req = PushTaskOutputRequest(
-            sub_status=sub_status,
-            details=details,
-        )
-        try:
-            stub.PushTaskOutput(pushoutput_req)
-        except grpc.RpcError as err:
-            log(ERROR, "Failed to push task output: %s", str(err))
-
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-
-        channel.close()
 
     flwr_exit(exit_code, event_type=EventType.FLWR_CONNECTOR_RUN_LEAVE)
 
