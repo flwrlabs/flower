@@ -107,6 +107,165 @@ python framework/dev/k8s/verify_evidence.py "${output_dir}" \
   --no-require-cleanup
 ```
 
+## Release Testing Toolkit
+
+Use `harnessctl.sh` when you want to run the local harness one step at a time
+for release testing, demos, or manual failure scenarios. It reuses the same
+default k3d cluster, namespace, images, manifest renderers, probe app, and
+Kubernetes executor config as the all-in-one wrapper.
+
+Build or reuse local images first:
+
+```bash
+./framework/dev/k8s/build-local-runtime-images.sh
+```
+
+This builds the local SuperLink and SuperExec images used by the harness.
+Set `IMPORT_IMAGES=false` only when the selected cluster can already pull the
+selected images.
+
+Start SuperLink:
+
+```bash
+./framework/dev/k8s/harnessctl.sh start-superlink
+```
+
+This creates the default k3d cluster if needed, imports the SuperLink image,
+applies the namespace, Service, and Pod, then waits for the Pod to be ready.
+
+Start SuperExec with the Kubernetes executor:
+
+```bash
+./framework/dev/k8s/harnessctl.sh start-superexec --active-pod-budget 2
+```
+
+This applies the SuperExec ServiceAccount/RBAC, executor ConfigMap, and Pod,
+then waits for SuperExec readiness. The active Pod budget is optional; omit it
+to use the executor defaults.
+
+Seed held probe ServerApp tasks:
+
+```bash
+./framework/dev/k8s/harnessctl.sh seed --count 3 --hold-seconds 45
+```
+
+This creates three deterministic ServerApp runs through the local Control API.
+Each probe TaskExecutor stays active for roughly 45 seconds so Pod scheduling,
+capacity waiting, and cleanup can be observed.
+
+Watch all Pods:
+
+```bash
+./framework/dev/k8s/harnessctl.sh watch-pods
+```
+
+This opens a live Pod view for the harness namespace. On systems without
+`watch`, the wrapper falls back to a one-second shell loop.
+
+Watch only TaskExecutors:
+
+```bash
+./framework/dev/k8s/harnessctl.sh watch-taskexecutors
+```
+
+This shows only TaskExecutor Pods for the current harness run, including
+resource-pool, task-id, and launch-attempt labels.
+
+Inspect SuperExec logs:
+
+```bash
+./framework/dev/k8s/harnessctl.sh logs-superexec --tail=200
+```
+
+This prints the current SuperExec Pod logs. Add `-f` to follow.
+
+Inspect TaskExecutor logs:
+
+```bash
+./framework/dev/k8s/harnessctl.sh logs-taskexecutors --tail=200 --prefix
+```
+
+This prints logs for TaskExecutor Pods selected by the harness labels. Add `-f`
+to follow active Pods.
+
+Stop currently observed TaskExecutors:
+
+```bash
+./framework/dev/k8s/harnessctl.sh stop-taskexecutors --count 1
+```
+
+This deletes one selected TaskExecutor Pod for the active harness run. The
+wrapper chooses Pods in creation-time order.
+
+Kill SuperExec:
+
+```bash
+./framework/dev/k8s/harnessctl.sh kill-superexec
+```
+
+This deletes the SuperExec Kubernetes Pod. It does not send a signal inside the
+container.
+
+Clean up the local namespace:
+
+```bash
+./framework/dev/k8s/harnessctl.sh cleanup
+```
+
+This deletes the harness namespace and waits for Kubernetes cleanup to finish.
+
+Minimal happy path:
+
+```bash
+./framework/dev/k8s/build-local-runtime-images.sh
+./framework/dev/k8s/harnessctl.sh start-superlink
+./framework/dev/k8s/harnessctl.sh start-superexec --active-pod-budget 2
+./framework/dev/k8s/harnessctl.sh seed --count 3 --hold-seconds 45
+./framework/dev/k8s/harnessctl.sh watch-taskexecutors
+./framework/dev/k8s/harnessctl.sh logs-superexec --tail=200
+./framework/dev/k8s/harnessctl.sh logs-taskexecutors --tail=200 --prefix
+./framework/dev/k8s/harnessctl.sh stop-taskexecutors --count 1
+./framework/dev/k8s/harnessctl.sh kill-superexec
+./framework/dev/k8s/harnessctl.sh cleanup
+```
+
+Crash-task scenario:
+
+```bash
+./framework/dev/k8s/harnessctl.sh start-superlink
+./framework/dev/k8s/harnessctl.sh start-superexec
+./framework/dev/k8s/harnessctl.sh seed --count 2 --crash
+./framework/dev/k8s/harnessctl.sh watch-taskexecutors
+./framework/dev/k8s/harnessctl.sh logs-taskexecutors --tail=200 --prefix
+./framework/dev/k8s/harnessctl.sh cleanup
+```
+
+The crash scenario fails inside the probe ServerApp running in TaskExecutor
+Pods. It is not a SuperExec crash test.
+
+Environment overrides:
+
+```bash
+CLUSTER_NAME=flower-release-k8s \
+NAMESPACE=flower-release-k8s \
+IMAGE_TAG=dev \
+./framework/dev/k8s/harnessctl.sh start-superlink
+
+CLUSTER_NAME=flower-release-k8s \
+NAMESPACE=flower-release-k8s \
+IMAGE_TAG=dev \
+./framework/dev/k8s/harnessctl.sh start-superexec --active-pod-budget 4
+```
+
+The most useful overrides are `CLUSTER_NAME`, `KUBECTL_CONTEXT`, `NAMESPACE`,
+`IMAGE_TAG`, `SUPERLINK_IMAGE`, `SUPEREXEC_IMAGE`, `TASKEXECUTOR_IMAGE`,
+`ACTIVE_POD_BUDGET`, `CREATE_CLUSTER`, `IMPORT_IMAGES`, and `OUTPUT_DIR`.
+
+`kill-superexec-after-claim-before-launch` is not implemented in this slice.
+That scenario needs deterministic SuperExec fault injection after `ClaimTask`
+and before TaskExecutor launch; an external timing-based kill would be too
+racy for this wrapper.
+
 ## Defaults
 
 | Setting | Default |

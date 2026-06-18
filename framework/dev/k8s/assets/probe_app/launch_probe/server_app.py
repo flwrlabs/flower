@@ -20,6 +20,7 @@ import flwr as fl
 
 app = fl.serverapp.ServerApp()
 _PROBE_HOLD_SECONDS_CONFIG_KEY = "local-k8s.probe-hold-seconds"
+_PROBE_CRASH_CONFIG_KEY = "local-k8s.probe-crash"
 
 
 @app.main()
@@ -28,6 +29,12 @@ def main(grid, context):
     run_id = context.run_id
     print(f"K8s launch probe ServerApp starting run_id={run_id}", flush=True)
     print(f"K8s launch probe ServerApp ran run_id={run_id}", flush=True)
+    if context.run_config.get(_PROBE_CRASH_CONFIG_KEY, False):
+        print(
+            f"K8s launch probe ServerApp crashing run_id={run_id}",
+            flush=True,
+        )
+        raise RuntimeError("Intentional local k8s probe crash")
     hold_seconds = context.run_config.get(_PROBE_HOLD_SECONDS_CONFIG_KEY, 0.0)
     if isinstance(hold_seconds, (float, int)) and hold_seconds > 0:
         print(

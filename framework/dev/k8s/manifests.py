@@ -21,7 +21,6 @@ from pathlib import Path
 from string import Template
 
 import yaml
-
 from common import HarnessProfile, _harness_object_labels, _run_object_labels
 
 _THIS_DIR = Path(__file__).resolve().parent
@@ -133,7 +132,7 @@ def render_real_launch_manifests(
 
 
 def render_appio_seed_manifests(
-    profile: HarnessProfile, run_id: str
+    profile: HarnessProfile, run_id: str, *, probe_crash: bool = False
 ) -> list[dict[str, object]]:
     """Render the Control API seed Job that creates one ServerApp task."""
     labels = _run_object_labels(profile, run_id)
@@ -159,10 +158,19 @@ def render_appio_seed_manifests(
     _merge_metadata_labels(seed_job, seed_labels)
     template = _mapping(seed_job["spec"])["template"]
     _merge_template_labels(template, seed_labels)
+    if probe_crash:
+        containers = _mapping(template["spec"])["containers"]
+        seed_container = _mapping(containers[0])
+        args = seed_container["args"]
+        if not isinstance(args, list):
+            raise TypeError("Seed Job container args must be a list")
+        args.append("--probe-crash")
     return manifests
 
 
-def _load_template(name: str, substitutions: Mapping[str, str]) -> list[dict[str, object]]:
+def _load_template(
+    name: str, substitutions: Mapping[str, str]
+) -> list[dict[str, object]]:
     content = (_MANIFEST_DIR / name).read_text(encoding="utf-8")
     rendered = Template(content).substitute(substitutions)
     documents = [document for document in yaml.safe_load_all(rendered) if document]
@@ -178,7 +186,9 @@ def _read_seed_assets() -> dict[str, str]:
     }
 
 
-def _merge_metadata_labels(manifest: dict[str, object], labels: Mapping[str, str]) -> None:
+def _merge_metadata_labels(
+    manifest: dict[str, object], labels: Mapping[str, str]
+) -> None:
     metadata = _mapping(manifest.setdefault("metadata", {}))
     existing = _mapping(metadata.setdefault("labels", {}))
     existing.update(labels)

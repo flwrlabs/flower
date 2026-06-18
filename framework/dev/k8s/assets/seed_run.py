@@ -29,6 +29,7 @@ from flwr.supercore.fab import Fab
 
 _PROBE_APP_DIR = Path("/opt/flower-local-k8s/probe_app")
 _PROBE_HOLD_SECONDS_CONFIG_KEY = "local-k8s.probe-hold-seconds"
+_PROBE_CRASH_CONFIG_KEY = "local-k8s.probe-crash"
 
 
 def main() -> None:
@@ -37,6 +38,7 @@ def main() -> None:
     parser.add_argument("--control-api-address", required=True)
     parser.add_argument("--run-count", type=int, default=1)
     parser.add_argument("--probe-hold-seconds", type=float, default=0.0)
+    parser.add_argument("--probe-crash", action="store_true")
     args = parser.parse_args()
     if args.run_count < 1:
         raise ValueError("--run-count must be at least 1")
@@ -51,6 +53,8 @@ def main() -> None:
         override_config[_PROBE_HOLD_SECONDS_CONFIG_KEY] = scalar_to_proto(
             args.probe_hold_seconds
         )
+    if args.probe_crash:
+        override_config[_PROBE_CRASH_CONFIG_KEY] = scalar_to_proto(True)
     run_ids = []
     for _ in range(args.run_count):
         response = stub.StartRun(
