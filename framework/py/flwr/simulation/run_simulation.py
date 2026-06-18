@@ -372,7 +372,7 @@ def _main_loop(
                     thread_ex = server_app_exception_queue.get_nowait()
                 except Empty as exc:
                     raise RuntimeError("Exception in ServerApp thread") from exc
-                raise thread_ex
+                raise thread_ex.with_traceback(thread_ex.__traceback__)
 
     log(DEBUG, "Stopping Simulation Runtime now.")
     return SimulationRunResult(context=updated_context, metrics=metrics)
