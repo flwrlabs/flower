@@ -354,6 +354,8 @@ def _main_loop(
     finally:
         # Trigger stop event
         f_stop.set()
+        if server_app_thread_has_exception.is_set():
+            success = False
         event(
             exit_event,
             event_details={
