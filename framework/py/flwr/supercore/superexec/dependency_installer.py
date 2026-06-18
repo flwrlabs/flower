@@ -224,11 +224,19 @@ def _log_index_reachability(index_url: str) -> None:
                 "  Checking reachability of uv package index: OK",
             )
     except HTTPError as exc:
-        log(
-            INFO,
-            "  Checking reachability of uv package index: ERROR (HTTP %s)",
-            exc.code,
-        )
+        if exc.code < 500:
+            log(
+                INFO,
+                "  Checking reachability of uv package index: OK (HTTP %s)",
+                exc.code,
+            )
+        else:
+            log(
+                WARNING,
+                "  Checking reachability of uv package index: ERROR (HTTP %s). "
+                "Attempting uv sync anyway.",
+                exc.code,
+            )
     except (OSError, ValueError) as exc:
         log(
             WARNING,
