@@ -151,16 +151,16 @@ def install_app_dependencies(
     if uv_default_index_name == _DEFAULT_UV_INDEX:
         log(
             INFO,
-            "  Using uv package index (default): %s",
-            _redact_url(uv_default_index_url),
+            "  uv default index not explicitly set; uv will use its configured default.",
         )
     else:
         log(
             INFO,
-            "  Using uv package index from: %s",
+            "  Using uv package index from %s: %s",
+            uv_default_index_name,
             _redact_url(uv_default_index_url),
         )
-    _log_index_reachability(uv_default_index_url)
+        _log_index_reachability(uv_default_index_url)
     log(INFO, "  Starting uv sync for application dependencies.")
 
     installed_packages: set[str] = set()
