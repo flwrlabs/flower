@@ -84,17 +84,20 @@ def test_parse_superlink_appio_tls_args() -> None:
 
 
 @pytest.mark.parametrize(
-    ("cli_args", "expected"),
+    ("env_value", "cli_args", "expected"),
     [
-        ([], False),
-        (["--allow-runtime-dependency-installation"], True),
+        ("1", [], False),
+        ("1", ["--allow-runtime-dependency-installation"], True),
+        ("0", [], True),
     ],
 )
 def test_parse_superlink_runtime_dependency_install_env_var(
-    cli_args: list[str], expected: bool
+    env_value: str, cli_args: list[str], expected: bool
 ) -> None:
     """SuperLink should allow disabling dependency installation via env var."""
-    with patch.dict("os.environ", {FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION: "1"}):
+    with patch.dict(
+        "os.environ", {FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION: env_value}
+    ):
         args = _parse_args_run_superlink().parse_args(cli_args)
 
     assert args.runtime_dependency_install is expected
