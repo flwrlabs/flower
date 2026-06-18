@@ -251,9 +251,11 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
             return_type=Message,
         )
 
-        # Set the message ID
-        # The deflated message doesn't contain the message_id (its own object_id)
-        message.metadata.__dict__["_message_id"] = object_tree.object_id
+        # Set the message ID from the transport message so replies refer to the
+        # instruction message tracked by the SuperNode.
+        message.metadata.__dict__["_message_id"] = pull_msg_res.messages_list[
+            0
+        ].metadata.message_id
         return message, context, run, fab
     except grpc.RpcError as e:
         log(ERROR, "[PullTaskInput] gRPC error occurred: %s", str(e))
