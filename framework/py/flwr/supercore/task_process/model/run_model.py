@@ -47,9 +47,10 @@ from flwr.supercore.interceptors import (
 from .task import handle_task
 
 
-def run_model(
+def run_model(  # pylint: disable=too-many-locals
     serverappio_api_address: str,
     token: str,
+    insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
 ) -> None:
@@ -61,6 +62,7 @@ def run_model(
     channel, stub, retry_invoker = _create_serverappio_stub(
         serverappio_api_address=serverappio_api_address,
         token=token,
+        insecure=insecure,
         certificates=certificates,
     )
 
@@ -136,12 +138,13 @@ def _create_serverappio_stub(
     *,
     serverappio_api_address: str,
     token: str,
+    insecure: bool,
     certificates: bytes | None,
 ) -> tuple[grpc.Channel, ServerAppIoStub, RetryInvoker]:
     """Create a ServerAppIo stub authenticated as the model task."""
     channel = create_channel(
         server_address=serverappio_api_address,
-        insecure=certificates is None,
+        insecure=insecure,
         root_certificates=certificates,
         interceptors=[
             RuntimeVersionClientInterceptor(component_name="flwr-model"),

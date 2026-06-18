@@ -35,7 +35,6 @@ from parameterized import parameterized
 
 from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
-from flwr.common import now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
@@ -45,7 +44,6 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.common.typing import Fab
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -58,6 +56,8 @@ from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLin
 from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType, TaskType
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.superlink.federation import NoOpFederationManager
@@ -446,7 +446,7 @@ class StateTest(CoreStateTest):
         assert state.activate_task(task_id)
 
         # Execute
-        # The run should be marked as failed after HEARTBEAT_DEFAULT_INTERVAL
+        # The run should be marked as failed after the heartbeat grace period
         # once the primary task is RUNNING.
         patched_dt = now() + timedelta(
             seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
@@ -480,7 +480,9 @@ class StateTest(CoreStateTest):
         assert state.activate_task(primary_task_id)
 
         # Execute: advance time past task claim expiry and trigger cleanup
-        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        patched_dt = now() + timedelta(
+            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
+        )
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
             state.get_run_status({run_id})
@@ -565,7 +567,9 @@ class StateTest(CoreStateTest):
         assert state.activate_task(task_id)
         state.federation_manager.report_run_usage = Mock()  # type: ignore
         # Execute: advance time past token expiry and trigger cleanup
-        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        patched_dt = now() + timedelta(
+            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
+        )
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
             state.get_run_status({run_id})

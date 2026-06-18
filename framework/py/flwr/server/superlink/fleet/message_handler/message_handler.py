@@ -31,7 +31,6 @@ from flwr.common.serde import (
     message_to_proto,
     run_to_proto,
 )
-from flwr.common.typing import InvalidRunStatusException, Run
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -65,6 +64,7 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.utils import check_abort
 from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
+from flwr.supercore.run import InvalidRunStatusException, Run
 
 
 class InvalidHeartbeatIntervalError(Exception):

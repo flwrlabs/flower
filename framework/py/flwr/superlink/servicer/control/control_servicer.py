@@ -28,7 +28,6 @@ import requests
 
 from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
 from flwr.cli.utils import validate_federation_name
-from flwr.common import now
 from flwr.common.config import (
     flatten_dict,
     fuse_dicts,
@@ -58,7 +57,6 @@ from flwr.common.serde import (
     run_to_proto,
     user_config_from_proto,
 )
-from flwr.common.typing import AccountInfo, Fab, Run
 from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -119,6 +117,7 @@ from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
+from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     NOOP_FEDERATION,
     PLATFORM_API_URL,
@@ -126,9 +125,12 @@ from flwr.supercore.constant import (
     RunTime,
     RunType,
 )
+from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
+from flwr.supercore.fab import Fab
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
+from flwr.supercore.run import Run
 from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
@@ -644,13 +646,16 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: ListFederationsRequest, context: grpc.ServicerContext
     ) -> ListFederationsResponse:
         """List all SuperNodes."""
-        log(INFO, "ControlServicer.ListFederations")
+        log(INFO, rpc_name := self.ListFederations.__qualname__)
 
         # Init link state
         state = self.linkstate_factory.state()
 
         # Get federations the account is a member of
-        federations = state.federation_manager.get_federations(_get_flwr_aid(context))
+        with rpc_error_translator(context, rpc_name):
+            federations = state.federation_manager.get_federations(
+                _get_flwr_aid(context)
+            )
 
         return ListFederationsResponse(
             federations=[
@@ -668,7 +673,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: ShowFederationRequest, context: grpc.ServicerContext
     ) -> ShowFederationResponse:
         """Show details of a specific Federation."""
-        log(INFO, "ControlServicer.ShowFederation")
+        log(INFO, rpc_name := self.ShowFederation.__qualname__)
 
         # Init link state
         state = self.linkstate_factory.state()
@@ -676,15 +681,16 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # Ensure flwr_aid is a member of the requested federation
         flwr_aid = _get_flwr_aid(context)
         federation = request.federation_name
-        if not state.federation_manager.has_member(flwr_aid, federation):
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                f"Federation '{federation}' does not exist or you are "
-                "not a member of it.",
-            )
+        with rpc_error_translator(context, rpc_name):
+            if not state.federation_manager.has_member(flwr_aid, federation):
+                context.abort(
+                    grpc.StatusCode.FAILED_PRECONDITION,
+                    f"Federation '{federation}' does not exist or you are "
+                    "not a member of it.",
+                )
 
-        # Fetch federation details
-        details = state.federation_manager.get_details(federation)
+            # Fetch federation details
+            details = state.federation_manager.get_details(federation)
 
         # Build Federation proto object
         federation_proto = Federation(

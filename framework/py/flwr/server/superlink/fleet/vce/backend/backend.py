@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Generic Backend class for Fleet API using the Simulation Engine."""
+"""Generic Backend class for Fleet API using the Simulation Runtime."""
 
 
 from abc import ABC, abstractmethod
@@ -26,7 +26,7 @@ BackendConfig = dict[str, dict[str, ConfigRecordValues]]
 
 
 class Backend(ABC):
-    """Abstract base class for a Simulation Engine Backend."""
+    """Abstract base class for a Simulation Runtime Backend."""
 
     def __init__(self, backend_config: BackendConfig) -> None:
         """Construct a backend."""
