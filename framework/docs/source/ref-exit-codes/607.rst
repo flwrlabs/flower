@@ -13,20 +13,27 @@ because a dependency is missing, or because a module from your app could not be 
  How to Resolve
 ****************
 
-Check the error message for the missing module.
+Check the error message to identify the missing module.
 
-If the import refers to a module or ``.py`` file in your app, make sure the file is
-included in the app and that the import name is correct.
+App module or file
+==================
 
-If the import refers to a missing library dependency, use the guidance below.
+If the missing import refers to a module or ``.py`` file in your app, make sure that:
+
+- the file is included in the app
+- the import name is correct
+
+Library dependency
+==================
+
+If the missing import refers to a library dependency, resolve it based on your
+dependency installation setup.
 
 If automatic runtime dependency installation is enabled, add the missing package to the
 app's ``pyproject.toml`` dependencies and run the app again.
 
-If automatic runtime dependency installation is disabled, ensure the Python environment
-where the ServerApp, ClientApp or AgentApp process runs has all required dependencies
-installed.
-
-Alternatively, enable automatic runtime dependency installation. See
-https://flower.ai/docs/framework/how-to-install-app-dependencies-at-runtime.html for
+If automatic runtime dependency installation is disabled, install the missing package in
+the Python environment where the ServerApp or ClientApp process runs. Alternatively,
+consider enabling automatic runtime dependency installation. See :doc:`Install Flower
+App dependencies at runtime <../how-to-install-app-dependencies-at-runtime>` for
 details.
