@@ -26,8 +26,13 @@ import numpy as np
 import pytest
 
 from flwr.app.typing import ConfigRecordValues, MetricRecordValues
-from flwr.common import NDArray, NDArrays, Parameters
-from flwr.common.parameter import ndarrays_to_parameters, parameters_to_ndarrays
+from flwr.common import (
+    NDArray,
+    NDArrays,
+    Parameters,
+    ndarrays_to_parameters,
+    parameters_to_ndarrays,
+)
 from flwr.common.recorddict_compat import (
     arrayrecord_to_parameters,
     parameters_to_arrayrecord,
