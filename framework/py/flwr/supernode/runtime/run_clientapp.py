@@ -116,92 +116,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
 
-    register_signal_handlers(
-        event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
-        exit_message="Task stopped by user.",
-    )
-
-    try:
-        # Start task heartbeat
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
-        heartbeat_sender.start()
-
-        # Pull Message, Context, Run and FAB from SuperNode
-        message, context, run, fab = pull_task_input(stub)
-
-        try:
-
-            # Install FAB
-            log(DEBUG, "[flwr-clientapp] Start FAB installation.")
-            install_from_fab(fab.content, skip_prompt=True)
-
-            app_path = get_project_dir(run.fab_id, run.fab_version, fab.hash_str)
-            if runtime_dependency_install:
-                log(DEBUG, "[flwr-clientapp] Installing app dependencies.")
-                runtime_env_dir = install_app_dependencies(
-                    app_path,
-                    launch_id=token,
-                    run_id=run.run_id,
-                    index_context={
-                        "component": "clientapp",
-                        "project_dir": str(app_path),
-                        "run_id": run.run_id,
-                        "launch_id": token,
-                        "fab_id": run.fab_id,
-                        "fab_version": run.fab_version,
-                        "fab_hash": fab.hash_str,
-                    },
-                )
-            else:
-                log(
-                    DEBUG,
-                    "[flwr-clientapp] Runtime dependency installation is disabled.",
-                )
-
-            load_client_app_fn = get_load_client_app_fn(
-                default_app_ref="",
-                app_path=None,
-                multi_app=True,
-            )
-
-            # Load ClientApp
-            log(DEBUG, "[flwr-clientapp] Start `ClientApp` Loading.")
-            client_app: ClientApp = load_client_app_fn(
-                run.fab_id, run.fab_version, fab.hash_str
-            )
-
-            # Execute ClientApp
-            reply_message = client_app(message=message, context=context)
-            sub_status = SubStatus.COMPLETED
-            details = ""
-
-        except Exception as ex:  # pylint: disable=broad-exception-caught
-            # Don't update/change NodeState
-
-            e_code = ErrorCode.CLIENT_APP_RAISED_EXCEPTION
-            # Ex fmt: "<class 'ZeroDivisionError'>:<'division by zero'>"
-            reason = str(type(ex)) + ":<'" + str(ex) + "'>"
-            exc_entity = "ClientApp"
-            if isinstance(ex, LoadClientAppError):
-                reason = "An exception was raised when attempting to load `ClientApp`"
-                e_code = ErrorCode.LOAD_CLIENT_APP_EXCEPTION
-
-            log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
-
-            # Create error message
-            reply_message = Message(Error(code=e_code, reason=reason), reply_to=message)
-            sub_status = SubStatus.FAILED
-            details = reason
-
-        finally:
-            # Push reply message to SuperNode
-            if reply_message:
-                push_message(stub, reply_message, context)
-
-    except grpc.RpcError as e:
-        log(ERROR, "gRPC error occurred: %s", str(e))
-        exit_code = ExitCode.CLIENTAPP_COMMUNICATION_ERROR
-    finally:
+    def on_exit() -> None:
         # Set Grpc max retries to 1 to avoid blocking on exit
         retry_invoker.max_tries = 1
 
@@ -220,6 +135,93 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
         cleanup_app_runtime_environment(runtime_env_dir)
 
+    register_signal_handlers(
+        event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
+        exit_message="Task stopped by user.",
+        exit_handlers=[on_exit],
+    )
+
+    try:
+        # Start task heartbeat
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
+        heartbeat_sender.start()
+
+        # Pull Message, Context, Run and FAB from SuperNode
+        message, context, run, fab = pull_task_input(stub)
+
+        # Install FAB
+        log(DEBUG, "[flwr-clientapp] Start FAB installation.")
+        install_from_fab(fab.content, skip_prompt=True)
+
+        app_path = get_project_dir(run.fab_id, run.fab_version, fab.hash_str)
+        if runtime_dependency_install:
+            log(DEBUG, "[flwr-clientapp] Installing app dependencies.")
+            runtime_env_dir = install_app_dependencies(
+                app_path,
+                launch_id=token,
+                run_id=run.run_id,
+                index_context={
+                    "component": "clientapp",
+                    "project_dir": str(app_path),
+                    "run_id": run.run_id,
+                    "launch_id": token,
+                    "fab_id": run.fab_id,
+                    "fab_version": run.fab_version,
+                    "fab_hash": fab.hash_str,
+                },
+            )
+        else:
+            log(
+                DEBUG,
+                "[flwr-clientapp] Runtime dependency installation is disabled.",
+            )
+
+        load_client_app_fn = get_load_client_app_fn(
+            default_app_ref="",
+            app_path=None,
+            multi_app=True,
+        )
+
+        # Load ClientApp
+        log(DEBUG, "[flwr-clientapp] Start `ClientApp` Loading.")
+        client_app: ClientApp = load_client_app_fn(
+            run.fab_id, run.fab_version, fab.hash_str
+        )
+
+        # Execute ClientApp
+        reply_message = client_app(message=message, context=context)
+        sub_status = SubStatus.COMPLETED
+        details = ""
+
+    except Exception as ex:  # pylint: disable=broad-exception-caught
+        # Don't update/change NodeState
+        e_code = ErrorCode.CLIENT_APP_RAISED_EXCEPTION
+        # Ex fmt: "<class 'ZeroDivisionError'>:<'division by zero'>"
+        reason = str(type(ex)) + ":<'" + str(ex) + "'>"
+        exc_entity = "ClientApp"
+        if isinstance(ex, LoadClientAppError):
+            reason = "An exception was raised when attempting to load `ClientApp`"
+            e_code = ErrorCode.LOAD_CLIENT_APP_EXCEPTION
+
+        log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
+
+        # Create error message
+        if message:
+            reply_message = Message(Error(code=e_code, reason=reason), reply_to=message)
+            sub_status = SubStatus.FAILED
+            details = reason
+
+        # Set exit code
+        exit_code = ExitCode.TASK_PROC_EXCEPTION
+    finally:
+        # Push reply message to SuperNode
+        if reply_message and context:
+            try:
+                push_message(stub, reply_message, context)
+            except Exception as ex:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to push reply message", exc_info=ex)
+                exit_code = ExitCode.CLIENTAPP_COMMUNICATION_ERROR
+
     flwr_exit(
         code=exit_code,
         event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
@@ -228,36 +230,30 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
 def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
     """Pull TaskInput from SuperNode."""
-    try:
-        # Pull Context, Run and FAB
-        res: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
-        context = context_from_proto(res.context)
-        run = run_from_proto(res.run)
-        fab = fab_from_proto(res.fab)
+    # Pull Context, Run and FAB
+    res: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
+    context = context_from_proto(res.context)
+    run = run_from_proto(res.run)
+    fab = fab_from_proto(res.fab)
 
-        # Pull and inflate the message
-        pull_msg_res: PullAppMessagesResponse = stub.PullMessage(
-            PullAppMessagesRequest()
-        )
-        run_id = context.run_id
-        node = Node(node_id=context.node_id)
-        object_tree = pull_msg_res.message_object_trees[0]
-        message = pull_and_inflate_object_from_tree(
-            object_tree,
-            make_pull_object_fn_protobuf(stub.PullObject, node, run_id),
-            make_confirm_message_received_fn_protobuf(
-                stub.ConfirmMessageReceived, node, run_id
-            ),
-            return_type=Message,
-        )
+    # Pull and inflate the message
+    pull_msg_res: PullAppMessagesResponse = stub.PullMessage(PullAppMessagesRequest())
+    run_id = context.run_id
+    node = Node(node_id=context.node_id)
+    object_tree = pull_msg_res.message_object_trees[0]
+    message = pull_and_inflate_object_from_tree(
+        object_tree,
+        make_pull_object_fn_protobuf(stub.PullObject, node, run_id),
+        make_confirm_message_received_fn_protobuf(
+            stub.ConfirmMessageReceived, node, run_id
+        ),
+        return_type=Message,
+    )
 
-        # Set the message ID
-        # The deflated message doesn't contain the message_id (its own object_id)
-        message.metadata.__dict__["_message_id"] = object_tree.object_id
-        return message, context, run, fab
-    except grpc.RpcError as e:
-        log(ERROR, "[PullTaskInput] gRPC error occurred: %s", str(e))
-        raise e
+    # Set the message ID
+    # The deflated message doesn't contain the message_id (its own object_id)
+    message.metadata.__dict__["_message_id"] = object_tree.object_id
+    return message, context, run, fab
 
 
 def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> None:
