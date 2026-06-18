@@ -29,13 +29,13 @@ if str(_THIS_DIR) not in sys.path:
 
 import real_launch  # noqa: E402,F401
 from common import (  # noqa: E402,F401
+    REDACTED,
     CommandResult,
     EvidenceBundleWriter,
     HarnessEvent,
     HarnessProfile,
     HarnessSummary,
     HostCommandRunner,
-    REDACTED,
     _command_error,
     _command_record,
     _kubectl_args,
@@ -394,7 +394,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "the contract scaffold; infra-proof mode writes "
             "infra/TLS/RBAC evidence; local-k8s-launch-path mode writes "
             "SuperLink/SuperExec/TaskExecutor evidence; capacity-cleanup-proof "
-            "mode writes the budget-1/two-task capacity and cleanup proof. "
+            "mode writes capacity and cleanup proof evidence. "
             "Host commands only run with --execute."
         )
     )

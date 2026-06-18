@@ -26,17 +26,17 @@ from typing import Protocol, cast
 from uuid import uuid4
 
 from common import (
+    REDACTED,
+    SCHEMA_VERSION,
     CommandResult,
     EvidenceBundleWriter,
     HarnessEvent,
     HarnessProfile,
     HarnessSummary,
     HostCommandRunner,
-    REDACTED,
-    SCHEMA_VERSION,
+    _combined_status,
     _command_error,
     _command_record,
-    _combined_status,
     _format_cleanup_plan,
     _format_image_preflight,
     _format_superexec_logs,
@@ -68,9 +68,9 @@ from observations import (
     _pod_names,
     _pod_observation,
     _pod_phases,
-    _seed_observation,
     _secret_names,
     _secret_observation,
+    _seed_observation,
     _superexec_capacity_wait_observation,
     _superexec_claim_observation,
     _taskexecutor_phase_status,
@@ -506,6 +506,11 @@ def run_local_k8s_launch_path(
     taskexecutor_observation: dict[str, object] = {"items": [], "phases": []}
     taskexecutor_wait_results: list[CommandResult] = []
     capacity_wait_results: list[CommandResult] = []
+    capacity_wait_observation: dict[str, object] = {
+        "observed": False,
+        "markers": [],
+    }
+    launched_after_capacity_opened: list[str] = []
     before_cleanup_secret_evidence: dict[str, object] = {
         "schema_version": SCHEMA_VERSION,
         "redacted": True,
@@ -525,7 +530,15 @@ def run_local_k8s_launch_path(
         "remaining_pods": [],
         "remaining_secrets": [],
     }
+    cardinality_observation: dict[str, object] = {
+        "required": _requires_cardinality_proof(profile),
+        "observed": False,
+        "reason": "not evaluated",
+    }
     taskexecutor_deadline = time.monotonic() + profile.timeout_seconds
+    required_initial_active_pods = _required_initial_active_pod_count(
+        profile, capacity_cleanup_proof=capacity_cleanup_proof
+    )
     while True:
         taskexecutor_pods_result = run_command(
             _taskexecutor_pods_args(profile, taskexecutor_selector),
@@ -534,8 +547,14 @@ def run_local_k8s_launch_path(
         )
         taskexecutor_pod_attempts.append(taskexecutor_pods_result)
         taskexecutor_observation = _pod_observation(taskexecutor_pods_result)
+        initial_capacity_ready = (
+            len(_active_pod_names(taskexecutor_observation))
+            >= required_initial_active_pods
+            if capacity_cleanup_proof
+            else bool(taskexecutor_observation["items"])
+        )
         if (
-            taskexecutor_observation["items"]
+            initial_capacity_ready
             or not execute
             or taskexecutor_pods_result.dry_run
         ):
@@ -547,8 +566,11 @@ def run_local_k8s_launch_path(
                     f"{_command_error(taskexecutor_pods_result)}"
                 )
             failures.append(
-                "No TaskExecutor Pod was observed through the local k8s selector "
-                "before timeout."
+                _taskexecutor_initial_observation_failure(
+                    taskexecutor_observation,
+                    required_active_pods=required_initial_active_pods,
+                    capacity_cleanup_proof=capacity_cleanup_proof,
+                )
             )
             break
         time.sleep(
@@ -579,10 +601,6 @@ def run_local_k8s_launch_path(
             command=_command_record(before_cleanup_secrets_result),
         )
 
-        capacity_wait_observation: dict[str, object] = {
-            "observed": False,
-            "markers": [],
-        }
         capacity_wait_result = CommandResult(args=[], returncode=0, dry_run=not execute)
         capacity_deadline = time.monotonic() + profile.timeout_seconds
         while True:
@@ -650,21 +668,23 @@ def run_local_k8s_launch_path(
             taskexecutor_observation = _pod_observation(taskexecutor_pods_result)
             current_pod_names = _pod_names(taskexecutor_observation)
             observed_pod_names.update(current_pod_names)
-            new_pod_names = [
+            launched_after_capacity_opened = sorted(
                 name
-                for name in current_pod_names
+                for name in observed_pod_names
                 if name not in first_taskexecutor_pod_names
-            ]
+            )
             if (
-                new_pod_names
-                or len(observed_pod_names) >= profile.seed_run_count
+                len(observed_pod_names) >= profile.seed_run_count
                 or not execute
                 or taskexecutor_pods_result.dry_run
             ):
                 break
             if time.monotonic() >= second_deadline:
+                observed_count = len(observed_pod_names)
                 failures.append(
-                    "Second TaskExecutor Pod was not observed after capacity opened."
+                    "Expected "
+                    f"{profile.seed_run_count} TaskExecutor Pods to launch after "
+                    f"capacity opened, but observed {observed_count}."
                 )
                 break
             time.sleep(
@@ -697,10 +717,28 @@ def run_local_k8s_launch_path(
             after_cleanup_pods=taskexecutor_observation,
             after_cleanup_secrets=after_cleanup_secret_observation,
         )
+        cardinality_observation = _cardinality_observation(
+            profile=profile,
+            seed_run_ids=seed_run_ids,
+            first_taskexecutor_observation=first_taskexecutor_observation,
+            after_capacity_observation=taskexecutor_observation,
+            capacity_wait_observation=capacity_wait_observation,
+            cleanup_observation=cleanup_observation,
+            launched_after_capacity_opened=launched_after_capacity_opened,
+        )
         if execute and not cleanup_observation["observed"]:
             failures.append(
                 "Completed TaskExecutor Pod and credential Secret cleanup was "
                 "not observed before namespace cleanup."
+            )
+        if (
+            execute
+            and cardinality_observation["required"]
+            and not cardinality_observation["observed"]
+        ):
+            failures.append(
+                "TaskExecutor capacity cardinality was not observed: "
+                f"{cardinality_observation['reason']}"
             )
         writer.write_json("objects/capacity-blocked-pods.json", blocked_pod_snapshot)
         writer.write_json(
@@ -727,6 +765,7 @@ def run_local_k8s_launch_path(
                 "pods_after_cleanup": taskexecutor_observation["items"],
                 "secrets_before_cleanup": before_cleanup_secret_observation["items"],
                 "secrets_after_cleanup": after_cleanup_secret_observation["items"],
+                "cardinality": cardinality_observation,
                 "second_pod_attempts": [
                     _command_record(result) for result in second_pod_attempts
                 ],
@@ -1038,6 +1077,7 @@ def run_local_k8s_launch_path(
                 ],
             },
             "cleanup_observed": cleanup_observation,
+            "cardinality": cardinality_observation,
             "secrets": {
                 "before_cleanup": before_cleanup_secret_evidence["items"],
                 "after_cleanup": after_cleanup_secret_evidence["items"],
@@ -1522,23 +1562,30 @@ def _proof_checklist(
             "fields": ["counts", "resources", "captured_before_namespace_cleanup"],
         },
     ]
-    out_of_scope = [
-        "budget-2/three-task cardinality behavior",
-        "AppIo TLS proof",
-        "production deployment readiness",
-    ]
+    cardinality_proof = _requires_cardinality_numbers(
+        active_pod_budget=active_pod_budget,
+        seed_run_count=seed_run_count,
+    )
+    out_of_scope = ["AppIo TLS proof", "production deployment readiness"]
+    if not cardinality_proof:
+        out_of_scope.insert(0, "capacity cardinality behavior")
     if capacity_cleanup_proof:
         claims.extend(
             [
                 {
-                    "claim": "The Kubernetes executor active Pod budget is one.",
+                    "claim": (
+                        "The Kubernetes executor active Pod budget is "
+                        f"{active_pod_budget}."
+                    ),
                     "status": proof_status,
                     "artifact": "objects/executor-config.yaml",
                     "fields": ["active-pod-budget"],
                     "expected": {"active-pod-budget": active_pod_budget},
                 },
                 {
-                    "claim": "Two deterministic ServerApp tasks were seeded.",
+                    "claim": (
+                        f"{seed_run_count} deterministic ServerApp tasks were seeded."
+                    ),
                     "status": proof_status,
                     "artifact": "summary.json",
                     "fields": ["details.seed_run_ids"],
@@ -1561,7 +1608,7 @@ def _proof_checklist(
                 },
                 {
                     "claim": (
-                        "A second TaskExecutor Pod launched after capacity opened."
+                        "Additional TaskExecutor Pods launched after capacity opened."
                     ),
                     "status": proof_status,
                     "artifact": "objects/cleanup-pods.json",
@@ -1581,6 +1628,40 @@ def _proof_checklist(
                 },
             ]
         )
+        if cardinality_proof:
+            claims.extend(
+                [
+                    {
+                        "claim": (
+                            f"{active_pod_budget} TaskExecutor Pods were active "
+                            "concurrently while the Kubernetes executor active "
+                            f"Pod budget was {active_pod_budget}."
+                        ),
+                        "status": proof_status,
+                        "artifact": "summary.json",
+                        "fields": [
+                            "details.cardinality.first_active_pods",
+                            "details.cardinality.active_pod_budget",
+                        ],
+                        "expected": {
+                            "active-pod-budget": active_pod_budget,
+                            "seed_run_count": seed_run_count,
+                        },
+                    },
+                    {
+                        "claim": (
+                            "After capacity opened, waiting TaskExecutor Pods "
+                            "launched."
+                        ),
+                        "status": proof_status,
+                        "artifact": "summary.json",
+                        "fields": [
+                            "details.cardinality.removed_pods",
+                            "details.cardinality.launched_after_capacity_opened",
+                        ],
+                    },
+                ]
+            )
     else:
         out_of_scope.extend(
             [
@@ -1627,6 +1708,141 @@ def _taskexecutor_secrets_args(profile: HarnessProfile, selector: str) -> list[s
             "json",
         ],
     )
+
+
+def _required_initial_active_pod_count(
+    profile: HarnessProfile, *, capacity_cleanup_proof: bool
+) -> int:
+    if not capacity_cleanup_proof or profile.active_pod_budget is None:
+        return 1
+    return max(1, min(profile.active_pod_budget, profile.seed_run_count))
+
+
+def _taskexecutor_initial_observation_failure(
+    observation: Mapping[str, object],
+    *,
+    required_active_pods: int,
+    capacity_cleanup_proof: bool,
+) -> str:
+    if not _sequence(observation.get("items")):
+        return (
+            "No TaskExecutor Pod was observed through the local k8s selector "
+            "before timeout."
+        )
+    if capacity_cleanup_proof:
+        return (
+            f"Expected {required_active_pods} active TaskExecutor Pod(s) before "
+            "capacity waiting, but observed "
+            f"{len(_active_pod_names(observation))}."
+        )
+    return (
+        "TaskExecutor Pods were observed through the local k8s selector, but "
+        "the observation did not satisfy the harness readiness condition."
+    )
+
+
+def _active_pod_names(observation: Mapping[str, object]) -> list[str]:
+    names: list[str] = []
+    raw_items = observation.get("items", [])
+    if not isinstance(raw_items, Sequence) or isinstance(raw_items, str):
+        return names
+    for item in raw_items:
+        if not isinstance(item, Mapping):
+            continue
+        phase = item.get("phase")
+        if phase in {"Succeeded", "Failed"}:
+            continue
+        name = item.get("name")
+        if isinstance(name, str) and name:
+            names.append(name)
+    return names
+
+
+def _requires_cardinality_proof(profile: HarnessProfile) -> bool:
+    return _requires_cardinality_numbers(
+        active_pod_budget=profile.active_pod_budget,
+        seed_run_count=profile.seed_run_count,
+    )
+
+
+def _requires_cardinality_numbers(
+    *, active_pod_budget: int | None, seed_run_count: int
+) -> bool:
+    return (
+        active_pod_budget is not None
+        and active_pod_budget >= 2
+        and seed_run_count > active_pod_budget
+    )
+
+
+def _cardinality_observation(
+    *,
+    profile: HarnessProfile,
+    seed_run_ids: Sequence[int],
+    first_taskexecutor_observation: Mapping[str, object],
+    after_capacity_observation: Mapping[str, object],
+    capacity_wait_observation: Mapping[str, object],
+    cleanup_observation: Mapping[str, object],
+    launched_after_capacity_opened: Sequence[str],
+) -> dict[str, object]:
+    required = _requires_cardinality_proof(profile)
+    first_active_pods = _active_pod_names(first_taskexecutor_observation)
+    first_observed_pods = _pod_names(first_taskexecutor_observation)
+    post_capacity_pods = _pod_names(after_capacity_observation)
+    removed_pods = list(_sequence(cleanup_observation.get("removed_pods")))
+    launched_pods = list(launched_after_capacity_opened)
+    expected_launched_pods = 0
+    if profile.active_pod_budget is not None:
+        expected_launched_pods = max(
+            1, profile.seed_run_count - profile.active_pod_budget
+        )
+    observation: dict[str, object] = {
+        "required": required,
+        "observed": False,
+        "active_pod_budget": profile.active_pod_budget,
+        "seed_run_count": profile.seed_run_count,
+        "seed_run_ids": list(seed_run_ids),
+        "first_active_pods": first_active_pods,
+        "first_observed_pods": first_observed_pods,
+        "post_capacity_pods": post_capacity_pods,
+        "removed_pods": removed_pods,
+        "launched_after_capacity_opened": launched_pods,
+        "expected_launched_after_capacity_opened": expected_launched_pods,
+    }
+    if not required:
+        observation["reason"] = (
+            "active Pod budget and seed count do not request cardinality"
+        )
+        return observation
+    missing: list[str] = []
+    if profile.active_pod_budget is None:
+        missing.append("active Pod budget")
+    elif len(first_active_pods) < profile.active_pod_budget:
+        missing.append(
+            f"{profile.active_pod_budget} first active Pods "
+            f"(observed {len(first_active_pods)})"
+        )
+    if len(seed_run_ids) < profile.seed_run_count:
+        missing.append(
+            f"{profile.seed_run_count} seeded run IDs "
+            f"(observed {len(seed_run_ids)})"
+        )
+    if capacity_wait_observation.get("observed") is not True:
+        missing.append("SuperExec capacity wait marker")
+    if not removed_pods:
+        missing.append("removed completed Pod")
+    if len(launched_pods) < expected_launched_pods:
+        missing.append(
+            f"{expected_launched_pods} new Pods after capacity opened "
+            f"(observed {len(launched_pods)})"
+        )
+    observation["observed"] = not missing
+    observation["reason"] = "observed" if not missing else "; ".join(missing)
+    return observation
+
+
+def _sequence(value: object) -> Sequence[object]:
+    return value if isinstance(value, list) else []
 
 
 def _cleanup_observation(

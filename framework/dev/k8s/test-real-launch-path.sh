@@ -36,6 +36,7 @@ kubernetes_package="${KUBERNETES_PACKAGE:-}"
 build_images=true
 cleanup=true
 capacity_cleanup_proof=false
+active_pod_budget="${ACTIVE_POD_BUDGET:-}"
 seed_run_count="${SEED_RUN_COUNT:-1}"
 probe_hold_seconds="${PROBE_HOLD_SECONDS:-0.0}"
 
@@ -62,12 +63,17 @@ Options:
   --cluster-name NAME       k3d cluster name (default: ${cluster_name})
   --namespace NAME          Kubernetes namespace (default: ${namespace})
   --timeout-seconds SECS    Harness wait timeout (default: ${timeout_seconds})
-  --capacity-cleanup-proof  Run the budget-1/two-task capacity and cleanup proof
+  --capacity-cleanup-proof  Run the capacity and cleanup proof
                             instead of the one-task launch-path proof
+  --active-pod-budget COUNT Kubernetes executor active Pod budget for
+                            --capacity-cleanup-proof (default: 1)
   --seed-run-count COUNT    Deterministic ServerApp runs to seed
                             (default: ${seed_run_count})
   --probe-hold-seconds SECS Seconds each probe ServerApp should stay active
                             (default: ${probe_hold_seconds})
+  --demo                    Demo preset: --capacity-cleanup-proof,
+                            --active-pod-budget 4, --seed-run-count 8,
+                            --probe-hold-seconds 45, and --skip-cleanup
   --platform PLATFORM       Optional docker build platform, for example linux/arm64
   --python-image IMAGE      Optional Python base image passed to the image builder
   --kubernetes-package SPEC Optional Kubernetes package spec passed to the image
@@ -141,13 +147,12 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     --capacity-cleanup-proof)
       capacity_cleanup_proof=true
-      if [[ "${seed_run_count}" == "1" ]]; then
-        seed_run_count="2"
-      fi
-      if [[ "${probe_hold_seconds}" == "0.0" ]]; then
-        probe_hold_seconds="5.0"
-      fi
       shift
+      ;;
+    --active-pod-budget)
+      require_value "$1" "${2:-}"
+      active_pod_budget="$2"
+      shift 2
       ;;
     --seed-run-count)
       require_value "$1" "${2:-}"
@@ -158,6 +163,14 @@ while [[ "$#" -gt 0 ]]; do
       require_value "$1" "${2:-}"
       probe_hold_seconds="$2"
       shift 2
+      ;;
+    --demo)
+      capacity_cleanup_proof=true
+      active_pod_budget="4"
+      seed_run_count="8"
+      probe_hold_seconds="45"
+      cleanup=false
+      shift
       ;;
     --platform)
       require_value "$1" "${2:-}"
@@ -192,6 +205,18 @@ while [[ "$#" -gt 0 ]]; do
   esac
 done
 
+if [[ "${capacity_cleanup_proof}" == true ]]; then
+  if [[ -z "${active_pod_budget}" ]]; then
+    active_pod_budget="1"
+  fi
+  if [[ "${seed_run_count}" == "1" ]]; then
+    seed_run_count="2"
+  fi
+  if [[ "${probe_hold_seconds}" == "0.0" ]]; then
+    probe_hold_seconds="5.0"
+  fi
+fi
+
 for command in docker k3d kubectl uv python; do
   if ! command -v "${command}" >/dev/null 2>&1; then
     die "${command} is required. Install dependencies, then rerun this script."
@@ -205,6 +230,11 @@ echo "Evidence: ${output_dir}"
 echo "SuperLink image: ${superlink_image}"
 echo "SuperExec/TaskExecutor image: ${superexec_image}"
 echo "Capacity cleanup proof: ${capacity_cleanup_proof}"
+if [[ "${capacity_cleanup_proof}" == true ]]; then
+  echo "Active Pod budget: ${active_pod_budget}"
+  echo "Seed run count: ${seed_run_count}"
+  echo "Probe hold seconds: ${probe_hold_seconds}"
+fi
 echo
 
 if [[ "${build_images}" == true ]]; then
@@ -250,10 +280,12 @@ verify_args=("${output_dir}")
 
 if [[ "${capacity_cleanup_proof}" == true ]]; then
   harness_args[1]="capacity-cleanup-proof"
-  harness_args+=(--active-pod-budget "1")
+  harness_args+=(--active-pod-budget "${active_pod_budget}")
   harness_args+=(--capacity-poll-interval "1.0")
   harness_args+=(--capacity-log-interval "1.0")
   verify_args+=(--expected-result "local-k8s-capacity-cleanup-proof")
+  verify_args+=(--expected-active-pod-budget "${active_pod_budget}")
+  verify_args+=(--expected-seed-run-count "${seed_run_count}")
 fi
 
 if [[ "${cleanup}" == true ]]; then
