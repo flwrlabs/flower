@@ -36,6 +36,7 @@ def main() -> None:
     """Create one or more deterministic ServerApp runs through Control API."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--control-api-address", required=True)
+    parser.add_argument("--control-root-certificates")
     parser.add_argument("--run-count", type=int, default=1)
     parser.add_argument("--probe-hold-seconds", type=float, default=0.0)
     parser.add_argument("--probe-crash", action="store_true")
@@ -45,7 +46,14 @@ def main() -> None:
 
     fab_bytes = build_fab_from_disk(_PROBE_APP_DIR)
     fab_hash = hashlib.sha256(fab_bytes).hexdigest()
-    channel = grpc.insecure_channel(args.control_api_address)
+    if args.control_root_certificates:
+        root_certificates = Path(args.control_root_certificates).read_bytes()
+        channel = grpc.secure_channel(
+            args.control_api_address,
+            grpc.ssl_channel_credentials(root_certificates=root_certificates),
+        )
+    else:
+        channel = grpc.insecure_channel(args.control_api_address)
     grpc.channel_ready_future(channel).result(timeout=60)
     stub = ControlStub(channel)
     override_config = {}

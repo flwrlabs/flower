@@ -47,6 +47,16 @@ superexec_service_account="${SUPEREXEC_SERVICE_ACCOUNT:-flower-superexec}"
 rbac_name="${RBAC_NAME:-flower-superexec-kubernetes-executor}"
 create_cluster="${CREATE_CLUSTER:-true}"
 import_images="${IMPORT_IMAGES:-true}"
+tls_enabled="${APPIO_TLS:-false}"
+tls_secret_name="${TLS_SECRET_NAME:-flower-local-k8s-appio-tls}"
+tls_dir="${TLS_DIR:-${output_dir}/tls}"
+tls_ca_cert="${TLS_CA_CERT:-${tls_dir}/ca.crt}"
+tls_ca_key="${TLS_CA_KEY:-${tls_dir}/ca.key}"
+tls_server_cert="${TLS_SERVER_CERT:-${tls_dir}/tls.crt}"
+tls_server_key="${TLS_SERVER_KEY:-${tls_dir}/tls.key}"
+tls_server_csr="${TLS_SERVER_CSR:-${tls_dir}/tls.csr}"
+tls_san_config="${TLS_SAN_CONFIG:-${tls_dir}/openssl-san.cnf}"
+tls_pod_ca_path="/etc/flower/tls/ca.crt"
 
 usage() {
   cat <<EOF
@@ -56,14 +66,18 @@ Usage:
   framework/dev/k8s/harnessctl.sh <command> [options]
 
 Commands:
+  init-tls
+      Generate local AppIo TLS material and apply the Kubernetes Secret.
   start-superlink
       Create the k3d cluster if needed, import the SuperLink image, and apply
       the local SuperLink Service/Pod.
-  start-superexec [--active-pod-budget N]
+  start-superlink --tls
+      Start SuperLink with TLS enabled for Fleet/Control and AppIo APIs.
+  start-superexec [--active-pod-budget N] [--tls]
       Apply SuperExec RBAC, executor config, and the SuperExec Pod.
-  seed --count N [--hold-seconds X]
+  seed --count N [--hold-seconds X] [--tls]
       Seed deterministic ServerApp tasks through the local Control API.
-  seed --count N --crash
+  seed --count N --crash [--tls]
       Seed deterministic ServerApp tasks whose probe ServerApp fails.
   kill-superexec
       Delete the current local SuperExec Pod.
@@ -89,6 +103,9 @@ Common environment:
   SUPEREXEC_IMAGE=${superexec_image}
   TASKEXECUTOR_IMAGE=${taskexecutor_image}
   ACTIVE_POD_BUDGET=${active_pod_budget:-<unset>}
+  APPIO_TLS=${tls_enabled}
+  TLS_SECRET_NAME=${tls_secret_name}
+  TLS_DIR=${tls_dir}
   CREATE_CLUSTER=${create_cluster}
   IMPORT_IMAGES=${import_images}
   OUTPUT_DIR=${output_dir}
@@ -160,6 +177,79 @@ maybe_import_images() {
   fi
 }
 
+enable_tls() {
+  tls_enabled="true"
+}
+
+tls_pod_root_certificates_path() {
+  if is_true "${tls_enabled}"; then
+    echo "${tls_pod_ca_path}"
+  fi
+}
+
+generate_tls_material() {
+  require_command openssl
+  mkdir -p "${tls_dir}"
+  if [[ -f "${tls_ca_cert}" && -f "${tls_server_cert}" && -f "${tls_server_key}" ]]; then
+    echo "Reusing AppIo TLS material in ${tls_dir}"
+    return
+  fi
+
+  rm -f "${tls_ca_cert}" "${tls_ca_key}" "${tls_server_cert}" \
+    "${tls_server_key}" "${tls_server_csr}" "${tls_san_config}" \
+    "${tls_dir}/ca.srl"
+
+  cat >"${tls_san_config}" <<EOF
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+CN = ${superlink_name}
+
+[v3_req]
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = ${superlink_name}
+DNS.2 = ${superlink_name}.${namespace}
+DNS.3 = ${superlink_name}.${namespace}.svc
+DNS.4 = ${superlink_name}.${namespace}.svc.cluster.local
+DNS.5 = localhost
+IP.1 = 127.0.0.1
+EOF
+
+  echo "Generating local AppIo TLS material in ${tls_dir}"
+  openssl genrsa -out "${tls_ca_key}" 2048 >/dev/null 2>&1
+  openssl req -x509 -new -nodes -key "${tls_ca_key}" -sha256 -days 7 \
+    -out "${tls_ca_cert}" -subj "/CN=flower-local-k8s-ca" >/dev/null 2>&1
+  openssl genrsa -out "${tls_server_key}" 2048 >/dev/null 2>&1
+  openssl req -new -key "${tls_server_key}" -out "${tls_server_csr}" \
+    -subj "/CN=${superlink_name}" -config "${tls_san_config}" >/dev/null 2>&1
+  openssl x509 -req -in "${tls_server_csr}" -CA "${tls_ca_cert}" \
+    -CAkey "${tls_ca_key}" -CAcreateserial -out "${tls_server_cert}" \
+    -days 7 -sha256 -extensions v3_req -extfile "${tls_san_config}" \
+    >/dev/null 2>&1
+}
+
+ensure_tls_secret() {
+  require_command kubectl
+  generate_tls_material
+  kubectl_cmd create namespace "${namespace}" --dry-run=client -o yaml \
+    | kubectl_cmd apply -f -
+  kubectl_cmd create secret generic "${tls_secret_name}" \
+    -n "${namespace}" \
+    --from-file=ca.crt="${tls_ca_cert}" \
+    --from-file=tls.crt="${tls_server_cert}" \
+    --from-file=tls.key="${tls_server_key}" \
+    --dry-run=client -o yaml \
+    | kubectl_cmd apply -f -
+  echo "AppIo TLS Secret ${tls_secret_name} is ready in namespace ${namespace}"
+}
+
 manifest_path() {
   mkdir -p "${output_dir}/objects"
   echo "${output_dir}/objects/harnessctl-$1.yaml"
@@ -221,6 +311,8 @@ render_manifest() {
   local seed_count="${4:-1}"
   local hold_seconds="${5:-0.0}"
   local probe_crash="${6:-false}"
+  local appio_root_certificates_path
+  appio_root_certificates_path="$(tls_pod_root_certificates_path)"
 
   python - "${script_dir}" "${target}" "${run_id}" "${output_file}" \
     "${namespace}" "${cluster_name}" "${kubectl_context}" \
@@ -229,7 +321,8 @@ render_manifest() {
     "${active_pod_budget}" "${capacity_poll_interval}" "${capacity_log_interval}" \
     "${timeout_seconds}" "${superlink_name}" "${superexec_name}" \
     "${seed_job_name}" "${seed_config_name}" "${executor_config_name}" \
-    "${superexec_service_account}" "${rbac_name}" "${seed_count}" \
+    "${superexec_service_account}" "${rbac_name}" \
+    "${appio_root_certificates_path}" "${tls_secret_name}" "${seed_count}" \
     "${hold_seconds}" "${probe_crash}" <<'PY'
 import sys
 from pathlib import Path
@@ -280,6 +373,8 @@ def optional_float(value: str) -> float | None:
     executor_config_name,
     superexec_service_account,
     rbac_name,
+    appio_root_certificates_path,
+    tls_secret_name,
     seed_count,
     hold_seconds,
     probe_crash,
@@ -308,6 +403,8 @@ profile = HarnessProfile(
     executor_config_name=executor_config_name,
     superexec_service_account=superexec_service_account,
     rbac_name=rbac_name,
+    appio_root_certificates_path=appio_root_certificates_path or None,
+    tls_secret_name=tls_secret_name,
     seed_run_count=int(seed_count),
     probe_hold_seconds=float(hold_seconds),
     active_pod_budget=optional_int(active_pod_budget),
@@ -337,10 +434,47 @@ path.write_text(yaml.safe_dump_all(documents, sort_keys=False), encoding="utf-8"
 PY
 }
 
+init_tls() {
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      -h | --help)
+        usage
+        exit 0
+        ;;
+      *)
+        die "unknown init-tls argument: $1"
+        ;;
+    esac
+  done
+  enable_tls
+  require_command kubectl
+  ensure_cluster
+  ensure_tls_secret
+}
+
 start_superlink() {
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      --tls)
+        enable_tls
+        shift
+        ;;
+      -h | --help)
+        usage
+        exit 0
+        ;;
+      *)
+        die "unknown start-superlink argument: $1"
+        ;;
+    esac
+  done
+
   require_command kubectl
   require_command python
   ensure_cluster
+  if is_true "${tls_enabled}"; then
+    ensure_tls_secret
+  fi
   local run_id
   local manifest
   run_id="$(new_run_id)"
@@ -365,6 +499,10 @@ start_superexec() {
         active_pod_budget="$2"
         shift 2
         ;;
+      --tls)
+        enable_tls
+        shift
+        ;;
       -h | --help)
         usage
         exit 0
@@ -378,6 +516,9 @@ start_superexec() {
   require_command kubectl
   require_command python
   ensure_cluster
+  if is_true "${tls_enabled}"; then
+    ensure_tls_secret
+  fi
   local run_id
   local manifest
   run_id="$(require_superlink_run_id)"
@@ -414,6 +555,10 @@ seed_runs() {
         probe_crash="true"
         shift
         ;;
+      --tls)
+        enable_tls
+        shift
+        ;;
       -h | --help)
         usage
         exit 0
@@ -429,6 +574,9 @@ seed_runs() {
 
   require_command kubectl
   require_command python
+  if is_true "${tls_enabled}"; then
+    ensure_tls_secret
+  fi
   local run_id
   local manifest
   run_id="$(require_superlink_run_id)"
@@ -577,6 +725,9 @@ command_name="$1"
 shift
 
 case "${command_name}" in
+  init-tls)
+    init_tls "$@"
+    ;;
   start-superlink)
     start_superlink "$@"
     ;;

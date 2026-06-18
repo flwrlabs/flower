@@ -444,6 +444,42 @@ def test_render_real_launch_manifests_use_superexec_kubernetes_executor() -> Non
     ]
 
 
+def test_render_real_launch_manifests_can_enable_appio_tls() -> None:
+    """Test launch manifests can run SuperLink/SuperExec with AppIo TLS."""
+    profile = harness_module.generic_k3d_profile()
+    profile.appio_root_certificates_path = "/etc/flower/tls/ca.crt"
+    profile.tls_secret_name = "flower-test-appio-tls"
+
+    manifests = harness_module.render_real_launch_manifests(profile, "k8s-tls-test")
+
+    _superlink_service, superlink_pod, executor_config, superexec_pod = manifests
+    superlink_container = superlink_pod["spec"]["containers"][0]
+    superlink_args = superlink_container["args"]
+    assert "--insecure" not in superlink_args
+    assert "--appio-ssl-certfile" in superlink_args
+    assert "--appio-ssl-keyfile" in superlink_args
+    assert "--appio-ssl-ca-certfile" in superlink_args
+    assert "--ssl-certfile" in superlink_args
+    assert "--ssl-keyfile" in superlink_args
+    assert "--ssl-ca-certfile" in superlink_args
+    assert superlink_pod["spec"]["volumes"][-1]["secret"]["secretName"] == (
+        "flower-test-appio-tls"
+    )
+
+    superexec_container = superexec_pod["spec"]["containers"][0]
+    superexec_args = superexec_container["args"]
+    assert "--insecure" not in superexec_args
+    assert "--root-certificates" in superexec_args
+    assert "/etc/flower/tls/ca.crt" in superexec_args
+    assert superexec_pod["spec"]["volumes"][-1]["secret"] == {
+        "secretName": "flower-test-appio-tls",
+        "items": [{"key": "ca.crt", "path": "ca.crt"}],
+    }
+
+    config = yaml.safe_load(executor_config["data"]["executor-config.yaml"])
+    assert config["appio-root-certificates-path"] == "/etc/flower/tls/ca.crt"
+
+
 def test_render_appio_seed_manifests_create_control_api_job() -> None:
     """Test seed manifests create one Control API StartRun Job."""
     profile = harness_module.generic_k3d_profile()
@@ -596,6 +632,27 @@ def test_render_appio_seed_manifests_can_create_crashing_runs() -> None:
     assert "--probe-crash" in container["args"]
     assert "local-k8s.probe-crash" in seed_script
     assert "Intentional local k8s probe crash" in server_app
+
+
+def test_render_appio_seed_manifests_can_enable_control_tls() -> None:
+    """Test seed manifests can connect to Control API over TLS."""
+    profile = harness_module.generic_k3d_profile()
+    profile.appio_root_certificates_path = "/etc/flower/tls/ca.crt"
+    profile.tls_secret_name = "flower-test-appio-tls"
+
+    manifests = harness_module.render_appio_seed_manifests(profile, "k8s-test")
+
+    seed_config, seed_job = manifests
+    seed_script = seed_config["data"]["seed_run.py"]
+    container = seed_job["spec"]["template"]["spec"]["containers"][0]
+    template_spec = seed_job["spec"]["template"]["spec"]
+    assert "--control-root-certificates" in container["args"]
+    assert "/etc/flower/tls/ca.crt" in container["args"]
+    assert "grpc.secure_channel" in seed_script
+    assert template_spec["volumes"][-1]["secret"] == {
+        "secretName": "flower-test-appio-tls",
+        "items": [{"key": "ca.crt", "path": "ca.crt"}],
+    }
 
 
 def test_rendered_local_k8s_outputs_do_not_use_sprint_identifiers() -> None:
@@ -1553,10 +1610,7 @@ class _CardinalityRunner:
                 args,
                 stdout=json.dumps(
                     _pod_list_items(
-                        *[
-                            _taskexecutor_pod(pod_name, phase)
-                            for pod_name in pod_names
-                        ]
+                        *[_taskexecutor_pod(pod_name, phase) for pod_name in pod_names]
                     )
                 ),
             )

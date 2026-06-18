@@ -27,13 +27,15 @@ _THIS_DIR = Path(__file__).resolve().parent
 _MANIFEST_DIR = _THIS_DIR / "manifests"
 _ASSET_DIR = _THIS_DIR / "assets"
 _LOCAL_K8S_ROOT = "/opt/flower-local-k8s"
+_TLS_MOUNT_PATH = "/etc/flower/tls"
+_TLS_CA_PATH = f"{_TLS_MOUNT_PATH}/ca.crt"
+_TLS_CERT_PATH = f"{_TLS_MOUNT_PATH}/tls.crt"
+_TLS_KEY_PATH = f"{_TLS_MOUNT_PATH}/tls.key"
+_TLS_VOLUME_NAME = "appio-tls"
 _SEED_CONFIGMAP_ASSETS = {
     "seed_run.py": _ASSET_DIR / "seed_run.py",
     "probe_pyproject.toml": _ASSET_DIR / "probe_app" / "pyproject.toml",
-    "launch_probe_init.py": _ASSET_DIR
-    / "probe_app"
-    / "launch_probe"
-    / "__init__.py",
+    "launch_probe_init.py": _ASSET_DIR / "probe_app" / "launch_probe" / "__init__.py",
     "launch_probe_server_app.py": _ASSET_DIR
     / "probe_app"
     / "launch_probe"
@@ -89,6 +91,8 @@ def render_kubernetes_executor_config(
         config["capacity-poll-interval"] = profile.capacity_poll_interval
     if profile.capacity_log_interval is not None:
         config["capacity-log-interval"] = profile.capacity_log_interval
+    if profile.appio_root_certificates_path is not None:
+        config["appio-root-certificates-path"] = profile.appio_root_certificates_path
     return config
 
 
@@ -122,6 +126,9 @@ def render_real_launch_manifests(
     _set_service_selector(superlink_service, run_id, "superlink")
     _merge_metadata_labels(superlink_pod, {"app.kubernetes.io/component": "superlink"})
     _merge_metadata_labels(superexec_pod, {"app.kubernetes.io/component": "superexec"})
+    if profile.appio_root_certificates_path is not None:
+        _enable_superlink_tls(superlink_pod, profile)
+        _enable_superexec_tls(superexec_pod, profile)
     executor_config["data"] = {
         "executor-config.yaml": yaml.safe_dump(
             render_kubernetes_executor_config(profile, run_id),
@@ -165,7 +172,176 @@ def render_appio_seed_manifests(
         if not isinstance(args, list):
             raise TypeError("Seed Job container args must be a list")
         args.append("--probe-crash")
+    if profile.appio_root_certificates_path is not None:
+        containers = _mapping(template["spec"])["containers"]
+        seed_container = _mapping(containers[0])
+        args = seed_container["args"]
+        if not isinstance(args, list):
+            raise TypeError("Seed Job container args must be a list")
+        args.extend(
+            ["--control-root-certificates", profile.appio_root_certificates_path]
+        )
+        _add_secret_volume_to_pod_template(
+            template,
+            secret_name=profile.tls_secret_name,
+            volume_name=_TLS_VOLUME_NAME,
+            mount_path=_TLS_MOUNT_PATH,
+            items={"ca.crt": "ca.crt"},
+        )
     return manifests
+
+
+def _enable_superlink_tls(
+    superlink_pod: dict[str, object], profile: HarnessProfile
+) -> None:
+    """Configure SuperLink to serve Fleet/Control and AppIo over TLS."""
+    container = _first_container(superlink_pod)
+    args = _args(container)
+    _remove_arg(args, "--insecure")
+    args[:0] = [
+        "--ssl-certfile",
+        _TLS_CERT_PATH,
+        "--ssl-keyfile",
+        _TLS_KEY_PATH,
+        "--ssl-ca-certfile",
+        _TLS_CA_PATH,
+        "--appio-ssl-certfile",
+        _TLS_CERT_PATH,
+        "--appio-ssl-keyfile",
+        _TLS_KEY_PATH,
+        "--appio-ssl-ca-certfile",
+        _TLS_CA_PATH,
+    ]
+    _add_secret_volume_to_pod(
+        superlink_pod,
+        secret_name=profile.tls_secret_name,
+        volume_name=_TLS_VOLUME_NAME,
+        mount_path=_TLS_MOUNT_PATH,
+    )
+
+
+def _enable_superexec_tls(
+    superexec_pod: dict[str, object], profile: HarnessProfile
+) -> None:
+    """Configure SuperExec to connect to AppIo over TLS."""
+    container = _first_container(superexec_pod)
+    args = _args(container)
+    insecure_index = _arg_index(args, "--insecure")
+    if insecure_index is not None:
+        args[insecure_index : insecure_index + 1] = [
+            "--root-certificates",
+            profile.appio_root_certificates_path or _TLS_CA_PATH,
+        ]
+    _add_secret_volume_to_pod(
+        superexec_pod,
+        secret_name=profile.tls_secret_name,
+        volume_name=_TLS_VOLUME_NAME,
+        mount_path=_TLS_MOUNT_PATH,
+        items={"ca.crt": "ca.crt"},
+    )
+
+
+def _add_secret_volume_to_pod(
+    pod: dict[str, object],
+    *,
+    secret_name: str,
+    volume_name: str,
+    mount_path: str,
+    items: Mapping[str, str] | None = None,
+) -> None:
+    """Mount a Secret on the first container of a Pod manifest."""
+    spec = _mapping(pod["spec"])
+    _add_secret_volume_to_spec(
+        spec,
+        secret_name=secret_name,
+        volume_name=volume_name,
+        mount_path=mount_path,
+        items=items,
+    )
+
+
+def _add_secret_volume_to_pod_template(
+    template: dict[str, object],
+    *,
+    secret_name: str,
+    volume_name: str,
+    mount_path: str,
+    items: Mapping[str, str] | None = None,
+) -> None:
+    """Mount a Secret on the first container of a Pod template manifest."""
+    spec = _mapping(template["spec"])
+    _add_secret_volume_to_spec(
+        spec,
+        secret_name=secret_name,
+        volume_name=volume_name,
+        mount_path=mount_path,
+        items=items,
+    )
+
+
+def _add_secret_volume_to_spec(
+    spec: dict[str, object],
+    *,
+    secret_name: str,
+    volume_name: str,
+    mount_path: str,
+    items: Mapping[str, str] | None,
+) -> None:
+    """Mount a Secret on the first container in a Pod spec."""
+    volumes = spec.setdefault("volumes", [])
+    if not isinstance(volumes, list):
+        raise TypeError("Pod spec volumes must be a list")
+    if not any(_mapping(volume).get("name") == volume_name for volume in volumes):
+        secret: dict[str, object] = {"secretName": secret_name}
+        if items is not None:
+            secret["items"] = [
+                {"key": key, "path": path} for key, path in sorted(items.items())
+            ]
+        volumes.append({"name": volume_name, "secret": secret})
+
+    container = _first_container_from_spec(spec)
+    mounts = container.setdefault("volumeMounts", [])
+    if not isinstance(mounts, list):
+        raise TypeError("Container volumeMounts must be a list")
+    if not any(_mapping(mount).get("name") == volume_name for mount in mounts):
+        mounts.append(
+            {
+                "name": volume_name,
+                "mountPath": mount_path,
+                "readOnly": True,
+            }
+        )
+
+
+def _first_container(pod: dict[str, object]) -> dict[str, object]:
+    return _first_container_from_spec(_mapping(pod["spec"]))
+
+
+def _first_container_from_spec(spec: dict[str, object]) -> dict[str, object]:
+    containers = spec["containers"]
+    if not isinstance(containers, list) or not containers:
+        raise TypeError("Pod spec containers must be a non-empty list")
+    return _mapping(containers[0])
+
+
+def _args(container: dict[str, object]) -> list[object]:
+    args = container["args"]
+    if not isinstance(args, list):
+        raise TypeError("Container args must be a list")
+    return args
+
+
+def _arg_index(args: list[object], arg: str) -> int | None:
+    try:
+        return args.index(arg)
+    except ValueError:
+        return None
+
+
+def _remove_arg(args: list[object], arg: str) -> None:
+    index = _arg_index(args, arg)
+    if index is not None:
+        del args[index]
 
 
 def _load_template(

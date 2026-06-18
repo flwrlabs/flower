@@ -143,6 +143,20 @@ This applies the SuperExec ServiceAccount/RBAC, executor ConfigMap, and Pod,
 then waits for SuperExec readiness. The active Pod budget is optional; omit it
 to use the executor defaults.
 
+Enable SuperLink and AppIo TLS:
+
+```bash
+./framework/dev/k8s/harnessctl.sh init-tls
+./framework/dev/k8s/harnessctl.sh start-superlink --tls
+./framework/dev/k8s/harnessctl.sh start-superexec --tls --active-pod-budget 2
+./framework/dev/k8s/harnessctl.sh seed --tls --count 3 --hold-seconds 45
+```
+
+This generates a local test CA/server certificate, stores it in a Kubernetes
+Secret, starts SuperLink without `--insecure`, and configures SuperExec,
+TaskExecutors, and the seed Job to trust the same CA. This is server-auth TLS
+for the local Fleet/Control and AppIo paths, not mTLS.
+
 Seed held probe ServerApp tasks:
 
 ```bash
