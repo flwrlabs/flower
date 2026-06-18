@@ -15,11 +15,18 @@
 """Tests for heartbeat sender."""
 
 
+import signal
 import time
 import unittest
-from unittest.mock import Mock
+from types import SimpleNamespace
+from typing import Any, cast
+from unittest.mock import Mock, patch
 
-from .heartbeat import HeartbeatSender
+import grpc
+
+from flwr.common.constant import HEARTBEAT_CALL_TIMEOUT
+
+from .heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 
 
 # pylint: disable=protected-access
@@ -90,3 +97,29 @@ class TestHeartbeatSender(unittest.TestCase):
     def test_thread_is_daemon(self) -> None:
         """Test that the thread is a daemon thread."""
         self.assertTrue(self.heartbeat_sender._thread.daemon)
+
+    def test_grpc_heartbeat_uses_timeout(self) -> None:
+        """Test that the gRPC heartbeat call has a deadline."""
+        stub = Mock()
+        stub.SendTaskHeartbeat.return_value = SimpleNamespace(success=True)
+
+        heartbeat_fn = make_task_heartbeat_fn_grpc(stub)
+
+        self.assertTrue(heartbeat_fn())
+        stub.SendTaskHeartbeat.assert_called_once()
+        _, kwargs = stub.SendTaskHeartbeat.call_args
+        self.assertEqual(kwargs["timeout"], HEARTBEAT_CALL_TIMEOUT)
+
+    def test_grpc_heartbeat_signals_shutdown_on_auth_error(self) -> None:
+        """Test that auth errors trigger task shutdown."""
+        stub = Mock()
+        rpc_error = grpc.RpcError()
+        cast(Any, rpc_error).code = Mock(return_value=grpc.StatusCode.UNAUTHENTICATED)
+        stub.SendTaskHeartbeat.side_effect = rpc_error
+
+        heartbeat_fn = make_task_heartbeat_fn_grpc(stub)
+
+        with patch("flwr.supercore.heartbeat.signal.raise_signal") as raise_signal:
+            self.assertFalse(heartbeat_fn())
+
+        raise_signal.assert_called_once_with(signal.SIGINT)

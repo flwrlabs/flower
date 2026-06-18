@@ -19,6 +19,7 @@ import random
 import signal
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import grpc
 
@@ -28,18 +29,34 @@ from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_RANDOM_RANGE,
 )
+from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.retry_invoker import RetryInvoker, exponential
 
 # pylint: disable=E0611
 from flwr.proto.appio_pb2 import SendTaskHeartbeatRequest
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.supercore.interceptors import (
+    AppIoTokenClientInterceptor,
+    RuntimeVersionClientInterceptor,
+)
 
 # pylint: enable=E0611
 
 
 class HeartbeatFailure(Exception):
     """Exception raised when a heartbeat fails."""
+
+
+@dataclass(frozen=True)
+class TaskHeartbeatConfig:
+    """Configuration for task heartbeat gRPC clients."""
+
+    appio_service_address: str
+    insecure: bool
+    root_certificates: bytes | None
+    token: str
+    component_name: str
 
 
 class HeartbeatSender:
@@ -139,12 +156,18 @@ def make_task_heartbeat_fn_grpc(
     def fn() -> bool:
         # Call ServerAppIo API
         try:
-            res = stub.SendTaskHeartbeat(req)
+            res = stub.SendTaskHeartbeat(req, timeout=HEARTBEAT_CALL_TIMEOUT)
         except grpc.RpcError as e:
-            status_code = e.code()
+            status_code = e.code()  # pylint: disable=no-member
             if status_code == grpc.StatusCode.UNAVAILABLE:
                 return False
             if status_code == grpc.StatusCode.DEADLINE_EXCEEDED:
+                return False
+            if status_code in (
+                grpc.StatusCode.PERMISSION_DENIED,
+                grpc.StatusCode.UNAUTHENTICATED,
+            ):
+                signal.raise_signal(signal.SIGINT)
                 return False
             raise
 
@@ -155,3 +178,48 @@ def make_task_heartbeat_fn_grpc(
         return True
 
     return fn
+
+
+class TaskHeartbeat:
+    """Task heartbeat connection and sender."""
+
+    def __init__(self, channel: grpc.Channel, sender: HeartbeatSender) -> None:
+        self._channel = channel
+        self._sender = sender
+
+    def start(self) -> None:
+        """Start sending task heartbeats."""
+        self._sender.start()
+
+    def close(self) -> None:
+        """Stop sending task heartbeats and close the gRPC channel."""
+        if self._sender.is_running:
+            self._sender.stop()
+        self._channel.close()
+
+
+def create_task_heartbeat_grpc(
+    config: TaskHeartbeatConfig,
+    stub_class: type[ServerAppIoStub] | type[ClientAppIoStub],
+) -> TaskHeartbeat:
+    """Create a task heartbeat sender over an unwrapped AppIO stub."""
+    channel, stub = _create_task_heartbeat_stub_grpc(config, stub_class)
+    return TaskHeartbeat(channel, HeartbeatSender(make_task_heartbeat_fn_grpc(stub)))
+
+
+def _create_task_heartbeat_stub_grpc(
+    config: TaskHeartbeatConfig,
+    stub_class: type[ServerAppIoStub] | type[ClientAppIoStub],
+) -> tuple[grpc.Channel, ServerAppIoStub | ClientAppIoStub]:
+    """Create an unwrapped AppIO stub for task heartbeats."""
+    channel = create_channel(
+        server_address=config.appio_service_address,
+        insecure=config.insecure,
+        root_certificates=config.root_certificates,
+        interceptors=[
+            RuntimeVersionClientInterceptor(component_name=config.component_name),
+            AppIoTokenClientInterceptor(config.token),
+        ],
+    )
+    channel.subscribe(on_channel_state_change)
+    return channel, stub_class(channel)

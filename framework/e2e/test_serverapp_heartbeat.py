@@ -145,24 +145,17 @@ def main() -> None:
             break
         time.sleep(0.1)
 
-    # Submit the second run
-    print("Starting the second run...")
-    run_id2 = flwr_run()
-
-    # Wait up to 6 seconds for both runs to reach RUNNING status
+    # Wait up to 6 seconds for the first run to reach RUNNING status
     tic = time.time()
     is_running = False
     while (time.time() - tic) < 6:
         run_status = flwr_ls()
-        if (
-            run_status.get(run_id1) == Status.RUNNING
-            and run_status.get(run_id2) == Status.RUNNING
-        ):
+        if run_status.get(run_id1) == Status.RUNNING:
             is_running = True
             break
         time.sleep(1)
-    assert is_running, "Run IDs did not start within 6 seconds"
-    print("Both runs are running.")
+    assert is_running, "First run did not start within 6 seconds"
+    print("First run is running.")
 
     # Kill SuperLink process first to simulate restart scenario
     # This prevents ServerApp from notifying SuperLink, isolating the heartbeat test
@@ -180,6 +173,10 @@ def main() -> None:
 
     # Allow time for SuperLink to start
     time.sleep(1)
+
+    # Submit the second run after restart to verify the runtime remains usable
+    print("Starting the second run...")
+    run_id2 = flwr_run()
 
     # Allow enough time for token expiry based heartbeat detection:
     # HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL (+ buffer for restart/retries)

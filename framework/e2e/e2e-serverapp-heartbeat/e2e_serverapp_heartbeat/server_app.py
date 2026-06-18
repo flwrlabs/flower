@@ -1,3 +1,5 @@
+"""ServerApp for heartbeat E2E tests."""
+
 import time
 
 import flwr as fl
@@ -7,6 +9,7 @@ app = fl.serverapp.ServerApp()
 
 @app.main()
 def main(grid, context):
-    print("Sleep for 10 seconds")
-    time.sleep(10)
+    """Keep the task alive long enough for heartbeat interruption tests."""
+    print("Sleep for 30 seconds")
+    time.sleep(30)
     print("Done sleeping")
