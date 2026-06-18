@@ -12,25 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Executor abstractions and implementations for SuperExec."""
+"""Connector registry."""
 
-from .factory import get_executor
-from .kubernetes_executor import (
-    KubernetesExecutor,
-    KubernetesExecutorConfig,
-    create_incluster_kubernetes_client,
-)
-from .subprocess_executor import SubprocessExecutor
-from .types import ExecutionSpec, Executor, LaunchResult, LaunchResultStatus
+from collections.abc import Callable
 
-__all__ = [
-    "ExecutionSpec",
-    "Executor",
-    "KubernetesExecutor",
-    "KubernetesExecutorConfig",
-    "LaunchResult",
-    "LaunchResultStatus",
-    "SubprocessExecutor",
-    "create_incluster_kubernetes_client",
-    "get_executor",
-]
+from flwr.supercore.typing import JSONObject, JSONValue
+
+from . import web_search
+
+ConnectorHandler = Callable[..., JSONValue]
+
+_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
+    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
+}
+
+
+def invoke_connector(name: str, arguments: JSONObject) -> JSONValue:
+    """Invoke one connector by name."""
+    handler = _CONNECTOR_HANDLERS.get(name)
+    if handler is None:
+        raise ValueError(f"Unsupported connector '{name}'.")
+    return handler(**arguments)
