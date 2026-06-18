@@ -25,6 +25,24 @@ import requests
 
 from flwr.supercore.typing import JSONObject
 
+WEB_FETCH_CONNECTOR_NAME = "web_fetch"
+WEB_FETCH_TOOL: JSONObject = {
+    "type": "function",
+    "name": WEB_FETCH_CONNECTOR_NAME,
+    "description": "Fetch a web page and extract readable content.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+                "description": "The URL to fetch.",
+            },
+        },
+        "required": ["url"],
+        "additionalProperties": False,
+    },
+}
+
 _MAX_RESPONSE_BYTES = 1024 * 1024
 _TIMEOUT = 30.0
 _MAX_REDIRECTS = 10

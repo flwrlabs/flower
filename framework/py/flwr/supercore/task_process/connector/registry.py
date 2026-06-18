@@ -18,12 +18,17 @@ from collections.abc import Callable
 
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from . import web_search
+from . import web_fetch, web_search
 
 ConnectorHandler = Callable[..., JSONValue]
 
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
+    web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
+}
+_BUILTIN_CONNECTOR_TOOLS: dict[str, JSONObject] = {
+    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.WEB_SEARCH_TOOL,
+    web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.WEB_FETCH_TOOL,
 }
 
 
@@ -33,3 +38,13 @@ def invoke_connector(name: str, arguments: JSONObject) -> JSONValue:
     if handler is None:
         raise ValueError(f"Unsupported connector '{name}'.")
     return handler(**arguments)
+
+
+def get_builtin_connector_tools() -> list[JSONObject]:
+    """Return function tools for built-in connectors."""
+    return list(_BUILTIN_CONNECTOR_TOOLS.values())
+
+
+def has_builtin_connector(name: str) -> bool:
+    """Return whether a built-in connector is registered."""
+    return name in _CONNECTOR_HANDLERS

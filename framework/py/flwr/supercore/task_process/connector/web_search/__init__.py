@@ -24,6 +24,22 @@ from .exa import EXA_API_KEY_ENV, ExaWebSearchProvider
 from .tavily import TAVILY_API_KEY_ENV, TavilyWebSearchProvider
 
 WEB_SEARCH_CONNECTOR_NAME = "web_search"
+WEB_SEARCH_TOOL: JSONObject = {
+    "type": "function",
+    "name": WEB_SEARCH_CONNECTOR_NAME,
+    "description": "Search the web for current information.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "The search query.",
+            },
+        },
+        "required": ["query"],
+        "additionalProperties": False,
+    },
+}
 _WEB_SEARCH_API_KEY_ENV_VARS = (
     BRAVE_API_KEY_ENV,
     TAVILY_API_KEY_ENV,
@@ -46,4 +62,4 @@ def search(query: str) -> JSONObject:
     )
 
 
-__all__ = ["WEB_SEARCH_CONNECTOR_NAME", "search"]
+__all__ = ["WEB_SEARCH_CONNECTOR_NAME", "WEB_SEARCH_TOOL", "search"]
