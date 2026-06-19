@@ -18,7 +18,6 @@ syntax = "proto3";
 package flwr.proto;
 
 import "flwr/proto/node.proto";
-import "flwr/proto/recorddict.proto";
 import "flwr/proto/transport.proto";
 
 message Run {
@@ -57,7 +56,3 @@ message GetRunRequest {
   uint64 run_id = 2;
 }
 message GetRunResponse { Run run = 1; }
-
-// Get Federation Options associated with run
-message GetFederationOptionsRequest { uint64 run_id = 1; }
-message GetFederationOptionsResponse { ConfigRecord federation_options = 1; }
