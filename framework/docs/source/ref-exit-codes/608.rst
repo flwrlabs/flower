@@ -22,5 +22,5 @@ package names, version constraints, and Python compatibility. If the runtime hos
 use a custom package index, configure uv's native ``UV_DEFAULT_INDEX`` and make sure the
 required packages are available there.
 
-If runtime package installation is not allowed in your environment, preinstall the app
-dependencies or disable runtime dependency installation.
+If your environment does not allow dependencies to be installed at runtime, preinstall
+the Flower App dependencies and disable runtime dependency installation.
