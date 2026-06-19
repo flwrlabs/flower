@@ -12,4 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Private connector task process helpers."""
+"""Flower connector task process."""
+
+
+from .run_connector import run_connector
+
+__all__ = ["run_connector"]

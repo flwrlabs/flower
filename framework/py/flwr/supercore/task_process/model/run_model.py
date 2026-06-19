@@ -25,12 +25,6 @@ from flwr.common.constant import SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
-from flwr.common.retry_invoker import (
-    RetryInvoker,
-    make_simple_grpc_retry_invoker,
-    wrap_stub,
-)
-from flwr.common.telemetry import EventType, event
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
@@ -43,13 +37,16 @@ from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
+from flwr.supercore.retry import RetryInvoker, make_simple_grpc_retry_invoker, wrap_stub
+from flwr.supercore.telemetry import EventType, event
 
 from .task import handle_task
 
 
-def run_model(
+def run_model(  # pylint: disable=too-many-locals
     serverappio_api_address: str,
     token: str,
+    insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
 ) -> None:
@@ -61,6 +58,7 @@ def run_model(
     channel, stub, retry_invoker = _create_serverappio_stub(
         serverappio_api_address=serverappio_api_address,
         token=token,
+        insecure=insecure,
         certificates=certificates,
     )
 
@@ -70,9 +68,33 @@ def run_model(
     details = "Model task failed with unknown error."
     exit_code = ExitCode.SUCCESS
 
+    def on_exit() -> None:
+        log(DEBUG, "[flwr-model] Will push Model task output")
+
+        # Set Grpc max retries to 1 to avoid blocking on exit
+        retry_invoker.max_tries = 1
+
+        # Push final status
+        pushoutput_req = PushTaskOutputRequest(
+            sub_status=sub_status,
+            details=details,
+        )
+        try:
+            stub.PushTaskOutput(pushoutput_req)
+        except grpc.RpcError as err:
+            log(ERROR, "Failed to push task output: %s", str(err))
+
+        # Stop heartbeat sender
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
+        # Close the Grpc connection
+        channel.close()
+
     register_signal_handlers(
         event_type=EventType.FLWR_MODEL_RUN_LEAVE,
         exit_message="Run stopped by user.",
+        exit_handlers=[on_exit],
     )
 
     try:
@@ -106,29 +128,6 @@ def run_model(
         # Set exit code
         exit_code = ExitCode.TASK_PROC_EXCEPTION
 
-    finally:
-        log(DEBUG, "[flwr-model] Will push Model task output")
-
-        # Set Grpc max retries to 1 to avoid blocking on exit
-        retry_invoker.max_tries = 1
-
-        # Push final status
-        pushoutput_req = PushTaskOutputRequest(
-            sub_status=sub_status,
-            details=details,
-        )
-        try:
-            stub.PushTaskOutput(pushoutput_req)
-        except grpc.RpcError as err:
-            log(ERROR, "Failed to push task output: %s", str(err))
-
-        # Stop heartbeat sender
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-
-        # Close the Grpc connection
-        channel.close()
-
     flwr_exit(exit_code, event_type=EventType.FLWR_MODEL_RUN_LEAVE)
 
 
@@ -136,12 +135,13 @@ def _create_serverappio_stub(
     *,
     serverappio_api_address: str,
     token: str,
+    insecure: bool,
     certificates: bytes | None,
 ) -> tuple[grpc.Channel, ServerAppIoStub, RetryInvoker]:
     """Create a ServerAppIo stub authenticated as the model task."""
     channel = create_channel(
         server_address=serverappio_api_address,
-        insecure=certificates is None,
+        insecure=insecure,
         root_certificates=certificates,
         interceptors=[
             RuntimeVersionClientInterceptor(component_name="flwr-model"),

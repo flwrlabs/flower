@@ -54,6 +54,7 @@ class ExitCode:
     # SuperExec-specific exit codes (400-499)
     SUPEREXEC_INVALID_PLUGIN_CONFIG = 400
     SUPEREXEC_AUTH_SECRET_LOAD_FAILED = 401
+    SUPEREXEC_INVALID_EXECUTOR_CONFIG = 402
 
     # FlowerCLI-specific exit codes (500-599)
     FLWRCLI_NODE_AUTH_PUBLIC_KEY_INVALID = 500
@@ -66,6 +67,8 @@ class ExitCode:
     COMMON_PATH_INVALID = 604
     COMMON_TLS_SERVER_CERTIFICATES_INVALID = 605
     RUNTIME_VERSION_INCOMPATIBLE = 606
+    COMMON_APP_IMPORT_ERROR = 607
+    COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR = 608
 
     # Simulation exit codes (700-799)
     SIMULATION_EXCEPTION = 700
@@ -159,6 +162,9 @@ EXIT_CODE_HELP = {
     ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED: (
         "Failed to load the SuperExec authentication secret."
     ),
+    ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG: (
+        "Failed to select, load, or apply the SuperExec executor configuration."
+    ),
     # FlowerCLI-specific exit codes (500-599)
     ExitCode.FLWRCLI_NODE_AUTH_PUBLIC_KEY_INVALID: (
         "Node authentication requires a valid elliptic curve public key in the "
@@ -191,6 +197,15 @@ To use the REST API, install `flwr` with the `rest` extra:
         "Upgrade your Flower version to the required version, or contact the server "
         "administrator."
     ),
+    ExitCode.COMMON_APP_IMPORT_ERROR: (
+        "A Flower App failed to import a required module. Ensure "
+        "the missing package is in the app's `pyproject.toml` dependencies, then "
+        "install the dependencies manually unless automatic runtime dependency "
+        "installation is enabled."
+    ),
+    ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR: (
+        "Runtime installation of app dependencies failed. Check the logs for details."
+    ),
     # Simulation exit codes (700-799)
     ExitCode.SIMULATION_EXCEPTION: (
         "An unhandled exception occurred when running the simulation."
@@ -198,9 +213,9 @@ To use the REST API, install `flwr` with the `rest` extra:
     ExitCode.SIMULATION_MISSING_EXTRA: """
 Extra dependencies required for simulation are missing.
 
-To use simulation with the Ray backend, install `flwr` with the `simulation` extra:
-
-    `pip install "flwr[simulation]"`.
+To use simulation with the Ray backend, add `flwr[simulation]` to the app's
+`pyproject.toml` dependencies, then install the dependencies manually unless
+automatic runtime dependency installation is enabled.
 """,
     # Task process exit codes (800-899)
     ExitCode.TASK_PROC_EXCEPTION: (

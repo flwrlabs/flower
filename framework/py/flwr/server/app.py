@@ -30,7 +30,7 @@ from typing import TypeVar, cast
 import grpc
 import yaml
 
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
+from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.args import (
     add_args_runtime_dependency_install,
     try_obtain_server_certificates,
@@ -41,6 +41,7 @@ from flwr.common.constant import (
     CONTROL_API_DEFAULT_SERVER_ADDRESS,
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     FLEET_API_REST_DEFAULT_ADDRESS,
+    FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
@@ -70,6 +71,7 @@ from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import create_fleet_runtime_version_server_interceptor
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import (
     get_client_tls_args,
     try_obtain_optional_appio_server_certificates,
@@ -241,6 +243,15 @@ def run_superlink() -> None:
             explicit_args.add(
                 arg.split("=")[0]
             )  # handles both `--arg val` and `--arg=val`
+
+    # The old opt-in flag is accepted for compatibility, but no longer needed.
+    if "--allow-runtime-dependency-installation" in explicit_args:
+        log(
+            WARN,
+            "The `--allow-runtime-dependency-installation` argument is deprecated. "
+            "Runtime dependency installation is enabled by default for SuperLink. "
+            "Use `--disable-runtime-dependency-installation` to disable it.",
+        )
 
     control_api_set = "--control-api-address" in explicit_args
     exec_api_set = "--exec-api-address" in explicit_args
@@ -572,8 +583,14 @@ def _get_superexec_command(
     command += ["--plugin-type", ExecPluginType.SERVER_APP]
     command += ["--parent-pid", str(parent_pid)]
     if runtime_dependency_install:
+        # SuperLink subprocess isolation owns this SuperExec, so install dependencies.
         command += ["--allow-runtime-dependency-installation"]
     return command
+
+
+def _runtime_dependency_install_default() -> bool:
+    """Return default runtime dependency installation setting."""
+    return os.getenv(FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION) != "1"
 
 
 def _load_control_auth_plugins(
@@ -850,7 +867,15 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Enable supernode authentication.",
     )
-    add_args_runtime_dependency_install(parser)
+    add_args_runtime_dependency_install(
+        parser,
+        default=_runtime_dependency_install_default(),
+        include_disable_flag=True,
+        allow_flag_help=(
+            "Deprecated. Runtime dependency installation is enabled by "
+            "default. Use `--disable-runtime-dependency-installation` to disable it."
+        ),
+    )
     parser.add_argument(
         "--log-file",
         type=str,

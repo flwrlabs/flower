@@ -446,7 +446,7 @@ class StateTest(CoreStateTest):
         assert state.activate_task(task_id)
 
         # Execute
-        # The run should be marked as failed after HEARTBEAT_DEFAULT_INTERVAL
+        # The run should be marked as failed after the heartbeat grace period
         # once the primary task is RUNNING.
         patched_dt = now() + timedelta(
             seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
@@ -480,7 +480,9 @@ class StateTest(CoreStateTest):
         assert state.activate_task(primary_task_id)
 
         # Execute: advance time past task claim expiry and trigger cleanup
-        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        patched_dt = now() + timedelta(
+            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
+        )
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
             state.get_run_status({run_id})
@@ -565,7 +567,9 @@ class StateTest(CoreStateTest):
         assert state.activate_task(task_id)
         state.federation_manager.report_run_usage = Mock()  # type: ignore
         # Execute: advance time past token expiry and trigger cleanup
-        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        patched_dt = now() + timedelta(
+            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
+        )
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
             state.get_run_status({run_id})

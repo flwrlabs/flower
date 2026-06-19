@@ -32,6 +32,8 @@ from flwr.common.serde import (
 )
 from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetNodesRequest,
+    GetNodesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -50,16 +52,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.run_pb2 import (  # pylint: disable=E0611
-    GetFederationOptionsRequest,
-    GetFederationOptionsResponse,
-    GetRunRequest,
-    GetRunResponse,
-)
-from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
-    GetNodesRequest,
-    GetNodesResponse,
-)
+from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import TaskType
@@ -319,13 +312,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushTaskOutputResponse()
-
-    def GetFederationOptions(
-        self, request: GetFederationOptionsRequest, context: grpc.ServicerContext
-    ) -> GetFederationOptionsResponse:
-        """Get Federation Options associated with a run."""
-        log(DEBUG, "ServerAppIoServicer.GetFederationOptions")
-        raise NotImplementedError("To be removed")
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext

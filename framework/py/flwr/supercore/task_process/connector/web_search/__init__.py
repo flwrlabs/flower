@@ -12,4 +12,58 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Built-in web-search connector."""
+"""Built-in web search connector."""
+
+
+import os
+
+from flwr.supercore.typing import JSONObject
+
+from .brave import BRAVE_API_KEY_ENV, BraveWebSearchProvider
+from .exa import EXA_API_KEY_ENV, ExaWebSearchProvider
+from .tavily import TAVILY_API_KEY_ENV, TavilyWebSearchProvider
+
+WEB_SEARCH_CONNECTOR_NAME = "web_search"
+_WEB_SEARCH_API_KEY_ENV_VARS = (
+    BRAVE_API_KEY_ENV,
+    TAVILY_API_KEY_ENV,
+    EXA_API_KEY_ENV,
+)
+
+
+def make_web_search_tool() -> JSONObject:
+    """Return the web search function tool schema."""
+    return {
+        "type": "function",
+        "name": WEB_SEARCH_CONNECTOR_NAME,
+        "description": "Search the web for current information.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The search query.",
+                },
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    }
+
+
+def search(query: str) -> JSONObject:
+    """Execute one web search request."""
+    if os.getenv(BRAVE_API_KEY_ENV, "").strip():
+        return BraveWebSearchProvider().search(query)
+    if os.getenv(TAVILY_API_KEY_ENV, "").strip():
+        return TavilyWebSearchProvider().search(query)
+    if os.getenv(EXA_API_KEY_ENV, "").strip():
+        return ExaWebSearchProvider().search(query)
+
+    raise RuntimeError(
+        "At least one web search API key environment variable is required: "
+        f"{', '.join(_WEB_SEARCH_API_KEY_ENV_VARS)}."
+    )
+
+
+__all__ = ["WEB_SEARCH_CONNECTOR_NAME", "make_web_search_tool", "search"]
