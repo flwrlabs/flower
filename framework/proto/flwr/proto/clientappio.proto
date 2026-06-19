@@ -88,9 +88,12 @@ service ClientAppIo {
   // Specific endpoints for ClientAppIo
   /////////////////////////////////////////////////////////////////////////////
 
-  // Push Message
-  rpc PushMessage(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
+  // Push messages
+  rpc PushMessages(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
 
-  // Pull Message
-  rpc PullMessage(PullAppMessagesRequest) returns (PullAppMessagesResponse) {}
+  // Pull messages
+  rpc PullMessages(PullAppMessagesRequest) returns (PullAppMessagesResponse) {}
+
+  // Return a set of nodes
+  rpc GetNodes(GetNodesRequest) returns (GetNodesResponse) {}
 }

@@ -18,6 +18,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
+import grpc
 from parameterized import parameterized
 
 from flwr.app import Context
@@ -26,6 +27,7 @@ from flwr.common.constant import SubStatus
 from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
+    GetNodesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
@@ -88,7 +90,7 @@ class TestClientAppIoServicer(unittest.TestCase):
             run=ProtoRun(run_id=61016, fab_id="mock/mock", fab_version="v1.0.0"),
             fab=fab_to_proto(mock_fab),
         )
-        self.mock_stub.PullMessage.return_value = PullAppMessagesResponse(
+        self.mock_stub.PullMessages.return_value = PullAppMessagesResponse(
             messages_list=[message_to_proto(mock_message)],
             message_object_trees=[get_object_tree(mock_message)],
         )
@@ -145,10 +147,10 @@ class TestClientAppIoServicer(unittest.TestCase):
         mock_response = PushTaskOutputResponse()
         self.mock_stub.PushTaskOutput.return_value = mock_response
 
-        # Prepare: Mock PushMessage RPC call
+        # Prepare: Mock PushMessages RPC call
         object_tree = get_object_tree(message)
         all_obj_ids = [tree.object_id for tree in iterate_object_tree(object_tree)]
-        self.mock_stub.PushMessage.return_value = PushAppMessagesResponse(
+        self.mock_stub.PushMessages.return_value = PushAppMessagesResponse(
             message_ids=[message.object_id],
             objects_to_push=all_obj_ids,
         )
@@ -174,7 +176,7 @@ class TestClientAppIoServicer(unittest.TestCase):
 
         # Assert
         self.mock_stub.PushTaskOutput.assert_called_once()
-        self.mock_stub.PushMessage.assert_called_once()
+        self.mock_stub.PushMessages.assert_called_once()
         self.assertSetEqual(pushed_obj_ids, set(all_obj_ids))
         push_outputs_request = self.mock_stub.PushTaskOutput.call_args.args[0]
         self.assertEqual(push_outputs_request.sub_status, sub_status)
@@ -256,6 +258,19 @@ class TestClientAppIoServicer(unittest.TestCase):
         finish_task_kwargs = self.mock_state.finish_task.call_args.kwargs
         self.assertEqual(finish_task_kwargs["task_id"], task_id)
         self.assertEqual(finish_task_kwargs["sub_status"], request.sub_status)
+
+    def test_get_nodes_unimplemented(self) -> None:
+        """GetNodes should be unavailable on ClientAppIo."""
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.GetNodes(GetNodesRequest(), context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.UNIMPLEMENTED,
+            "GetNodes is not available on ClientAppIo.",
+        )
 
     @parameterized.expand([(True,), (False,)])  # type: ignore
     def test_send_task_heartbeat(self, success: bool) -> None:

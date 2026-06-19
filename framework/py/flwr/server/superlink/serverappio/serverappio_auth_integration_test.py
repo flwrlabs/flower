@@ -25,6 +25,8 @@ from parameterized import parameterized
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetNodesRequest,
+    GetNodesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PushAppMessagesRequest,
@@ -43,10 +45,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectResponse,
     PushObjectRequest,
     PushObjectResponse,
-)
-from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
-    GetNodesRequest,
-    GetNodesResponse,
 )
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc

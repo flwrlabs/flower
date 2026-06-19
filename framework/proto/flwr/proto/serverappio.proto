@@ -19,7 +19,6 @@ package flwr.proto;
 
 import "flwr/proto/heartbeat.proto";
 import "flwr/proto/log.proto";
-import "flwr/proto/node.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/appio.proto";
@@ -98,7 +97,3 @@ service ServerAppIo {
   // Return a set of nodes
   rpc GetNodes(GetNodesRequest) returns (GetNodesResponse) {}
 }
-
-// GetNodes messages
-message GetNodesRequest {}
-message GetNodesResponse { repeated Node nodes = 1; }

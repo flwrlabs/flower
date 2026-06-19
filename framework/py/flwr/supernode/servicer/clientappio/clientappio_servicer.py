@@ -32,6 +32,8 @@ from flwr.common.serde import (
 # pylint: disable=E0611
 from flwr.proto import clientappio_pb2_grpc
 from flwr.proto.appio_pb2 import (
+    GetNodesRequest,
+    GetNodesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -181,11 +183,11 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
 
         return PushTaskOutputResponse()
 
-    def PullMessage(
+    def PullMessages(
         self, request: PullAppMessagesRequest, context: grpc.ServicerContext
     ) -> PullAppMessagesResponse:
         """Pull one Message."""
-        log(DEBUG, "ClientAppIo.PullMessage")
+        log(DEBUG, "ClientAppIo.PullMessages")
 
         # Get the authenticated task and associated run ID
         task = get_authenticated_task()
@@ -209,11 +211,11 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
             message_object_trees=[object_tree],
         )
 
-    def PushMessage(
+    def PushMessages(
         self, request: PushAppMessagesRequest, context: grpc.ServicerContext
     ) -> PushAppMessagesResponse:
         """Push one Message."""
-        log(DEBUG, "ClientAppIo.PushMessage")
+        log(DEBUG, "ClientAppIo.PushMessages")
 
         # Get the authenticated task and associated run ID
         task = get_authenticated_task()
@@ -236,6 +238,17 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         # Save the message to the state
         state.store_message(message_from_proto(request.messages_list[0]))
         return PushAppMessagesResponse(objects_to_push=objects_to_push)
+
+    def GetNodes(
+        self, request: GetNodesRequest, context: grpc.ServicerContext
+    ) -> GetNodesResponse:
+        """Get available nodes."""
+        log(DEBUG, "ClientAppIo.GetNodes")
+        context.abort(
+            grpc.StatusCode.UNIMPLEMENTED,
+            "GetNodes is not available on ClientAppIo.",
+        )
+        raise RuntimeError("Unreachable code")  # for mypy
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext

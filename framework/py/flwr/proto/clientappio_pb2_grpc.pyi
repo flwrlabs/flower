@@ -135,7 +135,7 @@ class ClientAppIoStub:
     ]
     """Push task logs"""
 
-    PushMessage: grpc.UnaryUnaryMultiCallable[
+    PushMessages: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
         flwr.proto.appio_pb2.PushAppMessagesResponse,
     ]
@@ -146,11 +146,17 @@ class ClientAppIoStub:
     Push Message
     """
 
-    PullMessage: grpc.UnaryUnaryMultiCallable[
+    PullMessages: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppMessagesRequest,
         flwr.proto.appio_pb2.PullAppMessagesResponse,
     ]
     """Pull Message"""
+
+    GetNodes: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.GetNodesRequest,
+        flwr.proto.appio_pb2.GetNodesResponse,
+    ]
+    """Return a set of nodes"""
 
 class ClientAppIoAsyncStub:
     PullPendingTasks: grpc.aio.UnaryUnaryMultiCallable[
@@ -252,7 +258,7 @@ class ClientAppIoAsyncStub:
     ]
     """Push task logs"""
 
-    PushMessage: grpc.aio.UnaryUnaryMultiCallable[
+    PushMessages: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
         flwr.proto.appio_pb2.PushAppMessagesResponse,
     ]
@@ -263,11 +269,17 @@ class ClientAppIoAsyncStub:
     Push Message
     """
 
-    PullMessage: grpc.aio.UnaryUnaryMultiCallable[
+    PullMessages: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppMessagesRequest,
         flwr.proto.appio_pb2.PullAppMessagesResponse,
     ]
     """Pull Message"""
+
+    GetNodes: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.GetNodesRequest,
+        flwr.proto.appio_pb2.GetNodesResponse,
+    ]
+    """Return a set of nodes"""
 
 class ClientAppIoServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -398,7 +410,7 @@ class ClientAppIoServicer(metaclass=abc.ABCMeta):
         """Push task logs"""
 
     @abc.abstractmethod
-    def PushMessage(
+    def PushMessages(
         self,
         request: flwr.proto.appio_pb2.PushAppMessagesRequest,
         context: _ServicerContext,
@@ -411,11 +423,19 @@ class ClientAppIoServicer(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def PullMessage(
+    def PullMessages(
         self,
         request: flwr.proto.appio_pb2.PullAppMessagesRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.PullAppMessagesResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullAppMessagesResponse]]:
         """Pull Message"""
+
+    @abc.abstractmethod
+    def GetNodes(
+        self,
+        request: flwr.proto.appio_pb2.GetNodesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.GetNodesResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.GetNodesResponse]]:
+        """Return a set of nodes"""
 
 def add_ClientAppIoServicer_to_server(servicer: ClientAppIoServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...
