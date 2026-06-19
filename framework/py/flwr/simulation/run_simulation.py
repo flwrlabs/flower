@@ -32,7 +32,7 @@ from flwr.app import Context, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.cli.utils import get_sha256_hash
 from flwr.clientapp import ClientApp
-from flwr.common import EventType, event, log
+from flwr.common import log
 from flwr.common.constant import RUN_ID_NUM_BYTES, TASK_ID_NUM_BYTES
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import (
@@ -60,6 +60,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run
+from flwr.supercore.telemetry import EventType, event
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.grid import InMemoryGrid
 

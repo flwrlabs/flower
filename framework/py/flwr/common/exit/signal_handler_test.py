@@ -20,7 +20,8 @@ import signal
 import unittest
 from unittest.mock import Mock, patch
 
-from ..telemetry import EventType
+from flwr.supercore.telemetry import EventType
+
 from .exit_handler import (
     add_exit_handler,
     registered_exit_handlers,

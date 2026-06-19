@@ -21,13 +21,13 @@ import unittest
 from unittest import mock
 from uuid import uuid4
 
-from flwr.common.telemetry import EventType, _get_partner_id, _get_source_id, event
+from flwr.supercore.telemetry import EventType, _get_partner_id, _get_source_id, event
 
 
 class TelemetryTest(unittest.TestCase):
     """Tests for the telemetry module."""
 
-    @mock.patch("flwr.common.telemetry.FLWR_TELEMETRY_ENABLED", "1")
+    @mock.patch("flwr.supercore.telemetry.FLWR_TELEMETRY_ENABLED", "1")
     def test_event(self) -> None:
         """Test if sending works against the actual API."""
         # Prepare
@@ -40,7 +40,7 @@ class TelemetryTest(unittest.TestCase):
         # Assert
         self.assertEqual(actual, expected)
 
-    @mock.patch("flwr.common.telemetry.FLWR_TELEMETRY_ENABLED", "1")
+    @mock.patch("flwr.supercore.telemetry.FLWR_TELEMETRY_ENABLED", "1")
     def test_not_blocking(self) -> None:
         """Test if the code is blocking.
 
@@ -59,7 +59,7 @@ class TelemetryTest(unittest.TestCase):
         # Assert
         self.assertLess(duration_actual, duration_max)
 
-    @mock.patch("flwr.common.telemetry.FLWR_TELEMETRY_ENABLED", "0")
+    @mock.patch("flwr.supercore.telemetry.FLWR_TELEMETRY_ENABLED", "0")
     def test_telemetry_disabled(self) -> None:
         """Test opt-out."""
         # Prepare
@@ -95,9 +95,7 @@ class TelemetryTest(unittest.TestCase):
         except_value = "unavailable"
 
         # Execute
-        with mock.patch(
-            "flwr.common.telemetry.get_flwr_home", side_effect=RuntimeError
-        ):
+        with mock.patch("flwr.supercore.utils.get_flwr_home", side_effect=RuntimeError):
             source_id = _get_source_id()
 
         # Assert
