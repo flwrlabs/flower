@@ -89,10 +89,6 @@ service ServerAppIo {
   // Specific endpoints for ServerAppIo
   /////////////////////////////////////////////////////////////////////////////
 
-  // Get Federation Options (only used by flwr-simulation)
-  rpc GetFederationOptions(GetFederationOptionsRequest)
-      returns (GetFederationOptionsResponse) {}
-
   // Create one or more messages
   rpc PushMessages(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
 
