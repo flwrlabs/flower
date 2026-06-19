@@ -140,17 +140,17 @@ class ServerAppIoStub:
         flwr.proto.appio_pb2.PushAppMessagesResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
-    Specific endpoints for ServerAppIo
+    Message and node endpoints
     ///////////////////////////////////////////////////////////////////////////
 
-    Create one or more messages
+    Push messages
     """
 
     PullMessages: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppMessagesRequest,
         flwr.proto.appio_pb2.PullAppMessagesResponse,
     ]
-    """Get message results"""
+    """Pull messages"""
 
     GetNodes: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.GetNodesRequest,
@@ -263,17 +263,17 @@ class ServerAppIoAsyncStub:
         flwr.proto.appio_pb2.PushAppMessagesResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
-    Specific endpoints for ServerAppIo
+    Message and node endpoints
     ///////////////////////////////////////////////////////////////////////////
 
-    Create one or more messages
+    Push messages
     """
 
     PullMessages: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppMessagesRequest,
         flwr.proto.appio_pb2.PullAppMessagesResponse,
     ]
-    """Get message results"""
+    """Pull messages"""
 
     GetNodes: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.GetNodesRequest,
@@ -416,10 +416,10 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.PushAppMessagesResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushAppMessagesResponse]]:
         """///////////////////////////////////////////////////////////////////////////
-        Specific endpoints for ServerAppIo
+        Message and node endpoints
         ///////////////////////////////////////////////////////////////////////////
 
-        Create one or more messages
+        Push messages
         """
 
     @abc.abstractmethod
@@ -428,7 +428,7 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         request: flwr.proto.appio_pb2.PullAppMessagesRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.PullAppMessagesResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullAppMessagesResponse]]:
-        """Get message results"""
+        """Pull messages"""
 
     @abc.abstractmethod
     def GetNodes(

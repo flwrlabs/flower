@@ -85,13 +85,13 @@ service ServerAppIo {
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
 
   /////////////////////////////////////////////////////////////////////////////
-  // Specific endpoints for ServerAppIo
+  // Message and node endpoints
   /////////////////////////////////////////////////////////////////////////////
 
-  // Create one or more messages
+  // Push messages
   rpc PushMessages(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
 
-  // Get message results
+  // Pull messages
   rpc PullMessages(PullAppMessagesRequest) returns (PullAppMessagesResponse) {}
 
   // Return a set of nodes

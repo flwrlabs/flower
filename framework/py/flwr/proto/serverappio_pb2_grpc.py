@@ -239,17 +239,17 @@ class ServerAppIoServicer(object):
 
     def PushMessages(self, request, context):
         """///////////////////////////////////////////////////////////////////////////
-        Specific endpoints for ServerAppIo
+        Message and node endpoints
         ///////////////////////////////////////////////////////////////////////////
 
-        Create one or more messages
+        Push messages
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def PullMessages(self, request, context):
-        """Get message results
+        """Pull messages
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
