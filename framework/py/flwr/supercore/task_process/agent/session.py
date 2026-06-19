@@ -37,6 +37,7 @@ from flwr.supercore.json_message.connector_message import (
 )
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.task_process.connector.tool_call import (
+    ConnectorToolCall,
     extract_builtin_connector_tool_calls,
     with_builtin_connector_tools,
 )
@@ -87,11 +88,7 @@ class RuntimeAgentResponses(AgentResponses):
             # Execute one connector batch; further tool-call loops stay in AgentApp.
             followup_input: list[JSONObject] = []
             for tool_call in tool_calls:
-                output = self._create_connector_response(
-                    name=tool_call.name,
-                    call_id=tool_call.call_id,
-                    arguments=tool_call.arguments,
-                )
+                output = self._create_connector_response(tool_call)
                 followup_input.append(
                     {
                         "type": "function_call_output",
@@ -152,14 +149,9 @@ class RuntimeAgentResponses(AgentResponses):
         response = ModelResponse.from_message(response_message)
         return response.payload
 
-    def _create_connector_response(
-        self,
-        *,
-        name: str,
-        call_id: str,
-        arguments: JSONObject,
-    ) -> JSONValue:
+    def _create_connector_response(self, tool_call: ConnectorToolCall) -> JSONValue:
         """Create one connector response through a child connector task."""
+        name = tool_call.name
         create_res = self._stub.CreateTask(
             CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=name)
         )
@@ -170,8 +162,8 @@ class RuntimeAgentResponses(AgentResponses):
         message = ConnectorRequest(
             dst_task_id=connector_task_id,
             name=name,
-            call_id=call_id,
-            arguments=arguments,
+            call_id=tool_call.call_id,
+            arguments=tool_call.arguments,
         )
         response_message = self._send_and_receive(message)
         response = ConnectorResponse.from_message(response_message)
