@@ -28,9 +28,11 @@ from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
     GetNodesRequest,
+    PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
+    PushAppMessagesRequest,
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
@@ -258,6 +260,59 @@ class TestClientAppIoServicer(unittest.TestCase):
         finish_task_kwargs = self.mock_state.finish_task.call_args.kwargs
         self.assertEqual(finish_task_kwargs["task_id"], task_id)
         self.assertEqual(finish_task_kwargs["sub_status"], request.sub_status)
+
+    def test_servicer_pull_messages_aborts_when_no_message_found(self) -> None:
+        """PullMessages should abort cleanly when no message is available."""
+        run_id = 61016
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+        self.mock_state.get_messages.return_value = []
+
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(run_id=run_id),
+        ):
+            with self.assertRaises(grpc.RpcError):
+                self.servicer.PullMessages(PullAppMessagesRequest(), context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.NOT_FOUND,
+            f"No message found for run {run_id} in NodeState.",
+        )
+        self.mock_state.record_message_processing_start.assert_not_called()
+
+    @parameterized.expand([(0, 0), (1, 0), (0, 1), (2, 1), (1, 2)])  # type: ignore
+    def test_servicer_push_messages_rejects_invalid_message_count(
+        self, message_count: int, object_tree_count: int
+    ) -> None:
+        """PushMessages should reject anything other than one message/tree."""
+        run_id = 61016
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+        message = make_message(
+            metadata=self.maker.metadata(),
+            content=self.maker.recorddict(1, 1, 1),
+        )
+        request = PushAppMessagesRequest(
+            messages_list=[message_to_proto(message)] * message_count,
+            message_object_trees=[get_object_tree(message)] * object_tree_count,
+        )
+
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(run_id=run_id),
+        ):
+            with self.assertRaises(grpc.RpcError):
+                self.servicer.PushMessages(request, context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.INVALID_ARGUMENT,
+            "ClientAppIo.PushMessages expects exactly one message and one object tree.",
+        )
+        self.mock_state.record_message_processing_end.assert_not_called()
+        self.mock_state.store_message.assert_not_called()
 
     def test_get_nodes_unimplemented(self) -> None:
         """GetNodes should be unavailable on ClientAppIo."""
