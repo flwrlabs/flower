@@ -17,13 +17,13 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import cast
 
 from flwr.supercore.typing import JSONObject
 
-from .registry import get_builtin_connector_tools, has_builtin_connector
+from .registry import get_builtin_connector_tool, has_builtin_connector
 
 
 @dataclass(frozen=True)
@@ -35,28 +35,85 @@ class ConnectorToolCall:
     arguments: JSONObject
 
 
-def with_builtin_connector_tools(request: JSONObject) -> JSONObject:
-    """Return request with built-in connector function tools enabled."""
+@dataclass(frozen=True)
+class PreparedConnectorTools:
+    """A model request with AgentApp connector tool state."""
+
+    request: JSONObject
+    builtin_connector_names: frozenset[str]
+    followup_tools: list[JSONObject] | None
+
+
+def with_builtin_connector_tools(request: JSONObject) -> PreparedConnectorTools:
+    """Return request with requested built-in connector function tools enabled."""
     updated = dict(request)
     tools = request.get("tools")
-    # Built-ins are appended once before the first model call.
-    builtin_tools = get_builtin_connector_tools()
 
     if tools is None:
-        updated["tools"] = builtin_tools
-        return updated
+        return PreparedConnectorTools(
+            request=updated,
+            builtin_connector_names=frozenset(),
+            followup_tools=None,
+        )
 
     if isinstance(tools, Sequence) and not isinstance(tools, str):
+        builtin_connector_names: set[str] = set()
+        followup_tools: list[JSONObject] = []
+        normalized_tools: list[JSONObject] = []
+
         tool_list = list(tools)
-        if all(isinstance(tool, dict) for tool in tool_list):
-            updated["tools"] = [*cast(list[JSONObject], tool_list), *builtin_tools]
-    return updated
+        for tool in tool_list:
+            if isinstance(tool, str):
+                if not has_builtin_connector(tool):
+                    raise ValueError(f"Unknown built-in connector tool '{tool}'.")
+                if tool in builtin_connector_names:
+                    raise ValueError(f"Duplicate built-in connector tool '{tool}'.")
+
+                normalized_tools.append(get_builtin_connector_tool(tool))
+                builtin_connector_names.add(tool)
+                continue
+
+            if isinstance(tool, dict):
+                tool_name = tool.get("name")
+                if isinstance(tool_name, str) and has_builtin_connector(tool_name):
+                    raise ValueError(
+                        f"Built-in connector tool name '{tool_name}' is reserved. "
+                        f"Use the string form '{tool_name}' to enable it."
+                    )
+                json_tool = cast(JSONObject, tool)
+                followup_tools.append(json_tool)
+                normalized_tools.append(json_tool)
+                continue
+
+            raise ValueError(
+                "AgentResponses request field 'tools' must contain JSON objects "
+                "or built-in connector tool names."
+            )
+
+        updated["tools"] = normalized_tools
+        if builtin_connector_names and updated.get("stream") is True:
+            updated["stream"] = False
+
+        return PreparedConnectorTools(
+            request=updated,
+            builtin_connector_names=frozenset(builtin_connector_names),
+            followup_tools=followup_tools if followup_tools else None,
+        )
+
+    return PreparedConnectorTools(
+        request=updated,
+        builtin_connector_names=frozenset(),
+        followup_tools=None,
+    )
 
 
 def extract_builtin_connector_tool_calls(
-    response: JSONObject,
+    response: JSONObject, builtin_connector_names: Collection[str]
 ) -> list[ConnectorToolCall]:
     """Extract built-in connector function calls from one model response."""
+    if not builtin_connector_names:
+        return []
+
     output = response.get("output")
     if not isinstance(output, Sequence) or isinstance(output, str):
         return []
@@ -69,7 +126,7 @@ def extract_builtin_connector_tool_calls(
             continue
 
         name = item.get("name")
-        if not isinstance(name, str) or not has_builtin_connector(name):
+        if not isinstance(name, str) or name not in builtin_connector_names:
             continue
 
         call_id = item.get("call_id")

@@ -46,6 +46,14 @@ def get_builtin_connector_tools() -> list[JSONObject]:
     return [make_tool() for make_tool in _BUILTIN_CONNECTOR_TOOL_FACTORIES.values()]
 
 
+def get_builtin_connector_tool(name: str) -> JSONObject:
+    """Return the function tool for one built-in connector."""
+    make_tool = _BUILTIN_CONNECTOR_TOOL_FACTORIES.get(name)
+    if make_tool is None:
+        raise ValueError(f"Unsupported connector '{name}'.")
+    return make_tool()
+
+
 def has_builtin_connector(name: str) -> bool:
     """Return whether a built-in connector is registered."""
     return name in _CONNECTOR_HANDLERS
