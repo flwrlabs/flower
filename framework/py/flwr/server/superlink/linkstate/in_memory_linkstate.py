@@ -148,13 +148,16 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         message_id = message.metadata.message_id
         with self.lock:
+            if message_id in self.message_ins_store:
+                return message_id
+
             # Validate run_id
-            if message.metadata.run_id not in self.run_ids:
+            if message.metadata.run_id not in self.run_ids or self._is_finished_run(
+                message.metadata.run_id
+            ):
                 log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
                 return None
-            if self._is_finished_run(message.metadata.run_id):
-                log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
-                return None
+
             federation = self.run_ids[message.metadata.run_id].run.federation
 
             # Validate destination node ID
@@ -176,7 +179,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
             self.message_ins_store[message_id] = message
 
-        # Return the new message_id
         return message_id
 
     def _check_stored_messages(self, message_ids: set[str]) -> None:

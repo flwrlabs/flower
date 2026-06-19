@@ -27,7 +27,6 @@ from enum import Enum, auto
 from threading import Lock, Thread
 from typing import Any
 
-from flwr.supercore.utils import get_flwr_home
 from flwr.supercore.version import package_name, package_version
 
 FLWR_TELEMETRY_ENABLED = os.getenv("FLWR_TELEMETRY_ENABLED", "1")
@@ -75,6 +74,8 @@ def _get_partner_id() -> str:
 
 def _get_source_id() -> str:
     """Get existing or new source ID."""
+    from flwr.supercore.utils import get_flwr_home  # pylint: disable=C0415
+
     source_id = "unavailable"
     # Check if .flwr in home exists
     try:
