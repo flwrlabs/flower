@@ -32,6 +32,8 @@ from flwr.common.serde import (
 # pylint: disable=E0611
 from flwr.proto import clientappio_pb2_grpc
 from flwr.proto.appio_pb2 import (
+    GetNodesRequest,
+    GetNodesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -181,11 +183,11 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
 
         return PushTaskOutputResponse()
 
-    def PullMessage(
+    def PullMessages(
         self, request: PullAppMessagesRequest, context: grpc.ServicerContext
     ) -> PullAppMessagesResponse:
-        """Pull one Message."""
-        log(DEBUG, "ClientAppIo.PullMessage")
+        """Pull messages for ClientApp; currently returns exactly one message."""
+        log(DEBUG, "ClientAppIo.PullMessages")
 
         # Get the authenticated task and associated run ID
         task = get_authenticated_task()
@@ -196,7 +198,14 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         store = self.objectstore_factory.store()
 
         # Retrieve message for this run
-        message = state.get_messages(run_ids=[run_id], is_reply=False)[0]
+        messages = state.get_messages(run_ids=[run_id], is_reply=False)
+        if not messages:
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                f"No message found for run {run_id} in NodeState.",
+            )
+            raise RuntimeError("Unreachable code")  # for mypy
+        message = messages[0]
 
         # Record message processing start time
         state.record_message_processing_start(message_id=message.metadata.message_id)
@@ -209,11 +218,11 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
             message_object_trees=[object_tree],
         )
 
-    def PushMessage(
+    def PushMessages(
         self, request: PushAppMessagesRequest, context: grpc.ServicerContext
     ) -> PushAppMessagesResponse:
-        """Push one Message."""
-        log(DEBUG, "ClientAppIo.PushMessage")
+        """Push messages for ClientApp; currently accepts exactly one message."""
+        log(DEBUG, "ClientAppIo.PushMessages")
 
         # Get the authenticated task and associated run ID
         task = get_authenticated_task()
@@ -223,19 +232,39 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
+        if len(request.messages_list) != 1 or len(request.message_object_trees) != 1:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "ClientAppIo.PushMessages expects exactly one message and "
+                "one object tree.",
+            )
+            raise RuntimeError("Unreachable code")  # for mypy
+
         # Record message processing end time
+        message = request.messages_list[0]
         state.record_message_processing_end(
-            message_id=request.messages_list[0].metadata.reply_to_message_id
+            message_id=message.metadata.reply_to_message_id
         )
 
         # Store Message object to descendants mapping and preregister objects
-        objects_to_push: set[str] = set()
-        for object_tree in request.message_object_trees:
-            objects_to_push |= set(store.preregister(run_id, object_tree))
+        objects_to_push = set(
+            store.preregister(run_id, request.message_object_trees[0])
+        )
 
         # Save the message to the state
-        state.store_message(message_from_proto(request.messages_list[0]))
+        state.store_message(message_from_proto(message))
         return PushAppMessagesResponse(objects_to_push=objects_to_push)
+
+    def GetNodes(
+        self, request: GetNodesRequest, context: grpc.ServicerContext
+    ) -> GetNodesResponse:
+        """Get available nodes."""
+        log(DEBUG, "ClientAppIo.GetNodes")
+        context.abort(
+            grpc.StatusCode.UNIMPLEMENTED,
+            "GetNodes is not available on ClientAppIo.",
+        )
+        raise RuntimeError("Unreachable code")  # for mypy
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext

@@ -20,6 +20,7 @@ package flwr.proto;
 import "flwr/proto/message.proto";
 import "flwr/proto/fab.proto";
 import "flwr/proto/federation_config.proto";
+import "flwr/proto/node.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/task.proto";
 
@@ -53,6 +54,10 @@ message PullAppMessagesResponse {
   repeated Message messages_list = 1;
   repeated ObjectTree message_object_trees = 2;
 }
+
+// GetNodes messages
+message GetNodesRequest {}
+message GetNodesResponse { repeated Node nodes = 1; }
 
 // PushTaskMessage messages
 message PushTaskMessageRequest { Message message = 1; }

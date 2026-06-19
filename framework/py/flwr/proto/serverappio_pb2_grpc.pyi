@@ -23,7 +23,6 @@ import flwr.proto.appio_pb2
 import flwr.proto.log_pb2
 import flwr.proto.message_pb2
 import flwr.proto.run_pb2
-import flwr.proto.serverappio_pb2
 import grpc
 import grpc.aio
 import typing
@@ -141,21 +140,21 @@ class ServerAppIoStub:
         flwr.proto.appio_pb2.PushAppMessagesResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
-    Specific endpoints for ServerAppIo
+    Message and node endpoints
     ///////////////////////////////////////////////////////////////////////////
 
-    Create one or more messages
+    Push messages
     """
 
     PullMessages: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppMessagesRequest,
         flwr.proto.appio_pb2.PullAppMessagesResponse,
     ]
-    """Get message results"""
+    """Pull messages"""
 
     GetNodes: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.serverappio_pb2.GetNodesRequest,
-        flwr.proto.serverappio_pb2.GetNodesResponse,
+        flwr.proto.appio_pb2.GetNodesRequest,
+        flwr.proto.appio_pb2.GetNodesResponse,
     ]
     """Return a set of nodes"""
 
@@ -264,21 +263,21 @@ class ServerAppIoAsyncStub:
         flwr.proto.appio_pb2.PushAppMessagesResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
-    Specific endpoints for ServerAppIo
+    Message and node endpoints
     ///////////////////////////////////////////////////////////////////////////
 
-    Create one or more messages
+    Push messages
     """
 
     PullMessages: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppMessagesRequest,
         flwr.proto.appio_pb2.PullAppMessagesResponse,
     ]
-    """Get message results"""
+    """Pull messages"""
 
     GetNodes: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.serverappio_pb2.GetNodesRequest,
-        flwr.proto.serverappio_pb2.GetNodesResponse,
+        flwr.proto.appio_pb2.GetNodesRequest,
+        flwr.proto.appio_pb2.GetNodesResponse,
     ]
     """Return a set of nodes"""
 
@@ -417,10 +416,10 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.PushAppMessagesResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushAppMessagesResponse]]:
         """///////////////////////////////////////////////////////////////////////////
-        Specific endpoints for ServerAppIo
+        Message and node endpoints
         ///////////////////////////////////////////////////////////////////////////
 
-        Create one or more messages
+        Push messages
         """
 
     @abc.abstractmethod
@@ -429,14 +428,14 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         request: flwr.proto.appio_pb2.PullAppMessagesRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.PullAppMessagesResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullAppMessagesResponse]]:
-        """Get message results"""
+        """Pull messages"""
 
     @abc.abstractmethod
     def GetNodes(
         self,
-        request: flwr.proto.serverappio_pb2.GetNodesRequest,
+        request: flwr.proto.appio_pb2.GetNodesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.serverappio_pb2.GetNodesResponse, collections.abc.Awaitable[flwr.proto.serverappio_pb2.GetNodesResponse]]:
+    ) -> typing.Union[flwr.proto.appio_pb2.GetNodesResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.GetNodesResponse]]:
         """Return a set of nodes"""
 
 def add_ServerAppIoServicer_to_server(servicer: ServerAppIoServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...
