@@ -53,7 +53,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.interceptors import get_authenticated_task
 
-from ..corestate import CoreState
+from ...corestate import CoreState
 
 
 # pylint: disable=invalid-name, unused-argument

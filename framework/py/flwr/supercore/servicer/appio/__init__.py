@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared SuperCore servicers."""
+"""AppIo API Servicer."""
 
 
 from .appio_servicer import AppIoServicer
