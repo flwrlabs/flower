@@ -688,8 +688,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         # Ensure flwr_aid is a member of the requested federation
-        account = _get_account(context)
-        flwr_aid = cast(str, account.flwr_aid)
+        federation = request.federation_name
         flwr_aid = _get_flwr_aid(context)
         with rpc_error_translator(context, rpc_name):
             state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
