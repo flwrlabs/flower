@@ -37,7 +37,6 @@ from flwr.common.serde import (
     message_to_proto,
     run_from_proto,
 )
-from flwr.common.telemetry import EventType, event
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
     PullAppMessagesResponse,
@@ -76,6 +75,7 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.telemetry import EventType, event
 
 
 def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917

@@ -22,7 +22,7 @@ from types import FrameType
 
 from grpc import Server
 
-from flwr.common.telemetry import EventType
+from flwr.supercore.telemetry import EventType
 
 from .exit import flwr_exit
 from .exit_code import ExitCode
