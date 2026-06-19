@@ -61,8 +61,8 @@ class FederationManager(ABC):
         """Given a node ID, check if it is in the federation."""
 
     @abstractmethod
-    def create_default_federations(self, flwr_aid: str) -> None:
-        """Create default federations for the given account if they do not exist.
+    def ensure_default_federations_exist(self, flwr_aid: str) -> None:
+        """Ensure default federations exist for the given account.
 
         Parameters
         ----------

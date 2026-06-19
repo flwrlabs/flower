@@ -928,9 +928,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ) as mock_can_execute,
             patch.object(
                 self.state.federation_manager,
-                "create_default_federations",
+                "ensure_default_federations_exist",
                 return_value=None,
-            ) as mock_create_default_federations,
+            ) as mock_ensure_default_federations_exist,
             patch.object(
                 self.state.federation_manager,
                 "create_federation",
@@ -951,7 +951,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 visibility="private",
             ),
         )
-        mock_create_default_federations.assert_called_once_with(
+        mock_ensure_default_federations_exist.assert_called_once_with(
             flwr_aid=self.aid,
         )
         mock_create.assert_called_once_with(
@@ -1187,7 +1187,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
 
         self.state.federation_manager.assert_has_calls(
             [
-                call.create_default_federations(
+                call.ensure_default_federations_exist(
                     flwr_aid=self.flwr_aid,
                 ),
                 call.get_simulation_config("test-federation"),
