@@ -68,6 +68,7 @@ class ExitCode:
     COMMON_TLS_SERVER_CERTIFICATES_INVALID = 605
     RUNTIME_VERSION_INCOMPATIBLE = 606
     COMMON_APP_IMPORT_ERROR = 607
+    COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR = 608
 
     # Simulation exit codes (700-799)
     SIMULATION_EXCEPTION = 700
@@ -201,6 +202,9 @@ To use the REST API, install `flwr` with the `rest` extra:
         "the missing package is in the app's `pyproject.toml` dependencies, then "
         "install the dependencies manually unless automatic runtime dependency "
         "installation is enabled."
+    ),
+    ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR: (
+        "Runtime installation of app dependencies failed. Check the logs for details."
     ),
     # Simulation exit codes (700-799)
     ExitCode.SIMULATION_EXCEPTION: (

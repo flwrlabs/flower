@@ -137,6 +137,42 @@ def test_install_app_dependencies_uses_resolved_index_url(tmp_path: Path) -> Non
     dependency_installer.cleanup_app_runtime_environment(runtime_env)
 
 
+def test_install_app_dependencies_raises_runtime_dependency_error(
+    tmp_path: Path,
+) -> None:
+    """Ensure uv sync failures use the runtime dependency error type."""
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "FLWR_HOME": str(tmp_path),
+                "UV_DEFAULT_INDEX": "",
+            },
+            clear=False,
+        ),
+        patch.object(dependency_installer, "_ensure_uv_available"),
+        patch.object(
+            dependency_installer,
+            "_get_project_dependencies",
+            return_value=["numpy>=1.26.0"],
+        ),
+        patch.object(
+            dependency_installer,
+            "_run_cmd",
+            return_value="exit code 1: resolver failed",
+        ),
+    ):
+        with pytest.raises(
+            dependency_installer.RuntimeDependencyInstallationError,
+            match="uv sync failed",
+        ):
+            dependency_installer.install_app_dependencies(
+                project_dir=tmp_path,
+                launch_id="token-b",
+                run_id=654,
+            )
+
+
 def test_same_host_superlink_and_supernode_share_run_scoped_env(tmp_path: Path) -> None:
     """Ensure same-run app processes on one host resolve to the same env path."""
 
