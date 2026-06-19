@@ -6,9 +6,9 @@
  Description
 *************
 
-A ServerApp, ClientApp or AgentApp failed while importing app code. This can happen
-because a dependency is missing, a module from your app could not be found, or an
-imported name such as a function or class does not exist.
+Flower could not load a Flower App because importing its code failed. This can happen if
+a dependency is missing, a module in the app cannot be found, or an imported name, such
+as a function or class, does not exist.
 
 ****************
  How to Resolve
