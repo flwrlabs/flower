@@ -47,6 +47,8 @@ _RUN_ID_FOREIGN_KEYS = (
     ("message_res", "message_res_run_id_fkey"),
 )
 
+# Historical run_type string values used by this migration.
+# Keep these local constants because RunType has been removed from the framework.
 AGENT_APP_RUN_TYPE = "agentapp"
 SERVER_APP_RUN_TYPE = "serverapp"
 SIMULATION_RUN_TYPE = "simulation"
