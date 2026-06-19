@@ -182,7 +182,7 @@ class FlowerResponsesChatModel:
         """Return the model name for legacy Browser Use callers."""
         return self.model
 
-    async def ainvoke(
+    async def ainvoke(  # pylint: disable=too-many-branches,too-many-locals,too-many-nested-blocks,too-many-statements
         self,
         messages: list[object],
         output_format: type[T] | None = None,
