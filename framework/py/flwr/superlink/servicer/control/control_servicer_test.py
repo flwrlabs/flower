@@ -24,7 +24,7 @@ import unittest
 from datetime import datetime
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 import grpc
 from parameterized import parameterized
@@ -928,6 +928,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ) as mock_can_execute,
             patch.object(
                 self.state.federation_manager,
+                "create_default_federations",
+                return_value=None,
+            ) as mock_create_default_federations,
+            patch.object(
+                self.state.federation_manager,
                 "create_federation",
                 return_value=mock_federation,
             ) as mock_create,
@@ -945,6 +950,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 runtime=RunTime.SIMULATION,
                 visibility="private",
             ),
+        )
+        mock_create_default_federations.assert_called_once_with(
+            flwr_aid=self.aid,
         )
         mock_create.assert_called_once_with(
             name=expected_name,
@@ -1146,6 +1154,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
     def setUp(self) -> None:
         """Set up test fixtures."""
         self.flwr_aid = "test-flwr-aid"
+        self.account_name = "test-account"
         self.state = Mock()
         self.state.federation_manager = Mock()
         self.linkstate_factory = Mock()
@@ -1157,7 +1166,9 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         )
         self.get_current_account_info_patcher = patch(
             "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-            return_value=SimpleNamespace(flwr_aid=self.flwr_aid),
+            return_value=SimpleNamespace(
+                flwr_aid=self.flwr_aid, account_name=self.account_name
+            ),
         )
         self.get_current_account_info_patcher.start()
         self.addCleanup(self.get_current_account_info_patcher.stop)
@@ -1174,6 +1185,28 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
 
         response = self.servicer.CreateInvitation(request, context)
 
+        self.state.federation_manager.assert_has_calls(
+            [
+                call.create_default_federations(
+                    flwr_aid=self.flwr_aid,
+                ),
+                call.get_simulation_config("test-federation"),
+                call.can_execute(
+                    flwr_aid=self.flwr_aid,
+                    action=ActionType.CREATE_INVITATION,
+                    context=CreateInvitationContext(
+                        federation_name="test-federation",
+                        invitee_account_name="invitee-aid",
+                        runtime=RunTime.DEPLOYMENT,
+                    ),
+                ),
+                call.create_invitation(
+                    flwr_aid=self.flwr_aid,
+                    federation="test-federation",
+                    invitee_account_name="invitee-aid",
+                ),
+            ]
+        )
         self.state.federation_manager.can_execute.assert_called_once_with(
             flwr_aid=self.flwr_aid,
             action=ActionType.CREATE_INVITATION,

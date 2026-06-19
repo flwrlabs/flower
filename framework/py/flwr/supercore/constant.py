@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from enum import StrEnum
 
 from flwr.common.constant import (
@@ -114,6 +115,34 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
     init_args_num_gpus=None,
     init_args_logging_level="WARNING",
     init_args_log_to_driver=True,
+)
+
+
+# Default federations
+DEFAULT_AGENT_RUNS_FEDERATION_NAME = "agentruns"
+DEFAULT_WORKSPACE_FEDERATION_NAME = "workspace"
+
+
+@dataclass(frozen=True)
+class _DefaultFederation:
+    """Default federation metadata."""
+
+    name: str
+    description: str
+    simulation: bool
+
+
+DEFAULT_FEDERATIONS = (
+    _DefaultFederation(
+        name=DEFAULT_WORKSPACE_FEDERATION_NAME,
+        description="Default workspace federation.",
+        simulation=True,
+    ),
+    _DefaultFederation(
+        name=DEFAULT_AGENT_RUNS_FEDERATION_NAME,
+        description="Default agent runs federation.",
+        simulation=False,
+    ),
 )
 
 # Constants for exit handling

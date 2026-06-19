@@ -79,6 +79,10 @@ class NoOpFederationManager(FederationManager):
             raise ValueError(f"Federation '{federation}' does not exist.")
         return True
 
+    def create_default_federations(self, flwr_aid: str) -> None:
+        """Create default federations for the given account if they do not exist."""
+        _ = flwr_aid
+
     def get_federations(self, flwr_aid: str) -> list[Federation]:
         """Get federations of which the account is a member."""
         if flwr_aid != NOOP_FLWR_AID:
