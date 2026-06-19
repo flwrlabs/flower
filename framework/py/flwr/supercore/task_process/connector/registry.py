@@ -18,7 +18,7 @@ from collections.abc import Callable
 
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from . import web_fetch, web_search
+from . import browser_use, web_fetch, web_search
 
 ConnectorHandler = Callable[..., JSONValue]
 ConnectorToolFactory = Callable[[], JSONObject]
@@ -26,10 +26,12 @@ ConnectorToolFactory = Callable[[], JSONObject]
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
+    browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
 }
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.make_web_search_tool,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.make_web_fetch_tool,
+    browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.make_browser_use_tool,
 }
 
 
