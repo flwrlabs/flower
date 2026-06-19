@@ -47,6 +47,7 @@ def make_web_fetch_tool() -> JSONObject:
         },
     }
 
+
 _MAX_RESPONSE_BYTES = 1024 * 1024
 _TIMEOUT = 30.0
 _MAX_REDIRECTS = 10
