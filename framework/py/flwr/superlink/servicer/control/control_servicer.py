@@ -174,7 +174,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         note: str | None = None
 
         builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
-        is_builtin_agent_app = builtin_agent_fab is not None
         if builtin_agent_fab is not None:
             fab_file, verification_dict = builtin_agent_fab
         elif request.app_spec:
@@ -215,30 +214,35 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     f"federation '{federation}'.",
                 )
 
-            # Derive run type based on the presence of simulation config and apply
-            # federation config overrides
-            run_type = RunType.AGENT_APP if is_builtin_agent_app else RunType.SERVER_APP
-            resolved_federation_config = None
-            runtime = RunTime.DEPLOYMENT
-            sim_cfg = state.federation_manager.get_simulation_config(federation)
-            if sim_cfg and not is_builtin_agent_app:
-                run_type = RunType.SIMULATION
-                runtime = RunTime.SIMULATION
-                resolved_federation_config = SimulationConfig()
-                resolved_federation_config.CopyFrom(sim_cfg)
-                resolved_federation_config.MergeFrom(request.override_federation_config)
-
-            state.federation_manager.can_execute(
-                flwr_aid,
-                ActionType.START_RUN,
-                StartRunContext(federation_name=federation, runtime=runtime),
-            )
-
         try:
             # Validate user config overrides matches keys in run config in FAB
             fab_config = get_fab_config(fab_file)
             run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
             _ = fuse_dicts(run_config, override_config)
+
+            # Derive run type from the submitted FAB. AgentApp-only FABs can be
+            # bundled locally and submitted through the regular `flwr run` path.
+            components = fab_config["tool"]["flwr"]["app"].get("components", {})
+            is_agentapp_bundle = "agentapp" in components
+            run_type = RunType.AGENT_APP if is_agentapp_bundle else RunType.SERVER_APP
+            resolved_federation_config = None
+            runtime = RunTime.DEPLOYMENT
+            with rpc_error_translator(context, rpc_name):
+                sim_cfg = state.federation_manager.get_simulation_config(federation)
+                if sim_cfg and not is_agentapp_bundle:
+                    run_type = RunType.SIMULATION
+                    runtime = RunTime.SIMULATION
+                    resolved_federation_config = SimulationConfig()
+                    resolved_federation_config.CopyFrom(sim_cfg)
+                    resolved_federation_config.MergeFrom(
+                        request.override_federation_config
+                    )
+
+                state.federation_manager.can_execute(
+                    flwr_aid,
+                    ActionType.START_RUN,
+                    StartRunContext(federation_name=federation, runtime=runtime),
+                )
 
             # Create run
             fab = Fab(
