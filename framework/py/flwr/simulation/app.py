@@ -59,7 +59,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushTaskOutputRequest,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-from flwr.server.superlink.fleet.vce import SimulationBackendImportError
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
 from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.simulation.run_simulation import _run_simulation
@@ -331,9 +330,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         # General exit code
         exit_code = ExitCode.SIMULATION_EXCEPTION
-        if isinstance(ex, SimulationBackendImportError):
-            exit_code = ExitCode.SIMULATION_MISSING_EXTRA
-        elif isinstance(ex, ImportError):
+        if isinstance(ex, ImportError):
             exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
         elif isinstance(ex, RuntimeDependencyInstallationError):
             exit_code = ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR

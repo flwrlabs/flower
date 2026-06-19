@@ -333,9 +333,9 @@ def _main_loop(
     except Empty:
         log(DEBUG, "Queue timeout. No context received.")
 
-    except (ImportError, vce.SimulationBackendImportError):
+    except ImportError:
         success = False
-        # Let import failures reach the process-level exit-code handler.
+        # Let app import failures reach the process-level exit-code handler.
         raise
 
     except Exception as ex:
