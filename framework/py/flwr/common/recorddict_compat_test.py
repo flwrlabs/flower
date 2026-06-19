@@ -34,9 +34,9 @@ from flwr.common import (
     NDArrays,
     Scalar,
     Status,
+    ndarrays_to_parameters,
 )
 
-from .parameter import ndarrays_to_parameters
 from .recorddict_compat import (
     evaluateins_to_recorddict,
     evaluateres_to_recorddict,

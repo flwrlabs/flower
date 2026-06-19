@@ -18,10 +18,18 @@ Paper: arxiv.org/pdf/1710.06963.pdf
 """
 
 
-from flwr.common import EvaluateIns, EvaluateRes, FitIns, FitRes, Parameters, Scalar
+from flwr.common import (
+    EvaluateIns,
+    EvaluateRes,
+    FitIns,
+    FitRes,
+    Parameters,
+    Scalar,
+    ndarrays_to_parameters,
+    parameters_to_ndarrays,
+)
 from flwr.common.dp import add_gaussian_noise
 from flwr.common.logger import warn_deprecated_feature
-from flwr.common.parameter import ndarrays_to_parameters, parameters_to_ndarrays
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy.strategy import Strategy
