@@ -288,7 +288,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         flwr_aid : str | None
             Flower Account ID of the creator.
         primary_task_type : str
-            The type of the primary task created for the run.
+            The type of the primary task to create for the run.
         series_id : int | None (default: None)
             Optional run series ID. If `None`, a new run series is created for
             the federation. If set, the series must already exist and belong to
