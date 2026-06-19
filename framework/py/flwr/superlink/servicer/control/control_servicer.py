@@ -285,10 +285,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             log(ERROR, "Could not start run: %s", str(e))
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
 
-        log_msg = (
-            f"Created {primary_task_type} primary task for run {run_id} "
-            f"in federation {run.federation}"
-        )
+        log_msg = f"Created run {run_id} in federation {run.federation}"
         log(INFO, log_msg)
         return StartRunResponse(
             run_id=run_id, note=note, series_id=series_id, federation=run.federation
