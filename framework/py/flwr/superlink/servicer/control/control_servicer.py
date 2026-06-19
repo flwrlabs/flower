@@ -119,8 +119,6 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
-    DEFAULT_FEDERATION_DEPLOYMENT,
-    DEFAULT_FEDERATION_SIMULATION,
     NOOP_FEDERATION,
     PLATFORM_API_URL,
     ActionType,
@@ -145,11 +143,6 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
 from .control_account_auth_interceptor import get_current_account_info
-
-_DEFAULT_FEDERATION_NAMES = {
-    DEFAULT_FEDERATION_DEPLOYMENT,
-    DEFAULT_FEDERATION_SIMULATION,
-}
 
 
 # pylint: disable=too-many-public-methods
@@ -741,12 +734,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 context.abort(
                     grpc.StatusCode.FAILED_PRECONDITION,
                     f"Invalid federation name: '{request.federation_name}'. {err_msg}",
-                )
-
-            if request.federation_name in _DEFAULT_FEDERATION_NAMES:
-                raise FlowerError(
-                    ApiErrorCode.FORBIDDEN_ACTION,
-                    f"Federation name '{request.federation_name}' is reserved.",
                 )
 
             # Init link state

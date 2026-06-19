@@ -84,8 +84,6 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
-    DEFAULT_FEDERATION_DEPLOYMENT,
-    DEFAULT_FEDERATION_SIMULATION,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION,
     ActionType,
@@ -1034,41 +1032,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         context.abort.assert_called_once()
         status_code, _ = context.abort.call_args.args
         self.assertEqual(status_code, grpc.StatusCode.FAILED_PRECONDITION)
-
-    @parameterized.expand(
-        [
-            (DEFAULT_FEDERATION_SIMULATION,),
-            (DEFAULT_FEDERATION_DEPLOYMENT,),
-        ]
-    )  # type: ignore
-    def test_create_federation_raises_on_reserved_default_name(
-        self, federation_name: str
-    ) -> None:
-        """Test CreateFederation aborts when a default federation name is used."""
-        request = CreateFederationRequest(
-            federation_name=federation_name,
-            description="A test federation with a reserved name",
-            simulation=False,
-        )
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-
-        with (
-            patch.object(
-                self.state.federation_manager,
-                "ensure_default_federations_exist",
-            ) as mock_ensure_default_federations_exist,
-            patch.object(
-                self.state.federation_manager,
-                "create_federation",
-            ) as mock_create_federation,
-            self.assertRaises(grpc.RpcError),
-        ):
-            self.servicer.CreateFederation(request, context)
-
-        _assert_abort_with_flwr_err(context, ApiErrorCode.FORBIDDEN_ACTION)
-        mock_ensure_default_federations_exist.assert_not_called()
-        mock_create_federation.assert_not_called()
 
     def test_archive_federation_success(self) -> None:
         """Test ArchiveFederation succeeds when federation_manager.archive_federation
