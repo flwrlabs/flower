@@ -116,6 +116,12 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
     init_args_log_to_driver=True,
 )
 
+
+# Default federation names for every Flower account
+DEFAULT_FEDERATION_SIMULATION = "workspace-simulation"
+DEFAULT_FEDERATION_DEPLOYMENT = "workspace-deployment"
+
+
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
 TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
