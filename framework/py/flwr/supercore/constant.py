@@ -135,12 +135,12 @@ class _DefaultFederation:
 DEFAULT_FEDERATIONS = (
     _DefaultFederation(
         name=DEFAULT_FEDERATION_SIMULATION,
-        description="Default workspace federation.",
+        description="Default simulation federation.",
         simulation=True,
     ),
     _DefaultFederation(
         name=DEFAULT_FEDERATION_DEPLOYMENT,
-        description="Default workspace federation.",
+        description="Default deployment federation.",
         simulation=False,
     ),
 )

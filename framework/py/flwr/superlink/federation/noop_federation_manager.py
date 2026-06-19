@@ -47,6 +47,7 @@ class UnsupportedError(FlowerError):
         )
 
 
+# pylint: disable-next=too-many-public-methods
 class NoOpFederationManager(FederationManager):
     """No-Op FederationManager implementation."""
 
