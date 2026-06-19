@@ -49,19 +49,16 @@ SuperExec, the seed Job, and TaskExecutor AppIo. The wrapper generates a local
 test CA/server certificate under the evidence directory, applies a Kubernetes
 Secret, and verifies TLS evidence after the run.
 
-Default launch-path proof with TLS:
+Common canned runs:
 
-```bash
-./framework/dev/k8s/test-real-launch-path.sh --tls
-```
+| Goal | Command |
+| --- | --- |
+| Default launch-path proof | `./framework/dev/k8s/test-real-launch-path.sh` |
+| Default launch-path proof with existing images | `./framework/dev/k8s/test-real-launch-path.sh --skip-build` |
+| Default launch-path proof with TLS | `./framework/dev/k8s/test-real-launch-path.sh --tls` |
+| Default launch-path proof with existing images and TLS | `./framework/dev/k8s/test-real-launch-path.sh --skip-build --tls` |
 
-Skip-build launch-path proof with TLS:
-
-```bash
-./framework/dev/k8s/test-real-launch-path.sh --skip-build --tls
-```
-
-To run the budget-1/two-task capacity and cleanup proof:
+Budget-1/two-task capacity and cleanup proof:
 
 ```bash
 output_dir=/private/tmp/f7d-v2-capacity-cleanup-proof-$(date +%Y%m%d-%H%M%S)
@@ -70,7 +67,7 @@ output_dir=/private/tmp/f7d-v2-capacity-cleanup-proof-$(date +%Y%m%d-%H%M%S)
   --output-dir "${output_dir}"
 ```
 
-Capacity and cleanup proof with TLS:
+Budget-1/two-task capacity and cleanup proof with TLS:
 
 ```bash
 output_dir=/private/tmp/f7d-v2-capacity-cleanup-proof-tls-$(date +%Y%m%d-%H%M%S)
@@ -80,14 +77,7 @@ output_dir=/private/tmp/f7d-v2-capacity-cleanup-proof-tls-$(date +%Y%m%d-%H%M%S)
   --output-dir "${output_dir}"
 ```
 
-To verify the saved capacity evidence manually after the wrapper finishes:
-
-```bash
-python framework/dev/k8s/verify_evidence.py "${output_dir}" \
-  --expected-result local-k8s-capacity-cleanup-proof
-```
-
-To run the demo-friendly budget-4/eight-task cardinality proof:
+Demo-friendly budget-4/eight-task cardinality proof:
 
 ```bash
 output_dir=/private/tmp/f7e-demo-cardinality-proof-$(date +%Y%m%d-%H%M%S)
@@ -96,7 +86,7 @@ output_dir=/private/tmp/f7e-demo-cardinality-proof-$(date +%Y%m%d-%H%M%S)
   --output-dir "${output_dir}"
 ```
 
-Demo-friendly cardinality proof with TLS:
+Demo-friendly budget-4/eight-task cardinality proof with TLS:
 
 ```bash
 output_dir=/private/tmp/f7e-demo-cardinality-proof-tls-$(date +%Y%m%d-%H%M%S)
@@ -106,8 +96,36 @@ output_dir=/private/tmp/f7e-demo-cardinality-proof-tls-$(date +%Y%m%d-%H%M%S)
   --output-dir "${output_dir}"
 ```
 
-The demo preset leaves namespace resources in place for live inspection. Verify
-the saved bundle with the explicit demo expectations:
+The wrapper runs the verifier automatically. To verify saved evidence manually
+after the wrapper finishes, use the same verifier arguments for the run mode.
+If the wrapper command did not set `--output-dir`, copy the `Evidence:` path
+printed by the wrapper into `output_dir` first.
+
+| Canned run | Manual verifier command |
+| --- | --- |
+| Default launch-path proof | `python framework/dev/k8s/verify_evidence.py "${output_dir}"` |
+| Default launch-path proof with TLS | `python framework/dev/k8s/verify_evidence.py "${output_dir}" --require-tls` |
+| Capacity and cleanup proof | `python framework/dev/k8s/verify_evidence.py "${output_dir}" --expected-result local-k8s-capacity-cleanup-proof --expected-active-pod-budget 1 --expected-seed-run-count 2` |
+| Capacity and cleanup proof with TLS | `python framework/dev/k8s/verify_evidence.py "${output_dir}" --expected-result local-k8s-capacity-cleanup-proof --expected-active-pod-budget 1 --expected-seed-run-count 2 --require-tls` |
+| Demo-friendly cardinality proof | `python framework/dev/k8s/verify_evidence.py "${output_dir}" --expected-result local-k8s-capacity-cleanup-proof --expected-active-pod-budget 4 --expected-seed-run-count 8 --no-require-cleanup` |
+| Demo-friendly cardinality proof with TLS | `python framework/dev/k8s/verify_evidence.py "${output_dir}" --expected-result local-k8s-capacity-cleanup-proof --expected-active-pod-budget 4 --expected-seed-run-count 8 --no-require-cleanup --require-tls` |
+
+Default launch-path proof, expanded:
+
+```bash
+python framework/dev/k8s/verify_evidence.py "${output_dir}"
+```
+
+Capacity and cleanup proof, expanded:
+
+```bash
+python framework/dev/k8s/verify_evidence.py "${output_dir}" \
+  --expected-result local-k8s-capacity-cleanup-proof \
+  --expected-active-pod-budget 1 \
+  --expected-seed-run-count 2
+```
+
+Demo-friendly cardinality proof, expanded:
 
 ```bash
 python framework/dev/k8s/verify_evidence.py "${output_dir}" \
@@ -117,7 +135,8 @@ python framework/dev/k8s/verify_evidence.py "${output_dir}" \
   --no-require-cleanup
 ```
 
-For the TLS demo preset, add `--require-tls`:
+For any run that used `--tls`, add `--require-tls` to the matching verifier
+command. For example, verify a TLS demo bundle with:
 
 ```bash
 python framework/dev/k8s/verify_evidence.py "${output_dir}" \
@@ -128,16 +147,46 @@ python framework/dev/k8s/verify_evidence.py "${output_dir}" \
   --require-tls
 ```
 
+The demo preset leaves namespace resources in place for live inspection.
+
 `/private/tmp` is only an example local scratch location. For handoff or review,
 choose a durable writable directory, or archive the completed evidence directory
-after saving the verifier report.
+after saving the verifier report. When `--tls` is used, the evidence directory
+also contains generated local TLS CA/server key material under `tls/`; do not
+commit or broadly share that raw directory. Prefer sharing the redacted evidence
+files plus a saved verifier report, or archive the raw directory only in a
+trusted private location.
 
 The wrapper prints verifier output to stdout. To make the verifier report part
-of an evidence bundle for review, rerun the verifier and save the output:
+of an evidence bundle for review, rerun the verifier and save the output with
+the same verifier arguments used for the run.
+
+Default launch-path proof:
+
+```bash
+python framework/dev/k8s/verify_evidence.py "${output_dir}" \
+  > "${output_dir}/diagnostics/verifier-output.txt"
+```
+
+Capacity and cleanup proof:
 
 ```bash
 python framework/dev/k8s/verify_evidence.py "${output_dir}" \
   --expected-result local-k8s-capacity-cleanup-proof \
+  --expected-active-pod-budget 1 \
+  --expected-seed-run-count 2 \
+  > "${output_dir}/diagnostics/verifier-output.txt"
+```
+
+TLS demo proof:
+
+```bash
+python framework/dev/k8s/verify_evidence.py "${output_dir}" \
+  --expected-result local-k8s-capacity-cleanup-proof \
+  --expected-active-pod-budget 4 \
+  --expected-seed-run-count 8 \
+  --no-require-cleanup \
+  --require-tls \
   > "${output_dir}/diagnostics/verifier-output.txt"
 ```
 
@@ -145,17 +194,16 @@ The wrapper deletes the test namespace by default. To inspect resources after a
 run:
 
 ```bash
-output_dir=/private/tmp/f7d-v2-capacity-cleanup-proof-live-$(date +%Y%m%d-%H%M%S)
+output_dir=/private/tmp/f7d-v2-launch-path-live-$(date +%Y%m%d-%H%M%S)
 ./framework/dev/k8s/test-real-launch-path.sh \
-  --capacity-cleanup-proof \
   --skip-cleanup \
-  --tls \
   --output-dir "${output_dir}"
 python framework/dev/k8s/verify_evidence.py "${output_dir}" \
-  --expected-result local-k8s-capacity-cleanup-proof \
-  --no-require-cleanup \
-  --require-tls
+  --no-require-cleanup
 ```
+
+Add `--capacity-cleanup-proof`, `--demo`, or `--tls` to the wrapper command as
+needed, and add the matching verifier flags shown above.
 
 ## Release Testing Toolkit
 
@@ -224,7 +272,7 @@ Watch all Pods:
 ```
 
 This opens a live Pod view for the harness namespace. On systems without
-`watch`, the wrapper falls back to a one-second shell loop.
+`watch`, `harnessctl.sh` falls back to a one-second shell loop.
 
 Watch only TaskExecutors:
 
@@ -252,7 +300,7 @@ Inspect TaskExecutor logs:
 This prints logs for TaskExecutor Pods selected by the harness labels. Add `-f`
 to follow active Pods.
 
-macOS watch and tmux setup:
+### macOS watch and tmux setup
 
 ```bash
 brew install watch tmux
@@ -357,7 +405,10 @@ IMAGE_TAG=dev \
 
 The most useful overrides are `CLUSTER_NAME`, `KUBECTL_CONTEXT`, `NAMESPACE`,
 `IMAGE_TAG`, `SUPERLINK_IMAGE`, `SUPEREXEC_IMAGE`, `TASKEXECUTOR_IMAGE`,
-`ACTIVE_POD_BUDGET`, `CREATE_CLUSTER`, `IMPORT_IMAGES`, and `OUTPUT_DIR`.
+`ACTIVE_POD_BUDGET`, `APPIO_TLS`, `TLS_SECRET_NAME`, `TLS_DIR`,
+`CREATE_CLUSTER`, `IMPORT_IMAGES`, and `OUTPUT_DIR`. For `harnessctl.sh`, the
+certificate file paths can also be overridden with `TLS_CA_CERT`, `TLS_CA_KEY`,
+`TLS_SERVER_CERT`, and `TLS_SERVER_KEY`.
 
 `kill-superexec-after-claim-before-launch` is not implemented in this slice.
 That scenario needs deterministic SuperExec fault injection after `ClaimTask`
@@ -414,12 +465,16 @@ Evidence is written under the selected output directory:
 | `objects/capacity-blocked-pods.json` | Capacity-proof snapshot of the first active TaskExecutor Pod. |
 | `objects/executor-config.yaml` | Rendered Kubernetes executor config, including capacity settings. |
 | `objects/executor-config.json` | JSON form of the rendered Kubernetes executor config. |
+| `objects/tls.json` | Redacted TLS evidence with CA path and SHA-256 fingerprint when TLS is configured. |
 | `objects/secrets-before-cleanup.redacted.json` | Capacity-proof redacted Secret snapshot before executor cleanup. |
 | `objects/cleanup-pods.json` | Capacity-proof TaskExecutor Pod state after capacity opens. |
 | `objects/secrets-after-cleanup.redacted.json` | Capacity-proof redacted Secret snapshot after executor cleanup. |
 | `objects/real-launch.yaml` | Rendered SuperLink, executor config, and SuperExec objects. |
+| `objects/real-launch.json` | JSON form of the rendered SuperLink, executor config, and SuperExec objects. |
 | `objects/seed-job.yaml` | Rendered seed ConfigMap and Job. |
+| `objects/seed-job.json` | JSON form of the rendered seed ConfigMap and Job. |
 | `objects/pods.json` | Observed TaskExecutor Pod list and phases. |
+| `tls/` | Generated local test TLS CA/server key material for wrapper `--tls` runs; keep private and do not commit. |
 | `diagnostics/commands.txt` | Planned or executed host commands. |
 | `diagnostics/failures.txt` | Failure messages when the harness records failures. |
 | `diagnostics/image-preflight.json` | Docker image inspection and k3d import plan/results. |
@@ -465,7 +520,7 @@ map in machine-readable form.
    and should match. For the capacity cleanup proof, `summary.json` should list
    the expected `seed_run_ids`, `task-lineage.json` should list the same
    `seeded_run_ids`, and `seeded_task_count` should match the expected run
-   count. The `--demo` preset expects three seeded runs.
+   count. The `--demo` preset expects eight seeded runs.
 
 4. Confirm the Kubernetes executor created the TaskExecutor Pod.
 
@@ -539,6 +594,21 @@ For `--capacity-cleanup-proof`, additionally confirm:
    full task-count evidence comes from `Task lineage records` and
    `task-lineage.json`.
 
+For `--tls`, additionally confirm:
+
+1. `objects/tls.json` has `ready: true`, an in-Pod root certificate path under
+   `root_certificates.path`, and a non-empty `root_certificates.sha256`.
+2. `objects/executor-config.json` uses the same
+   `appio-root-certificates-path` as `objects/tls.json`.
+3. `objects/real-launch.json` shows SuperLink without `--insecure` and with
+   `--appio-ssl-certfile`.
+4. `objects/real-launch.json` shows SuperExec with `--root-certificates` set to
+   the recorded root certificate path.
+5. `objects/seed-job.json` shows the seed Job with
+   `--control-root-certificates` set to the recorded root certificate path.
+6. The verifier was run with `--require-tls` and ended with
+   `Verification: PASSED`.
+
 For `--demo`, additionally confirm:
 
 1. `objects/executor-config.yaml` sets `active-pod-budget: 4`.
@@ -567,7 +637,7 @@ For `--demo`, additionally confirm:
 | Capacity wait | Optional | `--capacity-cleanup-proof` seeds two runs with active Pod budget `1` and requires SuperExec wait evidence. |
 | Sweeper cleanup | Optional | `--capacity-cleanup-proof` requires the first completed TaskExecutor Pod and Secret to be removed before namespace cleanup. |
 | Cardinality proof | Optional | `--demo` seeds eight runs with active Pod budget `4` and requires four active Pods before waiting work launches after slots open. |
-| AppIo TLS | Optional | `--tls` configures local server-auth TLS and `verify_evidence.py --require-tls` checks the saved TLS evidence. |
+| AppIo TLS | Optional | `--tls` configures local server-auth TLS and `verify_evidence.py --require-tls` checks the saved TLS evidence. `proof-checklist.json` still lists AppIo TLS proof out of scope, so use the verifier for TLS-specific evidence. |
 | Wrapper cleanup | Yes | Default wrapper behavior deletes the namespace and verifies cleanup evidence. |
 
 ## Out Of Scope
@@ -577,7 +647,7 @@ For `--demo`, additionally confirm:
 | AppIo result completion semantics | No | This slice observes launch and Pod success, not full result semantics. |
 | ClientApp execution | No | The probe includes a minimal ClientApp file only because the FAB schema expects it. |
 | CNI/NetworkPolicy, production RBAC | No | This is local/dev-only and does not validate production deployment policy. |
-| Concurrency, retry, failure behavior | No | The default proof starts one deterministic run; the capacity proof starts two deterministic runs only to exercise budget waiting and cleanup. |
+| Concurrency, retry, failure behavior | No | The default proof starts one deterministic run. The capacity proof starts two deterministic runs to exercise budget waiting and cleanup; the demo starts eight runs to exercise cardinality. |
 
 ## Useful Commands
 
@@ -620,14 +690,18 @@ Verify an existing capacity cleanup bundle:
 
 ```bash
 python framework/dev/k8s/verify_evidence.py "${output_dir}" \
-  --expected-result local-k8s-capacity-cleanup-proof
+  --expected-result local-k8s-capacity-cleanup-proof \
+  --expected-active-pod-budget 1 \
+  --expected-seed-run-count 2
 ```
 
-Verify a bundle from a run that used `--skip-cleanup`:
+Verify a capacity cleanup bundle from a run that used `--skip-cleanup`:
 
 ```bash
 python framework/dev/k8s/verify_evidence.py "${output_dir}" \
   --expected-result local-k8s-capacity-cleanup-proof \
+  --expected-active-pod-budget 1 \
+  --expected-seed-run-count 2 \
   --no-require-cleanup
 ```
 
