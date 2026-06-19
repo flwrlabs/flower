@@ -219,7 +219,6 @@ def _run_with_control_api(
             payload: dict[str, Any] = {
                 "success": res.HasField("run_id"),
                 "run-id": f"{res.run_id}" if res.HasField("run_id") else None,
-                "series-id": f"{res.series_id}" if res.HasField("series_id") else None,
                 "federation": res.federation,
             }
             if res.HasField("note"):
