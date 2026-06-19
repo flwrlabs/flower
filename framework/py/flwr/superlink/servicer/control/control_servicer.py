@@ -690,7 +690,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # Ensure flwr_aid is a member of the requested federation
         account = _get_account(context)
         flwr_aid = cast(str, account.flwr_aid)
-        federation = request.federation_name
+        flwr_aid = _get_flwr_aid(context)
         with rpc_error_translator(context, rpc_name):
             state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
             if not state.federation_manager.has_member(flwr_aid, federation):
@@ -810,8 +810,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         with rpc_error_translator(context, rpc_name):
             # Validate federation, node ID, and ownership
-            account = _get_account(context)
-            flwr_aid = cast(str, account.flwr_aid)
+            flwr_aid = _get_flwr_aid(context)
             state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
             _validate_federation_and_node_in_request(
                 state, flwr_aid, request.federation_name, request.node_id, context
@@ -886,8 +885,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         with rpc_error_translator(context, rpc_name):
-            account = _get_account(context)
-            flwr_aid = cast(str, account.flwr_aid)
+            flwr_aid = _get_flwr_aid(context)
             state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
             federation = request.federation_name
             invitee_account_name = request.invitee_account_name

@@ -123,28 +123,6 @@ DEFAULT_FEDERATION_SIMULATION = "workspace-simulation"
 DEFAULT_FEDERATION_DEPLOYMENT = "workspace-deployment"
 
 
-@dataclass(frozen=True)
-class _DefaultFederation:
-    """Default federation metadata."""
-
-    name: str
-    description: str
-    simulation: bool
-
-
-DEFAULT_FEDERATIONS = (
-    _DefaultFederation(
-        name=DEFAULT_FEDERATION_SIMULATION,
-        description="Default simulation federation.",
-        simulation=True,
-    ),
-    _DefaultFederation(
-        name=DEFAULT_FEDERATION_DEPLOYMENT,
-        description="Default deployment federation.",
-        simulation=False,
-    ),
-)
-
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
 TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
