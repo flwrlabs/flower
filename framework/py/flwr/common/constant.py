@@ -139,6 +139,9 @@ ISOLATION_MODE_PROCESS = "process"
 
 # Runtime dependency installation toggle
 RUNTIME_DEPENDENCY_INSTALL = False
+FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION = (
+    "FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION"
+)
 
 # Log streaming configurations
 CONN_REFRESH_PERIOD = 60  # Stream connection refresh period

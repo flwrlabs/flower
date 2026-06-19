@@ -96,15 +96,15 @@ def flwr_exit(
     # Log the exit message
     log(log_level, exit_message)
 
+    # Trigger exit handlers
+    trigger_exit_handlers()
+
     # Start a daemon thread to force exit if graceful exit fails
     def force_exit() -> None:
         time.sleep(FORCE_EXIT_TIMEOUT_SECONDS)
         os._exit(sys_exit_code)
 
     threading.Thread(target=force_exit, daemon=True).start()
-
-    # Trigger exit handlers
-    trigger_exit_handlers()
 
     # Wait for telemetry event to be sent before exiting
     if event_future:
