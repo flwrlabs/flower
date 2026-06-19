@@ -215,11 +215,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
             if not is_duplicate_message_id:
                 raise
-            log(
-                ERROR,
-                "Message with message_id %s already exists.",
-                message.metadata.message_id,
-            )
 
         return message.metadata.message_id
 
