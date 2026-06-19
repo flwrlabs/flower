@@ -659,11 +659,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Init link state
         state = self.linkstate_factory.state()
-        account = _get_account(context)
+        flwr_aid = _get_flwr_aid(context)
 
         # Get federations the account is a member of
         with rpc_error_translator(context, rpc_name):
-            flwr_aid = cast(str, account.flwr_aid)
             state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
             federations = state.federation_manager.get_federations(flwr_aid)
 
