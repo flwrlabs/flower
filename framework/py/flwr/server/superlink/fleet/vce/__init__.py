@@ -15,8 +15,9 @@
 """Fleet Simulation Runtime side."""
 
 
-from .vce_api import start_vce
+from .vce_api import SimulationBackendImportError, start_vce
 
 __all__ = [
+    "SimulationBackendImportError",
     "start_vce",
 ]

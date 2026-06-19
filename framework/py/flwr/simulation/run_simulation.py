@@ -333,9 +333,9 @@ def _main_loop(
     except Empty:
         log(DEBUG, "Queue timeout. No context received.")
 
-    except ImportError:
+    except (ImportError, vce.SimulationBackendImportError):
         success = False
-        # Let app import failures reach the process-level exit-code handler.
+        # Let import failures reach the process-level exit-code handler.
         raise
 
     except Exception as ex:
@@ -403,10 +403,6 @@ def _run_simulation(
         if importlib.util.find_spec("ray") is None:
             flwr_exit(
                 code=ExitCode.SIMULATION_MISSING_EXTRA,
-                message=(
-                    "`ray` backend selected for simulation, but `ray` is not "
-                    "installed."
-                ),
                 event_type=exit_event,
                 event_details={"success": False},
             )

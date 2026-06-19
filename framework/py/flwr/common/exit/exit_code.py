@@ -213,9 +213,9 @@ To use the REST API, install `flwr` with the `rest` extra:
     ExitCode.SIMULATION_MISSING_EXTRA: """
 Extra dependencies required for simulation are missing.
 
-To use simulation with the Ray backend, install `flwr` with the `simulation` extra:
-
-    `pip install "flwr[simulation]"`.
+To use simulation with the Ray backend, add `flwr[simulation]` to the app's
+`pyproject.toml` dependencies, then install the dependencies manually unless
+automatic runtime dependency installation is enabled.
 """,
     # Task process exit codes (800-899)
     ExitCode.TASK_PROC_EXCEPTION: (

@@ -53,6 +53,10 @@ from .metrics import VceMetrics
 NodeToPartitionMapping = dict[int, int]
 
 
+class SimulationBackendImportError(RuntimeError):
+    """Error raised when the simulation backend cannot import a dependency."""
+
+
 def _register_nodes(
     num_nodes: int, state_factory: LinkStateFactory
 ) -> NodeToPartitionMapping:
@@ -381,16 +385,21 @@ def start_vce(
 
             app_fn = _load_client_app
 
-        # Run main simulation loop
-        run_api(
-            app_fn,
-            backend_fn,
-            nodes_mapping,
-            state_factory,
-            node_info_stores,
-            f_stop,
-            metrics,
-        )
+        try:
+            # Run main simulation loop
+            run_api(
+                app_fn,
+                backend_fn,
+                nodes_mapping,
+                state_factory,
+                node_info_stores,
+                f_stop,
+                metrics,
+            )
+        except ImportError as ex:
+            raise SimulationBackendImportError(
+                "Simulation backend failed to import a required dependency."
+            ) from ex
     except LoadClientAppError as loadapp_ex:
         f_stop_delay = 10
         log(
