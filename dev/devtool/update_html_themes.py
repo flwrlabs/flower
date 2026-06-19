@@ -117,6 +117,40 @@ def _append_indented_fields(
     return bool(new_fields_indented)
 
 
+def _split_inline_comment(line: str) -> tuple[str, str]:
+    """Split off a Python comment while ignoring # inside strings."""
+    in_string = False
+    quote = ""
+    escaped = False
+    for index, char in enumerate(line):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                in_string = False
+        elif char in {"'", '"'}:
+            in_string = True
+            quote = char
+        elif char == "#":
+            return line[:index], line[index:]
+    return line, ""
+
+
+def _ensure_previous_entry_has_comma(updated_content: list[str]) -> None:
+    """Ensure new merged dictionary entries do not create invalid Python."""
+    for index in range(len(updated_content) - 1, -1, -1):
+        stripped = updated_content[index].strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        code, comment = _split_inline_comment(updated_content[index])
+        if code.rstrip().endswith((",", "{")):
+            return
+        updated_content[index] = code.rstrip() + (f", {comment}" if comment else ",")
+        return
+
+
 def _process_merge_field_line(
     updated_content: list[str],
     line: str,
@@ -139,6 +173,8 @@ def _process_merge_field_line(
     if brace_depth == 1:
         indent_match = re.match(r"^(\s*)}", line)
         indent = indent_match.group(1) if indent_match else ""
+        if merge_variables:
+            _ensure_previous_entry_has_comma(updated_content)
         for key, value in merge_variables.items():
             updated_content.append(indent + "    " + _dict_entry_str(key, value))
         next_merge_field = None
@@ -154,8 +190,7 @@ def update_conf_file(
     Insert new_fields into the html_theme_options block of file_path.
     Theme variable dictionaries are merged when they already exist.
     """
-    new_fields_str = dict_to_fields_str(new_fields)
-    if not new_fields_str.strip():
+    if not dict_to_fields_str(new_fields).strip():
         print(f"Skipping {file_path} (no new fields to insert)")
         return
 
@@ -181,14 +216,17 @@ def update_conf_file(
         if re.match(r"^\s*html_theme_options\s*=\s*{", line):
             inside_options = True
             found_options = True
-        variable_match = re.match(
-            r'^\s*"(?P<key>light_css_variables|dark_css_variables)"\s*:\s*{', line
-        )
-        if inside_options and brace_depth == 1 and variable_match:
-            theme_variable_key = variable_match.group("key")
+        top_level_match = re.match(r'^\s*"(?P<key>[^"]+)"\s*:', line)
+        if inside_options and brace_depth == 1 and top_level_match:
+            theme_variable_key = top_level_match.group("key")
+            fields_to_append.pop(theme_variable_key, None)
             if theme_variable_key in merge_fields:
-                merge_field = theme_variable_key
-                fields_to_append.pop(merge_field, None)
+                variable_match = re.match(
+                    r'^\s*"(?P<key>light_css_variables|dark_css_variables)"\s*:\s*{',
+                    line,
+                )
+                if variable_match:
+                    merge_field = theme_variable_key
         if inside_options:
             brace_depth += _brace_delta(line)
         # When inside html_theme_options, insert new fields before the closing brace.

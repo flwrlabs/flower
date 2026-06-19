@@ -101,6 +101,68 @@ def test_update_conf_file_skips_complete_theme_variables(
     assert capsys.readouterr().out == f"No changes needed in: {conf_file}\n"
 
 
+def test_update_conf_file_skips_existing_top_level_fields(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Existing top-level generated fields should not be duplicated."""
+    conf_file = tmp_path / "conf.py"
+    conf_file.write_text(
+        """html_theme_options = {
+    "announcement": "Existing banner",
+}
+""",
+        encoding="utf-8",
+    )
+    original_content = conf_file.read_text(encoding="utf-8")
+
+    update_html_themes.update_conf_file(
+        conf_file,
+        {
+            "announcement": "Generated banner",
+        },
+    )
+
+    assert conf_file.read_text(encoding="utf-8") == original_content
+    assert capsys.readouterr().out == f"No changes needed in: {conf_file}\n"
+
+
+def test_update_conf_file_adds_comma_before_merged_theme_variables(
+    tmp_path: Path,
+) -> None:
+    """Merged theme variables should keep valid Python without trailing commas."""
+    conf_file = tmp_path / "conf.py"
+    conf_file.write_text(
+        """html_theme_options = {
+    "light_css_variables": {
+        "color-announcement-background": "#17222d"
+    },
+}
+""",
+        encoding="utf-8",
+    )
+
+    update_html_themes.update_conf_file(
+        conf_file,
+        {
+            "light_css_variables": {
+                "color-announcement-background": "#292f36",
+                "color-announcement-text": "#ffffff",
+            },
+        },
+    )
+
+    assert (
+        conf_file.read_text(encoding="utf-8")
+        == """html_theme_options = {
+    "light_css_variables": {
+        "color-announcement-background": "#17222d",
+        "color-announcement-text": "#ffffff",
+    },
+}
+"""
+    )
+
+
 def test_update_conf_file_appends_missing_theme_variable_dictionaries(
     tmp_path: Path,
 ) -> None:
