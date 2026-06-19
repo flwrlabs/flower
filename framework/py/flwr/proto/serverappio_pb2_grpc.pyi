@@ -136,22 +136,16 @@ class ServerAppIoStub:
     ]
     """Push task logs"""
 
-    GetFederationOptions: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.run_pb2.GetFederationOptionsRequest,
-        flwr.proto.run_pb2.GetFederationOptionsResponse,
+    PushMessages: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushAppMessagesRequest,
+        flwr.proto.appio_pb2.PushAppMessagesResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
     Specific endpoints for ServerAppIo
     ///////////////////////////////////////////////////////////////////////////
 
-    Get Federation Options (only used by flwr-simulation)
+    Create one or more messages
     """
-
-    PushMessages: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushAppMessagesRequest,
-        flwr.proto.appio_pb2.PushAppMessagesResponse,
-    ]
-    """Create one or more messages"""
 
     PullMessages: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppMessagesRequest,
@@ -265,22 +259,16 @@ class ServerAppIoAsyncStub:
     ]
     """Push task logs"""
 
-    GetFederationOptions: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.run_pb2.GetFederationOptionsRequest,
-        flwr.proto.run_pb2.GetFederationOptionsResponse,
+    PushMessages: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushAppMessagesRequest,
+        flwr.proto.appio_pb2.PushAppMessagesResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
     Specific endpoints for ServerAppIo
     ///////////////////////////////////////////////////////////////////////////
 
-    Get Federation Options (only used by flwr-simulation)
+    Create one or more messages
     """
-
-    PushMessages: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushAppMessagesRequest,
-        flwr.proto.appio_pb2.PushAppMessagesResponse,
-    ]
-    """Create one or more messages"""
 
     PullMessages: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppMessagesRequest,
@@ -423,25 +411,17 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         """Push task logs"""
 
     @abc.abstractmethod
-    def GetFederationOptions(
-        self,
-        request: flwr.proto.run_pb2.GetFederationOptionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.run_pb2.GetFederationOptionsResponse, collections.abc.Awaitable[flwr.proto.run_pb2.GetFederationOptionsResponse]]:
-        """///////////////////////////////////////////////////////////////////////////
-        Specific endpoints for ServerAppIo
-        ///////////////////////////////////////////////////////////////////////////
-
-        Get Federation Options (only used by flwr-simulation)
-        """
-
-    @abc.abstractmethod
     def PushMessages(
         self,
         request: flwr.proto.appio_pb2.PushAppMessagesRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.PushAppMessagesResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushAppMessagesResponse]]:
-        """Create one or more messages"""
+        """///////////////////////////////////////////////////////////////////////////
+        Specific endpoints for ServerAppIo
+        ///////////////////////////////////////////////////////////////////////////
+
+        Create one or more messages
+        """
 
     @abc.abstractmethod
     def PullMessages(
