@@ -20,6 +20,7 @@ import importlib
 import json
 import logging
 import platform
+import sys
 import threading
 import traceback
 from dataclasses import dataclass
@@ -186,21 +187,21 @@ def run_serverapp_th(
     grid: Grid,
     app_dir: str,
     f_stop: threading.Event,
-    has_exception: threading.Event,
+    exception_queue: Queue[BaseException],
     enable_tf_gpu_growth: bool,
-    ctx_queue: "Queue[Context]",
+    ctx_queue: Queue[Context],
 ) -> threading.Thread:
     """Run SeverApp in a thread."""
 
     def server_th_with_start_checks(
         tf_gpu_growth: bool,
         stop_event: threading.Event,
-        exception_event: threading.Event,
+        _exception_queue: Queue[BaseException],
         _grid: Grid,
         _server_app_dir: str,
         _server_app_attr: str | None,
         _server_app: ServerApp | None,
-        _ctx_queue: "Queue[Context]",
+        _ctx_queue: Queue[Context],
     ) -> None:
         """Run SeverApp, after check if GPU memory growth has to be set.
 
@@ -221,10 +222,7 @@ def run_serverapp_th(
             )
             _ctx_queue.put(updated_context)
         except Exception as ex:  # pylint: disable=broad-exception-caught
-            log(ERROR, "ServerApp thread raised an exception: %s", ex)
-            log(ERROR, traceback.format_exc())
-            exception_event.set()
-            raise
+            _exception_queue.put(ex)
         finally:
             log(DEBUG, "ServerApp finished running.")
             # Upon completion, trigger stop event if one was passed
@@ -237,7 +235,7 @@ def run_serverapp_th(
         args=(
             enable_tf_gpu_growth,
             f_stop,
-            has_exception,
+            exception_queue,
             grid,
             app_dir,
             server_app_attr,
@@ -273,8 +271,7 @@ def _main_loop(
     )
 
     f_stop = threading.Event()
-    # A Threading event to indicate if an exception was raised in the ServerApp thread
-    server_app_thread_has_exception = threading.Event()
+    server_app_exception_queue: Queue[BaseException] = Queue()
     serverapp_th = None
     success = True
     if metrics is None:
@@ -311,7 +308,7 @@ def _main_loop(
             grid=grid,
             app_dir=app_dir,
             f_stop=f_stop,
-            has_exception=server_app_thread_has_exception,
+            exception_queue=server_app_exception_queue,
             enable_tf_gpu_growth=enable_tf_gpu_growth,
             ctx_queue=output_context_queue,
         )
@@ -336,6 +333,11 @@ def _main_loop(
     except Empty:
         log(DEBUG, "Queue timeout. No context received.")
 
+    except ImportError:
+        success = False
+        # Let app import failures reach the process-level exit-code handler.
+        raise
+
     except Exception as ex:
         log(ERROR, "An exception occurred !! %s", ex)
         log(ERROR, traceback.format_exc())
@@ -345,6 +347,13 @@ def _main_loop(
     finally:
         # Trigger stop event
         f_stop.set()
+        thread_ex: BaseException | None = None
+        try:
+            thread_ex = server_app_exception_queue.get_nowait()
+        except Empty:
+            pass
+        if thread_ex is not None:
+            success = False
         event(
             exit_event,
             event_details={
@@ -352,9 +361,10 @@ def _main_loop(
                 "success": success,
             },
         )
-        if serverapp_th:
-            if server_app_thread_has_exception.is_set():
-                raise RuntimeError("Exception in ServerApp thread")
+        if serverapp_th and thread_ex is not None:
+            # Don't mask an exception already being propagated from the main thread.
+            if sys.exc_info()[0] is None:
+                raise thread_ex.with_traceback(thread_ex.__traceback__)
 
     log(DEBUG, "Stopping Simulation Runtime now.")
     return SimulationRunResult(context=updated_context, metrics=metrics)
@@ -393,10 +403,6 @@ def _run_simulation(
         if importlib.util.find_spec("ray") is None:
             flwr_exit(
                 code=ExitCode.SIMULATION_MISSING_EXTRA,
-                message=(
-                    "`ray` backend selected for simulation, but `ray` is not "
-                    "installed."
-                ),
                 event_type=exit_event,
                 event_details={"success": False},
             )
