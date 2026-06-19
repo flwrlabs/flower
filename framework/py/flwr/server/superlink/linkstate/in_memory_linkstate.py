@@ -51,7 +51,6 @@ from flwr.superlink.federation import FederationManager
 from .utils import (
     check_node_availability_for_in_message,
     generate_rand_int_from_bytes,
-    primary_task_type_from_run_type,
     verify_found_message_replies,
     verify_message_ids,
 )
@@ -606,12 +605,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         federation: str,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
-        run_type: str,
+        primary_task_type: str,
         series_id: int | None = None,
     ) -> int:
         """Create a new run."""
-        task_type = primary_task_type_from_run_type(run_type)
-
         with self.lock_task_store, self.lock:
             run_id = generate_rand_int_from_bytes(
                 RUN_ID_NUM_BYTES,
@@ -656,7 +653,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     bytes_sent=0,
                     bytes_recv=0,
                     clientapp_runtime=0.0,
-                    run_type=run_type,
+                    primary_task_type=primary_task_type,
                     series_id=resolved_series_id,
                 ),
                 federation_config=federation_config,
@@ -668,7 +665,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
             self.task_store[task_id] = Task(
                 task_id=task_id,
-                type=task_type,
+                type=primary_task_type,
                 run_id=run_id,
                 status=TaskStatus(
                     status=Status.PENDING,

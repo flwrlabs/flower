@@ -184,8 +184,8 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     def set_run(self, run: Run) -> None:
         """Set the run."""
         if not isinstance(run, Run):
-            run_type = type(run).__name__
-            raise TypeError(f"`run` must be an instance of Run, got {run_type}")
+            actual_type = type(run).__name__
+            raise TypeError(f"`run` must be an instance of Run, got {actual_type}")
         self._run = run
 
     @property

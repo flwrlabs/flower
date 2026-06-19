@@ -27,7 +27,7 @@ from alembic import op
 from sqlalchemy.engine import Connection, RowMapping
 
 from flwr.common.constant import TASK_ID_NUM_BYTES, SubStatus
-from flwr.supercore.constant import RunType, TaskType
+from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate.utils import generate_rand_int_from_bytes
 from flwr.supercore.date import now
 from flwr.supercore.utils import uint64_to_int64
@@ -46,6 +46,10 @@ _RUN_ID_FOREIGN_KEYS = (
     ("message_ins", "message_ins_run_id_fkey"),
     ("message_res", "message_res_run_id_fkey"),
 )
+
+AGENT_APP_RUN_TYPE = "agentapp"
+SERVER_APP_RUN_TYPE = "serverapp"
+SIMULATION_RUN_TYPE = "simulation"
 
 
 def _is_postgresql() -> bool:
@@ -77,9 +81,11 @@ def _create_run_id_foreign_keys() -> None:
 
 def _primary_task_type_from_run_type(run_type: str) -> str:
     """Return the primary task type for the given run type."""
-    if run_type == RunType.SIMULATION:
+    if run_type == AGENT_APP_RUN_TYPE:
+        return TaskType.AGENT_APP
+    if run_type == SIMULATION_RUN_TYPE:
         return TaskType.SIMULATION
-    if run_type == RunType.SERVER_APP:
+    if run_type == SERVER_APP_RUN_TYPE:
         return TaskType.SERVER_APP
     raise RuntimeError(
         f"Unsupported run_type while backfilling primary tasks: {run_type}"

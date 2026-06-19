@@ -179,14 +179,6 @@ class InvitationStatus(StrEnum):
     EXPIRED = "expired"
 
 
-class RunType(StrEnum):
-    """Supported run types."""
-
-    AGENT_APP = "agentapp"
-    SERVER_APP = "serverapp"
-    SIMULATION = "simulation"
-
-
 class RunTime(StrEnum):
     """Supported runtimes."""
 
