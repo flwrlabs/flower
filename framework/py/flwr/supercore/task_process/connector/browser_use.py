@@ -195,12 +195,9 @@ class FlowerResponsesChatModel:
         for message in messages:
             # Browser Use passes chat-like message objects, not raw Responses input.
             role_value = getattr(message, "role", "user")
-            role = (
-                role_value
-                if isinstance(role_value, str)
-                and role_value in {"user", "system", "assistant"}
-                else "user"
-            )
+            if role_value not in ("user", "system", "assistant"):
+                role_value = "user"
+            role = role_value
             text = getattr(message, "text", None)
             if not isinstance(text, str):
                 content = getattr(message, "content", None)
