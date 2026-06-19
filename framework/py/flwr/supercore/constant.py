@@ -134,13 +134,13 @@ class _DefaultFederation:
 
 DEFAULT_FEDERATIONS = (
     _DefaultFederation(
-        name=DEFAULT_WORKSPACE_FEDERATION_NAME,
+        name=DEFAULT_FEDERATION_SIMULATION,
         description="Default workspace federation.",
         simulation=True,
     ),
     _DefaultFederation(
-        name=DEFAULT_AGENT_RUNS_FEDERATION_NAME,
-        description="Default agent runs federation.",
+        name=DEFAULT_FEDERATION_DEPLOYMENT,
+        description="Default workspace federation.",
         simulation=False,
     ),
 )

@@ -191,8 +191,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             )
             return StartRunResponse()
 
-        account = _get_account(context)
-        flwr_aid = cast(str, account.flwr_aid)
+        flwr_aid = _get_flwr_aid(context)
         override_config = user_config_from_proto(request.override_config)
 
         with rpc_error_translator(context, rpc_name):
