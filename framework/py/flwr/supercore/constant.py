@@ -118,9 +118,9 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
 )
 
 
-# Default federations
-DEFAULT_AGENT_RUNS_FEDERATION_NAME = "agentruns"
-DEFAULT_WORKSPACE_FEDERATION_NAME = "workspace"
+# Default federation names for every Flower account
+DEFAULT_FEDERATION_SIMULATION = "workspace-simulation"
+DEFAULT_FEDERATION_DEPLOYMENT = "workspace-deployment"
 
 
 @dataclass(frozen=True)
