@@ -111,23 +111,7 @@ class RuntimeAgentResponses(AgentResponses):
                 prior_output: list[JSONObject] = []
                 if _is_json_object_list(output):
                     prior_output = cast(list[JSONObject], output)
-                original_input = model_request.get("input")
-                original_input_items: list[JSONObject] = []
-                if isinstance(original_input, str):
-                    original_input_items = [
-                        {
-                            "type": "message",
-                            "role": "user",
-                            "content": original_input,
-                        }
-                    ]
-                elif isinstance(original_input, Sequence):
-                    original_input_items = cast(list[JSONObject], list(original_input))
-                model_request["input"] = [
-                    *original_input_items,
-                    *prior_output,
-                    *followup_input,
-                ]
+                model_request["input"] = [*prior_output, *followup_input]
             response_payload = self._create_model_response(model_request)
 
         output = response_payload.get("output")
