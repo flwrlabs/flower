@@ -30,7 +30,6 @@ from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatu
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
-from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -70,6 +69,7 @@ from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
+from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.supercore.run import Run
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,

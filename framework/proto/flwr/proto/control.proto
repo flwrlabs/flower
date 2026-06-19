@@ -137,6 +137,7 @@ message StartRunResponse {
   optional uint64 run_id = 1;
   optional string note = 2;
   optional uint64 series_id = 3;
+  string federation = 4;
 }
 message StreamLogsRequest {
   uint64 run_id = 1;
