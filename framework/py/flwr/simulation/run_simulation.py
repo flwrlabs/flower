@@ -403,10 +403,6 @@ def _run_simulation(
         if importlib.util.find_spec("ray") is None:
             flwr_exit(
                 code=ExitCode.SIMULATION_MISSING_EXTRA,
-                message=(
-                    "`ray` backend selected for simulation, but `ray` is not "
-                    "installed."
-                ),
                 event_type=exit_event,
                 event_details={"success": False},
             )
