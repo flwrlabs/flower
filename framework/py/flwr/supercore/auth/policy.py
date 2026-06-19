@@ -50,7 +50,6 @@ SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     # pylint: disable-next=line-too-long
     "/flwr.proto.ServerAppIo/ConfirmMessageReceived": MethodTokenPolicy.token_required(),  # noqa: E501
     "/flwr.proto.ServerAppIo/PushLogs": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/GetFederationOptions": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PushMessages": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PullMessages": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/GetNodes": MethodTokenPolicy.token_required(),

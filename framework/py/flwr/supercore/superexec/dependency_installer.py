@@ -34,6 +34,10 @@ _RUNTIME_ENV_DIR = "runtime-envs"
 RuntimeDependencyIndexContext = dict[str, str | int | None]
 
 
+class RuntimeDependencyInstallationError(RuntimeError):
+    """Raised when runtime dependency installation fails."""
+
+
 # The corresponding resolver is not ready in `flwr.ee` yet
 def _resolve_index_url_from_ee(
     _context: RuntimeDependencyIndexContext,
@@ -147,7 +151,7 @@ def install_app_dependencies(
         installed_packages=installed_packages,
     )
     if sync_error is not None:
-        raise RuntimeError(f"uv sync failed: {sync_error}")
+        raise RuntimeDependencyInstallationError(f"uv sync failed: {sync_error}")
 
     if installed_packages:
         log(INFO, "Installed: [%s]", ", ".join(sorted(installed_packages)))

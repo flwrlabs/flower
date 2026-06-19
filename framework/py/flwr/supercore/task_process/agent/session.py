@@ -31,8 +31,18 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
+from flwr.supercore.json_message.connector_message import (
+    ConnectorRequest,
+    ConnectorResponse,
+)
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
+from flwr.supercore.task_process.connector.tool_call import (
+    ConnectorToolCall,
+    extract_builtin_connector_tool_calls,
+    with_builtin_connector_tools,
+)
 from flwr.supercore.typing import JSONObject, JSONValue
+from flwr.supercore.utils import strict_json_dumps
 
 from .context_items import append_items
 
@@ -69,7 +79,45 @@ class RuntimeAgentResponses(AgentResponses):
         self._task_id = task_id
 
     def create(self, request: JSONObject) -> JSONObject:
-        """Create a model response through a child model task."""
+        """Create a model response through child model and connector tasks."""
+        model_request = with_builtin_connector_tools(request)
+        response_payload = self._create_model_response(model_request)
+
+        tool_calls = extract_builtin_connector_tool_calls(response_payload)
+        if tool_calls:
+            # Execute one connector batch; further tool-call loops stay in AgentApp.
+            followup_input: list[JSONObject] = []
+            for tool_call in tool_calls:
+                output = self._create_connector_response(tool_call)
+                followup_input.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": tool_call.call_id,
+                        "output": strict_json_dumps(output, compact=True),
+                    }
+                )
+
+            # Reuse the prepared model request, but replace input for continuation.
+            model_request.pop("tool_choice", None)
+            previous_response_id = response_payload.get("id")
+            if isinstance(previous_response_id, str) and previous_response_id:
+                model_request["input"] = followup_input
+                model_request["previous_response_id"] = previous_response_id
+            else:
+                output = response_payload.get("output")
+                prior_output: list[JSONObject] = []
+                if _is_json_object_list(output):
+                    prior_output = cast(list[JSONObject], output)
+                model_request["input"] = [*prior_output, *followup_input]
+            response_payload = self._create_model_response(model_request)
+
+        output = response_payload.get("output")
+        if _is_json_object_list(output):
+            append_items(self._context, cast(list[JSONObject], output))
+        return response_payload
+
+    def _create_model_response(self, request: JSONObject) -> JSONObject:
+        """Create one model response through a child model task."""
         model = request.get("model")
         if not isinstance(model, str) or not model:
             raise ValueError(
@@ -99,11 +147,35 @@ class RuntimeAgentResponses(AgentResponses):
         )
         response_message = self._send_and_receive(message)
         response = ModelResponse.from_message(response_message)
+        return response.payload
+
+    def _create_connector_response(self, tool_call: ConnectorToolCall) -> JSONValue:
+        """Create one connector response through a child connector task."""
+        name = tool_call.name
+        create_res = self._stub.CreateTask(
+            CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=name)
+        )
+        if not create_res.HasField("task_id"):
+            raise RuntimeError("Connector task could not be created.")
+
+        connector_task_id = create_res.task_id
+        message = ConnectorRequest(
+            dst_task_id=connector_task_id,
+            name=name,
+            call_id=tool_call.call_id,
+            arguments=tool_call.arguments,
+        )
+        response_message = self._send_and_receive(message)
+        response = ConnectorResponse.from_message(response_message)
         response_payload = response.payload
-        output = response_payload.get("output")
-        if _is_json_object_list(output):
-            append_items(self._context, cast(list[JSONObject], output))
-        return response_payload
+
+        error = response_payload.get("error")
+        if error is not None:
+            if isinstance(error, dict) and isinstance(error.get("message"), str):
+                raise RuntimeError(f"Connector '{name}' failed: {error['message']}")
+            raise RuntimeError(f"Connector '{name}' failed.")
+
+        return response_payload["output"]
 
     def _push_task_message(self, message: Message) -> None:
         """Push one task message and return its message ID."""
@@ -123,9 +195,9 @@ class RuntimeAgentResponses(AgentResponses):
         """Send one message and wait for its direct reply.
 
         For now, `flwr-agentapp` expects a strict one-request-one-reply exchange with
-        `flwr-model`, so any non-matching pulled message is treated as an error.
+        child tasks, so any non-matching pulled message is treated as an error.
         """
-        # Push the message to the flwr-model
+        # Push the message to the child task
         self._push_task_message(message)
         message_id = message.metadata.message_id
 
