@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-18 00:36+0000\n"
+"POT-Creation-Date: 2026-06-19 00:39+0000\n"
 "PO-Revision-Date: 2026-05-23 06:53+0000\n"
 "Last-Translator: Seulki Yun <icstuckyi@gmail.com>\n"
 "Language: ko\n"
@@ -11829,6 +11829,161 @@ msgid ""
 "<explanation-flower-strategy-abstraction>`."
 msgstr ""
 
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:-1
+msgid ""
+"Learn how Flower can automatically install Python dependencies for Flower"
+" Apps at runtime."
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:7
+#, fuzzy
+msgid "Install Flower App dependencies at runtime"
+msgstr "사전 릴리즈 설치"
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:9
+msgid ""
+"Flower Apps declare their Python package dependencies in "
+"``pyproject.toml``. Flower can use this metadata to install app "
+"dependencies automatically before the app is executed."
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:12
+msgid ""
+"Runtime dependency installation is useful when different apps need "
+"different Python packages, or when the machine running Flower does not "
+"have every app dependency preinstalled. For production deployments where "
+"startup time, network access, or exact image contents matter, you can "
+"still preinstall dependencies and disable runtime installation."
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:20
+msgid ""
+"SuperLink enables automatic dependency installation by default; "
+"SuperNodes do not."
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:22
+msgid ""
+"To disable this behavior in SuperLink, pass ``--disable-runtime-"
+"dependency-installation`` or set "
+"``FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1`` before starting it. To"
+" enable it in SuperNode, pass ``--allow-runtime-dependency-"
+"installation``."
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:29
+msgid ""
+"In SuperGrid, automatic dependency installation is enabled. This does not"
+" change the default for :doc:`SuperNodes connected to SuperGrid <how-to-"
+"connect-supernodes-to-supergrid>`; SuperNode operators decide separately "
+"whether to enable it."
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:36
+#, fuzzy
+msgid "Declare app dependencies"
+msgstr "사전 릴리즈 설치"
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:38
+msgid ""
+"Add runtime dependencies to the ``[project].dependencies`` section of "
+"your Flower App's ``pyproject.toml``:"
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:53
+msgid ""
+"Flower reads this list when installing dependencies at runtime. The "
+"``flwr`` dependency is skipped during runtime installation so the running"
+" Flower process is not replaced by the app's requirement. Other entries "
+"are installed into the runtime environment."
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:59
+msgid ""
+"Keep ``pyproject.toml`` up to date with all dependencies your app needs. "
+"If a dependency is missing from ``[project].dependencies``, automatic "
+"dependency installation will not install it."
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:65
+#, fuzzy
+msgid "Enable it for SuperNodes"
+msgstr ":code:`SuperNode`에서 노드 인증을 활성화합니다"
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:67
+msgid ""
+"SuperNodes run ``ClientApp`` code. To let a SuperNode install the "
+"dependencies declared by received apps, launch it with ``--allow-runtime-"
+"dependency-installation``. The following example shows how to connect a "
+"SuperNode to a locally running SuperLink for prototyping:"
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:80
+msgid ""
+"Use this when the SuperNode host is allowed to install Python packages at"
+" runtime. If the host has no package index access, or if you want "
+"stricter control over installed packages, preinstall the ClientApp "
+"dependencies in the SuperNode environment instead."
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:86
+msgid "Enable dependency installation in process mode"
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:88
+msgid ""
+"When running SuperLink or SuperNode with ``--isolation=process``, the "
+"runtime dependency installation flags passed to ``flower-superlink`` or "
+"``flower-supernode`` do not affect the app process. In this mode, "
+"SuperExec is started separately. Enable dependency installation on "
+"``flower-superexec`` instead:"
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:103
+#, fuzzy
+msgid "How installation works"
+msgstr "설치 확인"
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:105
+msgid "When runtime dependency installation is enabled, Flower:"
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:107
+msgid "reads ``[project].dependencies`` from the installed Flower App,"
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:108
+msgid "creates an isolated runtime environment under ``$FLWR_HOME/runtime-envs``,"
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:109
+msgid ""
+"invokes ``uv sync`` in the app project directory using the current Python"
+" executable,"
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:110
+msgid ""
+"installs the declared app dependencies into the isolated runtime "
+"environment,"
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:111
+msgid "activates that environment for the current app process, and"
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:112
+msgid "deletes the environment after app execution is complete."
+msgstr ""
+
+#: ../../source/how-to-install-app-dependencies-at-runtime.rst:114
+msgid ""
+"Each run gets its own environment, so concurrently running apps do not "
+"modify each other's Python packages. The app code itself comes from the "
+"Flower App Bundle (FAB); runtime dependency installation only installs "
+"the package dependencies needed by that app."
+msgstr ""
+
 #: ../../source/how-to-install-flower.rst:-1
 msgid ""
 "Learn how to install Flower, the Python-based federated learning "
@@ -12613,91 +12768,111 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:46
+#, fuzzy
+msgid "Runtime dependency installation"
+msgstr "flower 초연결"
+
+#: ../../source/how-to-run-flower-locally.rst:48
+msgid ""
+"The managed local SuperLink automatically installs the Flower App "
+"dependencies declared in ``pyproject.toml`` before executing the app. To "
+"disable this, set ``FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1``:"
+msgstr ""
+
+#: ../../source/how-to-run-flower-locally.rst:57
+msgid ""
+"If the background SuperLink is already running, :ref:`stop it first "
+"<stop-background-local-superlink>` so the new environment variable can "
+"take effect. For details, see :doc:`how-to-install-app-dependencies-at-"
+"runtime`."
+msgstr ""
+
+#: ../../source/how-to-run-flower-locally.rst:63
 msgid "Submit a run"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:48
+#: ../../source/how-to-run-flower-locally.rst:65
 msgid "From your Flower App directory, submit a run as usual:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:54
+#: ../../source/how-to-run-flower-locally.rst:71
 msgid "Representative output:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:61
+#: ../../source/how-to-run-flower-locally.rst:78
 msgid ""
 "Plain ``flwr run .`` submits the run, prints the run ID, and returns. If "
 "you want to submit the run and immediately follow the logs in the same "
 "terminal, use:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:70
+#: ../../source/how-to-run-flower-locally.rst:87
 #, fuzzy
 msgid "List runs"
 msgstr "시뮬레이션 실행"
 
-#: ../../source/how-to-run-flower-locally.rst:72
+#: ../../source/how-to-run-flower-locally.rst:89
 msgid "To see all runs known to the local SuperLink:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:78
+#: ../../source/how-to-run-flower-locally.rst:95
 msgid "To inspect one run in detail:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:86
+#: ../../source/how-to-run-flower-locally.rst:103
 msgid "View logs"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:88
+#: ../../source/how-to-run-flower-locally.rst:105
 msgid "To stream logs continuously:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:94
+#: ../../source/how-to-run-flower-locally.rst:111
 msgid "To fetch the currently available logs once and return:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:100
+#: ../../source/how-to-run-flower-locally.rst:117
 msgid "Representative streamed output:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:113
+#: ../../source/how-to-run-flower-locally.rst:130
 #, fuzzy
 msgid "Stop a run"
 msgstr "flower 초연결"
 
-#: ../../source/how-to-run-flower-locally.rst:115
+#: ../../source/how-to-run-flower-locally.rst:132
 msgid "To stop a submitted or running run:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:121
+#: ../../source/how-to-run-flower-locally.rst:138
 msgid ""
 "This stops the run only. It does **not** stop the background local "
 "SuperLink process."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:125
+#: ../../source/how-to-run-flower-locally.rst:142
 msgid "Local runtime files and state"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:127
+#: ../../source/how-to-run-flower-locally.rst:144
 msgid ""
 "The managed local SuperLink keeps its files in ``$FLWR_HOME/local-"
 "superlink/``:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:129
+#: ../../source/how-to-run-flower-locally.rst:146
 msgid "``state.db`` stores the local SuperLink state"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:130
+#: ../../source/how-to-run-flower-locally.rst:147
 msgid "``superlink.log`` stores the local SuperLink process output"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:132
+#: ../../source/how-to-run-flower-locally.rst:149
 msgid "These files persist across local runs until you remove them yourself."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:136
+#: ../../source/how-to-run-flower-locally.rst:153
 msgid ""
 "Starting with Flower 1.29 FABs are stored in SuperLink state instead of a"
 " separate local ``ffs/`` directory. This is a breaking change: legacy "
@@ -12705,59 +12880,59 @@ msgid ""
 " storage are not recoverable after upgrade without manual migration."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:145
+#: ../../source/how-to-run-flower-locally.rst:162
 msgid "Stop the background local SuperLink"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:147
+#: ../../source/how-to-run-flower-locally.rst:164
 msgid ""
 "There is currently no dedicated ``flwr`` command to stop the managed "
 "local SuperLink process. To stop it, first inspect the matching process "
 "and then terminate it."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:151
+#: ../../source/how-to-run-flower-locally.rst:168
 msgid "macOS/Linux"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:153
-#: ../../source/how-to-run-flower-locally.rst:168
+#: ../../source/how-to-run-flower-locally.rst:170
+#: ../../source/how-to-run-flower-locally.rst:185
 msgid "Inspect the process:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:159
-#: ../../source/how-to-run-flower-locally.rst:178
+#: ../../source/how-to-run-flower-locally.rst:176
+#: ../../source/how-to-run-flower-locally.rst:195
 #, fuzzy
 msgid "Stop the process:"
 msgstr "이미 *서버*를 시작할 수 있습니다:"
 
-#: ../../source/how-to-run-flower-locally.rst:166
+#: ../../source/how-to-run-flower-locally.rst:183
 msgid "Windows PowerShell"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:188
+#: ../../source/how-to-run-flower-locally.rst:205
 msgid ""
 "If you changed the local Control API port with "
 "``FLWR_LOCAL_CONTROL_API_PORT``, replace ``39093`` in the commands above."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:193
+#: ../../source/how-to-run-flower-locally.rst:210
 msgid "Troubleshooting"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:195
+#: ../../source/how-to-run-flower-locally.rst:212
 msgid ""
 "If you see SQL database errors such as ``database is locked``, see "
 ":ref:`FAQ <faq-local-superlink-db-error>`."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:198
+#: ../../source/how-to-run-flower-locally.rst:215
 msgid ""
 "If a local run fails before it starts, or if the managed local SuperLink "
 "does not come up correctly, inspect:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:205
+#: ../../source/how-to-run-flower-locally.rst:222
 msgid ""
 "That log contains the output of the background ``flower-superlink`` "
 "process and is the first place to check for startup errors, port "
