@@ -32,6 +32,8 @@ down_revision: str | Sequence[str] | None = "8e65d8ae60b0"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+# Historical run_type string values used by this migration.
+# Keep these local constants because RunType has been removed from the framework.
 SERVER_APP_RUN_TYPE = "serverapp"
 SIMULATION_RUN_TYPE = "simulation"
 
