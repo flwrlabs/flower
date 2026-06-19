@@ -276,15 +276,18 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     "Failed to create or initialize the run.",
                 )
 
-            runs = state.get_run_info(run_ids=[run_id])
-            series_id = runs[0].series_id
+            run = state.get_run_info(run_ids=[run_id])[0]
+            series_id = run.series_id
 
         except ValueError as e:
             log(ERROR, "Could not start run: %s", str(e))
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
 
-        log(INFO, "Created %s run %s", run_type, str(run_id))
-        return StartRunResponse(run_id=run_id, note=note, series_id=series_id)
+        log_msg = f"Created {run_type} run {run_id} in federation {run.federation}"
+        log(INFO, log_msg)
+        return StartRunResponse(
+            run_id=run_id, note=note, series_id=series_id, federation=run.federation
+        )
 
     def StreamLogs(  # pylint: disable=C0103
         self, request: StreamLogsRequest, context: grpc.ServicerContext
