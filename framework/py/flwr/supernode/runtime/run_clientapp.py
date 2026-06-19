@@ -37,7 +37,6 @@ from flwr.common.serde import (
     message_to_proto,
     run_from_proto,
 )
-from flwr.common.telemetry import EventType, event
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
     PullAppMessagesResponse,
@@ -76,6 +75,7 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.telemetry import EventType, event
 
 
 def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
@@ -242,7 +242,7 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
     fab = fab_from_proto(res.fab)
 
     # Pull and inflate the message
-    pull_msg_res: PullAppMessagesResponse = stub.PullMessage(PullAppMessagesRequest())
+    pull_msg_res: PullAppMessagesResponse = stub.PullMessages(PullAppMessagesRequest())
     run_id = context.run_id
     node = Node(node_id=context.node_id)
     object_tree = pull_msg_res.message_object_trees[0]
@@ -273,7 +273,7 @@ def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> N
 
         # Push Message
         # This is temporary. The message should not contain its content
-        push_msg_res = stub.PushMessage(
+        push_msg_res = stub.PushMessages(
             PushAppMessagesRequest(
                 messages_list=[proto_message], message_object_trees=[object_tree]
             )

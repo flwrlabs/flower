@@ -25,7 +25,6 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.hazmat.primitives.serialization import load_ssh_private_key
 from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 
-from flwr.common import EventType, event
 from flwr.common.args import (
     add_args_runtime_dependency_install,
     try_obtain_root_certificates,
@@ -47,6 +46,7 @@ from flwr.supercore.auth import (
     load_superexec_auth_secret,
 )
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import try_obtain_optional_appio_server_certificates
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
