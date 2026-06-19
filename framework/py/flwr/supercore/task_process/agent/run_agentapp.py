@@ -241,7 +241,9 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         exit_code = ExitCode.TASK_PROC_EXCEPTION
         if isinstance(ex, AppExitException):
             exit_code = ex.exit_code
-        if isinstance(ex, RuntimeDependencyInstallationError):
+        elif isinstance(ex, ImportError):
+            exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
+        elif isinstance(ex, RuntimeDependencyInstallationError):
             exit_code = ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR
 
     flwr_exit(

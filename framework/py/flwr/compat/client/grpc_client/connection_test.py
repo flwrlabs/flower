@@ -25,13 +25,13 @@ from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common import Code, GetPropertiesRes, Status
 from flwr.common import recorddict_compat as compat
 from flwr.common.constant import MessageTypeLegacy
-from flwr.common.retry_invoker import RetryInvoker, exponential
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
     ServerMessage,
 )
 from flwr.server.client_manager import SimpleClientManager
 from flwr.server.superlink.fleet.grpc_bidi.grpc_server import start_grpc_server
+from flwr.supercore.retry import RetryInvoker, exponential
 
 from .connection import grpc_connection
 

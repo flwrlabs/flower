@@ -30,7 +30,6 @@ from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatu
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
-from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -70,6 +69,7 @@ from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
+from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.supercore.run import Run
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
@@ -214,7 +214,9 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
         # Set exit code
         exit_code = ExitCode.TASK_PROC_EXCEPTION
-        if isinstance(ex, RuntimeDependencyInstallationError):
+        if isinstance(ex, ImportError):
+            exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
+        elif isinstance(ex, RuntimeDependencyInstallationError):
             exit_code = ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR
     finally:
         # Push reply message to SuperNode

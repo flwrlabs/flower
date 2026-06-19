@@ -203,6 +203,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(response.HasField("series_id"))
         self.assertGreater(response.series_id, 0)
         self.assertEqual(run_info.series_id, response.series_id)
+        self.assertEqual(response.federation, NOOP_FEDERATION)
         run_context = self.state.get_run_series_context(response.series_id)
         assert run_context is not None
         self.assertEqual(run_context.run_id, response.run_id)

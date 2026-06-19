@@ -28,7 +28,6 @@ from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.constant import HEARTBEAT_CALL_TIMEOUT, HEARTBEAT_DEFAULT_INTERVAL
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
-from flwr.common.retry_invoker import RetryInvoker, wrap_stub
 from flwr.common.serde import (
     fab_from_proto,
     message_from_proto,
@@ -64,6 +63,7 @@ from flwr.supercore.inflatable.inflatable_protobuf_utils import (
 )
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.retry import RetryInvoker, wrap_stub
 from flwr.supercore.run import Run
 
 from .grpc_adapter import GrpcAdapter
@@ -190,7 +190,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
                 req, timeout=HEARTBEAT_CALL_TIMEOUT
             )
         except grpc.RpcError as e:
-            status_code = e.code()
+            status_code = e.code()  # pylint: disable=E1101
             if status_code == grpc.StatusCode.UNAVAILABLE:
                 return False
             if status_code == grpc.StatusCode.DEADLINE_EXCEEDED:
