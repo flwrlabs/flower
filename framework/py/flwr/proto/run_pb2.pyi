@@ -20,7 +20,6 @@ limitations under the License.
 import builtins
 import collections.abc
 import flwr.proto.node_pb2
-import flwr.proto.recorddict_pb2
 import flwr.proto.transport_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -179,37 +178,3 @@ class GetRunResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["run", b"run"]) -> None: ...
 
 global___GetRunResponse = GetRunResponse
-
-@typing.final
-class GetFederationOptionsRequest(google.protobuf.message.Message):
-    """Get Federation Options associated with run"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    RUN_ID_FIELD_NUMBER: builtins.int
-    run_id: builtins.int
-    def __init__(
-        self,
-        *,
-        run_id: builtins.int = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["run_id", b"run_id"]) -> None: ...
-
-global___GetFederationOptionsRequest = GetFederationOptionsRequest
-
-@typing.final
-class GetFederationOptionsResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    FEDERATION_OPTIONS_FIELD_NUMBER: builtins.int
-    @property
-    def federation_options(self) -> flwr.proto.recorddict_pb2.ConfigRecord: ...
-    def __init__(
-        self,
-        *,
-        federation_options: flwr.proto.recorddict_pb2.ConfigRecord | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["federation_options", b"federation_options"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["federation_options", b"federation_options"]) -> None: ...
-
-global___GetFederationOptionsResponse = GetFederationOptionsResponse

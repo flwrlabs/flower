@@ -24,6 +24,10 @@ from flwr.app.typing import MetricRecordValues as MetricRecordValues
 
 from ..app.error import Error as Error
 from ..app.metadata import Metadata as Metadata
+from ..compat.common.parameter import bytes_to_ndarray as bytes_to_ndarray
+from ..compat.common.parameter import ndarray_to_bytes as ndarray_to_bytes
+from ..compat.common.parameter import ndarrays_to_parameters as ndarrays_to_parameters
+from ..compat.common.parameter import parameters_to_ndarrays as parameters_to_ndarrays
 from ..compat.common.typing import ClientMessage as ClientMessage
 from ..compat.common.typing import Code as Code
 from ..compat.common.typing import Config as Config
@@ -54,10 +58,6 @@ from .constant import MessageTypeLegacy as MessageTypeLegacy
 from .grpc import GRPC_MAX_MESSAGE_LENGTH
 from .logger import configure as configure
 from .logger import log as log
-from .parameter import bytes_to_ndarray as bytes_to_ndarray
-from .parameter import ndarray_to_bytes as ndarray_to_bytes
-from .parameter import ndarrays_to_parameters as ndarrays_to_parameters
-from .parameter import parameters_to_ndarrays as parameters_to_ndarrays
 from .telemetry import EventType as EventType
 from .telemetry import event as event
 

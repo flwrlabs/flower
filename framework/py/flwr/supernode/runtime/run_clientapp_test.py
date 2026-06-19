@@ -69,6 +69,5 @@ class TestRunClientApp(unittest.TestCase):
         channel.return_value.subscribe.assert_called_once()
         flwr_exit.assert_called_once()
         self.assertEqual(
-            flwr_exit.call_args.kwargs["code"],
-            ExitCode.CLIENTAPP_COMMUNICATION_ERROR,
+            flwr_exit.call_args.kwargs["code"], ExitCode.TASK_PROC_EXCEPTION
         )
