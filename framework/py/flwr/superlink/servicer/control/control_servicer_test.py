@@ -88,7 +88,6 @@ from flwr.supercore.constant import (
     NOOP_FEDERATION,
     ActionType,
     RunTime,
-    RunType,
     TaskType,
 )
 from flwr.supercore.date import now
@@ -147,7 +146,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             NOOP_FEDERATION,
             None,
             flwr_aid,
-            RunType.SERVER_APP,
+            TaskType.SERVER_APP,
         )
 
     def _create_dummy_run_series(
@@ -198,7 +197,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(run_info.fab_hash, fab_hash)
         self.assertEqual(run_info.fab_id, fab_id)
         self.assertEqual(run_info.fab_version, fab_version)
-        self.assertEqual(run_info.run_type, RunType.SERVER_APP)
+        self.assertEqual(run_info.primary_task_type, TaskType.SERVER_APP)
         self.assertFalse(response.HasField("note"))
         self.assertTrue(response.HasField("series_id"))
         self.assertGreater(response.series_id, 0)
@@ -257,17 +256,17 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     @parameterized.expand(
         [
-            (None, RunType.SERVER_APP, TaskType.SERVER_APP),
-            (SimulationConfig(), RunType.SIMULATION, TaskType.SIMULATION),
+            (None, TaskType.SERVER_APP, TaskType.SERVER_APP),
+            (SimulationConfig(), TaskType.SIMULATION, TaskType.SIMULATION),
         ]
     )  # type: ignore
     def test_start_run_creates_task_with_matching_type(
         self,
         sim_cfg: SimulationConfig | None,
-        expected_run_type: RunType,
+        expected_primary_task_type: TaskType,
         expected_task_type: TaskType,
     ) -> None:
-        """Test StartRun creates an initial task matching the resolved run type."""
+        """Test StartRun creates an initial task matching the resolved task type."""
         fab_content = b"test FAB content task type"
         request = StartRunRequest()
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
@@ -297,7 +296,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         tasks = self.state.get_tasks()
 
         self.assertEqual(len(runs), 1)
-        self.assertEqual(runs[0].run_type, expected_run_type)
+        self.assertEqual(runs[0].primary_task_type, expected_primary_task_type)
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, expected_task_type)
@@ -344,7 +343,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(runs), 1)
         self.assertEqual(runs[0].fab_id, "flwr/agent")
         self.assertEqual(runs[0].fab_version, "0.1.0")
-        self.assertEqual(runs[0].run_type, RunType.AGENT_APP)
+        self.assertEqual(runs[0].primary_task_type, TaskType.AGENT_APP)
         self.assertEqual(runs[0].override_config["agent.input"], "Hello")
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].run_id, response.run_id)
@@ -373,7 +372,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(runs[0].fab_id, "flwrlabs/flwr-agent")
         self.assertEqual(runs[0].fab_version, "0.1.0")
         self.assertEqual(runs[0].fab_hash, expected_fab_hash)
-        self.assertEqual(runs[0].run_type, RunType.AGENT_APP)
+        self.assertEqual(runs[0].primary_task_type, TaskType.AGENT_APP)
         self.assertEqual(runs[0].override_config["agent.input"], "Hello")
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].run_id, response.run_id)
@@ -1080,7 +1079,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             "test-federation",
             None,
             self.aid,
-            RunType.SERVER_APP,
+            TaskType.SERVER_APP,
         )
 
         with patch.object(
@@ -1133,7 +1132,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             "test-federation",
             None,
             target_flwr_aid,
-            RunType.SERVER_APP,
+            TaskType.SERVER_APP,
         )
 
         with patch.object(
@@ -1344,7 +1343,7 @@ class TestControlServicerAuth(unittest.TestCase):
             NOOP_FEDERATION,
             None,
             flwr_aid,
-            RunType.SERVER_APP,
+            TaskType.SERVER_APP,
         )
 
     def make_context(self) -> MagicMock:

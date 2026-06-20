@@ -123,7 +123,7 @@ from flwr.supercore.constant import (
     PLATFORM_API_URL,
     ActionType,
     RunTime,
-    RunType,
+    TaskType,
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
@@ -222,17 +222,19 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
             _ = fuse_dicts(run_config, override_config)
 
-            # Derive run type from the submitted FAB. AgentApp-only FABs can be
-            # bundled locally and submitted through the regular `flwr run` path.
+            # Derive primary task type from the submitted FAB. AgentApp-only FABs can
+            # be bundled locally and submitted through the regular `flwr run` path.
             components = fab_config["tool"]["flwr"]["app"].get("components", {})
             is_agentapp_bundle = "agentapp" in components
-            run_type = RunType.AGENT_APP if is_agentapp_bundle else RunType.SERVER_APP
+            primary_task_type = (
+                TaskType.AGENT_APP if is_agentapp_bundle else TaskType.SERVER_APP
+            )
             resolved_federation_config = None
             runtime = RunTime.DEPLOYMENT
             with rpc_error_translator(context, rpc_name):
                 sim_cfg = state.federation_manager.get_simulation_config(federation)
                 if sim_cfg and not is_agentapp_bundle:
-                    run_type = RunType.SIMULATION
+                    primary_task_type = TaskType.SIMULATION
                     runtime = RunTime.SIMULATION
                     resolved_federation_config = SimulationConfig()
                     resolved_federation_config.CopyFrom(sim_cfg)
@@ -268,7 +270,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 federation,
                 resolved_federation_config,
                 flwr_aid,
-                run_type,
+                primary_task_type,
                 request.series_id if request.HasField("series_id") else None,
             )
 
@@ -285,7 +287,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             log(ERROR, "Could not start run: %s", str(e))
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
 
-        log_msg = f"Created {run_type} run {run_id} in federation {run.federation}"
+        log_msg = f"Created run {run_id} in federation {run.federation}"
         log(INFO, log_msg)
         return StartRunResponse(
             run_id=run_id, note=note, series_id=series_id, federation=run.federation

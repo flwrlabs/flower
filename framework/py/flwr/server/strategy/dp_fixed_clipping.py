@@ -32,13 +32,11 @@ from flwr.common import (
     parameters_to_ndarrays,
 )
 from flwr.common.differential_privacy import (
+    CLIENTS_DISCREPANCY_WARNING,
+    KEY_CLIPPING_NORM,
     add_gaussian_noise_to_params,
     compute_clip_model_update,
     compute_stdv,
-)
-from flwr.common.differential_privacy_constants import (
-    CLIENTS_DISCREPANCY_WARNING,
-    KEY_CLIPPING_NORM,
 )
 from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager
