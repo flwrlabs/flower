@@ -149,22 +149,16 @@ def load_app(  # pylint: disable= too-many-branches
 
         module_str, _, attributes_str = module_attribute_str.partition(":")
 
-        try:
-            if project_dir is None:
-                project_dir = Path.cwd()
-            project_dir = Path(project_dir).absolute()
+        if project_dir is None:
+            project_dir = Path.cwd()
+        project_dir = Path(project_dir).absolute()
 
-            _ensure_sys_path(project_dir)
+        _ensure_sys_path(project_dir)
 
-            if module_str not in sys.modules:
-                module = importlib.import_module(module_str)
-            else:
-                module = sys.modules[module_str]
-
-        except ModuleNotFoundError as err:
-            raise error_type(
-                f"Unable to load module {module_str}{OBJECT_REF_HELP_STR}",
-            ) from err
+        if module_str not in sys.modules:
+            module = importlib.import_module(module_str)
+        else:
+            module = sys.modules[module_str]
 
         # Recursively load attribute
         attribute = module

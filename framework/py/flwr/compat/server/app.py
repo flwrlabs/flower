@@ -18,7 +18,7 @@
 import sys
 from logging import INFO
 
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
+from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.constant import FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS
 from flwr.common.exit import register_signal_handlers
 from flwr.common.logger import log, warn_deprecated_feature
@@ -29,6 +29,7 @@ from flwr.server.server_config import ServerConfig
 from flwr.server.strategy import Strategy
 from flwr.server.superlink.fleet.grpc_bidi.grpc_server import start_grpc_server
 from flwr.supercore.address import parse_address
+from flwr.supercore.telemetry import EventType, event
 
 
 def start_server(  # pylint: disable=too-many-arguments,too-many-locals

@@ -33,18 +33,19 @@ from flwr.client.message_handler.message_handler import handle_control_message
 from flwr.client.numpy_client import NumPyClient
 from flwr.client.run_info_store import DeprecatedRunInfoStore
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
+from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.constant import MAX_RETRY_DELAY, ErrorCode
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log, warn_deprecated_feature
-from flwr.common.retry_invoker import RetryInvoker, RetryState, exponential
 from flwr.compat.client.grpc_client.connection import grpc_connection
 from flwr.compat.client.typing import ClientFnExt
 from flwr.compat.common.constant import TRANSPORT_TYPE_GRPC_BIDI, TRANSPORT_TYPES_COMPAT
 from flwr.supercore.address import parse_address
 from flwr.supercore.fab import Fab
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.retry import RetryInvoker, RetryState, exponential
 from flwr.supercore.run import Run, RunNotRunningException
+from flwr.supercore.telemetry import EventType, event
 from flwr.supernode.nodestate import NodeStateFactory
 
 

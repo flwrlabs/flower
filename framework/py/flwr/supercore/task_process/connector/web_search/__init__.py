@@ -31,6 +31,26 @@ _WEB_SEARCH_API_KEY_ENV_VARS = (
 )
 
 
+def make_web_search_tool() -> JSONObject:
+    """Return the web search function tool schema."""
+    return {
+        "type": "function",
+        "name": WEB_SEARCH_CONNECTOR_NAME,
+        "description": "Search the web for current information.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The search query.",
+                },
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    }
+
+
 def search(query: str) -> JSONObject:
     """Execute one web search request."""
     if os.getenv(BRAVE_API_KEY_ENV, "").strip():
@@ -46,4 +66,4 @@ def search(query: str) -> JSONObject:
     )
 
 
-__all__ = ["WEB_SEARCH_CONNECTOR_NAME", "search"]
+__all__ = ["WEB_SEARCH_CONNECTOR_NAME", "make_web_search_tool", "search"]
