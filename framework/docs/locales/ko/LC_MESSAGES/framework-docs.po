@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-19 00:39+0000\n"
+"POT-Creation-Date: 2026-06-20 00:31+0000\n"
 "PO-Revision-Date: 2026-05-23 06:53+0000\n"
 "Last-Translator: Seulki Yun <icstuckyi@gmail.com>\n"
 "Language: ko\n"
@@ -386,6 +386,7 @@ msgstr "빌드 전달인자"
 #: ../../source/ref-exit-codes/601.rst:7 ../../source/ref-exit-codes/602.rst:7
 #: ../../source/ref-exit-codes/603.rst:7 ../../source/ref-exit-codes/604.rst:7
 #: ../../source/ref-exit-codes/605.rst:7 ../../source/ref-exit-codes/606.rst:7
+#: ../../source/ref-exit-codes/607.rst:7 ../../source/ref-exit-codes/608.rst:7
 #: ../../source/ref-exit-codes/700.rst:7 ../../source/ref-exit-codes/701.rst:7
 #: ../../source/ref-exit-codes/800.rst:7
 msgid "Description"
@@ -10853,14 +10854,14 @@ msgstr "flower 초연결"
 
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:211
 #: ../../source/how-to-create-and-manage-federations.rst:159
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:142
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:143
 #, fuzzy
 msgid "Advanced"
 msgstr "고급 Docker 옵션"
 
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:213
 #: ../../source/how-to-create-and-manage-federations.rst:161
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:144
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:145
 msgid ""
 "Everything shown above in the SuperGrid UI can also be done with the "
 ":doc:`Flower CLI <ref-api-cli>`."
@@ -10868,7 +10869,7 @@ msgstr ""
 
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:216
 #: ../../source/how-to-create-and-manage-federations.rst:164
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:147
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:148
 #, fuzzy
 msgid "Log in to SuperGrid:"
 msgstr "flower 초연결"
@@ -12641,21 +12642,21 @@ msgid ""
 "federation, for example ``@peter123/my-federation``."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:104
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:105
 msgid "The run appears in the same SuperGrid federation dashboard."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:106
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:107
 #: ../../source/tutorial-series-write-your-first-flower-app.rst:110
 msgid "SuperGrid dashboard showing the newly started run in the federation"
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:112
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:113
 #, fuzzy
 msgid "Customize the run configuration"
 msgstr "구성 값"
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:114
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:115
 msgid ""
 "Flower Apps can define default runtime settings in the "
 "``[tool.flwr.app.config]`` section of their ``pyproject.toml``. The "
@@ -12663,32 +12664,32 @@ msgid ""
 " to control how many rounds its ``ServerApp`` runs:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:123
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:124
 msgid ""
 "Apps can define additional settings in this section and read them from "
 "the app code, for example learning rates, model sizes, batch sizes, or "
 "dataset-specific options."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:126
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:127
 msgid ""
 "You can override app-defined values for a single run with the ``--run-"
 "config`` flag. The following command runs ``quickstart-numpy`` on "
 "SuperGrid with ``num-server-rounds`` set to ``5``:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:137
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:138
 msgid ""
 "For more details on Flower App configuration in ``pyproject.toml``, see "
 ":doc:`how-to-configure-pyproject-toml`."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:153
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:154
 #, fuzzy
 msgid "Run an app directly from Flower Hub:"
 msgstr "Flower SuperNode를 실행합니다."
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:161
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:162
 msgid "Inspect runs and logs from the terminal:"
 msgstr ""
 
@@ -34790,6 +34791,8 @@ msgstr ""
 #: ../../source/ref-exit-codes/604.rst:13
 #: ../../source/ref-exit-codes/605.rst:13
 #: ../../source/ref-exit-codes/606.rst:13
+#: ../../source/ref-exit-codes/607.rst:15
+#: ../../source/ref-exit-codes/608.rst:13
 #: ../../source/ref-exit-codes/700.rst:13
 #: ../../source/ref-exit-codes/701.rst:13
 #: ../../source/ref-exit-codes/800.rst:13
@@ -35398,7 +35401,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-exit-codes/601.rst:21
-#: ../../source/ref-exit-codes/701.rst:21
 msgid "Ensure that the installation completes successfully, and then retry."
 msgstr ""
 
@@ -35496,6 +35498,108 @@ msgstr ""
 msgid "Otherwise, upgrade Flower:"
 msgstr ""
 
+#: ../../source/ref-exit-codes/607.rst:3
+msgid "[607] COMMON_APP_IMPORT_ERROR"
+msgstr ""
+
+#: ../../source/ref-exit-codes/607.rst:9
+msgid ""
+"Flower could not load a Flower App because importing its code failed. "
+"This can happen if a dependency is missing, a module in the app cannot be"
+" found, or an imported name, such as a function or class, does not exist."
+msgstr ""
+
+#: ../../source/ref-exit-codes/607.rst:17
+msgid "Check the error message to identify the failed import."
+msgstr ""
+
+#: ../../source/ref-exit-codes/607.rst:20
+msgid "App module or file"
+msgstr ""
+
+#: ../../source/ref-exit-codes/607.rst:22
+msgid ""
+"If the missing import refers to a module or ``.py`` file in your app, "
+"make sure that:"
+msgstr ""
+
+#: ../../source/ref-exit-codes/607.rst:24
+msgid "the file is included in the app"
+msgstr ""
+
+#: ../../source/ref-exit-codes/607.rst:25
+msgid "the import name is correct"
+msgstr ""
+
+#: ../../source/ref-exit-codes/607.rst:27
+msgid ""
+"If the import refers to a name from an existing module, make sure that "
+"the function, class, or variable exists and is exported by that module."
+msgstr ""
+
+#: ../../source/ref-exit-codes/607.rst:31
+#, fuzzy
+msgid "Library dependency"
+msgstr "사전 릴리즈 설치"
+
+#: ../../source/ref-exit-codes/607.rst:33
+msgid ""
+"If the missing import refers to a library dependency, resolve it based on"
+" your dependency installation setup."
+msgstr ""
+
+#: ../../source/ref-exit-codes/607.rst:36
+msgid ""
+"If automatic runtime dependency installation is enabled, add the missing "
+"package to the app's ``pyproject.toml`` dependencies and run the app "
+"again."
+msgstr ""
+
+#: ../../source/ref-exit-codes/607.rst:39
+msgid ""
+"If automatic runtime dependency installation is disabled, install the "
+"missing package in the Python environment where the ServerApp or "
+"ClientApp process runs. Alternatively, consider enabling automatic "
+"runtime dependency installation. See :doc:`Install Flower App "
+"dependencies at runtime <../how-to-install-app-dependencies-at-runtime>` "
+"for details."
+msgstr ""
+
+#: ../../source/ref-exit-codes/608.rst:3
+#, fuzzy
+msgid "[608] COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR"
+msgstr ""
+
+#: ../../source/ref-exit-codes/608.rst:9
+#, fuzzy
+msgid "Runtime installation of Flower App dependencies failed."
+msgstr ""
+
+#: ../../source/ref-exit-codes/608.rst:15
+msgid ""
+"Check the logs for the ``uv sync`` error. The failure can happen for "
+"several reasons: the package index might be unreachable, a package or "
+"version might not exist on the configured index, credentials or proxy "
+"settings might be invalid, or the declared dependencies might be "
+"incompatible with the current Python environment."
+msgstr ""
+
+#: ../../source/ref-exit-codes/608.rst:20
+msgid ""
+"Verify the dependencies declared in the Flower App's ``pyproject.toml``, "
+"including package names, version constraints, and Python compatibility. "
+"If the runtime host should use a custom package index, configure uv's "
+"native ``UV_DEFAULT_INDEX`` and make sure the required packages are "
+"available there."
+msgstr ""
+
+#: ../../source/ref-exit-codes/608.rst:25
+msgid ""
+"If your environment does not allow dependencies to be installed at "
+"runtime, preinstall the Flower App dependencies and disable runtime "
+"dependency installation."
+msgstr ""
+
 #: ../../source/ref-exit-codes/700.rst:3
 #, fuzzy
 msgid "[700] SIMULATION_EXCEPTION"
@@ -35535,9 +35639,15 @@ msgstr ""
 #: ../../source/ref-exit-codes/701.rst:15
 #, fuzzy
 msgid ""
-"To use simulation with the Ray backend, install ``flwr`` with the "
-"``simulation`` extra:"
+"To use simulation with the Ray backend, add ``flwr`` with the "
+"``simulation`` extra to the app's ``pyproject.toml`` dependencies:"
 msgstr "가상 클라이언트 엔진을 사용하는 시뮬레이션의 경우 ``flwr``을 ``simulation``extra와 함께 설치해야 합니다:"
+
+#: ../../source/ref-exit-codes/701.rst:24
+msgid ""
+"Then install the app dependencies manually unless automatic runtime "
+"dependency installation is enabled, and retry."
+msgstr ""
 
 #: ../../source/ref-exit-codes/800.rst:3
 #, fuzzy
