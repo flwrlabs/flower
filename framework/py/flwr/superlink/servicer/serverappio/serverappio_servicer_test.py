@@ -67,11 +67,6 @@ from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
-from flwr.superlink.servicer.serverappio.serverappio_grpc import run_serverappio_api_grpc
-from flwr.superlink.servicer.serverappio.serverappio_servicer import (
-    ServerAppIoServicer,
-    _raise_if,
-)
 from flwr.server.superlink.utils import _STATUS_TO_MSG
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
@@ -97,6 +92,13 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
+from flwr.superlink.servicer.serverappio.serverappio_grpc import (
+    run_serverappio_api_grpc,
+)
+from flwr.superlink.servicer.serverappio.serverappio_servicer import (
+    ServerAppIoServicer,
+    _raise_if,
+)
 
 # pylint: disable=broad-except,too-many-lines
 
