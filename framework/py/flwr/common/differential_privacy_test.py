@@ -18,6 +18,9 @@
 import numpy as np
 
 from .differential_privacy import (
+    CLIENTS_DISCREPANCY_WARNING,
+    KEY_CLIPPING_NORM,
+    KEY_NORM_BIT,
     add_gaussian_noise_inplace,
     clip_inputs_inplace,
     compute_adaptive_noise_params,
@@ -25,6 +28,13 @@ from .differential_privacy import (
     compute_stdv,
     get_norm,
 )
+
+
+def test_differential_privacy_constants() -> None:
+    """Test differential privacy constants."""
+    assert KEY_CLIPPING_NORM == "clipping_norm"
+    assert KEY_NORM_BIT == "norm_bit"
+    assert "privacy guarantees" in CLIENTS_DISCREPANCY_WARNING
 
 
 def test_add_gaussian_noise_inplace() -> None:

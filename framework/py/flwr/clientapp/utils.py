@@ -26,7 +26,7 @@ from flwr.common.config import (
     get_project_dir,
 )
 from flwr.common.logger import log
-from flwr.common.object_ref import load_app, validate
+from flwr.supercore.object_ref import load_app, validate
 from flwr.supercore.utils import get_flwr_home
 
 
