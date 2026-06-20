@@ -35,7 +35,6 @@ from flwr.app import Context, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.client.grpc_adapter_client.connection import grpc_adapter
 from flwr.client.grpc_rere_client.connection import grpc_request_response
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.config import get_fused_config_from_fab
 from flwr.common.constant import (
     CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
@@ -50,13 +49,13 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import log
 from flwr.proto.clientappio_pb2_grpc import add_ClientAppIoServicer_to_server
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.constant import TaskType
 from flwr.supercore.fab import Fab
+from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
