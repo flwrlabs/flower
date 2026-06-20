@@ -23,7 +23,6 @@ import grpc
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
 from flwr.common.serde import run_from_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -36,6 +35,7 @@ from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import ExecutorType
+from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
