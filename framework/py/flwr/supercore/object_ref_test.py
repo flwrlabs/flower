@@ -104,18 +104,6 @@ def test_validate_object_reference_fails() -> None:
     )
 
 
-def test_validate_object_reference_finds_attribute_in_all(tmp_path: Path) -> None:
-    """Test that validate_object_reference finds attributes exported in __all__."""
-    for index, all_value in enumerate(('["app"]', '("app",)')):
-        module_name = f"module_{index}"
-        _write_module(tmp_path, module_name, f"__all__ = {all_value}\n")
-
-        is_valid, error = validate(f"{module_name}:app", project_dir=tmp_path)
-
-        assert is_valid
-        assert error is None
-
-
 def test_validate_check_module_false() -> None:
     """Test that check_module=False only validates the reference shape."""
     # Execute

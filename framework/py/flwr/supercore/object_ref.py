@@ -200,7 +200,11 @@ def _find_attribute_in_module(file_path: str, attribute_name: str) -> bool:
 def _is_module_in_all(attribute_name: str, target: ast.expr, n: ast.Assign) -> bool:
     """Now check if attribute_name is in __all__."""
     if isinstance(target, ast.Name) and target.id == "__all__":
-        if isinstance(n.value, (ast.List, ast.Tuple)):
+        if isinstance(n.value, ast.List):
+            for elt in n.value.elts:
+                if _is_string_constant(elt, attribute_name):
+                    return True
+        elif isinstance(n.value, ast.Tuple):
             for elt in n.value.elts:
                 if _is_string_constant(elt, attribute_name):
                     return True
