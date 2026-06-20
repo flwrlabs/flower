@@ -28,9 +28,8 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from flwr.app import DEFAULT_TTL, ConfigRecord, Message, Metadata, RecordDict
 from flwr.app.message import make_message
 from flwr.app.message_type import MessageType
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH, serde
+from flwr.common import serde
 from flwr.common.constant import MessageTypeLegacy
-from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
 from flwr.compat.common import recorddict_compat as compat
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
@@ -41,6 +40,11 @@ from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
 from flwr.proto.transport_pb2_grpc import FlowerServiceStub  # pylint: disable=E0611
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
+from flwr.supercore.grpc import (
+    GRPC_MAX_MESSAGE_LENGTH,
+    create_channel,
+    on_channel_state_change,
+)
 from flwr.supercore.retry import RetryInvoker
 from flwr.supercore.run import Run
 

@@ -30,7 +30,6 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     ErrorCode,
 )
-from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log, warn_deprecated_feature
 from flwr.common.serde import message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -49,6 +48,7 @@ from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E
 from flwr.serverapp.grid import Grid
 from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
 from flwr.supercore.date import now
+from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.inflatable.inflatable_object import (
     InflatableObject,
     get_all_nested_objects,

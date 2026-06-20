@@ -21,9 +21,9 @@ from typing import cast
 import grpc
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
-from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
+from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
