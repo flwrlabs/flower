@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import torch
-from flwr.common.parameter import ndarrays_to_parameters
+from flwr.common import ndarrays_to_parameters
 from flwr.common.typing import NDArrays, Parameters, Scalar
 from flwr.server.history import History
 from PIL import Image

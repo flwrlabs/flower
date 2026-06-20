@@ -22,7 +22,6 @@ from typing import Any
 
 import yaml
 
-from flwr.common import EventType, event
 from flwr.common.args import add_args_runtime_dependency_install
 from flwr.common.constant import ExecPluginType
 from flwr.common.exit import ExitCode, flwr_exit
@@ -47,6 +46,7 @@ from flwr.supercore.superexec.plugin import (
     ServerAppExecPlugin,
 )
 from flwr.supercore.superexec.run_superexec import run_superexec
+from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import disable_process_dumping
 from flwr.supercore.version import package_version

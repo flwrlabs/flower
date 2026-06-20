@@ -26,7 +26,6 @@ from flwr.app.message import Context, RecordDict
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
-from flwr.common import EventType, event
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.config import (
     get_fused_config_from_dir,
@@ -67,9 +66,11 @@ from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import NOOP_FEDERATION
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.superexec.dependency_installer import (
+    RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 
@@ -329,6 +330,10 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         # General exit code
         exit_code = ExitCode.SIMULATION_EXCEPTION
+        if isinstance(ex, ImportError):
+            exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
+        elif isinstance(ex, RuntimeDependencyInstallationError):
+            exit_code = ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR
 
     flwr_exit(
         code=exit_code,

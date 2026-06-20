@@ -30,7 +30,7 @@ from flwr.client.client import (
 from flwr.client.numpy_client import NumPyClient
 from flwr.common import log
 from flwr.common.constant import MessageTypeLegacy
-from flwr.common.recorddict_compat import (
+from flwr.compat.common.recorddict_compat import (
     evaluateres_to_recorddict,
     fitres_to_recorddict,
     getparametersres_to_recorddict,

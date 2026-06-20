@@ -21,8 +21,8 @@ from logging import INFO
 import grpc
 from grpc_health.v1.health_pb2_grpc import add_HealthServicer_to_server
 
-from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import log
+from flwr.supercore.grpc import generic_create_grpc_server
 
 from .simple_health_servicer import SimpleHealthServicer
 

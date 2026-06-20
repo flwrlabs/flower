@@ -107,15 +107,20 @@ class ClientAppIoStub(object):
                 request_serializer=flwr_dot_proto_dot_log__pb2.PushLogsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_log__pb2.PushLogsResponse.FromString,
                 _registered_method=True)
-        self.PushMessage = channel.unary_unary(
-                '/flwr.proto.ClientAppIo/PushMessage',
+        self.PushMessages = channel.unary_unary(
+                '/flwr.proto.ClientAppIo/PushMessages',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.FromString,
                 _registered_method=True)
-        self.PullMessage = channel.unary_unary(
-                '/flwr.proto.ClientAppIo/PullMessage',
+        self.PullMessages = channel.unary_unary(
+                '/flwr.proto.ClientAppIo/PullMessages',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.FromString,
+                _registered_method=True)
+        self.GetNodes = channel.unary_unary(
+                '/flwr.proto.ClientAppIo/GetNodes',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.GetNodesRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.GetNodesResponse.FromString,
                 _registered_method=True)
 
 
@@ -232,19 +237,26 @@ class ClientAppIoServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def PushMessage(self, request, context):
+    def PushMessages(self, request, context):
         """///////////////////////////////////////////////////////////////////////////
-        Specific endpoints for ClientAppIo
+        Message and node endpoints
         ///////////////////////////////////////////////////////////////////////////
 
-        Push Message
+        Push messages
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def PullMessage(self, request, context):
-        """Pull Message
+    def PullMessages(self, request, context):
+        """Pull messages
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNodes(self, request, context):
+        """Return a set of nodes
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -323,15 +335,20 @@ def add_ClientAppIoServicer_to_server(servicer, server):
                     request_deserializer=flwr_dot_proto_dot_log__pb2.PushLogsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_log__pb2.PushLogsResponse.SerializeToString,
             ),
-            'PushMessage': grpc.unary_unary_rpc_method_handler(
-                    servicer.PushMessage,
+            'PushMessages': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushMessages,
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.SerializeToString,
             ),
-            'PullMessage': grpc.unary_unary_rpc_method_handler(
-                    servicer.PullMessage,
+            'PullMessages': grpc.unary_unary_rpc_method_handler(
+                    servicer.PullMessages,
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.SerializeToString,
+            ),
+            'GetNodes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNodes,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.GetNodesRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.GetNodesResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -723,7 +740,7 @@ class ClientAppIo(object):
             _registered_method=True)
 
     @staticmethod
-    def PushMessage(request,
+    def PushMessages(request,
             target,
             options=(),
             channel_credentials=None,
@@ -736,7 +753,7 @@ class ClientAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ClientAppIo/PushMessage',
+            '/flwr.proto.ClientAppIo/PushMessages',
             flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.FromString,
             options,
@@ -750,7 +767,7 @@ class ClientAppIo(object):
             _registered_method=True)
 
     @staticmethod
-    def PullMessage(request,
+    def PullMessages(request,
             target,
             options=(),
             channel_credentials=None,
@@ -763,9 +780,36 @@ class ClientAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ClientAppIo/PullMessage',
+            '/flwr.proto.ClientAppIo/PullMessages',
             flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNodes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ClientAppIo/GetNodes',
+            flwr_dot_proto_dot_appio__pb2.GetNodesRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.GetNodesResponse.FromString,
             options,
             channel_credentials,
             insecure,

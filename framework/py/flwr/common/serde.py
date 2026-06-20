@@ -651,7 +651,7 @@ def run_to_proto(run: Run) -> ProtoRun:
         bytes_sent=run.bytes_sent,
         bytes_recv=run.bytes_recv,
         clientapp_runtime=run.clientapp_runtime,
-        run_type=run.run_type,
+        primary_task_type=run.primary_task_type,
         series_id=run.series_id,
     )
     if run.primary_task_id is not None:
@@ -680,7 +680,7 @@ def run_from_proto(run_proto: ProtoRun) -> Run:
         bytes_sent=run_proto.bytes_sent,
         bytes_recv=run_proto.bytes_recv,
         clientapp_runtime=run_proto.clientapp_runtime,
-        run_type=run_proto.run_type,
+        primary_task_type=run_proto.primary_task_type,
         series_id=run_proto.series_id,
     )
     return run
