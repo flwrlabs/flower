@@ -33,8 +33,8 @@ from flwr.common import (
     Parameters,
     Status,
 )
-from flwr.common import recorddict_compat as compat
 from flwr.common.constant import MessageTypeLegacy
+from flwr.compat.common import recorddict_compat as compat
 from flwr.supercore.date import now
 
 from .message_handler import handle_legacy_message_from_msgtype

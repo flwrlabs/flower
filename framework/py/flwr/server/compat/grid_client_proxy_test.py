@@ -40,7 +40,7 @@ from flwr.common import (
     Properties,
     Status,
 )
-from flwr.common import recorddict_compat as compat
+from flwr.compat.common import recorddict_compat as compat
 from flwr.server.compat.grid_client_proxy import GridClientProxy
 
 MESSAGE_PARAMETERS = Parameters(tensors=[b"abc"], tensor_type="np")

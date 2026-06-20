@@ -23,8 +23,8 @@ import grpc
 
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common import Code, GetPropertiesRes, Status
-from flwr.common import recorddict_compat as compat
 from flwr.common.constant import MessageTypeLegacy
+from flwr.compat.common import recorddict_compat as compat
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
     ServerMessage,
