@@ -27,6 +27,15 @@ from flwr.common import (
 )
 from flwr.common.logger import log
 
+KEY_CLIPPING_NORM = "clipping_norm"
+KEY_NORM_BIT = "norm_bit"
+CLIENTS_DISCREPANCY_WARNING = (
+    "The number of clients returning parameters (%s)"
+    " differs from the number of sampled clients (%s)."
+    " This could impact the differential privacy guarantees,"
+    " potentially leading to privacy leakage or inadequate noise calibration."
+)
+
 
 def get_norm(input_arrays: NDArrays) -> float:
     """Compute the L2 norm of the flattened input."""
