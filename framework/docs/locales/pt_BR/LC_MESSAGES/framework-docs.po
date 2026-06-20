@@ -33977,7 +33977,7 @@ msgstr ""
 #: ../../source/ref-exit-codes/608.rst:3
 #, fuzzy
 msgid "[608] COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/ref-exit-codes/608.rst:9
 msgid "Runtime installation of Flower App dependencies failed."

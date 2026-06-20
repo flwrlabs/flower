@@ -45920,7 +45920,7 @@ msgstr "Sinon, mettez à jour Flower :"
 #: ../../source/ref-exit-codes/607.rst:3
 #, fuzzy
 msgid "[607] COMMON_APP_IMPORT_ERROR"
-msgstr "[602] COMMON_TLS_NOT_SUPPORTED"
+msgstr "[607] COMMON_APP_IMPORT_ERROR"
 
 #: ../../source/ref-exit-codes/607.rst:9
 msgid ""
@@ -45988,12 +45988,12 @@ msgstr ""
 #: ../../source/ref-exit-codes/608.rst:3
 #, fuzzy
 msgid "[608] COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR"
-msgstr "`superexec.allowRuntimeDependencyInstallation`"
+msgstr "[608] COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR"
 
 #: ../../source/ref-exit-codes/608.rst:9
 #, fuzzy
 msgid "Runtime installation of Flower App dependencies failed."
-msgstr "Installez les dépendances"
+msgstr "L'installation à l'exécution des dépendances des applications Flower a échoué."
 
 #: ../../source/ref-exit-codes/608.rst:15
 msgid ""

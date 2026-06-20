@@ -39289,12 +39289,12 @@ msgstr ""
 #: ../../source/ref-exit-codes/608.rst:3
 #, fuzzy
 msgid "[608] COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR"
-msgstr "flower-superlink"
+msgstr ""
 
 #: ../../source/ref-exit-codes/608.rst:9
 #, fuzzy
 msgid "Runtime installation of Flower App dependencies failed."
-msgstr "安装依赖项"
+msgstr ""
 
 #: ../../source/ref-exit-codes/608.rst:15
 msgid ""
