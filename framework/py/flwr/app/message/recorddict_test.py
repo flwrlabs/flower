@@ -33,11 +33,11 @@ from flwr.common import (
     ndarrays_to_parameters,
     parameters_to_ndarrays,
 )
-from flwr.common.recorddict_compat import (
+from flwr.common.serde import config_record_to_proto, metric_record_to_proto
+from flwr.compat.common.recorddict_compat import (
     arrayrecord_to_parameters,
     parameters_to_arrayrecord,
 )
-from flwr.common.serde import config_record_to_proto, metric_record_to_proto
 from flwr.supercore.inflatable.inflatable_object import (
     get_object_body,
     get_object_type_from_object_content,

@@ -20,7 +20,8 @@ from typing import cast, get_args
 
 from flwr.app import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
 from flwr.app.typing import ConfigRecordValues, MetricRecordValues
-from flwr.common import (
+
+from .typing import (
     Code,
     EvaluateIns,
     EvaluateRes,
