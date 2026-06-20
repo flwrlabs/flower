@@ -49,7 +49,6 @@ _RUN_ID_FOREIGN_KEYS = (
 
 # Historical run_type string values used by this migration.
 # Keep these local constants because RunType has been removed from the framework.
-AGENT_APP_RUN_TYPE = "agentapp"
 SERVER_APP_RUN_TYPE = "serverapp"
 SIMULATION_RUN_TYPE = "simulation"
 
@@ -83,8 +82,6 @@ def _create_run_id_foreign_keys() -> None:
 
 def _primary_task_type_from_run_type(run_type: str) -> str:
     """Return the primary task type for the given run type."""
-    if run_type == AGENT_APP_RUN_TYPE:
-        return TaskType.AGENT_APP
     if run_type == SIMULATION_RUN_TYPE:
         return TaskType.SIMULATION
     if run_type == SERVER_APP_RUN_TYPE:
