@@ -20,6 +20,11 @@ from fastapi import APIRouter
 router = APIRouter(prefix="/control", tags=["control"])
 
 
+from fastapi import APIRouter, HTTPException
+
+router = APIRouter(prefix="/control", tags=["control"])
+
+
 @router.get("/runs")
 def list_runs() -> dict[str, str]:
     """List runs.
@@ -29,4 +34,4 @@ def list_runs() -> dict[str, str]:
     dict[str, str]
         Not yet implemented.
     """
-    return {"status": "not_implemented"}
+    raise HTTPException(status_code=501, detail="Not implemented")
