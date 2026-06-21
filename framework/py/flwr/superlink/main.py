@@ -17,12 +17,13 @@
 
 from fastapi import FastAPI
 
+from flwr import __version__
 from flwr.supercore.routers import health
 from flwr.superlink.routers import control, runtime
 
 app = FastAPI(
     title="SuperLink API",
-    version="1.32.0",
+    version=__version__,
     docs_url="/docs",
     redoc_url=None,
 )
