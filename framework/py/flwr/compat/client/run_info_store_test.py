@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Node state tests."""
+"""Run info store tests."""
 
 
 from typing import cast
 
 from flwr.app import ConfigRecord, Context
-from flwr.client.run_info_store import DeprecatedRunInfoStore
+from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
 
 
 def _run_dummy_task(context: Context) -> Context:
@@ -32,7 +32,7 @@ def _run_dummy_task(context: Context) -> Context:
     return context
 
 
-def test_multirun_in_node_state() -> None:
+def test_multirun_in_run_info_store() -> None:
     """Test basic DeprecatedRunInfoStore logic."""
     # Tasks to perform
     run_ids = [0, 1, 1, 2, 3, 2, 1, 5]

@@ -18,8 +18,9 @@
 from abc import ABC
 from collections.abc import Callable
 
-from flwr.client.client import Client
-from flwr.common import (
+from flwr.compat.client.client import Client
+from flwr.compat.common.parameter import ndarrays_to_parameters, parameters_to_ndarrays
+from flwr.compat.common.typing import (
     Code,
     Config,
     EvaluateIns,
@@ -33,8 +34,6 @@ from flwr.common import (
     NDArrays,
     Scalar,
     Status,
-    ndarrays_to_parameters,
-    parameters_to_ndarrays,
 )
 
 EXCEPTION_MESSAGE_WRONG_RETURN_TYPE_FIT = """

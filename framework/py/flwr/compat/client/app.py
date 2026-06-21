@@ -28,15 +28,15 @@ from flwr.app.error import Error
 from flwr.app.user_config import UserConfig
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
-from flwr.client.client import Client
 from flwr.client.message_handler.message_handler import handle_control_message
-from flwr.client.numpy_client import NumPyClient
-from flwr.client.run_info_store import DeprecatedRunInfoStore
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.common.constant import MAX_RETRY_DELAY, ErrorCode
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log, warn_deprecated_feature
+from flwr.compat.client.client import Client
 from flwr.compat.client.grpc_client.connection import grpc_connection
+from flwr.compat.client.numpy_client import NumPyClient
+from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
 from flwr.compat.client.typing import ClientFnExt
 from flwr.compat.common.constant import TRANSPORT_TYPE_GRPC_BIDI, TRANSPORT_TYPES_COMPAT
 from flwr.supercore.address import parse_address

@@ -24,10 +24,10 @@ import ray
 from flwr.app import DEFAULT_TTL, ConfigRecord, Context, Message, Metadata, RecordDict
 from flwr.app.message import make_message
 from flwr.client import Client, NumPyClient
-from flwr.client.run_info_store import DeprecatedRunInfoStore
 from flwr.clientapp import ClientApp
 from flwr.common import Config, GetPropertiesIns, MessageTypeLegacy, Scalar
 from flwr.common.constant import PARTITION_ID_KEY
+from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
 from flwr.compat.common.recorddict_compat import getpropertiesins_to_recorddict
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
 from flwr.server.superlink.fleet.vce.backend.raybackend import RayBackend
