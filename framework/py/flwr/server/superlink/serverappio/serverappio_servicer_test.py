@@ -463,6 +463,24 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
         assert run.clientapp_runtime == 7.89
 
+    def test_push_task_output_treats_negative_simulation_runtime_as_zero(self) -> None:
+        """PushTaskOutput should not persist negative Simulation Runtime usage."""
+        # Prepare
+        request = PushTaskOutputRequest(
+            sub_status="completed",
+            details="",
+            clientapp_runtime=-7.89,
+        )
+
+        # Execute
+        response, call = self._push_task_output.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, PushTaskOutputResponse)
+        assert grpc.StatusCode.OK == call.code()
+        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        assert run.clientapp_runtime == 0.0
+
     def test_push_task_output_stores_run_series_context(self) -> None:
         """PushTaskOutput should persist context in the authenticated run series."""
         # Prepare

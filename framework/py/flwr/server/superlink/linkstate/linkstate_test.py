@@ -1924,6 +1924,38 @@ class StateTest(CoreStateTest):
         assert run.bytes_sent == 0
         assert run.bytes_recv == 0
 
+    def test_add_clientapp_runtime_accumulates_positive_values(self) -> None:
+        """Test that ClientApp runtime accumulates positive values."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+
+        # Execute
+        state.add_clientapp_runtime(run_id, runtime=10.5)
+        state.add_clientapp_runtime(run_id, runtime=2.25)
+
+        # Assert
+        run = state.get_run_info(run_ids=[run_id])[0]
+        assert run.clientapp_runtime == 12.75
+
+    @parameterized.expand(
+        [(-10.5,), (float("nan"),), (float("inf"),), (float("-inf"),)]
+    )  # type: ignore
+    def test_add_clientapp_runtime_clamps_invalid_values_to_zero(
+        self, runtime: float
+    ) -> None:
+        """Test negative/non-finite ClientApp runtime values are treated as zero."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+
+        # Execute
+        state.add_clientapp_runtime(run_id, runtime=runtime)
+
+        # Assert
+        run = state.get_run_info(run_ids=[run_id])[0]
+        assert run.clientapp_runtime == 0.0
+
     def test_add_clientapp_runtime_invalid_run_id(self) -> None:
         """Test that invalid run_id raises ValueError for add_clientapp_runtime."""
         # Prepare

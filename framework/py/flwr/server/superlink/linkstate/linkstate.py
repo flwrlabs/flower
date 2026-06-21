@@ -418,7 +418,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
 
         This method accumulates the runtime by adding the provided value to the
         existing total runtime for the run. Multiple ClientApps can contribute
-        to the same run's total runtime.
+        to the same run's total runtime. Negative and non-finite runtimes are
+        treated as zero.
 
         Parameters
         ----------

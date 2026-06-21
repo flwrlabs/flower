@@ -15,6 +15,7 @@
 """In-memory LinkState implementation."""
 
 
+import math
 import threading
 from collections import defaultdict
 from collections.abc import Sequence
@@ -893,6 +894,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def add_clientapp_runtime(self, run_id: int, runtime: float) -> None:
         """Add ClientApp runtime to the cumulative total for the specified `run_id`."""
+        if runtime < 0 or not math.isfinite(runtime):
+            runtime = 0.0
         with self.lock:
             if run_id not in self.run_ids:
                 raise ValueError(f"Run {run_id} not found")
