@@ -20,6 +20,11 @@ from fastapi import APIRouter
 router = APIRouter(prefix="/runtime", tags=["runtime"])
 
 
+from fastapi import APIRouter, HTTPException
+
+router = APIRouter(prefix="/runtime", tags=["runtime"])
+
+
 @router.post("/messages")
 def pull_messages() -> dict[str, str]:
     """Pull messages for the ClientApp.
@@ -29,4 +34,4 @@ def pull_messages() -> dict[str, str]:
     dict[str, str]
         Message payloads for the authenticated ClientApp. Not yet implemented.
     """
-    return {"status": "not_implemented"}
+    raise HTTPException(status_code=501, detail="Not implemented")
