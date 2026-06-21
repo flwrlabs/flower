@@ -12,27 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower ServerApp exceptions."""
+"""Flower exit functionality."""
 
 
-from flwr.app.exception import AppExitException
-from flwr.supercore.exit import ExitCode
+from .exit import flwr_exit
+from .exit_code import ExitCode
+from .exit_handler import add_exit_handler
+from .signal_handler import register_signal_handlers
 
-
-class InconsistentMessageReplies(AppExitException):
-    """Exception triggered when replies are inconsistent and therefore aggregation must
-    be skipped."""
-
-    exit_code = ExitCode.SERVERAPP_STRATEGY_PRECONDITION_UNMET
-
-    def __init__(self, reason: str):
-        super().__init__(reason)
-
-
-class AggregationError(AppExitException):
-    """Exception triggered when aggregation fails."""
-
-    exit_code = ExitCode.SERVERAPP_STRATEGY_AGGREGATION_ERROR
-
-    def __init__(self, reason: str):
-        super().__init__(reason)
+__all__ = [
+    "ExitCode",
+    "add_exit_handler",
+    "flwr_exit",
+    "register_signal_handlers",
+]
