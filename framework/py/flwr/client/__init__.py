@@ -18,11 +18,11 @@
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
+from flwr.compat.client.client import Client
+from flwr.compat.client.numpy_client import NumPyClient
 from flwr.compat.client.typing import ClientFn, ClientFnExt
 
 from . import mod
-from .client import Client
-from .numpy_client import NumPyClient
 
 if TYPE_CHECKING:
     from flwr.clientapp.client_app import ClientApp
