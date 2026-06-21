@@ -86,6 +86,7 @@ from flwr.superlink.auth_plugin import (
 )
 from flwr.superlink.federation import FederationManager, NoOpFederationManager
 from flwr.superlink.servicer.control import run_control_api_grpc
+from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
 
 from .superlink.fleet.grpc_adapter.grpc_adapter_servicer import GrpcAdapterServicer
 from .superlink.fleet.grpc_rere.fleet_servicer import FleetServicer
@@ -93,7 +94,6 @@ from .superlink.fleet.grpc_rere.node_auth_server_interceptor import (
     NodeAuthServerInterceptor,
 )
 from .superlink.linkstate import LinkStateFactory
-from .superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 
 P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
 
