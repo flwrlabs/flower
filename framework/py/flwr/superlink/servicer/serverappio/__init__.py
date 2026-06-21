@@ -12,4 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower ServerAppIo service."""
+"""ServerAppIo API Servicer."""
+
+
+from .serverappio_grpc import run_serverappio_api_grpc
+
+__all__ = [
+    "run_serverappio_api_grpc",
+]

@@ -47,7 +47,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
-from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, TaskType
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
@@ -60,6 +59,9 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
+from flwr.superlink.servicer.serverappio.serverappio_grpc import (
+    run_serverappio_api_grpc,
+)
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
 
