@@ -14,12 +14,6 @@
 # ==============================================================================
 """Control API router."""
 
-
-from fastapi import APIRouter
-
-router = APIRouter(prefix="/control", tags=["control"])
-
-
 from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/control", tags=["control"])

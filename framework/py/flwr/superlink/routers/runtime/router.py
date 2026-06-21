@@ -14,12 +14,6 @@
 # ==============================================================================
 """Runtime API router."""
 
-
-from fastapi import APIRouter
-
-router = APIRouter(prefix="/runtime", tags=["runtime"])
-
-
 from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/runtime", tags=["runtime"])
