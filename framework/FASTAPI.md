@@ -2,9 +2,9 @@
 
 ## Install
 
-```
-uv sync --all-extras
-```
+~~~
+uv sync --locked --all-extras
+~~~
 
 ## Run
 
