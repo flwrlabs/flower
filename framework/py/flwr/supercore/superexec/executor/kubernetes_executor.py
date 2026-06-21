@@ -196,12 +196,14 @@ class KubernetesExecutor:
         self._last_completed_pod_sweep_at: float | None = None
 
     def wait_for_capacity(self) -> None:
-        """Wait until the configured resource pool is below its active Pod budget."""
+        """Wait until the configured resource pool is below its active Pod
+        budget."""
         self._sweep_completed_pods_if_due()
         if self._config.active_pod_budget is None:
             return
 
         last_log_at: float | None = None
+        waited_for_capacity = False
         while True:
             try:
                 active_pod_count = self._active_pod_count()
@@ -215,6 +217,8 @@ class KubernetesExecutor:
                 )
                 return
             if active_pod_count < self._config.active_pod_budget:
+                if waited_for_capacity:
+                    self._sweep_completed_pods()
                 return
 
             if self._config.capacity_log_interval is not None:
@@ -233,10 +237,12 @@ class KubernetesExecutor:
                     )
                     last_log_at = now
 
+            waited_for_capacity = True
             self._config.sleep(self._config.capacity_poll_interval)
 
     def _sweep_completed_pods_if_due(self) -> None:
-        """Run best-effort completed Pod cleanup if the internal throttle allows it."""
+        """Run best-effort completed Pod cleanup if the internal throttle
+        allows it."""
         now = self._config.monotonic()
         if (
             self._last_completed_pod_sweep_at is not None
@@ -246,6 +252,10 @@ class KubernetesExecutor:
             return
 
         self._last_completed_pod_sweep_at = now
+        self._sweep_completed_pods()
+
+    def _sweep_completed_pods(self) -> None:
+        """Run best-effort completed Pod cleanup."""
         try:
             self._completed_pod_sweeper.sweep()
         except Exception:  # pylint: disable=broad-exception-caught

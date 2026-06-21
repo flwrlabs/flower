@@ -292,7 +292,8 @@ def test_build_taskexecutor_objects_use_execution_spec_root_certificates(
 def test_build_taskexecutor_objects_expand_user_root_certificates_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Test ExecutionSpec root certificates path supports shell-style home paths."""
+    """Test ExecutionSpec root certificates path supports shell-style home
+    paths."""
     root_certificates_path = tmp_path / "appio-ca.pem"
     root_certificates_path.write_text("home-root-ca", encoding="utf-8")
     monkeypatch.setenv("HOME", str(tmp_path))
@@ -454,7 +455,8 @@ def test_build_taskexecutor_pod_supports_labels_annotations_and_security() -> No
 
 
 def test_wait_for_capacity_returns_below_budget_without_sleeping() -> None:
-    """Test capacity wait returns immediately when the active Pod count fits."""
+    """Test capacity wait returns immediately when the active Pod count
+    fits."""
     client = Mock()
     client.list_namespaced_pod.side_effect = [
         {"items": []},
@@ -478,11 +480,13 @@ def test_wait_for_capacity_returns_below_budget_without_sleeping() -> None:
 
 
 def test_wait_for_capacity_sleeps_and_polls_again_at_budget() -> None:
-    """Test capacity wait sleeps when the active Pod count reaches the budget."""
+    """Test capacity wait sleeps when the active Pod count reaches the
+    budget."""
     client = Mock()
     client.list_namespaced_pod.side_effect = [
         {"items": []},
         {"items": [_pod("Pending")]},
+        {"items": []},
         {"items": []},
     ]
     client.list_namespaced_secret.return_value = {"items": []}
@@ -496,8 +500,46 @@ def test_wait_for_capacity_sleeps_and_polls_again_at_budget() -> None:
 
     KubernetesExecutor(client=client, config=config).wait_for_capacity()
 
-    assert client.list_namespaced_pod.call_count == 3
+    assert client.list_namespaced_pod.call_count == 4
+    assert client.list_namespaced_secret.call_count == 2
     sleep.assert_called_once_with(3.0)
+
+
+def test_wait_for_capacity_sweeps_after_waiting_for_capacity_to_open() -> None:
+    """Test completed Pod cleanup runs after a blocking capacity wait opens."""
+    client = Mock()
+    labels = _task_labels(123)
+    client.list_namespaced_pod.side_effect = [
+        {"items": []},
+        {"items": [_pod("Running", labels=labels)]},
+        {"items": [_pod("Succeeded", labels=labels)]},
+        {"items": [_pod("Succeeded", labels=labels)]},
+    ]
+    client.list_namespaced_secret.side_effect = [
+        {"items": []},
+        {"items": [_secret(_SECRET_NAME, labels)]},
+    ]
+    sleep = Mock()
+    config = _executor_config(
+        resource_pool="gpu-pool",
+        active_pod_budget=1,
+        capacity_poll_interval=3.0,
+        sleep=sleep,
+    )
+
+    KubernetesExecutor(client=client, config=config).wait_for_capacity()
+
+    assert client.list_namespaced_pod.call_count == 4
+    assert client.list_namespaced_secret.call_count == 2
+    sleep.assert_called_once_with(3.0)
+    client.delete_namespaced_pod.assert_called_once_with(
+        name=_POD_NAME,
+        namespace="flower-system",
+        grace_period_seconds=0,
+    )
+    client.delete_namespaced_secret.assert_called_once_with(
+        name=_SECRET_NAME, namespace="flower-system"
+    )
 
 
 def test_wait_for_capacity_counts_pending_running_and_terminating_active_pods() -> None:
@@ -579,7 +621,8 @@ def test_wait_for_capacity_sweeps_terminal_pods_before_capacity_check() -> None:
 
 
 def test_wait_for_capacity_throttles_completed_pod_sweeps() -> None:
-    """Test capacity wait does not sweep more often than the internal interval."""
+    """Test capacity wait does not sweep more often than the internal
+    interval."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     client.list_namespaced_secret.return_value = {"items": []}
@@ -713,7 +756,8 @@ def test_sweeper_deletes_orphaned_credential_secret() -> None:
 
 
 def test_sweeper_keeps_active_retry_secret_for_same_task() -> None:
-    """Test cleanup keeps the Secret for a newer active retry of the same task."""
+    """Test cleanup keeps the Secret for a newer active retry of the same
+    task."""
     client = Mock()
     client.list_namespaced_pod.return_value = {
         "items": [
@@ -736,7 +780,8 @@ def test_sweeper_keeps_active_retry_secret_for_same_task() -> None:
 
 
 def test_sweeper_keeps_secret_without_credential_secret_name() -> None:
-    """Test cleanup does not delete Secrets without the credential name suffix."""
+    """Test cleanup does not delete Secrets without the credential name
+    suffix."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     client.list_namespaced_secret.return_value = {
@@ -754,7 +799,8 @@ def test_sweeper_keeps_secret_without_credential_secret_name() -> None:
 
 
 def test_sweeper_keeps_orphaned_credential_secret_without_task_id_label() -> None:
-    """Test cleanup ignores orphaned credential Secrets without a task-id label."""
+    """Test cleanup ignores orphaned credential Secrets without a task-id
+    label."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     client.list_namespaced_secret.return_value = {
@@ -818,7 +864,8 @@ def test_launch_submits_secret_before_pod_and_returns_accepted(
 def test_launch_generates_distinct_object_names_for_same_task(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test repeated launch calls for one task do not reuse Pod/Secret names."""
+    """Test repeated launch calls for one task do not reuse Pod/Secret
+    names."""
     client = Mock()
     monkeypatch.setattr(
         kube,
@@ -961,7 +1008,8 @@ def test_launch_returns_unknown_for_ambiguous_server_failure() -> None:
 
 
 def test_launch_returns_failed_if_root_certificates_file_cannot_be_read() -> None:
-    """Test launch fails before submission if spec root certificates cannot be read."""
+    """Test launch fails before submission if spec root certificates cannot be
+    read."""
     client = Mock()
 
     result = KubernetesExecutor(
@@ -991,6 +1039,7 @@ def test_execution_spec_rejects_invalid_task_id() -> None:
 def test_execution_spec_rejects_empty_required_strings(
     field: str, value: str, message: str
 ) -> None:
-    """Test ExecutionSpec rejects empty string fields required by all executors."""
+    """Test ExecutionSpec rejects empty string fields required by all
+    executors."""
     with pytest.raises(ValueError, match=message):
         _execution_spec(**{field: value})
