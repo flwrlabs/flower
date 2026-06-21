@@ -19,10 +19,10 @@ import copy
 
 import numpy as np
 
-from flwr.client.numpy_client import NumPyClient
-from flwr.common import Config, NDArrays, Scalar
 from flwr.common.logger import warn_deprecated_feature
+from flwr.compat.client.numpy_client import NumPyClient
 from flwr.compat.common.dp import add_gaussian_noise, clip_by_l2
+from flwr.compat.common.typing import Config, NDArrays, Scalar
 
 
 class DPFedAvgNumPyClient(NumPyClient):

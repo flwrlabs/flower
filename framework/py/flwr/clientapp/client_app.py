@@ -23,12 +23,12 @@ from flwr.app import Context, Message
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import validate_message_type
 from flwr.client import ClientFnExt
-from flwr.client.client import Client
 from flwr.client.message_handler.message_handler import (
     handle_legacy_message_from_msgtype,
 )
 from flwr.client.mod.utils import make_ffn
 from flwr.common.logger import warn_deprecated_feature
+from flwr.compat.client.client import Client
 
 from .typing import ClientAppCallable, Mod
 
