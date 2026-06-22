@@ -46,7 +46,6 @@ from flwr.supercore.utils import (
 
 from ..log import start_stream
 from ..utils import (
-    SUPERLINK_UNAVAILABLE_MESSAGE,
     cli_output_handler,
     flwr_cli_grpc_exc_handler,
     init_channel_from_connection,
@@ -54,6 +53,10 @@ from ..utils import (
 )
 
 CONN_REFRESH_PERIOD = 60  # Connection refresh period for log streaming (seconds)
+SUPERLINK_UNAVAILABLE_MESSAGE = (
+    "Connection to the SuperLink is unavailable. Please check your network "
+    "connection and 'address' in the SuperLink connection configuration."
+)
 CONTROL_API_READY_TIMEOUT_SECONDS = 30
 CONTROL_API_READY_CHECK_INTERVAL_SECONDS = 1
 
