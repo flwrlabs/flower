@@ -105,8 +105,32 @@ def test_invoke_browser_use_provider_uses_flower_headless(
     assert llm.model == "gpt-5"
 
 
+@pytest.mark.parametrize(
+    "provider_response",
+    [
+        {
+            "object": "response",
+            "output_text": "Click the first link.",
+        },
+        {
+            "object": "response",
+            "output": [
+                {
+                    "type": "message",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": "Click the first link.",
+                        }
+                    ],
+                }
+            ],
+        },
+    ],
+)
 def test_flower_responses_chat_model_invokes_model_provider(
     monkeypatch: pytest.MonkeyPatch,
+    provider_response: dict[str, object],
 ) -> None:
     """FlowerResponsesChatModel should send Browser Use messages to Responses."""
 
@@ -124,12 +148,7 @@ def test_flower_responses_chat_model_invokes_model_provider(
             self.usage = usage
             self.stop_reason = stop_reason
 
-    invoke_model_provider = Mock(
-        return_value={
-            "object": "response",
-            "output_text": "Click the first link.",
-        }
-    )
+    invoke_model_provider = Mock(return_value=provider_response)
     monkeypatch.setattr(
         "flwr.supercore.task_process.connector.browser_use.invoke_model_provider",
         invoke_model_provider,
