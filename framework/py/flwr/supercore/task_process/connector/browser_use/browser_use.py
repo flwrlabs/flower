@@ -18,49 +18,21 @@
 from __future__ import annotations
 
 import asyncio
-import importlib
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
+
+from browser_use import Agent, BrowserProfile  # pylint: disable=ungrouped-imports
+from browser_use.llm.base import BaseChatModel
+from browser_use.llm.messages import BaseMessage
+from browser_use.llm.schema import SchemaOptimizer
+from browser_use.llm.views import ChatInvokeCompletion
+from pydantic import BaseModel
 
 from flwr.supercore.task_process.model.provider import invoke_model_provider
 from flwr.supercore.typing import JSONObject, JSONValue
 
-if TYPE_CHECKING:
-    from browser_use.agent.views import AgentHistoryList
-    from browser_use.browser.profile import BrowserProfile
-    from browser_use.llm.base import BaseChatModel
-    from browser_use.llm.messages import BaseMessage
-    from browser_use.llm.views import ChatInvokeCompletion
-    from pydantic import BaseModel
-else:
-
-    class BaseChatModel:
-        """Runtime fallback for Browser Use's optional BaseChatModel protocol."""
-
-
-BROWSER_USE_CONNECTOR_NAME = "browser_use"
 _DEFAULT_BROWSER_USE_MODEL = "flwrlabs/lizzy-long-context"
 _LLM_PROVIDER = "flower"
 _HEADLESS = True
-
-
-def make_browser_use_tool() -> JSONObject:
-    """Return the browser use function tool schema."""
-    return {
-        "type": "function",
-        "name": BROWSER_USE_CONNECTOR_NAME,
-        "description": "Use a headless browser to complete a web task.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "task": {
-                    "type": "string",
-                    "description": "The browser task to complete.",
-                },
-            },
-            "required": ["task"],
-            "additionalProperties": False,
-        },
-    }
 
 
 class BrowserUseProvider:
@@ -106,17 +78,6 @@ class BrowserUseProvider:
         allowed_domains: list[str] | None,
     ) -> JSONObject:
         """Execute one Browser Use task asynchronously."""
-        try:
-            # Browser Use is optional, so import it only when the connector runs.
-            from browser_use import (  # pylint: disable=import-outside-toplevel
-                Agent,
-                BrowserProfile,
-            )
-        except ImportError as exc:
-            raise RuntimeError(
-                "Install 'browser-use[core]' to use the browser_use connector."
-            ) from exc
-
         # Browser Use drives the browser and calls this chat adapter for each step.
         browser_profile: BrowserProfile = BrowserProfile(
             headless=_HEADLESS,
@@ -129,18 +90,16 @@ class BrowserUseProvider:
         )
 
         try:
-            history: AgentHistoryList[Any] = await agent.run()
+            history = await agent.run()
         except Exception as exc:
             raise RuntimeError(f"browser_use request failed: {exc}") from exc
 
-        result = history.final_result()
-        if result is None:
-            result = ""
+        result = str(history.final_result() or "")
 
         return {
             "object": "browser_use.response",
             "status": "completed",
-            "output": result if isinstance(result, str) else str(result),
+            "output": result,
             "metadata": {
                 "llm_provider": _LLM_PROVIDER,
                 "model": self._model,
@@ -188,19 +147,12 @@ class FlowerResponsesChatModel(BaseChatModel):
             "stream": False,
         }
         if output_format is not None:
-            try:
-                # Reuse Browser Use's schema optimizer for structured step outputs.
-                schema_module = importlib.import_module("browser_use.llm.schema")
-                schema_optimizer = schema_module.SchemaOptimizer
-                schema = schema_optimizer.create_optimized_json_schema(
-                    output_format,
-                    remove_min_items=True,
-                    remove_defaults=True,
-                )
-            except (AttributeError, ImportError):
-                schema = output_format.model_json_schema()
-            if not isinstance(schema, dict):
-                raise TypeError("Browser Use output schema must be a JSON object.")
+            # Reuse Browser Use's schema optimizer for structured step outputs.
+            schema = SchemaOptimizer.create_optimized_json_schema(
+                output_format,
+                remove_min_items=True,
+                remove_defaults=True,
+            )
             request["text"] = {
                 "format": {
                     "type": "json_schema",
@@ -212,9 +164,6 @@ class FlowerResponsesChatModel(BaseChatModel):
 
         response = await asyncio.to_thread(invoke_model_provider, request)
         output_text = cast(str, response["output_text"])
-        from browser_use.llm.views import (  # pylint: disable=import-outside-toplevel
-            ChatInvokeCompletion,
-        )
 
         if output_format is not None:
             return ChatInvokeCompletion(
@@ -236,10 +185,3 @@ def invoke_browser_use_provider(
 ) -> JSONObject:
     """Execute one Browser Use connector request."""
     return BrowserUseProvider(model=model).invoke(task, allowed_domains=allowed_domains)
-
-
-__all__ = [
-    "BROWSER_USE_CONNECTOR_NAME",
-    "invoke_browser_use_provider",
-    "make_browser_use_tool",
-]

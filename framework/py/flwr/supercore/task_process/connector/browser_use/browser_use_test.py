@@ -70,10 +70,14 @@ def test_invoke_browser_use_provider_uses_flower_headless(
             """Return fake agent history."""
             return _History()
 
-    browser_use_module = ModuleType("browser_use")
-    browser_use_module.__dict__["Agent"] = _Agent
-    browser_use_module.__dict__["BrowserProfile"] = _BrowserProfile
-    monkeypatch.setitem(sys.modules, "browser_use", browser_use_module)
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.connector.browser_use.Agent",
+        _Agent,
+    )
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.connector.browser_use.BrowserProfile",
+        _BrowserProfile,
+    )
 
     result = invoke_browser_use_provider(
         " Find Flower docs ",
