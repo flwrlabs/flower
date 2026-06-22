@@ -28,7 +28,6 @@ import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 from flwr.client import ClientFnExt
-from flwr.common import EventType, event
 from flwr.common.constant import NODE_ID_NUM_BYTES, SUPERLINK_NODE_ID
 from flwr.common.logger import (
     log,
@@ -49,6 +48,7 @@ from flwr.simulation.ray_transport.ray_actor import (
     pool_size_from_resources,
 )
 from flwr.simulation.ray_transport.ray_client_proxy import RayActorClientProxy
+from flwr.supercore.telemetry import EventType, event
 
 NodeToPartitionMapping = dict[int, int]
 
@@ -234,7 +234,7 @@ def start_simulation(
 
     # Initialize Ray
     ray.init(**ray_init_args)
-    cluster_resources = ray.cluster_resources()  # type: ignore[no-untyped-call]
+    cluster_resources = ray.cluster_resources()  # type: ignore[no-untyped-call,unused-ignore]
     log(
         INFO,
         "Flower VCE: Ray initialized with resources: %s",

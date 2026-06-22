@@ -67,7 +67,6 @@ from .utils import (
     dict_to_message,
     generate_rand_int_from_bytes,
     message_to_dict,
-    primary_task_type_from_run_type,
     verify_found_message_replies,
     verify_message_ids,
 )
@@ -164,43 +163,57 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
             return None
 
-        with self.session():
-            # Validate run_id
-            run_row = self._lock_run(message.metadata.run_id, require_unfinished=True)
-            if not run_row:
-                log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
-                return None
-            federation: str = run_row["federation"]
-
-            # Validate destination node ID
-            query = """SELECT node_id FROM node WHERE node_id = :node_id
-                       AND status IN (:online, :offline)"""
-            rows = self.query(
-                query,
-                {
-                    "node_id": data[0]["dst_node_id"],
-                    "online": NodeStatus.ONLINE,
-                    "offline": NodeStatus.OFFLINE,
-                },
-            )
-            if not rows or not self.federation_manager.has_node(
-                message.metadata.dst_node_id, federation
-            ):
-                log(
-                    ERROR,
-                    "Invalid destination node ID for Message: %s",
-                    message.metadata.dst_node_id,
+        try:
+            with self.session():
+                # Validate run_id
+                run_row = self._lock_run(
+                    message.metadata.run_id, require_unfinished=True
                 )
-                return None
+                if not run_row:
+                    log(
+                        ERROR,
+                        "Invalid run ID for Message: %s",
+                        message.metadata.run_id,
+                    )
+                    return None
+                federation: str = run_row["federation"]
 
-            # Insert message
-            columns = ", ".join([f":{key}" for key in data[0]])
-            query = f"INSERT INTO message_ins VALUES({columns})"
+                # Validate destination node ID
+                query = """SELECT node_id FROM node WHERE node_id = :node_id
+                           AND status IN (:online, :offline)"""
+                rows = self.query(
+                    query,
+                    {
+                        "node_id": data[0]["dst_node_id"],
+                        "online": NodeStatus.ONLINE,
+                        "offline": NodeStatus.OFFLINE,
+                    },
+                )
+                if not rows or not self.federation_manager.has_node(
+                    message.metadata.dst_node_id, federation
+                ):
+                    log(
+                        ERROR,
+                        "Invalid destination node ID for Message: %s",
+                        message.metadata.dst_node_id,
+                    )
+                    return None
 
-            # Only invalid run_id can trigger IntegrityError.
-            # This may need to be changed in the future version
-            # with more integrity checks.
-            self.query(query, data[0])
+                # Insert message
+                columns = ", ".join([f":{key}" for key in data[0]])
+                query = f"INSERT INTO message_ins VALUES({columns})"
+
+                self.query(query, data[0])
+        except IntegrityError as e:
+            orig = e.orig
+            constraint = getattr(getattr(orig, "diag", None), "constraint_name", None)
+            is_duplicate_message_id = (
+                constraint == "message_ins_message_id_key"
+                if constraint
+                else "message_ins.message_id" in str(orig)
+            )
+            if not is_duplicate_message_id:
+                raise
 
         return message.metadata.message_id
 
@@ -925,12 +938,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         federation: str,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
-        run_type: str,
+        primary_task_type: str,
         series_id: int | None = None,
     ) -> int:
         """Create a new run."""
-        task_type = primary_task_type_from_run_type(run_type)
-
         # Convert federation_config to JSON string for storage
         fed_config_json = None
         if federation_config:
@@ -939,10 +950,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         run_insert_query = """
             INSERT INTO run
             (run_id, fab_id, fab_version, fab_hash, override_config, federation,
-            primary_task_id, federation_config, run_type, usage_reported_at,
+            primary_task_id, federation_config, usage_reported_at,
             series_id, flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
             VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
-            :federation, :primary_task_id, :federation_config, :run_type,
+            :federation, :primary_task_id, :federation_config,
             :usage_reported_at, :series_id, :flwr_aid,
             :bytes_sent, :bytes_recv, :clientapp_runtime)
         """
@@ -988,7 +999,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "federation": federation,
                         "primary_task_id": uint64_to_int64(task_id),
                         "federation_config": fed_config_json,
-                        "run_type": run_type,
                         "usage_reported_at": "",
                         "series_id": uint64_to_int64(resolved_series_id),
                         "flwr_aid": flwr_aid or "",
@@ -1001,7 +1011,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     task_insert_query,
                     {
                         "task_id": uint64_to_int64(task_id),
-                        "type": task_type,
+                        "type": primary_task_type,
                         "run_id": uint64_to_int64(run_id),
                         "fab_hash": fab_hash,
                         "model_ref": None,
@@ -1086,9 +1096,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         query = """
             SELECT
                 r.run_id, r.fab_id, r.fab_version, r.fab_hash, r.override_config,
-                r.federation, r.primary_task_id, r.federation_config, r.run_type,
+                r.federation, r.primary_task_id, r.federation_config,
                 r.series_id, r.flwr_aid, r.bytes_sent, r.bytes_recv,
                 r.clientapp_runtime,
+                t.type AS primary_task_type,
                 t.pending_at AS pending_at,
                 t.starting_at AS starting_at,
                 t.running_at AS running_at,
@@ -1396,6 +1407,6 @@ def _run_from_row(row: dict[str, Any]) -> Run:
         bytes_sent=row["bytes_sent"],
         bytes_recv=row["bytes_recv"],
         clientapp_runtime=row["clientapp_runtime"],
-        run_type=row["run_type"],
+        primary_task_type=row["primary_task_type"],
         series_id=int64_to_uint64(row["series_id"]) if row["series_id"] else 0,
     )

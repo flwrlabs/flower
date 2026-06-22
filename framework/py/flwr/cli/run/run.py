@@ -34,6 +34,7 @@ from flwr.common.serde import fab_to_proto, user_config_to_proto
 from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.supercore.constant import NOOP_FEDERATION
 from flwr.supercore.fab import Fab
 from flwr.supercore.utils import (
     check_federation_format,
@@ -206,9 +207,10 @@ def _run_with_control_api(
             typer.secho(f"Note: {res.note}", fg=typer.colors.YELLOW, err=True)
 
         if res.HasField("run_id"):
-            typer.secho(
-                f"🎊 Successfully started run {res.run_id}", fg=typer.colors.GREEN
-            )
+            message = f"🎊 Successfully started run {res.run_id}"
+            if res.federation and res.federation != NOOP_FEDERATION:
+                message += f" in federation {res.federation}"
+            typer.secho(message, fg=typer.colors.GREEN)
         else:
             raise click.ClickException("Failed to start run")
 
@@ -217,6 +219,7 @@ def _run_with_control_api(
             payload: dict[str, Any] = {
                 "success": res.HasField("run_id"),
                 "run-id": f"{res.run_id}" if res.HasField("run_id") else None,
+                "federation": res.federation,
             }
             if res.HasField("note"):
                 payload["note"] = res.note

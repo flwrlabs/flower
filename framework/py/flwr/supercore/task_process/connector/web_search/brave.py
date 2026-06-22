@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Brave-backed web-search adapter."""
+"""Brave-backed web search adapter."""
 
 
 import os
@@ -25,8 +25,7 @@ from flwr.supercore.typing import JSONObject, JSONValue
 
 BRAVE_WEB_SEARCH_PROVIDER = "brave"
 BRAVE_WEB_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
-BRAVE_SEARCH_API_KEY_ENV = "BRAVE_SEARCH_API_KEY"
-BRAVE_FALLBACK_API_KEY_ENV = "BRAVE_API_KEY"
+BRAVE_API_KEY_ENV = "BRAVE_API_KEY"
 REQUEST_TIMEOUT = 60.0
 
 
@@ -34,20 +33,15 @@ class BraveWebSearchProvider:
     """Brave Search API adapter."""
 
     def __init__(self) -> None:
-        api_key = os.getenv(BRAVE_SEARCH_API_KEY_ENV, "").strip()
+        api_key = os.getenv(BRAVE_API_KEY_ENV, "").strip()
         if not api_key:
-            api_key = os.getenv(BRAVE_FALLBACK_API_KEY_ENV, "").strip()
-        if not api_key:
-            raise RuntimeError(
-                f"Environment variable {BRAVE_SEARCH_API_KEY_ENV} is required "
-                f"({BRAVE_FALLBACK_API_KEY_ENV} is also accepted)."
-            )
+            raise RuntimeError(f"Environment variable {BRAVE_API_KEY_ENV} is required.")
         self._api_key = api_key
 
     def search(self, query: str) -> JSONObject:
-        """Execute one Brave web-search request."""
+        """Execute one Brave web search request."""
         if not query.strip():
-            raise ValueError("web-search requires a non-empty query.")
+            raise ValueError("web search requires a non-empty query.")
         query = query.strip()
 
         try:
@@ -63,7 +57,7 @@ class BraveWebSearchProvider:
             )
         except requests.RequestException as exc:
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} web-search request failed: {exc}"
+                f"{BRAVE_WEB_SEARCH_PROVIDER} web search request failed: {exc}"
             ) from exc
         if response.status_code >= 400:
             try:
@@ -71,7 +65,7 @@ class BraveWebSearchProvider:
             except ValueError:
                 detail = response.text
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} web-search request failed: "
+                f"{BRAVE_WEB_SEARCH_PROVIDER} web search request failed: "
                 f"{response.status_code} {detail}"
             )
 
@@ -79,11 +73,11 @@ class BraveWebSearchProvider:
             payload = response.json()
         except ValueError as exc:
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+                f"{BRAVE_WEB_SEARCH_PROVIDER} web search returned invalid JSON."
             ) from exc
         if not isinstance(payload, dict):
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+                f"{BRAVE_WEB_SEARCH_PROVIDER} web search returned invalid JSON."
             )
 
         return {

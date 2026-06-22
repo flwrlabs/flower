@@ -62,6 +62,107 @@ def test_update_conf_file_merges_nested_theme_variables(
     )
 
 
+def test_update_conf_file_skips_complete_theme_variables(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Complete theme dictionaries should not be rewritten."""
+    conf_file = tmp_path / "conf.py"
+    conf_file.write_text(
+        """html_theme_options = {
+    "light_css_variables": {
+        "color-announcement-background": "#17222d",
+        "color-announcement-text": "#ffffff",
+    },
+    "dark_css_variables": {
+        "color-announcement-background": "#17222d",
+        "color-announcement-text": "#ffffff",
+    },
+}
+""",
+        encoding="utf-8",
+    )
+    original_content = conf_file.read_text(encoding="utf-8")
+
+    update_html_themes.update_conf_file(
+        conf_file,
+        {
+            "light_css_variables": {
+                "color-announcement-background": "#292f36",
+                "color-announcement-text": "#ffffff",
+            },
+            "dark_css_variables": {
+                "color-announcement-background": "#292f36",
+                "color-announcement-text": "#ffffff",
+            },
+        },
+    )
+
+    assert conf_file.read_text(encoding="utf-8") == original_content
+    assert capsys.readouterr().out == f"No changes needed in: {conf_file}\n"
+
+
+def test_update_conf_file_skips_existing_top_level_fields(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Existing top-level generated fields should not be duplicated."""
+    conf_file = tmp_path / "conf.py"
+    conf_file.write_text(
+        """html_theme_options = {
+    "announcement": "Existing banner",
+}
+""",
+        encoding="utf-8",
+    )
+    original_content = conf_file.read_text(encoding="utf-8")
+
+    update_html_themes.update_conf_file(
+        conf_file,
+        {
+            "announcement": "Generated banner",
+        },
+    )
+
+    assert conf_file.read_text(encoding="utf-8") == original_content
+    assert capsys.readouterr().out == f"No changes needed in: {conf_file}\n"
+
+
+def test_update_conf_file_adds_comma_before_merged_theme_variables(
+    tmp_path: Path,
+) -> None:
+    """Merged theme variables should keep valid Python without trailing commas."""
+    conf_file = tmp_path / "conf.py"
+    conf_file.write_text(
+        """html_theme_options = {
+    "light_css_variables": {
+        "color-announcement-background": "#17222d"
+    },
+}
+""",
+        encoding="utf-8",
+    )
+
+    update_html_themes.update_conf_file(
+        conf_file,
+        {
+            "light_css_variables": {
+                "color-announcement-background": "#292f36",
+                "color-announcement-text": "#ffffff",
+            },
+        },
+    )
+
+    assert (
+        conf_file.read_text(encoding="utf-8")
+        == """html_theme_options = {
+    "light_css_variables": {
+        "color-announcement-background": "#17222d",
+        "color-announcement-text": "#ffffff",
+    },
+}
+"""
+    )
+
+
 def test_update_conf_file_appends_missing_theme_variable_dictionaries(
     tmp_path: Path,
 ) -> None:
@@ -104,36 +205,6 @@ def test_update_conf_file_appends_missing_theme_variable_dictionaries(
 }
 """
     )
-
-
-def test_update_conf_file_does_not_rewrite_when_no_changes_needed(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Existing generated fields should not cause a file rewrite."""
-    conf_file = tmp_path / "conf.py"
-    content = """html_theme_options = {
-    "light_css_variables": {
-        "color-announcement-background": "#17222d",
-        "color-announcement-text": "#ffffff",
-    },
-}
-"""
-    conf_file.write_text(content, encoding="utf-8")
-    modified_time = conf_file.stat().st_mtime_ns
-
-    update_html_themes.update_conf_file(
-        conf_file,
-        {
-            "light_css_variables": {
-                "color-announcement-background": "#292f36",
-                "color-announcement-text": "#ffffff",
-            },
-        },
-    )
-
-    assert conf_file.read_text(encoding="utf-8") == content
-    assert conf_file.stat().st_mtime_ns == modified_time
-    assert f"No changes needed in: {conf_file}" in capsys.readouterr().out
 
 
 def test_update_conf_file_reports_missing_theme_options(

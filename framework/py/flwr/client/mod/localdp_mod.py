@@ -23,12 +23,12 @@ from flwr.app.message import Context, Message
 from flwr.app.message_type import MessageType
 from flwr.clientapp.typing import ClientAppCallable
 from flwr.common import ndarrays_to_parameters, parameters_to_ndarrays
-from flwr.common import recorddict_compat as compat
 from flwr.common.differential_privacy import (
     add_localdp_gaussian_noise_to_params,
     compute_clip_model_update,
 )
 from flwr.common.logger import log
+from flwr.compat.common import recorddict_compat as compat
 
 
 class LocalDpMod:
