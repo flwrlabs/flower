@@ -45,11 +45,6 @@ from flwr.common.constant import (
     AuthnType,
     CliOutputFormat,
 )
-from flwr.common.grpc import (
-    GRPC_MAX_MESSAGE_LENGTH,
-    create_channel,
-    on_channel_state_change,
-)
 from flwr.common.logger import print_json_error, redirect_output, restore_output
 from flwr.proto.control_pb2_grpc import ControlStub  # pylint: disable=E0611
 from flwr.supercore.constant import (
@@ -59,6 +54,11 @@ from flwr.supercore.constant import (
     MAX_NAME_LENGTH,
 )
 from flwr.supercore.credential_store import get_credential_store
+from flwr.supercore.grpc import (
+    GRPC_MAX_MESSAGE_LENGTH,
+    create_channel,
+    on_channel_state_change,
+)
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 from flwr.supercore.utils import is_valid_name
 

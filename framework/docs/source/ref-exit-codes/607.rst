@@ -1,0 +1,43 @@
+###############################
+ [607] COMMON_APP_IMPORT_ERROR
+###############################
+
+*************
+ Description
+*************
+
+Flower could not load a Flower App because importing its code failed. This can happen if
+a dependency is missing, a module in the app cannot be found, or an imported name, such
+as a function or class, does not exist.
+
+****************
+ How to Resolve
+****************
+
+Check the error message to identify the failed import.
+
+App module or file
+==================
+
+If the missing import refers to a module or ``.py`` file in your app, make sure that:
+
+- the file is included in the app
+- the import name is correct
+
+If the import refers to a name from an existing module, make sure that the function,
+class, or variable exists and is exported by that module.
+
+Library dependency
+==================
+
+If the missing import refers to a library dependency, resolve it based on your
+dependency installation setup.
+
+If automatic runtime dependency installation is enabled, add the missing package to the
+app's ``pyproject.toml`` dependencies and run the app again.
+
+If automatic runtime dependency installation is disabled, install the missing package in
+the Python environment where the ServerApp or ClientApp process runs. Alternatively,
+consider enabling automatic runtime dependency installation. See :doc:`Install Flower
+App dependencies at runtime <../how-to-install-app-dependencies-at-runtime>` for
+details.

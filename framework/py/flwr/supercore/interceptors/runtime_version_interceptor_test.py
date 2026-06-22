@@ -25,7 +25,7 @@ import grpc
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common.exit import ExitCode
-from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
+from flwr.proto.appio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
     FLWR_PACKAGE_NAME_METADATA_KEY,

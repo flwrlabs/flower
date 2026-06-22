@@ -23,11 +23,11 @@ import time
 from logging import ERROR, INFO
 from typing import Any, NoReturn
 
-from flwr.common import EventType, event
 from flwr.supercore.constant import (
     FORCE_EXIT_TIMEOUT_SECONDS,
     TELEMETRY_TIMEOUT_SECONDS,
 )
+from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.version import package_version
 
 from ..logger import log
@@ -96,15 +96,15 @@ def flwr_exit(
     # Log the exit message
     log(log_level, exit_message)
 
+    # Trigger exit handlers
+    trigger_exit_handlers()
+
     # Start a daemon thread to force exit if graceful exit fails
     def force_exit() -> None:
         time.sleep(FORCE_EXIT_TIMEOUT_SECONDS)
         os._exit(sys_exit_code)
 
     threading.Thread(target=force_exit, daemon=True).start()
-
-    # Trigger exit handlers
-    trigger_exit_handlers()
 
     # Wait for telemetry event to be sent before exiting
     if event_future:
@@ -128,6 +128,8 @@ def _try_obtain_telemetry_event() -> EventType | None:
         return EventType.FLWR_AGENTAPP_RUN_LEAVE
     if sys.argv[0].endswith("flwr-model"):
         return EventType.FLWR_MODEL_RUN_LEAVE
+    if sys.argv[0].endswith("flwr-connector"):
+        return EventType.FLWR_CONNECTOR_RUN_LEAVE
     if sys.argv[0].endswith("flwr-serverapp"):
         return EventType.FLWR_SERVERAPP_RUN_LEAVE
     if sys.argv[0].endswith("flwr-clientapp"):

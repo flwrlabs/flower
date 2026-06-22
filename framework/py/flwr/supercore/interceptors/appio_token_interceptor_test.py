@@ -25,13 +25,13 @@ import grpc
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetNodesRequest,
     PullPendingTasksRequest,
     PushAppMessagesRequest,
     PushTaskOutputRequest,
 )
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoServicer
 from flwr.proto.message_pb2 import PushObjectRequest  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoServicer
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.auth import (

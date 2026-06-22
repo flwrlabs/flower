@@ -41,6 +41,23 @@ etc.), Flower starts a local ``flower-superlink`` process automatically. That pr
 You can override the default Control API port with the ``FLWR_LOCAL_CONTROL_API_PORT``
 environment variable.
 
+*********************************
+ Runtime dependency installation
+*********************************
+
+The managed local SuperLink automatically installs the Flower App dependencies declared
+in ``pyproject.toml`` before executing the app. To disable this, set
+``FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1``:
+
+.. code-block:: shell
+
+    $ export FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1
+    # Then submit your run
+
+If the background SuperLink is already running, :ref:`stop it first
+<stop-background-local-superlink>` so the new environment variable can take effect. For
+details, see :doc:`how-to-install-app-dependencies-at-runtime`.
+
 **************
  Submit a run
 **************
