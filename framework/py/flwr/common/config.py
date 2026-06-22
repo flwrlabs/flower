@@ -32,11 +32,10 @@ from flwr.common.constant import (
     FAB_HASH_TRUNCATION,
     FAB_INCLUDE_KEY,
 )
+from flwr.supercore import object_ref
 from flwr.supercore.fab_format_version import normalize_and_validate_fab_format
 from flwr.supercore.run import Run
 from flwr.supercore.utils import get_flwr_home
-
-from . import object_ref
 
 T_dict = TypeVar("T_dict", bound=dict[str, Any])  # pylint: disable=invalid-name
 

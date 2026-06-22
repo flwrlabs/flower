@@ -26,7 +26,7 @@ from flwr.common.config import (
     get_project_dir,
 )
 from flwr.common.logger import log
-from flwr.common.object_ref import load_app, validate
+from flwr.supercore.object_ref import load_app, validate
 from flwr.supercore.utils import get_flwr_home
 
 
@@ -73,8 +73,6 @@ def get_load_client_app_fn(
                     f"FAB version '{this_fab_version}', but received FAB ID '{fab_id}' "
                     f"and FAB version '{fab_version}'.",
                 ) from None
-
-            # log(WARN, "FAB ID is not provided; the default ClientApp will be loaded.")
 
             # Set app reference
             client_app_ref = config["tool"]["flwr"]["app"]["components"]["clientapp"]

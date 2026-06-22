@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Legacy client type definitions."""
+"""ServerAppIo API Servicer."""
 
 
-from collections.abc import Callable
+from .serverappio_grpc import run_serverappio_api_grpc
 
-from flwr.app import Context
-from flwr.compat.client.client import Client
-
-ClientFn = Callable[[str], Client]
-ClientFnExt = Callable[[Context], Client]
+__all__ = [
+    "run_serverappio_api_grpc",
+]

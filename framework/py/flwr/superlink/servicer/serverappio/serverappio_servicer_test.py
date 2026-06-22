@@ -41,6 +41,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
+    GetNodesRequest,
+    GetNodesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -62,25 +64,11 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
-    GetNodesRequest,
-    GetNodesResponse,
-)
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
-from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
-from flwr.server.superlink.serverappio.serverappio_servicer import (
-    ServerAppIoServicer,
-    _raise_if,
-)
 from flwr.server.superlink.utils import _STATUS_TO_MSG
-from flwr.supercore.constant import (
-    FLWR_IN_MEMORY_DB_NAME,
-    NOOP_FEDERATION,
-    RunType,
-    TaskType,
-)
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, TaskType
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
@@ -99,6 +87,13 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
+from flwr.superlink.servicer.serverappio.serverappio_grpc import (
+    run_serverappio_api_grpc,
+)
+from flwr.superlink.servicer.serverappio.serverappio_servicer import (
+    ServerAppIoServicer,
+    _raise_if,
+)
 
 # pylint: disable=broad-except,too-many-lines
 
@@ -201,7 +196,7 @@ def _create_shared_runtime(
         NOOP_FEDERATION,
         None,
         "",
-        RunType.SERVER_APP,
+        TaskType.SERVER_APP,
     )
     run = state_0.get_run_info(run_ids=[run_id])[0]
     state_0.set_run_series_context(
@@ -340,7 +335,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Provide a valid claimed-task token on the default test channel so existing
         # servicer behavior tests continue to exercise business logic paths.
         self._auth_run_id = self.state.create_run(
-            "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
+            "", "", "", {}, NOOP_FEDERATION, None, "", TaskType.SERVER_APP
         )
         auth_task_id = self._primary_task_id(self._auth_run_id)
         auth_token = self.state.claim_task(auth_task_id)
@@ -434,7 +429,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             NOOP_FEDERATION,
             None,
             "",
-            RunType.SERVER_APP,
+            TaskType.SERVER_APP,
         )
         if running:
             self._transition_run_status(run_id, 2)
@@ -900,7 +895,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Execute: Pull task input
         request = PullTaskInputRequest()
         with patch(
-            "flwr.server.superlink.serverappio.serverappio_servicer."
+            "flwr.superlink.servicer.serverappio.serverappio_servicer."
             "get_authenticated_task",
             return_value=Mock(task_id=task_id, run_id=run_id),
         ):

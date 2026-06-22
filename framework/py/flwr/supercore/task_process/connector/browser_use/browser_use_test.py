@@ -71,11 +71,11 @@ def test_invoke_browser_use_provider_uses_flower_headless(
             return _History()
 
     monkeypatch.setattr(
-        "flwr.supercore.task_process.connector.browser_use.Agent",
+        "flwr.supercore.task_process.connector.browser_use.browser_use.Agent",
         _Agent,
     )
     monkeypatch.setattr(
-        "flwr.supercore.task_process.connector.browser_use.BrowserProfile",
+        "flwr.supercore.task_process.connector.browser_use.browser_use.BrowserProfile",
         _BrowserProfile,
     )
 
@@ -150,7 +150,7 @@ def test_flower_responses_chat_model_invokes_model_provider(
 
     invoke_model_provider = Mock(return_value=provider_response)
     monkeypatch.setattr(
-        "flwr.supercore.task_process.connector.browser_use.invoke_model_provider",
+        "flwr.supercore.task_process.connector.browser_use.browser_use.invoke_model_provider",
         invoke_model_provider,
     )
     browser_use_module = ModuleType("browser_use")

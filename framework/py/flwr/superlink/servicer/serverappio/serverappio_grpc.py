@@ -19,13 +19,12 @@ from logging import INFO, WARNING
 
 import grpc
 
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH
-from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import log
 from flwr.proto.serverappio_pb2_grpc import (  # pylint: disable=E0611
     add_ServerAppIoServicer_to_server,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.interceptors import (
     create_serverappio_runtime_version_server_interceptor,
     create_serverappio_superexec_auth_server_interceptor,

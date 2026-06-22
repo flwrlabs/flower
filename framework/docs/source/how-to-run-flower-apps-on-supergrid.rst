@@ -100,6 +100,7 @@ authenticate with your SuperGrid account. Finally, run the app with ``flwr run``
     $ flwr login supergrid
 
     $ flwr run . --federation @<username>/<federation-name>
+    🎊 Successfully started run 1859953118041441032 in federation @<username>/<federation-name>
 
 The run appears in the same SuperGrid federation dashboard.
 

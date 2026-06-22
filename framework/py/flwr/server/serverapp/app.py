@@ -53,7 +53,6 @@ from flwr.common.serde import (
     fab_from_proto,
     run_from_proto,
 )
-from flwr.common.telemetry import EventType, event
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
@@ -67,6 +66,7 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.superlink.grid import GrpcGrid
 

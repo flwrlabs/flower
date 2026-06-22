@@ -32,6 +32,8 @@ from flwr.common.serde import (
 )
 from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetNodesRequest,
+    GetNodesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -51,10 +53,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
-    GetNodesRequest,
-    GetNodesResponse,
-)
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import TaskType
@@ -66,7 +64,7 @@ from flwr.supercore.inflatable.inflatable_object import (
 )
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
-from flwr.supercore.servicers import AppIoServicer
+from flwr.supercore.servicer.appio import AppIoServicer
 
 SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE = (
     "Some ServerAppIo API endpoints are only available for Deployment Runtime runs."

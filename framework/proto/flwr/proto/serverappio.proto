@@ -19,7 +19,6 @@ package flwr.proto;
 
 import "flwr/proto/heartbeat.proto";
 import "flwr/proto/log.proto";
-import "flwr/proto/node.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/appio.proto";
@@ -86,19 +85,15 @@ service ServerAppIo {
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
 
   /////////////////////////////////////////////////////////////////////////////
-  // Specific endpoints for ServerAppIo
+  // Message and node endpoints
   /////////////////////////////////////////////////////////////////////////////
 
-  // Create one or more messages
+  // Push messages
   rpc PushMessages(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
 
-  // Get message results
+  // Pull messages
   rpc PullMessages(PullAppMessagesRequest) returns (PullAppMessagesResponse) {}
 
   // Return a set of nodes
   rpc GetNodes(GetNodesRequest) returns (GetNodesResponse) {}
 }
-
-// GetNodes messages
-message GetNodesRequest {}
-message GetNodesResponse { repeated Node nodes = 1; }

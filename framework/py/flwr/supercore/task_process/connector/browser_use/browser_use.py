@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any, cast
 
-from browser_use import Agent, BrowserProfile  # pylint: disable=ungrouped-imports
+from browser_use import Agent, BrowserProfile
 from browser_use.llm.base import BaseChatModel
 from browser_use.llm.messages import BaseMessage
 from browser_use.llm.schema import SchemaOptimizer
@@ -79,7 +79,7 @@ class BrowserUseProvider:
     ) -> JSONObject:
         """Execute one Browser Use task asynchronously."""
         # Browser Use drives the browser and calls this chat adapter for each step.
-        browser_profile: BrowserProfile = BrowserProfile(
+        browser_profile = BrowserProfile(
             headless=_HEADLESS,
             allowed_domains=allowed_domains,
         )
@@ -191,9 +191,6 @@ class FlowerResponsesChatModel(BaseChatModel):
                     "Model provider response did not include assistant output text."
                 )
             output_text = "".join(content_texts)
-        from browser_use.llm.views import (  # pylint: disable=import-outside-toplevel
-            ChatInvokeCompletion,
-        )
 
         if output_format is not None:
             return ChatInvokeCompletion(

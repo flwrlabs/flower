@@ -21,6 +21,8 @@ import unittest
 import grpc
 
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetNodesRequest,
+    GetNodesResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
 )
@@ -95,6 +97,11 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             request_serializer=PullPendingTasksRequest.SerializeToString,
             response_deserializer=PullPendingTasksResponse.FromString,
         )
+        self._get_nodes = self._auth_channel.unary_unary(
+            "/flwr.proto.ClientAppIo/GetNodes",
+            request_serializer=GetNodesRequest.SerializeToString,
+            response_deserializer=GetNodesResponse.FromString,
+        )
 
     def tearDown(self) -> None:
         """Stop the gRPC API server."""
@@ -143,6 +150,14 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         )
         assert isinstance(response, PullPendingTasksResponse)
         assert call.code() == grpc.StatusCode.OK
+
+    def test_get_nodes_allows_auth_then_returns_unimplemented(self) -> None:
+        """GetNodes should authenticate, then report that it is unavailable."""
+        with self.assertRaises(grpc.RpcError) as err:
+            self._get_nodes.with_call(request=GetNodesRequest())
+
+        assert err.exception.code() == grpc.StatusCode.UNIMPLEMENTED
+        assert err.exception.details() == "GetNodes is not available on ClientAppIo."
 
 
 class TestClientAppIoAuthIntegrationWithoutSuperExecSecret(unittest.TestCase):
