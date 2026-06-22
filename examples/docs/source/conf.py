@@ -90,31 +90,41 @@ redirects = {
 #
 html_theme = "furo"
 html_title = f"Flower Examples {release}"
-html_logo = "_static/flower-logo.png"
 html_favicon = "_static/favicon.ico"
 html_baseurl = "https://flower.ai/docs/examples/"
 
 html_theme_options = {
-    #
-    # Sphinx Book Theme
-    #
-    # https://sphinx-book-theme.readthedocs.io/en/latest/configure.html
-    # "repository_url": "https://github.com/flwrlabs/flower",
-    # "repository_branch": "main",
-    # "path_to_docs": "doc/source/",
-    # "home_page_in_toc": True,
-    # "use_repository_button": True,
-    # "use_issues_button": True,
-    # "use_edit_page_button": True,
-    #
-    # Furo
-    #
-    # https://pradyunsg.me/furo/customisation/
-    # "light_css_variables": {
-    #     "color-brand-primary": "#292F36",
-    #     "color-brand-content": "#292F36",
-    #     "color-admonition-background": "#F2B705",
-    # },
+    "light_logo": "examples-light-mode.png",
+    "dark_logo": "examples-dark-mode.png",
+    "light_css_variables": {
+        "color-announcement-background": "#17222d",
+        "color-announcement-text": "#ffffff",
+        # Left sidebar
+        "color-sidebar-link-text": "#5e5e5e",
+        "color-sidebar-link-text--top-level": "#404040",
+        "color-sidebar-item-background--hover": "#e5e5e5",
+        "color-sidebar-search-background": "#f2f2f2",
+        "color-sidebar-search-background--focus": "#e2e2e2",
+        "color-sidebar-background": "#f2f2f2",
+        # Right sidebar (On this page)
+        "color-toc-item-text--active": "#404040",
+    },
+    "dark_css_variables": {
+        "color-announcement-text": "#ffffff",
+        "color-announcement-background": "#17222d",
+        # Left sidebar
+        "color-sidebar-link-text": "#ffffff",
+        "color-sidebar-link-text--top-level": "#ababab",
+        "color-sidebar-item-background--hover": "#222222",
+        "color-sidebar-background": "#161616",
+        "color-sidebar-search-background": "#161616",
+        "color-sidebar-search-background--focus": "#1c1c1c",
+        # Right sidebar (On this page)
+        "color-toc-title-text": "#ffffff",
+        "color-toc-item-text": "#ababab",
+        "color-toc-item-text--hover": "#d2d2d2",
+        "color-toc-item-text--active": "#fff5bf",
+    },
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -149,3 +159,4 @@ mermaid_version = ""
 # -- Options for MyST config  -------------------------------------
 # Enable this option to link to headers (`#`, `##`, or `###`)
 myst_heading_anchors = 3
+myst_enable_extensions = ["dollarmath"]
