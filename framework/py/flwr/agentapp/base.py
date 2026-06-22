@@ -35,6 +35,9 @@ class AgentResponses(ABC):
         ----------
         request : JSONObject
             Open Responses-compatible create request.
+            Built-in connector tools can be requested by name in ``tools``, for
+            example ``["web_search"]``. Built-in connector names are reserved
+            for runtime-managed tools.
 
         Returns
         -------
