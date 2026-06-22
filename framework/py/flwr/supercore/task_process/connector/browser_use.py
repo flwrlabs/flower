@@ -36,6 +36,7 @@ else:
     class BaseChatModel:
         """Runtime fallback for Browser Use's optional BaseChatModel protocol."""
 
+
 BROWSER_USE_CONNECTOR_NAME = "browser_use"
 _DEFAULT_BROWSER_USE_MODEL = "flwrlabs/lizzy-long-context"
 _LLM_PROVIDER = "flower"
