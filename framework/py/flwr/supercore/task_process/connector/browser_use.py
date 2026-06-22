@@ -211,7 +211,34 @@ class FlowerResponsesChatModel(BaseChatModel):
             }
 
         response = await asyncio.to_thread(invoke_model_provider, request)
-        output_text = cast(str, response["output_text"])
+        # Some Responses-compatible providers include the SDK-style convenience
+        # field directly on the response object.
+        raw_output_text = response.get("output_text")
+        if isinstance(raw_output_text, str):
+            output_text = raw_output_text
+        else:
+            # Raw Open Responses payloads keep message text in output content
+            # items, so collect those text chunks when output_text is absent.
+            content_texts: list[str] = []
+            output = response.get("output")
+            if isinstance(output, list):
+                for output_item in output:
+                    if not isinstance(output_item, dict):
+                        continue
+                    content = output_item.get("content")
+                    if not isinstance(content, list):
+                        continue
+                    for content_item in content:
+                        if not isinstance(content_item, dict):
+                            continue
+                        text = content_item.get("text")
+                        if isinstance(text, str):
+                            content_texts.append(text)
+            if not content_texts:
+                raise RuntimeError(
+                    "Model provider response did not include assistant output text."
+                )
+            output_text = "".join(content_texts)
         from browser_use.llm.views import (  # pylint: disable=import-outside-toplevel
             ChatInvokeCompletion,
         )
