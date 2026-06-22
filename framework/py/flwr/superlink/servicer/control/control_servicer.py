@@ -139,7 +139,11 @@ from flwr.supercore.typing import (
     RegisterSupernodeContext,
     StartRunContext,
 )
-from flwr.supercore.utils import parse_app_spec, request_download_link, resolve_account_ids
+from flwr.supercore.utils import (
+    parse_app_spec,
+    request_download_link,
+    resolve_account_ids,
+)
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
