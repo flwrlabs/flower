@@ -116,6 +116,8 @@ def run_connector(  # pylint: disable=too-many-locals
         details = f"Connector task failed with exception: {str(ex)}"
 
         exit_code = ExitCode.TASK_PROC_EXCEPTION
+        if isinstance(ex, ImportError):
+            exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
 
     flwr_exit(exit_code, event_type=EventType.FLWR_CONNECTOR_RUN_LEAVE)
 
