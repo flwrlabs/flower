@@ -60,10 +60,12 @@ def test_invoke_browser_use_provider_uses_flower_headless(
             task: str,
             llm: FlowerResponsesChatModel,
             browser_profile: _BrowserProfile,
+            enable_signal_handler: bool,
         ) -> None:
             self.task = task
             self.llm = llm
             self.browser_profile = browser_profile
+            self.enable_signal_handler = enable_signal_handler
             created["agent"] = self
             created["llm"] = llm
 
@@ -100,6 +102,7 @@ def test_invoke_browser_use_provider_uses_flower_headless(
     agent = created["agent"]
     assert isinstance(agent, _Agent)
     assert agent.task == "Find Flower docs"
+    assert not agent.enable_signal_handler
 
     llm = created["llm"]
     assert isinstance(llm, FlowerResponsesChatModel)
