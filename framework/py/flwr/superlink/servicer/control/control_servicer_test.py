@@ -84,6 +84,7 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
+    DEFAULT_FEDERATION_SIMULATION,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION,
     ActionType,
@@ -207,6 +208,18 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         assert run_context is not None
         self.assertEqual(run_context.run_id, response.run_id)
         self.assertEqual(run_context.series_id, response.series_id)
+
+    def test_start_run_defaults_to_account_simulation_federation(self) -> None:
+        """Test StartRun uses the account default simulation federation."""
+        expected_federation = f"@{NOOP_ACCOUNT_NAME}/{DEFAULT_FEDERATION_SIMULATION}"
+        federation_manager = Mock(exists=Mock(side_effect=RuntimeError))
+        self.servicer.linkstate_factory.federation_manager = federation_manager
+        self.servicer.linkstate_factory.state_instance = None
+
+        with self.assertRaises(RuntimeError):
+            self.servicer.StartRun(StartRunRequest(), Mock())
+
+        federation_manager.exists.assert_called_once_with(expected_federation)
 
     def test_start_run_uses_existing_series_id(self) -> None:
         """Test StartRun links the run to an existing run series."""
