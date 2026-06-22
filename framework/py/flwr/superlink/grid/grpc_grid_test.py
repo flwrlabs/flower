@@ -31,10 +31,10 @@ from flwr.app.message import Message
 from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetNodesRequest,
     PullAppMessagesRequest,
     PushAppMessagesRequest,
 )
-from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.supercore.constant import PULL_MAX_TIME, PULL_MAX_TRIES_PER_OBJECT
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -258,7 +258,7 @@ class TestGrpcGrid(unittest.TestCase):
         # Assert
         self.mock_channel.close.assert_not_called()
 
-    def test_set_run_rejects_non_run_type(self) -> None:
+    def test_set_run_rejects_non_run_instance(self) -> None:
         """Test `set_run` rejects invalid input types."""
         with self.assertRaises(TypeError):
             self.grid.set_run(61016)  # type: ignore[arg-type]

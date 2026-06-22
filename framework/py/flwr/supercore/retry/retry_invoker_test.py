@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from flwr.common.retry_invoker import RetryInvoker, constant
+from flwr.supercore.retry import RetryInvoker, constant
 
 
 def successful_function() -> str:

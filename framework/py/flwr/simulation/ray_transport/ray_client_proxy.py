@@ -23,11 +23,11 @@ from flwr.app import DEFAULT_TTL, Message, Metadata, RecordDict
 from flwr.app.message import make_message
 from flwr.app.message_type import MessageType
 from flwr.client import ClientFnExt
-from flwr.client.run_info_store import DeprecatedRunInfoStore
 from flwr.clientapp.client_app import ClientApp
 from flwr.common.constant import NUM_PARTITIONS_KEY, PARTITION_ID_KEY, MessageTypeLegacy
 from flwr.common.logger import log
-from flwr.common.recorddict_compat import (
+from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
+from flwr.compat.common.recorddict_compat import (
     evaluateins_to_recorddict,
     fitins_to_recorddict,
     getparametersins_to_recorddict,

@@ -1,4 +1,4 @@
-# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared SuperCore servicers."""
+"""Retry utilities for Flower infrastructure."""
 
 
-from .appio_servicer import AppIoServicer
+from .grpc_retry import make_simple_grpc_retry_invoker, wrap_stub
+from .retry_invoker import RetryInvoker, RetryState, constant, exponential, full_jitter
 
 __all__ = [
-    "AppIoServicer",
+    "RetryInvoker",
+    "RetryState",
+    "constant",
+    "exponential",
+    "full_jitter",
+    "make_simple_grpc_retry_invoker",
+    "wrap_stub",
 ]

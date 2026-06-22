@@ -28,9 +28,7 @@ from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common.config import get_project_dir
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
-from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -38,7 +36,6 @@ from flwr.common.serde import (
     message_to_proto,
     run_from_proto,
 )
-from flwr.common.telemetry import EventType, event
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
     PullAppMessagesResponse,
@@ -51,6 +48,7 @@ from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.fab import Fab
+from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -70,12 +68,14 @@ from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
+from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.supercore.run import Run
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.telemetry import EventType, event
 
 
 def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
@@ -242,7 +242,7 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
     fab = fab_from_proto(res.fab)
 
     # Pull and inflate the message
-    pull_msg_res: PullAppMessagesResponse = stub.PullMessage(PullAppMessagesRequest())
+    pull_msg_res: PullAppMessagesResponse = stub.PullMessages(PullAppMessagesRequest())
     run_id = context.run_id
     node = Node(node_id=context.node_id)
     object_tree = pull_msg_res.message_object_trees[0]
@@ -273,7 +273,7 @@ def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> N
 
         # Push Message
         # This is temporary. The message should not contain its content
-        push_msg_res = stub.PushMessage(
+        push_msg_res = stub.PushMessages(
             PushAppMessagesRequest(
                 messages_list=[proto_message], message_object_trees=[object_tree]
             )

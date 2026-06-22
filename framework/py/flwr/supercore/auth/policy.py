@@ -37,44 +37,36 @@ class MethodTokenPolicy:
         return MethodTokenPolicy(requires_token=True)
 
 
-# In a follow-up PR, create explicit method maps using a shared builder.
-SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
-    "/flwr.proto.ServerAppIo/PullPendingTasks": MethodTokenPolicy.no_auth(),
-    "/flwr.proto.ServerAppIo/ClaimTask": MethodTokenPolicy.no_auth(),
-    "/flwr.proto.ServerAppIo/GetRun": MethodTokenPolicy.no_auth(),
-    "/flwr.proto.ServerAppIo/SendTaskHeartbeat": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/PullTaskInput": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/PushTaskOutput": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/PushObject": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/PullObject": MethodTokenPolicy.token_required(),
-    # pylint: disable-next=line-too-long
-    "/flwr.proto.ServerAppIo/ConfirmMessageReceived": MethodTokenPolicy.token_required(),  # noqa: E501
-    "/flwr.proto.ServerAppIo/PushLogs": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/PushMessages": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/PullMessages": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/GetNodes": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/CreateTask": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/PushTaskMessage": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/PushTaskEvents": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/PullTaskMessage": MethodTokenPolicy.token_required(),
+_RUNTIME_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
+    "PullPendingTasks": MethodTokenPolicy.no_auth(),
+    "ClaimTask": MethodTokenPolicy.no_auth(),
+    "GetRun": MethodTokenPolicy.no_auth(),
+    "SendTaskHeartbeat": MethodTokenPolicy.token_required(),
+    "PullTaskInput": MethodTokenPolicy.token_required(),
+    "PushTaskOutput": MethodTokenPolicy.token_required(),
+    "PushObject": MethodTokenPolicy.token_required(),
+    "PullObject": MethodTokenPolicy.token_required(),
+    "ConfirmMessageReceived": MethodTokenPolicy.token_required(),
+    "PushLogs": MethodTokenPolicy.token_required(),
+    "PushMessages": MethodTokenPolicy.token_required(),
+    "PullMessages": MethodTokenPolicy.token_required(),
+    "GetNodes": MethodTokenPolicy.token_required(),
+    "CreateTask": MethodTokenPolicy.token_required(),
+    "PushTaskMessage": MethodTokenPolicy.token_required(),
+    "PushTaskEvents": MethodTokenPolicy.token_required(),
+    "PullTaskMessage": MethodTokenPolicy.token_required(),
 }
 
-CLIENTAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
-    "/flwr.proto.ClientAppIo/PullPendingTasks": MethodTokenPolicy.no_auth(),
-    "/flwr.proto.ClientAppIo/ClaimTask": MethodTokenPolicy.no_auth(),
-    "/flwr.proto.ClientAppIo/GetRun": MethodTokenPolicy.no_auth(),
-    "/flwr.proto.ClientAppIo/SendTaskHeartbeat": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ClientAppIo/PullTaskInput": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ClientAppIo/PushTaskOutput": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ClientAppIo/PushObject": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ClientAppIo/PullObject": MethodTokenPolicy.token_required(),
-    # pylint: disable-next=line-too-long
-    "/flwr.proto.ClientAppIo/ConfirmMessageReceived": MethodTokenPolicy.token_required(),  # noqa: E501
-    "/flwr.proto.ClientAppIo/PushLogs": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ClientAppIo/PushMessage": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ClientAppIo/PullMessage": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ClientAppIo/CreateTask": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ClientAppIo/PushTaskMessage": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ClientAppIo/PushTaskEvents": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ClientAppIo/PullTaskMessage": MethodTokenPolicy.token_required(),
-}
+
+def _build_runtime_method_auth_policy(
+    service_name: str,
+) -> dict[str, MethodTokenPolicy]:
+    """Build the token policy map for an AppIo service."""
+    return {
+        f"/flwr.proto.{service_name}/{method}": policy
+        for method, policy in _RUNTIME_METHOD_AUTH_POLICY.items()
+    }
+
+
+SERVERAPPIO_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy("ServerAppIo")
+CLIENTAPPIO_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy("ClientAppIo")
