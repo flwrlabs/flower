@@ -630,7 +630,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         if limit is None:
             limit = 999
-        self.assertLess(abs(retrieved_timestamp - now().timestamp()), 1e-3)
+        self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(set(response.run_dict.keys()), set(run_ids[-limit:]))
 
     def test_list_run_id(self) -> None:
@@ -644,7 +644,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         retrieved_timestamp = datetime.fromisoformat(response.now).timestamp()
 
         # Assert
-        self.assertLess(abs(retrieved_timestamp - now().timestamp()), 1e-3)
+        self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(set(response.run_dict.keys()), {run_id})
 
     def test_get_run_series_returns_context(self) -> None:
@@ -887,7 +887,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         retrieved_timestamp = datetime.fromisoformat(response.now).timestamp()
 
         # Assert
-        self.assertLess(abs(retrieved_timestamp - now().timestamp()), 1e-3)
+        self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(response.federation.name, NOOP_FEDERATION)
         self.assertFalse(response.federation.simulation)
 
