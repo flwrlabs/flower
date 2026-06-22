@@ -191,9 +191,6 @@ class FlowerResponsesChatModel(BaseChatModel):
                     "Model provider response did not include assistant output text."
                 )
             output_text = "".join(content_texts)
-        from browser_use.llm.views import (  # pylint: disable=import-outside-toplevel
-            ChatInvokeCompletion,
-        )
 
         if output_format is not None:
             return ChatInvokeCompletion(
