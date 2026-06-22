@@ -139,7 +139,7 @@ from flwr.supercore.typing import (
     RegisterSupernodeContext,
     StartRunContext,
 )
-from flwr.supercore.utils import parse_app_spec, request_download_link
+from flwr.supercore.utils import parse_app_spec, request_download_link, resolve_account_ids
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
@@ -362,8 +362,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # Init link state
         state = self.linkstate_factory.state()
 
-        account = _get_account(context)
-        flwr_aid = cast(str, account.flwr_aid)
+        flwr_aid = _get_flwr_aid(context)
+        flwr_aid = cast(str, flwr_aid)
+        account_name = resolve_account_ids([flwr_aid])[flwr_aid]
         # Build a set of run IDs for `flwr ls --runs`
         if not request.HasField("run_id"):
             # If no `run_id` is specified and account auth is enabled,
@@ -395,7 +396,13 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # Clear objects of finished runs
         store = self.objectstore_factory.store()
         for run in runs:
-            run.account_name = cast(str, account.account_name)
+            if run.flwr_aid == flwr_aid:
+                # For own runs, resolution can be done once
+                run.account_name = account_name
+            else:
+                # For runs launched by another account,
+                # we need to resolve account name.
+                run.account_name = resolve_account_ids([run.flwr_aid])[run.flwr_aid]
             if run.status.status == Status.FINISHED:
                 store.delete_objects_in_run(run.run_id)
 
