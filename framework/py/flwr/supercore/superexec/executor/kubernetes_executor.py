@@ -217,6 +217,7 @@ class KubernetesExecutor:
                 return
             if active_pod_count < self._config.active_pod_budget:
                 if waited_for_capacity:
+                    self._last_completed_pod_sweep_at = self._config.monotonic()
                     self._sweep_completed_pods()
                 return
 
