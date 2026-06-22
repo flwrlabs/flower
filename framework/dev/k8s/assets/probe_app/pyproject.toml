@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "launch-probe"
+version = "0.1.0"
+
+[tool.hatch.build.targets.wheel]
+packages = ["launch_probe"]
+
+[tool.flwr.app]
+publisher = "flwrlabs"
+
+[tool.flwr.app.components]
+serverapp = "launch_probe.server_app:app"
+clientapp = "launch_probe.client_app:app"
+
+[tool.flwr.app.config]
+local-k8s.probe-hold-seconds = 0.0
+local-k8s.probe-crash = false
