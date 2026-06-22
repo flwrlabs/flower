@@ -37,10 +37,15 @@ class ConnectorToolCall:
 
 @dataclass(frozen=True)
 class PreparedConnectorTools:
-    """A model request with per-request connector tool state."""
+    """A model request with per-request connector tool state.
+
+    `enabled_builtin_connectors` is the built-in connector allowlist for one
+    `responses.create` call. AgentApp-owned loops opt in again on later calls
+    by passing built-in connector names in `tools`.
+    """
 
     request: JSONObject
-    builtin_connector_names: frozenset[str]
+    enabled_builtin_connectors: frozenset[str]
     followup_tools: list[JSONObject] | None
 
 
@@ -52,12 +57,12 @@ def with_builtin_connector_tools(request: JSONObject) -> PreparedConnectorTools:
     if tools is None:
         return PreparedConnectorTools(
             request=updated,
-            builtin_connector_names=frozenset(),
+            enabled_builtin_connectors=frozenset(),
             followup_tools=None,
         )
 
     if isinstance(tools, Sequence) and not isinstance(tools, str):
-        builtin_connector_names: set[str] = set()
+        enabled_builtin_connectors: set[str] = set()
         followup_tools: list[JSONObject] = []
         normalized_tools: list[JSONObject] = []
 
@@ -68,11 +73,11 @@ def with_builtin_connector_tools(request: JSONObject) -> PreparedConnectorTools:
                 # built-in connector for this request.
                 if not has_builtin_connector(tool):
                     raise ValueError(f"Unknown built-in connector tool '{tool}'.")
-                if tool in builtin_connector_names:
+                if tool in enabled_builtin_connectors:
                     raise ValueError(f"Duplicate built-in connector tool '{tool}'.")
 
                 normalized_tools.append(get_builtin_connector_tool(tool))
-                builtin_connector_names.add(tool)
+                enabled_builtin_connectors.add(tool)
                 continue
 
             if isinstance(tool, dict):
@@ -96,29 +101,29 @@ def with_builtin_connector_tools(request: JSONObject) -> PreparedConnectorTools:
             )
 
         updated["tools"] = normalized_tools
-        if builtin_connector_names and updated.get("stream") is True:
+        if enabled_builtin_connectors and updated.get("stream") is True:
             # The runtime needs the complete first response to execute connector
             # calls, then restores the caller's stream setting on the follow-up.
             updated["stream"] = False
 
         return PreparedConnectorTools(
             request=updated,
-            builtin_connector_names=frozenset(builtin_connector_names),
+            enabled_builtin_connectors=frozenset(enabled_builtin_connectors),
             followup_tools=followup_tools if followup_tools else None,
         )
 
     return PreparedConnectorTools(
         request=updated,
-        builtin_connector_names=frozenset(),
+        enabled_builtin_connectors=frozenset(),
         followup_tools=None,
     )
 
 
 def extract_builtin_connector_tool_calls(
-    response: JSONObject, builtin_connector_names: Collection[str]
+    response: JSONObject, enabled_builtin_connectors: Collection[str]
 ) -> list[ConnectorToolCall]:
-    """Extract built-in connector function calls from one model response."""
-    if not builtin_connector_names:
+    """Extract enabled built-in connector function calls from one model response."""
+    if not enabled_builtin_connectors:
         return []
 
     output = response.get("output")
@@ -136,7 +141,7 @@ def extract_builtin_connector_tool_calls(
         # Use the per-request enabled set instead of the global built-in
         # registry. A model can emit arbitrary function_call names; the runtime
         # should only consume connector calls the AgentApp explicitly enabled.
-        if not isinstance(name, str) or name not in builtin_connector_names:
+        if not isinstance(name, str) or name not in enabled_builtin_connectors:
             continue
 
         call_id = item.get("call_id")

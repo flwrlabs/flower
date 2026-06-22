@@ -87,7 +87,7 @@ class RuntimeAgentResponses(AgentResponses):
         response_payload = self._create_model_response(model_request)
 
         tool_calls = extract_builtin_connector_tool_calls(
-            response_payload, prepared_tools.builtin_connector_names
+            response_payload, prepared_tools.enabled_builtin_connectors
         )
         if tool_calls:
             # Execute one connector batch; further tool-call loops stay in AgentApp.
