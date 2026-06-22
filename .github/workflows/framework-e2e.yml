@@ -84,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
         directory: [e2e-bare-auth]
         connection: [secure, insecure]
         engine: [deployment-engine, simulation-engine]
@@ -408,8 +408,9 @@ jobs:
     strategy:
       matrix:
         framework: ["numpy"]
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     name: Build & Install / Python ${{ matrix.python-version }} / ${{ matrix.framework }}
+
     steps:
       - uses: actions/checkout@v5
       - name: Bootstrap
