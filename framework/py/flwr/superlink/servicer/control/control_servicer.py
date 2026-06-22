@@ -119,6 +119,7 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    DEFAULT_FEDERATION_SIMULATION,
     NOOP_FEDERATION,
     PLATFORM_API_URL,
     ActionType,
@@ -141,6 +142,7 @@ from flwr.supercore.typing import (
 from flwr.supercore.utils import parse_app_spec, request_download_link
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
+from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 
 from .control_account_auth_interceptor import get_current_account_info
 
@@ -191,14 +193,22 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             )
             return StartRunResponse()
 
-        flwr_aid = _get_flwr_aid(context)
+        account = _get_account(context)
+        flwr_aid = cast(str, account.flwr_aid)
         override_config = user_config_from_proto(request.override_config)
+
+        # If federation is not specified, use default federation for the account
+        federation = request.federation
+        if not federation:
+            if isinstance(state.federation_manager, NoOpFederationManager):
+                federation = NOOP_FEDERATION
+            else:
+                federation = f"@{account.account_name}/{DEFAULT_FEDERATION_SIMULATION}"
 
         with rpc_error_translator(context, rpc_name):
             state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
 
             # Check (1) federation exists and (2) the flwr_aid is a member
-            federation = request.federation or NOOP_FEDERATION
             if not state.federation_manager.exists(federation):
                 if request.federation:
                     raise FlowerError(
