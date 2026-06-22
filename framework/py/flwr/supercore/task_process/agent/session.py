@@ -80,10 +80,15 @@ class RuntimeAgentResponses(AgentResponses):
 
     def create(self, request: JSONObject) -> JSONObject:
         """Create a model response through child model and connector tasks."""
-        model_request = with_builtin_connector_tools(request)
+        # Expand requested built-in connector names into function tools while
+        # keeping track of which names this request explicitly enabled.
+        prepared_tools = with_builtin_connector_tools(request)
+        model_request = prepared_tools.request
         response_payload = self._create_model_response(model_request)
 
-        tool_calls = extract_builtin_connector_tool_calls(response_payload)
+        tool_calls = extract_builtin_connector_tool_calls(
+            response_payload, prepared_tools.enabled_builtin_connectors
+        )
         if tool_calls:
             # Execute one connector batch; further tool-call loops stay in AgentApp.
             followup_input: list[JSONObject] = []
@@ -97,19 +102,30 @@ class RuntimeAgentResponses(AgentResponses):
                     }
                 )
 
-            # Reuse the prepared model request, but replace input for continuation.
-            model_request.pop("tool_choice", None)
+            # Continue with caller-defined tools only; runtime built-ins were only
+            # advertised for the hidden connector-planning turn.
+            followup_request = dict(model_request)
+            followup_request.pop("tool_choice", None)
+            if prepared_tools.followup_tools is None:
+                followup_request.pop("tools", None)
+            else:
+                followup_request["tools"] = prepared_tools.followup_tools
+            if request.get("stream") is True:
+                followup_request["stream"] = True
+
             previous_response_id = response_payload.get("id")
             if isinstance(previous_response_id, str) and previous_response_id:
-                model_request["input"] = followup_input
-                model_request["previous_response_id"] = previous_response_id
+                followup_request["input"] = followup_input
+                followup_request["previous_response_id"] = previous_response_id
             else:
                 output = response_payload.get("output")
                 prior_output: list[JSONObject] = []
                 if _is_json_object_list(output):
                     prior_output = cast(list[JSONObject], output)
-                model_request["input"] = [*prior_output, *followup_input]
-            response_payload = self._create_model_response(model_request)
+                # Some providers do not return a reusable response id, so replay
+                # the first response output with the connector results appended.
+                followup_request["input"] = [*prior_output, *followup_input]
+            response_payload = self._create_model_response(followup_request)
 
         output = response_payload.get("output")
         if _is_json_object_list(output):
