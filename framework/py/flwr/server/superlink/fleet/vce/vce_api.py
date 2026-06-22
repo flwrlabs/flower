@@ -29,7 +29,6 @@ from uuid import uuid4
 
 from flwr.app import Message
 from flwr.app.error import Error
-from flwr.client.run_info_store import DeprecatedRunInfoStore
 from flwr.clientapp.client_app import ClientApp, ClientAppException, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common.constant import (
@@ -41,6 +40,7 @@ from flwr.common.constant import (
     ErrorCode,
 )
 from flwr.common.logger import log
+from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.object_store import ObjectStoreFactory

@@ -54,10 +54,10 @@ from ..compat.common.typing import ServerMessage as ServerMessage
 from ..compat.common.typing import Status as Status
 from ..compat.common.typing import Value as Value
 from ..supercore.date import now as now
+from ..supercore.grpc import GRPC_MAX_MESSAGE_LENGTH as GRPC_MAX_MESSAGE_LENGTH
 from ..supercore.telemetry import EventType as EventType
 from ..supercore.telemetry import event as event
 from .constant import MessageTypeLegacy as MessageTypeLegacy
-from .grpc import GRPC_MAX_MESSAGE_LENGTH
 from .logger import configure as configure
 from .logger import log as log
 

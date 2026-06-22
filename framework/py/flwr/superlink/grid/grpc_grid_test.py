@@ -258,7 +258,7 @@ class TestGrpcGrid(unittest.TestCase):
         # Assert
         self.mock_channel.close.assert_not_called()
 
-    def test_set_run_rejects_non_run_type(self) -> None:
+    def test_set_run_rejects_non_run_instance(self) -> None:
         """Test `set_run` rejects invalid input types."""
         with self.assertRaises(TypeError):
             self.grid.set_run(61016)  # type: ignore[arg-type]

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from abc import ABC
 
-from flwr.common import (
+from flwr.compat.common.typing import (
     Code,
     EvaluateIns,
     EvaluateRes,

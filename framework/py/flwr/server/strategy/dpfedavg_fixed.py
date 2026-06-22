@@ -28,8 +28,8 @@ from flwr.common import (
     ndarrays_to_parameters,
     parameters_to_ndarrays,
 )
-from flwr.common.dp import add_gaussian_noise
 from flwr.common.logger import warn_deprecated_feature
+from flwr.compat.common.dp import add_gaussian_noise
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy.strategy import Strategy

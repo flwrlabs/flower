@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 
 import grpc
 
-from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH, create_channel
+from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, create_channel
 
 from .grpc import valid_certificates
 

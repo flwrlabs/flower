@@ -34,8 +34,8 @@ from flwr.cli.constant import (
 )
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
 from flwr.common.constant import FLWR_DIR
-from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
+from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 
 from .utils import (

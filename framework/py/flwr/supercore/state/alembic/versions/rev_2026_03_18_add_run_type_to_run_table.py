@@ -24,8 +24,6 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-from flwr.supercore.constant import RunType
-
 # pylint: disable=no-member
 
 # revision identifiers, used by Alembic.
@@ -33,6 +31,11 @@ revision: str = "c8f4f6e2c1ad"
 down_revision: str | Sequence[str] | None = "8e65d8ae60b0"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
+
+# Historical run_type string values used by this migration.
+# Keep these local constants because RunType has been removed from the framework.
+SERVER_APP_RUN_TYPE = "serverapp"
+SIMULATION_RUN_TYPE = "simulation"
 
 
 def upgrade() -> None:
@@ -43,14 +46,14 @@ def upgrade() -> None:
             "run_type",
             sa.String(),
             nullable=False,
-            server_default=RunType.SERVER_APP,
+            server_default=SERVER_APP_RUN_TYPE,
         ),
     )
     op.add_column("run", sa.Column("federation_config", sa.String(), nullable=True))
     op.execute(
         sa.text(
             "UPDATE run SET run_type = :run_type WHERE length(federation_options) > 0"
-        ).bindparams(run_type=RunType.SIMULATION)
+        ).bindparams(run_type=SIMULATION_RUN_TYPE)
     )
     op.drop_column("run", "federation_options")
 

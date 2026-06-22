@@ -337,7 +337,7 @@ class TestClientAppIoServicer(unittest.TestCase):
 
         # Execute
         with patch(
-            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+            "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
             return_value=Mock(task_id=task_id),
         ):
             response = self.servicer.SendTaskHeartbeat(request, Mock())
