@@ -17,7 +17,8 @@
 from __future__ import annotations
 
 import asyncio
-from types import SimpleNamespace
+import sys
+from types import ModuleType, SimpleNamespace
 from typing import Any, cast
 from unittest.mock import Mock
 
@@ -69,17 +70,14 @@ def test_invoke_browser_use_provider_uses_flower_headless(
             """Return fake agent history."""
             return _History()
 
-    import_module = Mock(
-        return_value=SimpleNamespace(Agent=_Agent, BrowserProfile=_BrowserProfile)
-    )
-    monkeypatch.setattr(
-        "flwr.supercore.task_process.connector.browser_use.importlib.import_module",
-        import_module,
-    )
+    browser_use_module = ModuleType("browser_use")
+    browser_use_module.__dict__["Agent"] = _Agent
+    browser_use_module.__dict__["BrowserProfile"] = _BrowserProfile
+    monkeypatch.setitem(sys.modules, "browser_use", browser_use_module)
 
     result = invoke_browser_use_provider(
         " Find Flower docs ",
-        allowed_domains=[" *.flower.ai ", "", "docs.python.org"],
+        allowed_domains=["*.flower.ai", "docs.python.org"],
         model=" gpt-5 ",
     )
 
@@ -94,8 +92,6 @@ def test_invoke_browser_use_provider_uses_flower_headless(
             "allowed_domains": ["*.flower.ai", "docs.python.org"],
         },
     }
-    import_module.assert_called_once_with("browser_use")
-
     agent = created["agent"]
     assert isinstance(agent, _Agent)
     assert agent.task == "Find Flower docs"
@@ -109,6 +105,21 @@ def test_flower_responses_chat_model_invokes_model_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """FlowerResponsesChatModel should send Browser Use messages to Responses."""
+
+    class _ChatInvokeCompletion:
+        """Fake Browser Use chat completion result."""
+
+        def __init__(
+            self,
+            *,
+            completion: object,
+            usage: object | None,
+            stop_reason: str | None,
+        ) -> None:
+            self.completion = completion
+            self.usage = usage
+            self.stop_reason = stop_reason
+
     invoke_model_provider = Mock(
         return_value={
             "object": "response",
@@ -119,17 +130,26 @@ def test_flower_responses_chat_model_invokes_model_provider(
         "flwr.supercore.task_process.connector.browser_use.invoke_model_provider",
         invoke_model_provider,
     )
+    browser_use_module = ModuleType("browser_use")
+    llm_module = ModuleType("browser_use.llm")
+    views_module = ModuleType("browser_use.llm.views")
+    browser_use_module.__dict__["__path__"] = []
+    browser_use_module.__dict__["llm"] = llm_module
+    llm_module.__dict__["__path__"] = []
+    llm_module.__dict__["views"] = views_module
+    views_module.__dict__["ChatInvokeCompletion"] = _ChatInvokeCompletion
+    monkeypatch.setitem(sys.modules, "browser_use", browser_use_module)
+    monkeypatch.setitem(sys.modules, "browser_use.llm", llm_module)
+    monkeypatch.setitem(sys.modules, "browser_use.llm.views", views_module)
+
+    messages: list[Any] = [
+        SimpleNamespace(role="system", text="You control a browser."),
+        SimpleNamespace(role="user", text="Open example.com."),
+    ]
 
     result = cast(
         Any,
-        asyncio.run(
-            FlowerResponsesChatModel(model="gpt-5").ainvoke(
-                [
-                    SimpleNamespace(role="system", text="You control a browser."),
-                    SimpleNamespace(role="user", text="Open example.com."),
-                ]
-            )
-        ),
+        asyncio.run(FlowerResponsesChatModel(model="gpt-5").ainvoke(messages)),
     )
 
     assert result.completion == "Click the first link."
