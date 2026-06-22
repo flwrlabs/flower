@@ -37,7 +37,7 @@ from flwr.server.superlink.linkstate import (
 )
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, TaskType
 from flwr.supercore.date import now
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run, RunStatus
@@ -125,7 +125,7 @@ class TestInMemoryGrid(unittest.TestCase):
         self.assertEqual(self.grid.run.fab_hash, "9f86d08")
         self.assertEqual(self.grid.run.override_config["test_key"], "test_value")
 
-    def test_set_run_rejects_non_run_type(self) -> None:
+    def test_set_run_rejects_non_run_instance(self) -> None:
         """Test `set_run` rejects invalid input types."""
         with self.assertRaises(TypeError):
             self.grid.set_run(61016)  # type: ignore[arg-type]
@@ -220,7 +220,7 @@ class TestInMemoryGrid(unittest.TestCase):
             "", NoOpFederationManager(), ObjectStoreFactory()
         ).state()
         run_id = state.create_run(
-            "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
+            "", "", "", {}, NOOP_FEDERATION, None, "", TaskType.SERVER_APP
         )
         self.grid = InMemoryGrid(MagicMock(state=lambda: state))
         runs = state.get_run_info(run_ids=[run_id])
@@ -253,7 +253,7 @@ class TestInMemoryGrid(unittest.TestCase):
         )
         state = state_factory.state()
         run_id = state.create_run(
-            "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
+            "", "", "", {}, NOOP_FEDERATION, None, "", TaskType.SERVER_APP
         )
         self.grid = InMemoryGrid(state_factory)
         runs = state.get_run_info(run_ids=[run_id])

@@ -66,7 +66,7 @@ from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=
 from flwr.server.app import _run_fleet_api_grpc_rere
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_res_message
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, TaskType
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -256,7 +256,7 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
             NOOP_FEDERATION,
             None,
             "",
-            RunType.SERVER_APP,
+            TaskType.SERVER_APP,
         )
         if running:
             run = self.state.get_run_info(run_ids=[run_id])[0]

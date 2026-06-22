@@ -24,9 +24,7 @@ import grpc
 from cryptography.hazmat.primitives.asymmetric import ec
 
 from flwr.app.message import Message, remove_content_from_message
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.constant import HEARTBEAT_CALL_TIMEOUT, HEARTBEAT_DEFAULT_INTERVAL
-from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
 from flwr.common.serde import (
     fab_from_proto,
@@ -55,6 +53,11 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
+from flwr.supercore.grpc import (
+    GRPC_MAX_MESSAGE_LENGTH,
+    create_channel,
+    on_channel_state_change,
+)
 from flwr.supercore.heartbeat import HeartbeatSender
 from flwr.supercore.inflatable.inflatable_protobuf_utils import (
     make_confirm_message_received_fn_protobuf,

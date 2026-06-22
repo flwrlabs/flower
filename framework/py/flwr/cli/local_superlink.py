@@ -27,10 +27,10 @@ import grpc
 import typer
 
 from flwr.common.constant import ISOLATION_MODE_SUBPROCESS
-from flwr.common.grpc import create_channel
 from flwr.proto.control_pb2 import ListFederationsRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.constant import FLWR_DISABLE_UPDATE_CHECK
+from flwr.supercore.grpc import create_channel
 from flwr.supercore.utils import get_flwr_home
 
 from .constant import (

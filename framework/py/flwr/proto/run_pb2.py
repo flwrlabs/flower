@@ -26,7 +26,7 @@ from flwr.proto import node_pb2 as flwr_dot_proto_dot_node__pb2
 from flwr.proto import transport_pb2 as flwr_dot_proto_dot_transport__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14\x66lwr/proto/run.proto\x12\nflwr.proto\x1a\x15\x66lwr/proto/node.proto\x1a\x1a\x66lwr/proto/transport.proto\"\x8e\x04\n\x03Run\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\x12\x0e\n\x06\x66\x61\x62_id\x18\x02 \x01(\t\x12\x13\n\x0b\x66\x61\x62_version\x18\x03 \x01(\t\x12<\n\x0foverride_config\x18\x04 \x03(\x0b\x32#.flwr.proto.Run.OverrideConfigEntry\x12\x10\n\x08\x66\x61\x62_hash\x18\x05 \x01(\t\x12\x12\n\npending_at\x18\x06 \x01(\t\x12\x13\n\x0bstarting_at\x18\x07 \x01(\t\x12\x12\n\nrunning_at\x18\x08 \x01(\t\x12\x13\n\x0b\x66inished_at\x18\t \x01(\t\x12%\n\x06status\x18\n \x01(\x0b\x32\x15.flwr.proto.RunStatus\x12\x10\n\x08\x66lwr_aid\x18\x0b \x01(\t\x12\x12\n\nfederation\x18\x0c \x01(\t\x12\x12\n\nbytes_sent\x18\r \x01(\x04\x12\x12\n\nbytes_recv\x18\x0e \x01(\x04\x12\x19\n\x11\x63lientapp_runtime\x18\x0f \x01(\x01\x12\x10\n\x08run_type\x18\x10 \x01(\t\x12\x1c\n\x0fprimary_task_id\x18\x11 \x01(\x04H\x00\x88\x01\x01\x12\x11\n\tseries_id\x18\x12 \x01(\x04\x1aI\n\x13OverrideConfigEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12!\n\x05value\x18\x02 \x01(\x0b\x32\x12.flwr.proto.Scalar:\x02\x38\x01\x42\x12\n\x10_primary_task_id\"@\n\tRunStatus\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x12\n\nsub_status\x18\x02 \x01(\t\x12\x0f\n\x07\x64\x65tails\x18\x03 \x01(\t\"?\n\rGetRunRequest\x12\x1e\n\x04node\x18\x01 \x01(\x0b\x32\x10.flwr.proto.Node\x12\x0e\n\x06run_id\x18\x02 \x01(\x04\".\n\x0eGetRunResponse\x12\x1c\n\x03run\x18\x01 \x01(\x0b\x32\x0f.flwr.proto.Runb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14\x66lwr/proto/run.proto\x12\nflwr.proto\x1a\x15\x66lwr/proto/node.proto\x1a\x1a\x66lwr/proto/transport.proto\"\xad\x04\n\x03Run\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\x12\x0e\n\x06\x66\x61\x62_id\x18\x02 \x01(\t\x12\x13\n\x0b\x66\x61\x62_version\x18\x03 \x01(\t\x12<\n\x0foverride_config\x18\x04 \x03(\x0b\x32#.flwr.proto.Run.OverrideConfigEntry\x12\x10\n\x08\x66\x61\x62_hash\x18\x05 \x01(\t\x12\x12\n\npending_at\x18\x06 \x01(\t\x12\x13\n\x0bstarting_at\x18\x07 \x01(\t\x12\x12\n\nrunning_at\x18\x08 \x01(\t\x12\x13\n\x0b\x66inished_at\x18\t \x01(\t\x12%\n\x06status\x18\n \x01(\x0b\x32\x15.flwr.proto.RunStatus\x12\x10\n\x08\x66lwr_aid\x18\x0b \x01(\t\x12\x12\n\nfederation\x18\x0c \x01(\t\x12\x12\n\nbytes_sent\x18\r \x01(\x04\x12\x12\n\nbytes_recv\x18\x0e \x01(\x04\x12\x19\n\x11\x63lientapp_runtime\x18\x0f \x01(\x01\x12\x19\n\x11primary_task_type\x18\x10 \x01(\t\x12\x1c\n\x0fprimary_task_id\x18\x11 \x01(\x04H\x00\x88\x01\x01\x12\x11\n\tseries_id\x18\x12 \x01(\x04\x12\x14\n\x0c\x61\x63\x63ount_name\x18\x13 \x01(\t\x1aI\n\x13OverrideConfigEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12!\n\x05value\x18\x02 \x01(\x0b\x32\x12.flwr.proto.Scalar:\x02\x38\x01\x42\x12\n\x10_primary_task_id\"@\n\tRunStatus\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x12\n\nsub_status\x18\x02 \x01(\t\x12\x0f\n\x07\x64\x65tails\x18\x03 \x01(\t\"?\n\rGetRunRequest\x12\x1e\n\x04node\x18\x01 \x01(\x0b\x32\x10.flwr.proto.Node\x12\x0e\n\x06run_id\x18\x02 \x01(\x04\".\n\x0eGetRunResponse\x12\x1c\n\x03run\x18\x01 \x01(\x0b\x32\x0f.flwr.proto.Runb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -36,13 +36,13 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_RUN_OVERRIDECONFIGENTRY']._loaded_options = None
   _globals['_RUN_OVERRIDECONFIGENTRY']._serialized_options = b'8\001'
   _globals['_RUN']._serialized_start=88
-  _globals['_RUN']._serialized_end=614
-  _globals['_RUN_OVERRIDECONFIGENTRY']._serialized_start=521
-  _globals['_RUN_OVERRIDECONFIGENTRY']._serialized_end=594
-  _globals['_RUNSTATUS']._serialized_start=616
-  _globals['_RUNSTATUS']._serialized_end=680
-  _globals['_GETRUNREQUEST']._serialized_start=682
-  _globals['_GETRUNREQUEST']._serialized_end=745
-  _globals['_GETRUNRESPONSE']._serialized_start=747
-  _globals['_GETRUNRESPONSE']._serialized_end=793
+  _globals['_RUN']._serialized_end=645
+  _globals['_RUN_OVERRIDECONFIGENTRY']._serialized_start=552
+  _globals['_RUN_OVERRIDECONFIGENTRY']._serialized_end=625
+  _globals['_RUNSTATUS']._serialized_start=647
+  _globals['_RUNSTATUS']._serialized_end=711
+  _globals['_GETRUNREQUEST']._serialized_start=713
+  _globals['_GETRUNREQUEST']._serialized_end=776
+  _globals['_GETRUNRESPONSE']._serialized_start=778
+  _globals['_GETRUNRESPONSE']._serialized_end=824
 # @@protoc_insertion_point(module_scope)

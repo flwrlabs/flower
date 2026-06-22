@@ -266,7 +266,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         federation: str,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
-        run_type: str,
+        primary_task_type: str,
         series_id: int | None = None,
     ) -> int:
         """Create a new run.
@@ -287,8 +287,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Optional resolved federation configuration for the run.
         flwr_aid : str | None
             Flower Account ID of the creator.
-        run_type : str
-            The type of run being created.
+        primary_task_type : str
+            The type of the primary task to create for the run.
         series_id : int | None (default: None)
             Optional run series ID. If `None`, a new run series is created for
             the federation. If set, the series must already exist and belong to

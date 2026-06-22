@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower run type definitions."""
+"""Flower run definitions."""
 
 
 from dataclasses import dataclass
 
 from flwr.app.user_config import UserConfig
-from flwr.supercore.constant import RunType
+from flwr.supercore.constant import TaskType
 
 
 @dataclass
@@ -50,7 +50,7 @@ class Run:  # pylint: disable=too-many-instance-attributes
     bytes_sent: int
     bytes_recv: int
     clientapp_runtime: float
-    run_type: str = ""
+    primary_task_type: str = ""
     series_id: int = 0
 
     @classmethod
@@ -73,7 +73,7 @@ class Run:  # pylint: disable=too-many-instance-attributes
             bytes_sent=0,
             bytes_recv=0,
             clientapp_runtime=0.0,
-            run_type=RunType.SERVER_APP,
+            primary_task_type=TaskType.SERVER_APP,
             series_id=0,
         )
 
