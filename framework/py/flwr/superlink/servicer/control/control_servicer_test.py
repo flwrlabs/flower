@@ -1566,10 +1566,14 @@ class TestControlServicerAuth(unittest.TestCase):
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
             ),
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.resolve_account_ids",
+                return_value={"run-owner": "owner-account"},
+            ),
         ):
             response = self.servicer.ListRuns(request, ctx)
             self.assertEqual(set(response.run_dict.keys()), {run_id})
-            self.assertEqual(response.run_dict[run_id].account_name, "test-account")
+            self.assertEqual(response.run_dict[run_id].account_name, "owner-account")
 
 
 class TestValidateFederationAndNodesInRequest(unittest.TestCase):

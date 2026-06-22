@@ -367,12 +367,12 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         flwr_aid = _get_flwr_aid(context)
-        flwr_aid = cast(str, flwr_aid)
-        account_name = resolve_account_ids([flwr_aid])[flwr_aid]
+        account_name = None
         # Build a set of run IDs for `flwr ls --runs`
         if not request.HasField("run_id"):
             # If no `run_id` is specified and account auth is enabled,
             # return run IDs for the authenticated account
+            account_name = resolve_account_ids([flwr_aid])[flwr_aid]
             limit = request.limit if request.HasField("limit") else None
             runs = state.get_run_info(
                 flwr_aids=[flwr_aid],
@@ -400,12 +400,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # Clear objects of finished runs
         store = self.objectstore_factory.store()
         for run in runs:
-            if run.flwr_aid == flwr_aid:
-                # For own runs, resolution can be done once
+            if account_name is not None:
                 run.account_name = account_name
             else:
-                # For runs launched by another account,
-                # we need to resolve account name.
                 run.account_name = resolve_account_ids([run.flwr_aid])[run.flwr_aid]
             if run.status.status == Status.FINISHED:
                 store.delete_objects_in_run(run.run_id)
