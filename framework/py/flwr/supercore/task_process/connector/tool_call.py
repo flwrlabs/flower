@@ -37,7 +37,7 @@ class ConnectorToolCall:
 
 @dataclass(frozen=True)
 class PreparedConnectorTools:
-    """A model request with AgentApp connector tool state."""
+    """A model request with per-request connector tool state."""
 
     request: JSONObject
     builtin_connector_names: frozenset[str]
@@ -64,6 +64,8 @@ def with_builtin_connector_tools(request: JSONObject) -> PreparedConnectorTools:
         tool_list = list(tools)
         for tool in tool_list:
             if isinstance(tool, str):
+                # String entries are the runtime shorthand for opting into a
+                # built-in connector for this request.
                 if not has_builtin_connector(tool):
                     raise ValueError(f"Unknown built-in connector tool '{tool}'.")
                 if tool in builtin_connector_names:
@@ -75,6 +77,9 @@ def with_builtin_connector_tools(request: JSONObject) -> PreparedConnectorTools:
 
             if isinstance(tool, dict):
                 tool_name = tool.get("name")
+                # JSON tool definitions belong to AgentApp/user code. Built-in
+                # connector names are reserved so the follow-up turn can remove
+                # only runtime-injected connector tools.
                 if isinstance(tool_name, str) and has_builtin_connector(tool_name):
                     raise ValueError(
                         f"Built-in connector tool name '{tool_name}' is reserved. "
@@ -92,6 +97,8 @@ def with_builtin_connector_tools(request: JSONObject) -> PreparedConnectorTools:
 
         updated["tools"] = normalized_tools
         if builtin_connector_names and updated.get("stream") is True:
+            # The runtime needs the complete first response to execute connector
+            # calls, then restores the caller's stream setting on the follow-up.
             updated["stream"] = False
 
         return PreparedConnectorTools(
@@ -126,6 +133,9 @@ def extract_builtin_connector_tool_calls(
             continue
 
         name = item.get("name")
+        # Use the per-request enabled set instead of the global built-in
+        # registry. A model can emit arbitrary function_call names; the runtime
+        # should only consume connector calls the AgentApp explicitly enabled.
         if not isinstance(name, str) or name not in builtin_connector_names:
             continue
 

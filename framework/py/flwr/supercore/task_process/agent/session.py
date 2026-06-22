@@ -80,6 +80,8 @@ class RuntimeAgentResponses(AgentResponses):
 
     def create(self, request: JSONObject) -> JSONObject:
         """Create a model response through child model and connector tasks."""
+        # Expand requested built-in connector names into function tools while
+        # keeping track of which names this request explicitly enabled.
         prepared_tools = with_builtin_connector_tools(request)
         model_request = prepared_tools.request
         response_payload = self._create_model_response(model_request)
@@ -120,6 +122,8 @@ class RuntimeAgentResponses(AgentResponses):
                 prior_output: list[JSONObject] = []
                 if _is_json_object_list(output):
                     prior_output = cast(list[JSONObject], output)
+                # Some providers do not return a reusable response id, so replay
+                # the first response output with the connector results appended.
                 followup_request["input"] = [*prior_output, *followup_input]
             response_payload = self._create_model_response(followup_request)
 
