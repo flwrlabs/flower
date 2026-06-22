@@ -205,3 +205,17 @@ def test_update_conf_file_appends_missing_theme_variable_dictionaries(
 }
 """
     )
+
+
+def test_update_conf_file_reports_missing_theme_options(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Files without html_theme_options should still be reported distinctly."""
+    conf_file = tmp_path / "conf.py"
+    conf_file.write_text('html_theme = "furo"\n', encoding="utf-8")
+
+    update_html_themes.update_conf_file(conf_file, {"announcement": "Banner"})
+
+    assert (
+        f"No html_theme_options block found in: {conf_file}" in capsys.readouterr().out
+    )
