@@ -18,7 +18,6 @@
 from typing import cast
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
-from flwr.common.typing import Federation
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import (  # pylint: disable=E0611
     Account,
@@ -33,6 +32,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.typing import ActionContext
+from flwr.superlink.federation.typing import Federation
 
 from .federation_manager import FederationManager
 
@@ -47,6 +47,7 @@ class UnsupportedError(FlowerError):
         )
 
 
+# pylint: disable-next=too-many-public-methods
 class NoOpFederationManager(FederationManager):
     """No-Op FederationManager implementation."""
 
@@ -78,6 +79,10 @@ class NoOpFederationManager(FederationManager):
         if not self.exists(federation):
             raise ValueError(f"Federation '{federation}' does not exist.")
         return True
+
+    def ensure_default_federations_exist(self, flwr_aid: str) -> None:
+        """Ensure default federations exist for the given account."""
+        _ = flwr_aid
 
     def get_federations(self, flwr_aid: str) -> list[Federation]:
         """Get federations of which the account is a member."""

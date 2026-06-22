@@ -23,8 +23,9 @@ current global model parameters as input and return evaluation results:
 .. code-block:: python
 
     from flwr.app import Context
+    from flwr.compat.server import ServerAppComponents
     from flwr.common import NDArrays, Scalar
-    from flwr.server import ServerAppComponents, ServerConfig
+    from flwr.server import ServerConfig
     from flwr.server.strategy import FedAvg
     from flwr.serverapp import ServerApp
 
@@ -149,7 +150,8 @@ the following arguments:
 .. code-block:: python
 
     from flwr.app import Context
-    from flwr.server import ServerAppComponents, ServerConfig
+    from flwr.compat.server import ServerAppComponents
+    from flwr.server import ServerConfig
     from flwr.server.strategy import FedAvg
     from flwr.serverapp import ServerApp
 

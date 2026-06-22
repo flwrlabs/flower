@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "flwr"
-version = "1.31.0"
+version = "1.32.0"
 description = "Flower: A Friendly Federated AI Framework"
 license = "Apache-2.0"
 authors = [{ name = "The Flower Authors", email = "hello@flower.ai" }]
@@ -69,6 +69,7 @@ simulation = [
     "ray==2.55.1; python_version >= '3.13' and python_version < '3.15' and sys_platform != 'win32'",
 ]
 rest = ["starlette>=0.50.0,<0.51.0", "uvicorn[standard]>=0.40.0,<0.41.0"]
+agent = ["trafilatura>=2.1.0,<3.0.0"]
 
 [project.scripts]
 # `flwr` CLI
@@ -83,6 +84,7 @@ flwr-serverapp = "flwr.server.serverapp:flwr_serverapp"
 flwr-clientapp = "flwr.supernode.cli:flwr_clientapp"
 flwr-agentapp = "flwr.supercore.cli:flwr_agentapp"
 flwr-model = "flwr.supercore.cli:flwr_model"
+flwr-connector = "flwr.supercore.cli:flwr_connector"
 
 [project.urls]
 homepage = "https://flower.ai"

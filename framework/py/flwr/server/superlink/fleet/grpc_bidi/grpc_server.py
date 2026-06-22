@@ -17,8 +17,6 @@
 
 import grpc
 
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH
-from flwr.common.grpc import generic_create_grpc_server
 from flwr.proto.transport_pb2_grpc import (  # pylint: disable=E0611
     add_FlowerServiceServicer_to_server,
 )
@@ -26,6 +24,7 @@ from flwr.server.client_manager import ClientManager
 from flwr.server.superlink.fleet.grpc_bidi.flower_service_servicer import (
     FlowerServiceServicer,
 )
+from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 
 
 def start_grpc_server(  # pylint: disable=too-many-arguments,R0917

@@ -15,6 +15,7 @@
 """SQLAlchemy-based CoreState implementation."""
 
 
+# pylint: disable=too-many-lines
 import hashlib
 import json
 import secrets
@@ -29,7 +30,6 @@ from sqlalchemy.exc import IntegrityError
 from flwr.app import Context, Message
 from flwr.app.message import make_message
 from flwr.app.metadata import Metadata
-from flwr.common import now
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -43,13 +43,14 @@ from flwr.common.constant import (
 from flwr.common.logger import log
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
-from flwr.common.typing import Fab
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
@@ -382,11 +383,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
              :task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
              :active_until, :pending_at, :starting_at, :running_at, :finished_at,
              :sub_status, :details
-            WHERE :requesting_task_id IS NULL
+            WHERE CAST(:requesting_task_id AS BIGINT) IS NULL
             OR EXISTS (
                 SELECT 1
                 FROM task
-                WHERE task_id = :requesting_task_id
+                WHERE task_id = CAST(:requesting_task_id AS BIGINT)
                 AND finished_at IS NULL
             )
             RETURNING task_id;
@@ -543,16 +544,24 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         with self.session():
             self._cleanup_expired_task_tokens()
+            activated_at = now()
+            active_until = activated_at + timedelta(
+                seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+            )
 
             # Activation is a strict STARTING -> RUNNING transition.
             rows = self.query(
                 f"""
                 UPDATE task
-                SET running_at = :running_at
+                SET running_at = :running_at, active_until = :active_until
                 WHERE task_id = :task_id AND {STATUS_CONDITIONS[Status.STARTING]}
                 RETURNING task_id
                 """,
-                {"task_id": uint64_to_int64(task_id), "running_at": now()},
+                {
+                    "task_id": uint64_to_int64(task_id),
+                    "running_at": activated_at,
+                    "active_until": active_until,
+                },
             )
         return len(rows) > 0
 
@@ -830,18 +839,31 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def _cleanup_expired_task_tokens(self) -> None:
         """Remove expired task heartbeat records.
 
-        Expired tasks are marked as finished with a failed status, and their tokens are
-        removed.
+        Expired starting tasks are moved back to pending. Expired running tasks
+        are marked as finished with a failed status. Tokens are removed in both
+        cases.
         """
         expired_at = now()
-        # Expired task claims are terminal failures and lose their token.
+        # Claims that never reached RUNNING are retryable launch failures.
+        self.query(
+            f"""
+            UPDATE task
+            SET token = NULL, active_until = NULL, starting_at = NULL,
+                sub_status = '', details = ''
+            WHERE token IS NOT NULL AND active_until < :current
+            AND {STATUS_CONDITIONS[Status.STARTING]}
+            """,
+            {"current": expired_at},
+        )
+
+        # Expired running task claims are terminal failures and lose their token.
         rows = self.query(
-            """
+            f"""
             UPDATE task
             SET token = NULL, finished_at = active_until, active_until = NULL,
                 sub_status = :sub_status, details = :details
             WHERE token IS NOT NULL AND active_until < :current
-            AND finished_at IS NULL
+            AND {STATUS_CONDITIONS[Status.RUNNING]}
             RETURNING task_id, type, run_id, fab_hash, model_ref, connector_ref,
                       pending_at, starting_at, running_at, finished_at,
                       sub_status, details

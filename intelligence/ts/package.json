@@ -59,23 +59,23 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "eslint": "^10.0.1",
+    "eslint": "^10.5.0",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "globals": "^16.5.0",
     "http-server": "^14.1.1",
-    "prettier": "^3.8.1",
-    "typedoc": "^0.28.17",
-    "typedoc-plugin-markdown": "^4.10.0",
+    "prettier": "^3.8.4",
+    "typedoc": "^0.28.19",
+    "typedoc-plugin-markdown": "^4.12.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.0",
-    "vite": "^6.4.1",
-    "vitest": "^3.2.4"
+    "typescript-eslint": "^8.61.1",
+    "vite": "^6.4.3",
+    "vitest": "^3.2.6"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
-    "@mlc-ai/web-llm": "^0.2.81",
+    "@mlc-ai/web-llm": "^0.2.84",
     "get-random-values": "^3.0.0",
-    "tar": "^7.5.9"
+    "tar": "^7.5.16"
   },
   "browser": {
     "fs": false,

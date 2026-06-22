@@ -25,7 +25,6 @@ from unittest.mock import patch
 import grpc
 from parameterized import parameterized
 
-from flwr.common import now
 from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     NOOP_ACCOUNT_NAME,
@@ -37,7 +36,6 @@ from flwr.common.constant import (
     TIMESTAMP_HEADER,
     TIMESTAMP_TOLERANCE,
 )
-from flwr.common.typing import Fab
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -68,7 +66,9 @@ from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=
 from flwr.server.app import _run_fleet_api_grpc_rere
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_res_message
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, TaskType
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import (
     generate_key_pairs,
@@ -256,7 +256,7 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
             NOOP_FEDERATION,
             None,
             "",
-            RunType.SERVER_APP,
+            TaskType.SERVER_APP,
         )
         if running:
             run = self.state.get_run_info(run_ids=[run_id])[0]

@@ -32,7 +32,6 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto
-from flwr.common.typing import Fab
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -70,8 +69,9 @@ from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION,
     NodeStatus,
-    RunType,
+    TaskType,
 )
+from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_id,
@@ -199,7 +199,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
             federation=NOOP_FEDERATION,
             federation_config=None,
             flwr_aid="",
-            run_type=RunType.SERVER_APP,
+            primary_task_type=TaskType.SERVER_APP,
         )
         if running:
             self._transition_run_status(run_id, 2)

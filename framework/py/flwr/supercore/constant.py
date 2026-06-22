@@ -116,6 +116,12 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
     init_args_log_to_driver=True,
 )
 
+
+# Default federation names for every Flower account
+DEFAULT_FEDERATION_SIMULATION = "workspace-simulation"
+DEFAULT_FEDERATION_DEPLOYMENT = "workspace-deployment"
+
+
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
 TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
@@ -179,14 +185,6 @@ class InvitationStatus(StrEnum):
     EXPIRED = "expired"
 
 
-class RunType(StrEnum):
-    """Supported run types."""
-
-    AGENT_APP = "agentapp"
-    SERVER_APP = "serverapp"
-    SIMULATION = "simulation"
-
-
 class RunTime(StrEnum):
     """Supported runtimes."""
 
@@ -198,6 +196,7 @@ class ExecutorType(StrEnum):
     """Supported SuperExec executor types."""
 
     SUBPROCESS = "subprocess"
+    KUBERNETES = "kubernetes"
 
 
 class TaskType(StrEnum):
@@ -214,6 +213,7 @@ class TaskType(StrEnum):
 TASK_TYPE_TO_APPIO_API_ADDRESS_ARG: dict[TaskType, str] = {
     TaskType.AGENT_APP: "--serverappio-api-address",
     TaskType.CLIENT_APP: "--clientappio-api-address",
+    TaskType.CONNECTOR: "--serverappio-api-address",
     TaskType.MODEL: "--serverappio-api-address",
     TaskType.SERVER_APP: "--serverappio-api-address",
     TaskType.SIMULATION: "--serverappio-api-address",
@@ -221,6 +221,7 @@ TASK_TYPE_TO_APPIO_API_ADDRESS_ARG: dict[TaskType, str] = {
 TASK_TYPE_TO_COMMAND: dict[TaskType, str] = {
     TaskType.AGENT_APP: "flwr-agentapp",
     TaskType.CLIENT_APP: "flwr-clientapp",
+    TaskType.CONNECTOR: "flwr-connector",
     TaskType.MODEL: "flwr-model",
     TaskType.SERVER_APP: "flwr-serverapp",
     TaskType.SIMULATION: "flwr-simulation",

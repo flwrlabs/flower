@@ -26,8 +26,8 @@ from typing import Any, cast
 import grpc
 import requests
 
+from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
 from flwr.cli.utils import validate_federation_name
-from flwr.common import now
 from flwr.common.config import (
     flatten_dict,
     fuse_dicts,
@@ -57,7 +57,6 @@ from flwr.common.serde import (
     run_to_proto,
     user_config_from_proto,
 )
-from flwr.common.typing import AccountInfo, Fab, Run
 from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -118,16 +117,21 @@ from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
+from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    DEFAULT_FEDERATION_SIMULATION,
     NOOP_FEDERATION,
     PLATFORM_API_URL,
     ActionType,
     RunTime,
-    RunType,
+    TaskType,
 )
+from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
+from flwr.supercore.fab import Fab
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
+from flwr.supercore.run import Run
 from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
@@ -138,6 +142,7 @@ from flwr.supercore.typing import (
 from flwr.supercore.utils import parse_app_spec, request_download_link
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
+from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 
 from .control_account_auth_interceptor import get_current_account_info
 
@@ -169,7 +174,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         verification_dict: dict[str, str] = {}
         note: str | None = None
-        if request.app_spec:
+
+        builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
+        if builtin_agent_fab is not None:
+            fab_file, verification_dict = builtin_agent_fab
+        elif request.app_spec:
             fab_file, verification_dict, note = _get_remote_fab(
                 self.fleet_api_type, request.app_spec, context
             )
@@ -184,12 +193,22 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             )
             return StartRunResponse()
 
-        flwr_aid = _get_flwr_aid(context)
+        account = _get_account(context)
+        flwr_aid = cast(str, account.flwr_aid)
         override_config = user_config_from_proto(request.override_config)
 
+        # If federation is not specified, use default federation for the account
+        federation = request.federation
+        if not federation:
+            if isinstance(state.federation_manager, NoOpFederationManager):
+                federation = NOOP_FEDERATION
+            else:
+                federation = f"@{account.account_name}/{DEFAULT_FEDERATION_SIMULATION}"
+
         with rpc_error_translator(context, rpc_name):
+            state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+
             # Check (1) federation exists and (2) the flwr_aid is a member
-            federation = request.federation or NOOP_FEDERATION
             if not state.federation_manager.exists(federation):
                 if request.federation:
                     raise FlowerError(
@@ -207,29 +226,37 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     f"federation '{federation}'.",
                 )
 
-            # Derive run type based on the presence of simulation config and apply
-            # federation config overrides
-            run_type = RunType.SERVER_APP
-            resolved_federation_config = None
-            runtime = RunTime.DEPLOYMENT
-            if sim_cfg := state.federation_manager.get_simulation_config(federation):
-                run_type = RunType.SIMULATION
-                runtime = RunTime.SIMULATION
-                resolved_federation_config = SimulationConfig()
-                resolved_federation_config.CopyFrom(sim_cfg)
-                resolved_federation_config.MergeFrom(request.override_federation_config)
-
-            state.federation_manager.can_execute(
-                flwr_aid,
-                ActionType.START_RUN,
-                StartRunContext(federation_name=federation, runtime=runtime),
-            )
-
         try:
             # Validate user config overrides matches keys in run config in FAB
             fab_config = get_fab_config(fab_file)
             run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
             _ = fuse_dicts(run_config, override_config)
+
+            # Derive primary task type from the submitted FAB. AgentApp-only FABs can
+            # be bundled locally and submitted through the regular `flwr run` path.
+            components = fab_config["tool"]["flwr"]["app"].get("components", {})
+            is_agentapp_bundle = "agentapp" in components
+            primary_task_type = (
+                TaskType.AGENT_APP if is_agentapp_bundle else TaskType.SERVER_APP
+            )
+            resolved_federation_config = None
+            runtime = RunTime.DEPLOYMENT
+            with rpc_error_translator(context, rpc_name):
+                sim_cfg = state.federation_manager.get_simulation_config(federation)
+                if sim_cfg and not is_agentapp_bundle:
+                    primary_task_type = TaskType.SIMULATION
+                    runtime = RunTime.SIMULATION
+                    resolved_federation_config = SimulationConfig()
+                    resolved_federation_config.CopyFrom(sim_cfg)
+                    resolved_federation_config.MergeFrom(
+                        request.override_federation_config
+                    )
+
+                state.federation_manager.can_execute(
+                    flwr_aid,
+                    ActionType.START_RUN,
+                    StartRunContext(federation_name=federation, runtime=runtime),
+                )
 
             # Create run
             fab = Fab(
@@ -253,7 +280,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 federation,
                 resolved_federation_config,
                 flwr_aid,
-                run_type,
+                primary_task_type,
                 request.series_id if request.HasField("series_id") else None,
             )
 
@@ -263,15 +290,18 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     "Failed to create or initialize the run.",
                 )
 
-            runs = state.get_run_info(run_ids=[run_id])
-            series_id = runs[0].series_id
+            run = state.get_run_info(run_ids=[run_id])[0]
+            series_id = run.series_id
 
         except ValueError as e:
             log(ERROR, "Could not start run: %s", str(e))
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
 
-        log(INFO, "Created %s run %s", run_type, str(run_id))
-        return StartRunResponse(run_id=run_id, note=note, series_id=series_id)
+        log_msg = f"Created run {run_id} in federation {run.federation}"
+        log(INFO, log_msg)
+        return StartRunResponse(
+            run_id=run_id, note=note, series_id=series_id, federation=run.federation
+        )
 
     def StreamLogs(  # pylint: disable=C0103
         self, request: StreamLogsRequest, context: grpc.ServicerContext
@@ -637,13 +667,16 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: ListFederationsRequest, context: grpc.ServicerContext
     ) -> ListFederationsResponse:
         """List all SuperNodes."""
-        log(INFO, "ControlServicer.ListFederations")
+        log(INFO, rpc_name := self.ListFederations.__qualname__)
 
         # Init link state
         state = self.linkstate_factory.state()
+        flwr_aid = _get_flwr_aid(context)
 
         # Get federations the account is a member of
-        federations = state.federation_manager.get_federations(_get_flwr_aid(context))
+        with rpc_error_translator(context, rpc_name):
+            state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+            federations = state.federation_manager.get_federations(flwr_aid)
 
         return ListFederationsResponse(
             federations=[
@@ -661,23 +694,25 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: ShowFederationRequest, context: grpc.ServicerContext
     ) -> ShowFederationResponse:
         """Show details of a specific Federation."""
-        log(INFO, "ControlServicer.ShowFederation")
+        log(INFO, rpc_name := self.ShowFederation.__qualname__)
 
         # Init link state
         state = self.linkstate_factory.state()
 
         # Ensure flwr_aid is a member of the requested federation
-        flwr_aid = _get_flwr_aid(context)
         federation = request.federation_name
-        if not state.federation_manager.has_member(flwr_aid, federation):
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                f"Federation '{federation}' does not exist or you are "
-                "not a member of it.",
-            )
+        flwr_aid = _get_flwr_aid(context)
+        with rpc_error_translator(context, rpc_name):
+            state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+            if not state.federation_manager.has_member(flwr_aid, federation):
+                context.abort(
+                    grpc.StatusCode.FAILED_PRECONDITION,
+                    f"Federation '{federation}' does not exist or you are "
+                    "not a member of it.",
+                )
 
-        # Fetch federation details
-        details = state.federation_manager.get_details(federation)
+            # Fetch federation details
+            details = state.federation_manager.get_details(federation)
 
         # Build Federation proto object
         federation_proto = Federation(
@@ -718,10 +753,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             # Construct federation name
             account = _get_account(context)
+            flwr_aid = cast(str, account.flwr_aid)
+            state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
             federation_name = f"@{account.account_name}/{request.federation_name}"
 
             runtime = RunTime.SIMULATION if request.simulation else RunTime.DEPLOYMENT
-            flwr_aid = cast(str, account.flwr_aid)
             state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.CREATE_FEDERATION,
@@ -786,6 +822,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         with rpc_error_translator(context, rpc_name):
             # Validate federation, node ID, and ownership
             flwr_aid = _get_flwr_aid(context)
+            state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
             _validate_federation_and_node_in_request(
                 state, flwr_aid, request.federation_name, request.node_id, context
             )
@@ -860,6 +897,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         with rpc_error_translator(context, rpc_name):
             flwr_aid = _get_flwr_aid(context)
+            state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
             federation = request.federation_name
             invitee_account_name = request.invitee_account_name
 

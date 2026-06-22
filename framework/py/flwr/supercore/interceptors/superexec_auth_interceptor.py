@@ -24,7 +24,6 @@ from typing import Any, NoReturn, Protocol, cast
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.common import now
 from flwr.supercore.auth import (
     compute_request_body_sha256,
     compute_superexec_signature,
@@ -39,6 +38,7 @@ from flwr.supercore.constant import (
     SUPEREXEC_AUTH_SIGNATURE_HEADER,
     SUPEREXEC_AUTH_TIMESTAMP_HEADER,
 )
+from flwr.supercore.date import now
 from flwr.supercore.utils import get_metadata_str
 
 from .appio_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
