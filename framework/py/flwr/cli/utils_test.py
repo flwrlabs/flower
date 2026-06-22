@@ -51,6 +51,7 @@ from .utils import (
     init_channel_from_connection,
     load_gitignore_patterns,
     validate_federation_name,
+    wait_for_control_api_channel,
 )
 
 
@@ -179,6 +180,27 @@ def test_load_gitignore_patterns_with_pathspec() -> None:
 
     # Should not match normal files
     assert spec.match_file("good.py") is False
+
+
+def test_wait_for_control_api_channel_retries_until_ready() -> None:
+    """Test that Control API readiness waits through transient unavailability."""
+    future = Mock()
+    future.result.side_effect = [grpc.FutureTimeoutError(), None]
+
+    with patch("flwr.cli.utils.grpc.channel_ready_future", return_value=future):
+        wait_for_control_api_channel(Mock(), timeout=1, check_interval=0.01)
+
+    assert future.result.call_count == 2
+
+
+def test_wait_for_control_api_channel_fails_after_timeout() -> None:
+    """Test that Control API readiness fails after the timeout expires."""
+    future = Mock()
+    future.result.side_effect = grpc.FutureTimeoutError()
+
+    with patch("flwr.cli.utils.grpc.channel_ready_future", return_value=future):
+        with pytest.raises(click.ClickException, match="SuperLink is unavailable"):
+            wait_for_control_api_channel(Mock(), timeout=0.01, check_interval=0.01)
 
 
 def test_get_executed_command_single() -> None:

@@ -35,6 +35,7 @@ from .utils import (
     flwr_cli_grpc_exc_handler,
     init_channel_from_connection,
     print_json_to_stdout,
+    wait_for_control_api_channel,
 )
 
 
@@ -82,6 +83,7 @@ def stop(  # pylint: disable=R0914
 
         try:
             channel = init_channel_from_connection(superlink_connection)
+            wait_for_control_api_channel(channel)
             stub = ControlStub(channel)  # pylint: disable=unused-variable # noqa: F841
 
             typer.secho(f"✋ Stopping run ID {run_id}...", fg=typer.colors.GREEN)

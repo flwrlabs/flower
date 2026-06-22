@@ -20,6 +20,7 @@ import json
 import os
 import re
 import sys
+import time
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from io import StringIO
@@ -68,6 +69,13 @@ from .config_utils import load_certificate_in_connection
 from .constant import AUTHN_TYPE_STORE_KEY
 from .flower_config import read_superlink_connection
 from .local_superlink import ensure_local_superlink
+
+SUPERLINK_UNAVAILABLE_MESSAGE = (
+    "Connection to the SuperLink is unavailable. Please check your network "
+    "connection and 'address' in the SuperLink connection configuration."
+)
+CONTROL_API_READY_TIMEOUT_SECONDS = 30
+CONTROL_API_READY_CHECK_INTERVAL_SECONDS = 1
 
 
 def print_json_to_stdout(data: str | Any) -> None:
@@ -396,6 +404,25 @@ def cli_output_control_stub(
             channel.close()
 
 
+def wait_for_control_api_channel(
+    channel: grpc.Channel,
+    timeout: float = CONTROL_API_READY_TIMEOUT_SECONDS,
+    check_interval: float = CONTROL_API_READY_CHECK_INTERVAL_SECONDS,
+) -> None:
+    """Wait for the Control API channel to become ready before sending an RPC."""
+    deadline = time.monotonic() + timeout
+    future = grpc.channel_ready_future(channel)
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE)
+        try:
+            future.result(timeout=min(check_interval, remaining))
+            return
+        except grpc.FutureTimeoutError:
+            continue
+
+
 @contextmanager  # docsig: disable=SIG503
 def flwr_cli_grpc_exc_handler(  # pylint: disable=too-many-branches
     custom_handler: Callable[[grpc.RpcError], None] | None = None,
@@ -450,10 +477,7 @@ def flwr_cli_grpc_exc_handler(  # pylint: disable=too-many-branches
             msg = "Permission denied." if details == "" else f"{details}"
             raise click.ClickException(msg) from None
         if e.code() == grpc.StatusCode.UNAVAILABLE:
-            raise click.ClickException(
-                "Connection to the SuperLink is unavailable. Please check your network "
-                "connection and 'address' in the SuperLink connection configuration."
-            ) from None
+            raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE) from None
         if e.code() == grpc.StatusCode.NOT_FOUND:
             if details == RUN_ID_NOT_FOUND_MESSAGE:
                 raise click.ClickException("Run ID not found.") from None
