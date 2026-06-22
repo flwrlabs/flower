@@ -79,7 +79,7 @@ class BrowserUseProvider:
     ) -> JSONObject:
         """Execute one Browser Use task asynchronously."""
         # Browser Use drives the browser and calls this chat adapter for each step.
-        browser_profile: BrowserProfile = BrowserProfile(
+        browser_profile = BrowserProfile(
             headless=_HEADLESS,
             allowed_domains=allowed_domains,
         )
