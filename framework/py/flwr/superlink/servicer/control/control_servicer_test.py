@@ -132,9 +132,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             authn_plugin=(authn_plugin := NoOpControlAuthnPlugin(Mock(), False)),
         )
         account_info = authn_plugin.validate_tokens_in_metadata([])[1]
-        self.account_info = account_info
         assert account_info is not None
         assert account_info.flwr_aid is not None
+        self.account_info = account_info
         self.aid: str = account_info.flwr_aid
         shared_account_info.set(account_info)
         self.state = self.servicer.linkstate_factory.state()
