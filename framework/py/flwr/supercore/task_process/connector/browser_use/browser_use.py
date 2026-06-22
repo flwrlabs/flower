@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any, cast
 
-from browser_use import Agent, BrowserProfile  # pylint: disable=ungrouped-imports
+from browser_use import Agent, BrowserProfile
 from browser_use.llm.base import BaseChatModel
 from browser_use.llm.messages import BaseMessage
 from browser_use.llm.schema import SchemaOptimizer
