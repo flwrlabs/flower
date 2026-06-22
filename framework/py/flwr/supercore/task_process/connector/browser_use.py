@@ -152,8 +152,6 @@ class BrowserUseProvider:
 class FlowerResponsesChatModel(BaseChatModel):
     """Browser Use LLM adapter backed by Flower's Responses API."""
 
-    _verified_api_keys = False
-
     def __init__(self, *, model: str) -> None:
         """Initialize the Flower Responses chat model."""
         self.model: str = model
