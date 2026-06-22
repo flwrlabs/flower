@@ -362,7 +362,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # Init link state
         state = self.linkstate_factory.state()
 
-        flwr_aid = _get_flwr_aid(context)
+        account = _get_account(context)
+        flwr_aid = cast(str, account.flwr_aid)
         # Build a set of run IDs for `flwr ls --runs`
         if not request.HasField("run_id"):
             # If no `run_id` is specified and account auth is enabled,
@@ -394,6 +395,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # Clear objects of finished runs
         store = self.objectstore_factory.store()
         for run in runs:
+            run.account_name = cast(str, account.account_name)
             if run.status.status == Status.FINISHED:
                 store.delete_objects_in_run(run.run_id)
 
