@@ -87,6 +87,7 @@ class BrowserUseProvider:
             task=task,
             llm=FlowerResponsesChatModel(model=self._model),
             browser_profile=browser_profile,
+            enable_signal_handler=False,
         )
 
         try:
