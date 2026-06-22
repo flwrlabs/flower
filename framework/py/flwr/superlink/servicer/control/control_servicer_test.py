@@ -1540,7 +1540,9 @@ class TestControlServicerAuth(unittest.TestCase):
         with (
             patch(
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=SimpleNamespace(
+                    flwr_aid="user-123", account_name="test-account"
+                ),
             ),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=False
