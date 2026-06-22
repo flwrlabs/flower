@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for the Browser Use connector."""
 
+
 from __future__ import annotations
 
 import asyncio
