@@ -30,7 +30,7 @@ from pydantic import BaseModel
 from flwr.supercore.task_process.model.provider import invoke_model_provider
 from flwr.supercore.typing import JSONObject, JSONValue
 
-_DEFAULT_BROWSER_USE_MODEL = "flwrlabs/lizzy-long-context"
+_DEFAULT_BROWSER_USE_MODEL = "openai/gpt-5.5"
 _LLM_PROVIDER = "flower"
 _HEADLESS = True
 
