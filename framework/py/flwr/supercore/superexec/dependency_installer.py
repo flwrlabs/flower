@@ -15,7 +15,6 @@
 """Utility for installing app dependencies via uv."""
 
 
-import atexit
 import hashlib
 import os
 import re
@@ -28,6 +27,7 @@ from pathlib import Path
 
 from flwr.common.config import get_project_config
 from flwr.common.logger import log
+from flwr.supercore.exit import add_exit_handler
 from flwr.supercore.utils import get_flwr_home
 
 _RUNTIME_ENV_DIR = "runtime-envs"
@@ -144,27 +144,22 @@ def install_app_dependencies(
     log(DEBUG, "Using UV_PROJECT_ENVIRONMENT=%s", sync_env["UV_PROJECT_ENVIRONMENT"])
 
     installed_packages: set[str] = set()
-    try:
-        sync_error = _run_cmd(
-            sync_cmd,
-            cwd=project_dir,
-            env=sync_env,
-            log_output_level=DEBUG,
-            installed_packages=installed_packages,
-        )
-        if sync_error is not None:
-            raise RuntimeDependencyInstallationError(f"uv sync failed: {sync_error}")
+    sync_error = _run_cmd(
+        sync_cmd,
+        cwd=project_dir,
+        env=sync_env,
+        log_output_level=DEBUG,
+        installed_packages=installed_packages,
+    )
+    if sync_error is not None:
+        raise RuntimeDependencyInstallationError(f"uv sync failed: {sync_error}")
 
-        if installed_packages:
-            log(INFO, "Installed: [%s]", ", ".join(sorted(installed_packages)))
-        else:
-            log(INFO, "No additional application dependencies needed installation.")
+    if installed_packages:
+        log(INFO, "Installed: [%s]", ", ".join(sorted(installed_packages)))
+    else:
+        log(INFO, "No additional application dependencies needed installation.")
 
-        _activate_runtime_env(runtime_env_dir)
-    except BaseException:
-        cleanup_app_runtime_environment(runtime_env_dir)
-        raise
-
+    _activate_runtime_env(runtime_env_dir)
     log(INFO, "App dependencies installed successfully via uv sync.")
     return runtime_env_dir
 
@@ -246,7 +241,11 @@ def _find_site_packages_dirs(runtime_env_dir: Path) -> list[Path]:
 
 def _register_runtime_env_cleanup(runtime_env_dir: Path) -> None:
     """Register best-effort cleanup for a launch-specific runtime environment."""
-    atexit.register(cleanup_app_runtime_environment, runtime_env_dir)
+
+    def _clean() -> None:
+        cleanup_app_runtime_environment(runtime_env_dir)
+
+    add_exit_handler(_clean)
 
 
 def cleanup_app_runtime_environment(runtime_env_dir: Path | None) -> None:
