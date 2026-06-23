@@ -39,35 +39,10 @@ and the ``ClientApp`` is connected to the ``SuperNode``; thus, the communication
 the ``ServerApp`` and the ``ClientApp`` is done via the ``SuperLink`` and the
 ``SuperNode``.
 
-.. mermaid::
+.. image:: ./_static/explanation-ref-secure-aggregation-protocols-light.png
+    :alt: SecAgg+ protocol sequence diagram
+    :class: no-scaled-link only-light
 
-    sequenceDiagram
-        participant ServerApp as ServerApp (in SuperLink)
-        participant SecAggPlusWorkflow
-        participant Mod as secaggplus_mod
-        participant ClientApp as ClientApp (in SuperNode)
-
-        ServerApp->>SecAggPlusWorkflow: Invoke
-
-        note over SecAggPlusWorkflow,Mod: Stage 0: Setup
-        SecAggPlusWorkflow-->>Mod: Send SecAgg+ configuration
-        Mod-->>SecAggPlusWorkflow: Send public keys
-
-        note over SecAggPlusWorkflow,Mod: Stage 1: Share Keys
-        SecAggPlusWorkflow-->>Mod: Broadcast public keys
-        Mod-->>SecAggPlusWorkflow: Send encrypted private key shares
-
-        note over SecAggPlusWorkflow,ClientApp: Stage 2: Collect Masked Vectors
-        SecAggPlusWorkflow-->>Mod: Forward the received shares
-        Mod->>ClientApp: Fit instructions
-        activate ClientApp
-        ClientApp->>Mod: Updated model
-        deactivate ClientApp
-        Mod-->>SecAggPlusWorkflow: Send masked model parameters
-
-        note over SecAggPlusWorkflow,Mod: Stage 3: Unmask
-        SecAggPlusWorkflow-->>Mod: Request private key shares
-        Mod-->>SecAggPlusWorkflow: Send private key shares
-
-        SecAggPlusWorkflow->>SecAggPlusWorkflow: Unmask aggregated model
-        SecAggPlusWorkflow->>ServerApp: Aggregated model
+.. image:: ./_static/explanation-ref-secure-aggregation-protocols-dark.png
+    :alt: SecAgg+ protocol sequence diagram (dark theme)
+    :class: no-scaled-link only-dark
