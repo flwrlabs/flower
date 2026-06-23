@@ -26,7 +26,6 @@ Problem-oriented how-to guides show step-by-step how to achieve a specific goal.
     how-to-authenticate-accounts
     how-to-configure-audit-logging
     how-to-manage-flower-federations
-    explanation-superlink-high-availability
     docker/index
     helm/index
     how-to-create-and-manage-federations
