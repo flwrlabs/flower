@@ -100,7 +100,7 @@ def print_success_prompt(package_name: str) -> None:
     )
 
     prompt += typer.style(
-        f"\tflwr run {package_name} --stream \n\n",
+        f"\tflwr run {package_name} --stream\n\n",
         fg=typer.colors.BRIGHT_CYAN,
         bold=True,
     )
