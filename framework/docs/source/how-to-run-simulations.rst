@@ -157,8 +157,8 @@ The complete list of examples can be found in `the Flower GitHub
  Customize the Simulation Runtime
 **********************************
 
-By default, the Simulation Runtime simulates a cohort of 10 SuperNodes and assigns two
-CPU cores to each backend worker. This means that if your system has 12 CPU cores, six
+By default, the Simulation Runtime simulates a cohort of two SuperNodes and assigns two
+CPU cores to each backend worker. This means that if your system has four CPU cores, all
 backend workers can be running in parallel, each executing a different ``ClientApp``
 instance.
 
