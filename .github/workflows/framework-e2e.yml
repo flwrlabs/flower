@@ -149,9 +149,6 @@ jobs:
           - directory: e2e-bare-auth
             e2e: e2e_bare_auth
 
-          - directory: e2e-agentapp
-            agentapp: true
-
           - directory: e2e-jax
             e2e: e2e_jax
 
@@ -232,22 +229,17 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' && matrix.dataset }}
         run: python -c "${{ matrix.dataset }}"
       - name: Run edge client test
-        if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory != 'e2e-bare-auth' && matrix.agentapp != true }}
+        if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory != 'e2e-bare-auth' }}
         working-directory: framework/e2e/${{ matrix.directory }}/${{ matrix.e2e }}
         run: ./../../test_legacy.sh "${{ matrix.directory }}"
       - name: Run virtual client test
-        if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory != 'e2e-bare-auth' && matrix.agentapp != true }}
+        if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory != 'e2e-bare-auth' }}
         run: python simulation.py
       - name: Run simulation engine test
         if: ${{ needs.changes.outputs.framework == 'true' && (matrix.directory == 'e2e-pytorch' || matrix.directory == 'e2e-tensorflow') }}
         run: python simulation_next.py
       - name: Run driver test
         if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory != 'e2e-bare-auth' }}
-        env:
-          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
-          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
-          FLWR_MODEL_API_KEY: ${{ secrets.FLWR_MODEL_API_KEY }}
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         run: ./../test_superlink.sh "${{ matrix.directory }}"
       - name: Run driver test with REST
         if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory == 'e2e-bare' }}
