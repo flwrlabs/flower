@@ -15,20 +15,38 @@
 """SuperNode API."""
 
 
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from logging import INFO
+
 from fastapi import FastAPI
 
 from flwr import __version__
+from flwr.common import log
 from flwr.supercore.routers import health
 from flwr.supernode.routers import runtime
 
 
 def create_app() -> FastAPI:
     """Create the SuperNode FastAPI app."""
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        """Own process-lifetime resources for the combined SuperLink service."""
+        log(INFO, "FastAPI lifespan: startup")
+
+        yield
+
+        log(INFO, "FastAPI lifespan: shutdown")
+
     app = FastAPI(
         title="SuperNode API",
         version=__version__,
         docs_url="/docs",
         redoc_url=None,
+        lifespan=lifespan,
     )
 
     # Core APIs
