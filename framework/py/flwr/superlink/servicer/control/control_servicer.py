@@ -120,6 +120,7 @@ from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
+    NOOP_ACCOUNT_NAME,
     NOOP_FEDERATION,
     PLATFORM_API_URL,
     ActionType,
@@ -368,7 +369,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         account = _get_account(context)
         flwr_aid = cast(str, account.flwr_aid)
-        account_name = cast(str, account.account_name)
+        account_name = account.account_name or NOOP_ACCOUNT_NAME
         # Build a set of run IDs for `flwr ls --runs`
         if not request.HasField("run_id"):
             # If no `run_id` is specified and account auth is enabled,
