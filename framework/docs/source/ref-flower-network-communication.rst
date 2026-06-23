@@ -21,14 +21,14 @@ connections used in a deployed Flower federated AI system.
 
     <div id="diagram1" style="display:block;">
         <img class="themed-image"
-             data-light="./_static/flower-network-diagram-subprocess-light.svg"
-             data-dark="./_static/flower-network-diagram-subprocess-dark.svg"
+             data-light="./_static/flower-network-diagram-subprocess-light.png?v=ebde3a5f"
+             data-dark="./_static/flower-network-diagram-subprocess-dark.png?v=a1d9d83a"
              alt="Flower Network Diagram (subprocess)">
     </div>
     <div id="diagram2" style="display:none;">
         <img class="themed-image"
-             data-light="./_static/flower-network-diagram-process-light.svg"
-             data-dark="./_static/flower-network-diagram-process-dark.svg"
+             data-light="./_static/flower-network-diagram-process-light.png?v=d2719101"
+             data-dark="./_static/flower-network-diagram-process-dark.png?v=c68f5263"
              alt="Flower Network Diagram (process)">
     </div>
     <div style="text-align: center; margin-bottom: 1em;">
