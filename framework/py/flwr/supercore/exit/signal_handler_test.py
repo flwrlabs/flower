@@ -37,7 +37,7 @@ class TestExitHandlers(unittest.TestCase):
         """Clear all exit handlers before each test."""
         registered_exit_handlers.clear()
 
-    @patch("flwr.common.exit.signal_handler.flwr_exit")
+    @patch("flwr.supercore.exit.signal_handler.flwr_exit")
     def test_register_exit_handlers(self, mock_flwr_exit: Mock) -> None:
         """Test register_exit_handlers."""
         # Prepare

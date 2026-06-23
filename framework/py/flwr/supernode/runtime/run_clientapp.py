@@ -27,7 +27,6 @@ from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common.config import get_project_dir
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatus
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -47,6 +46,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.fab import Fab
 from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc

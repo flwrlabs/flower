@@ -24,7 +24,6 @@ from unittest.mock import Mock, patch
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.common.exit import ExitCode
 from flwr.proto.appio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
@@ -33,6 +32,7 @@ from flwr.supercore.constant import (
     VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.exit import ExitCode
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
