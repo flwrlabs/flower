@@ -15,7 +15,12 @@
 """Built-in browser use connector."""
 
 
+import os
+
 from flwr.supercore.typing import JSONObject
+
+# Prevent browser-use from configuring logging and duplicating Flower logs
+os.environ["BROWSER_USE_SETUP_LOGGING"] = "false"
 
 try:
     from .browser_use import invoke_browser_use_provider

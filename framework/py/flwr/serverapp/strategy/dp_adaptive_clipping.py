@@ -26,7 +26,7 @@ import numpy as np
 
 from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord
 from flwr.common import log
-from flwr.common.differential_privacy import (
+from flwr.supercore.differential_privacy import (
     KEY_CLIPPING_NORM,
     KEY_NORM_BIT,
     adaptive_clip_inputs_inplace,

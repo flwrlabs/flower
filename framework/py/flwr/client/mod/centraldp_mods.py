@@ -21,14 +21,14 @@ from flwr.app.message import Context, Message
 from flwr.app.message_type import MessageType
 from flwr.clientapp.typing import ClientAppCallable
 from flwr.common import ndarrays_to_parameters, parameters_to_ndarrays
-from flwr.common.differential_privacy import (
+from flwr.common.logger import log
+from flwr.compat.common import recorddict_compat as compat
+from flwr.supercore.differential_privacy import (
     KEY_CLIPPING_NORM,
     KEY_NORM_BIT,
     compute_adaptive_clip_model_update,
     compute_clip_model_update,
 )
-from flwr.common.logger import log
-from flwr.compat.common import recorddict_compat as compat
 
 
 def fixedclipping_mod(
