@@ -1,4 +1,4 @@
-:og:description: Learn how SuperLink High Availability Mode works in Flower SuperGrid Max, including the load balancer, SuperLink replicas, and PostgreSQL-backed shared state.
+:og:description: Learn how SuperLink High Availability Mode works in Flower SuperGrid, including the load balancer, SuperLink replicas, and PostgreSQL-backed shared state.
 .. meta::
     :description: Learn how SuperLink High Availability Mode works in Flower SuperGrid Max, including the load balancer, SuperLink replicas, and PostgreSQL-backed shared state.
 
