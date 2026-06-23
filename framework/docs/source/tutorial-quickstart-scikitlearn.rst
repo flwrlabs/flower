@@ -79,6 +79,8 @@ To run the project, do:
 
 .. code-block:: shell
 
+    $ cd quickstart-sklearn
+
     # Run with default arguments and stream logs
     $ flwr run . --stream
 

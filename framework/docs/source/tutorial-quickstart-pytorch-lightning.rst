@@ -48,6 +48,8 @@ project, do:
 
 .. code-block:: shell
 
+    $ cd path/to/quickstart-pytorch-lightning
+
     # Run with default arguments and stream logs
     $ flwr run . --stream
 

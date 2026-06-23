@@ -93,6 +93,8 @@ To run the project do:
 
 .. code-block:: shell
 
+    $ cd quickstart-xgboost
+
     # Run with default arguments and stream logs
     $ flwr run . --stream
 

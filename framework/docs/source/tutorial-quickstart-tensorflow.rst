@@ -80,6 +80,8 @@ To run the project, do:
 
 .. code-block:: shell
 
+    $ cd quickstart-tensorflow
+
     # Run with default arguments and stream logs
     $ flwr run . --stream
 

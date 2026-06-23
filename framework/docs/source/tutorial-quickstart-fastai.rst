@@ -33,12 +33,6 @@ files:
     ├── pyproject.toml      # Project metadata like dependencies and configs
     └── README.md
 
-Next, activate your environment and navigate to the example directory:
-
-.. code-block:: shell
-
-    $ cd path/to/quickstart-fastai
-
 This example uses a local simulation profile that ``flwr run`` submits to a managed
 local SuperLink, which then executes the run with the Flower Simulation Runtime,
 creating a federation of two nodes using `FedAvg
@@ -49,6 +43,8 @@ as the aggregation strategy. The dataset will be partitioned using Flower Datase
 Let's run the project:
 
 .. code-block:: shell
+
+    $ cd path/to/quickstart-fastai
 
     # Run with default arguments and stream logs
     $ flwr run . --stream
