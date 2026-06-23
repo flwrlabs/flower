@@ -77,7 +77,7 @@ the Flower app programming model:
 
 - ``ServerApp`` and ``ClientApp`` code remains the same.
 - SuperNodes connect to the configured SuperLink endpoint, not to individual replicas.
-- Operators monitor and scale SuperLink replicas as part of the SuperGrid Max
+- Operators monitor and scale SuperLink replicas as part of the SuperGrid
   deployment.
 - The load balancer and PostgreSQL backend become critical infrastructure and must be
   operated with their own availability, backup, and monitoring strategy.
