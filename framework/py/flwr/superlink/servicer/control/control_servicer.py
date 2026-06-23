@@ -40,6 +40,7 @@ from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     LOG_STREAM_INTERVAL,
     NO_ACCOUNT_AUTH_MESSAGE,
+    NOOP_ACCOUNT_NAME,
     NO_ARTIFACT_PROVIDER_MESSAGE,
     NODE_NOT_FOUND_MESSAGE,
     PUBLIC_KEY_ALREADY_IN_USE_MESSAGE,
@@ -120,7 +121,6 @@ from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
-    NOOP_ACCOUNT_NAME,
     NOOP_FEDERATION,
     PLATFORM_API_URL,
     ActionType,
