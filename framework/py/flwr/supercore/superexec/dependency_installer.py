@@ -161,7 +161,7 @@ def install_app_dependencies(
             log(INFO, "No additional application dependencies needed installation.")
 
         _activate_runtime_env(runtime_env_dir)
-    except Exception:
+    except BaseException:
         cleanup_app_runtime_environment(runtime_env_dir)
         raise
 
