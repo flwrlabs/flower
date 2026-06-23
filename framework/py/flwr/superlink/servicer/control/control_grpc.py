@@ -19,13 +19,12 @@ from logging import INFO
 
 import grpc
 
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.common.exit import ExitCode, flwr_exit
-from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import log
 from flwr.proto.control_pb2_grpc import add_ControlServicer_to_server
 from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore.exit import ExitCode, flwr_exit
+from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.interceptors import (
     create_control_runtime_version_server_interceptor,
 )

@@ -18,7 +18,7 @@
 import argparse
 from pathlib import Path
 
-from flwr.common.exit import ExitCode, flwr_exit
+from flwr.supercore.exit import ExitCode, flwr_exit
 
 ServerCertificates = tuple[bytes, bytes, bytes]
 

@@ -30,7 +30,6 @@ from typing import TypeVar, cast
 import grpc
 import yaml
 
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
 from flwr.common.args import (
     add_args_runtime_dependency_install,
     try_obtain_server_certificates,
@@ -54,8 +53,6 @@ from flwr.common.constant import (
     ExecPluginType,
 )
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import configure_superlink_log_file, log
 from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
     add_FleetServicer_to_server,
@@ -68,9 +65,12 @@ from flwr.supercore.auth import (
     load_superexec_auth_secret,
 )
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import create_fleet_runtime_version_server_interceptor
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import (
     get_client_tls_args,
     try_obtain_optional_appio_server_certificates,
@@ -86,6 +86,7 @@ from flwr.superlink.auth_plugin import (
 )
 from flwr.superlink.federation import FederationManager, NoOpFederationManager
 from flwr.superlink.servicer.control import run_control_api_grpc
+from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
 
 from .superlink.fleet.grpc_adapter.grpc_adapter_servicer import GrpcAdapterServicer
 from .superlink.fleet.grpc_rere.fleet_servicer import FleetServicer
@@ -93,7 +94,6 @@ from .superlink.fleet.grpc_rere.node_auth_server_interceptor import (
     NodeAuthServerInterceptor,
 )
 from .superlink.linkstate import LinkStateFactory
-from .superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 
 P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
 

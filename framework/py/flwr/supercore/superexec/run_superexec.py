@@ -22,11 +22,8 @@ from typing import Any
 import grpc
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
 from flwr.common.serde import run_from_proto
-from flwr.common.telemetry import EventType
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     PullPendingTasksRequest,
@@ -37,6 +34,8 @@ from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import ExecutorType
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
@@ -48,6 +47,7 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.supercore.run import Run
+from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 from .executor import LaunchResult, LaunchResultStatus, get_executor

@@ -103,7 +103,6 @@ erDiagram
     VARCHAR override_config "nullable"
     BIGINT primary_task_id
     BIGINT run_id UK "nullable"
-    VARCHAR run_type
     BIGINT series_id "nullable"
     VARCHAR usage_reported_at
   }

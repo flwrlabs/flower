@@ -1,0 +1,930 @@
+# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""ServerAppIoServicer tests."""
+
+# pylint: disable=too-many-lines
+
+
+import hashlib
+import os
+import tempfile
+import threading
+import unittest
+from datetime import timedelta
+from unittest.mock import Mock, patch
+
+import grpc
+from parameterized import parameterized
+
+from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
+from flwr.common.constant import (
+    SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
+    SUPERLINK_NODE_ID,
+    Status,
+    SubStatus,
+)
+from flwr.common.serde import context_to_proto, message_from_proto
+from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    ClaimTaskRequest,
+    ClaimTaskResponse,
+    CreateTaskRequest,
+    CreateTaskResponse,
+    GetNodesRequest,
+    GetNodesResponse,
+    PullAppMessagesRequest,
+    PullAppMessagesResponse,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
+    PushAppMessagesRequest,
+    PushAppMessagesResponse,
+    PushTaskOutputRequest,
+    PushTaskOutputResponse,
+    SendTaskHeartbeatRequest,
+    SendTaskHeartbeatResponse,
+)
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ConfirmMessageReceivedRequest,
+    ConfirmMessageReceivedResponse,
+    ObjectTree,
+    PullObjectRequest,
+    PullObjectResponse,
+    PushObjectRequest,
+    PushObjectResponse,
+)
+from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.server.superlink.linkstate.linkstate import LinkState
+from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
+from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
+from flwr.server.superlink.utils import _STATUS_TO_MSG
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, TaskType
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_id,
+    get_object_tree,
+    iterate_object_tree,
+)
+from flwr.supercore.interceptors import (
+    TASK_TOKEN_HEADER,
+    AppIoTokenClientInterceptor,
+    SuperExecAuthClientInterceptor,
+)
+from flwr.supercore.interceptors.superexec_auth_interceptor import (
+    SERVERAPPIO_SUPEREXEC_METHODS,
+)
+from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.superlink.federation import NoOpFederationManager
+from flwr.superlink.servicer.serverappio.serverappio_grpc import (
+    run_serverappio_api_grpc,
+)
+from flwr.superlink.servicer.serverappio.serverappio_servicer import (
+    ServerAppIoServicer,
+    _raise_if,
+)
+
+# pylint: disable=broad-except,too-many-lines
+
+_SUPEREXEC_SECRET = b"test-superexec-secret"
+
+
+def test_raise_if_false() -> None:
+    """."""
+    # Prepare
+    validation_error = False
+    detail = "test"
+
+    try:
+        # Execute
+        _raise_if(
+            validation_error=validation_error,
+            request_name="DummyRequest",
+            detail=detail,
+        )
+
+        # Assert
+        assert True
+    except ValueError as err:
+        raise AssertionError() from err
+    except Exception as err:
+        raise AssertionError() from err
+
+
+def test_raise_if_true() -> None:
+    """."""
+    # Prepare
+    validation_error = True
+    detail = "test"
+
+    try:
+        # Execute
+        _raise_if(
+            validation_error=validation_error,
+            request_name="DummyRequest",
+            detail=detail,
+        )
+
+        # Assert
+        raise AssertionError()
+    except ValueError as err:
+        assert str(err) == "Malformed DummyRequest: test"
+    except Exception as err:
+        raise AssertionError() from err
+
+
+def _start_serverappio_with_port_retry(
+    state_factory: LinkStateFactory,
+    objectstore_factory: ObjectStoreFactory,
+    start_port: int,
+) -> grpc.Server:
+    for offset in range(40):
+        address = f"127.0.0.1:{start_port + offset}"
+        try:
+            return run_serverappio_api_grpc(
+                address,
+                state_factory,
+                objectstore_factory,
+                None,
+                superexec_auth_secret=_SUPEREXEC_SECRET,
+            )
+        except RuntimeError as err:
+            if "Failed to bind to address" in str(err):
+                continue
+            raise
+
+    raise AssertionError(
+        f"Could not bind ServerAppIo gRPC server starting at port {start_port}."
+    )
+
+
+def _create_shared_runtime(
+    tmpdir: str,
+) -> tuple[int, int, LinkState, grpc.Server, grpc.Server]:
+    database_path = os.path.join(tmpdir, "shared.db")
+
+    objectstore_factory_0 = ObjectStoreFactory()
+    objectstore_factory_1 = ObjectStoreFactory()
+    state_factory_0 = LinkStateFactory(
+        database_path, NoOpFederationManager(), objectstore_factory_0
+    )
+    state_factory_1 = LinkStateFactory(
+        database_path, NoOpFederationManager(), objectstore_factory_1
+    )
+    state_0 = state_factory_0.state()
+    fab_content = b"mock fab content"
+    fab_hash = state_0.store_fab(
+        Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
+    )
+
+    run_id = state_0.create_run(
+        "",
+        "",
+        fab_hash,
+        {},
+        NOOP_FEDERATION,
+        None,
+        "",
+        TaskType.SERVER_APP,
+    )
+    run = state_0.get_run_info(run_ids=[run_id])[0]
+    state_0.set_run_series_context(
+        run.series_id,
+        Context(
+            run_id,
+            SUPERLINK_NODE_ID,
+            {},
+            RecordDict(),
+            {},
+            series_id=run.series_id,
+        ),
+    )
+    assert run.primary_task_id is not None
+    task_id = run.primary_task_id
+    server_0 = _start_serverappio_with_port_retry(
+        state_factory_0,
+        objectstore_factory_0,
+        start_port=19091,
+    )
+    server_1 = _start_serverappio_with_port_retry(
+        state_factory_1,
+        objectstore_factory_1,
+        start_port=19141,
+    )
+    return run_id, task_id, state_0, server_0, server_1
+
+
+def _claim_task(channel: grpc.Channel, task_id: int) -> str:
+    superexec_channel = grpc.intercept_channel(
+        channel,
+        SuperExecAuthClientInterceptor(
+            master_secret=_SUPEREXEC_SECRET,
+            protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
+        ),
+    )
+    request_token = superexec_channel.unary_unary(
+        "/flwr.proto.ServerAppIo/ClaimTask",
+        request_serializer=ClaimTaskRequest.SerializeToString,
+        response_deserializer=ClaimTaskResponse.FromString,
+    )
+    token_response, token_call = request_token.with_call(
+        ClaimTaskRequest(task_id=task_id)
+    )
+    assert grpc.StatusCode.OK == token_call.code()
+    token = str(token_response.token)
+    assert token
+    return token
+
+
+def _claim_in_parallel(
+    channel_0: grpc.Channel, channel_1: grpc.Channel, token: str
+) -> list[grpc.StatusCode | None]:
+    pull_task_input_0 = channel_0.unary_unary(
+        "/flwr.proto.ServerAppIo/PullTaskInput",
+        request_serializer=PullTaskInputRequest.SerializeToString,
+        response_deserializer=PullTaskInputResponse.FromString,
+    )
+    pull_task_input_1 = channel_1.unary_unary(
+        "/flwr.proto.ServerAppIo/PullTaskInput",
+        request_serializer=PullTaskInputRequest.SerializeToString,
+        response_deserializer=PullTaskInputResponse.FromString,
+    )
+    timeout = 5.0
+    barrier = threading.Barrier(3)
+    results: list[grpc.StatusCode | None] = [None, None]
+    exceptions: list[Exception] = []
+
+    def claim_inputs(idx: int, pull_fn: grpc.UnaryUnaryMultiCallable) -> None:
+        try:
+            barrier.wait(timeout=timeout)
+            response, call = pull_fn.with_call(
+                PullTaskInputRequest(),
+                metadata=((TASK_TOKEN_HEADER, token),),
+            )
+            del response
+            results[idx] = call.code()
+        except grpc.RpcError as err:
+            results[idx] = err.code()
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            exceptions.append(ex)
+
+    threads = [
+        threading.Thread(target=claim_inputs, args=(0, pull_task_input_0)),
+        threading.Thread(target=claim_inputs, args=(1, pull_task_input_1)),
+    ]
+    for thread in threads:
+        thread.start()
+    try:
+        barrier.wait(timeout=timeout)
+    except threading.BrokenBarrierError as ex:
+        exceptions.append(ex)
+    for thread in threads:
+        thread.join(timeout=timeout)
+
+    alive_threads = [thread for thread in threads if thread.is_alive()]
+    if alive_threads:
+        raise AssertionError(
+            f"Concurrent PullTaskInput test timed out; {len(alive_threads)} "
+            f"thread(s) still alive after {timeout} seconds."
+        )
+    if exceptions:
+        raise exceptions[0]
+    return results
+
+
+class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
+    """ServerAppIoServicer tests for allowed RunStatuses."""
+
+    def setUp(self) -> None:
+        """Initialize mock stub and server interceptor."""
+        objectstore_factory = ObjectStoreFactory()
+        state_factory = LinkStateFactory(
+            FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
+        )
+        self.objectstore_factory = objectstore_factory
+        self.state_factory = state_factory
+        self.state = state_factory.state()
+        self.store = objectstore_factory.store()
+        self.node_pk = b"fake public key"
+        self.node_id = self.state.create_node(
+            "mock_owner", "fake_name", self.node_pk, 30
+        )
+        self.state.acknowledge_node_heartbeat(self.node_id, 1e3)
+
+        self.status_to_msg = _STATUS_TO_MSG
+
+        self._server: grpc.Server = run_serverappio_api_grpc(
+            SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
+            state_factory,
+            objectstore_factory,
+            None,
+            superexec_auth_secret=_SUPEREXEC_SECRET,
+        )
+
+        # Provide a valid claimed-task token on the default test channel so existing
+        # servicer behavior tests continue to exercise business logic paths.
+        self._auth_run_id = self.state.create_run(
+            "", "", "", {}, NOOP_FEDERATION, None, "", TaskType.SERVER_APP
+        )
+        auth_task_id = self._primary_task_id(self._auth_run_id)
+        auth_token = self.state.claim_task(auth_task_id)
+        assert auth_token is not None
+        assert self.state.activate_task(auth_task_id)
+        self._auth_token = auth_token
+        self._appio_auth_interceptor = AppIoTokenClientInterceptor(auth_token)
+        self._channel = grpc.intercept_channel(
+            grpc.insecure_channel("localhost:9091"),
+            self._appio_auth_interceptor,
+            SuperExecAuthClientInterceptor(
+                master_secret=_SUPEREXEC_SECRET,
+                protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
+            ),
+        )
+        self._get_nodes = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            request_serializer=GetNodesRequest.SerializeToString,
+            response_deserializer=GetNodesResponse.FromString,
+        )
+        self._push_messages = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PushMessages",
+            request_serializer=PushAppMessagesRequest.SerializeToString,
+            response_deserializer=PushAppMessagesResponse.FromString,
+        )
+        self._pull_messages = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PullMessages",
+            request_serializer=PullAppMessagesRequest.SerializeToString,
+            response_deserializer=PullAppMessagesResponse.FromString,
+        )
+        self._push_task_output = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PushTaskOutput",
+            request_serializer=PushTaskOutputRequest.SerializeToString,
+            response_deserializer=PushTaskOutputResponse.FromString,
+        )
+        self._send_task_heartbeat = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/SendTaskHeartbeat",
+            request_serializer=SendTaskHeartbeatRequest.SerializeToString,
+            response_deserializer=SendTaskHeartbeatResponse.FromString,
+        )
+        self._push_object = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PushObject",
+            request_serializer=PushObjectRequest.SerializeToString,
+            response_deserializer=PushObjectResponse.FromString,
+        )
+        self._pull_object = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PullObject",
+            request_serializer=PullObjectRequest.SerializeToString,
+            response_deserializer=PullObjectResponse.FromString,
+        )
+        self._confirm_message_received = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/ConfirmMessageReceived",
+            request_serializer=ConfirmMessageReceivedRequest.SerializeToString,
+            response_deserializer=ConfirmMessageReceivedResponse.FromString,
+        )
+        self._pull_task_input = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PullTaskInput",
+            request_serializer=PullTaskInputRequest.SerializeToString,
+            response_deserializer=PullTaskInputResponse.FromString,
+        )
+        self._create_task = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/CreateTask",
+            request_serializer=CreateTaskRequest.SerializeToString,
+            response_deserializer=CreateTaskResponse.FromString,
+        )
+
+    def tearDown(self) -> None:
+        """Clean up grpc server."""
+        self._server.stop(None)
+
+    def _primary_task_id(self, run_id: int) -> int:
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        assert run.primary_task_id is not None
+        return run.primary_task_id
+
+    def _transition_run_status(self, run_id: int, num_transitions: int) -> None:
+        task_id = self._primary_task_id(run_id)
+        if num_transitions > 0:
+            assert self.state.claim_task(task_id) is not None
+        if num_transitions > 1:
+            assert self.state.activate_task(task_id)
+        if num_transitions > 2:
+            assert self.state.finish_task(task_id, "", "")
+
+    def _create_dummy_run(self, running: bool = True, *, fab_hash: str = "") -> int:
+        run_id = self.state.create_run(
+            "",
+            "",
+            fab_hash,
+            {},
+            NOOP_FEDERATION,
+            None,
+            "",
+            TaskType.SERVER_APP,
+        )
+        if running:
+            self._transition_run_status(run_id, 2)
+        return run_id
+
+    def test_create_task_uses_authenticated_run_id(self) -> None:
+        """CreateTask should create tasks for the authenticated run."""
+        response = self._create_task(
+            CreateTaskRequest(type=TaskType.MODEL, model_ref="models/abc")
+        )
+
+        assert response.HasField("task_id")
+        task = self.state.get_tasks(task_ids=[response.task_id])[0]
+        assert task.run_id == self._auth_run_id
+        assert task.type == TaskType.MODEL
+        assert task.model_ref == "models/abc"
+
+    def test_push_task_output_stores_simulation_runtime(self) -> None:
+        """PushTaskOutput should persist Simulation Runtime usage."""
+        # Prepare
+        request = PushTaskOutputRequest(
+            sub_status="completed",
+            details="",
+            clientapp_runtime=7.89,
+        )
+
+        # Execute
+        response, call = self._push_task_output.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, PushTaskOutputResponse)
+        assert grpc.StatusCode.OK == call.code()
+        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        assert run.clientapp_runtime == 7.89
+
+    def test_push_task_output_stores_run_series_context(self) -> None:
+        """PushTaskOutput should persist context in the authenticated run series."""
+        # Prepare
+        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        request_context = Context(
+            run_id=123,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={"key": "value"},
+            state=RecordDict(),
+            run_config={"test": "test"},
+            series_id=456,
+        )
+        request = PushTaskOutputRequest(
+            sub_status="completed",
+            details="",
+            context=context_to_proto(request_context),
+        )
+
+        # Execute
+        response, call = self._push_task_output.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, PushTaskOutputResponse)
+        assert grpc.StatusCode.OK == call.code()
+        stored_context = self.state.get_run_series_context(run.series_id)
+        assert stored_context is not None
+        assert stored_context == request_context
+
+    def test_get_node(self) -> None:
+        """Test `GetNode` success."""
+        # Prepare
+        request = GetNodesRequest()
+
+        # Execute
+        response, call = self._get_nodes.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, GetNodesResponse)
+        assert grpc.StatusCode.OK == call.code()
+
+    def test_push_messages_keeps_shared_upload_hint_after_rejection(self) -> None:
+        """PushMessages should keep accepted-message upload hints."""
+        # Prepare
+        run_id = self._auth_run_id
+        message_1 = create_ins_message(
+            src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+        )
+        message_2 = create_ins_message(
+            src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+        )
+        shared_child_id = hashlib.sha256(b"shared-child").hexdigest()
+        object_tree_1 = ObjectTree(
+            object_id=message_1.metadata.message_id,
+            children=[ObjectTree(object_id=shared_child_id)],
+        )
+        object_tree_2 = ObjectTree(
+            object_id=message_2.metadata.message_id,
+            children=[ObjectTree(object_id=shared_child_id)],
+        )
+        request = PushAppMessagesRequest(
+            messages_list=[message_1, message_2],
+            message_object_trees=[object_tree_1, object_tree_2],
+        )
+        original_store_message_ins = self.state.store_message_ins
+        primary_task_id = self._primary_task_id(run_id)
+        call_count = 0
+
+        def store_message_ins_and_finish_run(message: Message) -> str | None:
+            nonlocal call_count
+            call_count += 1
+            message_id = original_store_message_ins(message)
+            if call_count == 1:
+                assert self.state.finish_task(primary_task_id, SubStatus.COMPLETED, "")
+            return message_id
+
+        # Execute
+        with patch.object(
+            self.state,
+            "store_message_ins",
+            side_effect=store_message_ins_and_finish_run,
+        ):
+            response, call = self._push_messages.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, PushAppMessagesResponse)
+        assert grpc.StatusCode.OK == call.code()
+        assert list(response.message_ids) == [message_1.metadata.message_id, ""]
+        assert set(response.objects_to_push) == {
+            message_1.metadata.message_id,
+            shared_child_id,
+        }
+
+    @parameterized.expand(
+        [
+            # The normal case:
+            # The message is recognized by both `LinkState` and `ObjectStore`
+            (True,),
+            # The failure case:
+            # The message is found in `LinkState` but not in `ObjectStore`
+            (False,),
+        ]
+    )  # type: ignore
+    def test_pull_messages(self, register_in_store: bool) -> None:
+        """Test `PullMessages` success if objects are registered in ObjectStore."""
+        # Prepare
+        run_id = self._auth_run_id
+
+        # Push Messages and reply
+        message_ins = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+            )
+        )
+        # pylint: disable-next=W0212
+        message_ins.metadata._message_id = message_ins.object_id  # type: ignore
+        msg_id = self.state.store_message_ins(message=message_ins)
+        msg_ = self.state.get_message_ins(node_id=self.node_id, limit=1)[0]
+
+        reply_msg = Message(RecordDict(), reply_to=msg_)
+        # pylint: disable-next=W0212
+        reply_msg.metadata._message_id = reply_msg.object_id  # type: ignore
+        self.state.store_message_res(message=reply_msg)
+
+        # Register response in ObjectStore (so pulling message request can be completed)
+        obj_ids_registered: list[str] = []
+        if register_in_store:
+            obj_ids_registered = self.store.preregister(
+                run_id, get_object_tree(reply_msg)
+            )
+
+        request = PullAppMessagesRequest(message_ids=[str(msg_id)])
+
+        # Execute
+        response, call = self._pull_messages.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, PullAppMessagesResponse)
+        assert call.code() == grpc.StatusCode.OK
+
+        if register_in_store:
+            object_tree = response.message_object_trees[0]
+            object_ids_in_response = [
+                tree.object_id for tree in iterate_object_tree(object_tree)
+            ]
+            # Assert expected object_ids
+            assert set(obj_ids_registered) == set(object_ids_in_response)
+            # Assert the root node of the object tree is the message
+            assert reply_msg.object_id == object_tree.object_id
+        else:
+            assert len(response.messages_list) == 0
+            assert len(response.message_object_trees) == 0
+            # Ins message was deleted
+            assert self.state.num_message_ins() == 0
+
+    @parameterized.expand(
+        [
+            # Reply with Message
+            (RecordDict(), None),
+            # Reply with Error
+            (None, Error(code=0)),
+        ]
+    )  # type: ignore
+    def test_successful_pull_messages_deletes_messages_in_linkstate(
+        self, content: RecordDict | None, error: Error | None
+    ) -> None:
+        """Test `PullMessages` deletes messages from LinkState."""
+        # Prepare
+        run_id = self._auth_run_id
+
+        # Push Messages and reply
+        message_ins = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+            )
+        )
+        # pylint: disable-next=W0212
+        message_ins.metadata._message_id = message_ins.object_id  # type: ignore
+
+        msg_id = self.state.store_message_ins(message=message_ins)
+        msg_ = self.state.get_message_ins(node_id=self.node_id, limit=1)[0]
+
+        if content is not None:
+            reply_msg = Message(content, reply_to=msg_)
+        else:
+            assert error is not None
+            reply_msg = Message(error, reply_to=msg_)
+
+        # pylint: disable-next=W0212
+        reply_msg.metadata._message_id = reply_msg.object_id  # type: ignore
+
+        self.state.store_message_res(message=reply_msg)
+        # Register response in ObjectStore (so pulling message request can be completed)
+        self.store.preregister(run_id, get_object_tree(reply_msg))
+        request = PullAppMessagesRequest(message_ids=[str(msg_id)])
+
+        # Execute
+        response, call = self._pull_messages.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, PullAppMessagesResponse)
+        assert grpc.StatusCode.OK == call.code()
+        assert self.state.num_message_ins() == 0
+        assert self.state.num_message_res() == 0
+
+    def test_pull_message_from_expired_message_error(self) -> None:
+        """Test that the servicer correctly handles the registration in the ObjectStore
+        of an Error message created by the LinkState due to an expired TTL."""
+        # Prepare
+        run_id = self._auth_run_id
+
+        # Push Messages and reply
+        message_ins = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+            )
+        )
+        message_ins.metadata.ttl = 1  # set short TTL for testing
+        msg_id = self.state.store_message_ins(message=message_ins)
+
+        # Simulate situation where the message has expired in the LinkState
+        # This will trigger the creation of an Error message
+        future_dt = now() + timedelta(seconds=message_ins.metadata.ttl + 0.1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = future_dt  # over TTL limit
+
+            # Execute
+            request = PullAppMessagesRequest(message_ids=[str(msg_id)])
+            response, call = self._pull_messages.with_call(request=request)
+
+            # Assert
+            assert isinstance(response, PullAppMessagesResponse)
+            assert grpc.StatusCode.OK == call.code()
+
+            # Assert that objects to pull points to a message carrying an error
+            msg_res = message_from_proto(response.messages_list[0])
+            assert msg_res.has_error()
+            object_tree = response.message_object_trees[0]
+            object_ids_in_response = [
+                tree.object_id for tree in iterate_object_tree(object_tree)
+            ]
+            # expected a single object id (that of the error message)
+            assert list(object_ids_in_response) == [msg_res.object_id]
+
+    def test_push_object_succesful(self) -> None:
+        """Test `PushObject`."""
+        # Prepare
+        run_id = self._create_dummy_run()
+        obj = ConfigRecord({"a": 123, "b": [4, 5, 6]})
+        obj_b = obj.deflate()
+
+        # Pre-register object
+        self.store.preregister(run_id, get_object_tree(obj))
+
+        # Execute
+        req = PushObjectRequest(
+            node=Node(node_id=SUPERLINK_NODE_ID),
+            run_id=run_id,
+            object_id=obj.object_id,
+            object_content=obj_b,
+        )
+        res: PushObjectResponse = self._push_object(request=req)
+
+        # Empty response
+        assert res.stored
+
+    def test_push_object_fails(self) -> None:
+        """Test `PushObject` in unsupported scenarios."""
+        run_id = self._create_dummy_run(running=False)
+
+        # Run is running but node ID isn't recognized
+        self._transition_run_status(run_id, 2)
+        req = PushObjectRequest(node=Node(node_id=123), run_id=run_id)
+        with self.assertRaises(grpc.RpcError) as e:
+            self._push_object(request=req)
+        assert e.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
+
+        # Prepare
+        obj = ConfigRecord({"a": 123, "b": [4, 5, 6]})
+        obj_b = obj.deflate()
+
+        # Push valid object but it hasn't been pre-registered
+        req = PushObjectRequest(
+            node=Node(node_id=SUPERLINK_NODE_ID),
+            run_id=run_id,
+            object_id=obj.object_id,
+            object_content=obj_b,
+        )
+        res: PushObjectResponse = self._push_object(request=req)
+
+        # Assert: object not inserted
+        assert not res.stored
+
+        # Push valid object but its hash doesnt match the one passed in the request
+        # Preregister under a different object-id
+        fake_object_id = get_object_id(b"1234")
+        self.store.preregister(run_id, ObjectTree(object_id=fake_object_id))
+
+        # Execute
+        req = PushObjectRequest(
+            node=Node(node_id=SUPERLINK_NODE_ID),
+            run_id=run_id,
+            object_id=fake_object_id,
+            object_content=obj_b,
+        )
+        res = self._push_object(request=req)
+
+        # Assert: object not inserted
+        assert not res.stored
+
+    def test_pull_object_successful(self) -> None:
+        """Test `PullObject` functionality."""
+        # Prepare
+        run_id = self._create_dummy_run()
+        obj = ConfigRecord({"a": 123, "b": [4, 5, 6]})
+        obj_b = obj.deflate()
+
+        # Preregister object
+        self.store.preregister(run_id, get_object_tree(obj))
+
+        # Pull
+        req = PullObjectRequest(
+            node=Node(node_id=SUPERLINK_NODE_ID), run_id=run_id, object_id=obj.object_id
+        )
+        res: PullObjectResponse = self._pull_object(req)
+
+        # Assert object content is b"" (it was never pushed)
+        assert res.object_found
+        assert not res.object_available
+        assert res.object_content == b""
+
+        # Put object in store, then check it can be pulled
+        self.store.put(object_id=obj.object_id, object_content=obj_b)
+        req = PullObjectRequest(
+            node=Node(node_id=SUPERLINK_NODE_ID), run_id=run_id, object_id=obj.object_id
+        )
+        res = self._pull_object(req)
+
+        # Assert, identical object pulled
+        assert res.object_found
+        assert res.object_available
+        assert obj_b == res.object_content
+
+    def test_pull_object_fails(self) -> None:
+        """Test `PullObject` in unsuported scenarios."""
+        run_id = self._create_dummy_run(running=False)
+
+        # Run is running but node ID isn't recognized
+        self._transition_run_status(run_id, 2)
+        req = PullObjectRequest(node=Node(node_id=123), run_id=run_id)
+        with self.assertRaises(grpc.RpcError) as e:
+            self._pull_object(request=req)
+        assert e.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
+
+        # Attempt pulling object that doesn't exist
+        req = PullObjectRequest(
+            node=Node(node_id=SUPERLINK_NODE_ID), run_id=run_id, object_id="1234"
+        )
+        res: PullObjectResponse = self._pull_object(req)
+        # Empty response
+        assert not res.object_found
+
+    def test_confirm_message_received_successful(self) -> None:
+        """Test `ConfirmMessageReceived` success."""
+        # Prepare
+        run_id = self._create_dummy_run()
+        proto = create_ins_message(
+            src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+        )
+        message_ins = message_from_proto(proto)
+        message_res = Message(
+            RecordDict({"cfg": ConfigRecord({"key": "value"})}), reply_to=message_ins
+        )
+
+        # Prepare: Save reply message in ObjectStore
+        all_objects = get_all_nested_objects(message_res)
+        self.store.preregister(run_id, get_object_tree(message_res))
+        for obj_id, obj in all_objects.items():
+            self.store.put(object_id=obj_id, object_content=obj.deflate())
+
+        # Assert: All objects are stored in the ObjectStore
+        assert len(self.store) == len(all_objects)
+
+        # Execute: Confirm message received
+        request = ConfirmMessageReceivedRequest(
+            node=Node(node_id=self.node_id),
+            run_id=run_id,
+            message_object_id=message_res.object_id,
+        )
+        response, call = self._confirm_message_received.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, ConfirmMessageReceivedResponse)
+        assert grpc.StatusCode.OK == call.code()
+
+        # Assert: Message is removed from LinkState
+        assert len(self.store) == 0
+
+    def test_run_status_transitions(self) -> None:
+        """Test `PullTaskInput` activates a claimed task and marks the run running."""
+        # Prepare: Create a run with FAB
+        fab_content = b"mock fab content"
+        fab_hash = self.state.store_fab(
+            Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
+        )
+        run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
+        task_id = self._primary_task_id(run_id)
+        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+
+        # Claim task through the servicer to transition the run to STARTING.
+        claim_response = servicer.ClaimTask(ClaimTaskRequest(task_id=task_id), Mock())
+        assert claim_response.HasField("token")
+
+        # Set run series context as if it was persisted by an earlier run.
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        context = Context(
+            123,
+            SUPERLINK_NODE_ID,
+            {},
+            RecordDict(),
+            {},
+            series_id=run.series_id,
+        )
+        self.state.set_run_series_context(run.series_id, context)
+
+        run_status = self.state.get_run_status({run_id})[run_id]
+        assert run_status.status == Status.STARTING
+
+        # Execute: Pull task input
+        request = PullTaskInputRequest()
+        with patch(
+            "flwr.superlink.servicer.serverappio.serverappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(task_id=task_id, run_id=run_id),
+        ):
+            response = servicer.PullTaskInput(request, Mock())
+
+        # Assert: Response is successful and run status is now RUNNING
+        assert isinstance(response, PullTaskInputResponse)
+        assert response.context.run_id == 123
+        assert response.context.series_id == run.series_id
+        run_status = self.state.get_run_status({run_id})[run_id]
+        assert run_status.status == Status.RUNNING
+
+
+def test_ha_pull_task_input_claim_is_unique_across_replicas() -> None:
+    """Ensure only one replica can claim STARTING -> RUNNING via PullTaskInput."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _, task_id, state_0, server_0, server_1 = _create_shared_runtime(tmpdir)
+        channel_0 = grpc.insecure_channel(server_0.bound_address)
+        channel_1 = grpc.insecure_channel(server_1.bound_address)
+        try:
+            token = _claim_task(channel_0, task_id)
+            results = _claim_in_parallel(channel_0, channel_1, token)
+
+            assert results.count(grpc.StatusCode.OK) == 1
+            assert results.count(grpc.StatusCode.FAILED_PRECONDITION) == 1
+            task_status = state_0.get_tasks(task_ids=[task_id])[0].status
+            assert task_status.status == Status.RUNNING
+        finally:
+            channel_0.close()
+            channel_1.close()
+            server_0.stop(None)
+            server_1.stop(None)

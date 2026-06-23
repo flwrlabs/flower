@@ -17,8 +17,8 @@
 
 from unittest.mock import Mock, patch
 
-from flwr.common.exit import ExitCode
 from flwr.supercore.constant import TaskType
+from flwr.supercore.exit import ExitCode
 from flwr.supercore.run import Run
 
 from .base_ephemeral_exec_plugin import BaseEphemeralExecPlugin

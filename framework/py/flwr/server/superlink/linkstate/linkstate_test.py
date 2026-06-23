@@ -53,7 +53,7 @@ from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
-from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType, TaskType
+from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, TaskType
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.date import now
@@ -149,7 +149,7 @@ class StateTest(CoreStateTest):
             "health-federation",
             None,
             "i1r9f",
-            RunType.SERVER_APP,
+            TaskType.SERVER_APP,
         )
 
         # Execute
@@ -650,6 +650,37 @@ class StateTest(CoreStateTest):
 
         assert datetime.fromisoformat(actual_message_ins.metadata.delivered_at) > dt
         assert actual_message_ins.metadata.ttl > 0
+
+    @parameterized.expand([(False,), (True,)])  # type: ignore
+    def test_store_message_ins_duplicate_same_message_is_idempotent(
+        self, deliver_before_retry: bool
+    ) -> None:
+        """Test duplicate store_message_ins with the same Message is idempotent."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        retry_msg = message_from_proto(message_to_proto(msg))
+
+        # Execute
+        first_message_id = state.store_message_ins(message=msg)
+        if deliver_before_retry:
+            delivered = state.get_message_ins(node_id=node_id, limit=1)
+            assert len(delivered) == 1
+            assert delivered[0].metadata.delivered_at != ""
+        second_message_id = state.store_message_ins(message=retry_msg)
+
+        # Assert
+        assert first_message_id == msg.metadata.message_id
+        assert second_message_id == msg.metadata.message_id
+        assert state.num_message_ins() == 1
 
     def test_store_message_ins_invalid_node_id(self) -> None:
         """Test store_message_ins with invalid node_id."""
@@ -1790,7 +1821,7 @@ class StateTest(CoreStateTest):
         run_id = create_dummy_run(
             state,
             federation_config=federation_config,
-            run_type=RunType.SIMULATION,
+            primary_task_type=TaskType.SIMULATION,
         )
         second_run_id = create_dummy_run(state)
 
@@ -1799,9 +1830,9 @@ class StateTest(CoreStateTest):
         second_run_info = state.get_run_info(run_ids=[second_run_id])[0]
 
         # Assert
-        assert run_info.run_type == RunType.SIMULATION
+        assert run_info.primary_task_type == TaskType.SIMULATION
         assert state.get_federation_config(run_id) == federation_config
-        assert second_run_info.run_type == RunType.SERVER_APP
+        assert second_run_info.primary_task_type == TaskType.SERVER_APP
         assert state.get_federation_config(second_run_id) is None
 
     def test_set_linkstate_of_federation_manager(self) -> None:
@@ -2009,7 +2040,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     federation: str = NOOP_FEDERATION,
     federation_config: SimulationConfig | None = None,
     flwr_aid: str | None = "mock_flwr_aid",
-    run_type: str = RunType.SERVER_APP,
+    primary_task_type: str = TaskType.SERVER_APP,
     series_id: int | None = None,
 ) -> int:
     """Create a dummy run."""
@@ -2021,7 +2052,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         federation=federation,
         federation_config=federation_config,
         flwr_aid=flwr_aid,
-        run_type=run_type,
+        primary_task_type=primary_task_type,
         series_id=series_id,
     )
 

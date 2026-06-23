@@ -40,8 +40,8 @@ from sqlalchemy import (
 from sqlalchemy.engine import URL, Connection, Engine
 
 from flwr.common.constant import SubStatus
-from flwr.common.exit import ExitCode
-from flwr.supercore.constant import RunType, TaskType
+from flwr.supercore.constant import TaskType
+from flwr.supercore.exit import ExitCode
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
     ALEMBIC_VERSION_TABLE,
@@ -133,7 +133,7 @@ class TestAlembicRun(unittest.TestCase):
             "details": None,
             "federation": "fed",
             "federation_config": None,
-            "run_type": RunType.SERVER_APP,
+            "run_type": "serverapp",
             "flwr_aid": "aid",
             "bytes_sent": 0,
             "bytes_recv": 0,
@@ -316,7 +316,7 @@ class TestAlembicRun(unittest.TestCase):
                             details="done",
                             federation="fed-b",
                             federation_config="{}",
-                            run_type=RunType.SIMULATION,
+                            run_type="simulation",
                             flwr_aid="aid-b",
                             bytes_sent=7,
                             bytes_recv=8,

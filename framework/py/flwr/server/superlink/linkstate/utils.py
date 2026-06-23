@@ -27,7 +27,7 @@ from flwr.common.serde_utils import error_from_proto, error_to_proto
 # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
-from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE, RunType, TaskType
+from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
 from flwr.supercore.corestate.utils import (
     generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
 )
@@ -68,17 +68,6 @@ def build_params(values: Sequence[Any], prefix: str) -> tuple[str, dict[str, Any
     placeholders = ",".join(f":{prefix}_{i}" for i in range(len(values)))
     params: dict[str, Any] = {f"{prefix}_{i}": v for i, v in enumerate(values)}
     return placeholders, params
-
-
-def primary_task_type_from_run_type(run_type: str) -> TaskType:
-    """Return the primary task type for a run type."""
-    if run_type == RunType.AGENT_APP:
-        return TaskType.AGENT_APP
-    if run_type == RunType.SIMULATION:
-        return TaskType.SIMULATION
-    if run_type == RunType.SERVER_APP:
-        return TaskType.SERVER_APP
-    raise ValueError(f"Unsupported run type: {run_type}")
 
 
 def generate_rand_int_from_bytes(

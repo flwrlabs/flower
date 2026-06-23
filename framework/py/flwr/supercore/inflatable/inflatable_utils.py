@@ -33,8 +33,8 @@ from flwr.app.message import (
     RecordDict,
 )
 from flwr.app.message.arraychunk import ArrayChunk
-from flwr.common.exit import add_exit_handler
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.supercore.exit import add_exit_handler
 
 from ..constant import (
     FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS,

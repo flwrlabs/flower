@@ -22,10 +22,7 @@ from logging import DEBUG, ERROR
 import grpc
 
 from flwr.common.constant import SubStatus
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
-from flwr.common.telemetry import EventType, event
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
@@ -33,12 +30,15 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 from flwr.supercore.retry import RetryInvoker, make_simple_grpc_retry_invoker, wrap_stub
+from flwr.supercore.telemetry import EventType, event
 
 from .task import handle_task
 

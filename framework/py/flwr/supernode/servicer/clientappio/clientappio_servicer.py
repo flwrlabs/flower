@@ -55,7 +55,7 @@ from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
 from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
-from flwr.supercore.servicers import AppIoServicer
+from flwr.supercore.servicer.appio import AppIoServicer
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 
 
