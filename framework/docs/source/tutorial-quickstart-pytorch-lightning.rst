@@ -45,7 +45,7 @@ Next, activate your environment and navigate to the example directory:
 
 By default, this project uses a local simulation profile that ``flwr run`` submits to a
 managed local SuperLink, which then executes the run with the Flower Simulation Runtime.
-It creates a federation of 4 nodes using |fedavg|_ as the aggregation strategy. The
+It creates a federation of two SuperNodes using |fedavg|_ as the aggregation strategy. The
 dataset will be partitioned using Flower Dataset's |iidpartitioner|_. To run the
 project, do:
 
@@ -68,10 +68,10 @@ With default arguments you will see streamed output like this:
     INFO :      Starting FedAvg strategy:
     INFO :          ├── Number of rounds: 3
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 2 nodes (out of 4)
+    INFO :      configure_train: Sampled 2 nodes (out of 2)
     INFO :      aggregate_train: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'train_loss': 0.0487}
-    INFO :      configure_evaluate: Sampled 2 nodes (out of 4)
+    INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
     INFO :      aggregate_evaluate: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'eval_loss': 0.0495}
     INFO :      [ROUND 2/3]
