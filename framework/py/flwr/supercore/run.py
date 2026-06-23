@@ -52,6 +52,7 @@ class Run:  # pylint: disable=too-many-instance-attributes
     clientapp_runtime: float
     primary_task_type: str = ""
     series_id: int = 0
+    account_name: str = ""
 
     @classmethod
     def create_empty(cls, run_id: int) -> "Run":
@@ -75,6 +76,7 @@ class Run:  # pylint: disable=too-many-instance-attributes
             clientapp_runtime=0.0,
             primary_task_type=TaskType.SERVER_APP,
             series_id=0,
+            account_name="",
         )
 
 
