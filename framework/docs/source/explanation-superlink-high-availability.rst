@@ -13,10 +13,9 @@ durable state in a PostgreSQL backend.
 
 .. important::
 
-    SuperLink High Availability Mode is available only through Flower SuperGrid Max. It
-    is not enabled in the open source Flower Framework distribution. To discuss
-    production requirements or get access to SuperGrid Max, contact the Flower team at
-    enquiries@flower.ai or visit `SuperGrid Pricing <https://flower.ai/pricing>`_.
+    SuperLink High Availability Mode is available in preview. To discuss
+    production requirements or request preview access, contact the Flower team at
+    enquiries@flower.ai.
 
 This page describes the architecture at a high level. It is not a deployment guide.
 
