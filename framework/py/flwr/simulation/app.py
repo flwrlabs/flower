@@ -16,6 +16,7 @@
 
 
 import argparse
+import os
 from dataclasses import replace
 from logging import DEBUG, ERROR, INFO
 from queue import Queue
@@ -72,6 +73,9 @@ from flwr.supercore.superexec.dependency_installer import (
 )
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
+
+# Disable Ray's uv runtime-env hook when running flwr-simulation.
+os.environ.setdefault("RAY_ENABLE_UV_RUN_RUNTIME_ENV", "0")
 
 
 def _run_simulation_settings(

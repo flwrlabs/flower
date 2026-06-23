@@ -32,7 +32,7 @@ from flwr.app import (
 from flwr.clientapp.typing import ClientAppCallable
 from flwr.common import log
 from flwr.common.constant import ErrorCode
-from flwr.common.differential_privacy import (
+from flwr.supercore.differential_privacy import (
     KEY_CLIPPING_NORM,
     KEY_NORM_BIT,
     compute_adaptive_clip_model_update,
