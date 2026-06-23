@@ -158,9 +158,9 @@ The complete list of examples can be found in `the Flower GitHub
 **********************************
 
 By default, the Simulation Runtime simulates a cohort of two SuperNodes and assigns two
-CPU cores to each backend worker. This means that if your system has four or more CPU cores, all
-backend workers can be running in parallel, each executing a different ``ClientApp``
-instance.
+CPU cores to each backend worker. This means that if your system has four or more CPU
+cores, all backend workers can be running in parallel, each executing a different
+``ClientApp`` instance.
 
 More often than not, you would probably like to adjust the resources your ``ClientApp``
 gets assigned based on the complexity (i.e., compute and memory footprint) of your
