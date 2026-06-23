@@ -15,26 +15,11 @@
 """Built-in browser use connector."""
 
 
-import logging
 import os
 
 from flwr.supercore.typing import JSONObject
 
-_BROWSER_USE_LOGGER_NAMES = ("browser_use", "bubus", "cdp_use")
-
-
-def _disable_browser_use_logging() -> None:
-    """Disable Browser Use's logging setup and related logger output."""
-    os.environ["BROWSER_USE_SETUP_LOGGING"] = "false"
-    for logger_name in _BROWSER_USE_LOGGER_NAMES:
-        logger = logging.getLogger(logger_name)
-        logger.handlers.clear()
-        logger.addHandler(logging.NullHandler())
-        logger.propagate = False
-        logger.setLevel(logging.CRITICAL + 1)
-
-
-_disable_browser_use_logging()
+os.environ["BROWSER_USE_SETUP_LOGGING"] = "false"
 
 try:
     from .browser_use import invoke_browser_use_provider
