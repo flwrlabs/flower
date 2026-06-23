@@ -118,6 +118,7 @@ def install_app_dependencies(
 
     runtime_env_dir = _create_runtime_env_dir(project_dir, launch_id, run_id)
     runtime_env_dir.parent.mkdir(parents=True, exist_ok=True)
+    _register_runtime_env_cleanup(runtime_env_dir)
     log(INFO, "Created env for run in: %s", runtime_env_dir)
 
     log(INFO, "Installing application dependencies...")
@@ -143,24 +144,27 @@ def install_app_dependencies(
     log(DEBUG, "Using UV_PROJECT_ENVIRONMENT=%s", sync_env["UV_PROJECT_ENVIRONMENT"])
 
     installed_packages: set[str] = set()
-    sync_error = _run_cmd(
-        sync_cmd,
-        cwd=project_dir,
-        env=sync_env,
-        log_output_level=DEBUG,
-        installed_packages=installed_packages,
-    )
-    if sync_error is not None:
-        raise RuntimeDependencyInstallationError(f"uv sync failed: {sync_error}")
+    try:
+        sync_error = _run_cmd(
+            sync_cmd,
+            cwd=project_dir,
+            env=sync_env,
+            log_output_level=DEBUG,
+            installed_packages=installed_packages,
+        )
+        if sync_error is not None:
+            raise RuntimeDependencyInstallationError(f"uv sync failed: {sync_error}")
 
-    if installed_packages:
-        log(INFO, "Installed: [%s]", ", ".join(sorted(installed_packages)))
-    else:
-        log(INFO, "No additional application dependencies needed installation.")
+        if installed_packages:
+            log(INFO, "Installed: [%s]", ", ".join(sorted(installed_packages)))
+        else:
+            log(INFO, "No additional application dependencies needed installation.")
 
-    _activate_runtime_env(runtime_env_dir)
-    if run_id is not None:
-        _register_runtime_env_cleanup(runtime_env_dir)
+        _activate_runtime_env(runtime_env_dir)
+    except Exception:
+        cleanup_app_runtime_environment(runtime_env_dir)
+        raise
+
     log(INFO, "App dependencies installed successfully via uv sync.")
     return runtime_env_dir
 

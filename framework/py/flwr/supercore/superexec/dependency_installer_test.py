@@ -141,6 +141,24 @@ def test_install_app_dependencies_raises_runtime_dependency_error(
     tmp_path: Path,
 ) -> None:
     """Ensure uv sync failures use the runtime dependency error type."""
+
+    # Simulate uv creating a partial runtime environment before failing.
+    def fail_after_creating_env(
+        cmd: list[str],
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+        **_kwargs: object,
+    ) -> str:
+        _ = cwd
+        if cmd[:4] == [sys.executable, "-m", "uv", "sync"] and env is not None:
+            runtime_env_dir = Path(env["UV_PROJECT_ENVIRONMENT"])
+            runtime_env_dir.mkdir(parents=True, exist_ok=True)
+            (runtime_env_dir / "partial-install.txt").write_text(
+                "partial",
+                encoding="utf-8",
+            )
+        return "exit code 1: resolver failed"
+
     with (
         patch.dict(
             os.environ,
@@ -157,9 +175,7 @@ def test_install_app_dependencies_raises_runtime_dependency_error(
             return_value=["numpy>=1.26.0"],
         ),
         patch.object(
-            dependency_installer,
-            "_run_cmd",
-            return_value="exit code 1: resolver failed",
+            dependency_installer, "_run_cmd", side_effect=fail_after_creating_env
         ),
     ):
         with pytest.raises(
@@ -171,6 +187,8 @@ def test_install_app_dependencies_raises_runtime_dependency_error(
                 launch_id="token-b",
                 run_id=654,
             )
+
+    assert not (tmp_path / "runtime-envs" / "654").exists()
 
 
 def test_same_host_superlink_and_supernode_share_run_scoped_env(tmp_path: Path) -> None:
