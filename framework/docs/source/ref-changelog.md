@@ -1,150 +1,52 @@
 # Changelog
 
-## v1.32.0 (2026-06-22)
+## v1.32.0 (2026-06-24)
 
 ### Thanks to our contributors
 
 We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
 
-`Aleksei Balan`, `Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Micah Sheller`, `Mohammad Naseri`, `Patrick Foley`, `Ruth Galindo`, `William Lindskog`, `reducedradius` <!---TOKEN_v1.32.0-->
+`Aleksei Balan`, `Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Julian Rußmeyer`, `Micah Sheller`, `Mohammad Naseri`, `Patrick Foley`, `Ruth Galindo`, `William Lindskog`, `reducedradius` <!---TOKEN_v1.32.0-->
 
+### What's new?
 
-### New features
+- **Introduce experimental agent features in SuperGrid** ([#7336](https://github.com/flwrlabs/flower/pull/7336), [#7341](https://github.com/flwrlabs/flower/pull/7341), [#7344](https://github.com/flwrlabs/flower/pull/7344), [#7345](https://github.com/flwrlabs/flower/pull/7345), [#7346](https://github.com/flwrlabs/flower/pull/7346), [#7351](https://github.com/flwrlabs/flower/pull/7351), [#7360](https://github.com/flwrlabs/flower/pull/7360), [#7366](https://github.com/flwrlabs/flower/pull/7366), [#7379](https://github.com/flwrlabs/flower/pull/7379), [#7397](https://github.com/flwrlabs/flower/pull/7397), [#7409](https://github.com/flwrlabs/flower/pull/7409), [#7418](https://github.com/flwrlabs/flower/pull/7418), [#7419](https://github.com/flwrlabs/flower/pull/7419), [#7435](https://github.com/flwrlabs/flower/pull/7435), [#7440](https://github.com/flwrlabs/flower/pull/7440), [#7441](https://github.com/flwrlabs/flower/pull/7441), [#7468](https://github.com/flwrlabs/flower/pull/7468))
 
+  Introduces experimental agent capabilities in SuperGrid through `AgentApp` and connectors. Adds web search connectors with Brave, Tavily, and Exa providers, a web fetch connector, and a browser-use connector, while enabling connector-based task execution and integration with `AgentApp` workflows.
 
+- **Add experimental Kubernetes executor support** ([#7269](https://github.com/flwrlabs/flower/pull/7269), [#7298](https://github.com/flwrlabs/flower/pull/7298), [#7300](https://github.com/flwrlabs/flower/pull/7300), [#7367](https://github.com/flwrlabs/flower/pull/7367), [#7377](https://github.com/flwrlabs/flower/pull/7377), [#7378](https://github.com/flwrlabs/flower/pull/7378), [#7463](https://github.com/flwrlabs/flower/pull/7463))
 
+  Introduces an experimental Kubernetes executor, a dedicated execution backend designed specifically for Kubernetes environments. It leverages Kubernetes-native mechanisms for task execution, capacity management, and lifecycle handling, providing stronger workload isolation and improved operational control.
 
-### Documentation improvements
+- **Enable runtime installation of Flower App dependencies** ([#7372](https://github.com/flwrlabs/flower/pull/7372), [#7386](https://github.com/flwrlabs/flower/pull/7386), [#7408](https://github.com/flwrlabs/flower/pull/7408), [#7410](https://github.com/flwrlabs/flower/pull/7410), [#7423](https://github.com/flwrlabs/flower/pull/7423), [#7428](https://github.com/flwrlabs/flower/pull/7428), [#7469](https://github.com/flwrlabs/flower/pull/7469))
 
-- **docs(framework:skip): Update source texts for translations (auto)** ([#7446](https://github.com/flwrlabs/flower/pull/7446))
+  Enables automatic runtime installation of Flower App dependencies by default in SuperLink and improves error handling. For more information, see the [runtime dependency installation documentation](https://flower.ai/docs/framework/1.32/en/how-to-install-app-dependencies-at-runtime.html).
 
-- **docs(framework:skip): Update source texts for translations (auto)** ([#7431](https://github.com/flwrlabs/flower/pull/7431))
+- **Update and fix Flower examples** ([#7364](https://github.com/flwrlabs/flower/pull/7364), [#7447](https://github.com/flwrlabs/flower/pull/7447))
 
-- **docs(framework:skip): Update source texts for translations (auto)** ([#7416](https://github.com/flwrlabs/flower/pull/7416))
+  Updates `UserConfig` imports across examples and fixes the loss calculation in the Opacus federated learning example.
 
-- **docs(framework): Add latest Hosted Weblate translation updates** ([#7358](https://github.com/flwrlabs/flower/pull/7358))
+- **Improve SuperLink high availability** ([#7371](https://github.com/flwrlabs/flower/pull/7371), [#7381](https://github.com/flwrlabs/flower/pull/7381))
 
-- **docs(framework:skip): Update source texts for translations (auto)** ([#7340](https://github.com/flwrlabs/flower/pull/7340))
-- **fix(framework): Update images on fl tutorial** ([#7398](https://github.com/flwrlabs/flower/pull/7398))
-- **fix(framework): Update images on Flower architecture docs** ([#7424](https://github.com/flwrlabs/flower/pull/7424))
+- **Restructure Flower framework packages** ([#7288](https://github.com/flwrlabs/flower/pull/7288), [#7342](https://github.com/flwrlabs/flower/pull/7342), [#7352](https://github.com/flwrlabs/flower/pull/7352), [#7359](https://github.com/flwrlabs/flower/pull/7359), [#7363](https://github.com/flwrlabs/flower/pull/7363), [#7420](https://github.com/flwrlabs/flower/pull/7420), [#7425](https://github.com/flwrlabs/flower/pull/7425), [#7429](https://github.com/flwrlabs/flower/pull/7429), [#7430](https://github.com/flwrlabs/flower/pull/7430), [#7442](https://github.com/flwrlabs/flower/pull/7442), [#7443](https://github.com/flwrlabs/flower/pull/7443), [#7448](https://github.com/flwrlabs/flower/pull/7448), [#7449](https://github.com/flwrlabs/flower/pull/7449), [#7450](https://github.com/flwrlabs/flower/pull/7450), [#7451](https://github.com/flwrlabs/flower/pull/7451), [#7455](https://github.com/flwrlabs/flower/pull/7455), [#7457](https://github.com/flwrlabs/flower/pull/7457), [#7458](https://github.com/flwrlabs/flower/pull/7458))
 
-### Fix example
-- **fix(examples): Update Opacus loss calculation** ([#7447](https://github.com/flwrlabs/flower/pull/7447))
+- **Update documentation and translations** ([#7340](https://github.com/flwrlabs/flower/pull/7340), [#7358](https://github.com/flwrlabs/flower/pull/7358), [#7368](https://github.com/flwrlabs/flower/pull/7368), [#7398](https://github.com/flwrlabs/flower/pull/7398), [#7416](https://github.com/flwrlabs/flower/pull/7416), [#7424](https://github.com/flwrlabs/flower/pull/7424), [#7431](https://github.com/flwrlabs/flower/pull/7431), [#7446](https://github.com/flwrlabs/flower/pull/7446))
+
+- **General improvements** ([#6871](https://github.com/flwrlabs/flower/pull/6871), [#7307](https://github.com/flwrlabs/flower/pull/7307), [#7317](https://github.com/flwrlabs/flower/pull/7317), [#7332](https://github.com/flwrlabs/flower/pull/7332), [#7339](https://github.com/flwrlabs/flower/pull/7339), [#7361](https://github.com/flwrlabs/flower/pull/7361), [#7362](https://github.com/flwrlabs/flower/pull/7362), [#7374](https://github.com/flwrlabs/flower/pull/7374), [#7400](https://github.com/flwrlabs/flower/pull/7400), [#7402](https://github.com/flwrlabs/flower/pull/7402), [#7404](https://github.com/flwrlabs/flower/pull/7404), [#7413](https://github.com/flwrlabs/flower/pull/7413), [#7421](https://github.com/flwrlabs/flower/pull/7421), [#7426](https://github.com/flwrlabs/flower/pull/7426), [#7432](https://github.com/flwrlabs/flower/pull/7432), [#7434](https://github.com/flwrlabs/flower/pull/7434), [#7438](https://github.com/flwrlabs/flower/pull/7438), [#7439](https://github.com/flwrlabs/flower/pull/7439), [#7454](https://github.com/flwrlabs/flower/pull/7454), [#7461](https://github.com/flwrlabs/flower/pull/7461), [#7462](https://github.com/flwrlabs/flower/pull/7462), [#7464](https://github.com/flwrlabs/flower/pull/7464), [#7465](https://github.com/flwrlabs/flower/pull/7465), [#7466](https://github.com/flwrlabs/flower/pull/7466), [#7470](https://github.com/flwrlabs/flower/pull/7470))
+
+  As always, many parts of the Flower framework and quality infrastructure were improved and updated.
 
 ### Incompatible changes
 
-- **break(framework): Remove** `owner-aid` **from returned json from** `supernode ls` ([#7373](https://github.com/flwrlabs/flower/pull/7373))
+- **Remove `owner-aid` from `flwr supernode ls` JSON output** ([#7373](https://github.com/flwrlabs/flower/pull/7373))
 
+  Removes the SuperNode owner's account ID from the JSON output returned by `flwr supernode ls`.
 
-### Default fed
+### default federations (TBD)
 
+- **feat(framework): Set default federation in servicer when no federation is provided** ([#7460](https://github.com/flwrlabs/flower/pull/7460))
 - **feat(framework): Prepare creation of default federations** ([#7437](https://github.com/flwrlabs/flower/pull/7437))
 - **feat(framework): Include the federation affiliation of the started run in the** `StartRunResponse` ([#7436](https://github.com/flwrlabs/flower/pull/7436))
-
-### K8s executor
-- **feat(framework): Wire Kubernetes executor factory config** ([#7378](https://github.com/flwrlabs/flower/pull/7378))
-- **feat(framework): Add in-cluster Kubernetes client helper** ([#7377](https://github.com/flwrlabs/flower/pull/7377))
-- **feat(framework): Add SuperExec executor config plumbing** ([#7367](https://github.com/flwrlabs/flower/pull/7367))
-- **feat(framework): Add K8s Completed Task Pod Sweeper** ([#7300](https://github.com/flwrlabs/flower/pull/7300))
-- **feat(framework): Add K8s Executor Capacity Wait** ([#7298](https://github.com/flwrlabs/flower/pull/7298))
-- **feat(framework): Add K8s Launch implementation** ([#7269](https://github.com/flwrlabs/flower/pull/7269))
-
-
-### Restructure Flower
-- **refactor(framework): Move Client/NumPyClient** ([#7455](https://github.com/flwrlabs/flower/pull/7455))
-- **refactor(framework): Move ServerAppIo servicer** ([#7451](https://github.com/flwrlabs/flower/pull/7451))
-- **refactor(framework): Restructure DP-related components in flwr.common** ([#7450](https://github.com/flwrlabs/flower/pull/7450))
-- **refactor(framework): Move** `grpc` **module** ([#7449](https://github.com/flwrlabs/flower/pull/7449))
-- **refactor(framework): Move object_ref** ([#7448](https://github.com/flwrlabs/flower/pull/7448))
-- **refactor(framework): Move recorddict_compat** ([#7443](https://github.com/flwrlabs/flower/pull/7443))
-- **refactor(framework): Move AppIoServicer** ([#7442](https://github.com/flwrlabs/flower/pull/7442))
-- **refactor(framework): Move EventType and event fn** ([#7430](https://github.com/flwrlabs/flower/pull/7430))
-- **refactor(framework): Move RetryInvoker** ([#7429](https://github.com/flwrlabs/flower/pull/7429))
-- **refactor(framework): Deprecate NDArray/Parameters conversion functions** ([#7425](https://github.com/flwrlabs/flower/pull/7425))
-- **refactor(framework): Move cleanup logic of** `flwr-` **processes to exit handler** ([#7420](https://github.com/flwrlabs/flower/pull/7420))
-- **refactor(framework): Move remaining types out of flwr.common.typing** ([#7363](https://github.com/flwrlabs/flower/pull/7363))
-- **refactor(framework): Update imports to use non-deprecated packages** ([#7359](https://github.com/flwrlabs/flower/pull/7359))
-- **refactor(framework): Move legacy types (NDArray, Ins/Res, Message, …)** ([#7352](https://github.com/flwrlabs/flower/pull/7352))
-- **refactor(framework): Move Server/ClientAppCallable and two mods** ([#7288](https://github.com/flwrlabs/flower/pull/7288))
-- **refactor(framework): Align lazy exports across all modules** ([#7342](https://github.com/flwrlabs/flower/pull/7342))
-
-
-
-### Update examples
-- **fix(framework): Fix PyTorch custom messages tutorial aggregation example** ([#7368](https://github.com/flwrlabs/flower/pull/7368))
-- **refactor(examples): Update** `UserConfig` **imports in examples** ([#7364](https://github.com/flwrlabs/flower/pull/7364))
-
-
-
-### General
-- **refactor(framework): Include** `account-name` **in** `Run` **proto** ([#7454](https://github.com/flwrlabs/flower/pull/7454))
-- **refactor(framework): Replace RunType with primary task type** ([#7439](https://github.com/flwrlabs/flower/pull/7439))
-- **fix(framework): Fix spacing in LoadClientAppError message** ([#6871](https://github.com/flwrlabs/flower/pull/6871))
-- **refactor(framework): Rename 'Simulation Engine' to 'Simulation Runtime'** ([#7339](https://github.com/flwrlabs/flower/pull/7339))
-- **refactor(framework): Complete executing all exit handlers before starting the timer for force shutdown** ([#7421](https://github.com/flwrlabs/flower/pull/7421))
-- **refactor(framework): Wrap missing** `ControlServicer` **methods with** `rpc_error_translator` **helper** ([#7404](https://github.com/flwrlabs/flower/pull/7404))
-- **refactor(framework): Make message processing time recording best-effort** ([#7400](https://github.com/flwrlabs/flower/pull/7400))
-- **refactor(:skip): Bump** `gitpython` **and** `pytest` ([#7307](https://github.com/flwrlabs/flower/pull/7307))
-- **refactor(:skip): Bump** `torch` **and** `torchvision` ([#7374](https://github.com/flwrlabs/flower/pull/7374))
-- **fix(:skip): Update tutorial links** ([#7362](https://github.com/flwrlabs/flower/pull/7362))
-- **fix(:skip): Update broken tutorial links in** `README.md` ([#7361](https://github.com/flwrlabs/flower/pull/7361))
-- **refactor(framework): Align ClientAppIo with ServerAppIo** ([#7434](https://github.com/flwrlabs/flower/pull/7434))
-- **refactor(framework): Remove GetFederationOptions** ([#7432](https://github.com/flwrlabs/flower/pull/7432))
-- **ci(:skip): Bump dev versions to** `1.32.0` ([#7317](https://github.com/flwrlabs/flower/pull/7317))
-- **refactor(framework): Remove unused** `validate_credentials_content` ([#7332](https://github.com/flwrlabs/flower/pull/7332))
-
-
-
-### agentapp
-
-- **refactor(framework): Change default agent in flwr_agent** ([#7441](https://github.com/flwrlabs/flower/pull/7441))
-
-- **feat(framework): Add connector to agentapp** ([#7418](https://github.com/flwrlabs/flower/pull/7418))
-
-- **feat(framework): Allow SuperLink to run locally bundled agentapp FAB** ([#7419](https://github.com/flwrlabs/flower/pull/7419))
-
-- **feat(framework): Add flwr-connector handle_task and websearch** ([#7409](https://github.com/flwrlabs/flower/pull/7409))
-
-- **feat(framework): Add web fetch connector** ([#7360](https://github.com/flwrlabs/flower/pull/7360))
-
-- **feat(framework): Add ConnectorRequest and ConnectorResponse** ([#7336](https://github.com/flwrlabs/flower/pull/7336))
-
-- **feat(framework): Allow TLS for flwr-model** ([#7366](https://github.com/flwrlabs/flower/pull/7366))
-
-- **refactor(framework): Refactor model task messages** ([#7341](https://github.com/flwrlabs/flower/pull/7341))
-
-- **feat(framework): Allow serverapp-ephemeral to run flwr-connector** ([#7397](https://github.com/flwrlabs/flower/pull/7397))
-
-- **feat(framework): Allow serverapp-ephemeral to run agentapp** ([#7379](https://github.com/flwrlabs/flower/pull/7379))
-
-- **feat(framework): Add flwr-connector implementation** ([#7351](https://github.com/flwrlabs/flower/pull/7351))
-
-- **feat(framework): Add Exa web search** ([#7345](https://github.com/flwrlabs/flower/pull/7345))
-
-- **feat(framework): Add Tavily web search** ([#7346](https://github.com/flwrlabs/flower/pull/7346))
-
-- **feat(framework): Add Brave web search** ([#7344](https://github.com/flwrlabs/flower/pull/7344))
-
-
-### High Availability
-- **fix(framework): Make instruction message inserts idempotent** ([#7381](https://github.com/flwrlabs/flower/pull/7381))
-
-- **fix(framework): Extend task heartbeat lease on activation** ([#7371](https://github.com/flwrlabs/flower/pull/7371))
-
-
-### runtime-dependencies-install
-
-- **refactor(framework): Capture** `ModuleNotFoundError` **and use new** `flwr_exit` **code** ([#7423](https://github.com/flwrlabs/flower/pull/7423))
-
-- **refactor(framework): Introduce** `flwr_exit` **code for** `uv sync` **failing** ([#7428](https://github.com/flwrlabs/flower/pull/7428))
-
-- **refactor(framework): Disable automatic dependencies install in local** `SuperLink` **via env var** ([#7408](https://github.com/flwrlabs/flower/pull/7408))
-
-- **docs(framework): Document how runtime installation of Flower Apps dependencies works** ([#7386](https://github.com/flwrlabs/flower/pull/7386))
-
-- **refactor(framework): Enable installation of app dependencies in** `SuperLink` **running in subprocess mode** ([#7372](https://github.com/flwrlabs/flower/pull/7372))
-
-- **fix(framework): Disable early** `ray` **import that conflicts with runtime environment switch if app dependencies are installed** ([#7410](https://github.com/flwrlabs/flower/pull/7410))
 
 ## v1.31.0 (2026-06-08)
 
