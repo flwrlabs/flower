@@ -24,7 +24,6 @@ import yaml
 
 from flwr.common.args import add_args_runtime_dependency_install
 from flwr.common.constant import ExecPluginType
-from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
@@ -33,6 +32,7 @@ from flwr.supercore.auth import (
     load_superexec_auth_secret,
 )
 from flwr.supercore.constant import EXEC_PLUGIN_SECTION, ExecutorType
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.superexec.executor.config import (
     ExecutorConfig,
