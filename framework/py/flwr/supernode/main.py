@@ -21,15 +21,23 @@ from flwr import __version__
 from flwr.supercore.routers import health
 from flwr.supernode.routers import runtime
 
-app = FastAPI(
-    title="SuperNode API",
-    version=__version__,
-    docs_url="/docs",
-    redoc_url=None,
-)
 
-# Core APIs
-app.include_router(health.router)
+def create_app() -> FastAPI:
+    """Create the SuperNode FastAPI app."""
+    app = FastAPI(
+        title="SuperNode API",
+        version=__version__,
+        docs_url="/docs",
+        redoc_url=None,
+    )
 
-# SuperNode APIs
-app.include_router(runtime.router)
+    # Core APIs
+    app.include_router(health.router)
+
+    # SuperNode APIs
+    app.include_router(runtime.router)
+
+    return app
+
+
+app = create_app()
