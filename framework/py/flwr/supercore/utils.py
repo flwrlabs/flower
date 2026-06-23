@@ -20,7 +20,7 @@ import json
 import os
 import re
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from logging import WARN
 from pathlib import Path
 from typing import Any, Literal, TypeVar, cast
@@ -514,8 +514,10 @@ def resolve_account_ids(ids: Iterable[str]) -> dict[str, str]:
     # Lazy import to avoid circular dependency with flwr.ee.utils
     try:
         # pylint: disable-next=import-outside-toplevel
-        from flwr.ee.utils import resolve_account_ids as resolve_account_ids_ee
+        from flwr.ee.utils import resolve_account_ids as _resolve_account_ids_ee
 
-        return cast(dict[str, str], resolve_account_ids_ee(ids))
+        resolve_account_ids_ee: Callable[[Iterable[str]], dict[str, str]]
+        resolve_account_ids_ee = _resolve_account_ids_ee
+        return resolve_account_ids_ee(ids)
     except ModuleNotFoundError:
         return {id_: NOOP_ACCOUNT_NAME for id_ in ids if id_ == NOOP_FLWR_AID}
