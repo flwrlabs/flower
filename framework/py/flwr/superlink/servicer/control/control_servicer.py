@@ -42,7 +42,6 @@ from flwr.common.constant import (
     NO_ACCOUNT_AUTH_MESSAGE,
     NO_ARTIFACT_PROVIDER_MESSAGE,
     NODE_NOT_FOUND_MESSAGE,
-    NOOP_ACCOUNT_NAME,
     PUBLIC_KEY_ALREADY_IN_USE_MESSAGE,
     PUBLIC_KEY_NOT_VALID,
     PULL_UNFINISHED_RUN_MESSAGE,
@@ -369,7 +368,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         account = _get_account(context)
         flwr_aid = cast(str, account.flwr_aid)
-        account_name = account.account_name or NOOP_ACCOUNT_NAME
+        account_name = cast(str, account.account_name)
         # Build a set of run IDs for `flwr ls --runs`
         if not request.HasField("run_id"):
             # If no `run_id` is specified and account auth is enabled,
