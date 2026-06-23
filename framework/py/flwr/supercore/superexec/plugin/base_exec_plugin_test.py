@@ -17,8 +17,8 @@
 from typing import cast
 from unittest.mock import Mock, patch
 
-from flwr.common.typing import Run
 from flwr.supercore.constant import TaskType
+from flwr.supercore.run import Run
 from flwr.supercore.superexec.executor import ExecutionSpec
 from flwr.supercore.superexec.plugin.base_exec_plugin import BaseExecPlugin
 from flwr.supercore.superexec.plugin.clientapp_exec_plugin import ClientAppExecPlugin

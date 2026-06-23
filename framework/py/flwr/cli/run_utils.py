@@ -18,8 +18,8 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from flwr.common.typing import Run
 from flwr.supercore.date import isoformat8601_utc
+from flwr.supercore.run import Run
 
 
 @dataclass

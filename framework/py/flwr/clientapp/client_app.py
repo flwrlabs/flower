@@ -22,15 +22,15 @@ from contextlib import contextmanager
 from flwr.app import Context, Message
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import validate_message_type
-from flwr.client.client import Client
+from flwr.client import ClientFnExt
 from flwr.client.message_handler.message_handler import (
     handle_legacy_message_from_msgtype,
 )
 from flwr.client.mod.utils import make_ffn
-from flwr.client.typing import ClientFnExt, Mod
 from flwr.common.logger import warn_deprecated_feature
+from flwr.compat.client.client import Client
 
-from .typing import ClientAppCallable
+from .typing import ClientAppCallable, Mod
 
 DEFAULT_ACTION = "default"
 
@@ -204,7 +204,7 @@ class ClientApp:
 
         Registering a train function with a function-specific Flower Mod::
 
-            from flwr.client.mod import message_size_mod
+            from flwr.clientapp.mod import message_size_mod
 
             app = ClientApp()
 
@@ -259,7 +259,7 @@ class ClientApp:
 
         Registering an evaluate function with a function-specific Flower Mod::
 
-            from flwr.client.mod import message_size_mod
+            from flwr.clientapp.mod import message_size_mod
 
             app = ClientApp()
 
@@ -314,7 +314,7 @@ class ClientApp:
 
         Registering a query function with a function-specific Flower Mod::
 
-            from flwr.client.mod import message_size_mod
+            from flwr.clientapp.mod import message_size_mod
 
             app = ClientApp()
 

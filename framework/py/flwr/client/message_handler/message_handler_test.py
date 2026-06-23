@@ -19,8 +19,7 @@ import uuid
 
 from flwr.app import DEFAULT_TTL, Context, Metadata, RecordDict
 from flwr.app.message import make_message
-from flwr.client import Client
-from flwr.client.typing import ClientFnExt
+from flwr.client import Client, ClientFnExt
 from flwr.common import (
     Code,
     EvaluateIns,
@@ -33,11 +32,10 @@ from flwr.common import (
     GetPropertiesRes,
     Parameters,
     Status,
-    now,
 )
-from flwr.common import recorddict_compat as compat
-from flwr.common import typing
 from flwr.common.constant import MessageTypeLegacy
+from flwr.compat.common import recorddict_compat as compat
+from flwr.supercore.date import now
 
 from .message_handler import handle_legacy_message_from_msgtype
 
@@ -48,14 +46,14 @@ class ClientWithoutProps(Client):
     def get_parameters(self, ins: GetParametersIns) -> GetParametersRes:
         """Get empty parameters of the client with 'Success' status."""
         return GetParametersRes(
-            status=typing.Status(code=typing.Code.OK, message="Success"),
+            status=Status(code=Code.OK, message="Success"),
             parameters=Parameters(tensors=[], tensor_type=""),
         )
 
     def fit(self, ins: FitIns) -> FitRes:
         """Simulate successful training, return no parameters, no metrics."""
         return FitRes(
-            status=typing.Status(code=typing.Code.OK, message="Success"),
+            status=Status(code=Code.OK, message="Success"),
             parameters=Parameters(tensors=[], tensor_type=""),
             num_examples=1,
             metrics={},
@@ -64,7 +62,7 @@ class ClientWithoutProps(Client):
     def evaluate(self, ins: EvaluateIns) -> EvaluateRes:
         """Simulate successful evaluation, return no metrics."""
         return EvaluateRes(
-            status=typing.Status(code=typing.Code.OK, message="Success"),
+            status=Status(code=Code.OK, message="Success"),
             loss=1.0,
             num_examples=1,
             metrics={},
@@ -77,21 +75,21 @@ class ClientWithProps(Client):
     def get_properties(self, ins: GetPropertiesIns) -> GetPropertiesRes:
         """Get fixed properties of the client with 'Success' status."""
         return GetPropertiesRes(
-            status=typing.Status(code=typing.Code.OK, message="Success"),
+            status=Status(code=Code.OK, message="Success"),
             properties={"str_prop": "val", "int_prop": 1},
         )
 
     def get_parameters(self, ins: GetParametersIns) -> GetParametersRes:
         """Get empty parameters of the client with 'Success' status."""
         return GetParametersRes(
-            status=typing.Status(code=typing.Code.OK, message="Success"),
+            status=Status(code=Code.OK, message="Success"),
             parameters=Parameters(tensors=[], tensor_type=""),
         )
 
     def fit(self, ins: FitIns) -> FitRes:
         """Simulate successful training, return no parameters, no metrics."""
         return FitRes(
-            status=typing.Status(code=typing.Code.OK, message="Success"),
+            status=Status(code=Code.OK, message="Success"),
             parameters=Parameters(tensors=[], tensor_type=""),
             num_examples=1,
             metrics={},
@@ -100,7 +98,7 @@ class ClientWithProps(Client):
     def evaluate(self, ins: EvaluateIns) -> EvaluateRes:
         """Simulate successful evaluation, return no metrics."""
         return EvaluateRes(
-            status=typing.Status(code=typing.Code.OK, message="Success"),
+            status=Status(code=Code.OK, message="Success"),
             loss=1.0,
             num_examples=1,
             metrics={},

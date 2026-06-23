@@ -20,7 +20,6 @@ from typing import Any
 
 from flwr.app import Error, Message, Metadata
 from flwr.app.message import make_message
-from flwr.common import now
 from flwr.common.constant import HEARTBEAT_PATIENCE, SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
@@ -28,10 +27,11 @@ from flwr.common.serde_utils import error_from_proto, error_to_proto
 # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
-from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE, RunType, TaskType
+from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
 from flwr.supercore.corestate.utils import (
     generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
 )
+from flwr.supercore.date import now
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 # pylint: enable=E0611
@@ -68,17 +68,6 @@ def build_params(values: Sequence[Any], prefix: str) -> tuple[str, dict[str, Any
     placeholders = ",".join(f":{prefix}_{i}" for i in range(len(values)))
     params: dict[str, Any] = {f"{prefix}_{i}": v for i, v in enumerate(values)}
     return placeholders, params
-
-
-def primary_task_type_from_run_type(run_type: str) -> TaskType:
-    """Return the primary task type for a run type."""
-    if run_type == RunType.AGENT_APP:
-        return TaskType.AGENT_APP
-    if run_type == RunType.SIMULATION:
-        return TaskType.SIMULATION
-    if run_type == RunType.SERVER_APP:
-        return TaskType.SERVER_APP
-    raise ValueError(f"Unsupported run type: {run_type}")
 
 
 def generate_rand_int_from_bytes(

@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flwr-agent"
+version = "0.1.0"
+description = "Built-in flwr agent."
+license = "Apache-2.0"
+
+[tool.flwr.app]
+publisher = "flwrlabs"
+fab-include = ["flwr_agent.py"]
+
+[tool.flwr.app.config.agent]
+input = ""
+
+[tool.flwr.app.components]
+agentapp = "flwr_agent:app"

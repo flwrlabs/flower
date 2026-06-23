@@ -26,7 +26,7 @@ from flwr.common.config import (
     get_project_dir,
 )
 from flwr.common.logger import log
-from flwr.common.object_ref import load_app, validate
+from flwr.supercore.object_ref import load_app, validate
 from flwr.supercore.utils import get_flwr_home
 
 
@@ -74,8 +74,6 @@ def get_load_client_app_fn(
                     f"and FAB version '{fab_version}'.",
                 ) from None
 
-            # log(WARN, "FAB ID is not provided; the default ClientApp will be loaded.")
-
             # Set app reference
             client_app_ref = config["tool"]["flwr"]["app"]["components"]["clientapp"]
         # If multi-app feature is enabled
@@ -85,7 +83,7 @@ def get_load_client_app_fn(
                 config = get_project_config(runtime_app_dir)
             except Exception as e:
                 raise LoadClientAppError(
-                    "Failed to load ClientApp."
+                    "Failed to load ClientApp. "
                     "Possible reasons for error include mismatched "
                     "`fab_id`, `fab_version`, or `fab_hash` in "
                     f"{str(get_flwr_home().resolve())}."

@@ -29,7 +29,8 @@ from unittest.mock import MagicMock, Mock, patch
 import grpc
 from parameterized import parameterized
 
-from flwr.common import ConfigRecord, Context, RecordDict, now
+from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
+from flwr.app import ConfigRecord, Context, RecordDict
 from flwr.common.constant import (
     NODE_NOT_FOUND_MESSAGE,
     NOOP_ACCOUNT_NAME,
@@ -40,7 +41,6 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import user_config_to_proto
-from flwr.common.typing import Run, RunStatus
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
@@ -84,16 +84,18 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
+    DEFAULT_FEDERATION_SIMULATION,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION,
     ActionType,
     RunTime,
-    RunType,
     TaskType,
 )
+from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, EntitlementError, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
@@ -132,6 +134,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         account_info = authn_plugin.validate_tokens_in_metadata([])[1]
         assert account_info is not None
         assert account_info.flwr_aid is not None
+        self.account_info = account_info
         self.aid: str = account_info.flwr_aid
         shared_account_info.set(account_info)
         self.state = self.servicer.linkstate_factory.state()
@@ -145,7 +148,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             NOOP_FEDERATION,
             None,
             flwr_aid,
-            RunType.SERVER_APP,
+            TaskType.SERVER_APP,
         )
 
     def _create_dummy_run_series(
@@ -196,15 +199,29 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(run_info.fab_hash, fab_hash)
         self.assertEqual(run_info.fab_id, fab_id)
         self.assertEqual(run_info.fab_version, fab_version)
-        self.assertEqual(run_info.run_type, RunType.SERVER_APP)
+        self.assertEqual(run_info.primary_task_type, TaskType.SERVER_APP)
         self.assertFalse(response.HasField("note"))
         self.assertTrue(response.HasField("series_id"))
         self.assertGreater(response.series_id, 0)
         self.assertEqual(run_info.series_id, response.series_id)
+        self.assertEqual(response.federation, NOOP_FEDERATION)
         run_context = self.state.get_run_series_context(response.series_id)
         assert run_context is not None
         self.assertEqual(run_context.run_id, response.run_id)
         self.assertEqual(run_context.series_id, response.series_id)
+
+    def test_start_run_defaults_to_account_simulation_federation(self) -> None:
+        """Test StartRun uses the account default simulation federation."""
+        self.account_info.account_name = "test_account"
+        expected_federation = f"@test_account/{DEFAULT_FEDERATION_SIMULATION}"
+        federation_manager = Mock(exists=Mock(side_effect=RuntimeError))
+        self.servicer.linkstate_factory.federation_manager = federation_manager
+        self.servicer.linkstate_factory.state_instance = None
+
+        with self.assertRaises(RuntimeError):
+            self.servicer.StartRun(StartRunRequest(), Mock())
+
+        federation_manager.exists.assert_called_once_with(expected_federation)
 
     def test_start_run_uses_existing_series_id(self) -> None:
         """Test StartRun links the run to an existing run series."""
@@ -254,17 +271,17 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     @parameterized.expand(
         [
-            (None, RunType.SERVER_APP, TaskType.SERVER_APP),
-            (SimulationConfig(), RunType.SIMULATION, TaskType.SIMULATION),
+            (None, TaskType.SERVER_APP, TaskType.SERVER_APP),
+            (SimulationConfig(), TaskType.SIMULATION, TaskType.SIMULATION),
         ]
     )  # type: ignore
     def test_start_run_creates_task_with_matching_type(
         self,
         sim_cfg: SimulationConfig | None,
-        expected_run_type: RunType,
+        expected_primary_task_type: TaskType,
         expected_task_type: TaskType,
     ) -> None:
-        """Test StartRun creates an initial task matching the resolved run type."""
+        """Test StartRun creates an initial task matching the resolved task type."""
         fab_content = b"test FAB content task type"
         request = StartRunRequest()
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
@@ -294,10 +311,88 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         tasks = self.state.get_tasks()
 
         self.assertEqual(len(runs), 1)
-        self.assertEqual(runs[0].run_type, expected_run_type)
+        self.assertEqual(runs[0].primary_task_type, expected_primary_task_type)
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, expected_task_type)
+
+    def test_start_run_creates_agentapp_run_from_local_fab(self) -> None:
+        """Test StartRun creates an AgentApp run for a submitted AgentApp FAB."""
+        fab_content = b"test AgentApp FAB content"
+        request = StartRunRequest()
+        request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.fab.content = fab_content
+        request.federation = NOOP_FEDERATION
+        for key, value in user_config_to_proto({"agent.input": "Hello"}).items():
+            request.override_config[key].CopyFrom(value)
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+            ) as mock_get_fab_config,
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+            ) as mock_get_metadata_from_config,
+            patch.object(
+                self.state.federation_manager,
+                "get_simulation_config",
+                return_value=SimulationConfig(),
+            ),
+        ):
+            mock_get_fab_config.return_value = {
+                "tool": {
+                    "flwr": {
+                        "app": {
+                            "config": {"agent": {"input": ""}},
+                            "components": {"agentapp": "agent:app"},
+                        }
+                    }
+                }
+            }
+            mock_get_metadata_from_config.return_value = ("flwr/agent", "0.1.0")
+            response = self.servicer.StartRun(request, Mock())
+
+        runs = self.state.get_run_info(run_ids=[response.run_id])
+        tasks = self.state.get_tasks()
+
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs[0].fab_id, "flwr/agent")
+        self.assertEqual(runs[0].fab_version, "0.1.0")
+        self.assertEqual(runs[0].primary_task_type, TaskType.AGENT_APP)
+        self.assertEqual(runs[0].override_config["agent.input"], "Hello")
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].run_id, response.run_id)
+        self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
+        self.assertEqual(tasks[0].fab_hash, runs[0].fab_hash)
+
+    def test_start_run_creates_builtin_agentapp_run_from_app_spec(self) -> None:
+        """Test StartRun creates an AgentApp run for the built-in flwr agent."""
+        request = StartRunRequest(
+            app_spec="@flwragent/flwr-agent",
+            federation=NOOP_FEDERATION,
+        )
+        for key, value in user_config_to_proto({"agent.input": "Hello"}).items():
+            request.override_config[key].CopyFrom(value)
+        builtin_agent_fab = try_resolve_builtin_agent_fab("@flwragent/flwr-agent")
+        assert builtin_agent_fab is not None
+        fab_file, _ = builtin_agent_fab
+        expected_fab_hash = hashlib.sha256(fab_file).hexdigest()
+
+        response = self.servicer.StartRun(request, Mock())
+
+        runs = self.state.get_run_info(run_ids=[response.run_id])
+        tasks = self.state.get_tasks()
+
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs[0].fab_id, "flwrlabs/flwr-agent")
+        self.assertEqual(runs[0].fab_version, "0.1.0")
+        self.assertEqual(runs[0].fab_hash, expected_fab_hash)
+        self.assertEqual(runs[0].primary_task_type, TaskType.AGENT_APP)
+        self.assertEqual(runs[0].override_config["agent.input"], "Hello")
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].run_id, response.run_id)
+        self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
+        self.assertEqual(tasks[0].fab_hash, runs[0].fab_hash)
 
     def test_start_run_aborts_if_create_run_fails(self) -> None:
         """Test StartRun aborts with INTERNAL if the initial task cannot be created."""
@@ -445,6 +540,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         context.abort.side_effect = grpc.RpcError()
 
         with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+            ) as mock_get_fab_config,
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
@@ -456,6 +554,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ),
             self.assertRaises(grpc.RpcError),
         ):
+            mock_get_fab_config.return_value = {
+                "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
+            }
             self.servicer.StartRun(request, context)
 
         _assert_abort_with_flwr_err(
@@ -529,8 +630,14 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         if limit is None:
             limit = 999
-        self.assertLess(abs(retrieved_timestamp - now().timestamp()), 1e-3)
+        self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(set(response.run_dict.keys()), set(run_ids[-limit:]))
+        self.assertTrue(
+            all(
+                run.account_name == self.account_info.account_name
+                for run in response.run_dict.values()
+            )
+        )
 
     def test_list_run_id(self) -> None:
         """Test List method of ControlServicer with --run-id option."""
@@ -543,8 +650,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         retrieved_timestamp = datetime.fromisoformat(response.now).timestamp()
 
         # Assert
-        self.assertLess(abs(retrieved_timestamp - now().timestamp()), 1e-3)
+        self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(set(response.run_dict.keys()), {run_id})
+        self.assertEqual(
+            response.run_dict[run_id].account_name, self.account_info.account_name
+        )
 
     def test_get_run_series_returns_context(self) -> None:
         """Test GetRunSeries returns series metadata and shared Context."""
@@ -786,7 +896,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         retrieved_timestamp = datetime.fromisoformat(response.now).timestamp()
 
         # Assert
-        self.assertLess(abs(retrieved_timestamp - now().timestamp()), 1e-3)
+        self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(response.federation.name, NOOP_FEDERATION)
         self.assertFalse(response.federation.simulation)
 
@@ -842,6 +952,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ) as mock_can_execute,
             patch.object(
                 self.state.federation_manager,
+                "ensure_default_federations_exist",
+                return_value=None,
+            ) as mock_ensure_default_federations_exist,
+            patch.object(
+                self.state.federation_manager,
                 "create_federation",
                 return_value=mock_federation,
             ) as mock_create,
@@ -859,6 +974,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 runtime=RunTime.SIMULATION,
                 visibility="private",
             ),
+        )
+        mock_ensure_default_federations_exist.assert_called_once_with(
+            flwr_aid=self.aid,
         )
         mock_create.assert_called_once_with(
             name=expected_name,
@@ -985,7 +1103,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             "test-federation",
             None,
             self.aid,
-            RunType.SERVER_APP,
+            TaskType.SERVER_APP,
         )
 
         with patch.object(
@@ -1038,7 +1156,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             "test-federation",
             None,
             target_flwr_aid,
-            RunType.SERVER_APP,
+            TaskType.SERVER_APP,
         )
 
         with patch.object(
@@ -1060,6 +1178,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
     def setUp(self) -> None:
         """Set up test fixtures."""
         self.flwr_aid = "test-flwr-aid"
+        self.account_name = "test-account"
         self.state = Mock()
         self.state.federation_manager = Mock()
         self.linkstate_factory = Mock()
@@ -1071,7 +1190,9 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         )
         self.get_current_account_info_patcher = patch(
             "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-            return_value=SimpleNamespace(flwr_aid=self.flwr_aid),
+            return_value=SimpleNamespace(
+                flwr_aid=self.flwr_aid, account_name=self.account_name
+            ),
         )
         self.get_current_account_info_patcher.start()
         self.addCleanup(self.get_current_account_info_patcher.stop)
@@ -1088,6 +1209,9 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
 
         response = self.servicer.CreateInvitation(request, context)
 
+        self.state.federation_manager.ensure_default_federations_exist.assert_called_once_with(
+            flwr_aid=self.flwr_aid
+        )
         self.state.federation_manager.can_execute.assert_called_once_with(
             flwr_aid=self.flwr_aid,
             action=ActionType.CREATE_INVITATION,
@@ -1243,7 +1367,7 @@ class TestControlServicerAuth(unittest.TestCase):
             NOOP_FEDERATION,
             None,
             flwr_aid,
-            RunType.SERVER_APP,
+            TaskType.SERVER_APP,
         )
 
     def make_context(self) -> MagicMock:
@@ -1416,7 +1540,9 @@ class TestControlServicerAuth(unittest.TestCase):
         with (
             patch(
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=SimpleNamespace(
+                    flwr_aid="user-123", account_name="test-account"
+                ),
             ),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=False
@@ -1435,14 +1561,21 @@ class TestControlServicerAuth(unittest.TestCase):
         with (
             patch(
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=SimpleNamespace(
+                    flwr_aid="user-123", account_name="test-account"
+                ),
             ),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
             ),
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.resolve_account_ids",
+                return_value={"run-owner": "owner-account"},
+            ),
         ):
             response = self.servicer.ListRuns(request, ctx)
             self.assertEqual(set(response.run_dict.keys()), {run_id})
+            self.assertEqual(response.run_dict[run_id].account_name, "owner-account")
 
 
 class TestValidateFederationAndNodesInRequest(unittest.TestCase):

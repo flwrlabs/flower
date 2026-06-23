@@ -21,16 +21,17 @@ import os
 import subprocess
 import time
 from pathlib import Path
+from typing import Any
 
 import click
 import grpc
 import typer
 
 from flwr.common.constant import ISOLATION_MODE_SUBPROCESS
-from flwr.common.grpc import create_channel
 from flwr.proto.control_pb2 import ListFederationsRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.constant import FLWR_DISABLE_UPDATE_CHECK
+from flwr.supercore.grpc import create_channel
 from flwr.supercore.utils import get_flwr_home
 
 from .constant import (
@@ -100,6 +101,17 @@ def _is_local_superlink_started() -> bool:
         channel.close()
 
 
+def _get_process_detach_kwargs() -> dict[str, Any]:
+    """Return platform-specific Popen kwargs to detach the local SuperLink."""
+    if os.name == "nt":
+        return {
+            # The Windows-only constant is absent from non-Windows type stubs.
+            "creationflags": subprocess.CREATE_NEW_PROCESS_GROUP,  # type: ignore[attr-defined]
+        }
+
+    return {"start_new_session": True}
+
+
 def _start_local_superlink(in_memory: bool = False) -> None:
     """Start a managed local SuperLink in simulation mode and wait for readiness."""
     database_path, log_file_path = _get_local_superlink_paths()
@@ -140,7 +152,7 @@ def _start_local_superlink(in_memory: bool = False) -> None:
             env=env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            start_new_session=True,
+            **_get_process_detach_kwargs(),
         )
     except OSError as exc:
         raise click.ClickException(

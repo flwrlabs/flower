@@ -27,29 +27,34 @@ from flwr.app.exception import AppExitException
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
-from flwr.common.config import get_project_config, get_project_dir
+from flwr.common.config import (
+    get_fused_config_from_dir,
+    get_project_config,
+    get_project_dir,
+)
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import flush_logs, log, start_log_uploader, stop_log_uploader
-from flwr.common.object_ref import load_app
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
     fab_from_proto,
     run_from_proto,
 )
-from flwr.common.telemetry import EventType, event
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushTaskOutputRequest,
 )
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
+from flwr.supercore.object_ref import load_app
 from flwr.supercore.superexec.dependency_installer import (
+    RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.typing import JSONObject
 from flwr.superlink.grid import GrpcGrid
 
@@ -90,9 +95,38 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     runtime_env_dir: Path | None = None
     exit_code = ExitCode.SUCCESS
 
+    def on_exit() -> None:
+        log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
+
+        grid._retry_invoker.max_tries = 1
+
+        if log_uploader:
+            flush_logs(log_queue)
+
+        pushoutput_req = PushTaskOutputRequest(
+            context=context_to_proto(context) if context else None,
+            sub_status=sub_status,
+            details=details,
+        )
+        try:
+            grid._stub.PushTaskOutput(pushoutput_req)
+        except grpc.RpcError as err:
+            log(ERROR, "Failed to push task output: %s", str(err))
+
+        if log_uploader:
+            stop_log_uploader(log_queue, log_uploader)
+
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
+        grid.close()
+
+        cleanup_app_runtime_environment(runtime_env_dir)
+
     register_signal_handlers(
         event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
         exit_message="Task stopped by user.",
+        exit_handlers=[on_exit],
     )
 
     try:
@@ -150,8 +184,9 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         config = get_project_config(app_path)
 
         agent_app_attr = config["tool"]["flwr"]["app"]["components"]["agentapp"]
-        context.run_config = config["tool"]["flwr"]["app"].get("config", {})
-        context.run_config.update(run.override_config)
+        context.run_config = get_fused_config_from_dir(
+            Path(app_path), run.override_config
+        )
 
         agent_input = context.run_config.get(_AGENT_INPUT_KEY)
         if agent_input is not None:
@@ -206,34 +241,10 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         exit_code = ExitCode.TASK_PROC_EXCEPTION
         if isinstance(ex, AppExitException):
             exit_code = ex.exit_code
-
-    finally:
-        log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
-
-        grid._retry_invoker.max_tries = 1
-
-        if log_uploader:
-            flush_logs(log_queue)
-
-        pushoutput_req = PushTaskOutputRequest(
-            context=context_to_proto(context) if context else None,
-            sub_status=sub_status,
-            details=details,
-        )
-        try:
-            grid._stub.PushTaskOutput(pushoutput_req)
-        except grpc.RpcError as err:
-            log(ERROR, "Failed to push task output: %s", str(err))
-
-        if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
-
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-
-        grid.close()
-
-        cleanup_app_runtime_environment(runtime_env_dir)
+        elif isinstance(ex, ImportError):
+            exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
+        elif isinstance(ex, RuntimeDependencyInstallationError):
+            exit_code = ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR
 
     flwr_exit(
         code=exit_code,
