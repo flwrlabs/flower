@@ -13,8 +13,8 @@ durable state in a PostgreSQL backend.
 
 .. important::
 
-    SuperLink High Availability Mode is available in preview. To discuss
-    production requirements or request preview access, contact the Flower team at
+    SuperLink High Availability Mode is available in preview. To discuss production
+    requirements or request preview access, contact the Flower team at
     enquiries@flower.ai.
 
 This page describes the architecture at a high level. It is not a deployment guide.
@@ -76,8 +76,7 @@ the Flower app programming model:
 
 - ``ServerApp`` and ``ClientApp`` code remains the same.
 - SuperNodes connect to the configured SuperLink endpoint, not to individual replicas.
-- Operators monitor and scale SuperLink replicas as part of the SuperGrid
-  deployment.
+- Operators monitor and scale SuperLink replicas as part of the SuperGrid deployment.
 - The load balancer and PostgreSQL backend become critical infrastructure and must be
   operated with their own availability, backup, and monitoring strategy.
 
