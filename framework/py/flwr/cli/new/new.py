@@ -94,26 +94,13 @@ def new(
 def print_success_prompt(package_name: str) -> None:
     """Print styled setup instructions for running a new Flower App after creation."""
     prompt = typer.style(
-        "🎊 Flower App creation successful.\n\n"
-        "To run your Flower App, first install its dependencies:\n\n",
+        "🎊 Flower App creation successful.\n\nRun the app as follows:\n\n",
         fg=typer.colors.GREEN,
         bold=True,
     )
 
     prompt += typer.style(
-        f"	cd {package_name} && pip install -e .\n\n",
-        fg=typer.colors.BRIGHT_CYAN,
-        bold=True,
-    )
-
-    prompt += typer.style(
-        "then, run the app:\n\n ",
-        fg=typer.colors.GREEN,
-        bold=True,
-    )
-
-    prompt += typer.style(
-        "\tflwr run .\n\n",
+        f"\tflwr run {package_name} --stream\n\n",
         fg=typer.colors.BRIGHT_CYAN,
         bold=True,
     )
