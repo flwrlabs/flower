@@ -45,8 +45,8 @@ Next, activate your environment and navigate to the example directory:
 
 By default, this project uses a local simulation profile that ``flwr run`` submits to a
 managed local SuperLink, which then executes the run with the Flower Simulation Runtime.
-It creates a federation of two SuperNodes using |fedavg|_ as the aggregation strategy. The
-dataset will be partitioned using Flower Dataset's |iidpartitioner|_. To run the
+It creates a federation of two SuperNodes using |fedavg|_ as the aggregation strategy.
+The dataset will be partitioned using Flower Dataset's |iidpartitioner|_. To run the
 project, do:
 
 .. code-block:: shell
