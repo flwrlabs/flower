@@ -35,15 +35,6 @@ from flwr.supercore.version import package_version as flwr_version
 from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH
 from .typing import JSONValue
 
-resolve_account_ids_ee: Callable[[Iterable[str]], dict[str, str]] | None = None
-try:
-    from flwr.ee.utils import resolve_account_ids as _resolve_account_ids_ee
-except ImportError:
-    pass
-else:
-    resolve_account_ids_ee = _resolve_account_ids_ee
-
-
 T = TypeVar("T", str, bytes)
 PR_SET_DUMPABLE = 4  # from /usr/include/linux/prctl.h
 
@@ -520,6 +511,13 @@ def disable_process_dumping(strict: bool) -> None:
 
 def resolve_account_ids(ids: Iterable[str]) -> dict[str, str]:
     """Resolve account IDs to account names."""
-    if resolve_account_ids_ee is not None:
+    # Lazy import to avoid circular dependency with flwr.ee.utils
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from flwr.ee.utils import resolve_account_ids as _resolve_account_ids_ee
+
+        resolve_account_ids_ee: Callable[[Iterable[str]], dict[str, str]]
+        resolve_account_ids_ee = _resolve_account_ids_ee
         return resolve_account_ids_ee(ids)
-    return {id_: NOOP_ACCOUNT_NAME for id_ in ids if id_ == NOOP_FLWR_AID}
+    except ModuleNotFoundError:
+        return {id_: NOOP_ACCOUNT_NAME for id_ in ids if id_ == NOOP_FLWR_AID}

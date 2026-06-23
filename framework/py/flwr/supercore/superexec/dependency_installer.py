@@ -15,7 +15,6 @@
 """Utility for installing app dependencies via uv."""
 
 
-import atexit
 import hashlib
 import os
 import re
@@ -28,6 +27,7 @@ from pathlib import Path
 
 from flwr.common.config import get_project_config
 from flwr.common.logger import log
+from flwr.supercore.exit import add_exit_handler
 from flwr.supercore.utils import get_flwr_home
 
 _RUNTIME_ENV_DIR = "runtime-envs"
@@ -118,6 +118,7 @@ def install_app_dependencies(
 
     runtime_env_dir = _create_runtime_env_dir(project_dir, launch_id, run_id)
     runtime_env_dir.parent.mkdir(parents=True, exist_ok=True)
+    _register_runtime_env_cleanup(runtime_env_dir)
     log(INFO, "Created env for run in: %s", runtime_env_dir)
 
     log(INFO, "Installing application dependencies...")
@@ -159,8 +160,6 @@ def install_app_dependencies(
         log(INFO, "No additional application dependencies needed installation.")
 
     _activate_runtime_env(runtime_env_dir)
-    if run_id is not None:
-        _register_runtime_env_cleanup(runtime_env_dir)
     log(INFO, "App dependencies installed successfully via uv sync.")
     return runtime_env_dir
 
@@ -242,7 +241,11 @@ def _find_site_packages_dirs(runtime_env_dir: Path) -> list[Path]:
 
 def _register_runtime_env_cleanup(runtime_env_dir: Path) -> None:
     """Register best-effort cleanup for a launch-specific runtime environment."""
-    atexit.register(cleanup_app_runtime_environment, runtime_env_dir)
+
+    def _clean() -> None:
+        cleanup_app_runtime_environment(runtime_env_dir)
+
+    add_exit_handler(_clean)
 
 
 def cleanup_app_runtime_environment(runtime_env_dir: Path | None) -> None:

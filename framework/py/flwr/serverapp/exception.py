@@ -16,7 +16,7 @@
 
 
 from flwr.app.exception import AppExitException
-from flwr.common.exit import ExitCode
+from flwr.supercore.exit import ExitCode
 
 
 class InconsistentMessageReplies(AppExitException):

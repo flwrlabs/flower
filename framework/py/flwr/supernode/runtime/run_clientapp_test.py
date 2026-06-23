@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 import grpc
 
-from flwr.common.exit import ExitCode
+from flwr.supercore.exit import ExitCode
 from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
