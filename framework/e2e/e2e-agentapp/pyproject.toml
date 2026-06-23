@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "e2e-agentapp"
+version = "0.1.0"
+description = "Minimal custom Flower AgentApp example"
+license = "Apache-2.0"
+dependencies = ["flwr @ {root:parent:parent:uri}"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["e2e_agentapp"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.flwr.app]
+publisher = "flwrlabs"
+fab-include = ["e2e_agentapp/**/*.py"]
+
+[tool.flwr.app.components]
+agentapp = "e2e_agentapp.agent:app"
+
+[tool.flwr.app.config.agent]
+input = ""
+instructions = "Use web search before answering, then answer in one short sentence."
+model = "openai/gpt-5.5"
+max-output-tokens = 96
+web-search = true
