@@ -404,11 +404,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         account_names = resolve_account_ids(
             {run.flwr_aid for run in runs if run.flwr_aid != flwr_aid}
         )
+        account_names[flwr_aid] = account_name
         for run in runs:
-            if run.flwr_aid == flwr_aid:
-                run.account_name = account_name
-            else:
-                run.account_name = account_names[run.flwr_aid]
+            run.account_name = account_names[run.flwr_aid]
             if run.status.status == Status.FINISHED:
                 store.delete_objects_in_run(run.run_id)
 
