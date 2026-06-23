@@ -34,7 +34,6 @@ from flwr.cli.utils import get_sha256_hash
 from flwr.clientapp import ClientApp
 from flwr.common import log
 from flwr.common.constant import RUN_ID_NUM_BYTES, TASK_ID_NUM_BYTES
-from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import (
     set_logger_propagation,
     update_console_handler,
@@ -58,6 +57,7 @@ from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION,
 )
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run
 from flwr.supercore.telemetry import EventType, event

@@ -21,7 +21,7 @@ from unittest.mock import patch
 
 import pytest
 
-from flwr.common.exit import ExitCode
+from flwr.supercore.exit import ExitCode
 
 from .tls import (
     get_client_tls_args,

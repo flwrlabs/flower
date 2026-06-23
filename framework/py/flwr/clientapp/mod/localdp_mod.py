@@ -22,11 +22,11 @@ import numpy as np
 from flwr.app import Array, ArrayRecord
 from flwr.app.message import Context, Message
 from flwr.clientapp.typing import ClientAppCallable
-from flwr.common.differential_privacy import (
+from flwr.common.logger import log
+from flwr.supercore.differential_privacy import (
     add_gaussian_noise_inplace,
     compute_clip_model_update,
 )
-from flwr.common.logger import log
 
 from .centraldp_mods import _handle_array_key_mismatch_err, _handle_multi_record_err
 

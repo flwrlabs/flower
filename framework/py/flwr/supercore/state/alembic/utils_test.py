@@ -40,8 +40,8 @@ from sqlalchemy import (
 from sqlalchemy.engine import URL, Connection, Engine
 
 from flwr.common.constant import SubStatus
-from flwr.common.exit import ExitCode
 from flwr.supercore.constant import TaskType
+from flwr.supercore.exit import ExitCode
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
     ALEMBIC_VERSION_TABLE,

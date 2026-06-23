@@ -16,6 +16,7 @@
 
 
 import argparse
+import os
 from dataclasses import replace
 from logging import DEBUG, ERROR, INFO
 from queue import Queue
@@ -37,7 +38,6 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SubStatus,
 )
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import (
     flush_logs,
     log,
@@ -64,6 +64,7 @@ from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import NOOP_FEDERATION
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
@@ -72,6 +73,9 @@ from flwr.supercore.superexec.dependency_installer import (
 )
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
+
+# Disable Ray's uv runtime-env hook when running flwr-simulation.
+os.environ.setdefault("RAY_ENABLE_UV_RUN_RUNTIME_ENV", "0")
 
 
 def _run_simulation_settings(

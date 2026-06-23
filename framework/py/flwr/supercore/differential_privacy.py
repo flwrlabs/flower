@@ -19,13 +19,9 @@ from logging import WARNING
 
 import numpy as np
 
-from flwr.common import (
-    NDArrays,
-    Parameters,
-    ndarrays_to_parameters,
-    parameters_to_ndarrays,
-)
 from flwr.common.logger import log
+from flwr.compat.common.parameter import ndarrays_to_parameters, parameters_to_ndarrays
+from flwr.compat.common.typing import NDArrays, Parameters
 
 KEY_CLIPPING_NORM = "clipping_norm"
 KEY_NORM_BIT = "norm_bit"
