@@ -511,6 +511,7 @@ def disable_process_dumping(strict: bool) -> None:
 
 def resolve_account_ids(ids: Iterable[str]) -> dict[str, str]:
     """Resolve account IDs to account names."""
+    # Lazy import to avoid circular dependency with flwr.ee.utils
     try:
         from flwr.ee.utils import resolve_account_ids as resolve_account_ids_ee
 
