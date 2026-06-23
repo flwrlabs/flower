@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower AppIO service."""
+"""Flower command line interface for SuperLink."""
 
 
-from .app import flwr_serverapp as flwr_serverapp
+from .flower_superlink import flower_superlink
+from .flwr_serverapp import flwr_serverapp
 
 __all__ = [
+    "flower_superlink",
     "flwr_serverapp",
 ]

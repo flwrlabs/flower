@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower server app."""
+"""`flower-superlink` command."""
 
 
 import argparse
@@ -59,6 +59,14 @@ from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
 )
 from flwr.proto.grpcadapter_pb2_grpc import add_GrpcAdapterServicer_to_server
 from flwr.server.fleet_event_log_interceptor import FleetEventLogInterceptor
+from flwr.server.superlink.fleet.grpc_adapter.grpc_adapter_servicer import (
+    GrpcAdapterServicer,
+)
+from flwr.server.superlink.fleet.grpc_rere.fleet_servicer import FleetServicer
+from flwr.server.superlink.fleet.grpc_rere.node_auth_server_interceptor import (
+    NodeAuthServerInterceptor,
+)
+from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
@@ -87,13 +95,6 @@ from flwr.superlink.auth_plugin import (
 from flwr.superlink.federation import FederationManager, NoOpFederationManager
 from flwr.superlink.servicer.control import run_control_api_grpc
 from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
-
-from .superlink.fleet.grpc_adapter.grpc_adapter_servicer import GrpcAdapterServicer
-from .superlink.fleet.grpc_rere.fleet_servicer import FleetServicer
-from .superlink.fleet.grpc_rere.node_auth_server_interceptor import (
-    NodeAuthServerInterceptor,
-)
-from .superlink.linkstate import LinkStateFactory
 
 P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
 
@@ -209,7 +210,7 @@ def _get_objectstore_linkstate_factories(
 
 
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
-def run_superlink() -> None:
+def flower_superlink() -> None:
     """Run Flower SuperLink (ServerAppIo API and Fleet API)."""
     warn_if_flwr_update_available(process_name="flower-superlink")
 

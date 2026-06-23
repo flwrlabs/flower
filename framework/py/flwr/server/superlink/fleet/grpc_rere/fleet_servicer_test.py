@@ -58,7 +58,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
-from flwr.server.app import _run_fleet_api_grpc_rere
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import (
     create_ins_message,
@@ -79,6 +78,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     iterate_object_tree,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.superlink.cli.flower_superlink import _run_fleet_api_grpc_rere
 from flwr.superlink.federation import NoOpFederationManager
 
 
