@@ -34,15 +34,11 @@ following files:
     ├── pyproject.toml      # Project metadata like dependencies and configs
     └── README.md
 
-Next, activate your environment, then run:
+Next, activate your environment and navigate to the example directory:
 
 .. code-block:: shell
 
-    # Navigate to the example directory
     $ cd path/to/quickstart-pytorch-lightning
-
-    # Install project and dependencies
-    $ pip install -e .
 
 By default, this project uses a local simulation profile that ``flwr run`` submits to a
 managed local SuperLink, which then executes the run with the Flower Simulation Runtime.

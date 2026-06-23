@@ -33,19 +33,15 @@ files:
     ├── pyproject.toml      # Project metadata like dependencies and configs
     └── README.md
 
-Next, activate your environment, then run:
+Next, activate your environment and navigate to the example directory:
 
 .. code-block:: shell
 
-    # Navigate to the example directory
     $ cd path/to/quickstart-fastai
-
-    # Install project and dependencies
-    $ pip install -e .
 
 This example uses a local simulation profile that ``flwr run`` submits to a managed
 local SuperLink, which then executes the run with the Flower Simulation Runtime,
-creating a federation of 10 nodes using `FedAvg
+creating a federation of two nodes using `FedAvg
 <https://flower.ai/docs/framework/ref-api/flwr.serverapp.strategy.FedAvg.html#flwr.server.strategy.FedAvg>`_
 as the aggregation strategy. The dataset will be partitioned using Flower Dataset's
 `IidPartitioner
@@ -69,11 +65,11 @@ With default arguments you will see streamed output like this:
     INFO :      Starting FedAvg strategy:
     INFO :          ├── Number of rounds: 3
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 10)
-    INFO :      aggregate_train: Received 5 results and 0 failures
+    INFO :      configure_train: Sampled 2 nodes (out of 2)
+    INFO :      aggregate_train: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
+    INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
+    INFO :      aggregate_evaluate: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'eval_loss': 3.1197, 'eval_acc': 0.14874}
     INFO :      [ROUND 2/3]
     INFO :      ...
