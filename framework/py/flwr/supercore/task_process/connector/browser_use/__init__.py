@@ -19,6 +19,7 @@ import os
 
 from flwr.supercore.typing import JSONObject
 
+# Prevent browser-use from configuring its own logging, which would duplicate Flower logs
 os.environ["BROWSER_USE_SETUP_LOGGING"] = "false"
 
 try:
