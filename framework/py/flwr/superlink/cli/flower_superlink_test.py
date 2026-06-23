@@ -16,6 +16,7 @@
 
 
 import argparse
+import importlib
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -23,15 +24,16 @@ import grpc
 import pytest
 
 from flwr.common.constant import FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION
+from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.interceptors import RuntimeVersionServerInterceptor
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.version import package_version
 from flwr.superlink.federation import NoOpFederationManager
 
-from . import app as app_module
-from .app import _obtain_superlink_certificates, _parse_args_run_superlink
-from .superlink.linkstate import LinkStateFactory
+from .flower_superlink import _obtain_superlink_certificates, _parse_args_run_superlink
+
+app_module = importlib.import_module("flwr.superlink.cli.flower_superlink")
 
 
 def test_parse_superlink_log_rotation_args_defaults() -> None:
@@ -134,7 +136,7 @@ def test_parse_superlink_log_rotation_backup_requires_positive_int(
         _parse_args_run_superlink().parse_args(["--log-rotation-backup-count", value])
 
 
-def test_run_superlink_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_flower_superlink_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> None:
     """SuperLink should run the startup update check before parsing arguments."""
 
     class _SentinelError(Exception):
@@ -164,7 +166,7 @@ def test_run_superlink_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(app_module, "warn_if_flwr_update_available", _raise_sentinel)
 
     with pytest.raises(_SentinelError):
-        app_module.run_superlink()
+        app_module.flower_superlink()
 
     assert captured == ["update", "flower-superlink"]
 

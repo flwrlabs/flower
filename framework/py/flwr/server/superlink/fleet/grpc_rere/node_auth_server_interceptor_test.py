@@ -63,7 +63,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
-from flwr.server.app import _run_fleet_api_grpc_rere
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_res_message
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, TaskType
@@ -75,6 +74,7 @@ from flwr.supercore.primitives.asymmetric import (
     public_key_to_bytes,
     sign_message,
 )
+from flwr.superlink.cli.flower_superlink import _run_fleet_api_grpc_rere
 from flwr.superlink.federation import NoOpFederationManager
 
 from .node_auth_server_interceptor import NodeAuthServerInterceptor
