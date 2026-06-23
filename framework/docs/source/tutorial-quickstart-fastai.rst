@@ -12,16 +12,19 @@ In this federated learning tutorial we will learn how to train a SqueezeNet mode
 MNIST using Flower and fastai. It is recommended to create a virtual environment and run
 everything within a :doc:`virtualenv <contributor-how-to-set-up-a-virtual-env>`.
 
-Then, clone the code example directly from GitHub:
+Now that we have a rough idea of what this example is about, let's get started. First,
+install Flower in your new environment:
 
 .. code-block:: shell
 
-    git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
-                 && mv _tmp/examples/quickstart-fastai . \
-                 && rm -rf _tmp && cd quickstart-fastai
+    # In a new Python environment
+    $ pip install flwr
 
-This will create a new directory called `quickstart-fastai` containing the following
-files:
+Then, run the command below:
+
+.. code-block:: shell
+
+    $ flwr new @flwrlabs/quickstart-fastai
 
 .. code-block:: shell
 
