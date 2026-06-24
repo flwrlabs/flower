@@ -67,7 +67,7 @@ execution of your app.
     :target: ./_static/run_started_dashboard.png
 
 If you click the ``Logs`` tab, you'll see the logs from the app execution. This demo app
-ran for three rounds and sampled all 10 SuperNodes in each round. In each round, the
+ran for three rounds and sampled all two SuperNodes in each round. In each round, the
 server aggregated different metrics received from the clients. You can see these in the
 logs under the ``'random_metric'`` key. At the end, the logs show the aggregated results
 from all rounds.
