@@ -24,6 +24,7 @@ from logging import ERROR, INFO
 from typing import Any, cast
 
 import grpc
+from ray import state
 import requests
 
 from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
@@ -1027,6 +1028,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         account_name = cast(str, account.account_name)
 
         with rpc_error_translator(context, rpc_name):
+            state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
             federation = self._resolve_federation(account_name, request.federation_name)
             if not state.federation_manager.exists(federation):
                 if request.federation_name:
