@@ -180,8 +180,8 @@ You can override values from ``pyproject.toml`` at run time. For example:
 .. tip::
 
     In SuperGrid, use the ``--federation`` flag to choose which federation runs your
-    app. If you omit it, Flower uses ``@<your-account>/workspace-simulation``. Learn
-    more in :doc:`Create and Manage Federations on SuperGrid
+    app. If you omit it, Flower uses ``@<your-account>/workspace``. Learn more in
+    :doc:`Create and Manage Federations on SuperGrid
     <how-to-create-and-manage-federations>`.
 
 *********************
