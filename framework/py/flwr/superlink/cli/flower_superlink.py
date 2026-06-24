@@ -22,6 +22,7 @@ import subprocess
 import sys
 import threading
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from logging import INFO, WARN
 from pathlib import Path
 from time import sleep
@@ -209,6 +210,18 @@ def _get_objectstore_linkstate_factories(
     return objectstore_factory, state_factory
 
 
+@dataclass
+class SuperLinkLifespanConfig:
+    """Configuration needed to start the SuperLink lifespan."""
+
+    serverappio_address: str
+    control_address: str
+    health_server_address: str | None
+    fleet_api_type: str
+    fleet_api_address: str | None
+    fleet_api_num_workers: int
+
+
 class SuperLinkLifespan:
     """Own the shared SuperLink lifespan state and legacy network servers.
 
@@ -217,6 +230,9 @@ class SuperLinkLifespan:
     FastAPI lifespan can use this object to start the existing gRPC APIs as
     compatibility adapters.
     """
+
+    def __init__(self, config: SuperLinkLifespanConfig) -> None:
+        self.config = config
 
     def startup(self) -> None:
         """Start shared lifespan and legacy SuperLink gRPC servers."""
