@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-fastai"
-version = "1.1.5"
+version = "1.1.6"
 description = "Federated Learning with Fastai and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 dependencies = [
@@ -29,5 +29,5 @@ clientapp = "fastai_example.client_app:app"
 
 [tool.flwr.app.config]
 num-server-rounds = 3
-fraction-train = 0.5
+fraction-train = 1.0
 save-model = false

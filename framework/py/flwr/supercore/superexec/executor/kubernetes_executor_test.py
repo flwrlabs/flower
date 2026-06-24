@@ -14,6 +14,8 @@
 # ==============================================================================
 """Tests for SuperExec Kubernetes executor."""
 
+# pylint: disable=too-many-lines
+
 from pathlib import Path
 from typing import Any, cast
 from unittest.mock import Mock, call
@@ -484,6 +486,7 @@ def test_wait_for_capacity_sleeps_and_polls_again_at_budget() -> None:
         {"items": []},
         {"items": [_pod("Pending")]},
         {"items": []},
+        {"items": []},
     ]
     client.list_namespaced_secret.return_value = {"items": []}
     sleep = Mock()
@@ -496,8 +499,46 @@ def test_wait_for_capacity_sleeps_and_polls_again_at_budget() -> None:
 
     KubernetesExecutor(client=client, config=config).wait_for_capacity()
 
-    assert client.list_namespaced_pod.call_count == 3
+    assert client.list_namespaced_pod.call_count == 4
+    assert client.list_namespaced_secret.call_count == 2
     sleep.assert_called_once_with(3.0)
+
+
+def test_wait_for_capacity_sweeps_after_waiting_for_capacity_to_open() -> None:
+    """Test completed Pod cleanup runs after a blocking capacity wait opens."""
+    client = Mock()
+    labels = _task_labels(123)
+    client.list_namespaced_pod.side_effect = [
+        {"items": []},
+        {"items": [_pod("Running", labels=labels)]},
+        {"items": [_pod("Succeeded", labels=labels)]},
+        {"items": [_pod("Succeeded", labels=labels)]},
+    ]
+    client.list_namespaced_secret.side_effect = [
+        {"items": []},
+        {"items": [_secret(_SECRET_NAME, labels)]},
+    ]
+    sleep = Mock()
+    config = _executor_config(
+        resource_pool="gpu-pool",
+        active_pod_budget=1,
+        capacity_poll_interval=3.0,
+        sleep=sleep,
+    )
+
+    KubernetesExecutor(client=client, config=config).wait_for_capacity()
+
+    assert client.list_namespaced_pod.call_count == 4
+    assert client.list_namespaced_secret.call_count == 2
+    sleep.assert_called_once_with(3.0)
+    client.delete_namespaced_pod.assert_called_once_with(
+        name=_POD_NAME,
+        namespace="flower-system",
+        grace_period_seconds=0,
+    )
+    client.delete_namespaced_secret.assert_called_once_with(
+        name=_SECRET_NAME, namespace="flower-system"
+    )
 
 
 def test_wait_for_capacity_counts_pending_running_and_terminating_active_pods() -> None:

@@ -16,8 +16,9 @@
 
 
 import argparse
+import os
 from dataclasses import replace
-from logging import DEBUG, ERROR, INFO
+from logging import DEBUG, ERROR, INFO, WARNING
 from queue import Queue
 
 import grpc
@@ -37,7 +38,6 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SubStatus,
 )
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import (
     flush_logs,
     log,
@@ -64,6 +64,7 @@ from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import NOOP_FEDERATION
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
@@ -72,6 +73,9 @@ from flwr.supercore.superexec.dependency_installer import (
 )
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
+
+# Disable Ray's uv runtime-env hook when running flwr-simulation.
+os.environ.setdefault("RAY_ENABLE_UV_RUN_RUNTIME_ENV", "0")
 
 
 def _run_simulation_settings(
@@ -229,6 +233,35 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             stub=conn._stub,
         )
 
+        # Extract federation configuration
+        (
+            num_supernodes,
+            backend_name,
+            backend_config,
+            verbose,
+            enable_tf_gpu_growth,
+        ) = _run_simulation_settings(res.federation_config)
+        # Warn about changed default federation size
+        log(
+            WARNING,
+            "Since flwr 1.32, default simulated SuperNodes changed from 10 to 2.",
+        )
+        # Log federation size
+        log(
+            INFO,
+            "Federation `%s` (%s simulated SuperNodes)",
+            run.federation,
+            num_supernodes,
+        )
+        # Indicate how to resize federation
+        log(INFO, "To change federation size, use the following command:")
+        log(
+            INFO,
+            "\tflwr federation simulation-config "
+            "%s <superlink> --num-supernodes <N>",
+            run.federation,
+        )
+
         log(DEBUG, "Simulation process starts FAB installation.")
         install_from_fab(fab.content, skip_prompt=True)
 
@@ -278,14 +311,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             client_app_attr,
             app_path,
         )
-
-        (
-            num_supernodes,
-            backend_name,
-            backend_config,
-            verbose,
-            enable_tf_gpu_growth,
-        ) = _run_simulation_settings(res.federation_config)
 
         run_id_hash = get_sha256_hash(run.run_id)
         event(

@@ -16,12 +16,14 @@
 
 
 import json
+import sys
 from typing import Any
 
 import pytest
 import requests
 from parameterized import parameterized
 
+from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 from .utils import (
@@ -36,6 +38,7 @@ from .utils import (
     mask_string,
     parse_app_spec,
     request_download_link,
+    resolve_account_ids,
     simulation_config_from_json,
     simulation_config_to_json,
     strict_json_dumps,
@@ -65,6 +68,15 @@ def test_mask_string() -> None:
     assert mask_string("") == ""
     assert mask_string("1234567890", head=2, tail=3) == "12...890"
     assert mask_string("1234567890", head=5, tail=4) == "12345...7890"
+
+
+def test_resolve_account_ids_without_ee(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolve the noop account id and ignore unknown ids."""
+    monkeypatch.setitem(sys.modules, "flwr.ee", None)
+    monkeypatch.setitem(sys.modules, "flwr.ee.utils", None)
+    assert resolve_account_ids([NOOP_FLWR_AID, "unknown"]) == {
+        NOOP_FLWR_AID: NOOP_ACCOUNT_NAME
+    }
 
 
 def test_strict_json_loads() -> None:

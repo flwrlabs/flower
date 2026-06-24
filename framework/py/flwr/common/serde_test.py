@@ -488,6 +488,7 @@ def test_run_serialization_deserialization() -> None:
         clientapp_runtime=3.14,
         primary_task_type=TaskType.SIMULATION,
         series_id=123,
+        account_name="test-account",
     )
 
     # Execute

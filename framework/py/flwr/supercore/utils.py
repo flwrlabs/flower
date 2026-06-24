@@ -20,14 +20,14 @@ import json
 import os
 import re
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from logging import WARN
 from pathlib import Path
 from typing import Any, Literal, TypeVar, cast
 
 import requests
 
-from flwr.common.constant import FLWR_DIR, FLWR_HOME
+from flwr.common.constant import FLWR_DIR, FLWR_HOME, NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.common.logger import log
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.version import package_version as flwr_version
@@ -507,3 +507,17 @@ def disable_process_dumping(strict: bool) -> None:
         if strict:
             raise RuntimeError(f"Failed to disable process dumping: {e!r}") from e
         log(WARN, "Failed to disable process dumping: %s", e)
+
+
+def resolve_account_ids(ids: Iterable[str]) -> dict[str, str]:
+    """Resolve account IDs to account names."""
+    # Lazy import to avoid circular dependency with flwr.ee.utils
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from flwr.ee.utils import resolve_account_ids as _resolve_account_ids_ee
+
+        resolve_account_ids_ee: Callable[[Iterable[str]], dict[str, str]]
+        resolve_account_ids_ee = _resolve_account_ids_ee
+        return resolve_account_ids_ee(ids)
+    except ModuleNotFoundError:
+        return {id_: NOOP_ACCOUNT_NAME for id_ in ids if id_ == NOOP_FLWR_AID}

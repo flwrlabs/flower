@@ -22,7 +22,6 @@ from typing import TypeVar, cast
 
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.common.exit import ExitCode, flwr_exit
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -53,6 +52,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.fleet.message_handler import message_handler
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 
 try:

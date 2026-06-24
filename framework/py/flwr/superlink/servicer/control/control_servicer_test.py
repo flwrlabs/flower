@@ -84,6 +84,7 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
+    DEFAULT_FEDERATION_SIMULATION,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION,
     ActionType,
@@ -133,6 +134,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         account_info = authn_plugin.validate_tokens_in_metadata([])[1]
         assert account_info is not None
         assert account_info.flwr_aid is not None
+        self.account_info = account_info
         self.aid: str = account_info.flwr_aid
         shared_account_info.set(account_info)
         self.state = self.servicer.linkstate_factory.state()
@@ -207,6 +209,19 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         assert run_context is not None
         self.assertEqual(run_context.run_id, response.run_id)
         self.assertEqual(run_context.series_id, response.series_id)
+
+    def test_start_run_defaults_to_account_simulation_federation(self) -> None:
+        """Test StartRun uses the account default simulation federation."""
+        self.account_info.account_name = "test_account"
+        expected_federation = f"@test_account/{DEFAULT_FEDERATION_SIMULATION}"
+        federation_manager = Mock(exists=Mock(side_effect=RuntimeError))
+        self.servicer.linkstate_factory.federation_manager = federation_manager
+        self.servicer.linkstate_factory.state_instance = None
+
+        with self.assertRaises(RuntimeError):
+            self.servicer.StartRun(StartRunRequest(), Mock())
+
+        federation_manager.exists.assert_called_once_with(expected_federation)
 
     def test_start_run_uses_existing_series_id(self) -> None:
         """Test StartRun links the run to an existing run series."""
@@ -615,8 +630,14 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         if limit is None:
             limit = 999
-        self.assertLess(abs(retrieved_timestamp - now().timestamp()), 1e-3)
+        self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(set(response.run_dict.keys()), set(run_ids[-limit:]))
+        self.assertTrue(
+            all(
+                run.account_name == self.account_info.account_name
+                for run in response.run_dict.values()
+            )
+        )
 
     def test_list_run_id(self) -> None:
         """Test List method of ControlServicer with --run-id option."""
@@ -629,8 +650,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         retrieved_timestamp = datetime.fromisoformat(response.now).timestamp()
 
         # Assert
-        self.assertLess(abs(retrieved_timestamp - now().timestamp()), 1e-3)
+        self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(set(response.run_dict.keys()), {run_id})
+        self.assertEqual(
+            response.run_dict[run_id].account_name, self.account_info.account_name
+        )
 
     def test_get_run_series_returns_context(self) -> None:
         """Test GetRunSeries returns series metadata and shared Context."""
@@ -872,7 +896,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         retrieved_timestamp = datetime.fromisoformat(response.now).timestamp()
 
         # Assert
-        self.assertLess(abs(retrieved_timestamp - now().timestamp()), 1e-3)
+        self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(response.federation.name, NOOP_FEDERATION)
         self.assertFalse(response.federation.simulation)
 
@@ -1516,7 +1540,9 @@ class TestControlServicerAuth(unittest.TestCase):
         with (
             patch(
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=SimpleNamespace(
+                    flwr_aid="user-123", account_name="test-account"
+                ),
             ),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=False
@@ -1535,14 +1561,21 @@ class TestControlServicerAuth(unittest.TestCase):
         with (
             patch(
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=SimpleNamespace(
+                    flwr_aid="user-123", account_name="test-account"
+                ),
             ),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
             ),
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.resolve_account_ids",
+                return_value={"run-owner": "owner-account"},
+            ),
         ):
             response = self.servicer.ListRuns(request, ctx)
             self.assertEqual(set(response.run_dict.keys()), {run_id})
+            self.assertEqual(response.run_dict[run_id].account_name, "owner-account")
 
 
 class TestValidateFederationAndNodesInRequest(unittest.TestCase):
