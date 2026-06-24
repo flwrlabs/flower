@@ -47,7 +47,7 @@ Let's run the project:
 
 .. code-block:: shell
 
-    $ cd path/to/quickstart-fastai
+    $ cd quickstart-fastai
 
     # Run with default arguments and stream logs
     $ flwr run . --stream

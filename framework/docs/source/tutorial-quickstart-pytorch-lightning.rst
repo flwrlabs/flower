@@ -41,7 +41,7 @@ Next, activate your environment and navigate to the example directory:
 
 .. code-block:: shell
 
-    $ cd path/to/quickstart-pytorch-lightning
+    $ cd quickstart-pytorch-lightning
 
 By default, this project uses a local simulation profile that ``flwr run`` submits to a
 managed local SuperLink, which then executes the run with the Flower Simulation Runtime.
@@ -50,8 +50,6 @@ The dataset will be partitioned using Flower Dataset's |iidpartitioner|_. To run
 project, do:
 
 .. code-block:: shell
-
-    $ cd path/to/quickstart-pytorch-lightning
 
     # Run with default arguments and stream logs
     $ flwr run . --stream
