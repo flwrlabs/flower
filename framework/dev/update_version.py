@@ -160,7 +160,7 @@ def _docker_tag_lines(image_dir, version):
     ]
 
 
-def _update_docker_readmes(current_version, check):
+def _update_docker_readmes(current_version, next_version, check):
     """Update Docker README supported tags."""
     changed = False
     today = datetime.date.today().strftime("%Y%m%d")
@@ -174,7 +174,7 @@ def _update_docker_readmes(current_version, check):
         content = re.sub(
             rf"(`nightly`, `<version>\.dev<YYYYMMDD>` e\.g\. `)"
             rf"{VERSION_PATTERN}\.dev\d{{8}}(`)",
-            rf"\g<1>{current_version}.dev{today}\g<2>",
+            rf"\g<1>{next_version}.dev{today}\g<2>",
             content,
         )
         content = re.sub(
@@ -262,7 +262,7 @@ if __name__ == "__main__":
     if not args.no_examples:
         changed |= _update_example_versions(curr_version, args.check)
 
-    changed |= _update_docker_readmes(curr_version, args.check)
+    changed |= _update_docker_readmes(curr_version, next_version, args.check)
 
     if changed and args.check:
         sys.exit(1)
