@@ -236,6 +236,7 @@ class SuperLinkLifespan:
 
     def __init__(self, config: SuperLinkLifespanConfig) -> None:
         self.config = config
+        self.bckg_threads: list[threading.Thread] = []
 
     def startup(self) -> None:
         """Start shared lifespan and legacy SuperLink gRPC servers."""
@@ -244,6 +245,16 @@ class SuperLinkLifespan:
     def shutdown(self) -> None:
         """Stop legacy gRPC servers started by this lifespan."""
         log(INFO, "SuperLinkLifespan: stop")
+
+    def wait_until_background_thread_exits(self) -> None:
+        """Block like the historical `flower-superlink` command.
+
+        With only gRPC servers, `self.bckg_threads` is empty and `all([])` is
+        intentionally true, so this loop blocks until a signal handler exits the
+        process. This preserves the current CLI behavior.
+        """
+        while all(thread.is_alive() for thread in self.bckg_threads):
+            sleep(0.1)
 
 
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
