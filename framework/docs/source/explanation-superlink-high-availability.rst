@@ -14,8 +14,7 @@ durable state in a PostgreSQL backend.
 .. important::
 
     SuperLink High Availability Mode is available in preview. To discuss production
-    requirements or request preview access, contact the Flower team at
-    enquiries@flower.ai.
+    requirements or request preview access, contact the Flower team at hello@flower.ai.
 
 This page describes the architecture at a high level. It is not a deployment guide.
 
