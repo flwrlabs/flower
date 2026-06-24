@@ -17,9 +17,8 @@
 
 import argparse
 import os
-import re
 from dataclasses import replace
-from logging import DEBUG, ERROR, INFO
+from logging import DEBUG, ERROR, INFO, WARNING
 from queue import Queue
 
 import grpc
@@ -74,7 +73,6 @@ from flwr.supercore.superexec.dependency_installer import (
 )
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
-from flwr.supercore.version import package_version
 
 # Disable Ray's uv runtime-env hook when running flwr-simulation.
 os.environ.setdefault("RAY_ENABLE_UV_RUN_RUNTIME_ENV", "0")
@@ -111,15 +109,6 @@ def _run_simulation_settings(
 
     verbose = sim_cfg.verbose if sim_cfg.HasField("verbose") else False
     return sim_cfg.num_supernodes, backend_name, backend_config, verbose, False
-
-
-def _get_simulation_guide_url() -> str:
-    """Return the versioned URL for the simulation guide."""
-    if not (match := re.match(r"\d+\.\d+", package_version)):
-        doc_path = "how-to-run-simulations.html"
-    else:
-        doc_path = f"{match.group(0)}/en/how-to-run-simulations.html"
-    return f"https://flower.ai/docs/framework/{doc_path}"
 
 
 def flwr_simulation() -> None:
@@ -252,20 +241,24 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             verbose,
             enable_tf_gpu_growth,
         ) = _run_simulation_settings(res.federation_config)
+        # Warn about changed default federation size
+        log(
+            WARNING,
+            "Since flwr 1.32, default simulated SuperNodes changed from 10 to 2.",
+        )
         # Log federation size
         log(
             INFO,
-            "Federation `%s` has %s virtual SuperNodes.",
+            "Federation `%s` (%s simulated SuperNodes)",
             run.federation,
             num_supernodes,
         )
         # Indicate how to resize federation
         log(
             INFO,
-            "Change the federation size with `flwr federation simulation-config "
-            "%s <superlink> --num-supernodes <N>`. For more details see %s",
+            "Change federation size using `flwr federation simulation-config "
+            "%s <superlink> --num-supernodes <N>`",
             run.federation,
-            _get_simulation_guide_url(),
         )
 
         log(DEBUG, "Simulation process starts FAB installation.")
