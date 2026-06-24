@@ -17,6 +17,7 @@
 
 import argparse
 import os
+import re
 from dataclasses import replace
 from logging import DEBUG, ERROR, INFO
 from queue import Queue
@@ -110,6 +111,15 @@ def _run_simulation_settings(
 
     verbose = sim_cfg.verbose if sim_cfg.HasField("verbose") else False
     return sim_cfg.num_supernodes, backend_name, backend_config, verbose, False
+
+
+def _get_simulation_guide_url() -> str:
+    """Return the versioned URL for the simulation guide."""
+    if not (match := re.match(r"\d+\.\d+", package_version)):
+        doc_path = "how-to-run-simulations.html"
+    else:
+        doc_path = f"{match.group(0)}/en/how-to-run-simulations.html"
+    return f"https://flower.ai/docs/framework/{doc_path}"
 
 
 def flwr_simulation() -> None:
@@ -243,7 +253,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             enable_tf_gpu_growth,
         ) = _run_simulation_settings(res.federation_config)
         # Log federation size
-        docs_version = ".".join(package_version.split(".")[:2])
         log(
             INFO,
             "Federation `%s` has %s virtual SuperNodes.",
@@ -254,10 +263,9 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         log(
             INFO,
             "Change the federation size with `flwr federation simulation-config "
-            "%s --num-supernodes <N>`. For more details see https://flower.ai/docs/framework/%s/en/"
-            "how-to-run-simulations.html",
+            "%s --num-supernodes <N>`. For more details see %s",
             run.federation,
-            docs_version,
+            _get_simulation_guide_url(),
         )
 
         log(DEBUG, "Simulation process starts FAB installation.")
