@@ -632,6 +632,12 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             limit = 999
         self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(set(response.run_dict.keys()), set(run_ids[-limit:]))
+        self.assertTrue(
+            all(
+                run.account_name == self.account_info.account_name
+                for run in response.run_dict.values()
+            )
+        )
 
     def test_list_run_id(self) -> None:
         """Test List method of ControlServicer with --run-id option."""
@@ -646,6 +652,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(set(response.run_dict.keys()), {run_id})
+        self.assertEqual(
+            response.run_dict[run_id].account_name, self.account_info.account_name
+        )
 
     def test_get_run_series_returns_context(self) -> None:
         """Test GetRunSeries returns series metadata and shared Context."""
@@ -1531,7 +1540,9 @@ class TestControlServicerAuth(unittest.TestCase):
         with (
             patch(
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=SimpleNamespace(
+                    flwr_aid="user-123", account_name="test-account"
+                ),
             ),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=False
@@ -1550,14 +1561,21 @@ class TestControlServicerAuth(unittest.TestCase):
         with (
             patch(
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=SimpleNamespace(
+                    flwr_aid="user-123", account_name="test-account"
+                ),
             ),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
             ),
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.resolve_account_ids",
+                return_value={"run-owner": "owner-account"},
+            ),
         ):
             response = self.servicer.ListRuns(request, ctx)
             self.assertEqual(set(response.run_dict.keys()), {run_id})
+            self.assertEqual(response.run_dict[run_id].account_name, "owner-account")
 
 
 class TestValidateFederationAndNodesInRequest(unittest.TestCase):
