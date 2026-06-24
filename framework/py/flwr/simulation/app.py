@@ -254,10 +254,11 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             num_supernodes,
         )
         # Indicate how to resize federation
+        log(INFO, "To change federation size, use the following command:")
         log(
             INFO,
-            "Change federation size using `flwr federation simulation-config "
-            "%s <superlink> --num-supernodes <N>`",
+            "\tflwr federation simulation-config "
+            "%s <superlink> --num-supernodes <N>",
             run.federation,
         )
 
