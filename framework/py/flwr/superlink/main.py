@@ -26,18 +26,42 @@ from fastapi import FastAPI
 from flwr import __version__
 from flwr.common import log
 from flwr.supercore.routers import health
+from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
 from flwr.superlink.routers import control, runtime
 
 
-def create_app() -> FastAPI:
-    """Create the SuperLink FastAPI app."""
+def create_app(
+    *,
+    superlink_lifespan: SuperLinkLifespan | None = None,
+    start_legacy_grpc: bool = False,
+) -> FastAPI:
+    """Create the SuperLink FastAPI app.
+
+    This FastAPI app can be started in two ways:
+    1. Via `flower-superlink`: superlink_lifespan will be passed
+    2. Via `uvicorn flwr.superlink.main:app`: superlink_lifespan will be None
+    """
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         """Own process-lifetime resources for the combined SuperLink service."""
         log(INFO, "FastAPI lifespan: startup")
 
-        yield
+        if superlink_lifespan is not None:
+            # Store the SuperLinkLifespan where future REST routers can access shared
+            # state through FastAPI dependencies
+            app.state.superlink_lifespan = superlink_lifespan
+
+        if superlink_lifespan is not None and start_legacy_grpc:
+            # Temporary compatibility path: start the existing gRPC APIs from
+            # FastAPI lifespan
+            superlink_lifespan.startup()
+
+        try:
+            yield
+        finally:
+            if superlink_lifespan is not None and start_legacy_grpc:
+                superlink_lifespan.shutdown()
 
         log(INFO, "FastAPI lifespan: shutdown")
 

@@ -209,6 +209,24 @@ def _get_objectstore_linkstate_factories(
     return objectstore_factory, state_factory
 
 
+class SuperLinkLifespan:
+    """Own the shared SuperLink lifespan state and legacy network servers.
+
+    Long-term, the gRPC-specific parts of this class should shrink until it only
+    initializes shared services used by FastAPI routers. During the migration,
+    FastAPI lifespan can use this object to start the existing gRPC APIs as
+    compatibility adapters.
+    """
+
+    def startup(self) -> None:
+        """Start shared lifespan and legacy SuperLink gRPC servers."""
+        log(INFO, "SuperLinkLifespan: start")
+
+    def shutdown(self) -> None:
+        """Stop legacy gRPC servers started by this lifespan."""
+        log(INFO, "SuperLinkLifespan: stop")
+
+
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
 def flower_superlink() -> None:
     """Run Flower SuperLink (ServerAppIo API and Fleet API)."""
