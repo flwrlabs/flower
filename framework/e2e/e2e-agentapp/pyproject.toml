@@ -27,4 +27,5 @@ input = ""
 instructions = "Use web search before answering, then answer in one short sentence."
 model = "openai/gpt-5.5"
 max-output-tokens = 96
+reasoning-effort = "none"
 web-search = true

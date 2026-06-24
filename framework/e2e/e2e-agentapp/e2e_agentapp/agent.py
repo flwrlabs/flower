@@ -26,7 +26,9 @@ _INPUT_KEY = "agent.input"
 _INSTRUCTIONS_KEY = "agent.instructions"
 _MAX_OUTPUT_TOKENS_KEY = "agent.max-output-tokens"
 _MODEL_KEY = "agent.model"
+_REASONING_EFFORT_KEY = "agent.reasoning-effort"
 _WEB_SEARCH_KEY = "agent.web-search"
+_SUPPORTED_REASONING_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
 
 app = AgentApp()
 
@@ -52,6 +54,17 @@ def main(agent: AgentSession, context: Context) -> None:
     if not isinstance(max_output_tokens, int) or max_output_tokens <= 0:
         raise ValueError(f"`{_MAX_OUTPUT_TOKENS_KEY}` must be a positive integer.")
 
+    reasoning_effort = run_config.get(_REASONING_EFFORT_KEY)
+    if reasoning_effort is not None:
+        if (
+            not isinstance(reasoning_effort, str)
+            or reasoning_effort not in _SUPPORTED_REASONING_EFFORTS
+        ):
+            raise ValueError(
+                f"`{_REASONING_EFFORT_KEY}` must be one of "
+                f"{sorted(_SUPPORTED_REASONING_EFFORTS)}."
+            )
+
     use_web_search = run_config.get(_WEB_SEARCH_KEY)
     if not isinstance(use_web_search, bool):
         raise ValueError(f"`{_WEB_SEARCH_KEY}` must be a boolean.")
@@ -64,8 +77,10 @@ def main(agent: AgentSession, context: Context) -> None:
     }
     if instructions:
         request["instructions"] = instructions
+    if reasoning_effort is not None:
+        request["reasoning"] = {"effort": reasoning_effort}
     if use_web_search:
         request["tools"] = ["web_search"]
-        request["tool_choice"] = "required"
+        request["tool_choice"] = "auto"
 
     agent.responses.create(request)
