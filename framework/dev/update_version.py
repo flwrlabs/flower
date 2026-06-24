@@ -13,11 +13,14 @@ REPLACE_NEXT_VERSION = {
         'release = "{version}"',
         ".. |stable_flwr_version| replace:: {version}",
     ],
-    "examples/docs/source/conf.py": ['release = "{version}"'],
-    "baselines/docs/source/conf.py": ['release = "{version}"'],
     "framework/docker/complete/compose.yml": ["FLWR_VERSION:-{version}"],
     "framework/docker/distributed/client/compose.yml": ["FLWR_VERSION:-{version}"],
     "framework/docker/distributed/server/compose.yml": ["FLWR_VERSION:-{version}"],
+}
+
+REPLACE_CURRENT_VERSION = {
+    "examples/docs/source/conf.py": ['release = "{version}"'],
+    "baselines/docs/source/conf.py": ['release = "{version}"'],
 }
 
 ROOT_DIR = Path(__file__).parents[2]
@@ -252,6 +255,9 @@ if __name__ == "__main__":
     # Update files with next version
     for file_pattern, strings in REPLACE_NEXT_VERSION.items():
         changed |= _update_versions(file_pattern, strings, next_version, args.check)
+
+    for file_pattern, strings in REPLACE_CURRENT_VERSION.items():
+        changed |= _update_versions(file_pattern, strings, curr_version, args.check)
 
     if not args.no_examples:
         changed |= _update_example_versions(curr_version, args.check)
