@@ -82,6 +82,16 @@ def print_json_to_stdout(data: str | Any) -> None:
         Console(file=sys.__stdout__).print_json(data=data)
 
 
+def log_superlink_connection(
+    superlink_connection: SuperLinkConnection, is_json: bool = False
+) -> None:
+    """Log the selected SuperLink connection for human-readable CLI output."""
+    if not is_json:
+        typer.secho(
+            f"Using superlink: {superlink_connection.name}", fg=typer.colors.BLUE
+        )
+
+
 def _format_grpc_error(err: grpc.RpcError) -> str:
     """Return a user-facing message from a gRPC error.
 
@@ -389,6 +399,7 @@ def cli_output_control_stub(
     """
     with cli_output_handler(output_format=output_format) as is_json:
         superlink_connection = read_superlink_connection(superlink)
+        log_superlink_connection(superlink_connection, is_json)
         channel = init_channel_from_connection(superlink_connection)
         try:
             yield ControlStub(channel), is_json

@@ -88,11 +88,14 @@ def test_run_command_accepts_remote_app_spec() -> None:
         patch.object(run_module, "read_superlink_connection") as mock_read_connection,
         patch.object(run_module, "_run_with_control_api") as mock_run_with_control_api,
     ):
-        mock_read_connection.return_value = SimpleNamespace(federation=None)
+        mock_read_connection.return_value = SimpleNamespace(
+            federation=None, name="mock-superlink"
+        )
 
         result = runner.invoke(app, ["run", "@flwrlabs/quickstart-numpy"])
 
     assert result.exit_code == 0
+    assert "Using superlink: mock-superlink" in result.output
     assert mock_run_with_control_api.call_args is not None
     assert mock_run_with_control_api.call_args.args[-1] == "@flwrlabs/quickstart-numpy"
 

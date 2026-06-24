@@ -29,7 +29,11 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.control_pb2_grpc import ControlStub
 
-from .utils import flwr_cli_grpc_exc_handler, init_channel_from_connection
+from .utils import (
+    flwr_cli_grpc_exc_handler,
+    init_channel_from_connection,
+    log_superlink_connection,
+)
 
 
 def pull(  # pylint: disable=R0914
@@ -64,6 +68,7 @@ def pull(  # pylint: disable=R0914
 
     # Read superlink connection configuration
     superlink_connection = read_superlink_connection(superlink)
+    log_superlink_connection(superlink_connection)
     channel = None
     try:
         channel = init_channel_from_connection(superlink_connection)
