@@ -48,7 +48,6 @@ from ..utils import (
     flwr_cli_grpc_exc_handler,
     init_channel_from_connection,
     print_json_to_stdout,
-    wait_for_control_api_channel,
 )
 
 CONN_REFRESH_PERIOD = 60  # Connection refresh period for log streaming (seconds)
@@ -202,7 +201,6 @@ def _run_with_control_api(
             app_spec=app_spec or "",
         )
         with flwr_cli_grpc_exc_handler():
-            wait_for_control_api_channel(channel)
             res = stub.StartRun(req)
 
         if res.HasField("note"):

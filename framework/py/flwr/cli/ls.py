@@ -41,7 +41,6 @@ from .utils import (
     flwr_cli_grpc_exc_handler,
     init_channel_from_connection,
     print_json_to_stdout,
-    wait_for_control_api_channel,
 )
 
 
@@ -115,7 +114,6 @@ def ls(  # pylint: disable=too-many-locals, too-many-branches, R0913, R0917
 
         try:
             channel = init_channel_from_connection(superlink_connection)
-            wait_for_control_api_channel(channel)
             stub = ControlStub(channel)
 
             # Display information about a specific run ID

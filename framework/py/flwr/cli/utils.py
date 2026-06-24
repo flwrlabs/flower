@@ -373,6 +373,9 @@ def init_channel_from_connection(
         ],
     )
     channel.subscribe(on_channel_state_change)
+
+    # Wait for the channel to be ready before returning it
+    wait_for_control_api_channel(channel)
     return channel
 
 

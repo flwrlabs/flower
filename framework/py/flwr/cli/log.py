@@ -32,11 +32,7 @@ from flwr.common.logger import log as logger
 from flwr.proto.control_pb2 import StreamLogsRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 
-from .utils import (
-    flwr_cli_grpc_exc_handler,
-    init_channel_from_connection,
-    wait_for_control_api_channel,
-)
+from .utils import flwr_cli_grpc_exc_handler, init_channel_from_connection
 
 
 class AllLogsRetrieved(BaseException):
@@ -222,7 +218,6 @@ def _log_with_control_api(
         If True, stream logs continuously; if False, print once.
     """
     channel = init_channel_from_connection(superlink_connection)
-    wait_for_control_api_channel(channel)
 
     if stream:
         start_stream(run_id, channel, CONN_REFRESH_PERIOD)
