@@ -244,15 +244,18 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
     auth_plugin = Mock()
     auth_plugin.load_tokens = Mock()
 
-    with patch(
-        "flwr.cli.utils.ensure_local_superlink", return_value=resolved
-    ) as mock_ensure:
-        with patch("flwr.cli.utils.load_certificate_in_connection", return_value=None):
-            with patch("flwr.cli.utils.create_channel") as mock_create:
-                channel = Mock()
-                mock_create.return_value = channel
+    with (
+        patch(
+            "flwr.cli.utils.ensure_local_superlink", return_value=resolved
+        ) as mock_ensure,
+        patch("flwr.cli.utils.load_certificate_in_connection", return_value=None),
+        patch("flwr.cli.utils.create_channel") as mock_create,
+        patch("flwr.cli.utils.wait_for_control_api_channel"),
+    ):
+        channel = Mock()
+        mock_create.return_value = channel
 
-                ret = init_channel_from_connection(unresolved, auth_plugin)
+    ret = init_channel_from_connection(unresolved, auth_plugin)
 
     assert ret is channel
     mock_ensure.assert_called_once_with(unresolved)
