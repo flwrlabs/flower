@@ -38,8 +38,8 @@ def create_app(
     """Create the SuperLink FastAPI app.
 
     This FastAPI app can be started in two ways:
-    1. Via `flower-superlink`: superlink_lifespan will be passed
-    2. Via `uvicorn flwr.superlink.main:app`: superlink_lifespan will be None
+    1. Via `flower-superlink`: `superlink_lifespan` will be passed.
+    2. Via `uvicorn flwr.superlink.main:app`: `superlink_lifespan` will be None.
     """
 
     @asynccontextmanager
@@ -63,7 +63,7 @@ def create_app(
             if superlink_lifespan is not None and start_legacy_grpc:
                 superlink_lifespan.shutdown()
 
-        log(INFO, "FastAPI lifespan: shutdown")
+            log(INFO, "FastAPI lifespan: shutdown")
 
     app = FastAPI(
         title="SuperLink API",
