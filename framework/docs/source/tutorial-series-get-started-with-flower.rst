@@ -27,59 +27,15 @@ Let's get started! 🌼
 The only prerequisite for this tutorial is to have an account for SuperGrid. Sign up on
 `flower.ai <https://flower.ai/>`__ or log in if you already have an account.
 
-*********************
- Create a Federation
-*********************
-
-On SuperGrid, all collaborative AI workloads happen within a federation and are run as
-Flower Apps. A federation is a collection of users and their SuperNodes that collaborate
-towards a common goal. For example, you can train an AI model across all SuperNodes in
-the federation, each with its own data. Only members of a federation can run Flower Apps
-across those SuperNodes.
-
-In this tutorial, you'll create a federation with simulated SuperNodes. This is ideal
-because it lets you get started without registering and connecting real SuperNodes. In a
-future tutorial, you'll learn how to connect real SuperNodes to your federation and run
-apps across them.
-
-Go to `the Federations page <https://flower.ai/federations/>`__ and click ``New
-Federation``. Select ``Simulation``, give your federation a name, set it to 10
-SuperNodes, and click ``Create``. See the screenshot below for reference.
-
-.. image:: ./_static/create_federation.png
-    :alt: Create federation dialog in SuperGrid
-    :align: center
-    :target: ./_static/create_federation.png
-
-After clicking ``Create``, you should see your federation in the dashboard. In the
-screenshot below, a user named ``peter123`` created a federation named
-``my-first-federation``. The unique name of a federation is always of the form
-``@<username>/<federation-name>``. In the screenshot, the federation's unique name is
-``@peter123/my-first-federation``.
-
-.. tip::
-
-    This tutorial creates a simulation federation. To create a deployment federation for
-    the Deployment Runtime, manage federation settings, or invite users to collaborate
-    in a federation, see :doc:`how-to-create-and-manage-federations`.
-
-.. image:: ./_static/federation_list.png
-    :alt: Federation list showing the newly created federation
-    :align: center
-    :target: ./_static/federation_list.png
-
-You are now the owner of a new federation!
-
 ******************
  Run a Flower App
 ******************
 
-With your federation created, you can now run a Flower App across the simulated
-SuperNodes in your federation. First, you need a Flower App. A Flower App is a Python
-project that defines the logic of your collaborative AI workload. More details will be
-covered in the next tutorial, but for now you can think of a Flower App as the code that
-defines what happens on the server (SuperGrid) and SuperNodes during your collaborative
-AI workload.
+Once you have loged into flower.ai, you are ready to start running Flower Apps. A Flower
+App is a Python project that defines the logic of your collaborative AI workload. More
+details will be covered in the next tutorial, but for now you can think of a Flower App
+as the code that defines what happens on the server (SuperGrid) and SuperNodes during
+your collaborative AI workload.
 
 `Flower Hub <https://flower.ai/apps/>`__ is a collection of open-source Flower Apps that
 you can use and learn from. In this tutorial, you'll use the `@flwrlabs/demo

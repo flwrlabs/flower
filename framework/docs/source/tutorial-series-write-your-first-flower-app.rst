@@ -41,7 +41,7 @@ First, we install the Flower package ``flwr`` in a new Python environment.
 
 .. code-block:: shell
 
-    $ pip install -U "flwr[simulation]"
+    $ pip install -U "flwr"
 
 Then, use ``flwr new`` to fetch an existing Flower App from the Flower Hub. In this
 case, you'll fetch the `@flwrlabs/demo <https://flower.ai/apps/flwrlabs/demo/>`__ app.
@@ -92,16 +92,14 @@ first login to SuperGrid:
     $ flwr login supergrid
 
 Once you are logged in, run the following command to run the app on SuperGrid and across
-the federation you created in the previous tutorial:
+your default federation:
 
 .. code-block:: shell
 
     # Navigate to the directory of the app you want to run
     $ cd /path/to/demo
-    # Run the app across the federation you created in the previous tutorial
-    $ flwr run . supergrid --federation @<username>/<federation-name>
-    # for example
-    # flwr run . supergrid --federation @peter123/my-first-federation
+    # Run the app on SuperGrid
+    $ flwr run . supergrid
 
 Then, if you navigate to the `SuperGrid dashboard <https://flower.ai/federations/>`__,
 you should see a new run in the list of runs of your federation. Click on it to see the
@@ -159,7 +157,7 @@ SuperGrid:
 .. code-block:: shell
 
     # Run your app
-    $ flwr run . supergrid --federation @<username>/<federation-name>
+    $ flwr run . supergrid
 
 Then, if you navigate to the `SuperGrid dashboard <https://flower.ai/federations/>`__,
 and open the logs of the new run, you should see the new printed messages from the
