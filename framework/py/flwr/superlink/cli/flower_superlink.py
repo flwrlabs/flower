@@ -246,7 +246,9 @@ class SuperLinkLifespan:
         """Start shared lifespan and legacy SuperLink gRPC servers."""
         log(INFO, "SuperLinkLifespan: start")
 
-        federation_manager = get_federation_manager(is_simulation=self.config.simulation)
+        federation_manager = get_federation_manager(
+            is_simulation=self.config.simulation
+        )
         objectstore_factory, state_factory = _get_objectstore_linkstate_factories(
             self.config.database, federation_manager
         )
@@ -274,15 +276,15 @@ class SuperLinkLifespan:
         """
         while all(thread.is_alive() for thread in self.bckg_threads):
             sleep(0.1)
-    
+
     def _start_control_api(self) -> None:
-        pass
+        config = self.config
 
     def _start_serverappio_api(self) -> None:
-        pass
+        config = self.config
 
     def _start_fleet_api(self) -> None:
-        pass
+        config = self.config
 
     def _start_legacy_fleet_rest_api(
         self, host: str, port: int, num_workers: int
@@ -294,16 +296,17 @@ class SuperLinkLifespan:
         """
 
     def _start_legacy_fleet_grpc_rere(self, fleet_address: str) -> None:
-        pass
+        """Start the current Fleet gRPC request-response API."""
 
     def _start_legacy_fleet_grpc_adapter(self, fleet_address: str) -> None:
         """Start the current Fleet GrpcAdapter compatibility API."""
 
     def _start_superexec_if_needed(self) -> None:
-        pass
+        config = self.config
 
     def _start_health_server_if_needed(self) -> None:
-        pass
+        if self.config.health_server_address is None:
+            return
 
 
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
