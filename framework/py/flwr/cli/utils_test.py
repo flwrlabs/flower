@@ -254,8 +254,7 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
     ):
         channel = Mock()
         mock_create.return_value = channel
-
-    ret = init_channel_from_connection(unresolved, auth_plugin)
+        ret = init_channel_from_connection(unresolved, auth_plugin)
 
     assert ret is channel
     mock_ensure.assert_called_once_with(unresolved)
