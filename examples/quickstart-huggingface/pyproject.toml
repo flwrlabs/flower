@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-huggingface"
-version = "1.1.5"
+version = "1.1.6"
 description = "Federated Learning with Hugginface Transformers and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 authors = [
@@ -35,6 +35,6 @@ clientapp = "huggingface_example.client_app:app"
 [tool.flwr.app.config]
 num-server-rounds = 3
 model-name = "prajjwal1/bert-tiny"
-fraction-train = 0.05
-fraction-evaluate = 0.1
+fraction-train = 1.0
+fraction-evaluate = 1.0
 save-model = false
