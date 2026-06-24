@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Minimal custom Flower AgentApp example."""
+"""Minimal Flower AgentApp example."""

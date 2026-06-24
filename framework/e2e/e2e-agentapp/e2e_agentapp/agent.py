@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Custom AgentApp used to demonstrate local FAB bundling and execution."""
+"""AgentApp to send one single LLM call with web search enabled."""
 
 
 from __future__ import annotations
