@@ -146,17 +146,14 @@ first login to SuperGrid:
     # This will open a browser window where you can enter your SuperGrid credentials.
     $ flwr login supergrid
 
-Once you are logged in, run the following command to run the app on SuperGrid and across
-the federation you created in the previous tutorial:
+Once you are logged in, run the following command to run the app on SuperGrid:
 
 .. code-block:: shell
 
     # Navigate to the directory of the app you want to run
     $ cd /path/to/quickstart-pytorch
-    # Run the app across the federation you created in the previous tutorial
-    $ flwr run . supergrid --federation @<username>/<federation-name>
-    # for example
-    # flwr run . supergrid --federation @peter123/my-first-federation
+    # Run the app
+    $ flwr run . supergrid
 
 SuperGrid will start a new run for this app. Open the `SuperGrid dashboard
 <https://flower.ai/federations/>`__, select your federation, and click the new run to
@@ -172,13 +169,20 @@ You can override values from ``pyproject.toml`` at run time. For example:
 .. code-block:: shell
 
     # Run the app for five rounds instead of the default three rounds
-    $ flwr run . --federation @<username>/<federation-name> \
+    $ flwr run . supergrid \
         --run-config "num-server-rounds=5"
 
     # Run the app for five rounds and a smaller batch size
-    $ flwr run . --federation @<username>/<federation-name> \
+    $ flwr run . supergrid \
         --run-config "num-server-rounds=5" \
         --run-config "batch-size=16"
+
+.. tip::
+
+    In SuperGrid, use the ``--federation`` flag to choose which federation runs your
+    app. If you omit it, Flower uses ``@<your-account>/workspace``. Learn more in
+    :doc:`Create and Manage Federations on SuperGrid
+    <how-to-create-and-manage-federations>`.
 
 *********************
  Run the App Locally
@@ -188,22 +192,16 @@ Running on SuperGrid is the recommended way to run collaborative AI workflows wi
 Flower. However, it is also useful to run the same app locally while you are developing
 or debugging.
 
-From the ``quickstart-pytorch`` directory, install the app and its dependencies into
-your Python environment:
+Navigate to the directory where the app was downloaded, then run the app locally with
+the command below. Flower will start a managed local SuperLink -- a distilled version of
+SuperGrid -- and execute the app with simulated SuperNodes on your machine. The first
+run can take longer because the app needs to download CIFAR-10 and install the
+dependencies of your App. With the flag ``--stream``, you can see the logs from the
+local run in your terminal.
 
 .. code-block:: shell
 
     $ cd /path/to/quickstart-pytorch
-    $ pip install -e .
-
-Then run the app locally with the command below. Flower will start a managed local
-SuperLink -- a distilled version of SuperGrid -- and execute the app with simulated
-SuperNodes on your machine. The first run can take longer because the app needs to
-download CIFAR-10. With the flag ``--stream``, you can see the logs from the local run
-in your terminal.
-
-.. code-block:: shell
-
     $ flwr run . local --stream
 
 The streamed output should include logs similar to this:
@@ -214,11 +212,11 @@ The streamed output should include logs similar to this:
     INFO :          ├── Number of rounds: 3
     INFO :      ...
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 5 SuperNodes (out of 10)
-    INFO :      aggregate_train: Received 5 results and 0 failures
+    INFO :      configure_train: Sampled 2 SuperNodes (out of 2)
+    INFO :      aggregate_train: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'train_loss': 2.149280}
-    INFO :      configure_evaluate: Sampled 10 SuperNodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
+    INFO :      configure_evaluate: Sampled 2 SuperNodes (out of 2)
+    INFO :      aggregate_evaluate: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'eval_loss': 2.31319, 'eval_acc': 0.13004}
     INFO :      [ROUND 2/3]
     INFO :      ...
@@ -548,24 +546,24 @@ So how does this work? How does Flower execute this simulation?
 
 When we execute ``flwr run`` against the default local connection configuration, Flower
 submits the run to the managed local SuperLink. By default, the local SuperLink will
-configure the simulation runtime to use 10 clients. Each will run an instance of the
+configure the simulation runtime to use two SuperNodes. Each will run an instance of the
 ``ClientApp`` we defined earlier.
 
 The local SuperLink then starts the ``ServerApp`` and asks it to issue instructions to
 those SuperNodes using the ``FedAvg`` strategy. In this example, ``FedAvg`` is
 configured with two key parameters:
 
-- ``fraction-train=0.5`` → select 50% of the available clients for training
+- ``fraction-train=1.0`` → select 100% of the available clients for training
 - ``fraction-evaluate=1.0`` → select 100% of the available clients for evaluation
 
-This means in our example, 5 out of 10 clients will be selected for training, and all 10
-clients will later participate in evaluation.
+This means in our example, all clients (SuperNodes) will be sampled for both a round of
+training and evaluation.
 
 A typical round looks like this:
 
 - **Training**
 
-  1. ``FedAvg`` randomly selects 5 clients (50% of 10).
+  1. ``FedAvg`` selects all clients (2 out of 2).
   2. Flower sends a ``TRAIN`` message to each selected ``ClientApp``.
   3. Each ``ClientApp`` calls the function decorated with ``@app.train()``, then returns
      a ``Message`` containing an ``ArrayRecord`` (the updated model parameters) and a
@@ -576,7 +574,7 @@ A typical round looks like this:
 
 - **Evaluation**
 
-  1. ``FedAvg`` selects all 10 clients (100%).
+  1. ``FedAvg`` selects all clients (2 out of 2).
   2. Flower sends an ``EVALUATE`` message to each ``ClientApp``.
   3. Each ``ClientApp`` calls the function decorated with ``@app.evaluate()`` and
      returns a ``Message`` containing a ``MetricRecord`` (the evaluation loss, accuracy,

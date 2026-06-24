@@ -207,7 +207,7 @@ def _run_with_control_api(
             typer.secho(f"Note: {res.note}", fg=typer.colors.YELLOW, err=True)
 
         if res.HasField("run_id"):
-            message = f"🎊 Successfully started run {res.run_id}"
+            message = f"Successfully started run {res.run_id}"
             if res.federation and res.federation != NOOP_FEDERATION:
                 message += f" in federation {res.federation}"
             typer.secho(message, fg=typer.colors.GREEN)

@@ -14,8 +14,7 @@ durable state in a PostgreSQL backend.
 .. important::
 
     SuperLink High Availability Mode is available in preview. To discuss production
-    requirements or request preview access, contact the Flower team at
-    enquiries@flower.ai.
+    requirements or request preview access, contact the Flower team at hello@flower.ai.
 
 This page describes the architecture at a high level. It is not a deployment guide.
 
@@ -30,25 +29,15 @@ SuperLink replicas. Each replica reads and writes shared state through the same
 PostgreSQL backend, so the replicas observe the same federation, run, node, message, and
 object state.
 
-.. mermaid::
+.. image:: ./_static/superlink-architecture-light.png
+    :width: 100%
+    :alt: SuperLink High Availability architecture
+    :class: no-scaled-link only-light
 
-    flowchart LR
-        CLI["flwr CLI / SuperExec"]
-        Nodes["SuperNodes"]
-        LB["Load balancer"]
-        SL1["SuperLink replica"]
-        SL2["SuperLink replica"]
-        SLN["SuperLink replica"]
-        DB[("PostgreSQL backend")]
-
-        CLI --> LB
-        Nodes --> LB
-        LB --> SL1
-        LB --> SL2
-        LB --> SLN
-        SL1 --> DB
-        SL2 --> DB
-        SLN --> DB
+.. image:: ./_static/superlink-architecture-dark.png
+    :width: 100%
+    :alt: SuperLink High Availability architecture (dark theme)
+    :class: no-scaled-link only-dark
 
 The main components are:
 

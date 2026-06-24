@@ -199,20 +199,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         account = _get_account(context)
         flwr_aid = cast(str, account.flwr_aid)
+        account_name = cast(str, account.account_name)
         override_config = user_config_from_proto(request.override_config)
-
-        # If federation is not specified, use default federation for the account
-        federation = request.federation
-        if not federation:
-            if isinstance(state.federation_manager, NoOpFederationManager):
-                federation = NOOP_FEDERATION
-            else:
-                federation = f"@{account.account_name}/{DEFAULT_FEDERATION_SIMULATION}"
 
         with rpc_error_translator(context, rpc_name):
             state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
 
             # Check (1) federation exists and (2) the flwr_aid is a member
+            federation = self._resolve_federation(account_name, request.federation)
             if not state.federation_manager.exists(federation):
                 if request.federation:
                     raise FlowerError(
@@ -1027,8 +1021,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         state = self.linkstate_factory.state()
 
+        # Get caller's account info
+        account = _get_account(context)
+        flwr_aid = cast(str, account.flwr_aid)
+        account_name = cast(str, account.account_name)
+
         with rpc_error_translator(context, rpc_name):
-            federation = request.federation_name or NOOP_FEDERATION
+            state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+            federation = self._resolve_federation(account_name, request.federation_name)
             if not state.federation_manager.exists(federation):
                 if request.federation_name:
                     raise FlowerError(
@@ -1039,12 +1039,12 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     ApiErrorCode.FEDERATION_NOT_SPECIFIED, "No federation specified."
                 )
             state.federation_manager.set_simulation_config(
-                flwr_aid=_get_flwr_aid(context),
+                flwr_aid=flwr_aid,
                 federation=federation,
                 config=request.config,
             )
 
-        return ConfigureSimulationFederationResponse()
+        return ConfigureSimulationFederationResponse(federation_name=federation)
 
     def StreamRunEvents(
         self, request: StreamRunEventsRequest, context: grpc.ServicerContext
@@ -1101,6 +1101,16 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             # Sleep briefly to avoid busy waiting
             time.sleep(RUN_EVENTS_STREAM_INTERVAL)
+
+    def _resolve_federation(self, account_name: str, federation: str) -> str:
+        """Return the requested federation or derive the default federation."""
+        if not federation:
+            federation_manager = self.linkstate_factory.federation_manager
+            if isinstance(federation_manager, NoOpFederationManager):
+                federation = NOOP_FEDERATION
+            else:
+                federation = f"@{account_name}/{DEFAULT_FEDERATION_SIMULATION}"
+        return federation
 
 
 class FederationNotSpecified(FlowerError):

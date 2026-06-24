@@ -51,6 +51,7 @@ from .utils import (
     init_channel_from_connection,
     load_gitignore_patterns,
     validate_federation_name,
+    wait_for_control_api_channel,
 )
 
 
@@ -181,6 +182,27 @@ def test_load_gitignore_patterns_with_pathspec() -> None:
     assert spec.match_file("good.py") is False
 
 
+def test_wait_for_control_api_channel_retries_until_ready() -> None:
+    """Test that Control API readiness waits through transient unavailability."""
+    future = Mock()
+    future.result.side_effect = [grpc.FutureTimeoutError(), None]
+
+    with patch("flwr.cli.utils.grpc.channel_ready_future", return_value=future):
+        wait_for_control_api_channel(Mock(), timeout=1, check_interval=0.01)
+
+    assert future.result.call_count == 2
+
+
+def test_wait_for_control_api_channel_fails_after_timeout() -> None:
+    """Test that Control API readiness fails after the timeout expires."""
+    future = Mock()
+    future.result.side_effect = grpc.FutureTimeoutError()
+
+    with patch("flwr.cli.utils.grpc.channel_ready_future", return_value=future):
+        with pytest.raises(click.ClickException, match="SuperLink is unavailable"):
+            wait_for_control_api_channel(Mock(), timeout=0.01, check_interval=0.01)
+
+
 def test_get_executed_command_single() -> None:
     """Test get_executed_command with a two-word command (e.g., flwr ls)."""
     root_group = click.Group("flwr")
@@ -222,15 +244,17 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
     auth_plugin = Mock()
     auth_plugin.load_tokens = Mock()
 
-    with patch(
-        "flwr.cli.utils.ensure_local_superlink", return_value=resolved
-    ) as mock_ensure:
-        with patch("flwr.cli.utils.load_certificate_in_connection", return_value=None):
-            with patch("flwr.cli.utils.create_channel") as mock_create:
-                channel = Mock()
-                mock_create.return_value = channel
-
-                ret = init_channel_from_connection(unresolved, auth_plugin)
+    with (
+        patch(
+            "flwr.cli.utils.ensure_local_superlink", return_value=resolved
+        ) as mock_ensure,
+        patch("flwr.cli.utils.load_certificate_in_connection", return_value=None),
+        patch("flwr.cli.utils.create_channel") as mock_create,
+        patch("flwr.cli.utils.wait_for_control_api_channel"),
+    ):
+        channel = Mock()
+        mock_create.return_value = channel
+        ret = init_channel_from_connection(unresolved, auth_plugin)
 
     assert ret is channel
     mock_ensure.assert_called_once_with(unresolved)

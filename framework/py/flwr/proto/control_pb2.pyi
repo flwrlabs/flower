@@ -878,9 +878,14 @@ global___ConfigureSimulationFederationRequest = ConfigureSimulationFederationReq
 class ConfigureSimulationFederationResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    FEDERATION_NAME_FIELD_NUMBER: builtins.int
+    federation_name: builtins.str
     def __init__(
         self,
+        *,
+        federation_name: builtins.str = ...,
     ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation_name", b"federation_name"]) -> None: ...
 
 global___ConfigureSimulationFederationResponse = ConfigureSimulationFederationResponse
 

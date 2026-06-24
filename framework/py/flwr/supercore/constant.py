@@ -118,8 +118,7 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
 
 
 # Default federation names for every Flower account
-DEFAULT_FEDERATION_SIMULATION = "workspace-simulation"
-DEFAULT_FEDERATION_DEPLOYMENT = "workspace-deployment"
+DEFAULT_FEDERATION_SIMULATION = "workspace"
 
 
 # Constants for exit handling
