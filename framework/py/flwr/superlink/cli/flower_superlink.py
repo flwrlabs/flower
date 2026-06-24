@@ -507,6 +507,8 @@ def flower_superlink() -> None:
             backup_count=args.log_rotation_backup_count,
         )
 
+    _validate_http_api_args(args)
+
     log(INFO, "Starting Flower SuperLink")
 
     event(EventType.RUN_SUPERLINK_ENTER)
@@ -751,7 +753,9 @@ def _run_superlink_http_api(
     REST routers should call shared SuperLink services directly and this runtime
     should no longer bind gRPC ports.
     """
-    if lifespan_config.fleet_api_type == TRANSPORT_TYPE_REST:
+    start_legacy_grpc = not args.disable_grpc_api
+
+    if start_legacy_grpc and lifespan_config.fleet_api_type == TRANSPORT_TYPE_REST:
         flwr_exit(
             ExitCode.SUPERLINK_INVALID_ARGS,
             "`--enable-http-api` cannot be combined with `--fleet-api-type rest`",
@@ -766,19 +770,30 @@ def _run_superlink_http_api(
     except ModuleNotFoundError:
         flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
 
-    superlink_lifespan = SuperLinkLifespan(lifespan_config)
+    superlink_lifespan = (
+        SuperLinkLifespan(lifespan_config) if start_legacy_grpc else None
+    )
     fastapi_app = create_app(
         superlink_lifespan=superlink_lifespan,
-        start_legacy_grpc=True,
+        start_legacy_grpc=start_legacy_grpc,
     )
 
-    log(
-        WARN,
-        "EXPERIMENTAL: Starting the combined SuperLink FastAPI service on %s:%s. "
-        "The legacy gRPC APIs are started from FastAPI lifespan.",
-        args.host,
-        args.port,
-    )
+    if start_legacy_grpc:
+        log(
+            WARN,
+            "EXPERIMENTAL: Starting the combined SuperLink FastAPI service on %s:%s. "
+            "The legacy gRPC APIs are started from FastAPI lifespan.",
+            args.host,
+            args.port,
+        )
+    else:
+        log(
+            WARN,
+            "EXPERIMENTAL: Starting the SuperLink FastAPI service on %s:%s. "
+            "The legacy gRPC APIs are disabled.",
+            args.host,
+            args.port,
+        )
 
     # Uvicorn workers must stay at 1 while the lifespan starts gRPC servers. With
     # multiple workers, every worker process would try to bind the same Control,
@@ -793,6 +808,16 @@ def _run_superlink_http_api(
         ssl_certfile=None if args.insecure else args.ssl_certfile,
         workers=1,
     )
+
+
+def _validate_http_api_args(args: argparse.Namespace) -> None:
+    """Validate relationships between experimental HTTP API CLI flags."""
+    if args.disable_grpc_api and not args.enable_http_api:
+        flwr_exit(
+            ExitCode.SUPERLINK_INVALID_ARGS,
+            "`--disable-grpc-api` can only be used together with "
+            "`--enable-http-api`.",
+        )
 
 
 def _obtain_superlink_certificates(
@@ -1153,6 +1178,15 @@ def _add_args_http_api(parser: argparse.ArgumentParser) -> None:
         help=(
             "EXPERIMENTAL: Start one FastAPI HTTP server and let its lifespan "
             "start the legacy SuperLink gRPC APIs."
+        ),
+    )
+    parser.add_argument(
+        "--disable-grpc-api",
+        action="store_true",
+        default=False,
+        help=(
+            "EXPERIMENTAL: When used with `--enable-http-api`, start only the "
+            "HTTP API and do not start the legacy SuperLink gRPC APIs."
         ),
     )
     parser.add_argument(
