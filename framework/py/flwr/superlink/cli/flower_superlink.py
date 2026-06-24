@@ -223,6 +223,7 @@ class SuperLinkLifespanConfig:
     fleet_api_type: str
     fleet_api_address: str | None
     fleet_api_num_workers: int
+    simulation: bool
 
 
 class SuperLinkLifespan:
@@ -237,10 +238,28 @@ class SuperLinkLifespan:
     def __init__(self, config: SuperLinkLifespanConfig) -> None:
         self.config = config
         self.bckg_threads: list[threading.Thread] = []
+        self.objectstore_factory: ObjectStoreFactory | None = None
+        self.state_factory: LinkStateFactory | None = None
+        self._started = False
 
     def startup(self) -> None:
         """Start shared lifespan and legacy SuperLink gRPC servers."""
         log(INFO, "SuperLinkLifespan: start")
+
+        federation_manager = get_federation_manager(is_simulation=self.config.simulation)
+        objectstore_factory, state_factory = _get_objectstore_linkstate_factories(
+            self.config.database, federation_manager
+        )
+        state_factory.state()  # Force initialization before starting network servers
+        self.objectstore_factory = objectstore_factory
+        self.state_factory = state_factory
+
+        self._start_control_api()
+        self._start_serverappio_api()
+        self._start_fleet_api()
+        self._start_superexec_if_needed()
+        self._start_health_server_if_needed()
+        self._started = True
 
     def shutdown(self) -> None:
         """Stop legacy gRPC servers started by this lifespan."""
@@ -255,6 +274,36 @@ class SuperLinkLifespan:
         """
         while all(thread.is_alive() for thread in self.bckg_threads):
             sleep(0.1)
+    
+    def _start_control_api(self) -> None:
+        pass
+
+    def _start_serverappio_api(self) -> None:
+        pass
+
+    def _start_fleet_api(self) -> None:
+        pass
+
+    def _start_legacy_fleet_rest_api(
+        self, host: str, port: int, num_workers: int
+    ) -> None:
+        """Start the old Fleet REST API compatibility server.
+
+        TODO: Replace this separate uvicorn server with `flwr.superlink.routers.fleet`
+        routes mounted in the main FastAPI app.
+        """
+
+    def _start_legacy_fleet_grpc_rere(self, fleet_address: str) -> None:
+        pass
+
+    def _start_legacy_fleet_grpc_adapter(self, fleet_address: str) -> None:
+        """Start the current Fleet GrpcAdapter compatibility API."""
+
+    def _start_superexec_if_needed(self) -> None:
+        pass
+
+    def _start_health_server_if_needed(self) -> None:
+        pass
 
 
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
@@ -441,6 +490,7 @@ def flower_superlink() -> None:
         fleet_api_type=args.fleet_api_type,
         fleet_api_address=args.fleet_api_address,
         fleet_api_num_workers=args.fleet_api_num_workers,
+        simulation=args.simulation,
     )
 
     ###########################################################################
