@@ -10,6 +10,10 @@ We would like to give our special thanks to all the contributors who made the ne
 
 ### What's new?
 
+- **Introduce default federations on SuperGrid** ([#7436](https://github.com/flwrlabs/flower/pull/7436), [#7437](https://github.com/flwrlabs/flower/pull/7437), [#7460](https://github.com/flwrlabs/flower/pull/7460))
+
+  Introduces two default federations for every Flower account in SuperGrid, allowing `flwr run` commands targeting SuperGrid to run without explicitly specifying `--federation`.
+
 - **Enable runtime installation of Flower App dependencies** ([#7372](https://github.com/flwrlabs/flower/pull/7372), [#7386](https://github.com/flwrlabs/flower/pull/7386), [#7408](https://github.com/flwrlabs/flower/pull/7408), [#7410](https://github.com/flwrlabs/flower/pull/7410), [#7423](https://github.com/flwrlabs/flower/pull/7423), [#7428](https://github.com/flwrlabs/flower/pull/7428), [#7469](https://github.com/flwrlabs/flower/pull/7469))
 
   Enables automatic runtime installation of Flower App dependencies by default in SuperLink and improves error handling. For more information, see the [runtime dependency installation documentation](https://flower.ai/docs/framework/1.32/en/how-to-install-app-dependencies-at-runtime.html).
@@ -22,9 +26,9 @@ We would like to give our special thanks to all the contributors who made the ne
 
   Expands experimental Flower Agent capabilities in SuperGrid, including connectors for web search, web fetch, and browser use. Improved infrastructure and building blocks are part of the experimental Flower Agent foundation for upcoming enterprise-grade agentic AI workflows.
 
-- **Improve SuperLink high availability** ([#7371](https://github.com/flwrlabs/flower/pull/7371), [#7381](https://github.com/flwrlabs/flower/pull/7381))
+- **Improve SuperLink high availability** ([#7308](https://github.com/flwrlabs/flower/pull/7308), [#7371](https://github.com/flwrlabs/flower/pull/7371), [#7381](https://github.com/flwrlabs/flower/pull/7381), [#7387](https://github.com/flwrlabs/flower/pull/7387), [#7483](https://github.com/flwrlabs/flower/pull/7483))
 
-  Improves high-availability deployment capabilites for Flower SuperLink to improve the robustness of large-scale Flower SuperGrid deployments.
+  Improves high-availability deployment capabilites for Flower SuperLink to improve the robustness of large-scale Flower SuperGrid deployments. See the [documentation](https://flower.ai/docs/framework/1.32/en/explanation-superlink-high-availability.html) for more details.
 
 - **Update and fix Flower examples** ([#7364](https://github.com/flwrlabs/flower/pull/7364), [#7447](https://github.com/flwrlabs/flower/pull/7447))
 
@@ -34,7 +38,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Update documentation and translations** ([#7340](https://github.com/flwrlabs/flower/pull/7340), [#7358](https://github.com/flwrlabs/flower/pull/7358), [#7368](https://github.com/flwrlabs/flower/pull/7368), [#7398](https://github.com/flwrlabs/flower/pull/7398), [#7416](https://github.com/flwrlabs/flower/pull/7416), [#7424](https://github.com/flwrlabs/flower/pull/7424), [#7431](https://github.com/flwrlabs/flower/pull/7431), [#7446](https://github.com/flwrlabs/flower/pull/7446))
 
-- **General improvements** ([#6871](https://github.com/flwrlabs/flower/pull/6871), [#7307](https://github.com/flwrlabs/flower/pull/7307), [#7317](https://github.com/flwrlabs/flower/pull/7317), [#7332](https://github.com/flwrlabs/flower/pull/7332), [#7339](https://github.com/flwrlabs/flower/pull/7339), [#7361](https://github.com/flwrlabs/flower/pull/7361), [#7362](https://github.com/flwrlabs/flower/pull/7362), [#7374](https://github.com/flwrlabs/flower/pull/7374), [#7400](https://github.com/flwrlabs/flower/pull/7400), [#7402](https://github.com/flwrlabs/flower/pull/7402), [#7404](https://github.com/flwrlabs/flower/pull/7404), [#7413](https://github.com/flwrlabs/flower/pull/7413), [#7421](https://github.com/flwrlabs/flower/pull/7421), [#7426](https://github.com/flwrlabs/flower/pull/7426), [#7432](https://github.com/flwrlabs/flower/pull/7432), [#7434](https://github.com/flwrlabs/flower/pull/7434), [#7438](https://github.com/flwrlabs/flower/pull/7438), [#7439](https://github.com/flwrlabs/flower/pull/7439), [#7454](https://github.com/flwrlabs/flower/pull/7454), [#7461](https://github.com/flwrlabs/flower/pull/7461), [#7462](https://github.com/flwrlabs/flower/pull/7462), [#7464](https://github.com/flwrlabs/flower/pull/7464), [#7465](https://github.com/flwrlabs/flower/pull/7465), [#7466](https://github.com/flwrlabs/flower/pull/7466), [#7470](https://github.com/flwrlabs/flower/pull/7470))
+- **General improvements** ([#6871](https://github.com/flwrlabs/flower/pull/6871), [#7307](https://github.com/flwrlabs/flower/pull/7307), [#7317](https://github.com/flwrlabs/flower/pull/7317), [#7332](https://github.com/flwrlabs/flower/pull/7332), [#7339](https://github.com/flwrlabs/flower/pull/7339), [#7361](https://github.com/flwrlabs/flower/pull/7361), [#7362](https://github.com/flwrlabs/flower/pull/7362), [#7374](https://github.com/flwrlabs/flower/pull/7374), [#7400](https://github.com/flwrlabs/flower/pull/7400), [#7402](https://github.com/flwrlabs/flower/pull/7402), [#7404](https://github.com/flwrlabs/flower/pull/7404), [#7413](https://github.com/flwrlabs/flower/pull/7413), [#7421](https://github.com/flwrlabs/flower/pull/7421), [#7426](https://github.com/flwrlabs/flower/pull/7426), [#7432](https://github.com/flwrlabs/flower/pull/7432), [#7434](https://github.com/flwrlabs/flower/pull/7434), [#7438](https://github.com/flwrlabs/flower/pull/7438), [#7439](https://github.com/flwrlabs/flower/pull/7439), [#7454](https://github.com/flwrlabs/flower/pull/7454), [#7461](https://github.com/flwrlabs/flower/pull/7461), [#7462](https://github.com/flwrlabs/flower/pull/7462), [#7464](https://github.com/flwrlabs/flower/pull/7464), [#7465](https://github.com/flwrlabs/flower/pull/7465), [#7466](https://github.com/flwrlabs/flower/pull/7466), [#7470](https://github.com/flwrlabs/flower/pull/7470), [#7472](https://github.com/flwrlabs/flower/pull/7472), [#7474](https://github.com/flwrlabs/flower/pull/7474), [#7475](https://github.com/flwrlabs/flower/pull/7475), [#7477](https://github.com/flwrlabs/flower/pull/7477), [#7481](https://github.com/flwrlabs/flower/pull/7481), [#7484](https://github.com/flwrlabs/flower/pull/7484))
 
   As always, many parts of the Flower framework and quality infrastructure were improved and updated.
 
@@ -44,11 +48,9 @@ We would like to give our special thanks to all the contributors who made the ne
 
   Removes the SuperNode owner's account ID from the JSON output returned by `flwr supernode ls`.
 
-### default federations (TBD)
+- **Default simulations to 2 SuperNodes** ([#7476](https://github.com/flwrlabs/flower/pull/7476), [#7478](https://github.com/flwrlabs/flower/pull/7478), [#7479](https://github.com/flwrlabs/flower/pull/7479), [#7482](https://github.com/flwrlabs/flower/pull/7482))
 
-- **feat(framework): Set default federation in servicer when no federation is provided** ([#7460](https://github.com/flwrlabs/flower/pull/7460))
-- **feat(framework): Prepare creation of default federations** ([#7437](https://github.com/flwrlabs/flower/pull/7437))
-- **feat(framework): Include the federation affiliation of the started run in the** `StartRunResponse` ([#7436](https://github.com/flwrlabs/flower/pull/7436))
+  Changes the default number of SuperNodes in simulation runs from 10 to 2, updates related examples and tutorials, and adds a helper message at startup. See the [documentation](https://flower.ai/docs/framework/how-to-run-simulations.html#customize-the-simulation-runtime) to customize the number of SuperNodes.
 
 ## v1.31.0 (2026-06-08)
 
