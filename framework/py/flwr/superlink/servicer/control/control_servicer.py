@@ -24,7 +24,6 @@ from logging import ERROR, INFO
 from typing import Any, cast
 
 import grpc
-from ray import state
 import requests
 
 from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
