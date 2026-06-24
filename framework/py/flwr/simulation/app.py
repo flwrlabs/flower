@@ -263,7 +263,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         log(
             INFO,
             "Change the federation size with `flwr federation simulation-config "
-            "%s --num-supernodes <N>`. For more details see %s",
+            "%s <superlink> --num-supernodes <N>`. For more details see %s",
             run.federation,
             _get_simulation_guide_url(),
         )
