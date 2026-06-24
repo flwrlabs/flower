@@ -4,10 +4,9 @@
 
 Welcome to the second part of the Flower collaborative AI tutorial!
 
-In the previous tutorial, you created your first federation on SuperGrid using the
-simulation runtime. This allowed you to experiment with simulated SuperNodes, run an
-existing Flower App on SuperGrid, and explore the dashboard to follow its progress and
-view its logs.
+In the previous tutorial, you ran an existing Flower App on SuperGrid using your default
+workspace simulation federation. This allowed you to experiment with simulated
+SuperNodes and explore the dashboard to follow the app's progress and view its logs.
 
 In this tutorial, you'll pull the `@flwrlabs/demo
 <https://flower.ai/apps/flwrlabs/demo/>`__ app from Flower Hub and run it on SuperGrid
@@ -91,8 +90,7 @@ first login to SuperGrid:
     # This will open a browser window where you can enter your SuperGrid credentials.
     $ flwr login supergrid
 
-Once you are logged in, run the following command to run the app on SuperGrid and across
-your default federation:
+Once you are logged in, run the following command to run the app on SuperGrid:
 
 .. code-block:: shell
 
@@ -102,8 +100,8 @@ your default federation:
     $ flwr run . supergrid
 
 Then, if you navigate to the `SuperGrid dashboard <https://flower.ai/federations/>`__,
-you should see a new run in the list of runs of your federation. Click on it to see the
-run details and logs.
+you should see a new run in ``@<your-account>/workspace-simulation``. Click on it to see
+the run details and logs.
 
 .. image:: ./_static/second_run_started_dashboard.png
     :alt: SuperGrid dashboard showing the newly started run in the federation
