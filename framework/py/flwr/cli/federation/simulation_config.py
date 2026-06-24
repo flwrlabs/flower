@@ -28,10 +28,10 @@ from flwr.cli.utils import (
 from flwr.common.constant import CliOutputFormat
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationRequest,
-    ConfigureSimulationFederationResponse,
 )
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.supercore.constant import NOOP_FEDERATION
 
 
 def simulation_config(  # pylint: disable=R0913,R0917,W0613,R0914
@@ -182,11 +182,13 @@ def _configure_federation_for_simulation(
 ) -> None:
     """Send a request to configure a federation for simulation."""
     with flwr_cli_grpc_exc_handler():
-        _: ConfigureSimulationFederationResponse = stub.ConfigureSimulationFederation(
-            request
-        )
+        response = stub.ConfigureSimulationFederation(request)
+        federation = response.federation_name
 
     if is_json:
-        print_json_to_stdout({"success": True})
+        print_json_to_stdout({"success": True, "federation_name": federation})
     else:
-        typer.secho("✅ Updated simulation configuration.")
+        message = "✅ Updated simulation configuration"
+        if federation and federation != NOOP_FEDERATION:
+            message += f" of federation {federation}"
+        typer.secho(message)
