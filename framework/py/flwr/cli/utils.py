@@ -85,7 +85,7 @@ def print_json_to_stdout(data: str | Any) -> None:
 def log_superlink_connection(superlink_connection: SuperLinkConnection) -> None:
     """Log the selected SuperLink connection for human-readable CLI output."""
     typer.secho(
-        f"Using superlink: {superlink_connection.name} "
+        f"Using SuperLink: {superlink_connection.name} "
         f"({superlink_connection.address})",
         fg=typer.colors.BLUE,
     )
