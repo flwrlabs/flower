@@ -99,6 +99,9 @@ from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
 
 P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
 
+UVICORN_DEFAULT_HOST = "127.0.0.1"
+UVICORN_DEFAULT_PORT = 8000
+
 
 try:
     from flwr.ee import (
@@ -420,6 +423,29 @@ def flower_superlink() -> None:
             f" to the Flower documentation for more information: {url_v}{page}",
         )
 
+    lifespan_config = SuperLinkLifespanConfig(
+        serverappio_address=serverappio_address,
+        control_address=control_address,
+        health_server_address=health_server_address,
+        fleet_api_type=args.fleet_api_type,
+        fleet_api_address=args.fleet_api_address,
+        fleet_api_num_workers=args.fleet_api_num_workers,
+    )
+
+    ###########################################################################
+    # Run SuperLink in Compatibility Mode (FastAPI + gRPC)
+    ###########################################################################
+
+    # Enable this mode by running `flower-superlink --enable-http-api`
+    if args.enable_http_api:
+        # Blocking: this will run uvicorn.run()
+        _run_superlink_http_api(args=args, lifespan_config=lifespan_config)
+        return
+
+    ###########################################################################
+    # Run SuperLink in Legacy Mode (Only gRPC)
+    ###########################################################################
+
     # Load Federation Manager
     federation_manager = get_federation_manager(is_simulation=args.simulation)
 
@@ -581,6 +607,60 @@ def _format_address(address: str) -> tuple[str, str, int]:
         )
     host, port, is_v6 = parsed_address
     return (f"[{host}]:{port}" if is_v6 else f"{host}:{port}", host, port)
+
+
+def _run_superlink_http_api(
+    args: argparse.Namespace, lifespan_config: SuperLinkLifespanConfig
+) -> None:
+    """Run the experimental FastAPI-owned SuperLink service.
+
+    In this mode, FastAPI owns process startup and starts the current
+    gRPC APIs from its lifespan as legacy compatibility adapters. Later, the
+    REST routers should call shared SuperLink services directly and this runtime
+    should no longer bind gRPC ports.
+    """
+    if lifespan_config.fleet_api_type == TRANSPORT_TYPE_REST:
+        flwr_exit(
+            ExitCode.SUPERLINK_INVALID_ARGS,
+            "`--enable-http-api` cannot be combined with `--fleet-api-type rest`",
+        )
+    if importlib.util.find_spec("uvicorn") is None:
+        flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
+
+    try:
+        import uvicorn
+
+        from flwr.superlink.main import create_app
+    except ModuleNotFoundError:
+        flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
+
+    superlink_lifespan = SuperLinkLifespan(lifespan_config)
+    fastapi_app = create_app(
+        superlink_lifespan=superlink_lifespan,
+        start_legacy_grpc=True,
+    )
+
+    log(
+        WARN,
+        "EXPERIMENTAL: Starting the combined SuperLink FastAPI service on %s:%s. "
+        "The legacy gRPC APIs are started from FastAPI lifespan.",
+        args.host,
+        args.port,
+    )
+
+    # Uvicorn workers must stay at 1 while the lifespan starts gRPC servers. With
+    # multiple workers, every worker process would try to bind the same Control,
+    # Fleet, and ServerAppIo ports.
+    uvicorn.run(
+        app=fastapi_app,
+        host=args.host,
+        port=args.port,
+        reload=False,
+        access_log=True,
+        ssl_keyfile=None if args.insecure else args.ssl_keyfile,
+        ssl_certfile=None if args.insecure else args.ssl_certfile,
+        workers=1,
+    )
 
 
 def _obtain_superlink_certificates(
@@ -835,6 +915,7 @@ def _parse_args_run_superlink() -> argparse.ArgumentParser:
 
     _add_args_common(parser=parser)
     add_ee_args_superlink(parser=parser)
+    _add_args_http_api(parser=parser)
     _add_args_serverappio_api(parser=parser)
     _add_args_fleet_api(parser=parser)
     _add_args_control_api(parser=parser)
@@ -932,6 +1013,35 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
     add_superexec_auth_secret_args(parser)
 
 
+def _add_args_http_api(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--enable-http-api",
+        action="store_true",
+        default=False,
+        help=(
+            "EXPERIMENTAL: Start one FastAPI HTTP server and let its lifespan "
+            "start the legacy SuperLink gRPC APIs."
+        ),
+    )
+    parser.add_argument(
+        "--host",
+        default=UVICORN_DEFAULT_HOST,
+        help=(
+            "Host for the experimental FastAPI HTTP server. "
+            f"By default, it is set to {UVICORN_DEFAULT_HOST}."
+        ),
+    )
+    parser.add_argument(
+        "--port",
+        type=_port_int,
+        default=UVICORN_DEFAULT_PORT,
+        help=(
+            "Port for the experimental FastAPI HTTP server. "
+            f"By default, it is set to {UVICORN_DEFAULT_PORT}."
+        ),
+    )
+
+
 def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--serverappio-api-address",
@@ -969,6 +1079,13 @@ def _positive_int(value: str) -> int:
     parsed = int(value)
     if parsed < 1:
         raise argparse.ArgumentTypeError("value must be >= 1")
+    return parsed
+
+
+def _port_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0 or parsed > 65535:
+        raise argparse.ArgumentTypeError("value must be between 0 and 65535")
     return parsed
 
 
