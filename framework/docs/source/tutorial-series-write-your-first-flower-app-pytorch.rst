@@ -146,8 +146,7 @@ first login to SuperGrid:
     # This will open a browser window where you can enter your SuperGrid credentials.
     $ flwr login supergrid
 
-Once you are logged in, run the following command to run the app on SuperGrid and across
-the federation you created in the previous tutorial:
+Once you are logged in, run the following command to run the app on SuperGrid:
 
 .. code-block:: shell
 
@@ -178,6 +177,12 @@ You can override values from ``pyproject.toml`` at run time. For example:
         --run-config "num-server-rounds=5" \
         --run-config "batch-size=16"
 
+.. tip::
+
+    Use ``flwr run --federation`` to choose which federation runs your app. If you omit
+    it, Flower uses ``@<your-account>/workspace-simulation``. Learn more in :doc:`Create
+    and Manage Federations on SuperGrid <how-to-create-and-manage-federations>`.
+
 *********************
  Run the App Locally
 *********************
@@ -186,21 +191,16 @@ Running on SuperGrid is the recommended way to run collaborative AI workflows wi
 Flower. However, it is also useful to run the same app locally while you are developing
 or debugging.
 
-From the ``quickstart-pytorch`` directory, install the app and its dependencies into
-your Python environment:
+Navigate to the directory where the app was downloaded, then run the app locally with
+the command below. Flower will start a managed local SuperLink -- a distilled version of
+SuperGrid -- and execute the app with simulated SuperNodes on your machine. The first
+run can take longer because the app needs to download CIFAR-10 and install the
+dependencies of your App. With the flag ``--stream``, you can see the logs from the
+local run in your terminal.
 
 .. code-block:: shell
 
     $ cd /path/to/quickstart-pytorch
-
-Then run the app locally with the command below. Flower will start a managed local
-SuperLink -- a distilled version of SuperGrid -- and execute the app with simulated
-SuperNodes on your machine. The first run can take longer because the app needs to
-download CIFAR-10 and install the dependencies of your App. With the flag ``--stream``,
-you can see the logs from the local run in your terminal.
-
-.. code-block:: shell
-
     $ flwr run . local --stream
 
 The streamed output should include logs similar to this:
@@ -555,7 +555,7 @@ configured with two key parameters:
 - ``fraction-train=1.0`` → select 100% of the available clients for training
 - ``fraction-evaluate=1.0`` → select 100% of the available clients for evaluation
 
-This means in our example, all clients (SuperNodes) will sampled for both a round of
+This means in our example, all clients (SuperNodes) will be sampled for both a round of
 training and evaluation.
 
 A typical round looks like this:
