@@ -31,11 +31,11 @@ The only prerequisite for this tutorial is to have an account for SuperGrid. Sig
  Run a Flower App
 ******************
 
-Once you have loged into flower.ai, you are ready to start running Flower Apps. A Flower
-App is a Python project that defines the logic of your collaborative AI workload. More
-details will be covered in the next tutorial, but for now you can think of a Flower App
-as the code that defines what happens on the server (SuperGrid) and SuperNodes during
-your collaborative AI workload.
+Once you have logged into flower.ai, you are ready to start running Flower Apps. A
+Flower App is a Python project that defines the logic of your collaborative AI workload.
+More details will be covered in the next tutorial, but for now you can think of a Flower
+App as the code that defines what happens on the server (SuperGrid) and SuperNodes
+during your collaborative AI workload.
 
 `Flower Hub <https://flower.ai/apps/>`__ is a collection of open-source Flower Apps that
 you can use and learn from. In this tutorial, you'll use the `@flwrlabs/demo
@@ -49,7 +49,8 @@ by the clients.
     :target: ./_static/demo_app.png
 
 When you click the ``🚀 Run`` button, you'll be asked which federation to run the app on.
-Select ``@<your-account>/workspace-simulation``, then click ``Run app``.
+Select ``@<your-account>/workspace-simulation`` (this is a federation created
+automatically by SuperGrid under your profile), then click ``Run app``.
 
 .. image:: ./_static/run_app_button.png
     :alt: Run app dialog in SuperGrid
