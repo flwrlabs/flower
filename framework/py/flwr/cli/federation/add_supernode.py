@@ -31,7 +31,6 @@ from ..utils import (
     cli_output_handler,
     flwr_cli_grpc_exc_handler,
     init_channel_from_connection,
-    log_superlink_connection,
     print_json_to_stdout,
 )
 
@@ -66,7 +65,6 @@ def add_supernode(
 
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
-        log_superlink_connection(superlink_connection, is_json)
         channel = None
 
         try:

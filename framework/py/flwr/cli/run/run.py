@@ -47,7 +47,6 @@ from ..utils import (
     cli_output_handler,
     flwr_cli_grpc_exc_handler,
     init_channel_from_connection,
-    log_superlink_connection,
     print_json_to_stdout,
 )
 
@@ -141,7 +140,6 @@ def run(
 
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
-        log_superlink_connection(superlink_connection, is_json)
 
         _run_with_control_api(
             app_path,

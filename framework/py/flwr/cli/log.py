@@ -32,11 +32,7 @@ from flwr.common.logger import log as logger
 from flwr.proto.control_pb2 import StreamLogsRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 
-from .utils import (
-    flwr_cli_grpc_exc_handler,
-    init_channel_from_connection,
-    log_superlink_connection,
-)
+from .utils import flwr_cli_grpc_exc_handler, init_channel_from_connection
 
 
 class AllLogsRetrieved(BaseException):
@@ -198,7 +194,6 @@ def log(
 
     # Read superlink connection configuration
     superlink_connection = read_superlink_connection(superlink)
-    log_superlink_connection(superlink_connection)
 
     try:
         _log_with_control_api(superlink_connection, run_id, stream)

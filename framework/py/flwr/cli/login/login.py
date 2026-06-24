@@ -22,7 +22,7 @@ import typer
 
 from flwr.cli.auth_plugin import LoginError, NoOpCliAuthPlugin
 from flwr.cli.constant import FEDERATION_CONFIG_HELP_MESSAGE
-from flwr.cli.utils import init_channel_from_connection, log_superlink_connection
+from flwr.cli.utils import init_channel_from_connection
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
@@ -59,7 +59,6 @@ def login(
 
     # Read superlink connection configuration
     superlink_connection = read_superlink_connection(superlink)
-    log_superlink_connection(superlink_connection)
     superlink = superlink_connection.name
 
     # Check if insecure flag is set to `True`
