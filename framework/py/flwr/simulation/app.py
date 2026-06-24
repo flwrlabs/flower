@@ -73,6 +73,7 @@ from flwr.supercore.superexec.dependency_installer import (
 )
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
+from flwr.supercore.version import package_version
 
 # Disable Ray's uv runtime-env hook when running flwr-simulation.
 os.environ.setdefault("RAY_ENABLE_UV_RUN_RUNTIME_ENV", "0")
@@ -233,6 +234,32 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             stub=conn._stub,
         )
 
+        # Extract federation configuration
+        (
+            num_supernodes,
+            backend_name,
+            backend_config,
+            verbose,
+            enable_tf_gpu_growth,
+        ) = _run_simulation_settings(res.federation_config)
+        # Log federation size
+        docs_version = ".".join(package_version.split(".")[:2])
+        log(
+            INFO,
+            "Federation `%s` has %s virtual SuperNodes.",
+            run.federation,
+            num_supernodes,
+        )
+        # Indicate how to resize federation
+        log(
+            INFO,
+            "Change the federation size with `flwr federation simulation-config "
+            "%s --num-supernodes <N>`. For more details see https://flower.ai/docs/framework/%s/en/"
+            "how-to-run-simulations.html",
+            run.federation,
+            docs_version,
+        )
+
         log(DEBUG, "Simulation process starts FAB installation.")
         install_from_fab(fab.content, skip_prompt=True)
 
@@ -282,14 +309,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             client_app_attr,
             app_path,
         )
-
-        (
-            num_supernodes,
-            backend_name,
-            backend_config,
-            verbose,
-            enable_tf_gpu_growth,
-        ) = _run_simulation_settings(res.federation_config)
 
         run_id_hash = get_sha256_hash(run.run_id)
         event(
