@@ -88,7 +88,9 @@ def log_superlink_connection(
     """Log the selected SuperLink connection for human-readable CLI output."""
     if not is_json:
         typer.secho(
-            f"Using superlink: {superlink_connection.name}", fg=typer.colors.BLUE
+            f"Using superlink: {superlink_connection.name} "
+            f"({superlink_connection.address})",
+            fg=typer.colors.BLUE,
         )
 
 
