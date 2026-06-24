@@ -90,8 +90,7 @@ first login to SuperGrid:
     # This will open a browser window where you can enter your SuperGrid credentials.
     $ flwr login supergrid
 
-Once you are logged in, run the following command to run the app on SuperGrid using your
-default workspace simulation federation:
+Once you are logged in, run the following command to run the app on SuperGrid:
 
 .. code-block:: shell
 
