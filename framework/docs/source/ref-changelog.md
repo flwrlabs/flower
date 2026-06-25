@@ -54,13 +54,6 @@ We would like to give our special thanks to all the contributors who made the ne
 
   Changes the default number of SuperNodes in simulation runs from 10 to 2, updates related examples and tutorials, and adds a helper message at startup. See the [documentation](https://flower.ai/docs/framework/how-to-run-simulations.html#customize-the-simulation-runtime) to customize the number of SuperNodes.
 
-### New features
-
-### Documentation improvements
-
-- **refactor(framework): Remove constant for default deployment federation** ()
-- **refactor(framework): Adjust default federation name in Flower tutorial** ()
-
 ## v1.31.0 (2026-06-08)
 
 ### Thanks to our contributors
