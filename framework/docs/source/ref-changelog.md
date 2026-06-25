@@ -12,7 +12,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Introduce default federations on SuperGrid** ([#7436](https://github.com/flwrlabs/flower/pull/7436), [#7437](https://github.com/flwrlabs/flower/pull/7437), [#7460](https://github.com/flwrlabs/flower/pull/7460), [#7486](https://github.com/flwrlabs/flower/pull/7486), [#7488](https://github.com/flwrlabs/flower/pull/7488), [#7491](https://github.com/flwrlabs/flower/pull/7491), [#7492](https://github.com/flwrlabs/flower/pull/7492))
 
-  Introduces default federations for every Flower account in SuperGrid, allowing `flwr run` commands targeting SuperGrid to run without explicitly specifying `--federation`. Run your first Flower App on SuperGrid by taking [the tutorial](https://flower.ai/docs/framework/1.32/en/tutorial-series-get-started-with-flower.html). 
+  Introduces default federations for every Flower account in SuperGrid, allowing `flwr run` commands targeting SuperGrid to run without explicitly specifying `--federation`. Run your first Flower App on SuperGrid by taking [the tutorial](https://flower.ai/docs/framework/1.32/en/tutorial-series-get-started-with-flower.html).
 
 - **Enable runtime installation of Flower App dependencies** ([#7372](https://github.com/flwrlabs/flower/pull/7372), [#7386](https://github.com/flwrlabs/flower/pull/7386), [#7408](https://github.com/flwrlabs/flower/pull/7408), [#7410](https://github.com/flwrlabs/flower/pull/7410), [#7423](https://github.com/flwrlabs/flower/pull/7423), [#7428](https://github.com/flwrlabs/flower/pull/7428), [#7469](https://github.com/flwrlabs/flower/pull/7469), [#7494](https://github.com/flwrlabs/flower/pull/7494))
 
