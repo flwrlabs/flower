@@ -49,8 +49,8 @@ by the clients.
     :target: ./_static/demo_app.png
 
 When you click the ``🚀 Run`` button, you'll be asked which federation to run the app on.
-Select ``@<your-account>/workspace-simulation`` (this is a federation created
-automatically by SuperGrid under your profile), then click ``Run app``.
+Select ``@<your-account>/workspace`` (this is a federation created automatically by
+SuperGrid under your profile), then click ``Run app``.
 
 .. image:: ./_static/run_app_button.png
     :alt: Run app dialog in SuperGrid

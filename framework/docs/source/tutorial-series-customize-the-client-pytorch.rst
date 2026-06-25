@@ -49,14 +49,12 @@ If you are starting here directly, install Flower and fetch the same app:
 
 .. code-block:: shell
 
-    # Install Flower with the simulation extra
-    $ pip install -U "flwr[simulation]"
+    # Install Flower
+    $ pip install -U flwr
     # Fetch the app from Flower Hub
     $ flwr new @flwrlabs/quickstart-pytorch
     # Navigate to the app directory
     $ cd quickstart-pytorch
-    # Install the app dependencies
-    $ pip install -e .
 
 Constructing Messages
 =====================

@@ -40,7 +40,7 @@ First, we install the Flower package ``flwr`` in a new Python environment.
 
 .. code-block:: shell
 
-    $ pip install -U "flwr"
+    $ pip install -U flwr
 
 Then, use ``flwr new`` to fetch an existing Flower App from the Flower Hub. In this
 case, you'll fetch the `@flwrlabs/demo <https://flower.ai/apps/flwrlabs/demo/>`__ app.
@@ -100,8 +100,8 @@ Once you are logged in, run the following command to run the app on SuperGrid:
     $ flwr run . supergrid
 
 Then, if you navigate to the `SuperGrid dashboard <https://flower.ai/federations/>`__,
-you should see a new run in ``@<your-account>/workspace-simulation``. Click on it to see
-the run details and logs.
+you should see a new run in ``@<your-account>/workspace``. Click on it to see the run
+details and logs.
 
 .. image:: ./_static/second_run_started_dashboard.png
     :alt: SuperGrid dashboard showing the newly started run in the federation
