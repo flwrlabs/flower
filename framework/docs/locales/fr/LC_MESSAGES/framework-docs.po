@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-06-20 00:31+0000\n"
+"POT-Creation-Date: 2026-06-25 00:31+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -67,12 +67,12 @@ msgstr ""
 "pour contribuer au code, à la documentation, aux traductions et plus "
 "encore pour avancer l'apprentissage fédéré avec Flower."
 
-#: ../../source/contribute.rst:7 ../../source/index.rst:115
-#: ../../source/index.rst:120
+#: ../../source/contribute.rst:7 ../../source/index.rst:116
+#: ../../source/index.rst:121
 msgid "Contribute"
 msgstr "Contribuer"
 
-#: ../../source/contribute.rst:9 ../../source/index.rst:117
+#: ../../source/contribute.rst:9 ../../source/index.rst:118
 msgid ""
 "The Flower community welcomes contributions. The following docs are "
 "intended to help along the way."
@@ -106,7 +106,7 @@ msgstr ""
 
 #: ../../source/contribute.rst:58
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:365
-#: ../../source/index.rst:105 ../../source/index.rst:107
+#: ../../source/index.rst:106 ../../source/index.rst:108
 #: ../../source/reference.rst:7
 msgid "References"
 msgstr "Références"
@@ -2471,13 +2471,13 @@ msgstr ""
 "Flower !"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:354
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:382
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:371
-#: ../../source/tutorial-series-get-started-with-flower.rst:148
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:363
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:381
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:369
+#: ../../source/tutorial-series-get-started-with-flower.rst:105
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:361
 #: ../../source/tutorial-series-what-is-federated-learning.rst:362
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:605
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:292
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:603
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:288
 msgid "Next steps"
 msgstr "Prochaines étapes"
 
@@ -6907,6 +6907,158 @@ msgstr ""
 " le ``ClientApp`` est connecté au ``SuperNode``; ainsi, la communication "
 "entre le ``ServerApp`` et le ``ClientApp`` est effectuée via le "
 "``SuperLink`` et le ``SuperNode``."
+
+#: ../../source/explanation-ref-secure-aggregation-protocols.rst:42
+msgid "SecAgg+ protocol sequence diagram"
+msgstr ""
+
+#: ../../source/explanation-ref-secure-aggregation-protocols.rst:46
+msgid "SecAgg+ protocol sequence diagram (dark theme)"
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:-1
+msgid ""
+"Learn how SuperLink High Availability Mode works in Flower SuperGrid, "
+"including the load balancer, SuperLink replicas, and PostgreSQL-backed "
+"shared state."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:7
+msgid "SuperLink High Availability Mode"
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:9
+msgid ""
+"SuperLink High Availability Mode is an architecture for running SuperLink"
+" without a single SuperLink process acting as the only entry point for a "
+"federation. Instead, traffic is routed through a load balancer to "
+"multiple SuperLink replicas that share durable state in a PostgreSQL "
+"backend."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:16
+msgid ""
+"SuperLink High Availability Mode is available in preview. To discuss "
+"production requirements or request preview access, contact the Flower "
+"team at hello@flower.ai."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:19
+msgid ""
+"This page describes the architecture at a high level. It is not a "
+"deployment guide."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:23
+#, fuzzy
+msgid "Architecture"
+msgstr "Flower Architecture (architecture de Flower)"
+
+#: ../../source/explanation-superlink-high-availability.rst:25
+msgid ""
+"In a standard Deployment Runtime setup, callers and SuperNodes connect to"
+" one long-running SuperLink. In High Availability Mode, callers and "
+"SuperNodes connect to a stable load-balanced endpoint. The load balancer "
+"distributes requests across multiple SuperLink replicas. Each replica "
+"reads and writes shared state through the same PostgreSQL backend, so the"
+" replicas observe the same federation, run, node, message, and object "
+"state."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:32
+msgid "SuperLink High Availability architecture"
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:37
+#, fuzzy
+msgid "SuperLink High Availability architecture (dark theme)"
+msgstr "Architecture Flower de base (thème sombre)"
+
+#: ../../source/explanation-superlink-high-availability.rst:42
+#, fuzzy
+msgid "The main components are:"
+msgstr "Composants d'application"
+
+#: ../../source/explanation-superlink-high-availability.rst:44
+msgid ""
+"**Load balancer**: exposes the stable SuperLink endpoint used by ``flwr``"
+" CLI commands, SuperNodes, and SuperExec processes. It routes traffic "
+"only to healthy SuperLink replicas."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:47
+msgid ""
+"**SuperLink replicas**: run the same SuperLink service role in parallel. "
+"Any healthy replica can handle requests for the federation because state "
+"is externalized."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:49
+msgid ""
+"**PostgreSQL backend**: stores shared SuperLink state durably so replicas"
+" can observe the same runs, messages, node registrations, and object "
+"metadata."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:51
+msgid ""
+"**SuperNodes and SuperExec**: continue to connect to a SuperLink "
+"endpoint. They do not need to know which SuperLink replica handles an "
+"individual request."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:56
+#, fuzzy
+msgid "Operational properties"
+msgstr "Améliorations facultatives"
+
+#: ../../source/explanation-superlink-high-availability.rst:58
+msgid ""
+"High Availability Mode is designed to reduce the impact of losing an "
+"individual SuperLink process. If one SuperLink replica becomes "
+"unavailable, the load balancer can route new requests to another healthy "
+"replica while the shared PostgreSQL backend continues to provide the "
+"federation state."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:63
+msgid ""
+"This changes the deployment architecture of the SuperLink layer, but it "
+"does not change the Flower app programming model:"
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:66
+msgid "``ServerApp`` and ``ClientApp`` code remains the same."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:67
+msgid ""
+"SuperNodes connect to the configured SuperLink endpoint, not to "
+"individual replicas."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:68
+msgid ""
+"Operators monitor and scale SuperLink replicas as part of the SuperGrid "
+"deployment."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:69
+msgid ""
+"The load balancer and PostgreSQL backend become critical infrastructure "
+"and must be operated with their own availability, backup, and monitoring "
+"strategy."
+msgstr ""
+
+#: ../../source/explanation-superlink-high-availability.rst:72
+msgid ""
+"High Availability Mode should be understood as part of a production "
+"SuperGrid architecture. It improves resilience at the SuperLink layer, "
+"but end-to-end production availability still depends on the surrounding "
+"infrastructure, including load balancing, database availability, "
+"networking, authentication services, and application-level retry "
+"behavior."
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md
 msgid ""
@@ -12632,7 +12784,6 @@ msgstr ""
 "fédération."
 
 #: ../../source/how-to-create-and-manage-federations.rst:36
-#: ../../source/tutorial-series-get-started-with-flower.rst:32
 msgid "Create a Federation"
 msgstr "Créer une Fédération"
 
@@ -14339,9 +14490,11 @@ msgid "First, we install the Flower package ``flwr``:"
 msgstr "Tout d'abord, nous installons le package Flower ``flwr`` :"
 
 #: ../../source/how-to-migrate-from-openfl.rst:69
+#: ../../source/tutorial-quickstart-fastai.rst:23
 #: ../../source/tutorial-quickstart-huggingface.rst:31
 #: ../../source/tutorial-quickstart-jax.rst:31
 #: ../../source/tutorial-quickstart-mlx.rst:66
+#: ../../source/tutorial-quickstart-pytorch-lightning.rst:24
 #: ../../source/tutorial-quickstart-pytorch.rst:67
 #: ../../source/tutorial-quickstart-scikitlearn.rst:58
 #: ../../source/tutorial-quickstart-tensorflow.rst:59
@@ -14747,7 +14900,7 @@ msgstr ""
 "``Run app``."
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:39
-#: ../../source/tutorial-series-get-started-with-flower.rst:98
+#: ../../source/tutorial-series-get-started-with-flower.rst:55
 msgid "Run app dialog in SuperGrid"
 msgstr "Dialogue d'exécution dans SuperGrid"
 
@@ -14761,7 +14914,7 @@ msgstr ""
 "l'état de l'exécution."
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:47
-#: ../../source/tutorial-series-get-started-with-flower.rst:107
+#: ../../source/tutorial-series-get-started-with-flower.rst:64
 msgid "Run details page showing the progress of the app execution"
 msgstr "Page des détails d'exécution montrant le progrès de l'application"
 
@@ -14770,7 +14923,7 @@ msgid "Open the ``Logs`` tab to inspect the app logs."
 msgstr "Ouvrez la page ``Logs`` pour inspecter les journaux d'application."
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:54
-#: ../../source/tutorial-series-get-started-with-flower.rst:118
+#: ../../source/tutorial-series-get-started-with-flower.rst:75
 msgid "Logs tab showing logs from the app execution"
 msgstr "Onglet des journaux montrant les journaux de l'exécution de l'application"
 
@@ -14783,7 +14936,7 @@ msgstr ""
 "la liste des exécutions pour cette fédération."
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:62
-#: ../../source/tutorial-series-get-started-with-flower.rst:137
+#: ../../source/tutorial-series-get-started-with-flower.rst:94
 msgid "Federation details page showing the run that was launched"
 msgstr "Page de détails de la fédération montrant l'exécution qui a été lancée"
 
@@ -14843,7 +14996,7 @@ msgstr ""
 "fédération."
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:107
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:110
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:106
 msgid "SuperGrid dashboard showing the newly started run in the federation"
 msgstr ""
 "Interface de dashboard SuperGrid montrant l'exécution lancée récemment "
@@ -18350,9 +18503,10 @@ msgid "Launch your Flower simulation"
 msgstr "Lancer votre simulation Flower"
 
 #: ../../source/how-to-run-simulations.rst:102
+#, fuzzy
 msgid ""
-"If you haven't already, install Flower via ``pip install -U "
-"\"flwr[simulation]\"`` in a Python environment."
+"If you haven't already, install Flower via ``pip install -U flwr`` in a "
+"Python environment."
 msgstr ""
 "Si vous n'avez pas déjà fait cela, installez Flower via ``pip install -U "
 "\"flwr[simulation]\"`` dans un environnement Python."
@@ -18490,11 +18644,12 @@ msgid "Customize the Simulation Runtime"
 msgstr "Personnaliser le Simulation Runtime"
 
 #: ../../source/how-to-run-simulations.rst:160
+#, fuzzy
 msgid ""
-"By default, the Simulation Runtime simulates a cohort of 10 SuperNodes "
+"By default, the Simulation Runtime simulates a cohort of two SuperNodes "
 "and assigns two CPU cores to each backend worker. This means that if your"
-" system has 12 CPU cores, six backend workers can be running in parallel,"
-" each executing a different ``ClientApp`` instance."
+" system has four or more CPU cores, all backend workers can be running in"
+" parallel, each executing a different ``ClientApp`` instance."
 msgstr ""
 "Par défaut, le Simulation Runtime simule un lot de 10 SuperNodes et "
 "affecte deux cœurs CPU à chaque worker backend. Cela signifie que si "
@@ -21691,7 +21846,7 @@ msgstr "Deploy"
 msgid "How-to Guides"
 msgstr "Guide pratique"
 
-#: ../../source/index.rst:120
+#: ../../source/index.rst:121
 msgid "Contributor docs"
 msgstr "Documents du contributeur"
 
@@ -22634,8 +22789,11 @@ msgid "Create a model response."
 msgstr "Créer une réponse du modèle."
 
 #: flwr.agentapp.base.AgentResponses.create:3 of
-msgid "Open Responses-compatible create request."
-msgstr "Demande de création compatible avec Open Responses."
+msgid ""
+"Open Responses-compatible create request. Built-in connector tools can be"
+" requested by name in ``tools``, for example ``[\"web_search\"]``. Built-"
+"in connector names are reserved for runtime-managed tools."
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst
 #: ../../source/ref-api/flwr.app.Array.rst
@@ -22672,7 +22830,7 @@ msgstr "Demande de création compatible avec Open Responses."
 msgid "Returns"
 msgstr "Type de retour"
 
-#: flwr.agentapp.base.AgentResponses.create:6 of
+#: flwr.agentapp.base.AgentResponses.create:9 of
 msgid "**response** -- Open Responses-compatible response."
 msgstr "**Réponse** -- Réponse compatible avec Open Responses."
 
@@ -45993,7 +46151,9 @@ msgstr "[608] COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR"
 #: ../../source/ref-exit-codes/608.rst:9
 #, fuzzy
 msgid "Runtime installation of Flower App dependencies failed."
-msgstr "L'installation à l'exécution des dépendances des applications Flower a échoué."
+msgstr ""
+"L'installation à l'exécution des dépendances des applications Flower a "
+"échoué."
 
 #: ../../source/ref-exit-codes/608.rst:15
 msgid ""
@@ -46600,10 +46760,11 @@ msgid "**Basic simulation configuration**"
 msgstr "**Configuration de simulation de base**"
 
 #: ../../source/ref-flower-configuration.rst:134
+#, fuzzy
 msgid ""
 "This creates a managed local SuperLink profile using the default "
-"simulation configuration, which involves running 10 simulated SuperNodes "
-"through the simulation runtime. Check the :doc:`Simulation Runtime docs "
+"simulation configuration, which involves running two simulated SuperNodes"
+" through the simulation runtime. Check the :doc:`Simulation Runtime docs "
 "<how-to-run-simulations>` to learn how to customize the number of "
 "SuperNodes and resources (CPU/GPU) allocated to your simulations."
 msgstr ""
@@ -48024,28 +48185,28 @@ msgstr ""
 " dans un :doc:`virtualenv <contributor-how-to-set-up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-fastai.rst:15
+#: ../../source/tutorial-quickstart-huggingface.rst:23
+#: ../../source/tutorial-quickstart-jax.rst:23
+#: ../../source/tutorial-quickstart-mlx.rst:58
 #: ../../source/tutorial-quickstart-pytorch-lightning.rst:16
-msgid "Then, clone the code example directly from GitHub:"
-msgstr "Alors, clonez l'exemple de code directement depuis GitHub :"
-
-#: ../../source/tutorial-quickstart-fastai.rst:23
+#: ../../source/tutorial-quickstart-pytorch.rst:59
+#: ../../source/tutorial-quickstart-scikitlearn.rst:50
+#: ../../source/tutorial-quickstart-tensorflow.rst:51
+#: ../../source/tutorial-quickstart-xgboost.rst:64
 msgid ""
-"This will create a new directory called `quickstart-fastai` containing "
-"the following files:"
+"Now that we have a rough idea of what this example is about, let's get "
+"started. First, install Flower in your new environment:"
 msgstr ""
-"Cela créera un nouveau répertoire appelé `quickstart-fastai` contenant "
-"les fichiers suivants :"
+"Maintenant que nous avons une idée approximative de ce que cet exemple "
+"est sur, allons-y. Tout d'abord, installez Flower dans votre nouvel "
+"environnement :"
 
-#: ../../source/tutorial-quickstart-fastai.rst:36
-#: ../../source/tutorial-quickstart-pytorch-lightning.rst:37
-msgid "Next, activate your environment, then run:"
-msgstr "Ensuite, activez votre environnement, puis exécutez :"
-
-#: ../../source/tutorial-quickstart-fastai.rst:46
+#: ../../source/tutorial-quickstart-fastai.rst:39
+#, fuzzy
 msgid ""
 "This example uses a local simulation profile that ``flwr run`` submits to"
 " a managed local SuperLink, which then executes the run with the Flower "
-"Simulation Runtime, creating a federation of 10 nodes using `FedAvg "
+"Simulation Runtime, creating a federation of two nodes using `FedAvg "
 "<https://flower.ai/docs/framework/ref-"
 "api/flwr.serverapp.strategy.FedAvg.html#flwr.server.strategy.FedAvg>`_ as"
 " the aggregation strategy. The dataset will be partitioned using Flower "
@@ -48063,15 +48224,15 @@ msgstr ""
 "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_"
 " du Dataset Flower. Laissez-nous exécuter le projet :"
 
-#: ../../source/tutorial-quickstart-fastai.rst:60
-#: ../../source/tutorial-quickstart-huggingface.rst:65
-#: ../../source/tutorial-quickstart-jax.rst:65
-#: ../../source/tutorial-quickstart-mlx.rst:100
-#: ../../source/tutorial-quickstart-pytorch-lightning.rst:58
-#: ../../source/tutorial-quickstart-pytorch.rst:101
-#: ../../source/tutorial-quickstart-scikitlearn.rst:92
-#: ../../source/tutorial-quickstart-tensorflow.rst:93
-#: ../../source/tutorial-quickstart-xgboost.rst:106
+#: ../../source/tutorial-quickstart-fastai.rst:55
+#: ../../source/tutorial-quickstart-huggingface.rst:60
+#: ../../source/tutorial-quickstart-jax.rst:60
+#: ../../source/tutorial-quickstart-mlx.rst:95
+#: ../../source/tutorial-quickstart-pytorch-lightning.rst:57
+#: ../../source/tutorial-quickstart-pytorch.rst:96
+#: ../../source/tutorial-quickstart-scikitlearn.rst:87
+#: ../../source/tutorial-quickstart-tensorflow.rst:88
+#: ../../source/tutorial-quickstart-xgboost.rst:101
 msgid ""
 "Plain ``flwr run .`` submits the run, prints the run ID, and returns "
 "without streaming logs. For the full local workflow, see :doc:`how-to-"
@@ -48081,25 +48242,25 @@ msgstr ""
 "et retourne sans diffuser les journaux. Pour le workflow local complet, "
 "voir :doc:`how-to-run-flower-locally`."
 
-#: ../../source/tutorial-quickstart-fastai.rst:63
-#: ../../source/tutorial-quickstart-huggingface.rst:68
-#: ../../source/tutorial-quickstart-jax.rst:68
-#: ../../source/tutorial-quickstart-pytorch-lightning.rst:61
-#: ../../source/tutorial-quickstart-pytorch.rst:104
-#: ../../source/tutorial-quickstart-scikitlearn.rst:95
-#: ../../source/tutorial-quickstart-tensorflow.rst:96
+#: ../../source/tutorial-quickstart-fastai.rst:58
+#: ../../source/tutorial-quickstart-huggingface.rst:63
+#: ../../source/tutorial-quickstart-jax.rst:63
+#: ../../source/tutorial-quickstart-pytorch-lightning.rst:60
+#: ../../source/tutorial-quickstart-pytorch.rst:99
+#: ../../source/tutorial-quickstart-scikitlearn.rst:90
+#: ../../source/tutorial-quickstart-tensorflow.rst:91
 msgid "With default arguments you will see streamed output like this:"
 msgstr ""
 "Avec les arguments par défaut, vous verrez une sortie en flux continu "
 "comme celle-ci :"
 
-#: ../../source/tutorial-quickstart-fastai.rst:87
-#: ../../source/tutorial-quickstart-huggingface.rst:102
-#: ../../source/tutorial-quickstart-jax.rst:92
-#: ../../source/tutorial-quickstart-pytorch-lightning.rst:97
-#: ../../source/tutorial-quickstart-pytorch.rst:128
-#: ../../source/tutorial-quickstart-scikitlearn.rst:119
-#: ../../source/tutorial-quickstart-tensorflow.rst:120
+#: ../../source/tutorial-quickstart-fastai.rst:82
+#: ../../source/tutorial-quickstart-huggingface.rst:97
+#: ../../source/tutorial-quickstart-jax.rst:87
+#: ../../source/tutorial-quickstart-pytorch-lightning.rst:96
+#: ../../source/tutorial-quickstart-pytorch.rst:123
+#: ../../source/tutorial-quickstart-scikitlearn.rst:114
+#: ../../source/tutorial-quickstart-tensorflow.rst:115
 msgid ""
 "You can also override the parameters defined in the "
 "``[tool.flwr.app.config]`` section in ``pyproject.toml`` like this:"
@@ -48107,15 +48268,15 @@ msgstr ""
 "Vous pouvez également surcharger les paramètres définis dans la section "
 "``[tool.flwr.app.config]`` de ``pyproject.toml`` comme suit:"
 
-#: ../../source/tutorial-quickstart-fastai.rst:97
-#: ../../source/tutorial-quickstart-huggingface.rst:374
-#: ../../source/tutorial-quickstart-jax.rst:413
-#: ../../source/tutorial-quickstart-mlx.rst:455
-#: ../../source/tutorial-quickstart-pytorch-lightning.rst:107
-#: ../../source/tutorial-quickstart-pytorch.rst:424
-#: ../../source/tutorial-quickstart-scikitlearn.rst:346
-#: ../../source/tutorial-quickstart-tensorflow.rst:358
-#: ../../source/tutorial-quickstart-xgboost.rst:439
+#: ../../source/tutorial-quickstart-fastai.rst:92
+#: ../../source/tutorial-quickstart-huggingface.rst:369
+#: ../../source/tutorial-quickstart-jax.rst:408
+#: ../../source/tutorial-quickstart-mlx.rst:450
+#: ../../source/tutorial-quickstart-pytorch-lightning.rst:106
+#: ../../source/tutorial-quickstart-pytorch.rst:419
+#: ../../source/tutorial-quickstart-scikitlearn.rst:341
+#: ../../source/tutorial-quickstart-tensorflow.rst:353
+#: ../../source/tutorial-quickstart-xgboost.rst:434
 msgid ""
 "Check the :doc:`how-to-run-simulations` documentation to learn more about"
 " how to configure and run Flower simulations."
@@ -48123,7 +48284,7 @@ msgstr ""
 "Vérifiez la documentation de :doc:`how-to-run-simulations` pour en savoir"
 " plus sur la façon de configurer et d'exécuter les simulations Flower."
 
-#: ../../source/tutorial-quickstart-fastai.rst:102
+#: ../../source/tutorial-quickstart-fastai.rst:97
 msgid ""
 "Check the `source code "
 "<https://github.com/flwrlabs/flower/tree/main/examples/quickstart-"
@@ -48164,10 +48325,11 @@ msgstr ""
 ":doc:`virtualenv <contributor-how-to-set-up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-huggingface.rst:16
+#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+🤗 Hugging Face "
-"project. It will generate all the files needed to run a federation of 10 "
-"nodes using |fedavg|_. By default, the generated app uses a local "
+"project. It will generate all the files needed to run a federation of two"
+" nodes using |fedavg|_. By default, the generated app uses a local "
 "simulation profile that ``flwr run`` submits to a managed local "
 "SuperLink, which then executes the run with the Flower Simulation "
 "Runtime. The dataset will be partitioned using |flowerdatasets|_'s "
@@ -48181,21 +48343,6 @@ msgstr ""
 "avec Flower Simulation Runtime. Le dataset sera partitionné en utilisant "
 "le |flowerdatasets|_ du |iidpartitioner|_."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:23
-#: ../../source/tutorial-quickstart-jax.rst:23
-#: ../../source/tutorial-quickstart-mlx.rst:58
-#: ../../source/tutorial-quickstart-pytorch.rst:59
-#: ../../source/tutorial-quickstart-scikitlearn.rst:50
-#: ../../source/tutorial-quickstart-tensorflow.rst:51
-#: ../../source/tutorial-quickstart-xgboost.rst:64
-msgid ""
-"Now that we have a rough idea of what this example is about, let's get "
-"started. First, install Flower in your new environment:"
-msgstr ""
-"Maintenant que nous avons une idée approximative de ce que cet exemple "
-"est sur, allons-y. Tout d'abord, installez Flower dans votre nouvel "
-"environnement :"
-
 #: ../../source/tutorial-quickstart-huggingface.rst:37
 msgid ""
 "After running it you'll notice a new directory named ``quickstart-"
@@ -48207,31 +48354,17 @@ msgstr ""
 
 #: ../../source/tutorial-quickstart-huggingface.rst:51
 #: ../../source/tutorial-quickstart-jax.rst:51
-#: ../../source/tutorial-quickstart-mlx.rst:86
 #: ../../source/tutorial-quickstart-pytorch.rst:87
 #: ../../source/tutorial-quickstart-scikitlearn.rst:78
 #: ../../source/tutorial-quickstart-tensorflow.rst:79
-#: ../../source/tutorial-quickstart-xgboost.rst:92
-msgid ""
-"If you haven't yet installed the project and its dependencies, you can do"
-" so by:"
-msgstr ""
-"Si vous n'avez pas encore installé le projet et ses dépendances, vous "
-"pouvez le faire avec :"
-
-#: ../../source/tutorial-quickstart-huggingface.rst:58
-#: ../../source/tutorial-quickstart-jax.rst:58
-#: ../../source/tutorial-quickstart-pytorch.rst:94
-#: ../../source/tutorial-quickstart-scikitlearn.rst:85
-#: ../../source/tutorial-quickstart-tensorflow.rst:86
 msgid "To run the project, do:"
 msgstr "Pour lancer le projet, faites:"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:92
+#: ../../source/tutorial-quickstart-huggingface.rst:87
 msgid "You can also run the project with GPU as follows:"
 msgstr "Vous pouvez également lancer le projet avec GPU comme suit:"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:99
+#: ../../source/tutorial-quickstart-huggingface.rst:94
 msgid ""
 "This will use the default arguments where each ``ClientApp`` will use 4 "
 "CPUs and at most 4 ``ClientApp``\\s will run in a given GPU."
@@ -48240,10 +48373,10 @@ msgstr ""
 " 4 processeurs et au plus 4 ``ClientApp``\\s s'exécuteront sur un GPU "
 "donné."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:110
-#: ../../source/tutorial-quickstart-jax.rst:100
-#: ../../source/tutorial-quickstart-pytorch.rst:136
-#: ../../source/tutorial-quickstart-scikitlearn.rst:127
+#: ../../source/tutorial-quickstart-huggingface.rst:105
+#: ../../source/tutorial-quickstart-jax.rst:95
+#: ../../source/tutorial-quickstart-pytorch.rst:131
+#: ../../source/tutorial-quickstart-scikitlearn.rst:122
 msgid ""
 "What follows is an explanation of each component in the project you just "
 "created: dataset partition, the model, defining the ``ClientApp`` and "
@@ -48253,17 +48386,17 @@ msgstr ""
 "de créer : partitionnement du jeu de données, modèle, définir la "
 "``ClientApp`` et définir la ``ServerApp``."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:114
-#: ../../source/tutorial-quickstart-jax.rst:105
-#: ../../source/tutorial-quickstart-mlx.rst:141
-#: ../../source/tutorial-quickstart-pytorch.rst:141
-#: ../../source/tutorial-quickstart-scikitlearn.rst:132
-#: ../../source/tutorial-quickstart-tensorflow.rst:130
-#: ../../source/tutorial-quickstart-xgboost.rst:177
+#: ../../source/tutorial-quickstart-huggingface.rst:109
+#: ../../source/tutorial-quickstart-jax.rst:100
+#: ../../source/tutorial-quickstart-mlx.rst:136
+#: ../../source/tutorial-quickstart-pytorch.rst:136
+#: ../../source/tutorial-quickstart-scikitlearn.rst:127
+#: ../../source/tutorial-quickstart-tensorflow.rst:125
+#: ../../source/tutorial-quickstart-xgboost.rst:172
 msgid "The Data"
 msgstr "Les données"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:116
+#: ../../source/tutorial-quickstart-huggingface.rst:111
 msgid ""
 "This tutorial uses |flowerdatasets|_ to easily download and partition the"
 " `IMDB <https://huggingface.co/datasets/stanfordnlp/imdb>`_ dataset. In "
@@ -48287,16 +48420,16 @@ msgstr ""
 "appellera cette fonction pour créer des chargements de données avec les "
 "données correspondant à leur partition de données."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:161
-#: ../../source/tutorial-quickstart-jax.rst:149
-#: ../../source/tutorial-quickstart-mlx.rst:184
-#: ../../source/tutorial-quickstart-pytorch.rst:180
-#: ../../source/tutorial-quickstart-scikitlearn.rst:157
-#: ../../source/tutorial-quickstart-tensorflow.rst:158
+#: ../../source/tutorial-quickstart-huggingface.rst:156
+#: ../../source/tutorial-quickstart-jax.rst:144
+#: ../../source/tutorial-quickstart-mlx.rst:179
+#: ../../source/tutorial-quickstart-pytorch.rst:175
+#: ../../source/tutorial-quickstart-scikitlearn.rst:152
+#: ../../source/tutorial-quickstart-tensorflow.rst:153
 msgid "The Model"
 msgstr "Le Modèle"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:163
+#: ../../source/tutorial-quickstart-huggingface.rst:158
 msgid ""
 "We will leverage 🤗 Hugging Face to federate the training of language "
 "models over multiple clients using Flower. More specifically, we will "
@@ -48313,7 +48446,7 @@ msgstr ""
 "positive ou négative. Si vous avez accès à des GPUs plus grandes, "
 "n'hésitez pas à utiliser des modèles plus grands !"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:175
+#: ../../source/tutorial-quickstart-huggingface.rst:170
 msgid ""
 "Note that here, ``model_name`` is a string that will be loaded from the "
 "``Context`` in the ClientApp and ServerApp."
@@ -48321,7 +48454,7 @@ msgstr ""
 "Notez que ici, ``model_name`` est une chaîne qui sera chargée à partir de"
 " ``Context`` dans ClientApp et ServerApp."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:178
+#: ../../source/tutorial-quickstart-huggingface.rst:173
 msgid ""
 "In addition to loading the pretrained model weights and architecture, we "
 "also include two utility functions to perform both training (i.e. "
@@ -48344,17 +48477,17 @@ msgstr ""
 "En résumé, vos clients peuvent utiliser des fonctions d'entraînement/test"
 " standard pour effectuer l'entraînement local ou l'évaluation :"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:218
-#: ../../source/tutorial-quickstart-jax.rst:230
-#: ../../source/tutorial-quickstart-mlx.rst:228
-#: ../../source/tutorial-quickstart-pytorch.rst:255
-#: ../../source/tutorial-quickstart-scikitlearn.rst:179
-#: ../../source/tutorial-quickstart-tensorflow.rst:189
-#: ../../source/tutorial-quickstart-xgboost.rst:232
+#: ../../source/tutorial-quickstart-huggingface.rst:213
+#: ../../source/tutorial-quickstart-jax.rst:225
+#: ../../source/tutorial-quickstart-mlx.rst:223
+#: ../../source/tutorial-quickstart-pytorch.rst:250
+#: ../../source/tutorial-quickstart-scikitlearn.rst:174
+#: ../../source/tutorial-quickstart-tensorflow.rst:184
+#: ../../source/tutorial-quickstart-xgboost.rst:227
 msgid "The ClientApp"
 msgstr "L'Application Client"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:220
+#: ../../source/tutorial-quickstart-huggingface.rst:215
 msgid ""
 "The main changes we have to make to use 🤗 Hugging Face with Flower have "
 "to do with converting the |arrayrecord_link|_ received in the "
@@ -48369,12 +48502,12 @@ msgstr ""
 "Client. Nous pouvons nous servir des méthodes intégrées dans le "
 "``ArrayRecord`` pour effectuer ces conversions :"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:241
-#: ../../source/tutorial-quickstart-jax.rst:274
-#: ../../source/tutorial-quickstart-pytorch.rst:279
-#: ../../source/tutorial-quickstart-scikitlearn.rst:210
-#: ../../source/tutorial-quickstart-tensorflow.rst:214
-#: ../../source/tutorial-quickstart-xgboost.rst:260
+#: ../../source/tutorial-quickstart-huggingface.rst:236
+#: ../../source/tutorial-quickstart-jax.rst:269
+#: ../../source/tutorial-quickstart-pytorch.rst:274
+#: ../../source/tutorial-quickstart-scikitlearn.rst:205
+#: ../../source/tutorial-quickstart-tensorflow.rst:209
+#: ../../source/tutorial-quickstart-xgboost.rst:255
 msgid ""
 "The rest of the functionality is directly inspired by the centralized "
 "case. The |clientapp_link|_ comes with three core methods (``train``, "
@@ -48394,12 +48527,12 @@ msgstr ""
 " informations sur le nœud exécutant le ``ClientApp``. Dans ce tutoriel, "
 "nous ne ferons que faire usage de ``train`` et ``evaluate``."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:249
-#: ../../source/tutorial-quickstart-jax.rst:282
-#: ../../source/tutorial-quickstart-pytorch.rst:287
-#: ../../source/tutorial-quickstart-scikitlearn.rst:218
-#: ../../source/tutorial-quickstart-tensorflow.rst:222
-#: ../../source/tutorial-quickstart-xgboost.rst:268
+#: ../../source/tutorial-quickstart-huggingface.rst:244
+#: ../../source/tutorial-quickstart-jax.rst:277
+#: ../../source/tutorial-quickstart-pytorch.rst:282
+#: ../../source/tutorial-quickstart-scikitlearn.rst:213
+#: ../../source/tutorial-quickstart-tensorflow.rst:217
+#: ../../source/tutorial-quickstart-xgboost.rst:263
 msgid ""
 "Let's see how the ``train`` method can be implemented. It receives as "
 "input arguments a |message_link|_ from the ``ServerApp``. By default it "
@@ -48409,12 +48542,12 @@ msgstr ""
 " arguments d'entrée un |message_link|_ depuis le ``ServerApp``. Par "
 "défaut, elle porte :"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:252
-#: ../../source/tutorial-quickstart-jax.rst:285
-#: ../../source/tutorial-quickstart-pytorch.rst:290
-#: ../../source/tutorial-quickstart-scikitlearn.rst:221
-#: ../../source/tutorial-quickstart-tensorflow.rst:225
-#: ../../source/tutorial-quickstart-xgboost.rst:271
+#: ../../source/tutorial-quickstart-huggingface.rst:247
+#: ../../source/tutorial-quickstart-jax.rst:280
+#: ../../source/tutorial-quickstart-pytorch.rst:285
+#: ../../source/tutorial-quickstart-scikitlearn.rst:216
+#: ../../source/tutorial-quickstart-tensorflow.rst:220
+#: ../../source/tutorial-quickstart-xgboost.rst:266
 msgid ""
 "an ``ArrayRecord`` with the arrays of the model to federate. By default "
 "they can be retrieved with key ``\"arrays\"`` when accessing the message "
@@ -48424,12 +48557,12 @@ msgstr ""
 " peuvent être récupérés avec la clé ``\"arrays\"`` lors de l'accès au "
 "contenu du message."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:254
-#: ../../source/tutorial-quickstart-jax.rst:287
-#: ../../source/tutorial-quickstart-pytorch.rst:292
-#: ../../source/tutorial-quickstart-scikitlearn.rst:223
-#: ../../source/tutorial-quickstart-tensorflow.rst:227
-#: ../../source/tutorial-quickstart-xgboost.rst:273
+#: ../../source/tutorial-quickstart-huggingface.rst:249
+#: ../../source/tutorial-quickstart-jax.rst:282
+#: ../../source/tutorial-quickstart-pytorch.rst:287
+#: ../../source/tutorial-quickstart-scikitlearn.rst:218
+#: ../../source/tutorial-quickstart-tensorflow.rst:222
+#: ../../source/tutorial-quickstart-xgboost.rst:268
 msgid ""
 "a ``ConfigRecord`` with the configuration sent from the ``ServerApp``. By"
 " default it can be retrieved with key ``\"config\"`` when accessing the "
@@ -48439,10 +48572,10 @@ msgstr ""
 "``ServerApp``. Par défaut, elle peut être récupérée avec la clé "
 "``\"config\"`` lors de l'accès au contenu du message."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:257
-#: ../../source/tutorial-quickstart-jax.rst:290
-#: ../../source/tutorial-quickstart-scikitlearn.rst:226
-#: ../../source/tutorial-quickstart-tensorflow.rst:230
+#: ../../source/tutorial-quickstart-huggingface.rst:252
+#: ../../source/tutorial-quickstart-jax.rst:285
+#: ../../source/tutorial-quickstart-scikitlearn.rst:221
+#: ../../source/tutorial-quickstart-tensorflow.rst:225
 msgid ""
 "The ``train`` method also receives the ``Context``, giving access to "
 "configs for your run and node. The run config hyperparameters are defined"
@@ -48457,11 +48590,11 @@ msgstr ""
 "configurée que lors de l'exécution de Flower avec le Deployment Runtime "
 "et ce, directement configurable pendant les simulations."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:297
-#: ../../source/tutorial-quickstart-jax.rst:332
-#: ../../source/tutorial-quickstart-pytorch.rst:347
-#: ../../source/tutorial-quickstart-tensorflow.rst:285
-#: ../../source/tutorial-quickstart-xgboost.rst:355
+#: ../../source/tutorial-quickstart-huggingface.rst:292
+#: ../../source/tutorial-quickstart-jax.rst:327
+#: ../../source/tutorial-quickstart-pytorch.rst:342
+#: ../../source/tutorial-quickstart-tensorflow.rst:280
+#: ../../source/tutorial-quickstart-xgboost.rst:350
 msgid ""
 "The ``@app.evaluate()`` method would be near identical with two "
 "exceptions: (1) the model is not locally trained, instead it is used to "
@@ -48475,22 +48608,22 @@ msgstr ""
 "inclure le modèle dans la réponse Message n'est plus nécessaire car il ne"
 " subit aucune modification locale."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:303
-#: ../../source/tutorial-quickstart-jax.rst:339
-#: ../../source/tutorial-quickstart-mlx.rst:386
-#: ../../source/tutorial-quickstart-mlx.rst:390
-#: ../../source/tutorial-quickstart-pytorch.rst:354
-#: ../../source/tutorial-quickstart-scikitlearn.rst:284
-#: ../../source/tutorial-quickstart-tensorflow.rst:292
-#: ../../source/tutorial-quickstart-xgboost.rst:362
+#: ../../source/tutorial-quickstart-huggingface.rst:298
+#: ../../source/tutorial-quickstart-jax.rst:334
+#: ../../source/tutorial-quickstart-mlx.rst:381
+#: ../../source/tutorial-quickstart-mlx.rst:385
+#: ../../source/tutorial-quickstart-pytorch.rst:349
+#: ../../source/tutorial-quickstart-scikitlearn.rst:279
+#: ../../source/tutorial-quickstart-tensorflow.rst:287
+#: ../../source/tutorial-quickstart-xgboost.rst:357
 msgid "The ServerApp"
 msgstr "L'Application Serveur"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:305
-#: ../../source/tutorial-quickstart-jax.rst:341
-#: ../../source/tutorial-quickstart-pytorch.rst:356
-#: ../../source/tutorial-quickstart-scikitlearn.rst:286
-#: ../../source/tutorial-quickstart-tensorflow.rst:294
+#: ../../source/tutorial-quickstart-huggingface.rst:300
+#: ../../source/tutorial-quickstart-jax.rst:336
+#: ../../source/tutorial-quickstart-pytorch.rst:351
+#: ../../source/tutorial-quickstart-scikitlearn.rst:281
+#: ../../source/tutorial-quickstart-tensorflow.rst:289
 msgid ""
 "To construct a |serverapp_link|_ we define its ``@app.main()`` method. "
 "This method receive as input arguments:"
@@ -48498,13 +48631,13 @@ msgstr ""
 "Pour construire un |serverapp_link|_, nous définissons sa méthode "
 "``@app.main()``. Cette méthode reçoit en arguments d'entrée :"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:308
-#: ../../source/tutorial-quickstart-jax.rst:344
-#: ../../source/tutorial-quickstart-mlx.rst:395
-#: ../../source/tutorial-quickstart-pytorch.rst:359
-#: ../../source/tutorial-quickstart-scikitlearn.rst:289
-#: ../../source/tutorial-quickstart-tensorflow.rst:297
-#: ../../source/tutorial-quickstart-xgboost.rst:367
+#: ../../source/tutorial-quickstart-huggingface.rst:303
+#: ../../source/tutorial-quickstart-jax.rst:339
+#: ../../source/tutorial-quickstart-mlx.rst:390
+#: ../../source/tutorial-quickstart-pytorch.rst:354
+#: ../../source/tutorial-quickstart-scikitlearn.rst:284
+#: ../../source/tutorial-quickstart-tensorflow.rst:292
+#: ../../source/tutorial-quickstart-xgboost.rst:362
 msgid ""
 "a ``Grid`` object that will be used to interface with the nodes running "
 "the ``ClientApp`` to involve them in a round of train/evaluate/query or "
@@ -48514,17 +48647,17 @@ msgstr ""
 "s'exécutant la ``ClientApp`` afin d'impliquer les clients dans une ronde "
 "d'entraînement/évaluation/requête ou autre."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:310
-#: ../../source/tutorial-quickstart-jax.rst:346
-#: ../../source/tutorial-quickstart-mlx.rst:397
-#: ../../source/tutorial-quickstart-pytorch.rst:361
-#: ../../source/tutorial-quickstart-scikitlearn.rst:291
-#: ../../source/tutorial-quickstart-tensorflow.rst:299
-#: ../../source/tutorial-quickstart-xgboost.rst:369
+#: ../../source/tutorial-quickstart-huggingface.rst:305
+#: ../../source/tutorial-quickstart-jax.rst:341
+#: ../../source/tutorial-quickstart-mlx.rst:392
+#: ../../source/tutorial-quickstart-pytorch.rst:356
+#: ../../source/tutorial-quickstart-scikitlearn.rst:286
+#: ../../source/tutorial-quickstart-tensorflow.rst:294
+#: ../../source/tutorial-quickstart-xgboost.rst:364
 msgid "a ``Context`` object that provides access to the run configuration."
 msgstr "Un objet ``Context`` qui fournit accès à la configuration de l'exécution."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:312
+#: ../../source/tutorial-quickstart-huggingface.rst:307
 msgid ""
 "In this example we use the |fedavg|_ and configure it with a specific "
 "value of ``fraction_train`` which is read from the run config. You can "
@@ -48539,18 +48672,18 @@ msgstr ""
 " lancée lorsqu'on invoque sa méthode |strategy_start_link|_. À cela on "
 "passe:"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:317
-#: ../../source/tutorial-quickstart-jax.rst:353
-#: ../../source/tutorial-quickstart-mlx.rst:404
-#: ../../source/tutorial-quickstart-pytorch.rst:368
-#: ../../source/tutorial-quickstart-scikitlearn.rst:298
-#: ../../source/tutorial-quickstart-tensorflow.rst:306
-#: ../../source/tutorial-quickstart-xgboost.rst:376
+#: ../../source/tutorial-quickstart-huggingface.rst:312
+#: ../../source/tutorial-quickstart-jax.rst:348
+#: ../../source/tutorial-quickstart-mlx.rst:399
+#: ../../source/tutorial-quickstart-pytorch.rst:363
+#: ../../source/tutorial-quickstart-scikitlearn.rst:293
+#: ../../source/tutorial-quickstart-tensorflow.rst:301
+#: ../../source/tutorial-quickstart-xgboost.rst:371
 msgid "the ``Grid`` object."
 msgstr "l'objet ``Grid``."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:318
-#: ../../source/tutorial-quickstart-jax.rst:354
+#: ../../source/tutorial-quickstart-huggingface.rst:313
+#: ../../source/tutorial-quickstart-jax.rst:349
 msgid ""
 "an ``ArrayRecord`` carrying a randomly initialized model that will serve "
 "as the global model to be federated."
@@ -48558,9 +48691,9 @@ msgstr ""
 "Un objet ``ArrayRecord`` portant un modèle initialisé aléatoirement qui "
 "servira de modèle global à fédérer."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:320
-#: ../../source/tutorial-quickstart-pytorch.rst:371
-#: ../../source/tutorial-quickstart-scikitlearn.rst:301
+#: ../../source/tutorial-quickstart-huggingface.rst:315
+#: ../../source/tutorial-quickstart-pytorch.rst:366
+#: ../../source/tutorial-quickstart-scikitlearn.rst:296
 msgid ""
 "a ``ConfigRecord`` with the training hyperparameters to be sent to the "
 "clients. The strategy will also insert the current round number in this "
@@ -48570,12 +48703,12 @@ msgstr ""
 "envoyer aux clients. La stratégie insérera également le numéro actuel de "
 "ronde dans cette configuration avant de l'envoyer aux nœuds participants."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:323
-#: ../../source/tutorial-quickstart-jax.rst:359
-#: ../../source/tutorial-quickstart-mlx.rst:407
-#: ../../source/tutorial-quickstart-pytorch.rst:374
-#: ../../source/tutorial-quickstart-scikitlearn.rst:304
-#: ../../source/tutorial-quickstart-tensorflow.rst:309
+#: ../../source/tutorial-quickstart-huggingface.rst:318
+#: ../../source/tutorial-quickstart-jax.rst:354
+#: ../../source/tutorial-quickstart-mlx.rst:402
+#: ../../source/tutorial-quickstart-pytorch.rst:369
+#: ../../source/tutorial-quickstart-scikitlearn.rst:299
+#: ../../source/tutorial-quickstart-tensorflow.rst:304
 msgid ""
 "the ``num_rounds`` parameter specifying how many rounds of ``FedAvg`` to "
 "perform."
@@ -48583,7 +48716,7 @@ msgstr ""
 "Le paramètre ``num_rounds`` spécifiant combien de rondes de ``FedAvg`` "
 "effectuer."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:361
+#: ../../source/tutorial-quickstart-huggingface.rst:356
 msgid ""
 "Note the ``start`` method of the strategy returns a result object. This "
 "object contains all the relevant information about the FL process, "
@@ -48604,7 +48737,7 @@ msgstr ""
 "est défini sur ``true``, sauvegarder le modèle global `state_dict` en "
 "utilisant ``torch.save``."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:368
+#: ../../source/tutorial-quickstart-huggingface.rst:363
 msgid ""
 "Congratulations! You've successfully built and run your first federated "
 "learning system for an LLM."
@@ -48612,7 +48745,7 @@ msgstr ""
 "Félicitations ! Vous avez réussi à créer et à lancer votre premier "
 "système d'apprentissage fédéré pour un LLM."
 
-#: ../../source/tutorial-quickstart-huggingface.rst:380
+#: ../../source/tutorial-quickstart-huggingface.rst:375
 msgid ""
 "Check the source code of the extended version of this tutorial in "
 "|quickstart_hf_link|_ in the Flower GitHub repository. For a "
@@ -48891,9 +49024,10 @@ msgstr ""
 "dans un :doc:`virtualenv <contributor-how-to-set-up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-jax.rst:17
+#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+JAX project. It will "
-"generate all the files needed to run a federation of 50 nodes using "
+"generate all the files needed to run a federation of two nodes using "
 "|fedavg|_. By default, the generated app uses a local simulation profile "
 "that ``flwr run`` submits to a managed local SuperLink, which then "
 "executes the run with the Flower Simulation Runtime. The MNIST dataset "
@@ -48915,7 +49049,7 @@ msgstr ""
 "Après l'avoir lancé, vous remarquerez qu'un nouveau répertoire nommé "
 "``quickstart-jax`` a été créé. Il devrait avoir la structure suivante:"
 
-#: ../../source/tutorial-quickstart-jax.rst:107
+#: ../../source/tutorial-quickstart-jax.rst:102
 msgid ""
 "This tutorial uses |flowerdatasets|_ to easily download and partition the"
 " MNIST dataset. In this example you'll make use of the |iidpartitioner|_ "
@@ -48928,7 +49062,7 @@ msgstr ""
 "pouvez choisir parmi les |otherpartitioners|_ disponibles dans les jeux "
 "de données Flower."
 
-#: ../../source/tutorial-quickstart-jax.rst:151
+#: ../../source/tutorial-quickstart-jax.rst:146
 msgid ""
 "We use `Flax <https://flax.readthedocs.io/en/latest/index.html>`_ to "
 "define a simple CNN model for image classification:"
@@ -48936,7 +49070,7 @@ msgstr ""
 "Nous utilisons `Flax <https://flax.readthedocs.io/en/latest/index.html>`_"
 " pour définir un modèle CNN simple pour la classification d'images :"
 
-#: ../../source/tutorial-quickstart-jax.rst:183
+#: ../../source/tutorial-quickstart-jax.rst:178
 msgid ""
 "In addition to defining the model architecture, we also include utility "
 "functions to perform both training (i.e. ``train()``) and evaluation "
@@ -48946,7 +49080,7 @@ msgstr ""
 "fonctions d'utilité pour effectuer à la fois l'entraînement (c'est-à-dire"
 " ``train()``) et l'évaluation en utilisant le modèle ci-dessus. "
 
-#: ../../source/tutorial-quickstart-jax.rst:232
+#: ../../source/tutorial-quickstart-jax.rst:227
 msgid ""
 "The main changes we have to make to use JAX with Flower have to do with "
 "converting the |arrayrecord_link|_ received in the |message_link|_ into "
@@ -48973,7 +49107,7 @@ msgstr ""
 "combiner ces fonctions avec les méthodes intégrées dans le "
 "``ArrayRecord`` pour faire ces conversions : "
 
-#: ../../source/tutorial-quickstart-jax.rst:348
+#: ../../source/tutorial-quickstart-jax.rst:343
 msgid ""
 "In this example we use the |fedavg|_ and configure it with specific "
 "values read from the run config. You can find the default values defined "
@@ -48987,7 +49121,7 @@ msgstr ""
 "lancée lorsqu'on invoque sa méthode |strategy_start_link|_. À cela on "
 "passe : "
 
-#: ../../source/tutorial-quickstart-jax.rst:356
+#: ../../source/tutorial-quickstart-jax.rst:351
 msgid ""
 "a ``ConfigRecord`` with the training hyperparameters (learning rate) to "
 "be sent to the clients. The strategy will also insert the current round "
@@ -48998,7 +49132,7 @@ msgstr ""
 "le numéro de ronde actuel dans ce config avant de l'envoyer aux nœuds "
 "participants."
 
-#: ../../source/tutorial-quickstart-jax.rst:401
+#: ../../source/tutorial-quickstart-jax.rst:396
 msgid ""
 "Note the ``start`` method of the strategy returns a result object. This "
 "object contains all the relevant information about the FL process, "
@@ -49019,7 +49153,7 @@ msgstr ""
 "est défini sur ``true``, sauvegarder les tableaux NumPy globaux du modèle"
 " à l'aide de ``np.savez()`` comme montré ci-dessus."
 
-#: ../../source/tutorial-quickstart-jax.rst:408
+#: ../../source/tutorial-quickstart-jax.rst:403
 msgid ""
 "Congratulations! You've successfully built and run your first federated "
 "learning system for JAX with Flower!"
@@ -49027,7 +49161,7 @@ msgstr ""
 "Félicitations ! Vous avez réussi à créer et à lancer votre premier "
 "système d'apprentissage fédéré pour JAX avec Flower!"
 
-#: ../../source/tutorial-quickstart-jax.rst:418
+#: ../../source/tutorial-quickstart-jax.rst:413
 msgid ""
 "Check the source code of the extended version of this tutorial in "
 "|quickstart_jax_link|_ in the Flower GitHub repository."
@@ -49060,9 +49194,10 @@ msgstr ""
 ":doc:`virtualenv <contributor-how-to-set-up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-mlx.rst:51
+#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+MLX project. It will "
-"generate all the files needed to run a federation of 10 nodes using "
+"generate all the files needed to run a federation of two nodes using "
 "|fedavg_link|_. By default, the generated app uses a local simulation "
 "profile that ``flwr run`` submits to a managed local SuperLink, which "
 "then executes the run with the Flower Simulation Runtime. The dataset "
@@ -49089,20 +49224,20 @@ msgstr ""
 "nommé ``quickstart-mlx`` a été créé. Il devrait avoir la structure "
 "suivante :"
 
-#: ../../source/tutorial-quickstart-mlx.rst:93
-#: ../../source/tutorial-quickstart-xgboost.rst:99
+#: ../../source/tutorial-quickstart-mlx.rst:86
+#: ../../source/tutorial-quickstart-xgboost.rst:92
 msgid "To run the project do:"
 msgstr "Pour exécuter le projet, faites :"
 
-#: ../../source/tutorial-quickstart-mlx.rst:103
-#: ../../source/tutorial-quickstart-xgboost.rst:109
+#: ../../source/tutorial-quickstart-mlx.rst:98
+#: ../../source/tutorial-quickstart-xgboost.rst:104
 msgid "With default arguments, you will see streamed output like this:"
 msgstr ""
 "Avec les arguments par défaut, vous verrez une sortie en flux comme "
 "celle-ci :"
 
-#: ../../source/tutorial-quickstart-mlx.rst:127
-#: ../../source/tutorial-quickstart-xgboost.rst:133
+#: ../../source/tutorial-quickstart-mlx.rst:122
+#: ../../source/tutorial-quickstart-xgboost.rst:128
 msgid ""
 "You can also override the parameters defined in the "
 "``[tool.flwr.app.config]`` section in the ``pyproject.toml`` like this:"
@@ -49110,7 +49245,7 @@ msgstr ""
 "Vous pouvez également surcharger les paramètres définis dans la section "
 "``[tool.flwr.app.config]`` du fichier ``pyproject.toml`` comme suit : "
 
-#: ../../source/tutorial-quickstart-mlx.rst:135
+#: ../../source/tutorial-quickstart-mlx.rst:130
 msgid ""
 "What follows is an explanation of each component in the project you just "
 "created: dataset partitioning, the model, defining the ``ClientApp``, and"
@@ -49120,7 +49255,7 @@ msgstr ""
 "de créer : partitionnement des jeux de données, modèle, définition de la "
 "stratégie et définition de l'application."
 
-#: ../../source/tutorial-quickstart-mlx.rst:143
+#: ../../source/tutorial-quickstart-mlx.rst:138
 msgid ""
 "We will use `Flower Datasets <https://flower.ai/docs/datasets/>`_ to "
 "easily download and partition the `MNIST` dataset. In this example, "
@@ -49141,7 +49276,7 @@ msgstr ""
 "api/flwr_datasets.partitioner.html>`_ disponibles dans les données de "
 "Flower :"
 
-#: ../../source/tutorial-quickstart-mlx.rst:186
+#: ../../source/tutorial-quickstart-mlx.rst:181
 msgid ""
 "We define the model as in the `centralized MLX example "
 "<https://github.com/ml-explore/mlx-examples/tree/main/mnist>`_, it's a "
@@ -49151,7 +49286,7 @@ msgstr ""
 " <https://github.com/ml-explore/mlx-examples/tree/main/mnist>`_, c'est un"
 " simple MLP :"
 
-#: ../../source/tutorial-quickstart-mlx.rst:209
+#: ../../source/tutorial-quickstart-mlx.rst:204
 msgid ""
 "We also define some utility functions to test our model and to iterate "
 "over batches."
@@ -49159,7 +49294,7 @@ msgstr ""
 "Nous définissons également certaines fonctions d'utilité pour tester "
 "notre modèle et pour itérer sur des lots."
 
-#: ../../source/tutorial-quickstart-mlx.rst:230
+#: ../../source/tutorial-quickstart-mlx.rst:225
 msgid ""
 "The main changes we have to make to use `MLX` with `Flower` will be found"
 " in the ``get_params()`` and ``set_params()`` functions. MLX doesn't "
@@ -49173,11 +49308,11 @@ msgstr ""
 " paramètres du modèle en une liste d'objets ``np.array`` (le format dont "
 "nous avons besoin pour la sérialisation des messages)."
 
-#: ../../source/tutorial-quickstart-mlx.rst:235
+#: ../../source/tutorial-quickstart-mlx.rst:230
 msgid "MLX stores its parameters as follows:"
 msgstr "MLX stocke ses paramètres comme suit :"
 
-#: ../../source/tutorial-quickstart-mlx.rst:248
+#: ../../source/tutorial-quickstart-mlx.rst:243
 msgid ""
 "Therefore, to get our list of ``np.array`` objects, we need to extract "
 "each array and convert it into a NumPy array:"
@@ -49186,7 +49321,7 @@ msgstr ""
 "avons besoin d'extrait chaque tableau et de les convertir en tableaux "
 "NumPy : "
 
-#: ../../source/tutorial-quickstart-mlx.rst:257
+#: ../../source/tutorial-quickstart-mlx.rst:252
 msgid ""
 "For the ``set_params()`` function, we perform the reverse operation. We "
 "receive a list of NumPy arrays and want to convert them into MLX "
@@ -49199,7 +49334,7 @@ msgstr ""
 "paramètres et leur assignons aux clés `weight` et `bias` de chaque "
 "dictionnaire de couche :"
 
-#: ../../source/tutorial-quickstart-mlx.rst:272
+#: ../../source/tutorial-quickstart-mlx.rst:267
 msgid ""
 "The rest of the functionality is directly inspired by the centralized "
 "case. The |clientapp_link|_ will train the model on local data using the "
@@ -49209,7 +49344,7 @@ msgstr ""
 "Le |clientapp_link|_ entraînera le modèle sur les données locales en "
 "utilisant le boucle d'entraînement standard MLX :"
 
-#: ../../source/tutorial-quickstart-mlx.rst:285
+#: ../../source/tutorial-quickstart-mlx.rst:280
 msgid ""
 "Let's put everything together and see the complete implementation of the "
 "``ClientApp``. First, the behavior in a round of training is defined "
@@ -49220,7 +49355,7 @@ msgstr ""
 "définie à l'intérieur d'une fonction enveloppée par le décorateur "
 "``@app.train()``."
 
-#: ../../source/tutorial-quickstart-mlx.rst:289
+#: ../../source/tutorial-quickstart-mlx.rst:284
 msgid ""
 "After reading configuration parameters from the |context_link|_, we "
 "instantiate the model and apply the global parameters sent by the server "
@@ -49250,7 +49385,7 @@ msgstr ""
 "valeur de cette clé est le nombre d'exemples de formation dans la "
 "partition de données locales."
 
-#: ../../source/tutorial-quickstart-mlx.rst:353
+#: ../../source/tutorial-quickstart-mlx.rst:348
 msgid ""
 "The ``ClientApp`` also allows for evaluation of the model on local test "
 "data. This can be done by defining a function wrapped with the "
@@ -49278,9 +49413,9 @@ msgstr ""
 "utilisée par le serveur pour effectuer une moyenne pondérée des "
 "métriques."
 
-#: ../../source/tutorial-quickstart-mlx.rst:392
-#: ../../source/tutorial-quickstart-xgboost.rst:364
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:485
+#: ../../source/tutorial-quickstart-mlx.rst:387
+#: ../../source/tutorial-quickstart-xgboost.rst:359
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:483
 msgid ""
 "To construct a |serverapp_link|_, we define its ``@app.main()`` method. "
 "This method receives as input arguments:"
@@ -49288,7 +49423,7 @@ msgstr ""
 "Pour construire un |serverapp_link|_, nous définissons sa méthode "
 "``@app.main()``. Cette méthode reçoit en entrée les arguments suivants :"
 
-#: ../../source/tutorial-quickstart-mlx.rst:399
+#: ../../source/tutorial-quickstart-mlx.rst:394
 msgid ""
 "In this example we use the |fedavg_link|_ and left it with its default "
 "parameters. Then, after initializing the ``MLP`` that would serve as "
@@ -49301,9 +49436,9 @@ msgstr ""
 "stratégie est lancée lorsqu'on invoque sa méthode |strategy_start_link|_."
 " À cela on passe:"
 
-#: ../../source/tutorial-quickstart-mlx.rst:405
-#: ../../source/tutorial-quickstart-pytorch.rst:369
-#: ../../source/tutorial-quickstart-scikitlearn.rst:299
+#: ../../source/tutorial-quickstart-mlx.rst:400
+#: ../../source/tutorial-quickstart-pytorch.rst:364
+#: ../../source/tutorial-quickstart-scikitlearn.rst:294
 msgid ""
 "an ``ArrayRecord`` carrying a randomly initialized model that will serve "
 "as the global model to federate."
@@ -49311,9 +49446,9 @@ msgstr ""
 "un ``ArrayRecord`` portant un modèle initialisé aléatoirement qui servira"
 " de modèle global pour fédérer."
 
-#: ../../source/tutorial-quickstart-mlx.rst:446
-#: ../../source/tutorial-quickstart-pytorch.rst:415
-#: ../../source/tutorial-quickstart-xgboost.rst:430
+#: ../../source/tutorial-quickstart-mlx.rst:441
+#: ../../source/tutorial-quickstart-pytorch.rst:410
+#: ../../source/tutorial-quickstart-xgboost.rst:425
 msgid ""
 "Note the ``start`` method of the strategy returns a |result_link|_ "
 "object. This object contains all the relevant information about the FL "
@@ -49326,10 +49461,10 @@ msgstr ""
 "``ArrayRecord``, et des métriques d'entraînement et d'évaluation fédérées"
 " sous forme de ``MetricRecords``."
 
-#: ../../source/tutorial-quickstart-mlx.rst:451
-#: ../../source/tutorial-quickstart-pytorch.rst:420
-#: ../../source/tutorial-quickstart-tensorflow.rst:354
-#: ../../source/tutorial-quickstart-xgboost.rst:435
+#: ../../source/tutorial-quickstart-mlx.rst:446
+#: ../../source/tutorial-quickstart-pytorch.rst:415
+#: ../../source/tutorial-quickstart-tensorflow.rst:349
+#: ../../source/tutorial-quickstart-xgboost.rst:430
 msgid ""
 "Congratulations! You've successfully built and run your first federated "
 "learning system."
@@ -49337,7 +49472,7 @@ msgstr ""
 "Félicitations ! Vous avez réussi à créer et exécuter votre premier "
 "système d'apprentissage fédéré."
 
-#: ../../source/tutorial-quickstart-mlx.rst:460
+#: ../../source/tutorial-quickstart-mlx.rst:455
 msgid ""
 "Check the `source code "
 "<https://github.com/flwrlabs/flower/blob/main/examples/quickstart-mlx>`_ "
@@ -49398,10 +49533,11 @@ msgstr ""
 "-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-pytorch.rst:52
+#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+PyTorch project. It "
-"will generate all the files needed to run a federation of 10 nodes using "
-"|fedavg_link|_. By default, the generated app uses a local simulation "
+"will generate all the files needed to run a federation of two nodes using"
+" |fedavg_link|_. By default, the generated app uses a local simulation "
 "profile that ``flwr run`` submits to a managed local SuperLink, which "
 "then executes the run with the Flower Simulation Runtime. The dataset "
 "will be partitioned using Flower Dataset's `IidPartitioner "
@@ -49427,7 +49563,7 @@ msgstr ""
 "nommé ``quickstart-pytorch`` a été créé. Il devrait avoir la structure "
 "suivante :"
 
-#: ../../source/tutorial-quickstart-pytorch.rst:143
+#: ../../source/tutorial-quickstart-pytorch.rst:138
 msgid ""
 "This tutorial uses `Flower Datasets <https://flower.ai/docs/datasets/>`_ "
 "to easily download and partition the `CIFAR-10` dataset. In this example "
@@ -49451,7 +49587,7 @@ msgstr ""
 "Chaque ``ClientApp`` appellera cette fonction pour créer des chargements "
 "de données avec les données correspondant à leur partition de données."
 
-#: ../../source/tutorial-quickstart-pytorch.rst:182
+#: ../../source/tutorial-quickstart-pytorch.rst:177
 msgid ""
 "We defined a simple Convolutional Neural Network (CNN), but feel free to "
 "replace it with a more sophisticated model if you'd like:"
@@ -49460,7 +49596,7 @@ msgstr ""
 "êtes libres de le remplacer par un modèle plus sophistiqué si vous le "
 "souhaitez :"
 
-#: ../../source/tutorial-quickstart-pytorch.rst:207
+#: ../../source/tutorial-quickstart-pytorch.rst:202
 msgid ""
 "In addition to defining the model architecture, we also include two "
 "utility functions to perform both training (i.e. ``train()``) and "
@@ -49484,7 +49620,7 @@ msgstr ""
 "d'entraînement/test standard pour effectuer un entraînement local ou une "
 "évaluation :"
 
-#: ../../source/tutorial-quickstart-pytorch.rst:257
+#: ../../source/tutorial-quickstart-pytorch.rst:252
 msgid ""
 "The main changes we have to make to use `PyTorch` with `Flower` have to "
 "do with converting the |arrayrecord_link|_ received in the "
@@ -49500,8 +49636,8 @@ msgstr ""
 "méthodes intégrées dans le ``ArrayRecord`` pour effectuer ces "
 "conversions:"
 
-#: ../../source/tutorial-quickstart-pytorch.rst:295
-#: ../../source/tutorial-quickstart-xgboost.rst:276
+#: ../../source/tutorial-quickstart-pytorch.rst:290
+#: ../../source/tutorial-quickstart-xgboost.rst:271
 msgid ""
 "The ``train`` method also receives the |context_link|_, giving access to "
 "configs for your run and node. The run config hyperparameters are defined"
@@ -49516,7 +49652,7 @@ msgstr ""
 "du nœud ne peut être définie qu'en exécutant Flower avec le Deployment "
 "Runtime et ce n'est pas directement configurable pendant les simulations."
 
-#: ../../source/tutorial-quickstart-pytorch.rst:363
+#: ../../source/tutorial-quickstart-pytorch.rst:358
 msgid ""
 "In this example we use the |fedavg_link|_ and configure it with a "
 "specific value of ``fraction_evaluate`` which is read from the run "
@@ -49531,7 +49667,7 @@ msgstr ""
 "stratégie est lancée lorsqu'on invoque sa méthode |strategy_start_link|_."
 " À cela on passe:"
 
-#: ../../source/tutorial-quickstart-pytorch.rst:375
+#: ../../source/tutorial-quickstart-pytorch.rst:370
 msgid ""
 "an ``evaluate_fn`` function that will be called to evaluate the global "
 "model on centralized test data after each round."
@@ -49539,7 +49675,7 @@ msgstr ""
 "une fonction ``evaluate_fn`` qui sera appelée pour évaluer le modèle "
 "global sur les données de test centralisées après chaque ronde."
 
-#: ../../source/tutorial-quickstart-pytorch.rst:429
+#: ../../source/tutorial-quickstart-pytorch.rst:424
 msgid ""
 "Check the `source code "
 "<https://github.com/flwrlabs/flower/blob/main/examples/quickstart-"
@@ -49577,22 +49713,20 @@ msgstr ""
 "d'exécuter tout cela dans un :doc:`virtualenv <contributor-how-to-set-"
 "up-a-virtual-env>`."
 
-#: ../../source/tutorial-quickstart-pytorch-lightning.rst:24
-msgid ""
-"This will create a new directory called `quickstart-pytorch-lightning` "
-"containing the following files:"
-msgstr ""
-"Cela créera un nouveau répertoire appelé `quickstart-pytorch-lightning` "
-"contenant les fichiers suivants :"
+#: ../../source/tutorial-quickstart-pytorch-lightning.rst:40
+#, fuzzy
+msgid "Next, activate your environment and navigate to the example directory:"
+msgstr "Ensuite, activez votre environnement, puis exécutez :"
 
-#: ../../source/tutorial-quickstart-pytorch-lightning.rst:47
+#: ../../source/tutorial-quickstart-pytorch-lightning.rst:46
+#, fuzzy
 msgid ""
 "By default, this project uses a local simulation profile that ``flwr "
 "run`` submits to a managed local SuperLink, which then executes the run "
-"with the Flower Simulation Runtime. It creates a federation of 4 nodes "
-"using |fedavg|_ as the aggregation strategy. The dataset will be "
-"partitioned using Flower Dataset's |iidpartitioner|_. To run the project,"
-" do:"
+"with the Flower Simulation Runtime. It creates a federation of two "
+"SuperNodes using |fedavg|_ as the aggregation strategy. The dataset will "
+"be partitioned using Flower Dataset's |iidpartitioner|_. To run the "
+"project, do:"
 msgstr ""
 "Par défaut, ce projet utilise un profil de simulation local que ``flwr "
 "run`` soumet à un SuperLink local géré, qui exécute ensuite l'exécution "
@@ -49601,7 +49735,7 @@ msgstr ""
 "partitionné avec |iidpartitioner|_ de Flower Datasets. Pour exécuter le "
 "projet :"
 
-#: ../../source/tutorial-quickstart-pytorch-lightning.rst:85
+#: ../../source/tutorial-quickstart-pytorch-lightning.rst:84
 msgid ""
 "Each simulated `ClientApp` (two per round) will also log a summary of "
 "their local training process. Expect this output to be similar to:"
@@ -49610,7 +49744,7 @@ msgstr ""
 "leur processus d'entraînement local. Attendez-vous à ce que cet sortie "
 "soit similaire à :"
 
-#: ../../source/tutorial-quickstart-pytorch-lightning.rst:112
+#: ../../source/tutorial-quickstart-pytorch-lightning.rst:111
 msgid ""
 "Check the `source code "
 "<https://github.com/flwrlabs/flower/tree/main/examples/quickstart-"
@@ -49658,9 +49792,10 @@ msgstr ""
 "how-to-set-up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-scikitlearn.rst:44
+#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+scikit-learn project. "
-"It will generate all the files needed to run a federation of 10 nodes "
+"It will generate all the files needed to run a federation of two nodes "
 "using |fedavg_link|_. By default, the generated app uses a local "
 "simulation profile that ``flwr run`` submits to a managed local "
 "SuperLink, which then executes the run with the Flower Simulation "
@@ -49684,7 +49819,7 @@ msgstr ""
 "nommé ``quickstart-sklearn`` a été créé. Il devrait avoir la structure "
 "suivante :"
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:134
+#: ../../source/tutorial-quickstart-scikitlearn.rst:129
 msgid ""
 "This tutorial uses |flowerdatasets|_ to easily download and partition the"
 " `Iris <https://huggingface.co/datasets/scikit-learn/iris>`_ dataset. In "
@@ -49705,7 +49840,7 @@ msgstr ""
 " de données. Notez que, dans cet exemple, seuls un sous-ensemble des "
 "colonnes seront utilisés."
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:159
+#: ../../source/tutorial-quickstart-scikitlearn.rst:154
 msgid ""
 "We define the |logisticregression|_ model from scikit-learn in the "
 "``create_log_reg_and_instantiate_parameters()`` function. This helper "
@@ -49718,7 +49853,7 @@ msgstr ""
 "utilisant la fonction utilitaire ``set_initial_params()`` dans le même "
 "fichier."
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:181
+#: ../../source/tutorial-quickstart-scikitlearn.rst:176
 msgid ""
 "The main changes we have to make to use ``Scikit-learn`` with ``Flower`` "
 "have to do with converting the |arrayrecord_link|_ received in the "
@@ -49738,7 +49873,7 @@ msgstr ""
 "méthodes intégrées dans le ``ArrayRecord`` pour effectuer ces "
 "conversions:"
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:277
+#: ../../source/tutorial-quickstart-scikitlearn.rst:272
 msgid ""
 "The ``@app.evaluate`` method mirrors ``train`` but only evaluates the "
 "received model on the local validation set. It returns a ``MetricRecord``"
@@ -49750,8 +49885,8 @@ msgstr ""
 "objet contenant la perte et l'exactitude d'évaluation, sans inclure les "
 "poids du modèle, puisqu'ils ne sont pas modifiés pendant l'évaluation."
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:293
-#: ../../source/tutorial-quickstart-tensorflow.rst:301
+#: ../../source/tutorial-quickstart-scikitlearn.rst:288
+#: ../../source/tutorial-quickstart-tensorflow.rst:296
 msgid ""
 "In this example we use the |fedavg_link|_ and configure it with a "
 "specific value of ``fraction_train`` which is read from the run config. "
@@ -49766,7 +49901,7 @@ msgstr ""
 "stratégie est lancée lorsqu'on invoque sa méthode |strategy_start_link|_."
 " À cela on passe:"
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:341
+#: ../../source/tutorial-quickstart-scikitlearn.rst:336
 msgid ""
 "Congratulations! You've successfully built and run your first federated "
 "learning system in scikit-learn on the Iris dataset using the new Message"
@@ -49776,7 +49911,7 @@ msgstr ""
 "système d'apprentissage fédéré dans scikit-learn sur le jeu de données "
 "Iris en utilisant la nouvelle API Message."
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:351
+#: ../../source/tutorial-quickstart-scikitlearn.rst:346
 msgid ""
 "Check the source code of another Flower App using ``scikit-learn`` in the"
 " `Flower GitHub repository "
@@ -49816,14 +49951,15 @@ msgstr ""
 "set-up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-tensorflow.rst:44
+#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+TensorFlow project. It"
-" will generate all the files needed to run a federation of 10 nodes using"
-" |fedavg_link|_. By default, the generated app uses a local simulation "
-"profile that ``flwr run`` submits to a managed local SuperLink, which "
-"then executes the run with the Flower Simulation Runtime. The dataset "
-"will be partitioned using Flower Dataset's `IidPartitioner "
-"<https://flower.ai/docs/datasets/ref-"
+" will generate all the files needed to run a federation of two nodes "
+"using |fedavg_link|_. By default, the generated app uses a local "
+"simulation profile that ``flwr run`` submits to a managed local "
+"SuperLink, which then executes the run with the Flower Simulation "
+"Runtime. The dataset will be partitioned using Flower Dataset's "
+"`IidPartitioner <https://flower.ai/docs/datasets/ref-"
 "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 msgstr ""
 "Utilisons ``flwr new`` pour créer un projet complet Flower+TensorFlow. Il"
@@ -49845,7 +49981,7 @@ msgstr ""
 "nommé ``quickstart-tensorflow`` a été créé. Il devrait avoir la structure"
 " suivante :"
 
-#: ../../source/tutorial-quickstart-tensorflow.rst:132
+#: ../../source/tutorial-quickstart-tensorflow.rst:127
 msgid ""
 "This tutorial uses `Flower Datasets <https://flower.ai/docs/datasets/>`_ "
 "to easily download and partition the `CIFAR-10` dataset. In this example "
@@ -49869,7 +50005,7 @@ msgstr ""
 "Chaque partie ``ClientApp`` appellera cette fonction pour créer les "
 "tableaux ``NumPy`` correspondant à leur partition de données."
 
-#: ../../source/tutorial-quickstart-tensorflow.rst:160
+#: ../../source/tutorial-quickstart-tensorflow.rst:155
 msgid ""
 "Next, we need a model. We defined a simple Convolutional Neural Network "
 "(CNN), but feel free to replace it with a more sophisticated model if "
@@ -49879,7 +50015,7 @@ msgstr ""
 "réseau neuronal convolutionnel (CNN), mais vous pouvez le remplacer par "
 "un modèle plus sophistiqué si vous le souhaitez :"
 
-#: ../../source/tutorial-quickstart-tensorflow.rst:191
+#: ../../source/tutorial-quickstart-tensorflow.rst:186
 msgid ""
 "The main changes we have to make to use `Tensorflow` with `Flower` have "
 "to do with converting the |arrayrecord_link|_ received in the "
@@ -49898,7 +50034,7 @@ msgstr ""
 " ClientApp. Nous pouvons faire usage des méthodes intégrées dans le "
 "``ArrayRecord`` pour effectuer ces conversions:"
 
-#: ../../source/tutorial-quickstart-tensorflow.rst:307
+#: ../../source/tutorial-quickstart-tensorflow.rst:302
 msgid ""
 "an ``ArrayRecord`` carrying a randomly initialized model that will serve "
 "as the global model to federated."
@@ -49906,7 +50042,7 @@ msgstr ""
 "un ``ArrayRecord`` portant un modèle initialisé aléatoirement qui servira"
 " de modèle global pour l'apprentissage fédéré."
 
-#: ../../source/tutorial-quickstart-tensorflow.rst:347
+#: ../../source/tutorial-quickstart-tensorflow.rst:342
 msgid ""
 "Note the ``start`` method of the strategy returns a result object. This "
 "object contains all the relevant information about the FL process, "
@@ -49925,7 +50061,7 @@ msgstr ""
 "<https://docs.python.org/3/library/pprint.html>`_ et sauvegarder les "
 "poids du modèle final à l'aide de la fonction Tensorflow's ``save()``."
 
-#: ../../source/tutorial-quickstart-tensorflow.rst:363
+#: ../../source/tutorial-quickstart-tensorflow.rst:358
 msgid ""
 "Check the source code of the extended version of this tutorial in "
 "|quickstart_tf_link|_ in the Flower GitHub repository."
@@ -49960,10 +50096,11 @@ msgstr ""
 "set-up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-xgboost.rst:52
+#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+XGBoost project. It "
-"will generate all the files needed to run a federation of 10 nodes using "
-"|fedxgbbagging_link|_ strategy. By default, the generated app uses a "
+"will generate all the files needed to run a federation of two nodes using"
+" |fedxgbbagging_link|_ strategy. By default, the generated app uses a "
 "local simulation profile that ``flwr run`` submits to a managed local "
 "SuperLink, which then executes the run with the Flower Simulation "
 "Runtime. The dataset will be partitioned using Flower Dataset's "
@@ -50003,7 +50140,7 @@ msgstr ""
 "Après l'exécution, vous remarquerez un nouveau répertoire nommé "
 "``quickstart-xgboost`` créé. Il devrait avoir la structure suivante :"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:141
+#: ../../source/tutorial-quickstart-xgboost.rst:136
 msgid ""
 "What follows is an explanation of each component in the project you just "
 "created: configurations, dataset partitioning, defining the "
@@ -50013,11 +50150,11 @@ msgstr ""
 "créer : configurations, partitionnement des données, définition du "
 "``ClientApp``, et définition du ``ServerApp``."
 
-#: ../../source/tutorial-quickstart-xgboost.rst:147
+#: ../../source/tutorial-quickstart-xgboost.rst:142
 msgid "The Configurations"
 msgstr "Les Configurations"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:149
+#: ../../source/tutorial-quickstart-xgboost.rst:144
 msgid ""
 "We define all required configurations / hyper-parameters inside the "
 "``pyproject.toml`` file:"
@@ -50025,7 +50162,7 @@ msgstr ""
 "Nous définissons toutes les configurations / hyper-paramètres requises à "
 "l'intérieur du fichier ``pyproject.toml``:"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:171
+#: ../../source/tutorial-quickstart-xgboost.rst:166
 msgid ""
 "The ``local-epochs`` represents the number of iterations for local tree "
 "boost. We use CPU for the training in default. One can assign it to a GPU"
@@ -50037,7 +50174,7 @@ msgstr ""
 "affecter cela à un GPU en définissant ``tree-method`` sur ``gpu_hist``. "
 "Nous utilisons AUC comme métrique d'évaluation."
 
-#: ../../source/tutorial-quickstart-xgboost.rst:179
+#: ../../source/tutorial-quickstart-xgboost.rst:174
 msgid ""
 "We will use `Flower Datasets <https://flower.ai/docs/datasets/>`_ to "
 "easily download and partition the `Higgs` dataset. In this example, "
@@ -50058,7 +50195,7 @@ msgstr ""
 "api/flwr_datasets.partitioner.html>`_ disponibles dans les Datasets "
 "Flower :"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:205
+#: ../../source/tutorial-quickstart-xgboost.rst:200
 msgid ""
 "We train/test split using the given partition (client's local data), and "
 "reformat data to DMatrix for the ``xgboost`` package. The functions of "
@@ -50071,7 +50208,7 @@ msgstr ""
 "``train_test_split`` et ``transform_dataset_to_dmatrix`` sont définies "
 "comme suit :"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:234
+#: ../../source/tutorial-quickstart-xgboost.rst:229
 msgid ""
 "The main changes we have to make to use `XGBoost` with `Flower` have to "
 "do with converting the |arrayrecord_link|_ received in the "
@@ -50085,7 +50222,7 @@ msgstr ""
 "lors de la génération de la réponse ``Message`` du ClientApp. Nous "
 "pouvons faire usage des conversions suivantes:"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:333
+#: ../../source/tutorial-quickstart-xgboost.rst:328
 msgid ""
 "At the first round, we call ``xgb.train()`` to build up the first set of "
 "trees. From the second round, we load the global model sent from server "
@@ -50098,7 +50235,7 @@ msgstr ""
 "mettons à jour les poids du modèle sur les données de formation locales "
 "avec la fonction ``_local_boost`` comme suit:"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:352
+#: ../../source/tutorial-quickstart-xgboost.rst:347
 msgid ""
 "Given ``num_local_round``, we update trees by calling "
 "``bst_input.update`` method. After training, the last "
@@ -50109,7 +50246,7 @@ msgstr ""
 "derniers ``N=num_local_round`` arbres seront extraits pour être envoyés "
 "au serveur."
 
-#: ../../source/tutorial-quickstart-xgboost.rst:371
+#: ../../source/tutorial-quickstart-xgboost.rst:366
 msgid ""
 "In this example we use the ``FedXgbBagging`` strategy. Then, we "
 "initialize an empty global model as the XGBoost model will be initialized"
@@ -50123,7 +50260,7 @@ msgstr ""
 "stratégie est lancée lorsqu'on invoque sa méthode |strategy_start_link|_."
 " À cette fin, on passe:"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:377
+#: ../../source/tutorial-quickstart-xgboost.rst:372
 msgid ""
 "an ``ArrayRecord`` carrying a randomly initialized model that will serve "
 "as the global"
@@ -50131,15 +50268,15 @@ msgstr ""
 "un ``ArrayRecord`` portant un modèle initialisé aléatoirement qui servira"
 " de modèle global"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:378
+#: ../../source/tutorial-quickstart-xgboost.rst:373
 msgid "model to federate."
 msgstr "modèle à fédérer."
 
-#: ../../source/tutorial-quickstart-xgboost.rst:379
+#: ../../source/tutorial-quickstart-xgboost.rst:374
 msgid "the ``num_rounds`` parameter specifying how many rounds to perform."
 msgstr "le paramètre ``num_rounds`` spécifiant combien de rondes effectuer."
 
-#: ../../source/tutorial-quickstart-xgboost.rst:444
+#: ../../source/tutorial-quickstart-xgboost.rst:439
 msgid ""
 "Check the `source code "
 "<https://github.com/flwrlabs/flower/blob/main/examples/xgboost-"
@@ -50185,7 +50322,7 @@ msgstr ""
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:42
 #: ../../source/tutorial-series-what-is-federated-learning.rst:17
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:59
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:22
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:21
 msgid ""
 "`Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and "
 "join the Flower community on `Flower Discuss "
@@ -50220,7 +50357,7 @@ msgstr ""
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:39
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:42
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:51
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:31
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:30
 msgid "Preparation"
 msgstr "Préparation"
 
@@ -50237,7 +50374,7 @@ msgstr ""
 "continuez d'où vous en étiez."
 
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:46
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:38
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:37
 msgid "Installing dependencies"
 msgstr "Installation des dépendances"
 
@@ -50261,24 +50398,30 @@ msgstr ""
 "``pyproject.toml``:"
 
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:70
-msgid "Then install the updated project dependencies:"
-msgstr "Ensuite installez les dépendances de projet mises à jour :"
+msgid ""
+"When the app runs, Flower installs this dependency in an isolated runtime"
+" environment. See :doc:`Install Flower App dependencies at runtime <how-"
+"to-install-app-dependencies-at-runtime>` for more details."
+msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:78
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:76
+#, fuzzy
 msgid ""
 "If this is your first time installing ``wandb``, you might be asked to "
 "create an account and then log in to your system. You can start this "
-"process by typing this in your terminal:"
+"process by typing the command below in your terminal. If that's the case,"
+" you might want to do this in your current environment before starting "
+"your run."
 msgstr ""
 "Si c'est la première fois que vous installez ``wandb``, vous pourriez "
 "être invité à créer un compte puis à vous connecter à votre système. Vous"
 " pouvez démarrer ce processus en tapant cela dans votre terminal:"
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:88
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:87
 msgid "Customize the ``start`` method of a strategy"
 msgstr "Personnalisez la méthode ``start`` d'une stratégie"
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:90
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:89
 msgid ""
 "Flower strategies have a number of methods that can be overridden to "
 "customize their behavior. In the previous strategy tutorial, you learned "
@@ -50304,7 +50447,7 @@ msgstr ""
 "chaque itération représente une ronde d'apprentissage fédéré. Chaque tour"
 " se compose de trois étapes distinctes :"
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:100
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:99
 msgid ""
 "A training stage, where a subset of clients is selected to train the "
 "current global model on their local data."
@@ -50312,7 +50455,7 @@ msgstr ""
 "Une étape d'entraînement, où un sous-ensemble de clients est sélectionné "
 "pour entraîner le modèle global actuel sur leurs données locales."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:102
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:101
 msgid ""
 "An evaluation stage, where a subset of clients is selected to evaluate "
 "the updated global model on their local validation sets."
@@ -50321,7 +50464,7 @@ msgstr ""
 "pour évaluer le modèle global mis à jour sur leurs jeux de validation "
 "locaux."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:104
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:103
 msgid ""
 "An optional stage to evaluate the global model on the server side. Note "
 "that this is what you enabled in the previous tutorial by means of the "
@@ -50331,7 +50474,7 @@ msgstr ""
 "Notez que c'est ce que vous avez activé dans le tutoriel précédent par "
 "l'intermédiaire de l'appel-back ``global_evaluate``."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:108
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:107
 msgid ""
 "Let's extend the ``CustomFedAdagrad`` strategy we created earlier and "
 "introduce:"
@@ -50339,7 +50482,7 @@ msgstr ""
 "Élargissons la stratégie ``CustomFedAdagrad`` que nous avons créée plus "
 "tôt et introduisons :"
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:110
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:109
 msgid ""
 "``_update_best_acc``: An auxiliary method to save the global model "
 "whenever a new best accuracy is found."
@@ -50347,7 +50490,7 @@ msgstr ""
 "``_update_best_acc``: Une méthode auxiliaire pour sauvegarder le modèle "
 "global chaque fois qu'un nouveau meilleur taux d'exactitude est trouvé."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:112
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:111
 msgid ""
 "``set_save_path``: An auxiliary method to set the path where ``wandb`` "
 "logs and model checkpoints will be saved. This method will be called from"
@@ -50358,7 +50501,7 @@ msgstr ""
 "sera appelée à partir du ``server_app.py`` après avoir instancié la "
 "stratégie."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:115
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:114
 msgid ""
 "A customized |strategy_start_link|_ method to log metrics to Weights & "
 "Biases (`W&B <https://wandb.ai/site>`__) and save the model checkpoints "
@@ -50368,7 +50511,7 @@ msgstr ""
 "métriques dans Weights & Biases (`W&B <https://wandb.ai/site>`__) et "
 "sauvegarder les checkpoints de modèle sur le disque."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:303
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:302
 msgid ""
 "With the extended ``CustomFedAdagrad`` strategy defined, we now need to "
 "set the path where the model checkpoints will be saved as well as the "
@@ -50393,7 +50536,7 @@ msgstr ""
 "signifie que chaque fois que vous faites ``flwr run``, un nouveau "
 "répertoire sera utilisé. Voyons comment cela ressemble en code :"
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:344
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:343
 msgid ""
 "Finally, let's run the Flower App locally. This tutorial writes model "
 "checkpoints to your working directory and logs metrics to Weights & "
@@ -50404,8 +50547,8 @@ msgstr ""
 "des métriques dans Weights & Biases, ce qui facilite la visualisation des"
 " résultats."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:352
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:339
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:351
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:337
 msgid ""
 "Plain ``flwr run . local`` submits the run, prints the run ID, and "
 "returns without streaming logs. See :doc:`how-to-run-flower-locally` for "
@@ -50415,11 +50558,11 @@ msgstr ""
 "retourne sans diffuser les journaux. Voir :doc:`how-to-run-flower-"
 "locally` pour le workflow local complet."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:355
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:354
 msgid "After starting the run you will notice two things:"
 msgstr "Après avoir démarré l'exécution, vous remarquerez deux choses :"
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:357
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:356
 msgid ""
 "A new directory will be created in ``outputs/YYYY-MM-DD/HH-MM-SS`` where "
 "``YYYY-MM-DD/HH-MM-SS`` is the current date and time. This directory will"
@@ -50434,7 +50577,7 @@ msgstr ""
 "meilleur taux d'exactitude est trouvé lors de la phase d'évaluation "
 "centralisée."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:361
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:360
 msgid ""
 "A new run will be created in your `W&B project <https://wandb.ai/home>`_ "
 "where you can visualize the metrics logged during the run."
@@ -50443,7 +50586,7 @@ msgstr ""
 "<https://wandb.ai/home>`_ où vous pouvez visualiser les métriques "
 "enregistrées pendant l'exécution."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:364
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:363
 msgid ""
 "Congratulations! You've successfully created a custom Flower strategy by "
 "overriding the |strategy_start_link|_ method. You've also learned how to "
@@ -50455,13 +50598,13 @@ msgstr ""
 "avez également appris à enregistrer des métriques dans Weights & Biases "
 "et à sauvegarder les checkpoints de modèle sur le disque."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:370
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:360
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:350
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:369
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:358
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:348
 msgid "Recap"
 msgstr "Récapitulation"
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:372
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:371
 msgid ""
 "In this tutorial, we've seen how to customize the |strategy_start_link|_ "
 "method of a Flower strategy. This method is the main entry point of any "
@@ -50476,7 +50619,7 @@ msgstr ""
 "enregistrer les métriques dans Weights & Biases et à sauvegarder les "
 "checkpoints de modèle sur le disque."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:377
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:376
 msgid ""
 "In the next tutorial, you'll communicate additional information between "
 "the ``ClientApp`` and the ``ServerApp`` by serializing it and sending it "
@@ -50486,13 +50629,13 @@ msgstr ""
 "supplémentaires entre la ``ClientApp`` et la ``ServerApp`` en les "
 "sérialisant et en les envoyant dans un ``Message``."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:384
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:373
-#: ../../source/tutorial-series-get-started-with-flower.rst:150
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:365
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:383
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:371
+#: ../../source/tutorial-series-get-started-with-flower.rst:107
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:363
 #: ../../source/tutorial-series-what-is-federated-learning.rst:364
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:607
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:294
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:605
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:290
 msgid ""
 "Before you continue, make sure to join the Flower community on Flower "
 "Discuss (`Join Flower Discuss <https://discuss.flower.ai>`__) and on "
@@ -50502,13 +50645,13 @@ msgstr ""
 "Flower Discuss (`Join Flower Discuss <https://discuss.flower.ai>`__) et "
 "Slack (`Join Slack <https://flower.ai/join-slack/>`__)."
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:388
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:377
-#: ../../source/tutorial-series-get-started-with-flower.rst:154
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:369
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:387
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:375
+#: ../../source/tutorial-series-get-started-with-flower.rst:111
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:367
 #: ../../source/tutorial-series-what-is-federated-learning.rst:368
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:611
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:298
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:609
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:294
 msgid ""
 "There's a dedicated ``#questions`` Slack channel if you need help, but "
 "we'd also love to hear who you are in ``#introductions``!"
@@ -50516,7 +50659,7 @@ msgstr ""
 "Il existe un canal Slack dédié si vous avez besoin d'aide, mais nous "
 "aimerions également entendre qui vous êtes dans ``#introductions`` !"
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:391
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:390
 msgid ""
 "The :doc:`Flower Collaborative AI Tutorial - Part 6: Communicate custom "
 "Messages <tutorial-series-customize-the-client-pytorch>` shows how to "
@@ -50573,11 +50716,11 @@ msgstr ""
 "Si vous commencez ici directement, installez Flower et récupérez la même "
 "application :"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:62
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:60
 msgid "Constructing Messages"
 msgstr "Construire des messages."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:64
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:62
 msgid ""
 "In Flower, the server and clients communicate by sending and receiving "
 "|message_link|_ objects. A ``Message`` carries a ``RecordDict`` as its "
@@ -50591,7 +50734,7 @@ msgstr ""
 "dictionnaire Python qui peut contenir plusieurs enregistrements de types "
 "différents. Il existe trois principaux types d'enregistrements :"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:69
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:67
 msgid ""
 "|arrayrecord_link|_: Contains model parameters as a dictionary of NumPy "
 "arrays"
@@ -50599,7 +50742,7 @@ msgstr ""
 "|arrayrecord_link|_: Contient des paramètres de modèle sous forme de "
 "dictionnaire de tableaux NumPy"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:70
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:68
 msgid ""
 "|metricrecord_link|_: Contains training or evaluation metrics as a "
 "dictionary of integers, floats, lists of integers, or lists of floats."
@@ -50608,7 +50751,7 @@ msgstr ""
 "d'évaluation sous forme de dictionnaire d'integers, de flottants, de "
 "listes d'integers ou de listes de flottants."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:72
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:70
 msgid ""
 "|configrecord_link|_: Contains configuration parameters as a dictionary "
 "of integers, floats, strings, booleans, or bytes. Lists of these types "
@@ -50618,7 +50761,7 @@ msgstr ""
 " de dictionnaire d'integers, de flottants, de chaînes, de booléens ou de "
 "bytes. Les listes de ces types sont également supportées."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:75
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:73
 msgid ""
 "Let's see a few examples of how to work with these types of records and, "
 "ultimately, construct a ``RecordDict`` that can be sent over a "
@@ -50628,11 +50771,11 @@ msgstr ""
 "registres et, finalement, construire un ``RecordDict`` qui peut être "
 "envoyé sur un ``Message``."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:102
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:100
 msgid "Revisiting replying from ClientApps"
 msgstr "Revisiter la réponse des applications Client"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:104
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:102
 msgid ""
 "Let's remind ourselves how the communication between ``ClientApp`` and "
 "``ServerApp`` works. A ``ClientApp`` function wrapped with "
@@ -50647,7 +50790,7 @@ msgstr ""
 "processus d'entraînement, telles que la perte d'entraînement et "
 "l'exactitude. En code, cela ressemblerait à :"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:127
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:125
 msgid ""
 "Then, on the ``ServerApp``, the Flower strategy will automatically "
 "aggregate the |arrayrecord_link|_ and |metricrecord_link|_ from each "
@@ -50670,7 +50813,7 @@ msgstr ""
 "métrique à la ``MetricRecord``. Elle sera également agrégée "
 "automatiquement par la stratégie. Si vous faites par exemple :"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:168
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:166
 msgid ""
 "If you'd like to communicate other types of objects and leave them out of"
 " the aggregation process, you can use a |configrecord_link|_. In addition"
@@ -50686,11 +50829,11 @@ msgstr ""
 "communiquer des objets Python arbitraires en les sérialisant d'abord en "
 "bytes."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:176
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:174
 msgid "Communicating arbitrary objects"
 msgstr "Communiquer des objets arbitraires"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:178
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:176
 msgid ""
 "Let's assume the training stage of our ``ClientApp`` produces a dataclass"
 " like the one below and we would like to communicate it to the "
@@ -50702,7 +50845,7 @@ msgstr ""
 "cela au ``ServerApp`` via le ``Message``. Allons-y et définissons cela "
 "dans ``task.py``:"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:200
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:198
 msgid ""
 "Now, let's see how the ``ClientApp`` can serialize this object, send it "
 "to the ``ServerApp``, make the strategy deserialize it back to the "
@@ -50712,11 +50855,11 @@ msgstr ""
 "l'envoyer au ``ServerApp``, faire la stratégie désérialiser-le à nouveau "
 "en objet original, et l'utiliser."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:204
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:202
 msgid "Sending from ClientApps"
 msgstr "Envoi depuis les ClientApps"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:206
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:204
 msgid ""
 "Let's assume our ``ClientApp`` trains the model locally and generates an "
 "instance of ``TrainProcessMetadata``. In order to send it as part of the "
@@ -50733,7 +50876,7 @@ msgstr ""
 "``ConfigRecord`` dans la réponse ``Message``. Voyons comment cela "
 "ressemblerait à du code:"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:212
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:210
 msgid ""
 "The example below focuses on the additional metadata logic; keep the "
 "model and data setup from your existing ``train`` function unchanged."
@@ -50742,7 +50885,7 @@ msgstr ""
 "supplémentaires ; gardez le modèle et les données de votre fonction "
 "d'entraînement existante inchangés."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:217
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:215
 msgid ""
 "The following code is for demonstration purposes only. In real-world "
 "applications, since `pickle "
@@ -50759,7 +50902,7 @@ msgstr ""
 "personnalisée simple si l'objet n'est pas trop complexe. ``pickle`` est "
 "utilisé ici uniquement pour la simplicité."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:272
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:270
 msgid ""
 "Let's see next how the strategy on the ``ServerApp`` can deserialize the "
 "object back to its original form and use it."
@@ -50767,11 +50910,11 @@ msgstr ""
 "Voyons ensuite comment la stratégie sur le ``ServerApp`` peut "
 "désérialiser l'objet à nouveau en sa forme originale et l'utiliser."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:276
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:274
 msgid "Receiving on ServerApps"
 msgstr "Réception sur ServerApps"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:278
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:276
 msgid ""
 "As you know, a Flower strategy will automatically aggregate the "
 "``ArrayRecord`` and ``MetricRecord`` from each client. However, it will "
@@ -50786,7 +50929,7 @@ msgstr ""
 " gérer la désérialisation et l'utilisation de l'objet "
 "``TrainProcessMetadata``."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:285
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:283
 msgid ""
 "We override the ``aggregate_train`` method because we sent the object "
 "from a ``@app.train()`` function. If we had sent it from an "
@@ -50798,7 +50941,7 @@ msgstr ""
 "depuis une fonction ``@app.evaluate()``, nous aurions surchargé la "
 "méthode ``aggregate_evaluate`` au lieu de celle-ci."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:289
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:287
 msgid ""
 "Let's create a new custom strategy, or reuse the one created in the "
 "previous strategy tutorials, in ``server_app.py`` that extends the "
@@ -50813,11 +50956,11 @@ msgstr ""
 " chaque client et imprimer le temps d'entraînement et l'état de "
 "convergence:"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:333
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:331
 msgid "Finally, we run the Flower App."
 msgstr "Finalement, nous exécutons l'application Flower."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:342
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:340
 msgid ""
 "You will observe that the training metadata from each client is logged to"
 " the console of the ``ServerApp``. If you finish embedding the creation "
@@ -50829,7 +50972,7 @@ msgstr ""
 "l'implémentation de la création de l'objet ``TrainProcessMetadata`` dans "
 "le ``ClientApp``, vous devriez voir un sortie similaire à celui-ci :"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:354
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:352
 msgid ""
 "You can now use this information in your strategy logic as needed. For "
 "example, to implement a custom aggregation method based on convergence "
@@ -50840,7 +50983,7 @@ msgstr ""
 " d'agrégation personnalisée sur la base de l'état de convergence ou pour "
 "logger des métriques supplémentaires."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:362
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:360
 msgid ""
 "In this part of the tutorial, we've seen how to communicate arbitrary "
 "Python objects between the ``ClientApp`` and the ``ServerApp`` by "
@@ -50859,7 +51002,7 @@ msgstr ""
 "identiques si vous avez besoin de sérialiser des objets dans la stratégie"
 " pour les envoyer aux clients."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:380
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:378
 msgid ""
 "This is the final part of the Flower tutorial (for now!), "
 "congratulations! You're now well equipped to understand the rest of the "
@@ -50871,15 +51014,15 @@ msgstr ""
 "la documentation. Il y a de nombreux sujets que nous n'avons pas abordés "
 "dans le tutoriel, nous te recommandons les ressources suivantes :"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:384
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:382
 msgid "`Read Flower Docs <https://flower.ai/docs/>`__"
 msgstr "`Lire la documentation sur Flower <https://flower.ai/docs/>`__"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:385
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:383
 msgid "`Check out Flower Code Examples <https://flower.ai/docs/examples/>`__"
 msgstr "`Check out Flower Code Examples <https://flower.ai/docs/examples/>`__"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:386
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:384
 msgid ""
 "`Watch Flower AI Summit 2026 videos <https://flower.ai/events/flower-ai-"
 "summit-2026/>`__"
@@ -50919,7 +51062,7 @@ msgstr ""
 
 #: ../../source/tutorial-series-get-started-with-flower.rst:21
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:64
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:27
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:26
 msgid "Let's get started! 🌼"
 msgstr "Allons-y ! 🌼"
 
@@ -50937,99 +51080,16 @@ msgstr ""
 "Inscrivez-vous sur `flower.ai <https://flower.ai/>`__ ou connectez-vous "
 "si vous avez déjà un compte."
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:34
-msgid ""
-"On SuperGrid, all collaborative AI workloads happen within a federation "
-"and are run as Flower Apps. A federation is a collection of users and "
-"their SuperNodes that collaborate towards a common goal. For example, you"
-" can train an AI model across all SuperNodes in the federation, each with"
-" its own data. Only members of a federation can run Flower Apps across "
-"those SuperNodes."
-msgstr ""
-"Sur SuperGrid, toutes les charges de travail d'intelligence artificielle "
-"collaborative se déroulent au sein d'une fédération et sont exécutées "
-"comme des applications Flower. Une fédération est une collection "
-"d'utilisateurs et de leurs SuperNodes qui collaborent vers un objectif "
-"commun. Par exemple, vous pouvez entraîner un modèle AI sur tous les "
-"SuperNodes dans la fédération, chacun avec ses propres données. Seuls les"
-" membres d'une fédération peuvent exécuter des applications Flower sur "
-"ces SuperNodes."
-
-#: ../../source/tutorial-series-get-started-with-flower.rst:40
-msgid ""
-"In this tutorial, you'll create a federation with simulated SuperNodes. "
-"This is ideal because it lets you get started without registering and "
-"connecting real SuperNodes. In a future tutorial, you'll learn how to "
-"connect real SuperNodes to your federation and run apps across them."
-msgstr ""
-"Dans ce tutoriel, vous créerez une fédération avec des SuperNodes "
-"simulés. C'est idéal car cela vous permet de commencer sans enregistrer "
-"et connecter des SuperNodes réels. Dans un futur tutoriel, vous "
-"apprendrez à connecter des SuperNodes réels à votre fédération et à "
-"exécuter des applications sur eux."
-
-#: ../../source/tutorial-series-get-started-with-flower.rst:45
-msgid ""
-"Go to `the Federations page <https://flower.ai/federations/>`__ and click"
-" ``New Federation``. Select ``Simulation``, give your federation a name, "
-"set it to 10 SuperNodes, and click ``Create``. See the screenshot below "
-"for reference."
-msgstr ""
-"Allez à `the Federations page <https://flower.ai/federations/>`__ et "
-"cliquez sur ``New Federation``. Sélectionnez ``Simulation``, donnez un "
-"nom à votre fédération, fixez-le à 10 SuperNodes et cliquez sur "
-"``Create``. Consultez l'écran ci-dessous pour référence."
-
-#: ../../source/tutorial-series-get-started-with-flower.rst:49
-msgid "Create federation dialog in SuperGrid"
-msgstr "Dialogue de création de fédération dans SuperGrid"
-
-#: ../../source/tutorial-series-get-started-with-flower.rst:54
-msgid ""
-"After clicking ``Create``, you should see your federation in the "
-"dashboard. In the screenshot below, a user named ``peter123`` created a "
-"federation named ``my-first-federation``. The unique name of a federation"
-" is always of the form ``@<username>/<federation-name>``. In the "
-"screenshot, the federation's unique name is ``@peter123/my-first-"
-"federation``."
-msgstr ""
-"Après avoir cliqué sur ``Create``, vous devriez voir votre fédération "
-"dans le tableau de bord. Dans l'écran d'exemple ci-dessous, un "
-"utilisateur nommé ``peter123`` a créé une fédération nommée ``my-first-"
-"federation``. Le nom unique d'une fédération est toujours sous la forme "
-"``@<username>/<federation-name>``. Dans l'écran, le nom unique de la "
-"fédération est ``@peter123/my-first-federation``."
-
-#: ../../source/tutorial-series-get-started-with-flower.rst:62
-msgid ""
-"This tutorial creates a simulation federation. To create a deployment "
-"federation for the Deployment Runtime, manage federation settings, or "
-"invite users to collaborate in a federation, see :doc:`how-to-create-and-"
-"manage-federations`."
-msgstr ""
-"Ce tutoriel crée une simulation fédérative. Pour créer une fédération de "
-"déploiement pour le Deployment Runtime, gérer les paramètres de la "
-"fédération, ou inviter des utilisateurs à collaborer dans une fédération,"
-" voir :doc:`how-to-create-and-manage-federations`."
-
-#: ../../source/tutorial-series-get-started-with-flower.rst:66
-msgid "Federation list showing the newly created federation"
-msgstr "Liste des fédérations montrant la nouvelle fédération créée"
-
-#: ../../source/tutorial-series-get-started-with-flower.rst:71
-msgid "You are now the owner of a new federation!"
-msgstr "Vous êtes maintenant propriétaire d'une nouvelle fédération !"
-
-#: ../../source/tutorial-series-get-started-with-flower.rst:75
+#: ../../source/tutorial-series-get-started-with-flower.rst:32
 msgid "Run a Flower App"
 msgstr "Exécutez une Application Flower"
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:77
+#: ../../source/tutorial-series-get-started-with-flower.rst:34
+#, fuzzy
 msgid ""
-"With your federation created, you can now run a Flower App across the "
-"simulated SuperNodes in your federation. First, you need a Flower App. A "
-"Flower App is a Python project that defines the logic of your "
-"collaborative AI workload. More details will be covered in the next "
+"Once you have logged into flower.ai, you are ready to start running "
+"Flower Apps. A Flower App is a Python project that defines the logic of "
+"your collaborative AI workload. More details will be covered in the next "
 "tutorial, but for now you can think of a Flower App as the code that "
 "defines what happens on the server (SuperGrid) and SuperNodes during your"
 " collaborative AI workload."
@@ -51044,7 +51104,7 @@ msgstr ""
 "serveur (SuperGrid) et les SuperNodes pendant votre charge de travail IA "
 "collaborative."
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:84
+#: ../../source/tutorial-series-get-started-with-flower.rst:40
 msgid ""
 "`Flower Hub <https://flower.ai/apps/>`__ is a collection of open-source "
 "Flower Apps that you can use and learn from. In this tutorial, you'll use"
@@ -51060,21 +51120,23 @@ msgstr ""
 "dans laquelle le serveur agrège des tableaux NumPy envoyés par les "
 "clients."
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:90
+#: ../../source/tutorial-series-get-started-with-flower.rst:46
 msgid "Demo app on Flower Hub"
 msgstr "Application de démonstration sur Flower Hub"
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:95
+#: ../../source/tutorial-series-get-started-with-flower.rst:51
+#, fuzzy
 msgid ""
 "When you click the ``🚀 Run`` button, you'll be asked which federation to "
-"run the app on. Select the federation you just created, then click ``Run "
-"app``."
+"run the app on. Select ``@<your-account>/workspace`` (this is a "
+"federation created automatically by SuperGrid under your profile), then "
+"click ``Run app``."
 msgstr ""
 "Lorsque vous cliquez sur le bouton ``🚀 Run``, vous serez invité à choisir"
 " quelle fédération exécuter l'application. Sélectionnez la fédération que"
 " vous venez de créer, puis cliquez sur ``Run app``."
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:103
+#: ../../source/tutorial-series-get-started-with-flower.rst:60
 msgid ""
 "Shortly after launching your app, your run will start and you will see "
 "the run details page. This page shows you the progress of your run and "
@@ -51085,10 +51147,11 @@ msgstr ""
 " progrès de votre exécution et vous donne des informations sur "
 "l'exécution de votre application."
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:112
+#: ../../source/tutorial-series-get-started-with-flower.rst:69
+#, fuzzy
 msgid ""
 "If you click the ``Logs`` tab, you'll see the logs from the app "
-"execution. This demo app ran for three rounds and sampled all 10 "
+"execution. This demo app ran for three rounds and sampled all two "
 "SuperNodes in each round. In each round, the server aggregated different "
 "metrics received from the clients. You can see these in the logs under "
 "the ``'random_metric'`` key. At the end, the logs show the aggregated "
@@ -51102,12 +51165,12 @@ msgstr ""
 "journaux sous la clé ``'random_metric'``. À la fin, les journaux montrent"
 " les résultats agrégés de toutes les tours."
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:125
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:593
+#: ../../source/tutorial-series-get-started-with-flower.rst:82
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:591
 msgid "Final remarks"
 msgstr "Remarques finales"
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:127
+#: ../../source/tutorial-series-get-started-with-flower.rst:84
 msgid ""
 "Congratulations, you have successfully run your first Flower App on "
 "SuperGrid! You've taken your first step into the world of collaborative "
@@ -51124,7 +51187,7 @@ msgstr ""
 "le tableau de bord de SuperGrid pour surveiller les progrès de votre "
 "application et consulter ses journaux."
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:133
+#: ../../source/tutorial-series-get-started-with-flower.rst:90
 msgid ""
 "If you return to the `Federations page "
 "<https://flower.ai/federations/>`__ and click your federation, you'll see"
@@ -51137,7 +51200,7 @@ msgstr ""
 "des détails d'exécution que vous avez vue juste après avoir lancé "
 "l'application."
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:142
+#: ../../source/tutorial-series-get-started-with-flower.rst:99
 msgid ""
 "In the next tutorial, you'll download an existing Flower App, run it from"
 " your local machine on SuperGrid, make a small customization, and learn "
@@ -51148,7 +51211,7 @@ msgstr ""
 "effectuerez une petite modification et apprendrez comment les composants "
 "principaux de l'application Flower s'intègrent."
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:157
+#: ../../source/tutorial-series-get-started-with-flower.rst:114
 msgid ""
 "The :doc:`Flower Collaborative AI Tutorial - Part 2: Write your first "
 "Flower App <tutorial-series-write-your-first-flower-app>` will walk you "
@@ -51198,17 +51261,17 @@ msgstr ""
 "ouvrez le répertoire existant ``quickstart-pytorch`` et continuez d'en "
 "là."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:71
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:69
 msgid "With that, we're ready to introduce a number of new strategy features."
 msgstr ""
 "Avec cela, nous sommes prêts à introduire un certain nombre de nouvelles "
 "fonctionnalités de stratégie."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:75
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:73
 msgid "Choosing a different strategy"
 msgstr "Choisissez une autre stratégie"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:77
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:75
 msgid ""
 "The strategy encapsulates the federated learning approach/algorithm, for "
 "example, |fedavg_link|_. Let's try to use a different strategy this time."
@@ -51220,7 +51283,7 @@ msgstr ""
 "cette fois. Modifiez les lignes suivantes dans votre ``server_app.py`` "
 "pour passer de ``FedAvg`` à |fedadagrad_link|_."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:116
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:114
 msgid ""
 "Next, run the app on SuperGrid to confirm that the new strategy is being "
 "used:"
@@ -51228,7 +51291,7 @@ msgstr ""
 "Exécutez ensuite l'application sur SuperGrid pour confirmer que la "
 "nouvelle stratégie est utilisée :"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:125
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:123
 msgid ""
 "Open the `SuperGrid dashboard <https://flower.ai/federations/>`__, select"
 " your federation, and inspect the logs for the new run. You should see "
@@ -51239,17 +51302,17 @@ msgstr ""
 " exécution. Vous devriez voir que Flower démarre la stratégie "
 "``FedAdagrad`` au lieu de ``FedAvg``."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:129
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:127
 msgid "You can also run the same app locally while developing or debugging:"
 msgstr ""
 "Vous pouvez également exécuter le même application localement pendant le "
 "développement ou la débogage :"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:137
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:135
 msgid "Server-side parameter **evaluation**"
 msgstr "Paramètre côté serveur **évaluation**"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:139
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:137
 msgid ""
 "Flower can evaluate the aggregated model on the server side or on the "
 "client side. Client-side and server-side evaluation are similar in some "
@@ -51259,7 +51322,7 @@ msgstr ""
 "L'évaluation côté client et côté serveur sont similaires dans certains "
 "aspects, mais différentes dans d'autres."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:143
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:141
 msgid ""
 "**Centralized Evaluation** (or *server-side evaluation*) is conceptually "
 "simple: it works the same way that evaluation in centralized machine "
@@ -51278,7 +51341,7 @@ msgstr ""
 "le modèle aux clients. Nous avons également la chance que l'ensemble de "
 "notre ensemble de données d'évaluation soit disponible à tout moment."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:150
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:148
 msgid ""
 "**Federated Evaluation** (or *client-side evaluation*) is more complex, "
 "but also more powerful: it doesn't require a centralized dataset and "
@@ -51309,7 +51372,7 @@ msgstr ""
 "le modèle, nous verrions nos résultats d'évaluation fluctuer au cours des"
 " cycles consécutifs."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:161
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:159
 msgid ""
 "We've seen how federated evaluation works on the client side (i.e., by "
 "implementing a function wrapped with the ``@app.evaluate`` decorator in "
@@ -51322,7 +51385,7 @@ msgstr ""
 "voyons comment nous pouvons évaluer les paramètres du modèle agrégé côté "
 "serveur."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:165
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:163
 msgid ""
 "To do so, we use the ``global_evaluate`` function defined in "
 "``server_app.py``. This function is a callback that will be passed to the"
@@ -51338,27 +51401,27 @@ msgstr ""
 "fédéré en passant deux arguments : le tour actuel d'apprentissage fédéré "
 "et les paramètres du modèle agrégé."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:171
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:169
 msgid "Our ``global_evaluate`` function performs the following steps:"
 msgstr "Notre fonction ``global_evaluate`` effectue les étapes suivantes :"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:173
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:171
 msgid "Load the aggregated model parameters into a PyTorch model"
 msgstr "Chargez les paramètres du modèle agrégé dans un modèle PyTorch"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:174
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:172
 msgid "Load the entire CIFAR-10 test dataset"
 msgstr "Chargement de l'intégralité du jeu de test CIFAR-10"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:175
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:173
 msgid "Evaluate the model on the test dataset"
 msgstr "Évaluez le modèle sur le jeu de test"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:176
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:174
 msgid "Return the evaluation metrics as a |metricrecord_link|_"
 msgstr "Retournez les métriques d'évaluation sous forme de |metricrecord_link|_"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:201
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:199
 msgid ""
 "Remember we mentioned this ``global_evaluate`` will be called by the "
 "strategy. To do so we need to pass it to the strategy's ``start`` method "
@@ -51371,7 +51434,7 @@ msgstr ""
 " quickstart le fait déjà, assurez-vous donc que cette partie reste dans "
 "``server_app.py`` après avoir passé à ``FedAdagrad``."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:226
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:224
 msgid ""
 "From here on, we'll run locally so you can iterate faster while editing "
 "the app. Run the local simulation with:"
@@ -51380,7 +51443,7 @@ msgstr ""
 "itérer plus rapidement pendant l'édition de l'application. Exécutez la "
 "simulation locale avec :"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:233
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:231
 msgid ""
 "You'll note that the server logs the metrics returned by the callback "
 "after each round. Also, at the end of the run, note the ``ServerApp-side "
@@ -51390,11 +51453,11 @@ msgstr ""
 "retournées par le callback après chaque tour. De plus, à la fin de "
 "l'exécution, notez le ``ServerApp-side Evaluate Metrics`` affiché :"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:246
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:244
 msgid "Sending configurations to clients from strategies"
 msgstr "Envoi de configurations aux clients depuis des stratégies"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:248
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:246
 msgid ""
 "In some situations, we want to configure client-side execution (training,"
 " evaluation) from the server side. One example of this is the server "
@@ -51411,7 +51474,7 @@ msgstr ""
 "serveur vers les clients comme partie de la |message_link|_ que le "
 "``ClientApp`` reçoit. Voyons comment nous pouvons faire cela."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:254
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:252
 msgid ""
 "To the |strategy_start_link|_ method of our strategy we are already "
 "passing a |configrecord_link|_ specifying the initial learning rate. This"
@@ -51429,7 +51492,7 @@ msgstr ""
 "tous les 5 tours, alors nous devons surcharger la méthode "
 "``configure_train`` de notre stratégie et y intégrer une telle logique."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:261
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:259
 msgid ""
 "To do so, we create a new class inheriting from |fedadagrad_link|_ and "
 "override the ``configure_train`` method. We then use this new strategy in"
@@ -51443,7 +51506,7 @@ msgstr ""
 "ressemble en code. Créez un nouveau fichier appelé ``custom_strategy.py``"
 " dans le répertoire ``pytorchexample`` et ajoutez le code suivant :"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:287
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:285
 msgid ""
 "Next, we use this new strategy in our ``ServerApp`` by importing it in "
 "your ``server_app.py`` and using it instead of the standard "
@@ -51453,7 +51516,7 @@ msgstr ""
 " en l'important dans votre ``server_app.py`` et en l'utilisant au lieu de"
 " la stratégie standard ``FedAdagrad``:"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:311
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:309
 msgid ""
 "Run locally again, this time increasing the number of rounds to 15 to see"
 " the learning rate decay in action."
@@ -51461,7 +51524,7 @@ msgstr ""
 "Exécutez localement à nouveau, cette fois augmentez le nombre de tours à "
 "15 pour voir la décadence du taux d'apprentissage en action."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:318
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:316
 msgid ""
 "You'll note that in the ``configure_train`` stage of rounds 5 and 10, the"
 " learning rate is decreased by a factor of 0.5 and the new learning rate "
@@ -51471,7 +51534,7 @@ msgstr ""
 "taux d'apprentissage est diminué par un facteur de 0,5 et le nouveau taux"
 " d'apprentissage est imprimé à la console."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:321
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:319
 msgid ""
 "How do we know the ``ClientApp`` is using that new learning rate? Recall "
 "that in ``client_app.py``, we are reading the learning rate from the "
@@ -51482,7 +51545,7 @@ msgstr ""
 "le taux d'apprentissage du ``Message`` reçu par la fonction "
 "``@app.train()``:"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:345
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:343
 msgid ""
 "Congratulations! You have created your first custom strategy adding "
 "dynamism to the ``ConfigRecord`` that is sent to clients."
@@ -51490,7 +51553,7 @@ msgstr ""
 "Félicitations ! Vous avez créé votre première stratégie personnalisée "
 "ajoutant de la dynamique à ce qui est envoyé aux clients."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:352
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:350
 msgid ""
 "In this tutorial, we've seen how we can gradually enhance our system by "
 "customizing the strategy, choosing a different strategy, applying "
@@ -51505,7 +51568,7 @@ msgstr ""
 "le côté serveur. C'est tout à fait une grande flexibilité avec si peu de "
 "code, n'est-ce pas ?"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:357
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:355
 #, fuzzy
 msgid ""
 "In the later sections, we've seen how we can communicate arbitrary values"
@@ -51521,7 +51584,7 @@ msgstr ""
 "50 clients dans le même workload -- tout cela dans le même projet Flower "
 "!"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:372
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:370
 msgid ""
 "The :doc:`Flower Collaborative AI Tutorial - Part 5: Build a strategy "
 "from scratch <tutorial-series-build-a-strategy-from-scratch-pytorch>` "
@@ -52162,7 +52225,7 @@ msgstr ""
 "quel cadre de ML et n'importe quel langage de programmation."
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:351
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:271
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:267
 msgid "Final Remarks"
 msgstr "Remarques Finales"
 
@@ -52210,11 +52273,12 @@ msgstr ""
 "artificielle collaborative de Flower !"
 
 #: ../../source/tutorial-series-write-your-first-flower-app.rst:7
+#, fuzzy
 msgid ""
-"In the previous tutorial, you created your first federation on SuperGrid "
-"using the simulation runtime. This allowed you to experiment with "
-"simulated SuperNodes, run an existing Flower App on SuperGrid, and "
-"explore the dashboard to follow its progress and view its logs."
+"In the previous tutorial, you ran an existing Flower App on SuperGrid "
+"using your default workspace simulation federation. This allowed you to "
+"experiment with simulated SuperNodes and explore the dashboard to follow "
+"the app's progress and view its logs."
 msgstr ""
 "Dans le tutoriel précédent, vous avez créé votre première fédération sur "
 "SuperGrid à l'aide du Simulation Runtime. Cela vous a permis "
@@ -52222,7 +52286,7 @@ msgstr ""
 "Flower existante sur SuperGrid et d'explorer l'interface de dashboard "
 "pour suivre son progression et visualiser ses journaux."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:12
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:11
 msgid ""
 "In this tutorial, you'll pull the `@flwrlabs/demo "
 "<https://flower.ai/apps/flwrlabs/demo/>`__ app from Flower Hub and run it"
@@ -52246,7 +52310,7 @@ msgstr ""
 "Flower et voir, dans des termes concrets, comment l'exemple d'application"
 " utilise ces composants ensemble."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:33
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:32
 msgid ""
 "In this tutorial, you'll edit the code of an existing Flower App that "
 "you'll pull from the Flower Hub. In order to do that, you'll need to "
@@ -52258,13 +52322,13 @@ msgstr ""
 "cela, vous devez installer ``flwr``, le package Python de Flower. Voici "
 "une brève guide sur la façon dont il faut procéder :"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:40
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:39
 msgid "First, we install the Flower package ``flwr`` in a new Python environment."
 msgstr ""
 "Tout d'abord, nous installons le paquet Flower ``flwr`` dans un nouvel "
 "environnement Python."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:46
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:45
 msgid ""
 "Then, use ``flwr new`` to fetch an existing Flower App from the Flower "
 "Hub. In this case, you'll fetch the `@flwrlabs/demo "
@@ -52275,7 +52339,7 @@ msgstr ""
 "récupérer l'application `@flwrlabs/demo "
 "<https://flower.ai/apps/flwrlabs/demo/>`__. "
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:53
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:52
 msgid ""
 "After running it you'll notice a new directory named ``demo`` has been "
 "created in the directory you executed the above command from. It should "
@@ -52285,7 +52349,7 @@ msgstr ""
 "nommé ``demo`` a été créé dans le répertoire où vous avez exécuté la "
 "commande précédente. Il devrait avoir la structure suivante :"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:67
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:66
 msgid ""
 "You did it! You have pulled an existing Flower App from the Flower Hub. "
 "Open the ``demo`` directory in your code editor of choice, then advance "
@@ -52298,11 +52362,11 @@ msgstr ""
 "apprendre comment exécuter cette application sur SuperGrid. Plus tard, "
 "vous allez apprendre les composants clés d'une application Flower."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:74
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:73
 msgid "Run the app on SuperGrid"
 msgstr "Exécutez l'application sur SuperGrid"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:78
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:77
 msgid ""
 "If you haven't already, make sure to complete the :doc:`first tutorial in"
 " this series <tutorial-series-get-started-with-flower>` to set up your "
@@ -52314,7 +52378,7 @@ msgstr ""
 "flower>` pour configurer votre compte SuperGrid et exécuter une démo "
 "directement depuis la plateforme Flower Hub."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:82
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:81
 msgid ""
 "In the previous tutorial, you ran the demo app on SuperGrid directly from"
 " Flower Hub. Now that you have the app code on your machine, you can run "
@@ -52328,7 +52392,7 @@ msgstr ""
 "personnaliser l'application et la rendre vôtre."
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:141
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:86
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:85
 msgid ""
 "Open a terminal, activate your Python environment, and run the following "
 "command to first login to SuperGrid:"
@@ -52337,27 +52401,30 @@ msgstr ""
 "exécutez la commande suivante pour vous connecter à SuperGrid :"
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:149
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:94
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:93
+#, fuzzy
 msgid ""
 "Once you are logged in, run the following command to run the app on "
-"SuperGrid and across the federation you created in the previous tutorial:"
+"SuperGrid:"
 msgstr ""
 "Une fois que vous êtes connecté, exécutez la commande suivante pour "
 "exécuter l'application sur SuperGrid et dans la fédération que vous avez "
 "créée dans le tutoriel précédent :"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:106
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:102
+#, fuzzy
 msgid ""
 "Then, if you navigate to the `SuperGrid dashboard "
-"<https://flower.ai/federations/>`__, you should see a new run in the list"
-" of runs of your federation. Click on it to see the run details and logs."
+"<https://flower.ai/federations/>`__, you should see a new run in "
+"``@<your-account>/workspace``. Click on it to see the run details and "
+"logs."
 msgstr ""
 "Ensuite, si vous naviguez vers le répertoire `SuperGrid dashboard "
 "<https://flower.ai/federations/>`__, vous devriez voir une nouvelle "
 "exécution dans la liste des exécutions de votre fédération. Cliquez "
 "dessus pour voir les détails et les journaux."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:115
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:111
 msgid ""
 "If you inspect the logs, you should see the same output as when you ran "
 "the app directly from the Flower Hub in the previous tutorial. This is "
@@ -52372,11 +52439,11 @@ msgstr ""
 "faire une petite modification à l'application qui se reflétera dans les "
 "journaux et la rendra vôtre !"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:122
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:118
 msgid "Customizing your App"
 msgstr "Personnalisez votre Application"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:124
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:120
 msgid ""
 "Now that you have the app running on SuperGrid, you can start customizing"
 " it. In this tutorial you'll make a small customization to the "
@@ -52393,7 +52460,7 @@ msgstr ""
 "de code préféré et ouvrez le fichier ``quickstart_numpy/server_app.py``. "
 "Ensuite, ajoutez les deux lignes suivantes à la fonction ``main()``: "
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:156
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:152
 msgid ""
 "If you now run the app again, you should see the new messages in the logs"
 " of your run on SuperGrid:"
@@ -52401,7 +52468,7 @@ msgstr ""
 "Si vous exécutez à nouveau l'application, vous devriez voir les nouveaux "
 "messages dans les journaux de votre exécution sur SuperGrid :"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:164
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:160
 msgid ""
 "Then, if you navigate to the `SuperGrid dashboard "
 "<https://flower.ai/federations/>`__, and open the logs of the new run, "
@@ -52413,13 +52480,13 @@ msgstr ""
 "nouvelle exécution, vous devriez voir les nouveaux messages imprimés du "
 "``ServerApp`` au début et à la fin des journaux."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:168
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:164
 msgid "SuperGrid run logs showing the custom ServerApp print statements"
 msgstr ""
 "Journaux d'exécution SuperGrid montrant les déclarations de print "
 "ServerApp personnalisées"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:173
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:169
 msgid ""
 "You did it! You have successfully customized an existing Flower App and "
 "run it on SuperGrid. So far you have learned about two powerful Flower "
@@ -52436,7 +52503,7 @@ msgstr ""
 "new`` est une excellente façon de commencer avec une nouvelle application"
 " que vous pouvez personnaliser pour vos besoins."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:179
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:175
 msgid ""
 "In the next section, you'll learn about the main components of a Flower "
 "App and how they work together, using the demo app as a concrete example."
@@ -52445,11 +52512,11 @@ msgstr ""
 "d'une application Flower et comment ils fonctionnent ensemble, en "
 "utilisant l'application démo comme exemple concret."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:184
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:180
 msgid "Flower App Components"
 msgstr "Composants d'une Application Flower"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:186
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:182
 msgid ""
 "All Flower Apps follow the same basic structure, which is designed to be "
 "flexible and powerful enough to support a wide variety of collaborative "
@@ -52462,7 +52529,7 @@ msgstr ""
 "fédéré, l'analyse fédérée, le formation distribuée et plus encore. Les "
 "composants principaux d'une application Flower sont :"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:191
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:187
 msgid ""
 "``ServerApp``: the server-side entry point for a run. In a typical "
 "federated learning setup, it defines how the run starts, which initial "
@@ -52477,7 +52544,7 @@ msgstr ""
 "Flower peut également être construite avec une stratégie personnalisée ou"
 " sans stratégie du tout."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:195
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:191
 msgid ""
 "``ClientApp``: the code that runs on each client (SuperNode). It defines "
 "what should happen when a SuperNode receives instructions from the server"
@@ -52491,7 +52558,7 @@ msgstr ""
 "données locales » ou « évaluez ce modèle sur vos données locales » ou, en"
 " général, « faites x avec vos données locales ». "
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:199
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:195
 msgid ""
 "``pyproject.toml``: the app configuration file. It declares project "
 "metadata and dependencies, tells Flower where to import the ``ServerApp``"
@@ -52504,7 +52571,7 @@ msgstr ""
 "configuration d'exécution (par exemple, les hyperparamètres) que "
 "l'application peut lire en temps réel."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:203
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:199
 msgid ""
 "In summary, you can think of the ``ServerApp`` as the place where the "
 "federated run is launched, the ``Strategy`` as the algorithm that "
@@ -52525,11 +52592,11 @@ msgstr ""
 "d'entraînement, ou toute autre information qui doit être communiquée "
 "entre le serveur et les SuperNodes pendant l'exécution."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:212
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:208
 msgid "How the demo app uses these components"
 msgstr "Comment l'application de démonstration utilise ces composants"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:214
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:210
 msgid ""
 "The ``@flwrlabs/demo`` app is built as a deliberately small NumPy example"
 " so the Flower structure is easy to see."
@@ -52537,7 +52604,7 @@ msgstr ""
 "L'application ``@flwrlabs/demo`` est construite comme exemple NumPy "
 "délibérément petit afin que la structure Flower soit facile à voir."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:217
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:213
 msgid ""
 "In ``quickstart_numpy/server_app.py``, the ``ServerApp`` is created and "
 "defines its main entry point with ``@app.main()``. When a run starts, "
@@ -52547,11 +52614,11 @@ msgstr ""
 "définit son point d'entrée principal avec ``@app.main()``. Lorsqu'une "
 "exécution commence, cette fonction :"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:220
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:216
 msgid "reads ``num-server-rounds`` from ``context.run_config``;"
 msgstr "lit ``num-server-rounds`` à partir de ``context.run_config``;"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:221
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:217
 msgid ""
 "creates the initial global model by calling ``get_dummy_model()`` from "
 "``quickstart_numpy/task.py``; For simplicity, the model is just a list of"
@@ -52563,7 +52630,7 @@ msgstr ""
 "une liste d'un tableau NumPy unique, mais dans une application réelle, il"
 " pourrait s'agir d'un objet plus complexe comme un modèle PyTorch."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:225
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:221
 msgid ""
 "wraps the model arrays in an ``ArrayRecord`` so Flower can send them to "
 "SuperNodes;"
@@ -52571,15 +52638,15 @@ msgstr ""
 "enveloppe les tableaux de modèles dans un ``ArrayRecord`` afin que Flower"
 " puisse les envoyer aux SuperNodes;"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:226
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:222
 msgid "creates a ``FedAvg`` strategy;"
 msgstr "crée une stratégie de ``FedAvg``;"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:227
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:223
 msgid "launches the strategy by calling ``strategy.start()``."
 msgstr "Lance la stratégie en appelant ``strategy.start()``."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:229
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:225
 msgid ""
 "In ``quickstart_numpy/client_app.py``, a ``ClientApp`` is created and "
 "defines two handlers:"
@@ -52587,7 +52654,7 @@ msgstr ""
 "Dans ``quickstart_numpy/client_app.py``, un ``ClientApp`` est créé et "
 "définit deux gestionnaires:"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:232
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:228
 msgid ""
 "``@app.train()`` receives the current global model array, simulates local"
 " training by adding random noise to it, then replies with the updated "
@@ -52597,7 +52664,7 @@ msgstr ""
 "entraînement local en ajoutant du bruit aléatoire à celui-ci, puis répond"
 " avec l'array mis à jour et quelques métriques."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:234
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:230
 msgid ""
 "``@app.evaluate()`` receives the current global model array and replies "
 "with evaluation metrics. It does not return an updated array because "
@@ -52607,7 +52674,7 @@ msgstr ""
 " des métriques d'évaluation. Il ne retourne pas un array mis à jour car "
 "l'évaluation ne modifie pas le modèle."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:238
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:234
 msgid ""
 "The strategy connects these two sides. In this demo, ``FedAvg`` sends the"
 " current global array to selected ``ClientApp`` instances for training, "
@@ -52619,7 +52686,7 @@ msgstr ""
 "l'entraînement, attend leurs réponses, et agrège les tableaux retournés "
 "dans le modèle global suivant."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:244
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:240
 msgid ""
 "In a real app, the ``ClientApp`` would likely have a more complex logic, "
 "for example it could load a model and data, perform actual training and "
@@ -52635,7 +52702,7 @@ msgstr ""
 "d'une application Flower qui utilise PyTorch et une logique "
 "d'entraînement et d'évaluation réelles."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:250
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:246
 msgid ""
 "Finally, ``pyproject.toml`` makes the app components discoverable and "
 "configurable. The ``[tool.flwr.app.components]`` section points Flower to"
@@ -52645,7 +52712,7 @@ msgstr ""
 "découvrables et configurables. La section ``[tool.flwr.app.components]`` "
 "pointe vers les objets que Flower doit importer:"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:258
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:254
 msgid ""
 "The ``[tool.flwr.app.config]`` section defines values available at "
 "runtime through ``context.run_config``. In this demo, it sets:"
@@ -52653,7 +52720,7 @@ msgstr ""
 "La section ``[tool.flwr.app.config]`` définit des valeurs disponibles en "
 "temps réel à travers ``context.run_config``. Dans ce démo, il définit :"
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:265
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:261
 msgid ""
 "That is the value the ``ServerApp`` reads to decide how many federated "
 "learning rounds the ``FedAvg`` strategy should run. In a real app, you "
@@ -52666,7 +52733,7 @@ msgstr ""
 "configuration telles que le taux d'apprentissage, la taille du lot et "
 "ainsi de suite."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:273
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:269
 msgid ""
 "Congratulations, you have successfully run your first custom Flower App "
 "on SuperGrid! You have also learned about the main components of a Flower"
@@ -52679,7 +52746,7 @@ msgstr ""
 "fonctionnent ensemble pour permettre des charges de travail d'IA "
 "collaborative au sein d'une fédération de SuperNodes."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:279
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:275
 msgid ""
 "This tutorial runs the app on SuperGrid with simulated SuperNodes. To run"
 " Flower Apps on SuperGrid with the Deployment Runtime instead, create a "
@@ -52694,7 +52761,7 @@ msgstr ""
 ":doc:`how-to-create-and-manage-federations` et :doc:`how-to-connect-"
 "supernodes-to-supergrid`."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:285
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:281
 msgid ""
 "In the next tutorial, you will take a look at a more complex Flower App "
 "that uses PyTorch and real training and evaluation logic. You will also "
@@ -52708,7 +52775,7 @@ msgstr ""
 "idéal pour le développement et la déboguage avant l'exécution sur "
 "SuperGrid."
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:301
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:297
 msgid ""
 "The :doc:`Flower Collaborative AI Tutorial - Part 3: Write a Flower App "
 "for a PyTorch model <tutorial-series-write-your-first-flower-app-"
@@ -52889,7 +52956,7 @@ msgstr ""
 "<tutorial-series-get-started-with-flower>` pour créer un compte SuperGrid"
 " et une fédération simulée."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:161
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:158
 msgid ""
 "SuperGrid will start a new run for this app. Open the `SuperGrid "
 "dashboard <https://flower.ai/federations/>`__, select your federation, "
@@ -52900,7 +52967,7 @@ msgstr ""
 " votre fédération et cliquez sur la nouvelle exécution pour suivre son "
 "progression et inspecter les journaux."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:165
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:162
 msgid ""
 "In the logs, you should see Flower start the ``FedAvg`` strategy and run "
 "several rounds of federated learning. Each round includes local training "
@@ -52913,17 +52980,25 @@ msgstr ""
 "``ClientApp``, une mise en forme dans le ``ServerApp``, et des métriques "
 "d'évaluation telles que ``eval_loss`` et ``eval_acc``."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:170
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:167
 msgid "You can override values from ``pyproject.toml`` at run time. For example:"
 msgstr ""
 "Vous pouvez définir des valeurs à partir de ``pyproject.toml`` en temps "
 "réel. Par exemple:"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:185
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:182
+msgid ""
+"In SuperGrid, use the ``--federation`` flag to choose which federation "
+"runs your app. If you omit it, Flower uses ``@<your-account>/workspace``."
+" Learn more in :doc:`Create and Manage Federations on SuperGrid <how-to-"
+"create-and-manage-federations>`."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:189
 msgid "Run the App Locally"
 msgstr "Exécutez l'App Localement"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:187
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:191
 msgid ""
 "Running on SuperGrid is the recommended way to run collaborative AI "
 "workflows with Flower. However, it is also useful to run the same app "
@@ -52934,21 +53009,16 @@ msgstr ""
 "Cependant, il est également utile d'exécuter la même application "
 "localement pendant que vous développez ou déboguez."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:191
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:195
+#, fuzzy
 msgid ""
-"From the ``quickstart-pytorch`` directory, install the app and its "
-"dependencies into your Python environment:"
-msgstr ""
-"À partir du répertoire ``quickstart-pytorch``, installez l'application et"
-" ses dépendances dans votre environnement Python :"
-
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:199
-msgid ""
-"Then run the app locally with the command below. Flower will start a "
-"managed local SuperLink -- a distilled version of SuperGrid -- and "
-"execute the app with simulated SuperNodes on your machine. The first run "
-"can take longer because the app needs to download CIFAR-10. With the flag"
-" ``--stream``, you can see the logs from the local run in your terminal."
+"Navigate to the directory where the app was downloaded, then run the app "
+"locally with the command below. Flower will start a managed local "
+"SuperLink -- a distilled version of SuperGrid -- and execute the app with"
+" simulated SuperNodes on your machine. The first run can take longer "
+"because the app needs to download CIFAR-10 and install the dependencies "
+"of your App. With the flag ``--stream``, you can see the logs from the "
+"local run in your terminal."
 msgstr ""
 "Exécutez ensuite l'application localement avec la commande suivante. "
 "Flower lancera une instance locale gérée de type SuperLink — une version "
@@ -52958,11 +53028,11 @@ msgstr ""
 "``--stream``, vous pouvez voir les journaux de l'exécution locale dans "
 "votre terminal."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:209
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:207
 msgid "The streamed output should include logs similar to this:"
 msgstr "Le flux de sortie doit inclure des journaux similaires à ceux-ci :"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:231
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:229
 msgid ""
 "In the above ``flwr run`` command you are not specifying a federation, "
 "this is because for local prototyping there is only one federation "
@@ -52973,7 +53043,7 @@ msgstr ""
 "seule fédération disponible. En raison de cela, le drapeau "
 "``--federation`` n'est pas requis."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:237
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:235
 msgid ""
 "If you're on Windows and see unexpected terminal output, for example ``� "
 "□[32m□[1m``, check :ref:`this FAQ entry <faq-windows-unexpected-output>`."
@@ -52982,7 +53052,7 @@ msgstr ""
 "par exemple ``� □[32m□[1m``, consultez :ref:`cette entrée de FAQ <faq-"
 "windows-unexpected-output>`."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:240
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:238
 msgid ""
 "For more details on using the Flower CLI against a locally running "
 "SuperLink, including how to list your runs and view their logs, see "
@@ -52995,11 +53065,11 @@ msgstr ""
 "journaux, consultez :doc:`Run Flower Locally with a Managed SuperLink "
 "<how-to-run-flower-locally>`."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:246
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:244
 msgid "A Deeper Dive into the App"
 msgstr "Une Plongée Plus Profonde dans l'Application"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:248
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:246
 msgid ""
 "The ``@flwrlabs/quickstart-pytorch`` app demonstrates a simple federated "
 "learning workflow. In federated learning, the server sends global model "
@@ -53019,11 +53089,11 @@ msgstr ""
 "modèle vers le serveur (ou, de manière alternative, il envoie uniquement "
 "les gradients vers le serveur, pas les paramètres du modèle complet)."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:256
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:254
 msgid "Define the Flower ClientApp"
 msgstr "Définissez l'Application Client Flower"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:258
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:256
 msgid ""
 "Federated learning systems consist of a server and multiple clients "
 "(SuperNodes). In Flower, we create a |serverapp_link|_ and a "
@@ -53035,7 +53105,7 @@ msgstr ""
 "une |clientapp_link|_ pour exécuter le code côté serveur et client, "
 "respectivement."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:262
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:260
 msgid ""
 "The core functionality of the ``ClientApp`` is to perform some action "
 "with the local data that the SuperNode it runs on (e.g. an edge device, a"
@@ -53050,11 +53120,11 @@ msgstr ""
 "consiste à entraîner et évaluer le petit modèle CNN défini plus tôt en "
 "utilisant les données d'entraînement et de validation locales."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:268
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:266
 msgid "Loading the data"
 msgstr "Chargement des données"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:270
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:268
 msgid ""
 "This app trains a small convolutional neural network on CIFAR-10. Since "
 "the tutorial uses the Simulation Runtime, all data starts from one "
@@ -53066,7 +53136,7 @@ msgstr ""
 "données proviennent d'abord d'un jeu de données centralisé, ensuite "
 "découpé en partitions, une pour chaque SuperNode simulé."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:274
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:272
 msgid ""
 "The ``load_data()`` function in ``task.py`` uses `Flower Datasets "
 "<https://flower.ai/docs/datasets/>`_ to load one partition, split it into"
@@ -53078,7 +53148,7 @@ msgstr ""
 "diviser en données d'entraînement et de validation, appliquer les "
 "transformations PyTorch, et retourner deux objets ``DataLoader``:"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:309
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:307
 msgid ""
 "This partitioning is only needed for simulation. In deployment, each "
 "SuperNode would usually load its own local data directly, for example "
@@ -53089,11 +53159,11 @@ msgstr ""
 " locales directement, par exemple à partir d'un chemin fourni via "
 "``--node-config``"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:314
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:312
 msgid "Training"
 msgstr "Entraînement"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:316
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:314
 msgid ""
 "We can define how the ``ClientApp`` performs training by wrapping a "
 "function with the ``@app.train()`` decorator. In this case we name this "
@@ -53106,7 +53176,7 @@ msgstr ""
 "pour entraîner le modèle sur les données locales. La fonction attend "
 "toujours deux arguments :"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:320
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:318
 msgid ""
 "A |message_link|_: The message received from the server. It contains the "
 "model parameters and any other configuration information sent by the "
@@ -53116,7 +53186,7 @@ msgstr ""
 "paramètres du modèle et toute autre information de configuration envoyée "
 "par le serveur."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:322
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:320
 msgid ""
 "A |context_link|_: The context object that contains information about the"
 " SuperNode executing the ``ClientApp`` and about the current run."
@@ -53125,7 +53195,7 @@ msgstr ""
 "l'exécution du SuperNode et du ``ClientApp``, ainsi que sur la dernière "
 "exécution."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:325
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:323
 msgid ""
 "Through the context you can retrieve the config settings defined in the "
 "``pyproject.toml`` of your app. The context can be used to persist the "
@@ -53141,7 +53211,7 @@ msgstr ""
 "éphémères sont des objets qui se créent pour l'exécution d'un ``Message``"
 " et sont détruits lorsque la réponse est communiquée vers le serveur."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:331
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:329
 msgid ""
 "Let's see an implementation of ``ClientApp`` that uses the previously "
 "defined PyTorch CNN model, applies the parameters received from the "
@@ -53157,7 +53227,7 @@ msgstr ""
 "``Message`` contenant les paramètres mis à jour du modèle ainsi que "
 "certaines métriques d'intérêt."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:382
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:380
 msgid ""
 "The ``partition-id`` and ``num-partitions`` values shown above are "
 "provided by the :doc:`Simulation Runtime <how-to-run-simulations>`. In a "
@@ -53175,7 +53245,7 @@ msgstr ""
 "SuperNode avec ``--node-config \"data-path=/path/to/data\"`` et puis "
 "appeler ``load_data`` avec ``context.node_config[\"data-path\"]``."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:389
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:387
 msgid ""
 "Note that the ``train_fn`` is simply an alias name pointing to the train "
 "function defined earlier in this tutorial (where we defined the PyTorch "
@@ -53202,7 +53272,7 @@ msgstr ""
 "configuration de run via le ``Context`` est également parfaitement "
 "valide."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:399
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:397
 msgid ""
 "Once training is completed, the ``ClientApp`` constructs a reply "
 "``Message``. This reply typically includes a ``RecordDict`` with two "
@@ -53212,11 +53282,11 @@ msgstr ""
 "``Message``. Cette réponse comprend généralement un ``RecordDict`` avec "
 "deux enregistrements :"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:402
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:400
 msgid "An ``ArrayRecord`` containing the updated model parameters"
 msgstr "Un ``ArrayRecord`` contenant les paramètres de modèle mis à jour"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:403
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:401
 msgid ""
 "A ``MetricRecord`` with relevant metrics (in this case, the training loss"
 " and the number of examples used for training)"
@@ -53224,7 +53294,7 @@ msgstr ""
 "Un ``MetricRecord`` avec des métriques pertinentes (dans ce cas, la perte"
 " d'entraînement et le nombre d'exemples utilisés pour l'entraînement)"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:408
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:406
 msgid ""
 "Returning the number of examples under the ``\"num-examples\"`` key is "
 "**required**, because strategies such as |fedavg_link|_ used by the "
@@ -53239,7 +53309,7 @@ msgstr ""
 "``weighted_by_key`` (par exemple : ``FedAvg(weighted_by_key=\"my-"
 "different-key\")``)."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:414
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:412
 msgid ""
 "After constructing the reply ``Message``, the ``ClientApp`` returns it. "
 "Flower then handles sending the reply back to the server automatically."
@@ -53248,12 +53318,12 @@ msgstr ""
 "retourne. Flower gère ensuite l'envoi de la réponse vers le serveur "
 "automatiquement."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:418
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:416
 #, fuzzy
 msgid "Evaluation"
 msgstr "**Évaluation**"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:420
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:418
 msgid ""
 "In a typical federated learning setup, the ``ClientApp`` would also "
 "implement an ``@app.evaluate()`` function to evaluate the model received "
@@ -53280,7 +53350,7 @@ msgstr ""
 " pas mis à jour pendant l'évaluation). Voici comment la fonction "
 "``evaluate`` ressemble :"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:468
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:466
 msgid ""
 "As you can see the ``evaluate`` implementation is near identical to the "
 "``train`` implementation, except that it calls the ``test_fn`` function "
@@ -53299,11 +53369,11 @@ msgstr ""
 "métriques afin que le serveur puisse agréger correctement les métriques "
 "d'évaluation."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:476
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:474
 msgid "Define the Flower ServerApp"
 msgstr "Définir l'application Flower ServerApp"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:478
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:476
 msgid ""
 "On the server side, we need to configure a strategy which encapsulates "
 "the federated learning approach/algorithm, for example, *Federated "
@@ -53324,7 +53394,7 @@ msgstr ""
 "spécifiant la fraction de SuperNodes connectés à impliquer dans une ronde"
 " d'entraînement."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:488
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:486
 msgid ""
 "a ``Grid`` object that will be used to interface with the SuperNodes "
 "running the ``ClientApp`` to involve them in a round of "
@@ -53334,11 +53404,11 @@ msgstr ""
 "exécutant le ``ClientApp`` afin de les impliquer dans une ronde "
 "d'entraînement/évaluation/requête ou autre"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:490
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:488
 msgid "a |context_link|_ object that provides access to the run configuration."
 msgstr "un objet |context_link|_ qui fournit accès à la configuration de run."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:492
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:490
 msgid ""
 "Before launching the strategy via the |strategy_start_link|_ method, we "
 "want to initialize the global model. This will be the model that gets "
@@ -53357,7 +53427,7 @@ msgstr ""
 " avec eux. Nous pouvons ensuite le rendre disponible à la stratégie via "
 "l'argument ``initial_arrays`` de la méthode ``start()``. "
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:499
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:497
 msgid ""
 "We can also optionally pass to the ``start()`` method a ``ConfigRecord`` "
 "containing settings that we would like to communicate to the clients. "
@@ -53369,7 +53439,7 @@ msgstr ""
 "communiquer aux clients. Ces derniers seront envoyés en tant que partie "
 "du ``Message`` qui transporte également les paramètres du modèle."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:538
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:536
 msgid ""
 "Most of the execution of the ``ServerApp`` happens inside the "
 "``strategy.start()`` method. After the specified number of rounds "
@@ -53386,23 +53456,24 @@ msgstr ""
 "ensuite sauvegarder le modèle final sur disque pour une utilisation "
 "ultérieure."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:545
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:543
 msgid "Behind the scenes"
 msgstr "Dans les coulisses"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:547
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:545
 msgid "So how does this work? How does Flower execute this simulation?"
 msgstr ""
 "Alors, comment cela fonctionne-t-il ? Comment Flower exécute-t-il cette "
 "simulation ?"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:549
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:547
+#, fuzzy
 msgid ""
 "When we execute ``flwr run`` against the default local connection "
 "configuration, Flower submits the run to the managed local SuperLink. By "
 "default, the local SuperLink will configure the simulation runtime to use"
-" 10 clients. Each will run an instance of the ``ClientApp`` we defined "
-"earlier."
+" two SuperNodes. Each will run an instance of the ``ClientApp`` we "
+"defined earlier."
 msgstr ""
 "Lorsque nous exécutons ``flwr run`` contre la configuration de connexion "
 "locale par défaut, Flower soumet l'exécution à la connexion locale gérée "
@@ -53410,7 +53481,7 @@ msgstr ""
 "Simulation Runtime pour utiliser 10 clients. Chacun d'eux exécutera une "
 "instance du modèle ``ClientApp`` que nous avons défini plus tôt."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:554
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:552
 msgid ""
 "The local SuperLink then starts the ``ServerApp`` and asks it to issue "
 "instructions to those SuperNodes using the ``FedAvg`` strategy. In this "
@@ -53421,14 +53492,14 @@ msgstr ""
 "en utilisant la stratégie ``FedAvg``. Dans cet exemple, ``FedAvg`` est "
 "configuré avec deux paramètres clés :"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:558
-#, python-format
-msgid "``fraction-train=0.5`` → select 50% of the available clients for training"
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:556
+#, fuzzy, python-format
+msgid "``fraction-train=1.0`` → select 100% of the available clients for training"
 msgstr ""
 "``fraction-train=0.5`` → sélectionner 50% des clients disponibles pour "
 "l'entraînement"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:559
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:557
 #, python-format
 msgid ""
 "``fraction-evaluate=1.0`` → select 100% of the available clients for "
@@ -53437,33 +53508,35 @@ msgstr ""
 "``fraction-evaluate=1.0`` → sélectionner 100% des clients disponibles "
 "pour l'évaluation"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:561
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:559
+#, fuzzy
 msgid ""
-"This means in our example, 5 out of 10 clients will be selected for "
-"training, and all 10 clients will later participate in evaluation."
+"This means in our example, all clients (SuperNodes) will be sampled for "
+"both a round of training and evaluation."
 msgstr ""
 "Cela signifie dans notre exemple, 5 clients sur 10 seront sélectionnés "
 "pour l'entraînement, et tous les 10 clients participeront plus tard à "
 "l'évaluation."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:564
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:562
 msgid "A typical round looks like this:"
 msgstr "Une ronde typique ressemble à ceci :"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:566
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:564
 msgid "**Training**"
 msgstr "**Entraînement**"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:568
-#, python-format
-msgid "``FedAvg`` randomly selects 5 clients (50% of 10)."
-msgstr "``FedAvg`` randomly selects 5 clients (50% of 10)."
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:566
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:577
+#, fuzzy
+msgid "``FedAvg`` selects all clients (2 out of 2)."
+msgstr "``FedAvg`` selects all 10 clients (100%)."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:569
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:567
 msgid "Flower sends a ``TRAIN`` message to each selected ``ClientApp``."
 msgstr "Flower sends a ``TRAIN`` message to each selected ``ClientApp``."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:570
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:568
 msgid ""
 "Each ``ClientApp`` calls the function decorated with ``@app.train()``, "
 "then returns a ``Message`` containing an ``ArrayRecord`` (the updated "
@@ -53475,12 +53548,12 @@ msgstr ""
 " du modèle mis à jour) et un ``MetricRecord`` (la perte d'entraînement et"
 " le nombre d'exemples)."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:573
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:584
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:571
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:582
 msgid "The ``ServerApp`` receives all replies."
 msgstr "La connexion locale ``ServerApp`` reçoit toutes les réponses."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:574
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:572
 msgid ""
 "``FedAvg`` aggregates all ``ArrayRecord`` into a new ``ArrayRecord`` "
 "representing the new global model and combines all ``MetricRecord``."
@@ -53489,19 +53562,15 @@ msgstr ""
 "``ArrayRecord`` représentant le modèle global et combine toutes les "
 "métriques ``MetricRecord``. "
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:577
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:575
 msgid "**Evaluation**"
 msgstr "**Évaluation**"
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:579
-msgid "``FedAvg`` selects all 10 clients (100%)."
-msgstr "``FedAvg`` selects all 10 clients (100%)."
-
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:580
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:578
 msgid "Flower sends an ``EVALUATE`` message to each ``ClientApp``."
 msgstr "Flower sends an ``EVALUATE`` message to each ``ClientApp``."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:581
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:579
 msgid ""
 "Each ``ClientApp`` calls the function decorated with ``@app.evaluate()`` "
 "and returns a ``Message`` containing a ``MetricRecord`` (the evaluation "
@@ -53511,11 +53580,11 @@ msgstr ""
 " et retourne un ``Message`` contenant un ``MetricRecord`` (la perte "
 "d'évaluation, l'exactitude et le nombre d'exemples)."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:585
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:583
 msgid "``FedAvg`` aggregates all ``MetricRecord``."
 msgstr "``FedAvg`` aggregates all ``MetricRecord``."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:587
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:585
 msgid ""
 "Once both training and evaluation are done, the next round begins: "
 "another training step, then another evaluation step, and so on, until the"
@@ -53526,7 +53595,7 @@ msgstr ""
 " d'évaluation supplémentaire, et ainsi de suite, jusqu'à ce que le nombre"
 " configuré de tours soit atteint."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:595
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:593
 msgid ""
 "You have now run a PyTorch Flower App on SuperGrid and locally. Compared "
 "with the NumPy demo, this app uses a real model, a real dataset, and real"
@@ -53539,7 +53608,7 @@ msgstr ""
 "la structure est la même : ``ServerApp``, ``ClientApp``, stratégie et "
 "``pyproject.toml``. "
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:600
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:598
 msgid ""
 "In the next tutorial, you will customize the federated learning strategy "
 "to change how the server coordinates training and evaluation."
@@ -53548,7 +53617,7 @@ msgstr ""
 "d'apprentissage fédéré pour changer la façon dont le serveur coordonne "
 "l'entraînement et l'évaluation."
 
-#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:614
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:612
 msgid ""
 "The :doc:`Flower Collaborative AI Tutorial - Part 4: Use a federated "
 "learning strategy <tutorial-series-use-a-federated-learning-strategy-"
@@ -53665,4 +53734,168 @@ msgstr ""
 
 #~ msgid "Finally, run the simulation with the following command:"
 #~ msgstr "Enfin, exécutez la simulation avec la commande suivante :"
+
+#~ msgid "Open Responses-compatible create request."
+#~ msgstr "Demande de création compatible avec Open Responses."
+
+#~ msgid "Then, clone the code example directly from GitHub:"
+#~ msgstr "Alors, clonez l'exemple de code directement depuis GitHub :"
+
+#~ msgid ""
+#~ "This will create a new directory "
+#~ "called `quickstart-fastai` containing the "
+#~ "following files:"
+#~ msgstr ""
+#~ "Cela créera un nouveau répertoire appelé"
+#~ " `quickstart-fastai` contenant les fichiers"
+#~ " suivants :"
+
+#~ msgid ""
+#~ "If you haven't yet installed the "
+#~ "project and its dependencies, you can"
+#~ " do so by:"
+#~ msgstr ""
+#~ "Si vous n'avez pas encore installé "
+#~ "le projet et ses dépendances, vous "
+#~ "pouvez le faire avec :"
+
+#~ msgid ""
+#~ "This will create a new directory "
+#~ "called `quickstart-pytorch-lightning` "
+#~ "containing the following files:"
+#~ msgstr ""
+#~ "Cela créera un nouveau répertoire appelé"
+#~ " `quickstart-pytorch-lightning` contenant "
+#~ "les fichiers suivants :"
+
+#~ msgid "Then install the updated project dependencies:"
+#~ msgstr "Ensuite installez les dépendances de projet mises à jour :"
+
+#~ msgid ""
+#~ "On SuperGrid, all collaborative AI "
+#~ "workloads happen within a federation and"
+#~ " are run as Flower Apps. A "
+#~ "federation is a collection of users "
+#~ "and their SuperNodes that collaborate "
+#~ "towards a common goal. For example, "
+#~ "you can train an AI model across"
+#~ " all SuperNodes in the federation, "
+#~ "each with its own data. Only "
+#~ "members of a federation can run "
+#~ "Flower Apps across those SuperNodes."
+#~ msgstr ""
+#~ "Sur SuperGrid, toutes les charges de "
+#~ "travail d'intelligence artificielle collaborative"
+#~ " se déroulent au sein d'une "
+#~ "fédération et sont exécutées comme des"
+#~ " applications Flower. Une fédération est"
+#~ " une collection d'utilisateurs et de "
+#~ "leurs SuperNodes qui collaborent vers un"
+#~ " objectif commun. Par exemple, vous "
+#~ "pouvez entraîner un modèle AI sur "
+#~ "tous les SuperNodes dans la fédération,"
+#~ " chacun avec ses propres données. "
+#~ "Seuls les membres d'une fédération "
+#~ "peuvent exécuter des applications Flower "
+#~ "sur ces SuperNodes."
+
+#~ msgid ""
+#~ "In this tutorial, you'll create a "
+#~ "federation with simulated SuperNodes. This "
+#~ "is ideal because it lets you get"
+#~ " started without registering and connecting"
+#~ " real SuperNodes. In a future "
+#~ "tutorial, you'll learn how to connect"
+#~ " real SuperNodes to your federation "
+#~ "and run apps across them."
+#~ msgstr ""
+#~ "Dans ce tutoriel, vous créerez une "
+#~ "fédération avec des SuperNodes simulés. "
+#~ "C'est idéal car cela vous permet "
+#~ "de commencer sans enregistrer et "
+#~ "connecter des SuperNodes réels. Dans un"
+#~ " futur tutoriel, vous apprendrez à "
+#~ "connecter des SuperNodes réels à votre"
+#~ " fédération et à exécuter des "
+#~ "applications sur eux."
+
+#~ msgid ""
+#~ "Go to `the Federations page "
+#~ "<https://flower.ai/federations/>`__ and click ``New"
+#~ " Federation``. Select ``Simulation``, give "
+#~ "your federation a name, set it to"
+#~ " 10 SuperNodes, and click ``Create``. "
+#~ "See the screenshot below for reference."
+#~ msgstr ""
+#~ "Allez à `the Federations page "
+#~ "<https://flower.ai/federations/>`__ et cliquez sur"
+#~ " ``New Federation``. Sélectionnez ``Simulation``,"
+#~ " donnez un nom à votre fédération,"
+#~ " fixez-le à 10 SuperNodes et "
+#~ "cliquez sur ``Create``. Consultez l'écran "
+#~ "ci-dessous pour référence."
+
+#~ msgid "Create federation dialog in SuperGrid"
+#~ msgstr "Dialogue de création de fédération dans SuperGrid"
+
+#~ msgid ""
+#~ "After clicking ``Create``, you should "
+#~ "see your federation in the dashboard."
+#~ " In the screenshot below, a user "
+#~ "named ``peter123`` created a federation "
+#~ "named ``my-first-federation``. The "
+#~ "unique name of a federation is "
+#~ "always of the form ``@<username"
+#~ ">/<federation-name>``. In the screenshot, "
+#~ "the federation's unique name is "
+#~ "``@peter123/my-first-federation``."
+#~ msgstr ""
+#~ "Après avoir cliqué sur ``Create``, vous"
+#~ " devriez voir votre fédération dans "
+#~ "le tableau de bord. Dans l'écran "
+#~ "d'exemple ci-dessous, un utilisateur "
+#~ "nommé ``peter123`` a créé une fédération"
+#~ " nommée ``my-first-federation``. Le "
+#~ "nom unique d'une fédération est toujours"
+#~ " sous la forme ``@<username>/<federation-"
+#~ "name>``. Dans l'écran, le nom unique "
+#~ "de la fédération est ``@peter123/my-"
+#~ "first-federation``."
+
+#~ msgid ""
+#~ "This tutorial creates a simulation "
+#~ "federation. To create a deployment "
+#~ "federation for the Deployment Runtime, "
+#~ "manage federation settings, or invite "
+#~ "users to collaborate in a federation,"
+#~ " see :doc:`how-to-create-and-"
+#~ "manage-federations`."
+#~ msgstr ""
+#~ "Ce tutoriel crée une simulation "
+#~ "fédérative. Pour créer une fédération de"
+#~ " déploiement pour le Deployment Runtime,"
+#~ " gérer les paramètres de la "
+#~ "fédération, ou inviter des utilisateurs "
+#~ "à collaborer dans une fédération, voir"
+#~ " :doc:`how-to-create-and-manage-"
+#~ "federations`."
+
+#~ msgid "Federation list showing the newly created federation"
+#~ msgstr "Liste des fédérations montrant la nouvelle fédération créée"
+
+#~ msgid "You are now the owner of a new federation!"
+#~ msgstr "Vous êtes maintenant propriétaire d'une nouvelle fédération !"
+
+#~ msgid ""
+#~ "From the ``quickstart-pytorch`` directory, "
+#~ "install the app and its dependencies "
+#~ "into your Python environment:"
+#~ msgstr ""
+#~ "À partir du répertoire ``quickstart-"
+#~ "pytorch``, installez l'application et ses "
+#~ "dépendances dans votre environnement Python"
+#~ " :"
+
+#~ msgid "``FedAvg`` randomly selects 5 clients (50% of 10)."
+#~ msgstr "``FedAvg`` randomly selects 5 clients (50% of 10)."
 

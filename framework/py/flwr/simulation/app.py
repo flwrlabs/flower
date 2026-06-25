@@ -16,6 +16,7 @@
 
 
 import argparse
+import importlib.util
 import os
 from dataclasses import replace
 from logging import DEBUG, ERROR, INFO, WARNING
@@ -285,6 +286,13 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
                     "fab_hash": fab.hash_str,
                 },
             )
+            if backend_name == "ray" and importlib.util.find_spec("ray") is None:
+                # Surface unsupported Ray/Python/platform combinations as dependency
+                # installation failures instead of missing simulation extras.
+                raise RuntimeDependencyInstallationError(
+                    "Runtime dependency installation completed, but `ray` is not "
+                    "available. Ensure your OS+Python combination supports `ray`."
+                )
         else:
             log(DEBUG, "Simulation runtime dependency installation is disabled.")
 
