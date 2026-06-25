@@ -14,7 +14,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
   Introduces default federations for every Flower account in SuperGrid, allowing `flwr run` commands targeting SuperGrid to run without explicitly specifying `--federation`.
 
-- **Enable runtime installation of Flower App dependencies** ([#7372](https://github.com/flwrlabs/flower/pull/7372), [#7386](https://github.com/flwrlabs/flower/pull/7386), [#7408](https://github.com/flwrlabs/flower/pull/7408), [#7410](https://github.com/flwrlabs/flower/pull/7410), [#7423](https://github.com/flwrlabs/flower/pull/7423), [#7428](https://github.com/flwrlabs/flower/pull/7428), [#7469](https://github.com/flwrlabs/flower/pull/7469))
+- **Enable runtime installation of Flower App dependencies** ([#7372](https://github.com/flwrlabs/flower/pull/7372), [#7386](https://github.com/flwrlabs/flower/pull/7386), [#7408](https://github.com/flwrlabs/flower/pull/7408), [#7410](https://github.com/flwrlabs/flower/pull/7410), [#7423](https://github.com/flwrlabs/flower/pull/7423), [#7428](https://github.com/flwrlabs/flower/pull/7428), [#7469](https://github.com/flwrlabs/flower/pull/7469), [#7494](https://github.com/flwrlabs/flower/pull/7494))
 
   Enables automatic runtime installation of Flower App dependencies by default in SuperLink and improves error handling. For more information, see the [runtime dependency installation documentation](https://flower.ai/docs/framework/1.32/en/how-to-install-app-dependencies-at-runtime.html).
 
