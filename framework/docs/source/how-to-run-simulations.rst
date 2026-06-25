@@ -99,8 +99,8 @@ particular, each worker is an `Actor
 
 .. tip::
 
-    If you haven't already, install Flower via ``pip install -U "flwr[simulation]"`` in
-    a Python environment.
+    If you haven't already, install Flower via ``pip install -U flwr`` in a Python
+    environment.
 
 Running a simulation is straightforward; in fact, it is the default mode of operation
 for |flwr_run_link|_. Therefore, the only requirement for running Flower simulations is
