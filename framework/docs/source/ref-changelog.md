@@ -10,7 +10,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
 ### What's new?
 
-- **Introduce default federations on SuperGrid** ([#7436](https://github.com/flwrlabs/flower/pull/7436), [#7437](https://github.com/flwrlabs/flower/pull/7437), [#7460](https://github.com/flwrlabs/flower/pull/7460), [#7486](https://github.com/flwrlabs/flower/pull/7486), [#7488](https://github.com/flwrlabs/flower/pull/7488))
+- **Introduce default federations on SuperGrid** ([#7436](https://github.com/flwrlabs/flower/pull/7436), [#7437](https://github.com/flwrlabs/flower/pull/7437), [#7460](https://github.com/flwrlabs/flower/pull/7460), [#7486](https://github.com/flwrlabs/flower/pull/7486), [#7488](https://github.com/flwrlabs/flower/pull/7488), [#7491](https://github.com/flwrlabs/flower/pull/7491), [#7492](https://github.com/flwrlabs/flower/pull/7492))
 
   Introduces default federations for every Flower account in SuperGrid, allowing `flwr run` commands targeting SuperGrid to run without explicitly specifying `--federation`.
 
@@ -38,7 +38,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Restructure Flower framework packages** ([#7288](https://github.com/flwrlabs/flower/pull/7288), [#7342](https://github.com/flwrlabs/flower/pull/7342), [#7352](https://github.com/flwrlabs/flower/pull/7352), [#7359](https://github.com/flwrlabs/flower/pull/7359), [#7363](https://github.com/flwrlabs/flower/pull/7363), [#7420](https://github.com/flwrlabs/flower/pull/7420), [#7425](https://github.com/flwrlabs/flower/pull/7425), [#7429](https://github.com/flwrlabs/flower/pull/7429), [#7430](https://github.com/flwrlabs/flower/pull/7430), [#7442](https://github.com/flwrlabs/flower/pull/7442), [#7443](https://github.com/flwrlabs/flower/pull/7443), [#7448](https://github.com/flwrlabs/flower/pull/7448), [#7449](https://github.com/flwrlabs/flower/pull/7449), [#7450](https://github.com/flwrlabs/flower/pull/7450), [#7451](https://github.com/flwrlabs/flower/pull/7451), [#7455](https://github.com/flwrlabs/flower/pull/7455), [#7457](https://github.com/flwrlabs/flower/pull/7457), [#7458](https://github.com/flwrlabs/flower/pull/7458))
 
-- **Update documentation and translations** ([#7340](https://github.com/flwrlabs/flower/pull/7340), [#7358](https://github.com/flwrlabs/flower/pull/7358), [#7368](https://github.com/flwrlabs/flower/pull/7368), [#7398](https://github.com/flwrlabs/flower/pull/7398), [#7416](https://github.com/flwrlabs/flower/pull/7416), [#7424](https://github.com/flwrlabs/flower/pull/7424), [#7431](https://github.com/flwrlabs/flower/pull/7431), [#7446](https://github.com/flwrlabs/flower/pull/7446))
+- **Update documentation and translations** ([#7340](https://github.com/flwrlabs/flower/pull/7340), [#7358](https://github.com/flwrlabs/flower/pull/7358), [#7368](https://github.com/flwrlabs/flower/pull/7368), [#7398](https://github.com/flwrlabs/flower/pull/7398), [#7416](https://github.com/flwrlabs/flower/pull/7416), [#7424](https://github.com/flwrlabs/flower/pull/7424), [#7431](https://github.com/flwrlabs/flower/pull/7431), [#7446](https://github.com/flwrlabs/flower/pull/7446), [#7493](https://github.com/flwrlabs/flower/pull/7493))
 
 - **General improvements** ([#6871](https://github.com/flwrlabs/flower/pull/6871), [#7307](https://github.com/flwrlabs/flower/pull/7307), [#7317](https://github.com/flwrlabs/flower/pull/7317), [#7332](https://github.com/flwrlabs/flower/pull/7332), [#7339](https://github.com/flwrlabs/flower/pull/7339), [#7361](https://github.com/flwrlabs/flower/pull/7361), [#7362](https://github.com/flwrlabs/flower/pull/7362), [#7374](https://github.com/flwrlabs/flower/pull/7374), [#7400](https://github.com/flwrlabs/flower/pull/7400), [#7402](https://github.com/flwrlabs/flower/pull/7402), [#7404](https://github.com/flwrlabs/flower/pull/7404), [#7413](https://github.com/flwrlabs/flower/pull/7413), [#7421](https://github.com/flwrlabs/flower/pull/7421), [#7426](https://github.com/flwrlabs/flower/pull/7426), [#7432](https://github.com/flwrlabs/flower/pull/7432), [#7434](https://github.com/flwrlabs/flower/pull/7434), [#7438](https://github.com/flwrlabs/flower/pull/7438), [#7439](https://github.com/flwrlabs/flower/pull/7439), [#7454](https://github.com/flwrlabs/flower/pull/7454), [#7461](https://github.com/flwrlabs/flower/pull/7461), [#7462](https://github.com/flwrlabs/flower/pull/7462), [#7464](https://github.com/flwrlabs/flower/pull/7464), [#7465](https://github.com/flwrlabs/flower/pull/7465), [#7466](https://github.com/flwrlabs/flower/pull/7466), [#7470](https://github.com/flwrlabs/flower/pull/7470), [#7472](https://github.com/flwrlabs/flower/pull/7472), [#7474](https://github.com/flwrlabs/flower/pull/7474), [#7475](https://github.com/flwrlabs/flower/pull/7475), [#7477](https://github.com/flwrlabs/flower/pull/7477), [#7481](https://github.com/flwrlabs/flower/pull/7481), [#7484](https://github.com/flwrlabs/flower/pull/7484), [#7487](https://github.com/flwrlabs/flower/pull/7487))
 
@@ -53,6 +53,13 @@ We would like to give our special thanks to all the contributors who made the ne
 - **Default simulations to 2 SuperNodes** ([#7476](https://github.com/flwrlabs/flower/pull/7476), [#7478](https://github.com/flwrlabs/flower/pull/7478), [#7479](https://github.com/flwrlabs/flower/pull/7479), [#7482](https://github.com/flwrlabs/flower/pull/7482))
 
   Changes the default number of SuperNodes in simulation runs from 10 to 2, updates related examples and tutorials, and adds a helper message at startup. See the [documentation](https://flower.ai/docs/framework/how-to-run-simulations.html#customize-the-simulation-runtime) to customize the number of SuperNodes.
+
+### New features
+
+### Documentation improvements
+
+- **refactor(framework): Remove constant for default deployment federation** ()
+- **refactor(framework): Adjust default federation name in Flower tutorial** ()
 
 ## v1.31.0 (2026-06-08)
 
