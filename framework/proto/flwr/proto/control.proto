@@ -266,7 +266,7 @@ message ConfigureSimulationFederationRequest {
   string federation_name = 1;
   SimulationConfig config = 2;
 }
-message ConfigureSimulationFederationResponse {}
+message ConfigureSimulationFederationResponse { string federation_name = 1; }
 
 message StreamRunEventsRequest {
   uint64 run_id = 1;

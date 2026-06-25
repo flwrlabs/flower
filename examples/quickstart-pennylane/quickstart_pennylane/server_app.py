@@ -16,7 +16,7 @@ def main(grid: Grid, context: Context) -> None:
     """Main entry point for the quantum federated learning ServerApp."""
 
     # Read run config
-    fraction_fit: float = context.run_config.get("fraction-fit", 1.0)
+    fraction_train: float = context.run_config.get("fraction-train", 1.0)
     fraction_evaluate: float = context.run_config.get("fraction-evaluate", 1.0)
     num_rounds: int = context.run_config["num-server-rounds"]
     lr: float = context.run_config["learning-rate"]
@@ -25,7 +25,7 @@ def main(grid: Grid, context: Context) -> None:
 
     print("Server configuration:")
     print(f"  - Number of rounds: {num_rounds}")
-    print(f"  - Fraction fit: {fraction_fit}")
+    print(f"  - Fraction fit: {fraction_train}")
     print(f"  - Fraction evaluate: {fraction_evaluate}")
     print(f"  - Learning rate: {lr}")
     print(f"  - Number of qubits: {n_qubits}")
@@ -41,7 +41,7 @@ def main(grid: Grid, context: Context) -> None:
 
     # Initialize FedAvg strategy
     strategy = FedAvg(
-        fraction_train=fraction_fit,
+        fraction_train=fraction_train,
         fraction_evaluate=fraction_evaluate,
     )
 

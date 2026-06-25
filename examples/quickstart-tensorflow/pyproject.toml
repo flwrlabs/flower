@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-tensorflow"
-version = "1.1.5"
+version = "1.1.7"
 description = "Federated Learning with Tensorflow/Keras and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 dependencies = [
@@ -18,7 +18,7 @@ packages = ["."]
 [tool.flwr.app]
 publisher = "flwrlabs"
 fab-format-version = 1
-flwr-version-target = "1.31.0"
+flwr-version-target = "1.32.0"
 
 [tool.flwr.app.components]
 serverapp = "tfexample.server_app:app"
@@ -29,6 +29,6 @@ num-server-rounds = 3
 local-epochs = 1
 batch-size = 32
 learning-rate = 0.005
-fraction-train = 0.5
+fraction-train = 1.0
 verbose = false
 save-model = false

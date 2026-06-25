@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-xgboost"
-version = "1.1.4"
+version = "1.1.6"
 description = "Federated Learning with XGBoost and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 dependencies = [
@@ -19,7 +19,7 @@ packages = ["."]
 [tool.flwr.app]
 publisher = "flwrlabs"
 fab-format-version = 1
-flwr-version-target = "1.31.0"
+flwr-version-target = "1.32.0"
 
 [tool.flwr.app.components]
 serverapp = "quickstart_xgboost.server_app:app"
@@ -27,8 +27,8 @@ clientapp = "quickstart_xgboost.client_app:app"
 
 [tool.flwr.app.config]
 num-server-rounds = 3
-fraction-train = 0.1
-fraction-evaluate = 0.1
+fraction-train = 1.0
+fraction-evaluate = 1.0
 local-epochs = 1
 save-model = false
 
