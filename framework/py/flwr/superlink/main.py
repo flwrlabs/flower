@@ -38,7 +38,7 @@ def create_app() -> FastAPI:
         yield
         log(INFO, "FastAPI lifespan: shutdown")
 
-    app = FastAPI(
+    fastapi_app = FastAPI(
         title="SuperLink API",
         version=__version__,
         docs_url="/docs",
@@ -47,12 +47,12 @@ def create_app() -> FastAPI:
     )
 
     # SuperCore API routers
-    app.include_router(health.router)
+    fastapi_app.include_router(health.router)
 
     # SuperLink API routers
-    app.include_router(runtime.router)
+    fastapi_app.include_router(runtime.router)
 
-    return app
+    return fastapi_app
 
 
 app = create_app()

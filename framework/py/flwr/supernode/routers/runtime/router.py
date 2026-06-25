@@ -16,12 +16,13 @@
 
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
+from starlette.datastructures import State
 
 router = APIRouter(prefix="/runtime", tags=["runtime"])
 
 
 @router.post("/messages")
-def pull_messages(_: Request) -> Response:
+def pull_messages(_: Request[State]) -> Response:
     """Pull messages for the ClientApp."""
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
