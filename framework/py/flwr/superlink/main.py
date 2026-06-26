@@ -43,14 +43,14 @@ def create_app(
     """
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
         """Own process-lifetime resources for the combined SuperLink service."""
         log(INFO, "FastAPI lifespan: startup")
 
         if superlink_lifespan is not None:
             # Store the SuperLinkLifespan where future REST routers can access shared
             # state through FastAPI dependencies
-            app.state.superlink_lifespan = superlink_lifespan
+            fastapi_app.state.superlink_lifespan = superlink_lifespan
 
         if superlink_lifespan is not None and start_legacy_grpc:
             # Temporary compatibility path: start the existing gRPC APIs from
@@ -65,7 +65,7 @@ def create_app(
 
             log(INFO, "FastAPI lifespan: shutdown")
 
-    app = FastAPI(
+    fastapi_app = FastAPI(
         title="SuperLink API",
         version=__version__,
         docs_url="/docs",
@@ -74,13 +74,13 @@ def create_app(
     )
 
     # Core APIs
-    app.include_router(health.router)
+    fastapi_app.include_router(health.router)
 
     # SuperLink APIs
-    app.include_router(control.router)
-    app.include_router(runtime.router)
+    fastapi_app.include_router(control.router)
+    fastapi_app.include_router(runtime.router)
 
-    return app
+    return fastapi_app
 
 
 app = create_app()

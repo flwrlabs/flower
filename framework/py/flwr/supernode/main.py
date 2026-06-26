@@ -33,15 +33,12 @@ def create_app() -> FastAPI:
     """Create the SuperNode FastAPI app."""
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        """Own process-lifetime resources for the combined SuperLink service."""
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         log(INFO, "FastAPI lifespan: startup")
-
         yield
-
         log(INFO, "FastAPI lifespan: shutdown")
 
-    app = FastAPI(
+    fastapi_app = FastAPI(
         title="SuperNode API",
         version=__version__,
         docs_url="/docs",
@@ -50,12 +47,12 @@ def create_app() -> FastAPI:
     )
 
     # Core APIs
-    app.include_router(health.router)
+    fastapi_app.include_router(health.router)
 
     # SuperNode APIs
-    app.include_router(runtime.router)
+    fastapi_app.include_router(runtime.router)
 
-    return app
+    return fastapi_app
 
 
 app = create_app()

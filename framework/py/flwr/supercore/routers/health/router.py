@@ -15,18 +15,30 @@
 """Health API router implementation."""
 
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response, status
 
 router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
-def health() -> dict[str, str]:
-    """Report whether the API server is healthy.
+async def health() -> Response:
+    """Report whether the API server is healthy."""
+    return Response(status_code=status.HTTP_200_OK)
 
-    Returns
-    -------
-    dict[str, str]
-        A mapping with key ``status`` set to ``"ok"`` when the server is healthy.
-    """
-    return {"status": "ok"}
+
+@router.head("/health")
+async def health_head() -> Response:
+    """Report whether the API server is healthy."""
+    return Response(status_code=status.HTTP_200_OK)
+
+
+@router.get("/ready")
+async def ready() -> Response:
+    """Report whether the API server is ready."""
+    return Response(status_code=status.HTTP_200_OK)
+
+
+@router.head("/ready")
+async def ready_head() -> Response:
+    """Report whether the API server is ready."""
+    return Response(status_code=status.HTTP_200_OK)

@@ -14,18 +14,15 @@
 # ==============================================================================
 """Runtime API router."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response, status
 
 router = APIRouter(prefix="/runtime", tags=["runtime"])
 
 
 @router.post("/messages")
-def pull_messages() -> dict[str, str]:
-    """Pull messages.
-
-    Returns
-    -------
-    dict[str, str]
-        Not yet implemented.
-    """
-    raise HTTPException(status_code=501, detail="Not implemented")
+def pull_messages() -> Response:
+    """Pull messages for the ServerApp."""
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Not implemented",
+    )
