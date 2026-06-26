@@ -15,7 +15,7 @@
 """Health API router implementation."""
 
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Request, Response, status
 from starlette.datastructures import State
 
 router = APIRouter(tags=["health"])
