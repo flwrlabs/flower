@@ -16,17 +16,18 @@
 
 
 from fastapi import APIRouter, Response, status
+from starlette.datastructures import State
 
 router = APIRouter(tags=["health"])
 
 
 @router.api_route("/health", methods=["GET", "HEAD"])
-async def health() -> Response:
+async def health(_: Request[State]) -> Response:
     """Report whether the API server is healthy."""
     return Response(status_code=status.HTTP_200_OK)
 
 
 @router.api_route("/ready", methods=["GET", "HEAD"])
-async def ready() -> Response:
+async def ready(_: Request[State]) -> Response:
     """Report whether the API server is ready."""
     return Response(status_code=status.HTTP_200_OK)
