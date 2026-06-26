@@ -20,25 +20,13 @@ from fastapi import APIRouter, Response, status
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health")
+@router.api_route("/health", methods=["GET", "HEAD"])
 async def health() -> Response:
     """Report whether the API server is healthy."""
     return Response(status_code=status.HTTP_200_OK)
 
 
-@router.head("/health")
-async def health_head() -> Response:
-    """Report whether the API server is healthy."""
-    return Response(status_code=status.HTTP_200_OK)
-
-
-@router.get("/ready")
+@router.api_route("/ready", methods=["GET", "HEAD"])
 async def ready() -> Response:
-    """Report whether the API server is ready."""
-    return Response(status_code=status.HTTP_200_OK)
-
-
-@router.head("/ready")
-async def ready_head() -> Response:
     """Report whether the API server is ready."""
     return Response(status_code=status.HTTP_200_OK)
