@@ -247,7 +247,7 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     runtime_dependency_install: bool
 
 
-class SuperLinkLifespan:
+class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
     """Own the shared SuperLink lifespan state and legacy network servers.
 
     Long-term, the gRPC-specific parts of this class should shrink until it only
@@ -291,7 +291,12 @@ class SuperLinkLifespan:
     def shutdown(self) -> None:
         """Stop legacy gRPC servers started by this lifespan."""
         log(INFO, "SuperLinkLifespan: stop")
-        if not self._started:
+        if (
+            not self._started
+            and not self.grpc_servers
+            and not self.bckg_threads
+            and self.superexec_process is None
+        ):
             return
 
         # Stop in reverse startup order so dependent services disappear before
@@ -739,6 +744,7 @@ def flower_superlink() -> None:
     try:
         superlink_lifespan.startup()
     except ValueError as err:
+        superlink_lifespan.shutdown()
         flwr_exit(ExitCode.SUPERLINK_INVALID_ARGS, str(err))
 
     # Graceful shutdown
@@ -746,6 +752,7 @@ def flower_superlink() -> None:
         event_type=EventType.RUN_SUPERLINK_LEAVE,
         exit_message="SuperLink terminated gracefully.",
         grpc_servers=superlink_lifespan.grpc_servers,
+        exit_handlers=[superlink_lifespan.shutdown],
     )
 
     # Block until a thread exits prematurely
