@@ -14,6 +14,7 @@
 # ==============================================================================
 """`flower-superlink` command."""
 
+# pylint: disable=too-many-lines
 
 import argparse
 import importlib.util
@@ -214,12 +215,17 @@ def _get_objectstore_linkstate_factories(
 
 
 @dataclass
-class SuperLinkLifespanConfig:
+class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     """Configuration needed to start the SuperLink lifespan."""
 
     serverappio_address: str
     control_address: str
     health_server_address: str | None
+    enable_http_api: bool
+    disable_grpc_api: bool
+    host: str
+    port: int
+    insecure: bool
     certificates: tuple[bytes, bytes, bytes] | None
     appio_certificates: tuple[bytes, bytes, bytes] | None
     superexec_auth_secret: bytes | None
@@ -494,10 +500,8 @@ class SuperLinkLifespan:
 
 
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
-def flower_superlink() -> None:
-    """Run Flower SuperLink (ServerAppIo API and Fleet API)."""
-    warn_if_flwr_update_available(process_name="flower-superlink")
-
+def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
+    """Parse SuperLink CLI args and return the startup configuration."""
     args = _parse_args_run_superlink().parse_args()
 
     if args.log_file:
@@ -508,10 +512,6 @@ def flower_superlink() -> None:
         )
 
     _validate_http_api_args(args)
-
-    log(INFO, "Starting Flower SuperLink")
-
-    event(EventType.RUN_SUPERLINK_ENTER)
 
     # Detect if `--executor*` arguments were set
     if args.executor or args.executor_dir or args.executor_config:
@@ -600,8 +600,6 @@ def flower_superlink() -> None:
     # provided
     verify_tls_cert = not getattr(args, "disable_oidc_tls_cert_verification", None)
 
-    authn_plugin: ControlAuthnPlugin | None = None
-    authz_plugin: ControlAuthzPlugin | None = None
     event_log_plugin: EventLogWriterPlugin | None = None
     # Load the auth plugin if the args.account_auth_config is provided
     if cfg_path := getattr(args, "user_auth_config", None):
@@ -672,10 +670,25 @@ def flower_superlink() -> None:
             f" to the Flower documentation for more information: {url_v}{page}",
         )
 
-    lifespan_config = SuperLinkLifespanConfig(
+    fleet_api_address = args.fleet_api_address
+    if not args.simulation and not fleet_api_address:
+        if args.fleet_api_type in [
+            TRANSPORT_TYPE_GRPC_RERE,
+            TRANSPORT_TYPE_GRPC_ADAPTER,
+        ]:
+            fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
+        elif args.fleet_api_type == TRANSPORT_TYPE_REST:
+            fleet_api_address = FLEET_API_REST_DEFAULT_ADDRESS
+
+    return SuperLinkLifespanConfig(
         serverappio_address=serverappio_address,
         control_address=control_address,
         health_server_address=health_server_address,
+        enable_http_api=args.enable_http_api,
+        disable_grpc_api=args.disable_grpc_api,
+        host=args.host,
+        port=args.port,
+        insecure=args.insecure,
         certificates=certificates,
         appio_certificates=appio_certificates,
         superexec_auth_secret=superexec_auth_secret,
@@ -686,7 +699,7 @@ def flower_superlink() -> None:
         artifact_provider=artifact_provider,
         enable_supernode_auth=enable_supernode_auth,
         fleet_api_type=args.fleet_api_type,
-        fleet_api_address=args.fleet_api_address,
+        fleet_api_address=fleet_api_address,
         fleet_api_num_workers=args.fleet_api_num_workers,
         simulation=args.simulation,
         ssl_keyfile=args.ssl_keyfile,
@@ -697,21 +710,32 @@ def flower_superlink() -> None:
         runtime_dependency_install=args.runtime_dependency_install,
     )
 
+
+def flower_superlink() -> None:
+    """Run Flower SuperLink (ServerAppIo API and Fleet API)."""
+    warn_if_flwr_update_available(process_name="flower-superlink")
+
+    config = _parse_superlink_lifespan_config()
+
+    log(INFO, "Starting Flower SuperLink")
+
+    event(EventType.RUN_SUPERLINK_ENTER)
+
     ###########################################################################
     # Run SuperLink in Compatibility Mode (FastAPI + gRPC)
     ###########################################################################
 
     # Enable this mode by running `flower-superlink --enable-http-api`
-    if args.enable_http_api:
+    if config.enable_http_api:
         # Blocking: this will run uvicorn.run()
-        _run_superlink_http_api(args=args, lifespan_config=lifespan_config)
+        _run_superlink_http_api(lifespan_config=config)
         return
 
     ###########################################################################
     # Run SuperLink in Legacy Mode (Only gRPC)
     ###########################################################################
 
-    superlink_lifespan = SuperLinkLifespan(lifespan_config)
+    superlink_lifespan = SuperLinkLifespan(config)
     try:
         superlink_lifespan.startup()
     except ValueError as err:
@@ -743,8 +767,8 @@ def _format_address(address: str) -> tuple[str, str, int]:
     return (f"[{host}]:{port}" if is_v6 else f"{host}:{port}", host, port)
 
 
-def _run_superlink_http_api(
-    args: argparse.Namespace, lifespan_config: SuperLinkLifespanConfig
+def _run_superlink_http_api(  # pylint: disable=import-outside-toplevel
+    lifespan_config: SuperLinkLifespanConfig,
 ) -> None:
     """Run the experimental FastAPI-owned SuperLink service.
 
@@ -753,7 +777,7 @@ def _run_superlink_http_api(
     REST routers should call shared SuperLink services directly and this runtime
     should no longer bind gRPC ports.
     """
-    start_legacy_grpc = not args.disable_grpc_api
+    start_legacy_grpc = not lifespan_config.disable_grpc_api
 
     if start_legacy_grpc and lifespan_config.fleet_api_type == TRANSPORT_TYPE_REST:
         flwr_exit(
@@ -783,16 +807,16 @@ def _run_superlink_http_api(
             WARN,
             "EXPERIMENTAL: Starting the combined SuperLink FastAPI service on %s:%s. "
             "The legacy gRPC APIs are started from FastAPI lifespan.",
-            args.host,
-            args.port,
+            lifespan_config.host,
+            lifespan_config.port,
         )
     else:
         log(
             WARN,
             "EXPERIMENTAL: Starting the SuperLink FastAPI service on %s:%s. "
             "The legacy gRPC APIs are disabled.",
-            args.host,
-            args.port,
+            lifespan_config.host,
+            lifespan_config.port,
         )
 
     # Uvicorn workers must stay at 1 while the lifespan starts gRPC servers. With
@@ -800,12 +824,12 @@ def _run_superlink_http_api(
     # Fleet, and ServerAppIo ports.
     uvicorn.run(
         app=fastapi_app,
-        host=args.host,
-        port=args.port,
+        host=lifespan_config.host,
+        port=lifespan_config.port,
         reload=False,
         access_log=True,
-        ssl_keyfile=None if args.insecure else args.ssl_keyfile,
-        ssl_certfile=None if args.insecure else args.ssl_certfile,
+        ssl_keyfile=None if lifespan_config.insecure else lifespan_config.ssl_keyfile,
+        ssl_certfile=None if lifespan_config.insecure else lifespan_config.ssl_certfile,
         workers=1,
     )
 
