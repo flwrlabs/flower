@@ -448,11 +448,11 @@ def flower_superlink() -> None:
     """Run Flower SuperLink (ServerAppIo API and Fleet API)."""
     warn_if_flwr_update_available(process_name="flower-superlink")
 
-    config = _parse_superlink_lifespan_config()
-
     log(INFO, "Starting Flower SuperLink")
 
     event(EventType.RUN_SUPERLINK_ENTER)
+
+    config = _parse_superlink_lifespan_config()
 
     # Load Federation Manager
     federation_manager = get_federation_manager(is_simulation=config.simulation)
