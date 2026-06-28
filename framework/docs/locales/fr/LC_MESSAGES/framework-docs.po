@@ -27990,12 +27990,12 @@ msgstr "Changelog"
 #: ../../source/ref-changelog.md:3
 #, fuzzy
 msgid "Unreleased"
-msgstr "Construire la version de sortie"
+msgstr ""
 
 #: ../../source/ref-changelog.md:5
 #, fuzzy
 msgid "v1.32.0 (2026-06-25)"
-msgstr "v1.30.0 (2026-05-20)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:7 ../../source/ref-changelog.md:61
 #: ../../source/ref-changelog.md:117 ../../source/ref-changelog.md:157
@@ -28053,10 +28053,6 @@ msgid ""
 "`Micah Sheller`, `Mohammad Naseri`, `Patrick Foley`, `Ruth Galindo`, "
 "`William Lindskog`, `reducedradius` <!---TOKEN_v1.32.0-->"
 msgstr ""
-"`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata "
-"Nugraha`, `Heng Pan`, `Javier`, `Julian Rußmeyer`, `Micah Sheller`, "
-"`Mohammad Naseri`, `Patrick Foley`, `Taner Topal`, `William Lindskog`, "
-"`Yan Gao`, `xiaoyanshen799` <!---TOKEN_v1.28.0-->"
 
 #: ../../source/ref-changelog.md:13 ../../source/ref-changelog.md:67
 #: ../../source/ref-changelog.md:123 ../../source/ref-changelog.md:163
@@ -28095,13 +28091,6 @@ msgid ""
 "[#7491](https://github.com/flwrlabs/flower/pull/7491), "
 "[#7492](https://github.com/flwrlabs/flower/pull/7492))"
 msgstr ""
-"**Improve documentation** "
-"([#2674](https://github.com/flwrlabs/flower/pull/2674), "
-"[#2480](https://github.com/flwrlabs/flower/pull/2480), "
-"[#2826](https://github.com/flwrlabs/flower/pull/2826), "
-"[#2727](https://github.com/flwrlabs/flower/pull/2727), "
-"[#2761](https://github.com/flwrlabs/flower/pull/2761), "
-"[#2900](https://github.com/flwrlabs/flower/pull/2900))"
 
 #: ../../source/ref-changelog.md:17
 msgid ""
@@ -28126,14 +28115,6 @@ msgid ""
 "[#7469](https://github.com/flwrlabs/flower/pull/7469), "
 "[#7494](https://github.com/flwrlabs/flower/pull/7494))"
 msgstr ""
-"**Upgrade simulation engine** "
-"([#3354](https://github.com/flwrlabs/flower/pull/3354), "
-"[#3378](https://github.com/flwrlabs/flower/pull/3378), "
-"[#3262](https://github.com/flwrlabs/flower/pull/3262), "
-"[#3435](https://github.com/flwrlabs/flower/pull/3435), "
-"[#3501](https://github.com/flwrlabs/flower/pull/3501), "
-"[#3482](https://github.com/flwrlabs/flower/pull/3482), "
-"[#3494](https://github.com/flwrlabs/flower/pull/3494))"
 
 #: ../../source/ref-changelog.md:21
 msgid ""
@@ -28156,15 +28137,6 @@ msgid ""
 "[#7378](https://github.com/flwrlabs/flower/pull/7378), "
 "[#7463](https://github.com/flwrlabs/flower/pull/7463))"
 msgstr ""
-"**General improvements** "
-"([#6056](https://github.com/flwrlabs/flower/pull/6056), "
-"[#6085](https://github.com/flwrlabs/flower/pull/6085), "
-"[#6176](https://github.com/flwrlabs/flower/pull/6176), "
-"[#6235](https://github.com/flwrlabs/flower/pull/6235), "
-"[#6236](https://github.com/flwrlabs/flower/pull/6236), "
-"[#6254](https://github.com/flwrlabs/flower/pull/6254), "
-"[#6278](https://github.com/flwrlabs/flower/pull/6278), "
-"[#6299](https://github.com/flwrlabs/flower/pull/6299))"
 
 #: ../../source/ref-changelog.md:25
 msgid ""
@@ -28197,19 +28169,6 @@ msgid ""
 "[#7441](https://github.com/flwrlabs/flower/pull/7441), "
 "[#7468](https://github.com/flwrlabs/flower/pull/7468))"
 msgstr ""
-"**Mettre à jour les workflows CI/CD et les tests** "
-"([#6301](https://github.com/flwrlabs/flower/pull/6301), "
-"[#6321](https://github.com/flwrlabs/flower/pull/6321), "
-"[#6330](https://github.com/flwrlabs/flower/pull/6330), "
-"[#6346](https://github.com/flwrlabs/flower/pull/6346), "
-"[#6347](https://github.com/flwrlabs/flower/pull/6347), "
-"[#6348](https://github.com/flwrlabs/flower/pull/6348), "
-"[#6352](https://github.com/flwrlabs/flower/pull/6352), "
-"[#6373](https://github.com/flwrlabs/flower/pull/6373), "
-"[#6375](https://github.com/flwrlabs/flower/pull/6375), "
-"[#6394](https://github.com/flwrlabs/flower/pull/6394), "
-"[#6445](https://github.com/flwrlabs/flower/pull/6445), "
-"[#6449](https://github.com/flwrlabs/flower/pull/6449))"
 
 #: ../../source/ref-changelog.md:29
 msgid ""
@@ -28229,12 +28188,6 @@ msgid ""
 "[#7387](https://github.com/flwrlabs/flower/pull/7387), "
 "[#7483](https://github.com/flwrlabs/flower/pull/7483))"
 msgstr ""
-"**Implement Message Time-to-Live (TTL)** "
-"([#3620](https://github.com/flwrlabs/flower/pull/3620), "
-"[#3596](https://github.com/flwrlabs/flower/pull/3596), "
-"[#3615](https://github.com/flwrlabs/flower/pull/3615), "
-"[#3609](https://github.com/flwrlabs/flower/pull/3609), "
-"[#3635](https://github.com/flwrlabs/flower/pull/3635))"
 
 #: ../../source/ref-changelog.md:33
 msgid ""
@@ -28251,9 +28204,6 @@ msgid ""
 "([#7364](https://github.com/flwrlabs/flower/pull/7364), "
 "[#7447](https://github.com/flwrlabs/flower/pull/7447))"
 msgstr ""
-"**Updated code example** "
-"([#1344](https://github.com/flwrlabs/flower/pull/1344), "
-"[#1347](https://github.com/flwrlabs/flower/pull/1347))"
 
 #: ../../source/ref-changelog.md:37
 msgid ""
@@ -28267,8 +28217,6 @@ msgid ""
 "**Show SuperLink name and address in Flower CLI** "
 "([#7485](https://github.com/flwrlabs/flower/pull/7485))"
 msgstr ""
-"**Autoriser la rotation des journaux SuperLink** "
-"([#6700](https://github.com/flwrlabs/flower/pull/6700)))"
 
 #: ../../source/ref-changelog.md:41
 #, fuzzy
@@ -28293,27 +28241,6 @@ msgid ""
 "[#7457](https://github.com/flwrlabs/flower/pull/7457), "
 "[#7458](https://github.com/flwrlabs/flower/pull/7458))"
 msgstr ""
-"**General improvements** "
-"([#5516](https://github.com/flwrlabs/flower/pull/5516), "
-"[#5499](https://github.com/flwrlabs/flower/pull/5499), "
-"[#4927](https://github.com/flwrlabs/flower/pull/4927), "
-"[#5310](https://github.com/flwrlabs/flower/pull/5310), "
-"[#5343](https://github.com/flwrlabs/flower/pull/5343), "
-"[#5359](https://github.com/flwrlabs/flower/pull/5359), "
-"[#5413](https://github.com/flwrlabs/flower/pull/5413), "
-"[#5299](https://github.com/flwrlabs/flower/pull/5299), "
-"[#5433](https://github.com/flwrlabs/flower/pull/5433), "
-"[#5390](https://github.com/flwrlabs/flower/pull/5390), "
-"[#5427](https://github.com/flwrlabs/flower/pull/5427), "
-"[#5350](https://github.com/flwrlabs/flower/pull/5350), "
-"[#5394](https://github.com/flwrlabs/flower/pull/5394), "
-"[#5295](https://github.com/flwrlabs/flower/pull/5295), "
-"[#5315](https://github.com/flwrlabs/flower/pull/5315), "
-"[#5468](https://github.com/flwrlabs/flower/pull/5468), "
-"[#5412](https://github.com/flwrlabs/flower/pull/5412), "
-"[#5348](https://github.com/flwrlabs/flower/pull/5348), "
-"[#5444](https://github.com/flwrlabs/flower/pull/5444), "
-"[#5522](https://github.com/flwrlabs/flower/pull/5522))"
 
 #: ../../source/ref-changelog.md:43
 #, fuzzy
@@ -28329,15 +28256,6 @@ msgid ""
 "[#7446](https://github.com/flwrlabs/flower/pull/7446), "
 "[#7493](https://github.com/flwrlabs/flower/pull/7493))"
 msgstr ""
-"**Rename core Message API components for clarity and consistency** "
-"([#5140](https://github.com/flwrlabs/flower/pull/5140), "
-"[#5133](https://github.com/flwrlabs/flower/pull/5133), "
-"[#5139](https://github.com/flwrlabs/flower/pull/5139), "
-"[#5129](https://github.com/flwrlabs/flower/pull/5129), "
-"[#5150](https://github.com/flwrlabs/flower/pull/5150), "
-"[#5151](https://github.com/flwrlabs/flower/pull/5151), "
-"[#5146](https://github.com/flwrlabs/flower/pull/5146), "
-"[#5152](https://github.com/flwrlabs/flower/pull/5152))"
 
 #: ../../source/ref-changelog.md:45
 msgid ""
@@ -28422,8 +28340,6 @@ msgid ""
 "**Remove `owner-aid` from `flwr supernode ls` JSON output** "
 "([#7373](https://github.com/flwrlabs/flower/pull/7373))"
 msgstr ""
-"**Remove `app` argument from `flower-supernode` command** "
-"([#4497](https://github.com/flwrlabs/flower/pull/4497))"
 
 #: ../../source/ref-changelog.md:53
 msgid ""
@@ -28440,11 +28356,6 @@ msgid ""
 "[#7479](https://github.com/flwrlabs/flower/pull/7479), "
 "[#7482](https://github.com/flwrlabs/flower/pull/7482))"
 msgstr ""
-"**Deprecate `flwr-*` commands** "
-"([#5707](https://github.com/flwrlabs/flower/pull/5707), "
-"[#5725](https://github.com/flwrlabs/flower/pull/5725), "
-"[#5727](https://github.com/flwrlabs/flower/pull/5727), "
-"[#5760](https://github.com/flwrlabs/flower/pull/5760))"
 
 #: ../../source/ref-changelog.md:57
 msgid ""
@@ -28458,7 +28369,7 @@ msgstr ""
 #: ../../source/ref-changelog.md:59
 #, fuzzy
 msgid "v1.31.0 (2026-06-08)"
-msgstr "v1.30.0 (2026-05-20)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:65
 #, fuzzy
@@ -28469,9 +28380,6 @@ msgid ""
 "`Seulki Yun`, `Sijiaomg Ohoh`, `Taner Topal`, `Yan Gao`, `Young D. Kwon`,"
 " `reducedradius` <!---TOKEN_v1.31.0-->"
 msgstr ""
-"`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata "
-"Nugraha`, `Heng Pan`, `Javier`, `Micah Sheller`, `Mohammad Naseri`, "
-"`Patrick Foley`, `Taner Topal`, `Yan Gao` <!---TOKEN_v1.30.0-->"
 
 #: ../../source/ref-changelog.md:69
 #, fuzzy
@@ -28498,18 +28406,6 @@ msgid ""
 "[#7324](https://github.com/flwrlabs/flower/pull/7324), "
 "[#7337](https://github.com/flwrlabs/flower/pull/7337))"
 msgstr ""
-"**Refactor Flower Simulation Engine** "
-"([#3581](https://github.com/flwrlabs/flower/pull/3581), "
-"[#3471](https://github.com/flwrlabs/flower/pull/3471), "
-"[#3804](https://github.com/flwrlabs/flower/pull/3804), "
-"[#3468](https://github.com/flwrlabs/flower/pull/3468), "
-"[#3839](https://github.com/flwrlabs/flower/pull/3839), "
-"[#3806](https://github.com/flwrlabs/flower/pull/3806), "
-"[#3861](https://github.com/flwrlabs/flower/pull/3861), "
-"[#3543](https://github.com/flwrlabs/flower/pull/3543), "
-"[#3472](https://github.com/flwrlabs/flower/pull/3472), "
-"[#3829](https://github.com/flwrlabs/flower/pull/3829), "
-"[#3469](https://github.com/flwrlabs/flower/pull/3469))"
 
 #: ../../source/ref-changelog.md:71
 msgid ""
@@ -28529,13 +28425,6 @@ msgid ""
 "[#7328](https://github.com/flwrlabs/flower/pull/7328), "
 "[#7334](https://github.com/flwrlabs/flower/pull/7334))"
 msgstr ""
-"**Improve CLI-side user authentication** "
-"([#4862](https://github.com/flwrlabs/flower/pull/4862), "
-"[#4861](https://github.com/flwrlabs/flower/pull/4861), "
-"[#4832](https://github.com/flwrlabs/flower/pull/4832), "
-"[#4850](https://github.com/flwrlabs/flower/pull/4850), "
-"[#4703](https://github.com/flwrlabs/flower/pull/4703), "
-"[#4885](https://github.com/flwrlabs/flower/pull/4885))"
 
 #: ../../source/ref-changelog.md:75
 msgid ""
@@ -28559,16 +28448,6 @@ msgid ""
 "[#7235](https://github.com/flwrlabs/flower/pull/7235), "
 "[#7323](https://github.com/flwrlabs/flower/pull/7323))"
 msgstr ""
-"**Introduce** `flwr run` **(beta)** "
-"([#3810](https://github.com/flwrlabs/flower/pull/3810), "
-"[#3826](https://github.com/flwrlabs/flower/pull/3826), "
-"[#3880](https://github.com/flwrlabs/flower/pull/3880), "
-"[#3807](https://github.com/flwrlabs/flower/pull/3807), "
-"[#3800](https://github.com/flwrlabs/flower/pull/3800), "
-"[#3814](https://github.com/flwrlabs/flower/pull/3814), "
-"[#3811](https://github.com/flwrlabs/flower/pull/3811), "
-"[#3809](https://github.com/flwrlabs/flower/pull/3809), "
-"[#3819](https://github.com/flwrlabs/flower/pull/3819))"
 
 #: ../../source/ref-changelog.md:79
 msgid ""
@@ -28593,13 +28472,6 @@ msgid ""
 "[#7285](https://github.com/flwrlabs/flower/pull/7285), "
 "[#7303](https://github.com/flwrlabs/flower/pull/7303))"
 msgstr ""
-"**Update documentation** "
-"([#3341](https://github.com/flwrlabs/flower/pull/3341), "
-"[#3338](https://github.com/flwrlabs/flower/pull/3338), "
-"[#3927](https://github.com/flwrlabs/flower/pull/3927), "
-"[#4152](https://github.com/flwrlabs/flower/pull/4152), "
-"[#4151](https://github.com/flwrlabs/flower/pull/4151), "
-"[#3993](https://github.com/flwrlabs/flower/pull/3993))"
 
 #: ../../source/ref-changelog.md:83
 msgid ""
@@ -28616,11 +28488,6 @@ msgid ""
 "[#7251](https://github.com/flwrlabs/flower/pull/7251), "
 "[#7260](https://github.com/flwrlabs/flower/pull/7260))"
 msgstr ""
-"**Deprecate `flwr-*` commands** "
-"([#5707](https://github.com/flwrlabs/flower/pull/5707), "
-"[#5725](https://github.com/flwrlabs/flower/pull/5725), "
-"[#5727](https://github.com/flwrlabs/flower/pull/5727), "
-"[#5760](https://github.com/flwrlabs/flower/pull/5760))"
 
 #: ../../source/ref-changelog.md:87
 msgid ""
@@ -28638,11 +28505,6 @@ msgid ""
 "[#7194](https://github.com/flwrlabs/flower/pull/7194), "
 "[#7213](https://github.com/flwrlabs/flower/pull/7213))"
 msgstr ""
-"**Deprecate `flwr-*` commands** "
-"([#5707](https://github.com/flwrlabs/flower/pull/5707), "
-"[#5725](https://github.com/flwrlabs/flower/pull/5725), "
-"[#5727](https://github.com/flwrlabs/flower/pull/5727), "
-"[#5760](https://github.com/flwrlabs/flower/pull/5760))"
 
 #: ../../source/ref-changelog.md:91
 msgid ""
@@ -28659,11 +28521,6 @@ msgid ""
 "[#7259](https://github.com/flwrlabs/flower/pull/7259), "
 "[#7278](https://github.com/flwrlabs/flower/pull/7278))"
 msgstr ""
-"**Deprecate `flwr-*` commands** "
-"([#5707](https://github.com/flwrlabs/flower/pull/5707), "
-"[#5725](https://github.com/flwrlabs/flower/pull/5725), "
-"[#5727](https://github.com/flwrlabs/flower/pull/5727), "
-"[#5760](https://github.com/flwrlabs/flower/pull/5760))"
 
 #: ../../source/ref-changelog.md:95
 msgid ""
@@ -28681,13 +28538,6 @@ msgid ""
 "[#7223](https://github.com/flwrlabs/flower/pull/7223), "
 "[#7275](https://github.com/flwrlabs/flower/pull/7275))"
 msgstr ""
-"**Améliorez la documentation du cadre** "
-"([#7006](https://github.com/flwrlabs/flower/pull/7006), "
-"[#7011](https://github.com/flwrlabs/flower/pull/7011), "
-"[#7022](https://github.com/flwrlabs/flower/pull/7022), "
-"[#7050](https://github.com/flwrlabs/flower/pull/7050), "
-"[#7150](https://github.com/flwrlabs/flower/pull/7150), "
-"[#7186](https://github.com/flwrlabs/flower/pull/7186))"
 
 #: ../../source/ref-changelog.md:99
 msgid ""
@@ -28713,19 +28563,6 @@ msgid ""
 "[#7302](https://github.com/flwrlabs/flower/pull/7302), "
 "[#7309](https://github.com/flwrlabs/flower/pull/7309))"
 msgstr ""
-"**Mettez à jour les exemples et les références** "
-"([#6234](https://github.com/flwrlabs/flower/pull/6234), "
-"[#6256](https://github.com/flwrlabs/flower/pull/6256), "
-"[#6257](https://github.com/flwrlabs/flower/pull/6257), "
-"[#6264](https://github.com/flwrlabs/flower/pull/6264), "
-"[#6280](https://github.com/flwrlabs/flower/pull/6280), "
-"[#6281](https://github.com/flwrlabs/flower/pull/6281), "
-"[#6286](https://github.com/flwrlabs/flower/pull/6286), "
-"[#6287](https://github.com/flwrlabs/flower/pull/6287), "
-"[#6288](https://github.com/flwrlabs/flower/pull/6288), "
-"[#6290](https://github.com/flwrlabs/flower/pull/6290), "
-"[#6291](https://github.com/flwrlabs/flower/pull/6291), "
-"[#6293](https://github.com/flwrlabs/flower/pull/6293))"
 
 #: ../../source/ref-changelog.md:103
 #, fuzzy
@@ -28733,8 +28570,6 @@ msgid ""
 "**Upgrade Ray to 2.55.1** "
 "([#7181](https://github.com/flwrlabs/flower/pull/7181))"
 msgstr ""
-"**Bump protobuf to 5.x** "
-"([#6104](https://github.com/flwrlabs/flower/pull/6104))"
 
 #: ../../source/ref-changelog.md:105
 #, fuzzy
@@ -28753,20 +28588,6 @@ msgid ""
 "[#7315](https://github.com/flwrlabs/flower/pull/7315), "
 "[#7331](https://github.com/flwrlabs/flower/pull/7331))"
 msgstr ""
-"**Update CI/CD workflows and dependencies** "
-"([#5647](https://github.com/flwrlabs/flower/pull/5647), "
-"[#5650](https://github.com/flwrlabs/flower/pull/5650), "
-"[#5651](https://github.com/flwrlabs/flower/pull/5651), "
-"[#5656](https://github.com/flwrlabs/flower/pull/5656), "
-"[#5712](https://github.com/flwrlabs/flower/pull/5712), "
-"[#5714](https://github.com/flwrlabs/flower/pull/5714), "
-"[#5747](https://github.com/flwrlabs/flower/pull/5747), "
-"[#5754](https://github.com/flwrlabs/flower/pull/5754), "
-"[#5755](https://github.com/flwrlabs/flower/pull/5755), "
-"[#5796](https://github.com/flwrlabs/flower/pull/5796), "
-"[#5806](https://github.com/flwrlabs/flower/pull/5806), "
-"[#5808](https://github.com/flwrlabs/flower/pull/5808), "
-"[#5829](https://github.com/flwrlabs/flower/pull/5829))"
 
 #: ../../source/ref-changelog.md:111
 #, fuzzy
@@ -28774,8 +28595,6 @@ msgid ""
 "**Drop Python 3.10 support** "
 "([#7190](https://github.com/flwrlabs/flower/pull/7190))"
 msgstr ""
-"**Support Python 3.10** "
-"([#1320](https://github.com/flwrlabs/flower/pull/1320))"
 
 #: ../../source/ref-changelog.md:113
 msgid ""
@@ -41746,7 +41565,7 @@ msgstr ""
 #: ../../source/ref-changelog.md:2057
 #, fuzzy
 msgid "**Deprecate Python 3.7**"
-msgstr "**Deprecate Python 3.9**"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2059
 #, fuzzy
@@ -41754,9 +41573,6 @@ msgid ""
 "Since Python 3.7 reached its end of life (EOL) on 2023-06-27, support for"
 " Python 3.7 is now deprecated and will be removed in an upcoming release."
 msgstr ""
-"Python 3.8 will stop receiving security fixes in [October "
-"2024](https://devguide.python.org/versions/). Support for Python 3.8 is "
-"now deprecated and will be removed in an upcoming release."
 
 #: ../../source/ref-changelog.md:2061
 msgid ""
@@ -41860,8 +41676,6 @@ msgid ""
 "Please note: The gRPC request-response API is still experimental and will"
 " likely change significantly over time."
 msgstr ""
-"Please note: The REST request-response API is still experimental and will"
-" likely change significantly over time."
 
 #: ../../source/ref-changelog.md:2085
 msgid ""
@@ -53985,9 +53799,6 @@ msgstr ""
 "pytorch>` entre dans plus de détails sur les stratégies et le "
 "comportement avancé que vous pouvez construire avec elles."
 
-#~ msgid "Unreleased"
-#~ msgstr "Construire la version de sortie"
-
 #~ msgid "Scaling federated learning"
 #~ msgstr "Mise à l'échelle de l'apprentissage fédéré"
 
@@ -54254,4 +54065,3 @@ msgstr ""
 
 #~ msgid "``FedAvg`` randomly selects 5 clients (50% of 10)."
 #~ msgstr "``FedAvg`` randomly selects 5 clients (50% of 10)."
-
