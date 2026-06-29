@@ -421,11 +421,19 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             request.updated_before if request.HasField("updated_before") else None
         )
         limit = request.limit if request.HasField("limit") else None
+        federation_name = request.federation if request.HasField("federation") else None
 
         with rpc_error_translator(context, rpc_name):
-            federations = state.federation_manager.get_federations(flwr_aid)
+            if federation_name is not None:
+                _validate_federation_membership_in_request(
+                    state, flwr_aid, federation_name, context
+                )
+                federation_names = [federation_name]
+            else:
+                federations = state.federation_manager.get_federations(flwr_aid)
+                federation_names = [federation.name for federation in federations]
             entries = state.get_run_series(
-                federations=[federation.name for federation in federations],
+                federations=federation_names,
                 updated_before=updated_before,
                 limit=limit,
             )
