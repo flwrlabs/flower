@@ -31,7 +31,11 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.version import package_version
 from flwr.superlink.federation import NoOpFederationManager
 
-from .flower_superlink import _obtain_superlink_certificates, _parse_args_run_superlink
+from .flower_superlink import (
+    _obtain_superlink_certificates,
+    _parse_args_run_superlink,
+    _parse_superlink_lifespan_config,
+)
 
 app_module = importlib.import_module("flwr.superlink.cli.flower_superlink")
 
@@ -45,6 +49,48 @@ def test_parse_superlink_log_rotation_args_defaults() -> None:
     assert args.log_file is None
     assert args.log_rotation_interval_hours == 24
     assert args.log_rotation_backup_count == 7
+
+
+def test_parse_superlink_lifespan_config_returns_final_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperLink CLI parsing should return the final lifespan config."""
+    monkeypatch.setattr(app_module.sys, "argv", ["flower-superlink", "--insecure"])
+
+    config = _parse_superlink_lifespan_config()
+
+    assert (
+        config.serverappio_address == app_module.SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
+    )
+    assert config.control_address == app_module.CONTROL_API_DEFAULT_SERVER_ADDRESS
+    assert config.fleet_api_address == app_module.FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
+    assert config.health_server_address is None
+    assert config.certificates is None
+    assert config.appio_certificates is None
+    assert config.superexec_auth_secret is None
+    assert config.enable_supernode_auth is False
+    assert config.simulation is False
+    assert config.database == FLWR_IN_MEMORY_DB_NAME
+
+
+def test_parse_superlink_lifespan_config_maps_exec_api_address(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Deprecated Exec API address should end up as Control API config."""
+    monkeypatch.setattr(
+        app_module.sys,
+        "argv",
+        [
+            "flower-superlink",
+            "--insecure",
+            "--exec-api-address",
+            "127.0.0.1:9099",
+        ],
+    )
+
+    config = _parse_superlink_lifespan_config()
+
+    assert config.control_address == "127.0.0.1:9099"
 
 
 def test_parse_superlink_log_rotation_args_custom_values() -> None:
