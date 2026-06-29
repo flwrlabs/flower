@@ -16,6 +16,7 @@
 
 
 import argparse
+from dataclasses import dataclass
 from logging import DEBUG, INFO, WARN
 from pathlib import Path
 
@@ -25,6 +26,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.hazmat.primitives.serialization import load_ssh_private_key
 from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 
+from flwr.app.user_config import UserConfig
 from flwr.common.args import (
     add_args_runtime_dependency_install,
     try_obtain_root_certificates,
@@ -53,15 +55,33 @@ from flwr.supercore.version import package_version
 from flwr.supernode.start_client_internal import start_client_internal
 
 
-def flower_supernode() -> None:
-    """Run Flower SuperNode."""
-    warn_if_flwr_update_available(process_name="flower-supernode")
+@dataclass
+class SuperNodeLifespanConfig:  # pylint: disable=too-many-instance-attributes
+    """Configuration needed to start the SuperNode lifespan."""
 
+    server_address: str
+    transport: str
+    root_certificates: bytes | str | None
+    insecure: bool
+    authentication_keys: (
+        tuple[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey] | None
+    )
+    max_retries: int | None
+    max_wait_time: float | None
+    node_config: UserConfig
+    isolation: str
+    clientappio_api_address: str
+    clientappio_certificates: tuple[bytes, bytes, bytes] | None
+    clientappio_root_certificates_path: str | None
+    health_server_address: str | None
+    trusted_entities: dict[str, str] | None
+    superexec_auth_secret: bytes | None
+    runtime_dependency_install: bool
+
+
+def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
+    """Parse SuperNode CLI args and return the startup configuration."""
     args = _parse_args_run_supernode().parse_args()
-
-    log(INFO, "Starting Flower SuperNode")
-
-    event(EventType.RUN_SUPERNODE_ENTER)
 
     trusted_entities = _try_obtain_trusted_entities(args.trusted_entities)
     if trusted_entities:
@@ -97,9 +117,7 @@ def flower_supernode() -> None:
             "SuperNode Authentication is only supported with the grpc-rere transport.",
         )
 
-    log(DEBUG, "Isolation mode: %s", args.isolation)
-
-    start_client_internal(
+    return SuperNodeLifespanConfig(
         server_address=args.superlink,
         transport=args.transport,
         root_certificates=root_certificates,
@@ -120,6 +138,38 @@ def flower_supernode() -> None:
         trusted_entities=trusted_entities,
         superexec_auth_secret=superexec_auth_secret,
         runtime_dependency_install=args.runtime_dependency_install,
+    )
+
+
+def flower_supernode() -> None:
+    """Run Flower SuperNode."""
+    warn_if_flwr_update_available(process_name="flower-supernode")
+
+    log(INFO, "Starting Flower SuperNode")
+
+    event(EventType.RUN_SUPERNODE_ENTER)
+
+    config = _parse_supernode_lifespan_config()
+
+    log(DEBUG, "Isolation mode: %s", config.isolation)
+
+    start_client_internal(
+        server_address=config.server_address,
+        transport=config.transport,
+        root_certificates=config.root_certificates,
+        insecure=config.insecure,
+        authentication_keys=config.authentication_keys,
+        max_retries=config.max_retries,
+        max_wait_time=config.max_wait_time,
+        node_config=config.node_config,
+        isolation=config.isolation,
+        clientappio_api_address=config.clientappio_api_address,
+        clientappio_certificates=config.clientappio_certificates,
+        clientappio_root_certificates_path=config.clientappio_root_certificates_path,
+        health_server_address=config.health_server_address,
+        trusted_entities=config.trusted_entities,
+        superexec_auth_secret=config.superexec_auth_secret,
+        runtime_dependency_install=config.runtime_dependency_install,
     )
 
 
