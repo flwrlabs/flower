@@ -114,6 +114,7 @@ try:
         get_fleet_event_log_writer_plugins,
     )
 except ImportError:
+
     # pylint: disable-next=unused-argument
     def add_ee_args_superlink(parser: argparse.ArgumentParser) -> None:
         """Add EE-specific arguments to the parser."""
