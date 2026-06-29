@@ -15,13 +15,23 @@
 """Tests for SuperExec base ephemeral plugin behavior."""
 
 
-from unittest.mock import Mock, patch
+import os
+from unittest.mock import ANY, Mock, patch
+
+import pytest
 
 from flwr.supercore.constant import TaskType
 from flwr.supercore.exit import ExitCode
 from flwr.supercore.run import Run
 
 from .base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
+
+_PROVIDER_ENV = {
+    "BRAVE_API_KEY": "brave-key",
+    "EXA_API_KEY": "exa-key",
+    "FLWR_MODEL_API_KEY": "model-key",
+    "TAVILY_API_KEY": "tavily-key",
+}
 
 
 def _get_run(_: int) -> Run:
@@ -93,6 +103,7 @@ def test_launch_task_runs_expected_command_and_exits() -> None:
             "1234",
         ],
         check=False,
+        env=ANY,
     )
     flwr_exit.assert_called_once_with(
         ExitCode.SUCCESS,
@@ -119,3 +130,63 @@ def test_launch_task_calls_cleanup_before_launch() -> None:
 
     # Assert
     assert call_log == ["cleanup", "subprocess"]
+
+
+@pytest.mark.parametrize(
+    "task_type",
+    [TaskType.AGENT_APP, TaskType.SERVER_APP, TaskType.SIMULATION],
+    ids=["agentapp", "serverapp", "simulation"],
+)
+def test_launch_task_removes_provider_keys_for_fab_backed_tasks(
+    task_type: TaskType,
+) -> None:
+    """Launch should remove provider keys from FAB-backed task env."""
+    plugin = _get_ephemeral_plugin()
+    env = {
+        **_PROVIDER_ENV,
+        "PATH": "/usr/bin",
+        "PYTHONPATH": "/path/to/python",
+        "UNRELATED_API_KEY": "keep-me",
+    }
+
+    with (
+        patch.dict(os.environ, env, clear=True),
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run"
+        ) as run,
+        patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
+    ):
+        plugin.launch_task(token="token", task=_get_task(task_type=task_type))
+
+    child_env = run.call_args.kwargs["env"]
+    for env_var in _PROVIDER_ENV:
+        assert env_var not in child_env
+    assert child_env["PATH"] == "/usr/bin"
+    assert child_env["PYTHONPATH"] == "/path/to/python"
+    assert child_env["UNRELATED_API_KEY"] == "keep-me"
+
+
+@pytest.mark.parametrize(
+    "task_type",
+    [TaskType.CONNECTOR, TaskType.MODEL],
+    ids=["connector", "model"],
+)
+def test_launch_task_keeps_provider_keys_for_flower_controlled_tasks(
+    task_type: TaskType,
+) -> None:
+    """Launch should keep provider keys for Flower-controlled task env."""
+    plugin = _get_ephemeral_plugin()
+    env = {**_PROVIDER_ENV, "PATH": "/usr/bin"}
+
+    with (
+        patch.dict(os.environ, env, clear=True),
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run"
+        ) as run,
+        patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
+    ):
+        plugin.launch_task(token="token", task=_get_task(task_type=task_type))
+
+    child_env = run.call_args.kwargs["env"]
+    for env_var, value in _PROVIDER_ENV.items():
+        assert child_env[env_var] == value

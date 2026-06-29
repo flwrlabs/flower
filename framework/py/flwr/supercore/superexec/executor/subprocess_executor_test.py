@@ -15,9 +15,10 @@
 """Tests for SuperExec subprocess executor."""
 
 
+import os
 import subprocess
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import pytest
 
@@ -25,6 +26,13 @@ from flwr.supercore.constant import TaskType
 
 from .subprocess_executor import SubprocessExecutor
 from .types import ExecutionSpec, LaunchResultStatus
+
+_PROVIDER_ENV = {
+    "BRAVE_API_KEY": "brave-key",
+    "EXA_API_KEY": "exa-key",
+    "FLWR_MODEL_API_KEY": "model-key",
+    "TAVILY_API_KEY": "tavily-key",
+}
 
 
 def _execution_spec(**overrides: Any) -> ExecutionSpec:
@@ -56,7 +64,8 @@ def test_launch_renders_insecure_clientapp_args() -> None:
             "--token",
             "token",
             "--insecure",
-        ]
+        ],
+        env=ANY,
     )
     assert result.status == LaunchResultStatus.ACCEPTED
     assert result.message is None
@@ -81,7 +90,8 @@ def test_launch_renders_root_certificates_args() -> None:
             "token",
             "--root-certificates",
             "/path/to/root.pem",
-        ]
+        ],
+        env=ANY,
     )
 
 
@@ -107,10 +117,9 @@ def test_launch_suppresses_output_when_requested() -> None:
     with patch.object(subprocess, "Popen") as popen_mock:
         result = SubprocessExecutor().launch(_execution_spec(suppress_output=True))
 
-    assert popen_mock.call_args.kwargs == {
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
-    }
+    assert popen_mock.call_args.kwargs["env"] is not None
+    assert popen_mock.call_args.kwargs["stdout"] == subprocess.DEVNULL
+    assert popen_mock.call_args.kwargs["stderr"] == subprocess.DEVNULL
     assert result.status == LaunchResultStatus.ACCEPTED
 
 
@@ -140,7 +149,8 @@ def test_launch_renders_serverappio_task_args(
             "--token",
             "token",
             "--insecure",
-        ]
+        ],
+        env=ANY,
     )
 
 
@@ -153,6 +163,63 @@ def test_launch_does_not_suppress_output_by_default() -> None:
 
     assert "stdout" not in popen_mock.call_args.kwargs
     assert "stderr" not in popen_mock.call_args.kwargs
+
+
+@pytest.mark.parametrize(
+    "task_type",
+    [
+        TaskType.AGENT_APP,
+        TaskType.CLIENT_APP,
+        TaskType.SERVER_APP,
+        TaskType.SIMULATION,
+    ],
+    ids=["agentapp", "clientapp", "serverapp", "simulation"],
+)
+def test_launch_removes_provider_keys_for_fab_backed_tasks(
+    task_type: TaskType,
+) -> None:
+    """Test subprocess executor removes provider keys from FAB-backed tasks."""
+    env = {
+        **_PROVIDER_ENV,
+        "PATH": "/usr/bin",
+        "PYTHONPATH": "/path/to/python",
+        "UNRELATED_API_KEY": "keep-me",
+    }
+
+    with (
+        patch.dict(os.environ, env, clear=True),
+        patch.object(subprocess, "Popen") as popen_mock,
+    ):
+        SubprocessExecutor().launch(_execution_spec(task_type=task_type))
+
+    child_env = popen_mock.call_args.kwargs["env"]
+    for env_var in _PROVIDER_ENV:
+        assert env_var not in child_env
+    assert child_env["PATH"] == "/usr/bin"
+    assert child_env["PYTHONPATH"] == "/path/to/python"
+    assert child_env["UNRELATED_API_KEY"] == "keep-me"
+
+
+@pytest.mark.parametrize(
+    "task_type",
+    [TaskType.CONNECTOR, TaskType.MODEL],
+    ids=["connector", "model"],
+)
+def test_launch_keeps_provider_keys_for_flower_controlled_tasks(
+    task_type: TaskType,
+) -> None:
+    """Test subprocess executor keeps provider keys for Flower-controlled tasks."""
+    env = {**_PROVIDER_ENV, "PATH": "/usr/bin"}
+
+    with (
+        patch.dict(os.environ, env, clear=True),
+        patch.object(subprocess, "Popen") as popen_mock,
+    ):
+        SubprocessExecutor().launch(_execution_spec(task_type=task_type))
+
+    child_env = popen_mock.call_args.kwargs["env"]
+    for env_var, value in _PROVIDER_ENV.items():
+        assert child_env[env_var] == value
 
 
 def test_launch_raises_when_subprocess_cannot_start() -> None:
