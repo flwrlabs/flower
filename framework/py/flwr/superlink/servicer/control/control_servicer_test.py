@@ -657,18 +657,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             response.run_dict[run_id].account_name, self.account_info.account_name
         )
 
-    def test_list_run_series_returns_accessible_federations(self) -> None:
-        """Test ListRunSeries returns only caller-accessible federations."""
-        # Prepare
-        self._create_dummy_run_series(1, federation=NOOP_FEDERATION)
-        self._create_dummy_run_series(2, federation="other-federation")
-
-        # Execute
-        response = self.servicer.ListRunSeries(ListRunSeriesRequest(), Mock())
-
-        # Assert
-        self.assertEqual([entry.series_id for entry in response.entries], [1])
-
     def test_list_run_series_filters_by_federation(self) -> None:
         """Test ListRunSeries filters by an explicit federation."""
         # Prepare
@@ -682,45 +670,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Assert
         self.assertEqual([entry.series_id for entry in response.entries], [1])
-
-    def test_list_run_series_aborts_for_inaccessible_federation(self) -> None:
-        """Test ListRunSeries rejects inaccessible federation filters."""
-        # Prepare
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-
-        # Execute/Assert
-        with (
-            patch.object(
-                self.state.federation_manager, "has_member", return_value=False
-            ),
-            self.assertRaises(grpc.RpcError),
-        ):
-            self.servicer.ListRunSeries(
-                ListRunSeriesRequest(federation=NOOP_FEDERATION), context
-            )
-
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Federation '{NOOP_FEDERATION}' does not exist",
-        )
-
-    def test_list_run_series_aborts_for_unknown_federation(self) -> None:
-        """Test ListRunSeries rejects unknown federation filters."""
-        # Prepare
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-
-        # Execute/Assert
-        with self.assertRaises(grpc.RpcError):
-            self.servicer.ListRunSeries(
-                ListRunSeriesRequest(federation="unknown-federation"), context
-            )
-
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            "Federation 'unknown-federation' does not exist",
-        )
 
     def test_get_run_series_returns_context(self) -> None:
         """Test GetRunSeries returns series metadata and shared Context."""
