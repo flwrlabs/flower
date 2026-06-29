@@ -30,10 +30,10 @@ class FdsWithSKLearn(unittest.TestCase):
         partition = fds.load_partition(partition_id, "train")
         partition.set_format("numpy")
         partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
-        X_train, y_train = partition_train_test["train"]["image"], partition_train_test[
-            "train"]["label"]
-        X_test, y_test = partition_train_test["test"]["image"], partition_train_test[
-            "test"]["label"]
+        X_train, y_train = partition_train_test["train"][:]["image"], partition_train_test[
+            "train"][:]["label"]
+        X_test, y_test = partition_train_test["test"][:]["image"], partition_train_test[
+            "test"][:]["label"]
         X_train = X_train.reshape(-1, 28 * 28)
         X_test = X_test.reshape(-1, 28 * 28)
         if self.preprocessing:

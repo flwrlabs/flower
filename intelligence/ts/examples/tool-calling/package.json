@@ -10,10 +10,10 @@
   "keywords": [],
   "author": "",
   "dependencies": {
-    "@flwr/flwr": "file:../../"
+    "@flwr/flwr": "file:../.."
   },
   "devDependencies": {
-    "@types/node": "^22.7.9",
-    "typescript": "^5.6.3"
+    "@types/node": "^22.19.7",
+    "typescript": "^5.9.3"
   }
 }

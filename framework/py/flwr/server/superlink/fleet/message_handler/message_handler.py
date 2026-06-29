@@ -16,7 +16,8 @@
 
 from logging import ERROR
 
-from flwr.common import Message, log
+from flwr.app import Message
+from flwr.common import log
 from flwr.common.constant import (
     HEARTBEAT_MAX_INTERVAL,
     HEARTBEAT_MIN_INTERVAL,
@@ -24,14 +25,12 @@ from flwr.common.constant import (
     NOOP_FLWR_AID,
     Status,
 )
-from flwr.common.inflatable import UnexpectedObjectContentError
 from flwr.common.serde import (
     fab_to_proto,
     message_from_proto,
     message_to_proto,
     run_to_proto,
 )
-from flwr.common.typing import Fab, InvalidRunStatusException, Run
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -63,8 +62,9 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.utils import check_abort
-from flwr.supercore.ffs import Ffs
+from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
+from flwr.supercore.run import InvalidRunStatusException, Run
 
 
 class InvalidHeartbeatIntervalError(Exception):
@@ -165,11 +165,17 @@ def pull_messages(  # pylint: disable=too-many-locals
 
     response = PullMessagesResponse(messages_list=msg_proto, message_object_trees=trees)
 
+    # Record incoming traffic size
+    bytes_recv = request.ByteSize()
+
     # Record traffic only if message was successfully processed
     # All messages in this request are assumed to belong to the same run
     if run_id_to_record is not None:
-        bytes_sent = len(response.SerializeToString())
-        state.store_traffic(run_id_to_record, bytes_sent=bytes_sent, bytes_recv=0)
+        # Record outgoing traffic size
+        bytes_sent = response.ByteSize()
+        state.store_traffic(
+            run_id_to_record, bytes_sent=bytes_sent, bytes_recv=bytes_recv
+        )
 
     return response
 
@@ -185,7 +191,7 @@ def push_messages(
     run_id = msg.metadata.run_id
 
     # Record incoming traffic size
-    bytes_recv = len(request.SerializeToString())
+    bytes_recv = request.ByteSize()
 
     # Abort if the run is not running
     abort_msg = check_abort(
@@ -203,6 +209,16 @@ def push_messages(
         objects_to_push |= set(store.preregister(run_id, object_tree))
     # Store Message in State
     message_id: str | None = state.store_message_res(message=msg)
+    # This is temporary. We should consider a more robust cleanup
+    # mechanism that protects duplicate messages from premature deletion.
+    # Once that is in place, we can remove the run status check below.
+    if (
+        message_id is None
+        and state.get_run_status({run_id})[run_id].status == Status.FINISHED
+    ):
+        # The request currently contains only one message and its object tree.
+        store.delete(request.message_object_trees[0].object_id)
+        objects_to_push.clear()
 
     # Build response
     response = PushMessagesResponse(
@@ -211,9 +227,14 @@ def push_messages(
         objects_to_push=objects_to_push,
     )
 
+    # Record outgoing traffic size
+    bytes_sent = response.ByteSize()
+
     # Record traffic only if message was successfully processed
-    # All messages in this request are assumed to belong to the same run
-    state.store_traffic(run_id, bytes_sent=0, bytes_recv=bytes_recv)
+    # Only one message is processed per request
+    state.store_traffic(run_id, bytes_sent=bytes_sent, bytes_recv=bytes_recv)
+    if request.clientapp_runtime_list:
+        state.add_clientapp_runtime(run_id, request.clientapp_runtime_list[0])
 
     return response
 
@@ -239,11 +260,11 @@ def get_run(
 
 
 def get_fab(
-    request: GetFabRequest, ffs: Ffs, state: LinkState, store: ObjectStore
+    request: GetFabRequest, state: LinkState, store: ObjectStore
 ) -> GetFabResponse:
     """Get FAB."""
     # Validate that the requesting SuperNode is part of the federation
-    _validate_node_in_federation(state, request.node.node_id, request.run_id)
+    run = _validate_node_in_federation(state, request.node.node_id, request.run_id)
 
     # Abort if the run is not running
     abort_msg = check_abort(
@@ -255,8 +276,13 @@ def get_fab(
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
-    if result := ffs.get(request.hash_str):
-        fab = Fab(request.hash_str, result[0], result[1])
+    if request.hash_str != run.fab_hash:
+        raise ValueError(
+            f"Requested FAB hash {request.hash_str} does not match run FAB "
+            f"hash {run.fab_hash}."
+        )
+
+    if fab := state.get_fab(request.hash_str):
         return GetFabResponse(fab=fab_to_proto(fab))
 
     raise ValueError(f"Found no FAB with hash: {request.hash_str}")
@@ -310,7 +336,8 @@ def pull_object(
     if content is not None:
         object_available = content != b""
         # Record bytes traffic pulled by SuperNode
-        state.store_traffic(request.run_id, bytes_sent=len(content), bytes_recv=0)
+        if object_available:
+            state.store_traffic(request.run_id, bytes_sent=len(content), bytes_recv=0)
         return PullObjectResponse(
             object_found=True,
             object_available=object_available,
@@ -356,10 +383,10 @@ def _validate_node_in_federation(
 ) -> Run:
     """Raise if the requesting SuperNode is not part of the federation the run belongs
     to."""
-    run = state.get_run(run_id)
-    if not run:
+    if not (runs := state.get_run_info(run_ids=[run_id])):
         raise ValueError(f"Run ID not found: {run_id}")
 
+    run = runs[0]
     if not state.federation_manager.has_node(node_id, run.federation):
         raise ValueError(f"SuperNode is not part of the federation '{run.federation}'.")
     return run

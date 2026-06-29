@@ -47,7 +47,7 @@ Before you begin, make sure you have the following prerequisites:
    .. code-block:: bash
        :substitutions:
 
-       $ git clone --depth=1 --branch v|stable_flwr_version| https://github.com/adap/flower.git
+       $ git clone --depth=1 --branch v|stable_flwr_version| https://github.com/flwrlabs/flower.git
        $ cd flower/framework/docker/distributed
 
 2. Get the IP address from the remote machine and save it for later.
@@ -88,7 +88,7 @@ For example, you can use ``scp`` to copy the directories:
 
     $ scp -r ./server \
            ./superlink-certificates \
-           ../../../examples/quickstart-sklearn-tabular/pyproject.toml remote:~/distributed
+           ../../../examples/quickstart-sklearn/pyproject.toml remote:~/distributed
 
 ********************************************
  Step 3: Start the Flower Server Components
@@ -135,7 +135,7 @@ On your local machine, run the following command to start the client components:
 .. code-block:: bash
 
     # In the `docker/distributed` directory
-    $ export PROJECT_DIR=../../../../examples/quickstart-sklearn-tabular
+    $ export PROJECT_DIR=../../../../examples/quickstart-sklearn
     $ docker compose -f client/compose.yml up --build -d
 
 .. note::
@@ -147,27 +147,36 @@ On your local machine, run the following command to start the client components:
  Step 5: Run Your Flower Project
 *********************************
 
-Specify the remote SuperLink IP addresses and the path to the root certificate in the
-``[tool.flwr.federations.remote-deployment]`` table in the ``pyproject.toml`` file.
-Here, we have named our remote federation ``remote-deployment``:
+Specify the remote SuperLink IP addresses and the path to the root certificate in the in
+a new SuperLink connection in your Flower Configuration file. The easiest way to locate
+this file is by means of ``flwr config list``:
+
+.. code-block:: console
+    :emphasize-lines: 3
+
+    $ flwr config list
+
+    Flower Config file: /path/to/.flwr/config.toml
+    SuperLink connections:
+    supergrid
+    local (default)
+
+With the file located in your system, edit it and add a new connection named
+``remote-deployment``:
 
 .. code-block:: toml
-    :caption: examples/quickstart-sklearn-tabular/pyproject.toml
+    :caption: config.toml
 
-    [tool.flwr.federations.remote-deployment]
+    [superlink.remote-deployment]
     address = "192.168.2.33:9093"
-    root-certificates = "../../framework/docker/distributed/superlink-certificates/ca.crt"
-
-.. note::
-
-    The path of the ``root-certificates`` should be relative to the location of the
-    ``pyproject.toml`` file.
+    root-certificates = "/absolute/path/to/superlink-certificates/ca.crt"
 
 Run the project and follow the ``ServerApp`` logs:
 
 .. code-block:: bash
 
-    $ flwr run ../../../examples/quickstart-sklearn-tabular remote-deployment --stream
+    $ cd flower/examples/quickstart-sklearn
+    $ flwr run ../../../examples/quickstart-sklearn remote-deployment --stream
 
 That's it! With these steps, you've set up Flower on two separate machines and are ready
 to start using it.
@@ -191,6 +200,6 @@ Shut down the Flower server components and delete the SuperLink state:
     $ cd <path-to-``distributed``-directory>
     $ docker compose -f server/compose.yml down -v
 
-.. |quickstart_sklearn_tabular| replace:: ``examples/quickstart-sklearn-tabular``
+.. |quickstart_sklearn_tabular| replace:: ``examples/quickstart-sklearn``
 
-.. _quickstart_sklearn_tabular: https://github.com/adap/flower/tree/main/examples/quickstart-sklearn-tabular
+.. _quickstart_sklearn_tabular: https://github.com/flwrlabs/flower/tree/main/examples/quickstart-sklearn

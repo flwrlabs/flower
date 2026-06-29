@@ -32,7 +32,6 @@ from flwr.common.constant import (
     GRPC_ADAPTER_METADATA_MESSAGE_QUALNAME_KEY,
     GRPC_ADAPTER_METADATA_SHOULD_EXIT_KEY,
 )
-from flwr.common.version import package_name, package_version
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -64,6 +63,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.supercore.constant import FORCE_EXIT_TIMEOUT_SECONDS
+from flwr.supercore.version import package_name, package_version
 
 T = TypeVar("T", bound=GrpcMessage)
 

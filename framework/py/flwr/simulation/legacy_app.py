@@ -28,7 +28,6 @@ import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
 from flwr.client import ClientFnExt
-from flwr.common import EventType, event
 from flwr.common.constant import NODE_ID_NUM_BYTES, SUPERLINK_NODE_ID
 from flwr.common.logger import (
     log,
@@ -49,33 +48,7 @@ from flwr.simulation.ray_transport.ray_actor import (
     pool_size_from_resources,
 )
 from flwr.simulation.ray_transport.ray_client_proxy import RayActorClientProxy
-
-INVALID_ARGUMENTS_START_SIMULATION = """
-INVALID ARGUMENTS ERROR
-
-Invalid Arguments in method:
-
-`start_simulation(
-    *,
-    client_fn: ClientFn,
-    num_clients: int,
-    clients_ids: Optional[List[str]] = None,
-    client_resources: Optional[Dict[str, float]] = None,
-    server: Optional[Server] = None,
-    config: ServerConfig = None,
-    strategy: Optional[Strategy] = None,
-    client_manager: Optional[ClientManager] = None,
-    ray_init_args: Optional[Dict[str, Any]] = None,
-) -> None:`
-
-REASON:
-    Method requires:
-        - Either `num_clients`[int] or `clients_ids`[List[str]]
-        to be set exclusively.
-        OR
-        - `len(clients_ids)` == `num_clients`
-
-"""
+from flwr.supercore.telemetry import EventType, event
 
 NodeToPartitionMapping = dict[int, int]
 
@@ -88,7 +61,7 @@ def _create_node_id_to_partition_mapping(
     for i in range(num_clients):
         while True:
             node_id = generate_rand_int_from_bytes(
-                NODE_ID_NUM_BYTES, exclude=[SUPERLINK_NODE_ID, 0]
+                NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
             )
             if node_id not in nodes_mapping:
                 break
@@ -182,9 +155,10 @@ def start_simulation(
 
     actor_scheduling: Optional[Union[str, NodeAffinitySchedulingStrategy]]
         (default: "DEFAULT")
-        Optional string ("DEFAULT" or "SPREAD") for the VCE to choose in which
-        node the actor is placed. If you are an advanced user needed more control
-        you can use lower-level scheduling strategies to pin actors to specific
+        Optional string ("DEFAULT" or "SPREAD") for the Simulation Runtime to
+        choose in which node the actor is placed. If you are an advanced user
+        needing more control, you can use lower-level scheduling strategies to pin
+        actors to specific
         compute nodes (e.g. via NodeAffinitySchedulingStrategy). Please note this
         is an advanced feature. For all details, please refer to the Ray documentation:
         https://docs.ray.io/en/latest/ray-core/scheduling/index.html
@@ -260,7 +234,7 @@ def start_simulation(
 
     # Initialize Ray
     ray.init(**ray_init_args)
-    cluster_resources = ray.cluster_resources()
+    cluster_resources = ray.cluster_resources()  # type: ignore[no-untyped-call,unused-ignore]
     log(
         INFO,
         "Flower VCE: Ray initialized with resources: %s",

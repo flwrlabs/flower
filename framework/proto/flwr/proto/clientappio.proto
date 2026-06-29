@@ -18,39 +18,44 @@ syntax = "proto3";
 package flwr.proto;
 
 import "flwr/proto/heartbeat.proto";
+import "flwr/proto/log.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/appio.proto";
 
 service ClientAppIo {
 
-  // Get run IDs with pending messages
-  rpc ListAppsToLaunch(ListAppsToLaunchRequest)
-      returns (ListAppsToLaunchResponse) {}
+  /////////////////////////////////////////////////////////////////////////////
+  // General *AppIo endpoints for SuperExec processes
+  /////////////////////////////////////////////////////////////////////////////
 
-  // Request token
-  rpc RequestToken(RequestTokenRequest) returns (RequestTokenResponse) {}
+  // Pull pending tasks
+  rpc PullPendingTasks(PullPendingTasksRequest)
+      returns (PullPendingTasksResponse) {}
+
+  // Claim task
+  rpc ClaimTask(ClaimTaskRequest) returns (ClaimTaskResponse) {}
+
+  /////////////////////////////////////////////////////////////////////////////
+  // General *AppIo endpoints for App Executor processes
+  /////////////////////////////////////////////////////////////////////////////
 
   // Get run details
   rpc GetRun(GetRunRequest) returns (GetRunResponse) {}
 
-  // Pull client app inputs
-  rpc PullClientAppInputs(PullAppInputsRequest)
-      returns (PullAppInputsResponse) {}
+  // Task heartbeat
+  rpc SendTaskHeartbeat(SendTaskHeartbeatRequest)
+      returns (SendTaskHeartbeatResponse) {}
 
-  // Push client app outputs
-  rpc PushClientAppOutputs(PushAppOutputsRequest)
-      returns (PushAppOutputsResponse) {}
+  // Pull task inputs
+  rpc PullTaskInput(PullTaskInputRequest) returns (PullTaskInputResponse) {}
 
-  // Push Message
-  rpc PushMessage(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
+  // Push task outputs
+  rpc PushTaskOutput(PushTaskOutputRequest) returns (PushTaskOutputResponse) {}
 
-  // Pull Message
-  rpc PullMessage(PullAppMessagesRequest) returns (PullAppMessagesResponse) {}
-
-  // App heartbeat
-  rpc SendAppHeartbeat(SendAppHeartbeatRequest)
-      returns (SendAppHeartbeatResponse) {}
+  /////////////////////////////////////////////////////////////////////////////
+  // Specific endpoints shared by ServerAppIo and ClientAppIo
+  /////////////////////////////////////////////////////////////////////////////
 
   // Push Object
   rpc PushObject(PushObjectRequest) returns (PushObjectResponse) {}
@@ -61,4 +66,34 @@ service ClientAppIo {
   // Confirm Message Received
   rpc ConfirmMessageReceived(ConfirmMessageReceivedRequest)
       returns (ConfirmMessageReceivedResponse) {}
+
+  // Create a task
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
+
+  // Push task message
+  rpc PushTaskMessage(PushTaskMessageRequest)
+      returns (PushTaskMessageResponse) {}
+
+  // Push task events
+  rpc PushTaskEvents(PushTaskEventsRequest) returns (PushTaskEventsResponse) {}
+
+  // Pull task messages
+  rpc PullTaskMessage(PullTaskMessageRequest)
+      returns (PullTaskMessageResponse) {}
+
+  // Push task logs
+  rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Message and node endpoints
+  /////////////////////////////////////////////////////////////////////////////
+
+  // Push messages
+  rpc PushMessages(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
+
+  // Pull messages
+  rpc PullMessages(PullAppMessagesRequest) returns (PullAppMessagesResponse) {}
+
+  // Return a set of nodes
+  rpc GetNodes(GetNodesRequest) returns (GetNodesResponse) {}
 }

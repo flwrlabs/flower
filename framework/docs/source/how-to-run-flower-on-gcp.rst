@@ -55,7 +55,7 @@ interface. Before proceeding, please make sure you have an account on GCP.
    By default, the Kubernetes clusters are deployed using the ``Autopilot`` mode. For
    the current guide, we use the ``Autopilot`` mode.
 4. **Configure Kubernetes Cluster**: in the page that is shown, we assign a name to the
-   new cluster, e.g., ``flower-numpy-example`` and we select the region, e.g.,
+   new cluster, e.g., ``quickstart-numpy`` and we select the region, e.g.,
    ``us-central1``. For the rest of the configuration settings, such as ``Cluster
    Tier``, ``Fleet Registration``, ``Networking``, and other settings we use the default
    values. Now, press the ``Create`` button.
@@ -132,12 +132,12 @@ picker.
     ``flower-gcp-XXXXXX``. Its value will be used in subsequent steps, e.g.,
 
 The next step is to configure ``kubectl`` to point to the GKE cluster you created in the
-previous steps by using the name of the cluster, e.g., ``flower-numpy-example``, and the
+previous steps by using the name of the cluster, e.g., ``quickstart-numpy``, and the
 name of the region where the cluster was created:
 
 .. code-block:: bash
 
-    gcloud container clusters get-credentials flower-numpy-example --region us-central1
+    gcloud container clusters get-credentials quickstart-numpy --region us-central1
 
 This will configure the required metadata and fetch the necessary credentials to allow
 your local ``kubectl`` to communicate with the GKE cluster. To verify that ``kubectl``
@@ -221,8 +221,8 @@ We create the Flower NumPy app as follows:
 
 .. code-block:: bash
 
-    # flwr new <YOUR_APP_NAME> --framework <YOUR_ML_FRAMEWORK> --username <YOUR_USERNAME>
-    flwr new flower-numpy-example --framework NumPy --username flower
+    # flwr new <APP_ID>[==<APP_VERSION>]
+    flwr new @flwrlabs/quickstart-numpy
 
 Create Docker Images
 ====================
@@ -264,7 +264,7 @@ Once we have created the required Dockerfile, we build the Docker Image as follo
 
 .. code-block:: bash
 
-    docker build --platform linux/amd64 -f superexec.Dockerfile -t flower_numpy_example_superexec:0.0.1 .
+    docker build --platform linux/amd64 -f superexec.Dockerfile -t quickstart_numpy_superexec:0.0.1 .
 
 Tag Docker Images
 =================
@@ -273,7 +273,7 @@ Before we are able to push our two newly locally created Docker images, we need 
 them with the Google Artifact Registry repository name and image name we created during
 the previous steps. If you have followed the earlier naming suggestions, the repository
 name is ``flower-gcp-example-artifacts``, the local Docker image name is
-``flower_numpy_example_superexec:0.0.1``, and the region is ``us-central1``. Please note
+``quickstart_numpy_superexec:0.0.1``, and the region is ``us-central1``. Please note
 that the ``<YOUR_PROJECT_ID>`` is different from user to user, so in the commands below
 we use the ``<YOUR_PROJECT_ID>`` placeholder. Putting all this together, the final
 command you need to run to tag the ``SuperExec`` Docker image is:
@@ -283,7 +283,7 @@ command you need to run to tag the ``SuperExec`` Docker image is:
     # docker tag YOUR_IMAGE_NAME YOUR_REGION-docker.pkg.dev/YOUR_PROJECT_ID/YOUR_REPOSITORY_NAME/YOUR_IMAGE_NAME:YOUR_TAG
 
     # please change <YOUR_PROJECT_ID> to point to your project identifier
-    docker tag flower_numpy_example_superexec:0.0.1 us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/flower_numpy_example_superexec:0.0.1
+    docker tag quickstart_numpy_superexec:0.0.1 us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/quickstart_numpy_superexec:0.0.1
 
 Push Docker Images
 ==================
@@ -296,7 +296,7 @@ repository using the ``docker push`` command with the tagged name:
     # docker push YOUR_REGION-docker.pkg.dev/<YOUR_PROJECT_ID>/YOUR_REPOSITORY_NAME/YOUR_IMAGE_NAME:YOUR_TAG
 
     # please change <YOUR_PROJECT_ID> to point to your project identifier
-    docker push us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/flower_numpy_example_superexec:0.0.1
+    docker push us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/quickstart_numpy_superexec:0.0.1
 
 ******************************
  Deploy Flower Infrastructure
@@ -475,7 +475,7 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
               containers:
               - name: superexec-serverapp
                 # please change <YOUR_PROJECT_ID> to point to your project identifier
-                image: us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/flower_numpy_example_superexec:0.0.1
+                image: us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/quickstart_numpy_superexec:0.0.1
                 args:
                   - "--insecure"
                   - "--appio-api-address"
@@ -504,7 +504,7 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
               containers:
               - name: superexec-clientapp
                 # please change <YOUR_PROJECT_ID> to point to your project identifier
-                image: us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/flower_numpy_example_superexec:0.0.1
+                image: us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/quickstart_numpy_superexec:0.0.1
                 args:
                   - "--insecure"
                   - "--appio-api-address"
@@ -533,7 +533,7 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
               containers:
               - name: superexec-clientapp
                 # please change <YOUR_PROJECT_ID> to point to your project identifier
-                image: us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/flower_numpy_example_superexec:0.0.1
+                image: us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/quickstart_numpy_superexec:0.0.1
                 args:
                   - "--insecure"
                   - "--appio-api-address"
@@ -602,14 +602,31 @@ the service:
 
     kubectl get service superlink-service
 
-After we get the ``EXTERNAL-IP`` , we go to the directory of the Flower example, we open
-the ``pyproject.toml`` and then add the following section at the end of the file:
+After we get the ``EXTERNAL-IP`` we need to create a new SuperLink connection in the
+Flower Configuration file:
 
-.. code-block:: bash
+1. Run ``flwr config list`` to locate the Flower configuration file on your machine and
+   view available SuperLink connections.
 
-    [tool.flwr.federations.gcp-deployment]
-    address = "<EXTERNAL_IP>:9093" # replace the EXTERNAL_IP with the correct value
-    insecure = true
+   .. code-block:: console
+       :emphasize-lines: 3
+
+         $ flwr config list
+
+         Flower Config file: /path/to/.flwr/config.toml
+         SuperLink connections:
+           supergrid
+           local (default)
+
+2. Open the Flower Configuration file (``config.toml``) and add a new SuperLink
+   connection at the end:
+
+   .. code-block:: toml
+       :caption: config.toml
+
+       [superlink.gcp-deployment]
+       address = "<EXTERNAL_IP>:9093" # replace the EXTERNAL_IP with the correct value
+       insecure = true
 
 Then we can execute the example on the GCP cluster by running:
 
@@ -633,51 +650,76 @@ the logs from the run. The output should look like the one shared below.
 
         Loading project configuration...
         Success
-        🎊 Successfully built flower.flower-numpy-example.1-0-0.ba270a25.fab
+        🎊 Successfully built flower.quickstart-numpy.1-0-0.ba270a25.fab
         🎊 Successfully started run 2796207907461390277
         INFO :      Starting logstream for run_id `2796207907461390277`
         INFO :      Start `flwr-serverapp` process
-        🎊 Successfully installed flower-numpy-example to /app/.flwr/apps/flower.flower-numpy-example.1.0.0.ba270a25.
-        INFO :      Starting Flower ServerApp, config: num_rounds=3, no round_timeout
+        🎊 Successfully installed quickstart-numpy to /app/.flwr/apps/flower.quickstart-numpy.1.0.0.ba270a25.
+        INFO :      Starting FedAvg strategy:
+        INFO :          ├── Number of rounds: 3
+        INFO :          ├── ArrayRecord (0.00 MB)
+        INFO :          ├── ConfigRecord (train): (empty!)
+        INFO :          ├── ConfigRecord (evaluate): (empty!)
+        INFO :          ├──> Sampling:
+        INFO :          │       ├──Fraction: train (1.00) | evaluate ( 1.00)
+        INFO :          │       ├──Minimum nodes: train (2) | evaluate (2)
+        INFO :          │       └──Minimum available nodes: 2
+        INFO :          └──> Keys in records:
+        INFO :                  ├── Weighted by: 'num-examples'
+        INFO :                  ├── ArrayRecord key: 'arrays'
+        INFO :                  └── ConfigRecord key: 'config'
         INFO :
-        INFO :      [INIT]
-        INFO :      Using initial global parameters provided by strategy
-        INFO :      Starting evaluation of initial global parameters
-        INFO :      Evaluation returned no results (`None`)
         INFO :
-        INFO :      [ROUND 1]
-        INFO :      configure_fit: strategy sampled 2 clients (out of 2)
-        INFO :      aggregate_fit: received 2 results and 0 failures
-        WARNING :   No fit_metrics_aggregation_fn provided
-        INFO :      configure_evaluate: strategy sampled 2 clients (out of 2)
-        INFO :      aggregate_evaluate: received 2 results and 0 failures
-        WARNING :   No evaluate_metrics_aggregation_fn provided
+        INFO :      [ROUND 1/3]
+        INFO :      configure_train: Sampled 2 nodes (out of 2)
+        INFO :      aggregate_train: Received 2 results and 0 failures
+        INFO :          └──> Aggregated MetricRecord: {'random_metric': 0.6692931409515264}
+        INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
+        INFO :      aggregate_evaluate: Received 2 results and 0 failures
+        INFO :          └──> Aggregated MetricRecord: {'random_metric': [0.4880010858339962, 0.3087008997447846, 0.6336219116058434]}
         INFO :
-        INFO :      [ROUND 2]
-        INFO :      configure_fit: strategy sampled 2 clients (out of 2)
-        INFO :      aggregate_fit: received 2 results and 0 failures
-        INFO :      configure_evaluate: strategy sampled 2 clients (out of 2)
-        INFO :      aggregate_evaluate: received 2 results and 0 failures
+        INFO :      [ROUND 2/3]
+        INFO :      configure_train: Sampled 2 nodes (out of 2)
+        INFO :      aggregate_train: Received 2 results and 0 failures
+        INFO :          └──> Aggregated MetricRecord: {'random_metric': 0.5360441357065859}
+        INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
+        INFO :      aggregate_evaluate: Received 2 results and 0 failures
+        INFO :          └──> Aggregated MetricRecord: {'random_metric': [0.25413977771677904, 0.33788546118090673, 0.64626655554784]}
         INFO :
-        INFO :      [ROUND 3]
-        INFO :      configure_fit: strategy sampled 2 clients (out of 2)
-        INFO :      aggregate_fit: received 2 results and 0 failures
-        INFO :      configure_evaluate: strategy sampled 2 clients (out of 2)
-        INFO :      aggregate_evaluate: received 2 results and 0 failures
+        INFO :      [ROUND 3/3]
+        INFO :      configure_train: Sampled 2 nodes (out of 2)
+        INFO :      aggregate_train: Received 2 results and 0 failures
+        INFO :          └──> Aggregated MetricRecord: {'random_metric': 0.04090013167984635}
+        INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
+        INFO :      aggregate_evaluate: Received 2 results and 0 failures
+        INFO :          └──> Aggregated MetricRecord: {'random_metric': [0.7990976665955934, 0.20095453623327086, 0.6090265112641057]}
         INFO :
-        INFO :      [SUMMARY]
-        INFO :      Run finished 3 round(s) in 30.11s
-        INFO :          History (loss, distributed):
-        INFO :                  round 1: 0.0
-        INFO :                  round 2: 0.0
-        INFO :                  round 3: 0.0
+        INFO :      Strategy execution finished in 14.66s
+        INFO :
+        INFO :      Final results:
+        INFO :
+        INFO :          Global Arrays:
+        INFO :                  ArrayRecord (0.000 MB)
+        INFO :
+        INFO :          Aggregated ClientApp-side Train Metrics:
+        INFO :          { 1: {'random_metric': '6.6929e-01'},
+        INFO :            2: {'random_metric': '5.3604e-01'},
+        INFO :            3: {'random_metric': '4.0900e-02'}}
+        INFO :
+        INFO :          Aggregated ClientApp-side Evaluate Metrics:
+        INFO :          { 1: {'random_metric': "['4.8800e-01', '3.0870e-01', '6.3362e-01']"},
+        INFO :            2: {'random_metric': "['2.5414e-01', '3.3789e-01', '6.4627e-01']"},
+        INFO :            3: {'random_metric': "['7.9910e-01', '2.0095e-01', '6.0903e-01']"}}
+        INFO :
+        INFO :          ServerApp-side Evaluate Metrics:
+        INFO :          {}
         INFO :
 
 .. note::
 
     Please note that if you terminate or shut down the cluster, and create a new one,
     the value of the ``EXTERNAL_IP`` changes. In that case, you will have to update the
-    ``pyproject.toml``.
+    Flower Configuration file.
 
 ********************************
  Shutdown Flower Infrastructure

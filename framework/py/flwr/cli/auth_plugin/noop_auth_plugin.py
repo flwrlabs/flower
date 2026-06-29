@@ -16,10 +16,9 @@
 
 
 from collections.abc import Sequence
-from pathlib import Path
 
-from flwr.common.typing import AccountAuthCredentials, AccountAuthLoginDetails
 from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
 
 from .auth_plugin import CliAuthPlugin, LoginError
 
@@ -57,7 +56,7 @@ class NoOpCliAuthPlugin(CliAuthPlugin):
         """
         raise LoginError("Account authentication is not enabled on this SuperLink.")
 
-    def __init__(self, credentials_path: Path) -> None:
+    def __init__(self, host: str = "") -> None:
         pass
 
     def store_tokens(self, credentials: AccountAuthCredentials) -> None:

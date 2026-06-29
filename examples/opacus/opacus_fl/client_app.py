@@ -1,93 +1,110 @@
 """opacus: Training with Sample-Level Differential Privacy using Opacus Privacy Engine."""
 
-import logging
 import warnings
 
 import torch
-from flwr.client import NumPyClient
+from flwr.app import ArrayRecord, Context, Message, MetricRecord, RecordDict
 from flwr.clientapp import ClientApp
-from flwr.common import Context
 
 from opacus import PrivacyEngine
-from opacus_fl.task import Net, get_weights, load_data, set_weights, test, train
+from opacus_fl.task import Net, load_data, test, train
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-class FlowerClient(NumPyClient):
-    def __init__(
-        self,
-        train_loader,
-        test_loader,
-        target_delta,
-        noise_multiplier,
-        max_grad_norm,
-    ) -> None:
-        super().__init__()
-        self.model = Net()
-        self.train_loader = train_loader
-        self.test_loader = test_loader
-        self.target_delta = target_delta
-        self.noise_multiplier = noise_multiplier
-        self.max_grad_norm = max_grad_norm
-
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-    def fit(self, parameters, config):
-        model = self.model
-        set_weights(model, parameters)
-
-        optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-
-        privacy_engine = PrivacyEngine(secure_mode=False)
-        (
-            model,
-            optimizer,
-            self.train_loader,
-        ) = privacy_engine.make_private(
-            module=model,
-            optimizer=optimizer,
-            data_loader=self.train_loader,
-            noise_multiplier=self.noise_multiplier,
-            max_grad_norm=self.max_grad_norm,
-        )
-
-        epsilon = train(
-            model,
-            self.train_loader,
-            privacy_engine,
-            optimizer,
-            self.target_delta,
-            device=self.device,
-        )
-
-        if epsilon is not None:
-            print(f"Epsilon value for delta={self.target_delta} is {epsilon:.2f}")
-        else:
-            print("Epsilon value not available.")
-
-        return (get_weights(model), len(self.train_loader.dataset), {})
-
-    def evaluate(self, parameters, config):
-        set_weights(self.model, parameters)
-        loss, accuracy = test(self.model, self.test_loader, self.device)
-        return loss, len(self.test_loader.dataset), {"accuracy": accuracy}
+app = ClientApp()
 
 
-def client_fn(context: Context):
-    partition_id = context.node_config["partition-id"]
-    noise_multiplier = 1.0 if partition_id % 2 == 0 else 1.5
+def _device() -> torch.device:
+    return torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    train_loader, test_loader = load_data(
-        partition_id=partition_id, num_partitions=context.node_config["num-partitions"]
+
+def _partition_loaders(context: Context):
+    pid = context.node_config["partition-id"]
+    n = context.node_config["num-partitions"]
+    noise = 1.0 if pid % 2 == 0 else 1.5
+    train_loader, test_loader = load_data(partition_id=pid, num_partitions=n)
+    return pid, noise, train_loader, test_loader
+
+
+def _unwrap_state_dict(model: torch.nn.Module) -> dict:
+    # NOTE: this is to return plain or unwrapped state_dict even if Opacus wrapped the model.
+    return (
+        model._module.state_dict() if hasattr(model, "_module") else model.state_dict()
     )
-    return FlowerClient(
-        train_loader,
-        test_loader,
-        context.run_config["target-delta"],
-        noise_multiplier,
-        context.run_config["max-grad-norm"],
-    ).to_client()
 
 
-app = ClientApp(client_fn=client_fn)
+@app.train()
+def train_message(msg: Message, context: Context) -> Message:
+    pid, noise_multiplier, train_loader, _ = _partition_loaders(context)
+    device = _device()
+
+    target_delta = float(context.run_config["target-delta"])
+    max_grad_norm = float(context.run_config["max-grad-norm"])
+
+    model = Net().to(device)
+    model.load_state_dict(msg.content["arrays"].to_torch_state_dict(), strict=True)
+
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+
+    privacy_engine = PrivacyEngine(secure_mode=False)
+    private_model, optimizer, private_train_loader = privacy_engine.make_private(
+        module=model,
+        optimizer=optimizer,
+        data_loader=train_loader,
+        noise_multiplier=noise_multiplier,
+        max_grad_norm=max_grad_norm,
+    )
+
+    epsilon = train(
+        private_model,
+        private_train_loader,
+        privacy_engine,
+        optimizer,
+        target_delta,
+        device=device,
+        epochs=1,
+    )
+
+    out_arrays = ArrayRecord(_unwrap_state_dict(private_model))
+    out_metrics = MetricRecord(
+        {
+            "num-examples": len(private_train_loader.dataset),
+            "epsilon": float(epsilon),
+            "target_delta": float(target_delta),
+            "noise_multiplier": float(noise_multiplier),
+            "max_grad_norm": float(max_grad_norm),
+        }
+    )
+
+    print(
+        f"[client {pid}] epsilon(delta={target_delta})={epsilon:.2f}, noise={noise_multiplier}"
+    )
+
+    return Message(
+        content=RecordDict({"arrays": out_arrays, "metrics": out_metrics}),
+        reply_to=msg,
+    )
+
+
+@app.evaluate()
+def evaluate_message(msg: Message, context: Context) -> Message:
+    pid, _, _, test_loader = _partition_loaders(context)
+    device = _device()
+
+    model = Net().to(device)
+    model.load_state_dict(msg.content["arrays"].to_torch_state_dict(), strict=True)
+
+    loss, accuracy = test(model, test_loader, device)
+
+    out_metrics = MetricRecord(
+        {
+            "loss": float(loss),
+            "accuracy": float(accuracy),
+            "num-examples": len(test_loader.dataset),
+        }
+    )
+
+    print(f"[client {pid}] eval loss={loss:.4f}, acc={accuracy:.4f}")
+
+    return Message(content=RecordDict({"metrics": out_metrics}), reply_to=msg)

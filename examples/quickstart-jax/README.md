@@ -10,15 +10,18 @@ This introductory example to Flower uses JAX, but deep knowledge of JAX is not n
 
 ## Set up the project
 
-### Clone the project
+### Fetch the app
 
-Start by cloning the example project:
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
-        && mv _tmp/examples/quickstart-jax . \
-        && rm -rf _tmp \
-        && cd quickstart-jax
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/quickstart-jax
 ```
 
 This will create a new directory called `quickstart-jax` with the following structure:
@@ -52,13 +55,13 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
-flwr run .
+flwr run . --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```bash
-flwr run . --run-config "num-server-rounds=5 batch-size=32"
+flwr run . --run-config "num-server-rounds=5 batch-size=32"  --stream
 ```
 
 > [!TIP]

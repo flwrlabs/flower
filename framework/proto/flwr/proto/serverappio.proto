@@ -19,55 +19,43 @@ package flwr.proto;
 
 import "flwr/proto/heartbeat.proto";
 import "flwr/proto/log.proto";
-import "flwr/proto/node.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/run.proto";
-import "flwr/proto/fab.proto";
 import "flwr/proto/appio.proto";
 
 service ServerAppIo {
 
-  // List runs to launch
-  rpc ListAppsToLaunch(ListAppsToLaunchRequest)
-      returns (ListAppsToLaunchResponse) {}
+  /////////////////////////////////////////////////////////////////////////////
+  // General *AppIo endpoints for SuperExec processes
+  /////////////////////////////////////////////////////////////////////////////
 
-  // Request token for a run
-  rpc RequestToken(RequestTokenRequest) returns (RequestTokenResponse) {}
+  // Pull pending tasks
+  rpc PullPendingTasks(PullPendingTasksRequest)
+      returns (PullPendingTasksResponse) {}
 
-  // Return a set of nodes
-  rpc GetNodes(GetNodesRequest) returns (GetNodesResponse) {}
+  // Claim task
+  rpc ClaimTask(ClaimTaskRequest) returns (ClaimTaskResponse) {}
 
-  // Create one or more messages
-  rpc PushMessages(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
-
-  // Get message results
-  rpc PullMessages(PullAppMessagesRequest) returns (PullAppMessagesResponse) {}
+  /////////////////////////////////////////////////////////////////////////////
+  // General *AppIo endpoints for App Executor processes
+  /////////////////////////////////////////////////////////////////////////////
 
   // Get run details
   rpc GetRun(GetRunRequest) returns (GetRunResponse) {}
 
-  // Get FAB
-  rpc GetFab(GetFabRequest) returns (GetFabResponse) {}
+  // Task heartbeat
+  rpc SendTaskHeartbeat(SendTaskHeartbeatRequest)
+      returns (SendTaskHeartbeatResponse) {}
 
-  // Pull ServerApp inputs
-  rpc PullAppInputs(PullAppInputsRequest) returns (PullAppInputsResponse) {}
+  // Pull task inputs
+  rpc PullTaskInput(PullTaskInputRequest) returns (PullTaskInputResponse) {}
 
-  // Push ServerApp outputs
-  rpc PushAppOutputs(PushAppOutputsRequest) returns (PushAppOutputsResponse) {}
+  // Push task outputs
+  rpc PushTaskOutput(PushTaskOutputRequest) returns (PushTaskOutputResponse) {}
 
-  // Update the status of a given run
-  rpc UpdateRunStatus(UpdateRunStatusRequest)
-      returns (UpdateRunStatusResponse) {}
-
-  // Get the status of a given run
-  rpc GetRunStatus(GetRunStatusRequest) returns (GetRunStatusResponse) {}
-
-  // Push ServerApp logs
-  rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
-
-  // App heartbeat
-  rpc SendAppHeartbeat(SendAppHeartbeatRequest)
-      returns (SendAppHeartbeatResponse) {}
+  /////////////////////////////////////////////////////////////////////////////
+  // Specific endpoints shared by ServerAppIo and ClientAppIo
+  /////////////////////////////////////////////////////////////////////////////
 
   // Push Object
   rpc PushObject(PushObjectRequest) returns (PushObjectResponse) {}
@@ -78,8 +66,34 @@ service ServerAppIo {
   // Confirm Message Received
   rpc ConfirmMessageReceived(ConfirmMessageReceivedRequest)
       returns (ConfirmMessageReceivedResponse) {}
-}
 
-// GetNodes messages
-message GetNodesRequest { uint64 run_id = 1; }
-message GetNodesResponse { repeated Node nodes = 1; }
+  // Create a task
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
+
+  // Push task message
+  rpc PushTaskMessage(PushTaskMessageRequest)
+      returns (PushTaskMessageResponse) {}
+
+  // Push task events
+  rpc PushTaskEvents(PushTaskEventsRequest) returns (PushTaskEventsResponse) {}
+
+  // Pull task messages
+  rpc PullTaskMessage(PullTaskMessageRequest)
+      returns (PullTaskMessageResponse) {}
+
+  // Push task logs
+  rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Message and node endpoints
+  /////////////////////////////////////////////////////////////////////////////
+
+  // Push messages
+  rpc PushMessages(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
+
+  // Pull messages
+  rpc PullMessages(PullAppMessagesRequest) returns (PullAppMessagesResponse) {}
+
+  // Return a set of nodes
+  rpc GetNodes(GetNodesRequest) returns (GetNodesResponse) {}
+}

@@ -21,7 +21,7 @@
 ====================
 
 .. argparse::
-    :module: flwr.server.app
+    :module: flwr.superlink.cli.flower_superlink
     :func: _parse_args_run_superlink
     :prog: flower-superlink
 

@@ -31,19 +31,17 @@ from flwr.common import (
     ndarrays_to_parameters,
     parameters_to_ndarrays,
 )
-from flwr.common.differential_privacy import (
-    add_gaussian_noise_to_params,
-    compute_clip_model_update,
-    compute_stdv,
-)
-from flwr.common.differential_privacy_constants import (
-    CLIENTS_DISCREPANCY_WARNING,
-    KEY_CLIPPING_NORM,
-)
 from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy.strategy import Strategy
+from flwr.supercore.differential_privacy import (
+    CLIENTS_DISCREPANCY_WARNING,
+    KEY_CLIPPING_NORM,
+    add_gaussian_noise_to_params,
+    compute_clip_model_update,
+    compute_stdv,
+)
 
 
 class DifferentialPrivacyServerSideFixedClipping(Strategy):

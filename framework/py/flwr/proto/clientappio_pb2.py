@@ -23,18 +23,19 @@ _sym_db = _symbol_database.Default()
 
 
 from flwr.proto import heartbeat_pb2 as flwr_dot_proto_dot_heartbeat__pb2
+from flwr.proto import log_pb2 as flwr_dot_proto_dot_log__pb2
 from flwr.proto import run_pb2 as flwr_dot_proto_dot_run__pb2
 from flwr.proto import message_pb2 as flwr_dot_proto_dot_message__pb2
 from flwr.proto import appio_pb2 as flwr_dot_proto_dot_appio__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1c\x66lwr/proto/clientappio.proto\x12\nflwr.proto\x1a\x1a\x66lwr/proto/heartbeat.proto\x1a\x14\x66lwr/proto/run.proto\x1a\x18\x66lwr/proto/message.proto\x1a\x16\x66lwr/proto/appio.proto2\xeb\x07\n\x0b\x43lientAppIo\x12_\n\x10ListAppsToLaunch\x12#.flwr.proto.ListAppsToLaunchRequest\x1a$.flwr.proto.ListAppsToLaunchResponse\"\x00\x12S\n\x0cRequestToken\x12\x1f.flwr.proto.RequestTokenRequest\x1a .flwr.proto.RequestTokenResponse\"\x00\x12\x41\n\x06GetRun\x12\x19.flwr.proto.GetRunRequest\x1a\x1a.flwr.proto.GetRunResponse\"\x00\x12\\\n\x13PullClientAppInputs\x12 .flwr.proto.PullAppInputsRequest\x1a!.flwr.proto.PullAppInputsResponse\"\x00\x12_\n\x14PushClientAppOutputs\x12!.flwr.proto.PushAppOutputsRequest\x1a\".flwr.proto.PushAppOutputsResponse\"\x00\x12X\n\x0bPushMessage\x12\".flwr.proto.PushAppMessagesRequest\x1a#.flwr.proto.PushAppMessagesResponse\"\x00\x12X\n\x0bPullMessage\x12\".flwr.proto.PullAppMessagesRequest\x1a#.flwr.proto.PullAppMessagesResponse\"\x00\x12_\n\x10SendAppHeartbeat\x12#.flwr.proto.SendAppHeartbeatRequest\x1a$.flwr.proto.SendAppHeartbeatResponse\"\x00\x12M\n\nPushObject\x12\x1d.flwr.proto.PushObjectRequest\x1a\x1e.flwr.proto.PushObjectResponse\"\x00\x12M\n\nPullObject\x12\x1d.flwr.proto.PullObjectRequest\x1a\x1e.flwr.proto.PullObjectResponse\"\x00\x12q\n\x16\x43onfirmMessageReceived\x12).flwr.proto.ConfirmMessageReceivedRequest\x1a*.flwr.proto.ConfirmMessageReceivedResponse\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1c\x66lwr/proto/clientappio.proto\x12\nflwr.proto\x1a\x1a\x66lwr/proto/heartbeat.proto\x1a\x14\x66lwr/proto/log.proto\x1a\x14\x66lwr/proto/run.proto\x1a\x18\x66lwr/proto/message.proto\x1a\x16\x66lwr/proto/appio.proto2\xd3\x0b\n\x0b\x43lientAppIo\x12_\n\x10PullPendingTasks\x12#.flwr.proto.PullPendingTasksRequest\x1a$.flwr.proto.PullPendingTasksResponse\"\x00\x12J\n\tClaimTask\x12\x1c.flwr.proto.ClaimTaskRequest\x1a\x1d.flwr.proto.ClaimTaskResponse\"\x00\x12\x41\n\x06GetRun\x12\x19.flwr.proto.GetRunRequest\x1a\x1a.flwr.proto.GetRunResponse\"\x00\x12\x62\n\x11SendTaskHeartbeat\x12$.flwr.proto.SendTaskHeartbeatRequest\x1a%.flwr.proto.SendTaskHeartbeatResponse\"\x00\x12V\n\rPullTaskInput\x12 .flwr.proto.PullTaskInputRequest\x1a!.flwr.proto.PullTaskInputResponse\"\x00\x12Y\n\x0ePushTaskOutput\x12!.flwr.proto.PushTaskOutputRequest\x1a\".flwr.proto.PushTaskOutputResponse\"\x00\x12M\n\nPushObject\x12\x1d.flwr.proto.PushObjectRequest\x1a\x1e.flwr.proto.PushObjectResponse\"\x00\x12M\n\nPullObject\x12\x1d.flwr.proto.PullObjectRequest\x1a\x1e.flwr.proto.PullObjectResponse\"\x00\x12q\n\x16\x43onfirmMessageReceived\x12).flwr.proto.ConfirmMessageReceivedRequest\x1a*.flwr.proto.ConfirmMessageReceivedResponse\"\x00\x12M\n\nCreateTask\x12\x1d.flwr.proto.CreateTaskRequest\x1a\x1e.flwr.proto.CreateTaskResponse\"\x00\x12\\\n\x0fPushTaskMessage\x12\".flwr.proto.PushTaskMessageRequest\x1a#.flwr.proto.PushTaskMessageResponse\"\x00\x12Y\n\x0ePushTaskEvents\x12!.flwr.proto.PushTaskEventsRequest\x1a\".flwr.proto.PushTaskEventsResponse\"\x00\x12\\\n\x0fPullTaskMessage\x12\".flwr.proto.PullTaskMessageRequest\x1a#.flwr.proto.PullTaskMessageResponse\"\x00\x12G\n\x08PushLogs\x12\x1b.flwr.proto.PushLogsRequest\x1a\x1c.flwr.proto.PushLogsResponse\"\x00\x12Y\n\x0cPushMessages\x12\".flwr.proto.PushAppMessagesRequest\x1a#.flwr.proto.PushAppMessagesResponse\"\x00\x12Y\n\x0cPullMessages\x12\".flwr.proto.PullAppMessagesRequest\x1a#.flwr.proto.PullAppMessagesResponse\"\x00\x12G\n\x08GetNodes\x12\x1b.flwr.proto.GetNodesRequest\x1a\x1c.flwr.proto.GetNodesResponse\"\x00\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'flwr.proto.clientappio_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_CLIENTAPPIO']._serialized_start=145
-  _globals['_CLIENTAPPIO']._serialized_end=1148
+  _globals['_CLIENTAPPIO']._serialized_start=167
+  _globals['_CLIENTAPPIO']._serialized_end=1658
 # @@protoc_insertion_point(module_scope)

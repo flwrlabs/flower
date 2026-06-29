@@ -58,8 +58,20 @@ case "$2" in
     ;;
 esac
 
+# These e2e apps are preinstalled by CI; keep the SuperLink harness from creating
+# per-run dependency environments.
+runtime_dependency_install_arg="--disable-runtime-dependency-installation"
+
 # Install Flower app
 pip install -e . --no-deps
+
+# revert changes if any in pyproject.toml
+# This is needed for multi-stage CI tests that 
+# perform migrations more than once. A conflict
+# arise when toml-federations are migrated and then 
+# re-injected with commands below. It's safer to
+# start from a clean slate.
+git checkout pyproject.toml
 
 # Remove any duplicates
 sed -i '/^\[tool\.flwr\.federations\.e2e\]/,/^$/d' pyproject.toml
@@ -73,14 +85,19 @@ else
   echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:9093\"\nroot-certificates = \"certificates/ca.crt\"" >> pyproject.toml
 fi
 
-timeout 5m flower-superlink $server_arg $db_arg $rest_arg_superlink $server_auth &
+timeout 5m flower-superlink \
+  $server_arg $db_arg $rest_arg_superlink $server_auth \
+  $runtime_dependency_install_arg &
 sl_pid=$(pgrep -f "flower-superlink")
 sleep 3
 
+# Trigger migration
+flwr ls "." e2e || true
+
 if [ "$2" = "client-auth" ]; then
   # Register two SuperNodes using the Flower CLI
-  flwr supernode register keys/client_credentials_1.pub "." e2e
-  flwr supernode register keys/client_credentials_2.pub "." e2e
+  flwr supernode register keys/client_credentials_1.pub e2e
+  flwr supernode register keys/client_credentials_2.pub e2e
 fi
 
 timeout 5m flower-supernode $client_arg $rest_arg_supernode \
@@ -114,7 +131,7 @@ cleanup_and_exit() {
 # Check for "finished:completed" status in a loop with a timeout
 while [ "$found_success" = false ] && [ $elapsed -lt $timeout ]; do
     # Run the command and capture output
-    output=$(flwr ls . e2e --format=json)
+    output=$(flwr ls e2e --format=json)
 
     # Extract status from the first run (or loop over all if needed)
     status=$(echo "$output" | jq -r '.runs[0].status')

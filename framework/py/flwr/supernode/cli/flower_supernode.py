@@ -16,6 +16,7 @@
 
 
 import argparse
+from dataclasses import dataclass
 from logging import DEBUG, INFO, WARN
 from pathlib import Path
 
@@ -25,8 +26,11 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.hazmat.primitives.serialization import load_ssh_private_key
 from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 
-from flwr.common import EventType, event
-from flwr.common.args import try_obtain_root_certificates
+from flwr.app.user_config import UserConfig
+from flwr.common.args import (
+    add_args_runtime_dependency_install,
+    try_obtain_root_certificates,
+)
 from flwr.common.config import parse_config_args
 from flwr.common.constant import (
     CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
@@ -37,33 +41,74 @@ from flwr.common.constant import (
     TRANSPORT_TYPE_GRPC_RERE,
     TRANSPORT_TYPE_REST,
 )
-from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
+from flwr.supercore.auth import (
+    add_superexec_auth_secret_args,
+    load_superexec_auth_secret,
+)
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.telemetry import EventType, event
+from flwr.supercore.tls import try_obtain_optional_appio_server_certificates
+from flwr.supercore.update_check import warn_if_flwr_update_available
+from flwr.supercore.version import package_version
 from flwr.supernode.start_client_internal import start_client_internal
 
 
-def flower_supernode() -> None:
-    """Run Flower SuperNode."""
+@dataclass
+class SuperNodeLifespanConfig:  # pylint: disable=too-many-instance-attributes
+    """Configuration needed to start the SuperNode lifespan."""
+
+    server_address: str
+    transport: str
+    root_certificates: bytes | str | None
+    insecure: bool
+    authentication_keys: (
+        tuple[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey] | None
+    )
+    max_retries: int | None
+    max_wait_time: float | None
+    node_config: UserConfig
+    isolation: str
+    clientappio_api_address: str
+    clientappio_certificates: tuple[bytes, bytes, bytes] | None
+    clientappio_root_certificates_path: str | None
+    health_server_address: str | None
+    trusted_entities: dict[str, str] | None
+    superexec_auth_secret: bytes | None
+    runtime_dependency_install: bool
+
+
+def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
+    """Parse SuperNode CLI args and return the startup configuration."""
     args = _parse_args_run_supernode().parse_args()
-
-    log(INFO, "Starting Flower SuperNode")
-
-    event(EventType.RUN_SUPERNODE_ENTER)
-
-    # Check if both `--flwr-dir` and `--isolation` were set
-    if args.flwr_dir is not None and args.isolation is not None:
-        log(
-            WARN,
-            "Both `--flwr-dir` and `--isolation` were specified. "
-            "Ignoring `--flwr-dir`.",
-        )
 
     trusted_entities = _try_obtain_trusted_entities(args.trusted_entities)
     if trusted_entities:
         _validate_public_keys_ed25519(trusted_entities)
     root_certificates = try_obtain_root_certificates(args, args.superlink)
+    clientappio_certificates = try_obtain_optional_appio_server_certificates(args)
     authentication_keys = _try_setup_client_authentication(args)
+    superexec_auth_secret = None
+    if args.superexec_auth_secret_file is not None:
+        log(
+            WARN,
+            "EXPERIMENTAL: SuperExec authentication is experimental and "
+            "may change in future releases.",
+        )
+    if (
+        args.isolation == ISOLATION_MODE_PROCESS
+        and args.superexec_auth_secret_file is not None
+    ):
+        try:
+            superexec_auth_secret = load_superexec_auth_secret(
+                secret_file=args.superexec_auth_secret_file,
+            )
+        except ValueError as err:
+            flwr_exit(
+                ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED,
+                f"Failed to load SuperExec auth secret: {err}",
+            )
 
     # Warn if authentication keys are provided but transport is not grpc-rere
     if authentication_keys is not None and args.transport != TRANSPORT_TYPE_GRPC_RERE:
@@ -72,9 +117,7 @@ def flower_supernode() -> None:
             "SuperNode Authentication is only supported with the grpc-rere transport.",
         )
 
-    log(DEBUG, "Isolation mode: %s", args.isolation)
-
-    start_client_internal(
+    return SuperNodeLifespanConfig(
         server_address=args.superlink,
         transport=args.transport,
         root_certificates=root_certificates,
@@ -85,11 +128,48 @@ def flower_supernode() -> None:
         node_config=parse_config_args(
             [args.node_config] if args.node_config else args.node_config
         ),
-        flwr_path=args.flwr_dir,
         isolation=args.isolation,
         clientappio_api_address=args.clientappio_api_address,
+        clientappio_certificates=clientappio_certificates,
+        clientappio_root_certificates_path=(
+            args.appio_ssl_ca_certfile if clientappio_certificates is not None else None
+        ),
         health_server_address=args.health_server_address,
         trusted_entities=trusted_entities,
+        superexec_auth_secret=superexec_auth_secret,
+        runtime_dependency_install=args.runtime_dependency_install,
+    )
+
+
+def flower_supernode() -> None:
+    """Run Flower SuperNode."""
+    warn_if_flwr_update_available(process_name="flower-supernode")
+
+    log(INFO, "Starting Flower SuperNode")
+
+    event(EventType.RUN_SUPERNODE_ENTER)
+
+    config = _parse_supernode_lifespan_config()
+
+    log(DEBUG, "Isolation mode: %s", config.isolation)
+
+    start_client_internal(
+        server_address=config.server_address,
+        transport=config.transport,
+        root_certificates=config.root_certificates,
+        insecure=config.insecure,
+        authentication_keys=config.authentication_keys,
+        max_retries=config.max_retries,
+        max_wait_time=config.max_wait_time,
+        node_config=config.node_config,
+        isolation=config.isolation,
+        clientappio_api_address=config.clientappio_api_address,
+        clientappio_certificates=config.clientappio_certificates,
+        clientappio_root_certificates_path=config.clientappio_root_certificates_path,
+        health_server_address=config.health_server_address,
+        trusted_entities=config.trusted_entities,
+        superexec_auth_secret=config.superexec_auth_secret,
+        runtime_dependency_install=config.runtime_dependency_install,
     )
 
 
@@ -98,18 +178,13 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Start a Flower SuperNode",
     )
-    _parse_args_common(parser)
     parser.add_argument(
-        "--flwr-dir",
-        default=None,
-        help="""The path containing installed Flower Apps.
-        The default directory is:
-
-        - `$FLWR_HOME/` if `$FLWR_HOME` is defined
-        - `$XDG_DATA_HOME/.flwr/` if `$XDG_DATA_HOME` is defined
-        - `$HOME/.flwr/` in all other cases
-        """,
+        "-V",
+        "--version",
+        action="version",
+        version=f"Flower version: {package_version}",
     )
+    _parse_args_common(parser)
     parser.add_argument(
         "--isolation",
         default=ISOLATION_MODE_SUBPROCESS,
@@ -130,6 +205,27 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
         f"By default, it is set to {CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS}.",
     )
     parser.add_argument(
+        "--appio-ssl-certfile",
+        help="ClientAppIo API server TLS certificate file (as a path str) "
+        "to create a secure connection. The certificate must include SANs for "
+        "the AppIO API address used by SuperExec.",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--appio-ssl-keyfile",
+        help="ClientAppIo API server TLS private key file (as a path str) "
+        "to create a secure connection.",
+        type=str,
+    )
+    parser.add_argument(
+        "--appio-ssl-ca-certfile",
+        help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
+        "the ClientAppIo API server certificate. This is not a client certificate "
+        "for mTLS.",
+        type=str,
+    )
+    parser.add_argument(
         "--trusted-entities",
         type=Path,
         default=None,
@@ -141,6 +237,8 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
             "fpk_UUID2: 'ssh-ed25519 <key2> [comment2]' }"
         ),
     )
+    add_superexec_auth_secret_args(parser)
+    add_args_runtime_dependency_install(parser)
     add_args_health(parser)
 
     return parser
@@ -180,8 +278,8 @@ def _parse_args_common(parser: argparse.ArgumentParser) -> None:
         "--root-certificates",
         metavar="ROOT_CERT",
         type=str,
-        help="Specifies the path to the PEM-encoded root certificate file for "
-        "establishing secure HTTPS connections.",
+        help="Path to a PEM-encoded root CA certificate (or CA bundle) used to verify "
+        "the server's TLS certificate. This is not a client certificate for mTLS.",
     )
     parser.add_argument(
         "--superlink",
@@ -233,7 +331,7 @@ def _try_setup_client_authentication(
 
     try:
         ssh_private_key = load_ssh_private_key(
-            Path(args.auth_supernode_private_key).read_bytes(),
+            Path(args.auth_supernode_private_key).expanduser().read_bytes(),
             None,
         )
         if not isinstance(ssh_private_key, ec.EllipticCurvePrivateKey):
@@ -260,6 +358,7 @@ def _try_obtain_trusted_entities(
     """Validate and return the trust entities."""
     if not trusted_entities_path:
         return None
+    trusted_entities_path = trusted_entities_path.expanduser()
     if not trusted_entities_path.is_file():
         flwr_exit(
             ExitCode.SUPERNODE_INVALID_TRUSTED_ENTITIES,

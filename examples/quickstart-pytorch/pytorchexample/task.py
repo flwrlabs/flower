@@ -88,7 +88,7 @@ def train(net, trainloader, epochs, lr, device):
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-    avg_trainloss = running_loss / len(trainloader)
+    avg_trainloss = running_loss / (epochs * len(trainloader))
     return avg_trainloss
 
 

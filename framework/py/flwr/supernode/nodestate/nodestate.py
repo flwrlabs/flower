@@ -18,9 +18,9 @@
 from abc import abstractmethod
 from collections.abc import Sequence
 
-from flwr.common import Context, Message
-from flwr.common.typing import Run
+from flwr.app import Message
 from flwr.supercore.corestate import CoreState
+from flwr.supercore.run import Run
 
 
 class NodeState(CoreState):
@@ -132,44 +132,6 @@ class NodeState(CoreState):
         """
 
     @abstractmethod
-    def store_context(self, context: Context) -> None:
-        """Store a context.
-
-        Parameters
-        ----------
-        context : Context
-            The context to store.
-        """
-
-    @abstractmethod
-    def get_context(self, run_id: int) -> Context | None:
-        """Retrieve a context by its run ID.
-
-        Parameters
-        ----------
-        run_id : int
-            The ID of the run with which the context is associated.
-
-        Returns
-        -------
-        Optional[Context]
-            The `Context` instance if found, otherwise None.
-        """
-
-    @abstractmethod
-    def get_run_ids_with_pending_messages(self) -> Sequence[int]:
-        """Retrieve run IDs that have at least one pending message.
-
-        Run IDs that are currently in progress (i.e., those associated with tokens)
-        will not be returned, even if they have pending messages.
-
-        Returns
-        -------
-        Sequence[int]
-            Sequence of run IDs with pending messages.
-        """
-
-    @abstractmethod
     def record_message_processing_start(self, message_id: str) -> None:
         """Record the start time of message processing based on the message ID.
 
@@ -188,10 +150,10 @@ class NodeState(CoreState):
         message_id : str
             The ID of the message associated with the end time.
 
-        Raises
-        ------
-        ValueError
-            If the message ID is not found.
+        Notes
+        -----
+        This method is best-effort. Implementations should log and return if
+        the message processing start time is unavailable.
         """
 
     @abstractmethod
@@ -206,10 +168,6 @@ class NodeState(CoreState):
         Returns
         -------
         float
-            The processing duration in seconds.
-
-        Raises
-        ------
-        ValueError
-            If the message ID is not found, or if start/end times are missing.
+            The processing duration in seconds, or 0.0 if the duration could
+            not be calculated.
         """

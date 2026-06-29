@@ -15,8 +15,6 @@
 """Krum tests."""
 
 
-from unittest.mock import MagicMock
-
 from numpy import array, float32
 
 from flwr.common import (
@@ -28,8 +26,8 @@ from flwr.common import (
     ndarrays_to_parameters,
     parameters_to_ndarrays,
 )
+from flwr.server.client_manager_test import TestClientProxy
 from flwr.server.client_proxy import ClientProxy
-from flwr.server.superlink.fleet.grpc_bidi.grpc_client_proxy import GrpcClientProxy
 
 from .krum import Krum
 
@@ -155,10 +153,9 @@ def test_aggregate_fit() -> None:
     param_2: Parameters = ndarrays_to_parameters(
         [array([1.0, 1.0, 1.0, 1.0], dtype=float32)]
     )
-    bridge = MagicMock()
-    client_0 = GrpcClientProxy(cid="0", bridge=bridge)
-    client_1 = GrpcClientProxy(cid="1", bridge=bridge)
-    client_2 = GrpcClientProxy(cid="2", bridge=bridge)
+    client_0 = TestClientProxy(cid="0")
+    client_1 = TestClientProxy(cid="1")
+    client_2 = TestClientProxy(cid="2")
     results: list[tuple[ClientProxy, FitRes]] = [
         (
             client_0,

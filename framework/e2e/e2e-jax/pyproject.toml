@@ -9,8 +9,8 @@ description = "JAX example training a linear regression model with federated lea
 license = "Apache-2.0"
 dependencies = [
     "flwr[simulation] @ {root:parent:parent:uri}",
-    "jax==0.4.13",
-    "jaxlib==0.4.13",
+    "jax==0.4.31",
+    "jaxlib==0.4.31",
     "scikit-learn>=1.1.1,<2.0.0",
     "numpy>=1.21.4,<2.0.0",
 ]

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 # Create and install Flower app
-flwr new e2e-tmp-test --framework numpy --username flwrlabs
-cd e2e-tmp-test
+flwr new @flwrlabs/numpy-ci
+cd numpy-ci
 
 # Modify the config file
 echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:9093\"\ninsecure = true" >> pyproject.toml
@@ -46,7 +46,7 @@ cleanup_and_exit() {
 # Check for "finished:completed" status in a loop with a timeout
 while [ "$found_success" = false ] && [ $elapsed -lt $timeout ]; do
     # Run the command and capture output
-    output=$(flwr ls . e2e --format=json)
+    output=$(flwr ls e2e --format=json)
 
     # Extract status from the first run (or loop over all if needed)
     status=$(echo "$output" | jq -r '.runs[0].status')

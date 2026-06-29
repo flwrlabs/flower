@@ -17,7 +17,32 @@
 
 from __future__ import annotations
 
-from flwr.common.constant import FLWR_DIR
+import os
+from enum import StrEnum
+
+from flwr.common.constant import (
+    FLWR_DIR,
+    NOOP_ACCOUNT_NAME,
+    SYSTEM_TIME_TOLERANCE,
+    TIMESTAMP_TOLERANCE,
+)
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+
+# Constants for Inflatable
+HEAD_BODY_DIVIDER = b"\x00"
+HEAD_VALUE_DIVIDER = " "
+
+# Constants for object pushing and pulling
+FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES = int(
+    os.getenv("FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES", "2")
+)  # Default maximum number of concurrent pushes
+FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS = int(
+    os.getenv("FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS", "2")
+)  # Default maximum number of concurrent pulls
+PULL_MAX_TIME = 7200  # Default maximum time to wait for pulling objects
+PULL_MAX_TRIES_PER_OBJECT = 500  # Default maximum number of tries to pull an object
+PULL_INITIAL_BACKOFF = 1  # Initial backoff time for pulling objects
+PULL_BACKOFF_CAP = 10  # Maximum backoff time for pulling objects
 
 # Top-level key in YAML config for exec plugin settings
 EXEC_PLUGIN_SECTION = "exec_plugin"
@@ -25,18 +50,42 @@ EXEC_PLUGIN_SECTION = "exec_plugin"
 # Flower in-memory Python-based database name
 FLWR_IN_MEMORY_DB_NAME = ":flwr-in-memory:"
 
+# Flower in-memory SQLite database URL
+FLWR_IN_MEMORY_SQLITE_DB_URL = "sqlite:///:memory:"
+
 # Constants for Hub
 APP_ID_PATTERN = r"^@[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
 APP_VERSION_PATTERN = r"^\d+\.\d+\.\d+$"
 PLATFORM_API_URL = "https://api.flower.ai/v1"
 
+# Constants for Flower CLI update check
+FLWR_DISABLE_UPDATE_CHECK = "FLWR_DISABLE_UPDATE_CHECK"
+FLWR_UPDATE_CHECK_URL = f"{PLATFORM_API_URL}/update-check/flwr"
+FLWR_UPDATE_CHECK_CONNECT_TIMEOUT_SECONDS = 1
+FLWR_UPDATE_CHECK_READ_TIMEOUT_SECONDS = 2
+FLWR_UPDATE_CHECK_CACHE_DIR = ".cache"
+FLWR_UPDATE_CHECK_CACHE_FILENAME = "update-check.json"
+FLWR_UPDATE_CHECK_SHOW_INTERVAL_SECONDS = 12 * 60 * 60
+
+# SuperGrid constants
+SUPERGRID_ADDRESS = "supergrid.flower.ai"
+
 # Specification for app publishing
+APP_PUBLISH_ALLOWED_LICENSE_FILES = ("LICENSE", "LICENSE.md")
 APP_PUBLISH_INCLUDE_PATTERNS = (
     "**/*.py",
     "**/*.toml",
     "**/*.md",
+    "**/*.yaml",
+    "**/*.yml",
+    "**/*.json",
+    "**/*.jsonl",
+    "/.gitignore",
+    "**/.editorconfig",
+    "/LICENSE",
+    "/LICENSE.md",
 )
-APP_PUBLISH_EXCLUDE_PATTERNS = FAB_EXCLUDE_PATTERNS = (
+APP_PUBLISH_EXCLUDE_PATTERNS = (
     f"{FLWR_DIR}/**",  # Exclude the .flwr directory
     "**/__pycache__/**",
 )
@@ -50,15 +99,66 @@ MIME_MAP = {
     ".md": "text/markdown; charset=utf-8",
     ".toml": "application/toml; charset=utf-8",
 }
+MAX_NAME_LENGTH = 32  # max length for app names; also used for federation names
 
 # Constants for federations
-NOOP_FEDERATION = "default"
+NOOP_FEDERATION = f"@{NOOP_ACCOUNT_NAME}/default"
+NOOP_FEDERATION_DESCRIPTION = "A federation for testing and development purposes."
+DEFAULT_SIMULATION_CONFIG = SimulationConfig(
+    num_supernodes=2,
+    client_resources_num_cpus=2,
+    client_resources_num_gpus=0.0,
+    backend="ray",
+    verbose=False,
+    init_args_num_cpus=None,
+    init_args_num_gpus=None,
+    init_args_logging_level="WARNING",
+    init_args_log_to_driver=True,
+)
+
+
+# Default federation names for every Flower account
+DEFAULT_FEDERATION_SIMULATION = "workspace"
+
 
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
+TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
 
 # Constants for message processing timing
 MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS = 3600
+
+# SuperExec auth constants
+SUPEREXEC_AUTH_TIMESTAMP_HEADER = "flwr-superexec-ts"
+SUPEREXEC_AUTH_NONCE_HEADER = "flwr-superexec-nonce"
+SUPEREXEC_AUTH_BODY_SHA256_HEADER = "flwr-superexec-body-sha256"
+SUPEREXEC_AUTH_SIGNATURE_HEADER = "flwr-superexec-signature"
+SUPEREXEC_AUTH_SECRET_CONTEXT = b"superexec-auth-v1"
+MIN_TIMESTAMP_DIFF_SECONDS = -SYSTEM_TIME_TOLERANCE
+MAX_TIMESTAMP_DIFF_SECONDS = TIMESTAMP_TOLERANCE + SYSTEM_TIME_TOLERANCE
+
+# Constants for Flower runtime version metadata
+FLWR_PACKAGE_NAME_METADATA_KEY = "flwr-package-name"
+FLWR_PACKAGE_VERSION_METADATA_KEY = "flwr-package-version"
+FLWR_COMPONENT_NAME_METADATA_KEY = "flwr-component-name"
+VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY = "flwr-version-incompatibility-message"
+
+# System message type
+SYSTEM_MESSAGE_TYPE = "system"
+
+# SQLite PRAGMA settings for optimal performance and correctness
+SQLITE_PRAGMAS = (
+    ("busy_timeout", "5000"),  # Retry lock acquisition for up to 5s before SQLITE_BUSY
+    ("journal_mode", "WAL"),  # Enable Write-Ahead Logging for better concurrency
+    ("synchronous", "NORMAL"),
+    ("foreign_keys", "ON"),
+    ("cache_size", "-64000"),  # 64MB cache
+    ("temp_store", "MEMORY"),  # In-memory temp tables
+    ("mmap_size", "268435456"),  # 256MB memory-mapped I/O
+)
+
+# Constants for SQL LinkState
+SQL_ALLOWED_DIALECTS: frozenset[str] = frozenset({"sqlite"})
 
 
 class NodeStatus:
@@ -72,3 +172,84 @@ class NodeStatus:
     def __new__(cls) -> NodeStatus:
         """Prevent instantiation."""
         raise TypeError(f"{cls.__name__} cannot be instantiated.")
+
+
+class InvitationStatus(StrEnum):
+    """Status of a federation invitation."""
+
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    REVOKED = "revoked"
+    EXPIRED = "expired"
+
+
+class RunTime(StrEnum):
+    """Supported runtimes."""
+
+    DEPLOYMENT = "deployment"
+    SIMULATION = "simulation"
+
+
+class ExecutorType(StrEnum):
+    """Supported SuperExec executor types."""
+
+    SUBPROCESS = "subprocess"
+    KUBERNETES = "kubernetes"
+
+
+class TaskType(StrEnum):
+    """Supported task types."""
+
+    SERVER_APP = "flwr-serverapp"
+    CLIENT_APP = "flwr-clientapp"
+    SIMULATION = "flwr-simulation"
+    AGENT_APP = "flwr-agentapp"
+    MODEL = "flwr-model"
+    CONNECTOR = "flwr-connector"
+
+
+TASK_TYPE_TO_APPIO_API_ADDRESS_ARG: dict[TaskType, str] = {
+    TaskType.AGENT_APP: "--serverappio-api-address",
+    TaskType.CLIENT_APP: "--clientappio-api-address",
+    TaskType.CONNECTOR: "--serverappio-api-address",
+    TaskType.MODEL: "--serverappio-api-address",
+    TaskType.SERVER_APP: "--serverappio-api-address",
+    TaskType.SIMULATION: "--serverappio-api-address",
+}
+TASK_TYPE_TO_COMMAND: dict[TaskType, str] = {
+    TaskType.AGENT_APP: "flwr-agentapp",
+    TaskType.CLIENT_APP: "flwr-clientapp",
+    TaskType.CONNECTOR: "flwr-connector",
+    TaskType.MODEL: "flwr-model",
+    TaskType.SERVER_APP: "flwr-serverapp",
+    TaskType.SIMULATION: "flwr-simulation",
+}
+TASK_TYPES_ALLOWED_TO_CREATE_TASKS: frozenset[TaskType] = frozenset(
+    {
+        TaskType.AGENT_APP,
+        TaskType.SERVER_APP,
+        TaskType.CLIENT_APP,
+    }
+)
+TASK_TYPES_REQUIRING_FAB_HASH: frozenset[TaskType] = frozenset(
+    {
+        TaskType.SERVER_APP,
+        TaskType.CLIENT_APP,
+        TaskType.AGENT_APP,
+    }
+)
+TASK_TYPES_REQUIRING_MODEL_REF: frozenset[TaskType] = frozenset({TaskType.MODEL})
+TASK_TYPES_REQUIRING_CONNECTOR_REF: frozenset[TaskType] = frozenset(
+    {TaskType.CONNECTOR}
+)
+
+
+class ActionType(StrEnum):
+    """Supported control action types."""
+
+    REGISTER_SUPERNODE = "register_supernode"
+    START_RUN = "start_run"
+    CREATE_FEDERATION = "create_federation"
+    CREATE_INVITATION = "create_invitation"
+    ACCEPT_INVITATION = "accept_invitation"

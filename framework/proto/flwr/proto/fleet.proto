@@ -102,6 +102,7 @@ message PushMessagesRequest {
   Node node = 1;
   repeated Message messages_list = 2;
   repeated ObjectTree message_object_trees = 3;
+  repeated double clientapp_runtime_list = 4;
 }
 message PushMessagesResponse {
   Reconnect reconnect = 1;

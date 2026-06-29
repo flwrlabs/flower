@@ -18,8 +18,8 @@
 import pprint
 from dataclasses import dataclass, field
 
-from flwr.common import ArrayRecord, MetricRecord
-from flwr.common.typing import MetricRecordValues
+from flwr.app import ArrayRecord, MetricRecord
+from flwr.app.typing import MetricRecordValues
 
 
 @dataclass

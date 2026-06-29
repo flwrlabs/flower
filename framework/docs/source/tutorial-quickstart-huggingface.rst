@@ -14,8 +14,10 @@ virtual environment and run everything within a :doc:`virtualenv
 <contributor-how-to-set-up-a-virtual-env>`.
 
 Let's use ``flwr new`` to create a complete Flower+🤗 Hugging Face project. It will
-generate all the files needed to run, by default with the Flower Simulation Engine, a
-federation of 10 nodes using |fedavg|_ The dataset will be partitioned using
+generate all the files needed to run a federation of two nodes using |fedavg|_. By
+default, the generated app uses a local simulation profile that ``flwr run`` submits to
+a managed local SuperLink, which then executes the run with the Flower Simulation
+Runtime. The dataset will be partitioned using
 |flowerdatasets|_'s |iidpartitioner|_.
 
 Now that we have a rough idea of what this example is about, let's get started. First,
@@ -26,21 +28,19 @@ install Flower in your new environment:
     # In a new Python environment
     $ pip install flwr
 
-Then, run the command below. You will be prompted to select one of the available
-templates (choose ``HuggingFace``), give a name to your project, and type in your
-developer name:
+Then, run the command below:
 
 .. code-block:: shell
 
-    $ flwr new
+    $ flwr new @flwrlabs/quickstart-huggingface
 
-After running it you'll notice a new directory with your project name has been created.
+After running it you'll notice a new directory named ``quickstart-huggingface`` has been created.
 It should have the following structure:
 
 .. code-block:: shell
 
-    <your-project-name>
-    ├── <your-project-name>
+    quickstart-huggingface
+    ├── huggingface_example
     │   ├── __init__.py
     │   ├── client_app.py   # Defines your ClientApp
     │   ├── server_app.py   # Defines your ServerApp
@@ -48,94 +48,48 @@ It should have the following structure:
     ├── pyproject.toml      # Project metadata like dependencies and configs
     └── README.md
 
-If you haven't yet installed the project and its dependencies, you can do so by:
-
-.. code-block:: shell
-
-    # From the directory where your pyproject.toml is
-    $ pip install -e .
-
 To run the project, do:
 
 .. code-block:: shell
 
-    # Run with default arguments
-    $ flwr run .
+    $ cd quickstart-huggingface
 
-With default arguments you will see an output like this one:
+    # Run with default arguments and stream logs
+    $ flwr run . --stream
+
+Plain ``flwr run .`` submits the run, prints the run ID, and returns without streaming
+logs. For the full local workflow, see :doc:`how-to-run-flower-locally`.
+
+With default arguments you will see streamed output like this:
 
 .. code-block:: shell
 
-    Loading project configuration...
-    Success
+    Starting local SuperLink on 127.0.0.1:39093...
+    Successfully started run 1859953118041441032
     INFO :      Starting FedAvg strategy:
     INFO :          ├── Number of rounds: 3
-    INFO :          ├── ArrayRecord (16.74 MB)
-    INFO :          ├── ConfigRecord (train): (empty!)
-    INFO :          ├── ConfigRecord (evaluate): (empty!)
-    INFO :          ├──> Sampling:
-    INFO :          │       ├──Fraction: train (0.50) | evaluate ( 1.00)
-    INFO :          │       ├──Minimum nodes: train (2) | evaluate (2)
-    INFO :          │       └──Minimum available nodes: 2
-    INFO :          └──> Keys in records:
-    INFO :                  ├── Weighted by: 'num-examples'
-    INFO :                  ├── ArrayRecord key: 'arrays'
-    INFO :                  └── ConfigRecord key: 'config'
-    INFO :
-    INFO :
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 10)
-    INFO :      aggregate_train: Received 5 results and 0 failures
+    INFO :      configure_train: Sampled 2 nodes (out of 2)
+    INFO :      aggregate_train: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'train_loss': 0.6974}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
+    INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
+    INFO :      aggregate_evaluate: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'val_loss': 0.0223, 'val_accuracy': 0.5024}
-    INFO :
     INFO :      [ROUND 2/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 10)
-    INFO :      aggregate_train: Received 5 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_loss': 0.7019}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'val_loss': 0.0221, 'val_accuracy': 0.5176}
-    INFO :
+    INFO :      ...
     INFO :      [ROUND 3/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 10)
-    INFO :      aggregate_train: Received 5 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_loss': 0.6845}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'val_loss': 0.0221, 'val_accuracy': 0.5042}
-    INFO :
+    INFO :      ...
     INFO :      Strategy execution finished in 151.02s
-    INFO :
     INFO :      Final results:
-    INFO :
-    INFO :          Global Arrays:
-    INFO :                  ArrayRecord (16.737 MB)
-    INFO :
-    INFO :          Aggregated ClientApp-side Train Metrics:
-    INFO :          { 1: {'train_loss': '6.9738e-01'},
-    INFO :            2: {'train_loss': '7.0191e-01'},
-    INFO :            3: {'train_loss': '6.8449e-01'}}
-    INFO :
-    INFO :          Aggregated ClientApp-side Evaluate Metrics:
-    INFO :          { 1: {'val_accuracy': '5.0240e-01', 'val_loss': '2.2265e-02'},
-    INFO :            2: {'val_accuracy': '5.1760e-01', 'val_loss': '2.2134e-02'},
-    INFO :            3: {'val_accuracy': '5.0420e-01', 'val_loss': '2.2124e-02'}}
-    INFO :
     INFO :          ServerApp-side Evaluate Metrics:
     INFO :          {}
-    INFO :
-
-    Saving final model to disk...
 
 You can also run the project with GPU as follows:
 
 .. code-block:: shell
 
     # Run with default arguments
-    $ flwr run . localhost-gpu
+    $ flwr run . localhost-gpu --stream
 
 This will use the default arguments where each ``ClientApp`` will use 4 CPUs and at most
 4 ``ClientApp``\s will run in a given GPU.
@@ -173,12 +127,12 @@ to create dataloaders with the data that correspond to their data partition.
     # Divide data: 80% train, 20% test
     partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, model_max_length=512)
 
 
     def tokenize_function(examples):
         return tokenizer(
-            examples["text"], truncation=True, add_special_tokens=True, max_length=512
+            examples["text"], truncation=True, add_special_tokens=True
         )
 
 
@@ -210,7 +164,7 @@ have access to larger GPUs, feel free to use larger models!
 .. code-block:: python
 
     net = AutoModelForSequenceClassification.from_pretrained(
-        model_name, num_labels=num_labels
+        model_name, num_labels=2
     )
 
 Note that here, ``model_name`` is a string that will be loaded from the ``Context`` in
@@ -226,7 +180,7 @@ use standard training/testing functions to perform local training or evaluation:
 
 .. code-block:: python
 
-    def train(net, trainloader, epochs, device):
+    def train_fn(net, trainloader, epochs, device) -> None:
         optimizer = AdamW(net.parameters(), lr=5e-5)
         net.train()
         for _ in range(epochs):
@@ -239,7 +193,7 @@ use standard training/testing functions to perform local training or evaluation:
                 optimizer.zero_grad()
 
 
-    def test(net, testloader, device):
+    def test_fn(net, testloader, device) -> tuple[Any | float, Any]:
         metric = load_metric("accuracy")
         loss = 0
         net.eval()
@@ -267,19 +221,17 @@ conversions:
 .. code-block:: python
 
     # Load the model
-    net = AutoModelForSequenceClassification.from_pretrained(
-        model_name, num_labels=num_labels
-    )
+    model = get_model(model_name)
 
-    # Extract ArrayRecord from Message and convert to PyTorch state_dict,
-    state_dict = msg.content["arrays"].to_torch_state_dict()
+    # Extract ArrayRecord from Message and convert to PyTorch state_dict
+    arrays = msg.content["arrays"]
     # Load state_dict into the model
-    net.load_state_dict(state_dict)
+    model.load_state_dict(arrays.to_torch_state_dict(), strict=True)
 
     # ... do some training
 
     # Convert state_dict back into an ArrayRecord
-    model_record = ArrayRecord(net.state_dict())
+    model_record = ArrayRecord(model.state_dict())
 
 The rest of the functionality is directly inspired by the centralized case. The
 |clientapp_link|_ comes with three core methods (``train``, ``evaluate``, and ``query``)
@@ -309,7 +261,7 @@ Runtime and is not directly configurable during simulations.
 
 
     @app.train()
-    def train(msg: Message, context: Context):
+    def train(msg: Message, context: Context) -> Message:
         """Train the model on local data."""
 
         # Get this client's dataset partition
@@ -319,32 +271,22 @@ Runtime and is not directly configurable during simulations.
         trainloader, _ = load_data(partition_id, num_partitions, model_name)
 
         # Load model
-        num_labels = context.run_config["num-labels"]
-        net = AutoModelForSequenceClassification.from_pretrained(
-            model_name, num_labels=num_labels
-        )
+        model = get_model(model_name)
 
         # Initialize it with the received weights
-        net.load_state_dict(msg.content["arrays"].to_torch_state_dict())
+        arrays = msg.content["arrays"]
+        model.load_state_dict(arrays.to_torch_state_dict(), strict=True)
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        net.to(device)
+        model.to(device)
 
         # Train the model on local data
-        train_loss = train_fn(
-            net,
-            trainloader,
-            context.run_config["local-steps"],
-            device,
-        )
+        train_fn(model, trainloader, epochs=1, device=device)
 
         # Construct and return reply Message
-        model_record = ArrayRecord(net.state_dict())
-        metrics = {
-            "train_loss": train_loss,
-            "num-examples": len(trainloader.dataset),
-        }
-        metric_record = MetricRecord(metrics)
-        content = RecordDict({"arrays": model_record, "metrics": metric_record})
+        model_record = ArrayRecord(model.state_dict())
+        metrics = MetricRecord({"num-examples": len(trainloader)})
+        # Construct RecordDict and add ArrayRecord and MetricRecord
+        content = RecordDict({"arrays": model_record, "metrics": metrics})
         return Message(content=content, reply_to=msg)
 
 The ``@app.evaluate()`` method would be near identical with two exceptions: (1) the
@@ -383,44 +325,50 @@ invoking its |strategy_start_link|_ method. To it we pass:
 
     @app.main()
     def main(grid: Grid, context: Context) -> None:
-        """Main entry point for the ServerApp."""
 
-        # Read from config
-        num_rounds = context.run_config["num-server-rounds"]
-        fraction_train = context.run_config["fraction-train"]
-
-        # Initialize global model
+        # Define model to federate and extract parameters
         model_name = context.run_config["model-name"]
-        num_labels = context.run_config["num-labels"]
-        net = AutoModelForSequenceClassification.from_pretrained(
-            model_name, num_labels=num_labels
+        model = get_model(model_name)
+        arrays = ArrayRecord(model.state_dict())
+
+        # Instantiate strategy
+        fraction_train = context.run_config["fraction-train"]
+        fraction_evaluate = context.run_config["fraction-evaluate"]
+        strategy = FedAvg(
+            fraction_train=fraction_train,
+            fraction_evaluate=fraction_evaluate,
         )
-        arrays = ArrayRecord(net.state_dict())
 
-        # Initialize FedAvg strategy
-        strategy = FedAvg(fraction_train=fraction_train)
-
-        # Start strategy, run FedAvg for `num_rounds`
+        num_rounds = context.run_config["num-server-rounds"]
+        # Start the strategy
         result = strategy.start(
             grid=grid,
             initial_arrays=arrays,
             num_rounds=num_rounds,
         )
 
-        # Save final model to disk
-        print("\nSaving final model to disk...")
-        state_dict = result.arrays.to_torch_state_dict()
-        torch.save(state_dict, "final_model.pt")
+        if context.run_config["save-model"]:
+            # Save final model to disk
+            print("\nSaving final model to disk...")
+            state_dict = result.arrays.to_torch_state_dict()
+            torch.save(state_dict, "final_model.pt")
 
 Note the ``start`` method of the strategy returns a result object. This object contains
 all the relevant information about the FL process, including the final model weights as
 an ``ArrayRecord``, and federated training and evaluation metrics as ``MetricRecords``.
 You can easily log the metrics using Python's `pprint
-<https://docs.python.org/3/library/pprint.html>`_ and save the global model `state_dict`
-using ``torch.save``.
+<https://docs.python.org/3/library/pprint.html>`_ and, if ``save-model`` is set to
+``true``, save the global model `state_dict` using ``torch.save``.
 
 Congratulations! You've successfully built and run your first federated learning system
 for an LLM.
+
+
+.. tip::
+
+    Check the :doc:`how-to-run-simulations` documentation to learn
+    more about how to configure and run Flower simulations.
+
 
 .. note::
 
@@ -449,13 +397,13 @@ for an LLM.
 
 .. _flowerdatasets: https://flower.ai/docs/datasets/
 
-.. _flowertune: https://github.com/adap/flower/tree/main/examples/flowertune-llm
+.. _flowertune: https://github.com/flwrlabs/flower/tree/main/examples/flowertune-llm
 
 .. _iidpartitioner: https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner
 
 .. _otherpartitioners: https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.html
 
-.. _quickstart_hf_link: https://github.com/adap/flower/tree/main/examples/quickstart-huggingface
+.. _quickstart_hf_link: https://github.com/flwrlabs/flower/tree/main/examples/quickstart-huggingface
 
 .. |arrayrecord_link| replace:: ``ArrayRecord``
 

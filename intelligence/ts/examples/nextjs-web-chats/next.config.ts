@@ -1,7 +1,10 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  turbopack: {
+    root: process.cwd(),
+  },
+  serverExternalPackages: ['@flwr/flwr', '@huggingface/transformers', 'onnxruntime-node'],
 };
 
 export default nextConfig;

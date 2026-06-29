@@ -27,12 +27,12 @@ from flwr.common import (
     EvaluateRes,
     FitIns,
     FitRes,
+    GetParametersIns,
     Parameters,
     ReconnectIns,
     Scalar,
 )
 from flwr.common.logger import log
-from flwr.common.typing import GetParametersIns
 from flwr.server.client_manager import ClientManager, SimpleClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.history import History

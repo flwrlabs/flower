@@ -15,17 +15,31 @@
 """Tests all CoreState implementations have to conform to."""
 
 
+# pylint: disable=too-many-lines
 import unittest
-from datetime import timedelta
+from contextlib import ExitStack
+from datetime import datetime, timedelta
+from typing import Any, cast
 from unittest.mock import patch
 
-from flwr.common import now
-from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL
+from parameterized import parameterized
+
+from flwr.common.constant import (
+    HEARTBEAT_DEFAULT_INTERVAL,
+    HEARTBEAT_PATIENCE,
+    SUPERLINK_NODE_ID,
+    Status,
+    SubStatus,
+)
+from flwr.proto.task_pb2 import TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.supercore.constant import TaskType
+from flwr.supercore.date import now
 
 from . import CoreState
+from .utils_test import create_task_message
 
 
-class StateTest(unittest.TestCase):
+class StateTest(unittest.TestCase):  # pylint: disable=R0904
     """Test all CoreState implementations."""
 
     # This is to True in each child class
@@ -35,115 +49,977 @@ class StateTest(unittest.TestCase):
         """Provide state implementation to test."""
         raise NotImplementedError()
 
-    def test_create_verify_and_delete_token(self) -> None:
-        """Test creating, verifying, and deleting tokens."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
+    def task_run_id(self, _state: CoreState) -> int:
+        """Return the run ID to use in task-related tests.
 
-        # Execute: create a token
-        token = state.create_token(run_id)
-        assert token is not None
+        Subclasses can override this hook when task creation requires an existing run
+        record instead of an arbitrary placeholder ID.
+        """
+        return 42
 
-        # Assert: token should be valid
-        self.assertTrue(state.verify_token(run_id, token))
+    def other_task_run_id(self, _state: CoreState) -> int:
+        """Return a second run ID for task tests that need multiple runs.
 
-        # Execute: delete the token
-        state.delete_token(run_id)
+        Subclasses can override this hook when task creation requires existing run
+        records instead of arbitrary placeholder IDs.
+        """
+        return 123
 
-        # Assert: token should no longer be valid
-        self.assertFalse(state.verify_token(run_id, token))
+    def _patch_task_log_datetime_now(self, *timestamps: datetime) -> ExitStack:
+        """Patch the shared datetime source used for task-log timestamps."""
+        stack = ExitStack()
+        mock_datetime = stack.enter_context(
+            patch("flwr.supercore.date.datetime.datetime")
+        )
+        mock_datetime.now.side_effect = timestamps
+        return stack
 
-    def test_create_token_already_exists(self) -> None:
-        """Test creating a token that already exists."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        state.create_token(run_id)
-
-        # Execute
-        ret = state.create_token(run_id)
-
-        # Assert: The return is None
-        self.assertIsNone(ret)
-
-    def test_get_run_id_by_token(self) -> None:
-        """Test retrieving run ID by token."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        token = state.create_token(run_id)
-        assert token is not None
-
-        # Execute: get run ID by token
-        retrieved_run_id1 = state.get_run_id_by_token(token)
-        retrieved_run_id2 = state.get_run_id_by_token("nonexistent_token")
-
-        # Assert: should return the correct run ID
-        self.assertEqual(retrieved_run_id1, run_id)
-        self.assertIsNone(retrieved_run_id2)
-
-    def test_acknowledge_app_heartbeat_success(self) -> None:
-        """Test successfully acknowledging an app heartbeat."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        token = state.create_token(run_id)
-        assert token is not None
-
-        # Execute: acknowledge heartbeat
-        result = state.acknowledge_app_heartbeat(token)
-
-        # Assert: should return True
-        self.assertTrue(result)
-
-        # Assert: token should still be valid
-        self.assertTrue(state.verify_token(run_id, token))
-
-    def test_acknowledge_app_heartbeat_nonexistent_token(self) -> None:
-        """Test acknowledging heartbeat with nonexistent token."""
-        # Prepare
+    def test_store_run_in_series_creates_id(self) -> None:
+        """Storing a run in a run series should create a nonzero ID."""
         state = self.state_factory()
 
-        # Execute: acknowledge heartbeat with invalid token
-        result = state.acknowledge_app_heartbeat("nonexistent_token")
+        series_id = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
 
-        # Assert: should return False
-        self.assertFalse(result)
+        self.assertIsNotNone(series_id)
+        assert series_id is not None
+        self.assertGreater(series_id, 0)
 
-    def test_acknowledge_app_heartbeat_extends_expiration_and_cleanup(self) -> None:
-        """Test that acknowledging app heartbeat extends token expiration and cleanup is
-        performed when expired."""
-        # Prepare
+    def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
+        """Unknown caller-provided run series IDs return None."""
         state = self.state_factory()
-        created_at = now()
-        run_id1 = 42
-        run_id2 = 123
-        token1 = state.create_token(run_id1)
-        token2 = state.create_token(run_id2)
-        assert token1 is not None and token2 is not None
 
-        # Execute: send heartbeat for token2 to keep it alive
-        state.acknowledge_app_heartbeat(token2)
-
-        # Mock datetime to simulate time passage
-        # token1 should expire in HEARTBEAT_DEFAULT_INTERVAL
-        # token2 should expire in HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-        with patch("datetime.datetime") as mock_dt:
-            # Advance time just before token1 expiration
-            mock_dt.now.return_value = created_at + timedelta(
-                seconds=HEARTBEAT_DEFAULT_INTERVAL - 1
+        with self.assertLogs("flwr", level="ERROR") as logs:
+            series_id = state.store_run_in_series(
+                run_id=123,
+                federation="federation-a",
+                series_id=123,
             )
 
-            # Verify tokens are valid
-            self.assertTrue(state.verify_token(run_id1, token1))
-            self.assertTrue(state.verify_token(run_id2, token2))
+        self.assertIsNone(series_id)
+        self.assertIn("Run series 123 not found", logs.output[0])
 
-            # Advance time past token1 expiration
-            mock_dt.now.return_value = created_at + timedelta(
+    def test_store_run_in_series_returns_none_for_duplicate_run_id(self) -> None:
+        """Storing the same run ID twice should return None."""
+        state = self.state_factory()
+        series_id = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
+        assert series_id is not None
+
+        stored = state.store_run_in_series(
+            run_id=123,
+            federation="federation-a",
+            series_id=series_id,
+        )
+
+        self.assertIsNone(stored)
+
+    def test_get_run_series_filters_by_series_ids_and_federations(self) -> None:
+        """RunSeries lookup should filter by IDs and federations."""
+        state = self.state_factory()
+        series_id_a = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
+        series_id_b = state.store_run_in_series(
+            run_id=456, federation="federation-b", series_id=None
+        )
+        series_id_c = state.store_run_in_series(
+            run_id=789, federation="federation-a", series_id=None
+        )
+        assert series_id_a is not None
+        assert series_id_b is not None
+        assert series_id_c is not None
+
+        fed_a_series = state.get_run_series(federations=["federation-a"])
+        self.assertSetEqual(
+            {entry.series_id for entry in fed_a_series},
+            {series_id_a, series_id_c},
+        )
+
+        id_filtered_series = state.get_run_series(series_ids=[series_id_b])
+        self.assertEqual(
+            [entry.series_id for entry in id_filtered_series],
+            [series_id_b],
+        )
+
+        combined_series = state.get_run_series(
+            series_ids=[series_id_a, series_id_b],
+            federations=["federation-a"],
+        )
+        self.assertEqual([entry.series_id for entry in combined_series], [series_id_a])
+
+        self.assertEqual(state.get_run_series(series_ids=[]), [])
+        self.assertEqual(state.get_run_series(federations=[]), [])
+
+    def test_create_and_get_task(self) -> None:
+        """Test creating and retrieving a task."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=run_id,
+            fab_hash=None,
+            model_ref="model://test",
+            connector_ref=None,
+        )
+        assert task_id is not None
+        tasks = state.get_tasks(task_ids=[task_id])
+
+        self.assertEqual(len(tasks), 1)
+        task = tasks[0]
+        self.assertEqual(task.task_id, task_id)
+        self.assertEqual(task.type, TaskType.MODEL)
+        self.assertEqual(task.run_id, run_id)
+        self.assertEqual(
+            task.status,
+            TaskStatus(status=Status.PENDING, sub_status="", details=""),
+        )
+        self.assertEqual(task.model_ref, "model://test")
+        self.assertFalse(task.HasField("fab_hash"))
+        self.assertFalse(task.HasField("connector_ref"))
+        self.assertTrue(task.pending_at)
+        self.assertEqual(task.starting_at, "")
+        self.assertEqual(task.running_at, "")
+        self.assertEqual(task.finished_at, "")
+
+    def test_create_task_rejects_finished_requesting_task(self) -> None:
+        """Task creation should fail if the requesting task is already finished."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        requesting_task_id = state.create_task(
+            task_type=TaskType.SERVER_APP,
+            run_id=run_id,
+        )
+        assert requesting_task_id is not None
+        self.assertTrue(state.finish_task(requesting_task_id, SubStatus.STOPPED, ""))
+
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=run_id,
+            model_ref="model://test",
+            requesting_task_id=requesting_task_id,
+        )
+
+        self.assertIsNone(task_id)
+
+    def test_get_tasks_missing_returns_empty(self) -> None:
+        """Missing tasks should return an empty sequence."""
+        state = self.state_factory()
+        self.assertEqual(state.get_tasks(task_ids=[123]), [])
+
+    def test_get_tasks_run_id_matches(self) -> None:
+        """Run ID filters should match only tasks from the requested runs."""
+        state = self.state_factory()
+        run_id_1 = self.task_run_id(state)
+        run_id_2 = self.other_task_run_id(state)
+        task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_1)
+        task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_2)
+        task_id_3 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_1)
+        assert task_id_1 and task_id_2 and task_id_3
+
+        tasks = state.get_tasks(run_ids=[run_id_1])
+        task_ids = {task.task_id for task in tasks}
+
+        self.assertTrue({task_id_1, task_id_3}.issubset(task_ids))
+        self.assertNotIn(task_id_2, task_ids)
+        self.assertTrue(all(task.run_id == run_id_1 for task in tasks))
+
+    def test_get_tasks_single_status_matches(self) -> None:
+        """A single-item status sequence should match pending tasks."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert task_id
+
+        tasks = state.get_tasks(statuses=[Status.PENDING])
+        task_ids = {task.task_id for task in tasks}
+
+        self.assertIn(task_id, task_ids)
+        for task in tasks:
+            self.assertEqual(task.status.status, Status.PENDING)
+
+    def test_get_tasks_negative_limit_raises(self) -> None:
+        """Negative limits should be rejected consistently."""
+        state = self.state_factory()
+
+        with self.assertRaises(AssertionError):
+            _ = state.get_tasks(limit=-1)
+
+    def test_get_tasks_invalid_order_by_raises(self) -> None:
+        """Unsupported order_by values should be rejected consistently."""
+        state = self.state_factory()
+
+        with self.assertRaises(AssertionError):
+            _ = state.get_tasks(order_by=cast(Any, "foo"))
+
+    def test_get_task_message_invalid_order_by_raises(self) -> None:
+        """Unsupported task-message order_by values should be rejected."""
+        state = self.state_factory()
+
+        with self.assertRaises(AssertionError):
+            _ = state.get_task_message(order_by=cast(Any, "foo"))
+
+    def test_get_task_returns_copy(self) -> None:
+        """Retrieved task should be a defensive copy."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(
+            task_type=TaskType.SERVER_APP,
+            run_id=run_id,
+            fab_hash="fab-hash",
+            model_ref=None,
+            connector_ref=None,
+        )
+        assert task_id is not None
+
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        task = tasks[0]
+        task.fab_hash = "mutated"
+
+        reloaded_tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(reloaded_tasks), 1)
+        reloaded = reloaded_tasks[0]
+        self.assertEqual(reloaded.fab_hash, "fab-hash")
+
+    def test_add_and_get_task_log(self) -> None:
+        """Adding and retrieving task logs should preserve concatenation order."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        log_entry_1 = "Log entry 1"
+        log_entry_2 = "Log entry 2"
+        fixed_now = now()
+        timestamp = (fixed_now - timedelta(microseconds=1)).timestamp()
+
+        with self._patch_task_log_datetime_now(
+            fixed_now,
+            fixed_now + timedelta(microseconds=1),
+        ):
+            state.add_task_log(task_id, log_entry_1)
+            state.add_task_log(task_id, log_entry_2)
+
+        # Reading from before the first log should return both entries and the
+        # timestamp of the newest returned entry.
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest > timestamp
+        assert log_entry_1 + log_entry_2 == retrieved_logs
+
+    def test_get_task_log_after_timestamp(self) -> None:
+        """Retrieving task logs after a specific timestamp should filter old logs."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        log_entry_1 = "Log entry 1"
+        log_entry_2 = "Log entry 2"
+        fixed_now = now()
+        timestamp = (fixed_now + timedelta(microseconds=1)).timestamp()
+
+        with self._patch_task_log_datetime_now(
+            fixed_now,
+            fixed_now + timedelta(microseconds=2),
+        ):
+            state.add_task_log(task_id, log_entry_1)
+            state.add_task_log(task_id, log_entry_2)
+
+        # A timestamp between the two entries should filter out only the older
+        # log and advance the checkpoint to the returned entry.
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest > timestamp
+        assert log_entry_1 not in retrieved_logs
+        assert log_entry_2 == retrieved_logs
+
+    def test_get_task_log_after_timestamp_no_logs(self) -> None:
+        """Retrieving task logs after the last entry should return an empty result."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        fixed_now = now()
+        with self._patch_task_log_datetime_now(fixed_now):
+            state.add_task_log(task_id, "Log entry")
+        timestamp = (fixed_now + timedelta(microseconds=1)).timestamp()
+
+        # Polling after the latest known entry should return no logs and no new
+        # checkpoint.
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest == 0
+        assert retrieved_logs == ""
+
+    def test_get_task_log_does_not_repeat_logs_at_checkpoint_timestamp(self) -> None:
+        """Polling with the last returned timestamp should not repeat old logs."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        fixed_now = now()
+
+        with self._patch_task_log_datetime_now(fixed_now):
+            state.add_task_log(task_id, "Log entry 1")
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=None)
+
+        assert retrieved_logs == "Log entry 1"
+        assert latest == fixed_now.timestamp()
+
+        # Reusing the returned timestamp as the next checkpoint must not replay
+        # the log that produced that checkpoint.
+        next_logs, next_latest = state.get_task_log(task_id, after_timestamp=latest)
+
+        assert next_logs == ""
+        assert next_latest == 0
+
+    def test_claim_task_transitions_pending_to_starting(self) -> None:
+        """Claiming a task should create a token and move it to starting."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
+        )
+        assert task_id is not None
+
+        # Claim should persist token ownership and move the task to STARTING.
+        token = state.claim_task(task_id)
+
+        self.assertIsNotNone(token)
+        assert token is not None
+        assert (task := state.get_task_by_token(token))
+        self.assertEqual(task.task_id, task_id)
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].status.status, Status.STARTING)
+        self.assertTrue(tasks[0].starting_at)
+        self.assertEqual(tasks[0].running_at, "")
+        self.assertEqual(tasks[0].finished_at, "")
+
+    def test_claim_task_rejects_missing_claimed_and_non_pending(self) -> None:
+        """Only existing pending unclaimed tasks should be claimable."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+
+        # Missing tasks cannot be claimed.
+        self.assertIsNone(state.claim_task(61016))
+
+        claimed_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        finished_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert claimed_task_id is not None and finished_task_id is not None
+
+        # Claiming is single-owner and cannot be repeated.
+        self.assertIsNotNone(state.claim_task(claimed_task_id))
+        self.assertIsNone(state.claim_task(claimed_task_id))
+
+        # Finished tasks are not claimable.
+        self.assertTrue(state.finish_task(finished_task_id, SubStatus.FAILED, "done"))
+        self.assertIsNone(state.claim_task(finished_task_id))
+
+    def test_activate_task_transitions_starting_to_running(self) -> None:
+        """Only starting tasks should transition to running."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
+        )
+        assert task_id is not None
+
+        # Task does not exist, so it cannot be activated.
+        self.assertFalse(state.activate_task(61016))
+        # Task exists but is pending, so it must be claimed before activation.
+        self.assertFalse(state.activate_task(task_id))
+        # Claiming the task returns a token.
+        self.assertIsNotNone(state.claim_task(task_id))
+        # The task is in starting status, so it can be activated.
+        self.assertTrue(state.activate_task(task_id))
+        # The task is already in running status, so it cannot be activated again.
+        self.assertFalse(state.activate_task(task_id))
+
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].status.status, Status.RUNNING)
+        self.assertTrue(tasks[0].running_at)
+        self.assertEqual(tasks[0].finished_at, "")
+
+    @parameterized.expand(  # type: ignore
+        [
+            (SubStatus.FAILED, False),
+            (SubStatus.STOPPED, False),
+            (SubStatus.COMPLETED, True),
+        ]
+    )
+    def test_finish_task_transitions_unfinished_task_to_finished(
+        self, sub_status: str, requires_running: bool
+    ) -> None:
+        """Finishing a task should store the terminal status details."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
+        )
+        assert task_id is not None
+
+        # Task does not exist.
+        self.assertFalse(state.finish_task(61016, SubStatus.FAILED, "missing"))
+
+        if requires_running:
+            # FINISHED:COMPLETED is only valid once the task is RUNNING.
+            self.assertFalse(state.finish_task(task_id, sub_status, "boom"))
+            self.assertIsNotNone(state.claim_task(task_id))
+            self.assertTrue(state.activate_task(task_id))
+
+        # Valid unfinished task transition should succeed.
+        self.assertTrue(state.finish_task(task_id, sub_status, "boom"))
+        # Task is already finished, so it cannot be finished again.
+        self.assertFalse(state.finish_task(task_id, SubStatus.FAILED, "again"))
+        # Finished tasks cannot be claimed.
+        self.assertIsNone(state.claim_task(task_id))
+
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        task = tasks[0]
+        self.assertEqual(
+            task.status,
+            TaskStatus(
+                status=Status.FINISHED,
+                sub_status=sub_status,
+                details="boom",
+            ),
+        )
+        self.assertTrue(task.finished_at)
+
+    def test_task_heartbeat_extends_token_expiration(self) -> None:
+        """Task heartbeat should keep a claimed task token valid."""
+        state = self.state_factory()
+        fixed_now = now()
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            assert task_id is not None
+            token = state.claim_task(task_id)
+            assert token is not None
+
+            # Heartbeat extends only existing claimed task leases.
+            self.assertFalse(state.acknowledge_task_heartbeat(61016))
+            self.assertTrue(state.acknowledge_task_heartbeat(task_id))
+
+            # The heartbeat extension should keep the token valid past its
+            # initial claim deadline.
+            mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
+            assert (task := state.get_task_by_token(token))
+            self.assertEqual(task.task_id, task_id)
 
-            # Assert: token1 should be cleaned up, token2 should still be valid
-            self.assertFalse(state.verify_token(run_id1, token1))
-            self.assertTrue(state.verify_token(run_id2, token2))
+            # Once the extended deadline passes, the token no longer resolves.
+            mock_dt.now.return_value = fixed_now + timedelta(
+                seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            self.assertIsNone(state.get_task_by_token(token))
+            self.assertFalse(state.acknowledge_task_heartbeat(task_id))
+
+    def test_expired_starting_task_token_revives_task_to_pending(self) -> None:
+        """Expired STARTING task claims should make tasks pending again."""
+        # Prepare: create and claim a model task.
+        state = self.state_factory()
+        fixed_now = now()
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            assert task_id is not None
+            pending_at = state.get_tasks(task_ids=[task_id])[0].pending_at
+
+            token = state.claim_task(task_id)
+            assert token is not None
+
+            # Execute: advance past claim expiry and trigger cleanup.
+            mock_dt.now.return_value = fixed_now + timedelta(
+                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            self.assertIsNone(state.get_task_by_token(token))
+            self.assertFalse(state.acknowledge_task_heartbeat(task_id))
+
+        # Assert: task is pending again and can be claimed with a fresh token.
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(
+            tasks[0].status,
+            TaskStatus(status=Status.PENDING, sub_status="", details=""),
+        )
+        self.assertEqual(tasks[0].pending_at, pending_at)
+        self.assertEqual(tasks[0].starting_at, "")
+        self.assertEqual(tasks[0].running_at, "")
+        self.assertEqual(tasks[0].finished_at, "")
+        self.assertIsNone(state.get_task_by_token(token))
+        new_token = state.claim_task(task_id)
+        self.assertNotEqual(new_token, token)
+        assert new_token is not None
+        new_task = state.get_task_by_token(new_token)
+        self.assertIsNotNone(new_task)
+        assert new_task is not None
+        self.assertEqual(new_task.task_id, task_id)
+
+    def test_expired_running_task_token_transitions_task_to_finished_failed(
+        self,
+    ) -> None:
+        """Expired RUNNING task claims should transition tasks to FINISHED:FAILED."""
+        state = self.state_factory()
+        fixed_now = now()
+        active_until = fixed_now + timedelta(
+            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+        )
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            assert task_id is not None
+
+            token = state.claim_task(task_id)
+            assert token is not None
+            self.assertTrue(state.activate_task(task_id))
+
+            mock_dt.now.return_value = active_until + timedelta(seconds=1)
+            self.assertIsNone(state.get_task_by_token(token))
+            self.assertFalse(state.acknowledge_task_heartbeat(task_id))
+
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(
+            tasks[0].status,
+            TaskStatus(
+                status=Status.FINISHED,
+                sub_status=SubStatus.FAILED,
+                details="No heartbeat received from the task",
+            ),
+        )
+        self.assertTrue(tasks[0].finished_at)
+        self.assertEqual(datetime.fromisoformat(tasks[0].finished_at), active_until)
+
+    def test_activate_task_extends_token_expiration(self) -> None:
+        """Activating a task should give it the regular heartbeat grace period."""
+        state = self.state_factory()
+        fixed_now = now()
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            assert task_id is not None
+            token = state.claim_task(task_id)
+            assert token is not None
+            self.assertTrue(state.activate_task(task_id))
+
+            mock_dt.now.return_value = fixed_now + timedelta(
+                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            task = state.get_task_by_token(token)
+            self.assertIsNotNone(task)
+            assert task is not None
+            self.assertEqual(task.task_id, task_id)
+
+    def test_get_tasks_expires_stale_task_tokens(self) -> None:
+        """Reading tasks should expire stale claimed task tokens first."""
+        state = self.state_factory()
+        fixed_now = now()
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            assert task_id is not None
+            assert (token := state.claim_task(task_id))
+
+            mock_dt.now.return_value = fixed_now + timedelta(
+                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            tasks = state.get_tasks(task_ids=[task_id])
+
+        self.assertIsNone(state.get_task_by_token(token))
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(
+            tasks[0].status,
+            TaskStatus(status=Status.PENDING, sub_status="", details=""),
+        )
+        self.assertEqual(tasks[0].starting_at, "")
+        self.assertEqual(tasks[0].finished_at, "")
+
+    def test_expired_starting_task_token_does_not_call_expiry_hook(self) -> None:
+        """Revived STARTING tasks should not be passed to expiry hooks."""
+        state = self.state_factory()
+        fixed_now = now()
+        run_id = self.task_run_id(state)
+
+        with patch.object(  # pylint: disable=protected-access
+            state, "_on_task_tokens_expired"
+        ) as on_expired:
+            with patch("datetime.datetime") as mock_dt:
+                mock_dt.now.return_value = fixed_now
+                task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+                assert task_id is not None
+                assert state.claim_task(task_id) is not None
+
+                mock_dt.now.return_value = fixed_now + timedelta(
+                    seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+                )
+                state.get_tasks(task_ids=[task_id])
+
+            on_expired.assert_not_called()
+
+    def test_get_task_by_token_returns_none_for_unknown_token(self) -> None:
+        """Unknown task tokens should not resolve to a task."""
+        state = self.state_factory()
+
+        self.assertIsNone(state.get_task_by_token("missing-token"))
+
+    def test_store_and_get_task_message(self) -> None:
+        """Task Messages should round-trip, filter, and be delivered once."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        other_dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert (
+            src_task_id is not None
+            and dst_task_id is not None
+            and other_dst_task_id is not None
+        )
+
+        message = create_task_message(
+            src_task_id=src_task_id,
+            dst_task_id=dst_task_id,
+            run_id=run_id,
+        )
+        expired = create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            created_at=now().timestamp() - 2.0,
+            ttl=1.0,
+        )
+        other_destination = create_task_message(src_task_id, other_dst_task_id, run_id)
+
+        self.assertTrue(state.store_task_message(message))
+        self.assertFalse(state.store_task_message(expired))
+        self.assertTrue(state.store_task_message(other_destination))
+        pulled = state.get_task_message(dst_task_ids=[dst_task_id])
+        pulled_again = state.get_task_message(dst_task_ids=[dst_task_id])
+        pulled_other = state.get_task_message(dst_task_ids=[other_dst_task_id])
+        pulled_other_again = state.get_task_message(dst_task_ids=[other_dst_task_id])
+
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(pulled_again, [])
+        self.assertEqual(len(pulled_other), 1)
+        self.assertEqual(pulled_other_again, [])
+        pulled_message = pulled[0]
+        pulled_other_message = pulled_other[0]
+        self.assertEqual(
+            pulled_message.metadata.message_id, message.metadata.message_id
+        )
+        self.assertEqual(
+            pulled_other_message.metadata.message_id,
+            other_destination.metadata.message_id,
+        )
+        self.assertEqual(pulled_message.metadata.run_id, run_id)
+        self.assertEqual(pulled_message.metadata.src_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(pulled_message.metadata.dst_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(pulled_message.metadata.src_task_id, src_task_id)
+        self.assertEqual(pulled_message.metadata.dst_task_id, dst_task_id)
+        self.assertTrue(pulled_message.has_content())
+
+    def test_store_task_message_validates_task_relationship(self) -> None:
+        """Task Messages should only be stored for valid same-run destinations."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        other_run_id = self.other_task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        other_run_task_id = state.create_task(
+            task_type=TaskType.MODEL, run_id=other_run_id
+        )
+        finished_src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id
+        )
+        finished_dst_task_id = state.create_task(
+            task_type=TaskType.MODEL, run_id=run_id
+        )
+        assert (
+            src_task_id is not None
+            and dst_task_id is not None
+            and other_run_task_id is not None
+            and finished_src_task_id is not None
+            and finished_dst_task_id is not None
+        )
+        assert state.finish_task(finished_src_task_id, SubStatus.FAILED, "done")
+        assert state.finish_task(finished_dst_task_id, SubStatus.FAILED, "done")
+
+        missing_task_id = (
+            max(
+                src_task_id,
+                dst_task_id,
+                other_run_task_id,
+                finished_src_task_id,
+                finished_dst_task_id,
+            )
+            + 1
+        )
+        while state.get_tasks(task_ids=[missing_task_id]):
+            missing_task_id += 1
+        invalid_messages = [
+            create_task_message(missing_task_id, dst_task_id, run_id),
+            create_task_message(src_task_id, missing_task_id, run_id),
+            create_task_message(src_task_id, other_run_task_id, run_id),
+            create_task_message(src_task_id, finished_dst_task_id, run_id),
+            create_task_message(src_task_id, dst_task_id, 0),
+            create_task_message(src_task_id, dst_task_id, other_run_id),
+        ]
+        finished_source_message = create_task_message(
+            finished_src_task_id, dst_task_id, run_id
+        )
+
+        for message in invalid_messages:
+            self.assertFalse(state.store_task_message(message))
+        self.assertTrue(state.store_task_message(finished_source_message))
+
+        pulled = state.get_task_message(dst_task_ids=[dst_task_id])
+
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(
+            pulled[0].metadata.message_id,
+            finished_source_message.metadata.message_id,
+        )
+        self.assertEqual(state.get_task_message(dst_task_ids=[other_run_task_id]), [])
+        self.assertEqual(
+            state.get_task_message(dst_task_ids=[finished_dst_task_id]), []
+        )
+        self.assertEqual(state.get_task_message(), [])
+
+    def test_get_task_message_does_not_return_expired_messages(self) -> None:
+        """Getting task Messages should not return expired Messages."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert src_task_id is not None and dst_task_id is not None
+
+        msg_ttl = 60.0
+        current = now()
+        expired = create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            created_at=current.timestamp(),
+            ttl=msg_ttl,
+        )
+        self.assertTrue(state.store_task_message(expired))
+
+        future = current + timedelta(seconds=msg_ttl + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = future
+            self.assertEqual(state.get_task_message(dst_task_ids=[dst_task_id]), [])
+
+    def test_get_task_message_limit(self) -> None:
+        """Getting task Messages should respect the provided limit."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert src_task_id is not None and dst_task_id is not None
+
+        current = now().timestamp()
+        msg_1 = create_task_message(
+            src_task_id, dst_task_id, run_id, created_at=current - 2.0
+        )
+        msg_2 = create_task_message(
+            src_task_id, dst_task_id, run_id, created_at=current - 1.0
+        )
+        self.assertTrue(state.store_task_message(msg_2))
+        self.assertTrue(state.store_task_message(msg_1))
+
+        pulled = state.get_task_message(
+            dst_task_ids=[dst_task_id], order_by="created_at", limit=1
+        )
+        pulled_next = state.get_task_message(
+            dst_task_ids=[dst_task_id], order_by="created_at", limit=1
+        )
+
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(len(pulled_next), 1)
+        self.assertEqual(pulled[0].metadata.message_id, msg_1.metadata.message_id)
+        self.assertEqual(pulled_next[0].metadata.message_id, msg_2.metadata.message_id)
+
+    def test_store_and_get_task_events(self) -> None:
+        """Task events should round-trip in assigned ID order."""
+        # Prepare: Create one run with a task and two valid task events.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        event_1 = TaskEvent(
+            run_id=run_id,
+            task_id=task_id,
+            event="response.created",
+            data='{"type":"response.created"}',
+        )
+        event_2 = TaskEvent(
+            run_id=run_id,
+            task_id=task_id,
+            event="response.output_text.delta",
+            data='{"type":"response.output_text.delta","delta":"Hel"}',
+        )
+
+        # Execute: Store the events and read them through full and cursored fetches.
+        self.assertFalse(state.store_task_events([]))
+        self.assertTrue(state.store_task_events([event_1, event_2]))
+        events = state.get_task_events(run_id=run_id, after_task_event_id=None)
+        latest_id = events[-1].id
+        after_first = state.get_task_events(
+            run_id=run_id, after_task_event_id=events[0].id
+        )
+        no_new = state.get_task_events(run_id=run_id, after_task_event_id=latest_id)
+
+        # Assert: Events keep assigned ID order and cursor filtering works.
+        self.assertEqual(len(events), 2)
+        self.assertIsInstance(events[0], TaskEvent)
+        self.assertGreater(events[0].id, 0)
+        self.assertGreater(events[1].id, events[0].id)
+        self.assertTrue(events[0].timestamp)
+        self.assertEqual(events[0].run_id, run_id)
+        self.assertEqual(events[1].run_id, run_id)
+        self.assertEqual(
+            (events[0].task_id, events[0].event, events[0].data),
+            (task_id, event_1.event, event_1.data),
+        )
+        self.assertEqual(
+            (events[1].task_id, events[1].event, events[1].data),
+            (task_id, event_2.event, event_2.data),
+        )
+        self.assertEqual(latest_id, events[1].id)
+        self.assertEqual(after_first, [events[1]])
+        self.assertEqual(no_new, [])
+
+    @parameterized.expand(  # type: ignore
+        [
+            ("malformed", "{"),
+            ("array", "[]"),
+            ("string", '"value"'),
+            ("non_finite", '{"value": NaN}'),
+        ]
+    )
+    def test_store_task_events_requires_json_object_payload(
+        self, _name: str, data: str
+    ) -> None:
+        """Task event data should be a JSON object string."""
+        # Prepare: Create one valid event followed by an invalid payload variant.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+
+        # Execute: Attempt to store the mixed event batch.
+        self.assertFalse(
+            state.store_task_events(
+                [
+                    TaskEvent(
+                        run_id=run_id,
+                        task_id=task_id,
+                        event="response.created",
+                        data='{"type":"response.created"}',
+                    ),
+                    TaskEvent(
+                        run_id=run_id,
+                        task_id=task_id,
+                        event="response.output_text.delta",
+                        data=data,
+                    ),
+                ]
+            )
+        )
+
+        # Assert: The invalid payload rejects the whole batch.
+        events = state.get_task_events(run_id=run_id, after_task_event_id=None)
+        self.assertEqual(events, [])
+
+    def test_reserve_nonce_first_reservation_succeeds(self) -> None:
+        """A new nonce reservation should succeed."""
+        state = self.state_factory()
+        reserved = state.reserve_nonce(
+            namespace="superexec:test",
+            nonce="nonce-1",
+            expires_at=now().timestamp() + 60.0,
+        )
+        self.assertTrue(reserved)
+
+    def test_reserve_nonce_duplicate_is_rejected(self) -> None:
+        """Reserving the same active nonce twice should fail on the second call."""
+        state = self.state_factory()
+        expires_at = now().timestamp() + 60.0
+        self.assertTrue(
+            state.reserve_nonce(
+                namespace="superexec:test",
+                nonce="nonce-1",
+                expires_at=expires_at,
+            )
+        )
+        self.assertFalse(
+            state.reserve_nonce(
+                namespace="superexec:test",
+                nonce="nonce-1",
+                expires_at=expires_at + 30.0,
+            )
+        )
+
+    def test_reserve_nonce_invalid_inputs_return_false(self) -> None:
+        """Invalid empty namespace/nonce values should be rejected."""
+        state = self.state_factory()
+        expires_at = now().timestamp() + 60.0
+
+        self.assertFalse(
+            state.reserve_nonce(
+                namespace="",
+                nonce="nonce-1",
+                expires_at=expires_at,
+            )
+        )
+        self.assertFalse(
+            state.reserve_nonce(
+                namespace="superexec:test",
+                nonce="",
+                expires_at=expires_at,
+            )
+        )
+
+    def test_reserve_nonce_allows_reuse_after_expiry(self) -> None:
+        """Nonce can be reused after its prior reservation expires."""
+        state = self.state_factory()
+        created_at = now()
+        self.assertTrue(
+            state.reserve_nonce(
+                namespace="superexec:test",
+                nonce="nonce-1",
+                expires_at=created_at.timestamp() + 1.0,
+            )
+        )
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = created_at + timedelta(seconds=5)
+            self.assertTrue(
+                state.reserve_nonce(
+                    namespace="superexec:test",
+                    nonce="nonce-1",
+                    expires_at=created_at.timestamp() + 10.0,
+                )
+            )

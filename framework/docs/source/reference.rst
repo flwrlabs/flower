@@ -25,6 +25,7 @@ Information-oriented API reference and other reference material.
     :maxdepth: 1
     :caption: Reference docs
 
+    ref-flower-configuration
     ref-example-projects
     ref-telemetry
     ref-changelog

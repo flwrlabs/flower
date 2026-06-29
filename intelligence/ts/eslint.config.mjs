@@ -1,5 +1,5 @@
 import eslint from '@eslint/js';
-import importPlugin from 'eslint-plugin-import';
+import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -9,8 +9,10 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.stylisticTypeChecked,
   ...tseslint.configs.strictTypeChecked,
-  importPlugin.flatConfigs.recommended,
   {
+    plugins: {
+      'simple-import-sort': simpleImportSort,
+    },
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -20,7 +22,8 @@ export default tseslint.config(
       sourceType: 'module',
     },
     rules: {
-      'import/order': 2,
+      'simple-import-sort/imports': 'error',
+      'simple-import-sort/exports': 'error',
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
@@ -33,16 +36,6 @@ export default tseslint.config(
           ignoreRestSiblings: true,
         },
       ],
-    },
-    settings: {
-      'import/parsers': {
-        '@typescript-eslint/parser': ['.ts', '.tsx'],
-      },
-      'import/resolver': {
-        typescript: {
-          alwaysTryTypes: true, // always try to resolve types under `<root>@types` directory even it doesn't contain any source code, like `@types/unist`
-        },
-      },
     },
   }
 );

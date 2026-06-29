@@ -10,7 +10,7 @@ license = "Apache-2.0"
 authors = ["The Flower Authors <hello@flower.ai>"]
 readme = "README.md"
 homepage = "https://flower.ai"
-repository = "https://github.com/adap/flower"
+repository = "https://github.com/flwrlabs/flower"
 documentation = "https://flower.ai"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -56,7 +56,6 @@ pillow = "==10.2.0"
 [tool.poetry.dev-dependencies]
 isort = "==5.13.2"
 black = "==24.2.0"
-docformatter = "==1.7.5"
 mypy = "==1.8.0"
 pylint = "==2.8.2"
 flake8 = "==3.9.2"

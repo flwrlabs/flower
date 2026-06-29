@@ -9,7 +9,7 @@ tags: [node, minimal, remote, encryption, Flower Confidential Remote Compute, ty
 You must first download the example with the following command:
 
 ```bash
-git clone --depth=1 https://github.com/adap/flower.git _tmp && mv _tmp/intelligence/ts/examples/encrypted . && rm -rf _tmp && cd encrypted
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp && mv _tmp/intelligence/ts/examples/encrypted . && rm -rf _tmp && cd encrypted
 ```
 
 You can then install the project dependencies with:

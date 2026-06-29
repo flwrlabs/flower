@@ -19,10 +19,13 @@ package flwr.proto;
 
 import "flwr/proto/fab.proto";
 import "flwr/proto/transport.proto";
-import "flwr/proto/recorddict.proto";
 import "flwr/proto/run.proto";
+import "flwr/proto/runseries.proto";
+import "flwr/proto/task.proto";
 import "flwr/proto/node.proto";
+import "flwr/proto/message.proto";
 import "flwr/proto/federation.proto";
+import "flwr/proto/federation_config.proto";
 
 service Control {
   // Start run upon request
@@ -36,6 +39,12 @@ service Control {
 
   // flwr ls command
   rpc ListRuns(ListRunsRequest) returns (ListRunsResponse) {}
+
+  // List run series
+  rpc ListRunSeries(ListRunSeriesRequest) returns (ListRunSeriesResponse) {}
+
+  // Get run series
+  rpc GetRunSeries(GetRunSeriesRequest) returns (GetRunSeriesResponse) {}
 
   // Get login details upon request
   rpc GetLoginDetails(GetLoginDetailsRequest)
@@ -62,16 +71,74 @@ service Control {
 
   // Show Federation
   rpc ShowFederation(ShowFederationRequest) returns (ShowFederationResponse) {}
+
+  // Create Federation
+  rpc CreateFederation(CreateFederationRequest)
+      returns (CreateFederationResponse) {}
+
+  // Archive Federation
+  rpc ArchiveFederation(ArchiveFederationRequest)
+      returns (ArchiveFederationResponse) {}
+
+  // Add SuperNode to Federation
+  rpc AddNodeToFederation(AddNodeToFederationRequest)
+      returns (AddNodeToFederationResponse) {}
+
+  // Remove SuperNode from Federation
+  rpc RemoveNodeFromFederation(RemoveNodeFromFederationRequest)
+      returns (RemoveNodeFromFederationResponse) {}
+
+  // Remove Account from Federation
+  rpc RemoveAccountFromFederation(RemoveAccountFromFederationRequest)
+      returns (RemoveAccountFromFederationResponse) {}
+
+  // Create Invitation
+  rpc CreateInvitation(CreateInvitationRequest)
+      returns (CreateInvitationResponse) {}
+
+  // List Invitations
+  rpc ListInvitations(ListInvitationsRequest)
+      returns (ListInvitationsResponse) {}
+
+  // Accept Invitation
+  rpc AcceptInvitation(AcceptInvitationRequest)
+      returns (AcceptInvitationResponse) {}
+
+  // Reject Invitation
+  rpc RejectInvitation(RejectInvitationRequest)
+      returns (RejectInvitationResponse) {}
+
+  // Revoke Invitation
+  rpc RevokeInvitation(RevokeInvitationRequest)
+      returns (RevokeInvitationResponse) {}
+
+  // Set Simulation Configuration
+  rpc ConfigureSimulationFederation(ConfigureSimulationFederationRequest)
+      returns (ConfigureSimulationFederationResponse) {}
+
+  // ##############
+  // Unused for now
+  // ##############
+
+  // Start run event stream
+  rpc StreamRunEvents(StreamRunEventsRequest)
+      returns (stream StreamRunEventsResponse) {}
 }
 
 message StartRunRequest {
   Fab fab = 1;
   map<string, Scalar> override_config = 2;
-  ConfigRecord federation_options = 3;
+  SimulationConfig override_federation_config = 3;
   string app_spec = 4;
   string federation = 5;
+  optional uint64 series_id = 6;
 }
-message StartRunResponse { optional uint64 run_id = 1; }
+message StartRunResponse {
+  optional uint64 run_id = 1;
+  optional string note = 2;
+  optional uint64 series_id = 3;
+  string federation = 4;
+}
 message StreamLogsRequest {
   uint64 run_id = 1;
   double after_timestamp = 2;
@@ -80,10 +147,25 @@ message StreamLogsResponse {
   string log_output = 1;
   double latest_timestamp = 2;
 }
-message ListRunsRequest { optional uint64 run_id = 1; }
+message ListRunsRequest {
+  optional uint64 run_id = 1;
+  optional uint64 limit = 2;
+}
 message ListRunsResponse {
   map<uint64, Run> run_dict = 1;
   string now = 2;
+}
+
+message ListRunSeriesRequest {
+  optional string updated_before = 1;
+  optional uint32 limit = 2;
+}
+message ListRunSeriesResponse { repeated RunSeries entries = 1; }
+
+message GetRunSeriesRequest { uint64 series_id = 1; }
+message GetRunSeriesResponse {
+  RunSeries series = 1;
+  Context context = 2;
 }
 
 message GetLoginDetailsRequest {}
@@ -127,3 +209,67 @@ message ShowFederationResponse {
   Federation federation = 1;
   string now = 2;
 }
+
+message CreateFederationRequest {
+  string federation_name = 1;
+  string description = 2;
+  bool simulation = 3;
+}
+message CreateFederationResponse { Federation federation = 1; }
+
+message ArchiveFederationRequest { string federation_name = 1; }
+message ArchiveFederationResponse {}
+
+message AddNodeToFederationRequest {
+  string federation_name = 1;
+  uint64 node_id = 2;
+}
+message AddNodeToFederationResponse {}
+
+message RemoveNodeFromFederationRequest {
+  string federation_name = 1;
+  uint64 node_id = 2;
+}
+message RemoveNodeFromFederationResponse {}
+
+message RemoveAccountFromFederationRequest {
+  string federation_name = 1;
+  optional string account_name = 2;
+}
+message RemoveAccountFromFederationResponse {}
+
+message CreateInvitationRequest {
+  string invitee_account_name = 1;
+  string federation_name = 2;
+}
+message CreateInvitationResponse {}
+
+message ListInvitationsRequest {}
+message ListInvitationsResponse {
+  repeated Invitation created_invitations = 1;
+  repeated Invitation received_invitations = 2;
+}
+
+message AcceptInvitationRequest { string federation_name = 1; }
+message AcceptInvitationResponse {}
+
+message RejectInvitationRequest { string federation_name = 1; }
+message RejectInvitationResponse {}
+
+message RevokeInvitationRequest {
+  string invitee_account_name = 1;
+  string federation_name = 2;
+}
+message RevokeInvitationResponse {}
+
+message ConfigureSimulationFederationRequest {
+  string federation_name = 1;
+  SimulationConfig config = 2;
+}
+message ConfigureSimulationFederationResponse { string federation_name = 1; }
+
+message StreamRunEventsRequest {
+  uint64 run_id = 1;
+  optional uint64 after_task_event_id = 2;
+}
+message StreamRunEventsResponse { TaskEvent task_event = 1; }

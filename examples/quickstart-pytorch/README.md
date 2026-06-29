@@ -10,15 +10,18 @@ This introductory example to Flower uses PyTorch, but deep knowledge of PyTorch 
 
 ## Set up the project
 
-### Clone the project
+### Fetch the app
 
-Start by cloning the example project:
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
-        && mv _tmp/examples/quickstart-pytorch . \
-        && rm -rf _tmp \
-        && cd quickstart-pytorch
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/quickstart-pytorch
 ```
 
 This will create a new directory called `quickstart-pytorch` with the following structure:
@@ -49,24 +52,17 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 ### Run with the Simulation Engine
 
 > [!TIP]
-> This example might run faster when the `ClientApp`s have access to a GPU. If your system has one, you can make use of it by configuring the `backend.client-resources` component in `pyproject.toml`. If you want to try running the example with GPU right away, use the `local-simulation-gpu` federation as shown below. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more.
+> This example runs faster when the `ClientApp`s have access to a GPU. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
 # Run with the default federation (CPU only)
-flwr run .
+flwr run .  --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```bash
-flwr run . --run-config "num-server-rounds=5 learning-rate=0.05"
-```
-
-Run the project in the `local-simulation-gpu` federation that gives CPU and GPU resources to each `ClientApp`. By default, at most 5x`ClientApp` will run in parallel in the available GPU. You can tweak the degree of parallelism by adjusting the settings of this federation in the `pyproject.toml`.
-
-```bash
-# Run with the `local-simulation-gpu` federation
-flwr run . local-simulation-gpu
+flwr run . --run-config "num-server-rounds=5 learning-rate=0.05"  --stream
 ```
 
 > [!TIP]

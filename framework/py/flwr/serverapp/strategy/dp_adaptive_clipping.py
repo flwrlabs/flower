@@ -24,17 +24,19 @@ from logging import INFO
 
 import numpy as np
 
-from flwr.common import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, log
-from flwr.common.differential_privacy import (
+from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord
+from flwr.common import log
+from flwr.supercore.differential_privacy import (
+    KEY_CLIPPING_NORM,
+    KEY_NORM_BIT,
     adaptive_clip_inputs_inplace,
     add_gaussian_noise_inplace,
     compute_adaptive_noise_params,
     compute_stdv,
 )
-from flwr.common.differential_privacy_constants import KEY_CLIPPING_NORM, KEY_NORM_BIT
-from flwr.server import Grid
-from flwr.serverapp.exception import AggregationError
 
+from ..exception import AggregationError
+from ..grid import Grid
 from .dp_fixed_clipping import validate_replies
 from .strategy import Strategy
 
@@ -94,7 +96,10 @@ class DifferentialPrivacyAdaptiveBase(Strategy, ABC):
         add_gaussian_noise_inplace(nds, stdv)
         log(INFO, "aggregate_fit: central DP noise with %.4f stdev added", stdv)
         return ArrayRecord(
-            {k: Array(v) for k, v in zip(aggregated.keys(), nds, strict=True)}
+            {
+                k: Array(np.asarray(v))
+                for k, v in zip(aggregated.keys(), nds, strict=True)
+            }
         )
 
     def _noisy_fraction(self, count: int, total: int) -> float:
@@ -194,7 +199,10 @@ class DifferentialPrivacyServerSideAdaptiveClipping(DifferentialPrivacyAdaptiveB
                     c + u for c, u in zip(current_nd, model_update, strict=True)
                 ]
                 reply.content[arr_name] = ArrayRecord(
-                    {k: Array(v) for k, v in zip(record.keys(), restored, strict=True)}
+                    {
+                        k: Array(np.asarray(v))
+                        for k, v in zip(record.keys(), restored, strict=True)
+                    }
                 )
             log(
                 INFO,

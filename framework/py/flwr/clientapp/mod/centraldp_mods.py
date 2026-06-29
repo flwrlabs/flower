@@ -18,23 +18,26 @@
 from logging import ERROR, INFO
 from typing import cast
 
-from flwr.app import Error
-from flwr.clientapp.typing import ClientAppCallable
-from flwr.common import (
+import numpy as np
+
+from flwr.app import (
     Array,
     ArrayRecord,
     ConfigRecord,
     Context,
+    Error,
     Message,
     MetricRecord,
-    log,
 )
+from flwr.clientapp.typing import ClientAppCallable
+from flwr.common import log
 from flwr.common.constant import ErrorCode
-from flwr.common.differential_privacy import (
+from flwr.supercore.differential_privacy import (
+    KEY_CLIPPING_NORM,
+    KEY_NORM_BIT,
     compute_adaptive_clip_model_update,
     compute_clip_model_update,
 )
-from flwr.common.differential_privacy_constants import KEY_CLIPPING_NORM, KEY_NORM_BIT
 
 
 # pylint: disable=too-many-return-statements
@@ -105,7 +108,7 @@ def fixedclipping_mod(
     # Replace outgoing ArrayRecord's Array while preserving their keys
     out_msg.content.array_records[new_array_record_key] = ArrayRecord(
         {
-            k: Array(v)
+            k: Array(np.asarray(v))
             for k, v in zip(
                 client_to_server_arrecord.keys(),
                 client_to_server_ndarrays,
@@ -192,7 +195,7 @@ def adaptiveclipping_mod(
     # Replace outgoing ArrayRecord's Array while preserving their keys
     out_msg.content.array_records[new_array_record_key] = ArrayRecord(
         {
-            k: Array(v)
+            k: Array(np.asarray(v))
             for k, v in zip(
                 client_to_server_arrecord.keys(),
                 client_to_server_ndarrays,

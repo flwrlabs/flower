@@ -1,15 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { FlowerIntelligence, ChatResponseResult, ChatOptions, Message } from '@flwr/flwr';
 
-const fi: FlowerIntelligence = FlowerIntelligence.instance;
+type ChatMessageRole = 'system' | 'user' | 'assistant';
 
-const history: Message[] = [
-  { role: 'system', content: 'You are a friendly assistant that loves using emojis.' },
-];
+interface ChatMessage {
+  role: ChatMessageRole;
+  content: string;
+}
 
 interface ChatEntry {
   role: 'user' | 'bot';
@@ -17,57 +17,59 @@ interface ChatEntry {
 }
 
 export default function ClientSideChatPage() {
-  // Initialize local state using the current global history (excluding the system message)
-  const [chatLog, setChatLog] = useState<ChatEntry[]>(
-    history
-      .filter((msg) => msg.role !== 'system')
-      .map((msg) => ({
-        role: msg.role as 'user' | 'bot',
-        content: msg.content,
-      }))
-  );
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: 'system', content: 'You are a friendly assistant that loves using emojis.' },
+  ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const sendQuestion = async () => {
-    if (!input.trim()) return;
-    setLoading(true);
-    setChatLog((prev) => [...prev, { role: 'user', content: input }]);
+  const chatLog = useMemo<ChatEntry[]>(
+    () =>
+      messages
+        .filter((msg) => msg.role !== 'system')
+        .map((msg) => ({
+          role: msg.role === 'user' ? 'user' : 'bot',
+          content: msg.content,
+        })),
+    [messages]
+  );
 
-    // Append user's question to the global history.
-    history.push({ role: 'user', content: input });
+  const sendQuestion = async () => {
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    setLoading(true);
+    setInput('');
+
+    const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: trimmed }];
+    setMessages(nextMessages);
+
     try {
-      // Call the FlowerIntelligence client directly with updated history.
-      const response: ChatResponseResult = await fi.chat(input, {
-        messages: history,
-      } as ChatOptions);
-      if (response.ok) {
-        history.push(response.message);
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: nextMessages }),
+      });
+      const data = (await res.json()) as {
+        message?: string;
+        role?: ChatMessageRole;
+        error?: string;
+      };
+      if (res.ok && data.message) {
+        const message = data.message;
+        setMessages((prev) => [...prev, { role: data.role ?? 'assistant', content: message }]);
       } else {
-        history.push({ role: 'bot', content: 'Failed to get a valid response.' });
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: data.error || 'Failed to get a valid response.' },
+        ]);
       }
     } catch {
-      setChatLog([
-        ...history
-          .filter((msg) => msg.role !== 'system')
-          .map((msg) => ({
-            role: msg.role as 'user' | 'bot',
-            content: msg.content,
-          })),
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: 'Network error, please try again.' },
       ]);
-    } finally {
-      // Update local chat log to reflect the global history (filtering out the system message).
-      setChatLog([
-        ...history
-          .filter((msg) => msg.role !== 'system')
-          .map((msg) => ({
-            role: msg.role as 'user' | 'bot',
-            content: msg.content,
-          })),
-      ]);
-      setInput('');
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {

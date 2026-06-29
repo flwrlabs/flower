@@ -49,10 +49,11 @@ classifier on Higgs dataset using Flower and XGBoost. It is recommended to creat
 virtual environment and run everything within a :doc:`virtualenv
 <contributor-how-to-set-up-a-virtual-env>`.
 
-Let's use `flwr new` to create a complete Flower+XGBoost project. It will generate all
-the files needed to run, by default with the Simulation Engine, a federation of 10 nodes
-using |fedxgbbagging_link|_ strategy. The dataset will be partitioned using Flower
-Dataset's `IidPartitioner
+Let's use ``flwr new`` to create a complete Flower+XGBoost project. It will generate all
+the files needed to run a federation of two nodes using |fedxgbbagging_link|_ strategy.
+By default, the generated app uses a local simulation profile that ``flwr run`` submits
+to a managed local SuperLink, which then executes the run with the Flower Simulation
+Runtime. The dataset will be partitioned using Flower Dataset's `IidPartitioner
 <https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_.
 
 |fedxgbbagging_link|_ (bootstrap aggregation) is an ensemble method that improves
@@ -68,21 +69,19 @@ install Flower in your new environment:
     # In a new Python environment
     $ pip install flwr
 
-Then, run the command below. You will be prompted to select one of the available
-templates (choose ``XGBoost``), give a name to your project, and enter your developer
-name:
+Then, run the command below:
 
 .. code-block:: shell
 
-    $ flwr new
+    $ flwr new @flwrlabs/quickstart-xgboost
 
-After running it you'll notice a new directory with your project name has been created.
-It should have the following structure:
+After running it you'll notice a new directory named ``quickstart-xgboost`` has been
+created. It should have the following structure:
 
 .. code-block:: shell
 
-    <your-project-name>
-    ├── <your-project-name>
+    quickstart-xgboost
+    ├── quickstart_xgboost
     │   ├── __init__.py
     │   ├── client_app.py   # Defines your ClientApp
     │   ├── server_app.py   # Defines your ServerApp
@@ -90,85 +89,41 @@ It should have the following structure:
     ├── pyproject.toml      # Project metadata like dependencies and configs
     └── README.md
 
-If you haven't yet installed the project and its dependencies, you can do so by:
-
-.. code-block:: shell
-
-    # From the directory where your pyproject.toml is
-    $ pip install -e .
-
 To run the project do:
 
 .. code-block:: shell
 
-    # Run with default arguments
-    $ flwr run .
+    $ cd quickstart-xgboost
 
-With default arguments, you will see output like this:
+    # Run with default arguments and stream logs
+    $ flwr run . --stream
+
+Plain ``flwr run .`` submits the run, prints the run ID, and returns without streaming
+logs. For the full local workflow, see :doc:`how-to-run-flower-locally`.
+
+With default arguments, you will see streamed output like this:
 
 .. code-block:: shell
 
-    Loading project configuration...
-    Success
+    Starting local SuperLink on 127.0.0.1:39093...
+    Successfully started run 1859953118041441032
     INFO :      Starting FedXgbBagging strategy:
     INFO :              ├── Number of rounds: 3
-    INFO :              ├── ArrayRecord (0.00 MB)
-    INFO :              ├── ConfigRecord (train): (empty!)
-    INFO :              ├── ConfigRecord (evaluate): (empty!)
-    INFO :              ├──> Sampling:
-    INFO :              │       ├──Fraction: train (0.10) | evaluate ( 0.10)
-    INFO :              │       ├──Minimum nodes: train (2) | evaluate (2)
-    INFO :              │       └──Minimum available nodes: 2
-    INFO :              └──> Keys in records:
-    INFO :                      ├── Weighted by: 'num-examples'
-    INFO :                      ├── ArrayRecord key: 'arrays'
-    INFO :                      └── ConfigRecord key: 'config'
-    INFO :
-    INFO :
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 2 nodes (out of 10)
+    INFO :      configure_train: Sampled 2 nodes (out of 2)
     INFO :      aggregate_train: Received 2 results and 0 failures
     INFO :              └──> Aggregated MetricRecord: {}
-    INFO :      configure_evaluate: Sampled 2 nodes (out of 10)
+    INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
     INFO :      aggregate_evaluate: Received 2 results and 0 failures
     INFO :              └──> Aggregated MetricRecord: {'auc': 0.7677505289821278}
-    INFO :
     INFO :      [ROUND 2/3]
-    INFO :      configure_train: Sampled 2 nodes (out of 10)
-    INFO :      aggregate_train: Received 2 results and 0 failures
-    INFO :              └──> Aggregated MetricRecord: {}
-    INFO :      configure_evaluate: Sampled 2 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 2 results and 0 failures
-    INFO :              └──> Aggregated MetricRecord: {'auc': 0.7758267351298489}
-    INFO :
+    INFO :      ...
     INFO :      [ROUND 3/3]
-    INFO :      configure_train: Sampled 2 nodes (out of 10)
-    INFO :      aggregate_train: Received 2 results and 0 failures
-    INFO :              └──> Aggregated MetricRecord: {}
-    INFO :      configure_evaluate: Sampled 2 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 2 results and 0 failures
-    INFO :              └──> Aggregated MetricRecord: {'auc': 0.7811659285552999}
-    INFO :
+    INFO :      ...
     INFO :      Strategy execution finished in 132.88s
-    INFO :
     INFO :      Final results:
-    INFO :
-    INFO :              Global Arrays:
-    INFO :                      ArrayRecord (0.195 MB)
-    INFO :
-    INFO :              Aggregated ClientApp-side Train Metrics:
-    INFO :              {1: {}, 2: {}, 3: {}}
-    INFO :
-    INFO :              Aggregated ClientApp-side Evaluate Metrics:
-    INFO :              { 1: {'auc': '7.6775e-01'},
-    INFO :                2: {'auc': '7.7583e-01'},
-    INFO :                3: {'auc': '7.8117e-01'}}
-    INFO :
     INFO :              ServerApp-side Evaluate Metrics:
     INFO :              {}
-    INFO :
-
-    Saving final model to disk...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
 in the ``pyproject.toml`` like this:
@@ -196,6 +151,7 @@ file:
     fraction-train = 0.1
     fraction-evaluate = 0.1
     local-epochs = 1
+    save-model = false
 
     # XGBoost parameters
     params.objective = "binary:logistic"
@@ -376,17 +332,16 @@ follows:
 
 .. code-block:: python
 
-    def _local_boost(self, bst_input):
+    def _local_boost(bst_input, num_local_round, train_dmatrix):
         # Update trees based on local training data.
-        for i in range(self.num_local_round):
-            bst_input.update(self.train_dmatrix, bst_input.num_boosted_rounds())
+        for i in range(num_local_round):
+            bst_input.update(train_dmatrix, bst_input.num_boosted_rounds())
 
         # Bagging: extract the last N=num_local_round trees for sever aggregation
         bst = bst_input[
             bst_input.num_boosted_rounds()
-            - self.num_local_round : bst_input.num_boosted_rounds()
+            - num_local_round : bst_input.num_boosted_rounds()
         ]
-
         return bst
 
 Given ``num_local_round``, we update trees by calling ``bst_input.update`` method. After
@@ -455,16 +410,17 @@ After that, the execution of the strategy is launched when invoking its
             num_rounds=num_rounds,
         )
 
-        # Save final model to disk
-        bst = xgb.Booster(params=params)
-        global_model = bytearray(result.arrays["0"].numpy().tobytes())
+        if context.run_config["save-model"]:
+            # Save final model to disk
+            bst = xgb.Booster(params=params)
+            global_model = bytearray(result.arrays["0"].numpy().tobytes())
 
-        # Load global model into booster
-        bst.load_model(global_model)
+            # Load global model into booster
+            bst.load_model(global_model)
 
-        # Save model
-        print("\nSaving final model to disk...")
-        bst.save_model("final_model.json")
+            # Save model
+            print("\nSaving final model to disk...")
+            bst.save_model("final_model.json")
 
 Note the ``start`` method of the strategy returns a |result_link|_ object. This object
 contains all the relevant information about the FL process, including the final model
@@ -473,9 +429,14 @@ weights as an ``ArrayRecord``, and federated training and evaluation metrics as
 
 Congratulations! You've successfully built and run your first federated learning system.
 
+.. tip::
+
+    Check the :doc:`how-to-run-simulations` documentation to learn more about how to
+    configure and run Flower simulations.
+
 .. note::
 
     Check the `source code
-    <https://github.com/adap/flower/blob/main/examples/xgboost-quickstart>`_ of the
+    <https://github.com/flwrlabs/flower/blob/main/examples/xgboost-quickstart>`_ of the
     extended version of this tutorial in ``examples/xgboost-quickstart`` in the Flower
     GitHub repository.

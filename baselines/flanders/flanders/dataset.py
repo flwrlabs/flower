@@ -1,6 +1,6 @@
 """Dataset utilities for FL experiments."""
 
-# Borrowed from adap/Flower examples
+# Borrowed from flwrlabs/flower examples
 
 import shutil
 from pathlib import Path

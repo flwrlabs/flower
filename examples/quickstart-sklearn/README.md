@@ -14,12 +14,18 @@ download, partition and preprocess the dataset.
 
 ## Set up the project
 
-### Clone the project
+### Fetch the app
 
-Start by cloning the example project. We prepared a single-line command that you can copy into your shell which will checkout the example for you:
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git && mv flower/examples/quickstart-sklearn . && rm -rf flower && cd quickstart-sklearn
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/quickstart-sklearn
 ```
 
 This will create a new directory called `quickstart-sklearn` with the following structure:
@@ -53,13 +59,13 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
-flwr run .
+flwr run . --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```bash
-flwr run . --run-config penalty="'l1'"
+flwr run . --run-config penalty="'l1'" --stream
 ```
 
 ### Run with the Deployment Engine

@@ -21,14 +21,15 @@ from logging import ERROR
 
 from cryptography.hazmat.primitives.asymmetric import ec
 
+from flwr.app.message import Message
 from flwr.client.grpc_rere_client.connection import grpc_request_response
 from flwr.client.grpc_rere_client.grpc_adapter import GrpcAdapter
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.logger import log
-from flwr.common.message import Message
-from flwr.common.retry_invoker import RetryInvoker
-from flwr.common.typing import Fab, Run
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.supercore.fab import Fab
+from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
+from flwr.supercore.retry import RetryInvoker
+from flwr.supercore.run import Run
 
 
 @contextmanager
@@ -45,7 +46,7 @@ def grpc_adapter(  # pylint: disable=R0913,too-many-positional-arguments
     tuple[
         int,
         Callable[[], tuple[Message, ObjectTree] | None],
-        Callable[[Message, ObjectTree], set[str]],
+        Callable[[Message, ObjectTree, float], set[str]],
         Callable[[int], Run],
         Callable[[str, int], Fab],
         Callable[[int, str], bytes],
@@ -81,7 +82,7 @@ def grpc_adapter(  # pylint: disable=R0913,too-many-positional-arguments
     -------
     node_id : int
     receive : Callable[[], Optional[tuple[Message, ObjectTree]]]
-    send : Callable[[Message, ObjectTree], set[str]]
+    send : Callable[[Message, ObjectTree, float], set[str]]
     get_run : Callable[[int], Run]
     get_fab : Callable[[str, int], Fab]
     pull_object : Callable[[str], bytes]

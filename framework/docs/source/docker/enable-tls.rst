@@ -242,23 +242,34 @@ Transport Layer Security (TLS) for each Flower component to ensure secure commun
             * | ``--insecure``:  This flag tells the container to operate in an insecure mode, allowing
               | unencrypted communication. Secure connections will be added in future releases.
 
-Append the following lines to the end of the ``pyproject.toml`` file and save it:
+Locate the Flower Configuration TOML file in your machine.
+
+.. code-block:: console
+    :emphasize-lines: 3
+
+    $ flwr config list
+
+    Flower Config file: /path/to/.flwr/config.toml
+    SuperLink connections:
+      supergrid
+      local (default)
+
+Append the following lines to the end of the ``config.toml`` file to add a new SuperLink
+connection and save it:
 
 .. code-block:: toml
-    :caption: pyproject.toml
+    :caption: config.toml
 
-    [tool.flwr.federations.local-deployment-tls]
+    [superlink.local-deployment-tls]
     address = "127.0.0.1:9093"
-    root-certificates = "../superlink-certificates/ca.crt"
-
-The path of the ``root-certificates`` should be relative to the location of the
-``pyproject.toml`` file.
+    root-certificates = "/absolute/path/to/superlink-certificates/ca.crt"
 
 .. note::
 
-    You can customize the string that follows ``tool.flwr.federations.`` to fit your
-    needs. However, please note that the string cannot contain a dot (``.``).
+    You can customize the string that follows ``superlink.`` to fit your needs. However,
+    please note that the string cannot contain a dot (``.``).
 
-    In this example, ``local-deployment-tls`` has been used. Just remember to replace
-    ``local-deployment-tls`` with your chosen name in both the
-    ``tool.flwr.federations.`` string and the corresponding ``flwr run .`` command.
+    In this example, ``local-deployment`` has been used. Just remember to replace
+    ``local-deployment`` with your chosen name in both the ``superlink.`` string and the
+    corresponding ``flwr run .`` command. Refer to the `Flower Configuration
+    <ref-flower-configuration.html>`_ for more information.

@@ -33,7 +33,7 @@ Those diagrams illustrate HFL vs VFL using a simplified version of what we will 
 Start by cloning the example project:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/vertical-fl . \
         && rm -rf _tmp \
         && cd vertical-fl
@@ -95,6 +95,14 @@ You can control the number of partitions as well as how many features each have 
 ## Run the project
 
 You can run your Flower project in both _simulation_ and _deployment_ mode without making changes to the code. If you are starting with Flower, we recommend you using the _simulation_ mode as it requires fewer components to be launched manually. By default, `flwr run` will make use of the Simulation Engine.
+
+This example is designed to run with three virtual `SuperNodes`. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
+
+```bash
+flwr federation simulation-config --num-supernodes=3
+```
+
+Remember, if you wish to change `--num-supernodes` you'll need to adjust `feature-splits` in the `pyproject.toml` accordingly.
 
 ### Run with the Simulation Engine
 

@@ -18,7 +18,7 @@
 from typing import Any
 
 import numpy as np
-from numpy.typing import DTypeLike, NDArray
+from numpy.typing import NDArray
 
 
 def factor_combine(factor: int, parameters: list[NDArray[Any]]) -> list[NDArray[Any]]:
@@ -36,13 +36,6 @@ def factor_extract(
 def get_parameters_shape(parameters: list[NDArray[Any]]) -> list[tuple[int, ...]]:
     """Get dimensions of each NDArray in parameters."""
     return [arr.shape for arr in parameters]
-
-
-def get_zero_parameters(
-    dimensions_list: list[tuple[int, ...]], dtype: DTypeLike = np.int64
-) -> list[NDArray[Any]]:
-    """Generate zero parameters based on the dimensions list."""
-    return [np.zeros(dimensions, dtype=dtype) for dimensions in dimensions_list]
 
 
 def parameters_addition(
@@ -72,10 +65,3 @@ def parameters_multiply(
 ) -> list[NDArray[Any]]:
     """Multiply parameters by an integer/float multiplier."""
     return [parameters[idx] * multiplier for idx in range(len(parameters))]
-
-
-def parameters_divide(
-    parameters: list[NDArray[Any]], divisor: int | float
-) -> list[NDArray[Any]]:
-    """Divide weight by an integer/float divisor."""
-    return [parameters[idx] / divisor for idx in range(len(parameters))]

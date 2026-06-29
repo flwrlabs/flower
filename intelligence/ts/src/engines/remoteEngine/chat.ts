@@ -218,9 +218,7 @@ async function processChunk(
     for (const choice of parsed.choices) {
       const delta = choice.delta;
       if (delta.tool_calls) {
-        if (!finalTools) {
-          finalTools = [];
-        }
+        finalTools ??= [];
         for (const t of delta.tool_calls) {
           const callId = String(t.index);
           const fn = t.function;

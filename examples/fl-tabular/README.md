@@ -12,12 +12,18 @@ This example uses [Flower Datasets](https://flower.ai/docs/datasets/) to downloa
 
 ## Set up the project
 
-### Clone the project
+### Fetch the app
 
-Start by cloning the example project:
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git && mv flower/examples/fl-tabular . && rm -rf flower && cd fl-tabular
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/fl-tabular
 ```
 
 This will create a new directory called `fl-tabular` containing the following files:
@@ -53,14 +59,22 @@ fewer components to be launched manually. By default, `flwr run` will make use o
 > [!NOTE]
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
+This example is designed to run with 5 virtual `SuperNodes`. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
+
 ```bash
-flwr run .
+flwr federation simulation-config --num-supernodes=5
+```
+
+Finally, let's run the app:
+
+```bash
+flwr run .  --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```bash
-flwr run . --run-config num-server-rounds=10
+flwr run . --run-config num-server-rounds=10  --stream
 ```
 
 ### Run with the Deployment Engine

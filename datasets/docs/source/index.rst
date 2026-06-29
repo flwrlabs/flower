@@ -45,19 +45,19 @@ Problem-oriented how-to guides show step-by-step how to achieve a specific goal.
    how-to-use-with-numpy
    how-to-use-with-local-data
    how-to-disable-enable-progress-bar
+   how-to-generate-demo-data-for-deployment
 
 References
 ~~~~~~~~~~
 
 Information-oriented API reference and other reference material.
 
-.. autosummary::
-   :toctree: ref-api
-   :template: autosummary/module.rst
-   :caption: API reference
-   :recursive:
+.. toctree::
+    :titlesonly:
+    :maxdepth: 2
+    :caption: References
 
-      flwr_datasets
+    reference
 
 .. toctree::
    :maxdepth: 1
@@ -70,6 +70,7 @@ Information-oriented API reference and other reference material.
    :maxdepth: 1
    :caption: Contributor tutorials
 
+   contributor-how-to-develop-flwr-datasets
    contributor-how-to-contribute-dataset
 
 

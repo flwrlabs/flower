@@ -9,7 +9,7 @@ Three datasets have been selected for this evaluation: [MBPP](https://huggingfac
 ## Environment Setup
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git && mv flower/benchmarks/flowertune-llm/evaluation/code ./flowertune-eval-code && rm -rf flower && cd flowertune-eval-code
+git clone --depth=1 https://github.com/flwrlabs/flower.git && mv flower/benchmarks/flowertune-llm/evaluation/code ./flowertune-eval-code && rm -rf flower && cd flowertune-eval-code
 ```
 
 Create a new Python environment (we recommend Python 3.11), activate it, then install dependencies with:
@@ -19,7 +19,7 @@ Create a new Python environment (we recommend Python 3.11), activate it, then in
 pip install -r requirements.txt
 
 # Log in HuggingFace account
-huggingface-cli login
+hf auth login
 ```
 
 After that, install `Node.js` and `g++` for the evaluation of JavaScript, C++:
@@ -67,4 +67,4 @@ The model answers and pass@1 scores will be saved to `generations_{dataset_name}
 
 
 > [!NOTE]
-> Please ensure that you provide all **four pass@1 scores** for the evaluation datasets when submitting to the LLM Leaderboard (see the [`Make Submission`](https://github.com/adap/flower/tree/main/benchmarks/flowertune-llm/evaluation#make-submission-on-flowertune-llm-leaderboard) section).
+> Please ensure that you provide all **four pass@1 scores** for the evaluation datasets when submitting to the LLM Leaderboard (see the [`Make Submission`](https://github.com/flwrlabs/flower/tree/main/benchmarks/flowertune-llm/evaluation#make-submission-on-flowertune-llm-leaderboard) section).

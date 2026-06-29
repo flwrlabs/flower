@@ -23,12 +23,7 @@ from typing import Any
 import click
 import pytest
 
-from .config_utils import (
-    load,
-    process_loaded_project_config,
-    validate_certificate_in_federation_config,
-    validate_federation_in_project_config,
-)
+from .config_utils import load, validate_federation_in_project_config
 
 
 def test_load_pyproject_toml_load_from_cwd(tmp_path: Path) -> None:
@@ -161,21 +156,6 @@ def test_load_pyproject_toml_from_path(tmp_path: Path) -> None:
         os.chdir(origin)
 
 
-def test_validate_project_config_fail() -> None:
-    """Test that validate_project_config fails correctly."""
-    # Prepare
-    config = None
-    errors = ["Error"]
-    warnings = ["Warning"]
-
-    # Execute
-    with pytest.raises(click.exceptions.Exit) as excinfo:
-        _ = process_loaded_project_config(config, errors, warnings)
-
-    # Assert
-    assert excinfo.value.exit_code == 1
-
-
 def test_validate_federation_in_project_config() -> None:
     """Test that validate_federation_in_config succeeds correctly."""
     # Prepare - Test federation is None
@@ -277,7 +257,7 @@ def test_validate_federation_in_project_config_fail() -> None:
 
     def run_and_assert_exit(federation: str | None, config: dict[str, Any]) -> None:
         """Execute validation and assert exit code is 1."""
-        with pytest.raises(click.exceptions.Exit) as excinfo:
+        with pytest.raises(click.ClickException) as excinfo:
             validate_federation_in_project_config(federation, config)
         assert excinfo.value.exit_code == 1
 
@@ -315,95 +295,3 @@ def test_validate_federation_in_project_config_fail() -> None:
 
     # Execute and assert
     run_and_assert_exit(federation, config)
-
-
-@pytest.mark.parametrize(
-    "config,expected",
-    [
-        # Test insecure is True and root_certificates is None
-        ({"address": "127.0.0.1:9091", "insecure": True}, (True, None)),
-        # Test insecure is not declared and root_certificates is present
-        (
-            {"address": "127.0.0.1:9091", "root-certificates": "dummy_cert.pem"},
-            (False, b"dummy_cert"),
-        ),
-        # Test insecure is False and root_certificates is present
-        (
-            {
-                "address": "127.0.0.1:9091",
-                "insecure": False,
-                "root-certificates": "dummy_cert.pem",
-            },
-            (False, b"dummy_cert"),
-        ),
-        # Test insecure is not declared and root_certificates is None
-        ({"address": "127.0.0.1:9091"}, (False, None)),
-        # Test insecure is False and root_certificates is None
-        ({"address": "127.0.0.1:9091", "insecure": False}, (False, None)),
-    ],
-)
-def test_validate_certificate_in_federation_config(
-    tmp_path: Path, config: dict[str, Any], expected: tuple[bool, bytes | None]
-) -> None:
-    """Test that validate_certificate_in_federation_config succeeds correctly."""
-    # Prepare
-    # If a certificate is referenced, create a dummy certificate file.
-    if "root-certificates" in config:
-        dummy_cert = tmp_path / config["root-certificates"]
-        dummy_cert.write_text("dummy_cert")
-
-    # Current directory
-    origin = Path.cwd()
-
-    try:
-        # Change into the temporary directory
-        os.chdir(tmp_path)
-
-        # Execute: Validate the configuration.
-        result = validate_certificate_in_federation_config(tmp_path, config)
-        # Assert
-        assert result == expected
-    finally:
-        os.chdir(origin)
-
-
-@pytest.mark.parametrize(
-    "config",
-    [
-        # Test insecure is set to an invalid value
-        {"address": "127.0.0.1:9091", "insecure": "invalid_value"},
-        # Test insecure is True and root_certificates is set
-        {
-            "address": "127.0.0.1:9091",
-            "insecure": True,
-            "root-certificates": "dummy_cert.pem",
-        },
-        # Test insecure is False and root_certificates cannot be read
-        {
-            "address": "127.0.0.1:9091",
-            "root-certificates": "non_existent_cert.pem",
-        },
-    ],
-)
-def test_validate_certificate_in_federation_config_fail(
-    tmp_path: Path, config: dict[str, Any]
-) -> None:
-    """Test that validate_certificate_in_federation_config fails correctly."""
-
-    def run_and_assert_exit(app: Path, config: dict[str, Any]) -> None:
-        """Execute validation and assert exit code is 1."""
-        with pytest.raises(click.exceptions.Exit) as excinfo:
-            validate_certificate_in_federation_config(app, config)
-        assert excinfo.value.exit_code == 1
-
-    # Prepare
-    origin = Path.cwd()
-
-    try:
-        # Change into the temporary directory
-        os.chdir(tmp_path)
-
-        # Execute and assert for each failing configuration
-        run_and_assert_exit(tmp_path, config)
-    finally:
-        os.chdir(origin)

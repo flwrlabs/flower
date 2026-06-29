@@ -17,25 +17,22 @@
 
 import time
 from logging import DEBUG, ERROR, INFO
-from pathlib import Path
-from typing import Annotated, Any, cast
+from typing import Annotated, cast
 
+import click
 import grpc
 import typer
 
-from flwr.cli.config_utils import (
-    exit_if_no_address,
-    load_and_validate,
-    process_loaded_project_config,
-    validate_federation_in_project_config,
-)
+from flwr.cli.config_migration import migrate, warn_if_federation_config_overrides
 from flwr.cli.constant import FEDERATION_CONFIG_HELP_MESSAGE
+from flwr.cli.flower_config import read_superlink_connection
+from flwr.cli.typing import SuperLinkConnection
 from flwr.common.constant import CONN_RECONNECT_INTERVAL, CONN_REFRESH_PERIOD
 from flwr.common.logger import log as logger
 from flwr.proto.control_pb2 import StreamLogsRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 
-from .utils import flwr_cli_grpc_exc_handler, init_channel, load_cli_auth_plugin
+from .utils import flwr_cli_grpc_exc_handler, init_channel_from_connection
 
 
 class AllLogsRetrieved(BaseException):
@@ -108,18 +105,19 @@ def stream_logs(
 
     latest_timestamp = 0.0
     res = None
-    try:
-        with flwr_cli_grpc_exc_handler():
+
+    with flwr_cli_grpc_exc_handler():
+        try:
             for res in stub.StreamLogs(req, timeout=duration):
                 print(res.log_output, end="")
-        raise AllLogsRetrieved()
-    except grpc.RpcError as e:
-        # pylint: disable=E1101
-        if e.code() != grpc.StatusCode.DEADLINE_EXCEEDED:
-            raise e
-    finally:
-        if res is not None:
-            latest_timestamp = cast(float, res.latest_timestamp)
+            raise AllLogsRetrieved()
+        except grpc.RpcError as e:
+            # pylint: disable=E1101
+            if e.code() != grpc.StatusCode.DEADLINE_EXCEEDED:
+                raise e
+        finally:
+            if res is not None:
+                latest_timestamp = cast(float, res.latest_timestamp)
 
     return max(latest_timestamp, after_timestamp)
 
@@ -139,42 +137,40 @@ def print_logs(run_id: int, channel: grpc.Channel, timeout: int) -> None:
     stub = ControlStub(channel)
     req = StreamLogsRequest(run_id=run_id, after_timestamp=0.0)
 
-    try:
-        with flwr_cli_grpc_exc_handler():
+    with flwr_cli_grpc_exc_handler():
+        try:
             # Enforce timeout for graceful exit
             for res in stub.StreamLogs(req, timeout=timeout):
                 print(res.log_output)
                 break
-    except grpc.RpcError as e:
-        if e.code() == grpc.StatusCode.NOT_FOUND:  # pylint: disable=E1101
-            logger(ERROR, "Invalid run_id `%s`, exiting", run_id)
-        elif e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:  # pylint: disable=E1101
-            pass
-        else:
-            raise e
-    finally:
-        channel.close()
-        logger(DEBUG, "Channel closed")
+        except grpc.RpcError as e:
+            if e.code() == grpc.StatusCode.NOT_FOUND:  # pylint: disable=E1101
+                logger(ERROR, "Invalid run_id `%s`, exiting", run_id)
+            elif e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:  # pylint: disable=E1101
+                pass
+            else:
+                raise e
+        finally:
+            channel.close()
+            logger(DEBUG, "Channel closed")
 
 
 def log(
+    ctx: typer.Context,
     run_id: Annotated[
         int,
         typer.Argument(help="The Flower run ID to query"),
     ],
-    app: Annotated[
-        Path,
-        typer.Argument(help="Path of the Flower project to run"),
-    ] = Path("."),
-    federation: Annotated[
+    superlink: Annotated[
         str | None,
-        typer.Argument(help="Name of the federation to run the app on"),
+        typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     federation_config_overrides: Annotated[
         list[str] | None,
         typer.Option(
             "--federation-config",
             help=FEDERATION_CONFIG_HELP_MESSAGE,
+            hidden=True,
         ),
     ] = None,
     stream: Annotated[
@@ -190,27 +186,23 @@ def log(
     Retrieve and display logs from a Flower run. Logs can be streamed in real-time (with
     --stream) or printed once (with --show).
     """
-    typer.secho("Loading project configuration... ", fg=typer.colors.BLUE)
+    # Warn `--federation-config` is ignored
+    warn_if_federation_config_overrides(federation_config_overrides)
 
-    pyproject_path = app / "pyproject.toml" if app else None
-    config, errors, warnings = load_and_validate(pyproject_path, check_module=False)
-    config = process_loaded_project_config(config, errors, warnings)
-    federation, federation_config = validate_federation_in_project_config(
-        federation, config, federation_config_overrides
-    )
-    exit_if_no_address(federation_config, "log")
+    # Migrate legacy usage if any
+    migrate(superlink, args=ctx.args)
+
+    # Read superlink connection configuration
+    superlink_connection = read_superlink_connection(superlink)
 
     try:
-        _log_with_control_api(app, federation, federation_config, run_id, stream)
+        _log_with_control_api(superlink_connection, run_id, stream)
     except Exception as err:  # pylint: disable=broad-except
-        typer.secho(str(err), fg=typer.colors.RED, bold=True, err=True)
-        raise typer.Exit(code=1) from None
+        raise click.ClickException(str(err)) from None
 
 
 def _log_with_control_api(
-    app: Path,
-    federation: str,
-    federation_config: dict[str, Any],
+    superlink_connection: SuperLinkConnection,
     run_id: int,
     stream: bool,
 ) -> None:
@@ -218,19 +210,14 @@ def _log_with_control_api(
 
     Parameters
     ----------
-    app : Path
-        Path to the Flower app directory.
-    federation : str
-        Name of the federation.
-    federation_config : dict[str, Any]
-        Federation configuration dictionary.
+    superlink_connection : SuperLinkConnection
+        Superlink connection configuration.
     run_id : int
         The unique identifier of the run to retrieve logs from.
     stream : bool
         If True, stream logs continuously; if False, print once.
     """
-    auth_plugin = load_cli_auth_plugin(app, federation, federation_config)
-    channel = init_channel(app, federation_config, auth_plugin)
+    channel = init_channel_from_connection(superlink_connection)
 
     if stream:
         start_stream(run_id, channel, CONN_REFRESH_PERIOD)

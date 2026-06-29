@@ -19,7 +19,7 @@ which allows users to perform the training on a single GPU.
 Start by cloning the example project:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/flowertune-llm . \
         && rm -rf _tmp \
         && cd flowertune-llm
@@ -53,23 +53,32 @@ pip install -e .
 
 You can run your Flower project in both _simulation_ and _deployment_ mode without making changes to the code. If you are starting with Flower, we recommend you using the _simulation_ mode as it requires fewer components to be launched manually. By default, `flwr run` will make use of the Simulation Engine.
 
+This example is designed to run with 20 virtual `SuperNodes` which have GPU-enabled `ClientApp` execution. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes and only CPU). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
+
+```bash
+flwr federation simulation-config \
+    --num-supernodes=20 \
+    --client-resources-num-cpus=8 \
+    --client-resources-num-gpus=1.0
+```
+
 ### Run with the Simulation Engine
 
 > [!NOTE]
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
-flwr run .
+flwr run .  --stream
 ```
 
 This command will run FL simulations with a 4-bit [OpenLLaMA 3Bv2](https://huggingface.co/openlm-research/open_llama_3b_v2) model involving 2 clients per rounds for 100 FL rounds. You can override configuration parameters directly from the command line. Below are a few settings you might want to test:
 
 ```bash
 # Use OpenLLaMA-7B instead of 3B and 8-bits quantization
-flwr run . --run-config "model.name='openlm-research/open_llama_7b_v2' model.quantization=8"
+flwr run . --run-config "model.name='openlm-research/open_llama_7b_v2' model.quantization=8"  --stream
 
 # Run for 50 rounds but increasing the fraction of clients that participate per round to 25%
-flwr run . --run-config "num-server-rounds=50 strategy.fraction-train=0.25"
+flwr run . --run-config "num-server-rounds=50 strategy.fraction-train=0.25"  --stream
 ```
 
 ### Run with the Deployment Engine
@@ -94,7 +103,7 @@ We make use of the [bitsandbytes](https://huggingface.co/docs/bitsandbytes/main/
 The above table shows the VRAM consumption per client for the different models considered in this example.
 You can adjust the CPU/GPU resources you assign to each of the clients based on your device.
 For example, it is easy to train 2 concurrent clients on each GPU (24 GB VRAM) if you choose 3-billion (4-bit) model.
-Assigning 50% of the GPU's VRAM to each client by setting `options.backend.clientapp-gpus = 0.5` under `[tool.flwr.federations.local-simulation]` in `pyproject.toml`.
+Assigning 50% of the GPU's VRAM to each client by setting `options.backend.clientapp-gpus = 0.5` under `[superlink.local]` in your Flower Configuration file.
 
 ## Test with your Questions
 

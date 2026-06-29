@@ -15,9 +15,48 @@
 """Tests for utility functions for the infrastructure."""
 
 
+import json
+import sys
+from typing import Any
+
+import pytest
+import requests
 from parameterized import parameterized
 
-from .utils import int64_to_uint64, mask_string, uint64_to_int64
+from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+
+from .utils import (
+    MetadataLookupError,
+    find_metadata_keys,
+    get_metadata_bytes,
+    get_metadata_str,
+    get_metadata_str_checked,
+    humanize_bytes,
+    humanize_duration,
+    int64_to_uint64,
+    mask_string,
+    parse_app_spec,
+    request_download_link,
+    resolve_account_ids,
+    simulation_config_from_json,
+    simulation_config_to_json,
+    strict_json_dumps,
+    strict_json_loads,
+    uint64_to_int64,
+)
+
+
+def test_find_metadata_keys() -> None:
+    """Return the subset of requested keys present in metadata."""
+    assert find_metadata_keys(
+        [
+            ("x-token", "value"),
+            ("x-trace-id", "abc"),
+            ("x-token", "other"),
+        ],
+        ("x-token", "missing"),
+    ) == {"x-token"}
 
 
 def test_mask_string() -> None:
@@ -29,6 +68,104 @@ def test_mask_string() -> None:
     assert mask_string("") == ""
     assert mask_string("1234567890", head=2, tail=3) == "12...890"
     assert mask_string("1234567890", head=5, tail=4) == "12345...7890"
+
+
+def test_resolve_account_ids_without_ee(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolve the noop account id and ignore unknown ids."""
+    monkeypatch.setitem(sys.modules, "flwr.ee", None)
+    monkeypatch.setitem(sys.modules, "flwr.ee.utils", None)
+    assert resolve_account_ids([NOOP_FLWR_AID, "unknown"]) == {
+        NOOP_FLWR_AID: NOOP_ACCOUNT_NAME
+    }
+
+
+def test_strict_json_loads() -> None:
+    """Parse valid JSON values."""
+    assert strict_json_loads('{"key":[1,true,null]}') == {"key": [1, True, None]}
+
+
+def test_strict_json_loads_rejects_non_finite_numbers() -> None:
+    """Reject Python's non-standard JSON number constants."""
+    with pytest.raises(ValueError, match="non-finite number NaN"):
+        strict_json_loads('{"key":NaN}')
+
+
+def test_strict_json_dumps() -> None:
+    """Serialize valid JSON values."""
+    assert strict_json_dumps({"key": [1, True, None]}, compact=True) == (
+        '{"key":[1,true,null]}'
+    )
+
+
+def test_strict_json_dumps_rejects_non_finite_numbers() -> None:
+    """Reject non-finite floating-point values."""
+    with pytest.raises(ValueError, match="Out of range float values"):
+        strict_json_dumps({"key": float("nan")})
+
+
+@pytest.mark.parametrize(
+    ("metadata", "key", "expected"),
+    [
+        ([("x-token", "value")], "x-token", "value"),
+        (
+            [
+                ("x-token", ""),
+            ],
+            "x-token",
+            None,
+        ),
+        ([("x-token", "value"), ("x-token", "other")], "x-token", None),
+        ([("x-token", b"value")], "x-token", None),
+    ],
+)
+def test_get_metadata_str(
+    metadata: list[tuple[str, str | bytes]], key: str, expected: str | None
+) -> None:
+    """Return exactly one non-empty string value of the expected type."""
+    assert get_metadata_str(metadata, key) == expected
+
+
+@pytest.mark.parametrize(
+    ("metadata", "key", "expected_value", "expected_error"),
+    [
+        ([("x-token", "value")], "x-token", "value", None),
+        ([("x-token", "")], "x-token", None, "empty"),
+        ([("x-token", "value"), ("x-token", "other")], "x-token", None, "duplicate"),
+        ([("x-token", b"value")], "x-token", None, "wrong_type"),
+        ([("other", "value")], "x-token", None, "missing"),
+    ],
+)
+def test_get_metadata_str_checked(
+    metadata: list[tuple[str, str | bytes]],
+    key: str,
+    expected_value: str | None,
+    expected_error: str | None,
+) -> None:
+    """Preserve metadata validation outcomes for callers that need them."""
+    value, error_type = None, None
+    try:
+        value = get_metadata_str_checked(metadata, key)
+    except MetadataLookupError as e:
+        error_type = e.error_type
+
+    assert value == expected_value
+    assert error_type == expected_error
+
+
+@pytest.mark.parametrize(
+    ("metadata", "key", "expected"),
+    [
+        ([("x-bin", b"value")], "x-bin", b"value"),
+        ([("x-bin", b"")], "x-bin", None),
+        ([("x-bin", b"value"), ("x-bin", b"other")], "x-bin", None),
+        ([("x-bin", "value")], "x-bin", None),
+    ],
+)
+def test_get_metadata_bytes(
+    metadata: list[tuple[str, str | bytes]], key: str, expected: bytes | None
+) -> None:
+    """Return exactly one non-empty bytes value of the expected type."""
+    assert get_metadata_bytes(metadata, key) == expected
 
 
 @parameterized.expand(  # type: ignore
@@ -88,3 +225,273 @@ def test_uint64_to_sint64_to_uint64(expected: int) -> None:
     """Test conversion from sint64 to uint64."""
     actual = int64_to_uint64(uint64_to_int64(expected))
     assert actual == expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "user/app==1.2.3",  # missing '@'
+        "@accountapp==1.2.3",  # missing slash
+        "@account/app==1.2",  # bad version
+        "@account/app==1.2.3.4",  # bad version
+        "@account*/app==1.2.3",  # bad user id chars
+        "@account/app*==1.2.3",  # bad app id chars
+    ],
+)
+def test_parse_app_spec_rejects_invalid_formats(value: str) -> None:
+    """For an invalid string, the function should fail fast with ValueError."""
+    with pytest.raises(ValueError):
+        parse_app_spec(value)
+
+
+def test_request_download_link_all_scenarios(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Single table-driven test covering all major outcomes for
+    request_download_link."""
+    app_id: str = "@user/app"
+    app_version: str | None = "1.0.0"
+    in_url = "https://example.ai/hub/fetch-fab"
+    out_url = "fab_url"
+
+    # Table of scenarios
+    scenarios: list[dict[str, Any]] = [
+        {
+            "name": "success_with_verifications",
+            "fake_resp": {
+                "ok": True,
+                "status": 200,
+                "json": {
+                    "fab_url": "https://example.ai/fab.fab",
+                    "verifications": [
+                        {"public_key_id": "key1", "sig": "abc", "algo": "ed25519"}
+                    ],
+                    "note": "Compatibility fallback applied.",
+                },
+            },
+            "assert": lambda out: (
+                out[0] == "https://example.ai/fab.fab"
+                and isinstance(out[1], list)
+                and out[1][0]["public_key_id"] == "key1"
+                and out[2] == "Compatibility fallback applied."
+            ),
+        },
+        {
+            "name": "success_without_verifications",
+            "fake_resp": {
+                "ok": True,
+                "status": 200,
+                "json": {"fab_url": "https://example.ai/fab.fab"},
+            },
+            "assert": lambda out: out[0] == "https://example.ai/fab.fab"
+            and out[1] is None
+            and out[2] is None,
+        },
+        {
+            "name": "http_404_not_found",
+            "fake_resp": {
+                "ok": False,
+                "status": 404,
+                "text": "not found",
+                # No JSON body -> json() returns {}
+            },
+            "raises": "not found in Platform API",
+        },
+        {
+            "name": "http_503_unavailable",
+            "fake_resp": {
+                "ok": False,
+                "status": 503,
+                "text": "service unavailable",
+            },
+            "raises": "status 503",
+        },
+        {
+            "name": "network_error",
+            "fake_exc": requests.RequestException("network down"),
+            "raises": "Unable to connect to Platform API",
+        },
+        {
+            "name": "missing_fab_url",
+            "fake_resp": {
+                "ok": True,
+                "status": 200,
+                "json": {"verifications": []},
+            },
+            "raises": "Invalid response from Platform API",
+        },
+    ]
+
+    current_case: dict[str, Any] = {"data": None}
+
+    class _FakeResp:
+        ok: bool
+        status_code: int
+        _json: dict[str, Any]
+        text: str
+
+        def __init__(
+            self,
+            ok: bool,
+            status: int,
+            json_data: dict[str, Any] | None = None,
+            text: str = "",
+        ) -> None:
+            self.ok = ok
+            self.status_code = status
+            self._json = json_data or {}
+            self.text = text
+
+        def json(self) -> dict[str, Any]:
+            """Return JSON data."""
+            return self._json
+
+    def fake_post(url: str, data: str | None = None, **_: Any) -> _FakeResp:
+        case_data: dict[str, Any] | None = current_case.get("data")
+
+        # Basic payload sanity check for the success-like cases
+        if isinstance(case_data, dict) and "fake_resp" in case_data:
+            assert url == in_url
+            assert data is not None
+            payload: dict[str, Any] = json.loads(data)
+            assert payload["app_id"] == app_id
+            assert payload["app_version"] == app_version
+            assert "flwr_version" in payload
+
+        # Simulate network error if requested
+        if isinstance(case_data, dict) and "fake_exc" in case_data:
+            raise case_data["fake_exc"]
+
+        fr: dict[str, Any] = case_data["fake_resp"]  # type: ignore[index]
+        return _FakeResp(
+            ok=fr["ok"],
+            status=fr["status"],
+            json_data=fr.get("json"),
+            text=fr.get("text", ""),
+        )
+
+    monkeypatch.setattr(requests, "post", fake_post)
+
+    for case in scenarios:
+        current_case["data"] = case
+
+        if "raises" in case:
+            with pytest.raises(ValueError) as exc:
+                _ = request_download_link(app_id, app_version, in_url, out_url)
+            msg: str = str(exc.value)
+            assert case["raises"] in msg, f"Expected '{case['raises']}' in '{msg}'"
+            if case["name"] == "http_404_not_found":
+                assert app_id in msg
+        else:
+            # Expect a (fab_url, verifications, note) tuple
+            result: tuple[str, list[dict[str, str]] | None, str | None] = (
+                request_download_link(app_id, app_version, in_url, out_url)
+            )
+            assert case["assert"](result), f"Assertion failed for {case['name']}"
+
+
+def test_simulation_config_to_json_includes_unset_optional_fields() -> None:
+    """Serialize simulation config with unset optional fields as null."""
+    config = SimulationConfig(
+        num_supernodes=10,
+        client_resources_num_cpus=2,
+        client_resources_num_gpus=0.25,
+        backend="ray",
+        verbose=True,
+    )
+
+    assert simulation_config_to_json(config) == {
+        "num_supernodes": 10,
+        "client_resources_num_cpus": 2,
+        "client_resources_num_gpus": 0.25,
+        "backend": "ray",
+        "verbose": True,
+        "init_args_num_cpus": None,
+        "init_args_num_gpus": None,
+        "init_args_logging_level": None,
+        "init_args_log_to_driver": None,
+    }
+
+
+def test_simulation_config_from_json_preserves_falsey_optional_values() -> None:
+    """Deserialize optional values without dropping explicit zero/false settings."""
+    payload = {
+        "num_supernodes": 5,
+        "client_resources_num_cpus": 1,
+        "client_resources_num_gpus": 0.0,
+        "backend": "ray",
+        "verbose": False,
+        "init_args_num_cpus": 4,
+        "init_args_num_gpus": 0,
+        "init_args_logging_level": "",
+        "init_args_log_to_driver": False,
+    }
+
+    config = simulation_config_from_json(payload)
+
+    assert config.num_supernodes == 5
+    assert config.client_resources_num_cpus == 1
+    assert config.client_resources_num_gpus == 0.0
+    assert config.backend == "ray"
+    assert not config.verbose
+    assert config.init_args_num_cpus == 4
+    assert config.init_args_num_gpus == 0
+    assert config.init_args_logging_level == ""
+    assert not config.init_args_log_to_driver
+    assert config.HasField("init_args_num_cpus")
+    assert config.HasField("init_args_num_gpus")
+    assert config.HasField("init_args_logging_level")
+    assert config.HasField("init_args_log_to_driver")
+
+
+def test_simulation_config_json_round_trip_preserves_presence() -> None:
+    """Round-trip simulation config JSON without inventing optional fields."""
+    original = SimulationConfig(
+        num_supernodes=12,
+        client_resources_num_cpus=3,
+        client_resources_num_gpus=1.5,
+        backend="ray",
+        verbose=False,
+        init_args_num_gpus=2,
+    )
+
+    restored = simulation_config_from_json(simulation_config_to_json(original))
+
+    assert restored == original
+    assert not restored.HasField("init_args_num_cpus")
+    assert restored.HasField("init_args_num_gpus")
+    assert not restored.HasField("init_args_logging_level")
+    assert not restored.HasField("init_args_log_to_driver")
+
+
+def test_simulation_config_from_json_rejects_unknown_fields() -> None:
+    """Reject unknown JSON keys when deserializing simulation configs."""
+    with pytest.raises(ValueError, match="unknown_field"):
+        simulation_config_from_json({"unknown_field": 1})
+
+
+@parameterized.expand(  # type: ignore
+    [
+        (24, "24s"),  # seconds
+        (90, "1m 30s"),  # min + sec
+        (3723, "1h 2m"),  # hour + min
+        (90000, "1d 1h"),  # day + hour
+    ]
+)
+def test_humanize_duration(seconds, expected) -> None:
+    """Test the humanize_duration function."""
+    assert humanize_duration(seconds) == expected
+
+
+@parameterized.expand(  # type: ignore
+    [
+        (800, "800 B"),  # bytes
+        (2048, "2.0 KB"),  # KB < 10 → 1 decimal
+        (10 * 1024, "10 KB"),  # KB >= 10 → no decimal
+        (5 * 1024**2, "5.0 MB"),  # MB < 10
+        (3 * 1024**3, "3.0 GB"),  # GB < 10
+    ]
+)
+def test_humanize_bytes(num_bytes, expected) -> None:
+    """Test the humanize_bytes function."""
+    assert humanize_bytes(num_bytes) == expected

@@ -20,7 +20,8 @@ from abc import ABC, abstractmethod
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.common.typing import AccountInfo, LogEntry
+from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.event_log.typing import LogEntry
 
 
 class EventLogWriterPlugin(ABC):

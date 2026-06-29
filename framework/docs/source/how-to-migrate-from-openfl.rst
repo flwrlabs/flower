@@ -66,23 +66,22 @@ First, we install the Flower package ``flwr``:
     # In a new Python environment
     $ pip install -U "flwr[simulation]"
 
-Then, we create a new Flower app called ``flower-tutorial`` using the PyTorch template.
-We also specify a username (``flwrlabs``) for the project:
+Then, run the command below:
 
 .. code-block:: shell
 
-    $ flwr new flower-tutorial --framework pytorch --username flwrlabs
+    $ flwr new @flwrlabs/quickstart-pytorch
 
-After running the command, a new directory called ``flower-tutorial`` will be created.
-Here is a comparison between it and the relevant files in a typical ``openfl-example``
-folder:
+After running the command, a new directory called ``quickstart-pytorch`` will be
+created. Here is a comparison between it and the relevant files in a typical
+``openfl-example`` folder:
 
 .. grid:: 2
 
     .. grid-item-card:: OpenFL Example
 
         .. code-block:: text
-           :emphasize-lines: 15-18
+           :emphasize-lines: 15-17
 
            openfl-example
            ├── requirements.txt
@@ -102,13 +101,13 @@ folder:
                ├── utils.py
                └── dataloader.py
 
-    .. grid-item-card:: Flower Tutorial
+    .. grid-item-card:: Flower Quickstart (PyTorch)
 
         .. code-block:: text
            :emphasize-lines: 4-6
 
-           flower-tutorial
-           ├── flower_tutorial
+           quickstart-pytorch
+           ├── pytorchexample
            │   ├── __init__.py
            │   ├── client_app.py
            │   ├── server_app.py
@@ -134,12 +133,12 @@ Migrate your model
 ==================
 
 The model is very straightforward to port from OpenFL to Flower. If you are working with
-a PyTorch model, OpenFL has a ``PyTorchTaskRunner`` that inherits from ``nn.module`` (in
+a PyTorch model, OpenFL has a ``PyTorchTaskRunner`` that inherits from ``nn.Module`` (in
 ``taskrunner.py``) - and includes other things like the ``train`` and ``validate``
 functions. Flower assumes you bring a standard PyTorch model, so it's as easy as moving
-the model definition to ``task.py`` in the ``flower_tutorial`` directory, and changing
-the inheritance of the Net back to ``nn.module``. For a concrete example, see the
-following OpenFL TaskRunner code snippet:
+the model definition to ``task.py`` in the ``quickstart-pytorch`` directory, and
+changing the inheritance of the Net back to ``nn.Module``. For a concrete example, see
+the following OpenFL TaskRunner code snippet:
 
 .. code-block:: python
     :emphasize-lines: 2,50-60
@@ -149,7 +148,7 @@ following OpenFL TaskRunner code snippet:
         """
         Simple CNN for classification.
 
-        PyTorchTaskRunner inherits from nn.module, so you can define your model
+        PyTorchTaskRunner inherits from nn.Module, so you can define your model
         in the same way that you would for PyTorch
         """
 
@@ -546,7 +545,7 @@ given deep learning framework (in this case PyTorch) due to the saving of a fina
 This functionality is optional, but mirrors the automatic saving of a model at the end
 of an OpenFL experiment. This ``ServerApp`` change requires only a few lines of
 modifications, and Flower has support for an extensive set of deep learning frameworks
-in it's `examples <https://github.com/adap/flower/tree/main/examples>`_ (Tensorflow,
+in it's `examples <https://github.com/flwrlabs/flower/tree/main/examples>`_ (Tensorflow,
 FastAI, Huggingface, etc.) should you need reference code.
 
 **************
@@ -555,7 +554,7 @@ FastAI, Huggingface, etc.) should you need reference code.
 
 For a complete PyTorch example that goes into depth on various Flower components, see
 the `Get started with Flower
-<https://flower.ai/docs/framework/tutorial-series-get-started-with-flower-pytorch.html>`_
+<https://flower.ai/docs/framework/tutorial-series-write-your-first-flower-app-pytorch.html>`_
 tutorial. While we expect this guide will help most users get migrated quickly to the
 Flower ecosystem, certain complex OpenFL workloads may require more clarification or
 help. If you have further questions, `join the Flower Slack

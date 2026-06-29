@@ -22,18 +22,19 @@ from abc import ABC
 from collections.abc import Iterable
 from logging import INFO, WARNING
 
-from flwr.common import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, log
-from flwr.common.differential_privacy import (
+import numpy as np
+
+from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord
+from flwr.common import log
+from flwr.supercore.differential_privacy import (
+    CLIENTS_DISCREPANCY_WARNING,
+    KEY_CLIPPING_NORM,
     add_gaussian_noise_inplace,
     compute_clip_model_update,
     compute_stdv,
 )
-from flwr.common.differential_privacy_constants import (
-    CLIENTS_DISCREPANCY_WARNING,
-    KEY_CLIPPING_NORM,
-)
-from flwr.server import Grid
 
+from ..grid import Grid
 from .strategy import Strategy
 
 
@@ -112,7 +113,7 @@ class DifferentialPrivacyFixedClippingBase(Strategy, ABC):
 
         return ArrayRecord(
             {
-                k: Array(v)
+                k: Array(np.asarray(v))
                 for k, v in zip(
                     aggregated_arrays.keys(), aggregated_ndarrays, strict=True
                 )
@@ -216,7 +217,13 @@ class DifferentialPrivacyServerSideFixedClipping(DifferentialPrivacyFixedClippin
                 )
                 # Replace content while preserving keys
                 reply.content[arr_name] = ArrayRecord(
-                    dict(zip(record.keys(), map(Array, reply_ndarrays), strict=True))
+                    dict(
+                        zip(
+                            record.keys(),
+                            (Array(np.asarray(v)) for v in reply_ndarrays),
+                            strict=True,
+                        )
+                    )
                 )
             log(
                 INFO,

@@ -613,6 +613,7 @@ class IncorrectUsageFederatedDatasets(unittest.TestCase):
         )
 
 
+# pylint: disable=too-many-return-statements
 def datasets_are_equal(ds1: Dataset, ds2: Dataset) -> bool:
     """Check if two Datasets have the same values."""
     # Check if both datasets have the same length
@@ -629,14 +630,18 @@ def datasets_are_equal(ds1: Dataset, ds2: Dataset) -> bool:
         for key in row1:
             if key == "audio":
                 # Special handling for 'audio' key
-                if not all(
-                    [
-                        np.array_equal(row1[key]["array"], row2[key]["array"]),
-                        row1[key]["path"] == row2[key]["path"],
-                        row1[key]["sampling_rate"] == row2[key]["sampling_rate"],
-                    ]
-                ):
+                # Check array and sampling_rate
+                if not np.array_equal(row1[key]["array"], row2[key]["array"]):
                     return False
+                if row1[key]["sampling_rate"] != row2[key]["sampling_rate"]:
+                    return False
+
+                # Check path if available (AudioDecoder raises TypeError)
+                try:
+                    if row1[key]["path"] != row2[key]["path"]:
+                        return False
+                except TypeError:
+                    pass
             elif row1[key] != row2[key]:
                 # Direct comparison for other keys
                 return False

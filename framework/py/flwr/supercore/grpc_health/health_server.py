@@ -21,8 +21,8 @@ from logging import INFO
 import grpc
 from grpc_health.v1.health_pb2_grpc import add_HealthServicer_to_server
 
-from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import log
+from flwr.supercore.grpc import generic_create_grpc_server
 
 from .simple_health_servicer import SimpleHealthServicer
 
@@ -37,7 +37,7 @@ def run_health_server_grpc_no_tls(address: str) -> grpc.Server:
         server_address=address,
         certificates=None,
     )
-    log(INFO, "Starting gRPC health server on %s", address)
+    log(INFO, "Starting gRPC health server on %s", health_server.bound_address)
     health_server.start()
     return health_server
 

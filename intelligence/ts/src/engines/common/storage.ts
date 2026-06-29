@@ -96,9 +96,7 @@ export class NodeCacheStorage extends CacheStorage {
 
   async getItem(key: string): Promise<CachedEntry | null> {
     let cache = await this.load();
-    if (!cache) {
-      cache = { mapping: {} };
-    }
+    cache ??= { mapping: {} };
 
     if (key in cache.mapping) {
       return cache.mapping[key];
@@ -109,9 +107,7 @@ export class NodeCacheStorage extends CacheStorage {
   async setItem(key: string, value: string | null): Promise<void> {
     const now = Date.now();
     let cache = await this.load();
-    if (!cache) {
-      cache = { mapping: {} };
-    }
+    cache ??= { mapping: {} };
     if (value) {
       cache.mapping[key] = { value: value, lastUpdate: now };
       await this.save(cache);

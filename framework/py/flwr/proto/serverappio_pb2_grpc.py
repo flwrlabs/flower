@@ -4,12 +4,9 @@ import grpc
 import warnings
 
 from flwr.proto import appio_pb2 as flwr_dot_proto_dot_appio__pb2
-from flwr.proto import fab_pb2 as flwr_dot_proto_dot_fab__pb2
-from flwr.proto import heartbeat_pb2 as flwr_dot_proto_dot_heartbeat__pb2
 from flwr.proto import log_pb2 as flwr_dot_proto_dot_log__pb2
 from flwr.proto import message_pb2 as flwr_dot_proto_dot_message__pb2
 from flwr.proto import run_pb2 as flwr_dot_proto_dot_run__pb2
-from flwr.proto import serverappio_pb2 as flwr_dot_proto_dot_serverappio__pb2
 
 GRPC_GENERATED_VERSION = '1.70.0'
 GRPC_VERSION = grpc.__version__
@@ -40,70 +37,35 @@ class ServerAppIoStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.ListAppsToLaunch = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/ListAppsToLaunch',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchResponse.FromString,
+        self.PullPendingTasks = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PullPendingTasks',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PullPendingTasksRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullPendingTasksResponse.FromString,
                 _registered_method=True)
-        self.RequestToken = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/RequestToken',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.RequestTokenRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.RequestTokenResponse.FromString,
-                _registered_method=True)
-        self.GetNodes = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/GetNodes',
-                request_serializer=flwr_dot_proto_dot_serverappio__pb2.GetNodesRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_serverappio__pb2.GetNodesResponse.FromString,
-                _registered_method=True)
-        self.PushMessages = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PushMessages',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.FromString,
-                _registered_method=True)
-        self.PullMessages = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PullMessages',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.FromString,
+        self.ClaimTask = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/ClaimTask',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.ClaimTaskRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.ClaimTaskResponse.FromString,
                 _registered_method=True)
         self.GetRun = channel.unary_unary(
                 '/flwr.proto.ServerAppIo/GetRun',
                 request_serializer=flwr_dot_proto_dot_run__pb2.GetRunRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_run__pb2.GetRunResponse.FromString,
                 _registered_method=True)
-        self.GetFab = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/GetFab',
-                request_serializer=flwr_dot_proto_dot_fab__pb2.GetFabRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_fab__pb2.GetFabResponse.FromString,
+        self.SendTaskHeartbeat = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/SendTaskHeartbeat',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatResponse.FromString,
                 _registered_method=True)
-        self.PullAppInputs = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PullAppInputs',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PullAppInputsRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullAppInputsResponse.FromString,
+        self.PullTaskInput = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PullTaskInput',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputResponse.FromString,
                 _registered_method=True)
-        self.PushAppOutputs = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PushAppOutputs',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PushAppOutputsRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushAppOutputsResponse.FromString,
-                _registered_method=True)
-        self.UpdateRunStatus = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/UpdateRunStatus',
-                request_serializer=flwr_dot_proto_dot_run__pb2.UpdateRunStatusRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_run__pb2.UpdateRunStatusResponse.FromString,
-                _registered_method=True)
-        self.GetRunStatus = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/GetRunStatus',
-                request_serializer=flwr_dot_proto_dot_run__pb2.GetRunStatusRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_run__pb2.GetRunStatusResponse.FromString,
-                _registered_method=True)
-        self.PushLogs = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PushLogs',
-                request_serializer=flwr_dot_proto_dot_log__pb2.PushLogsRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_log__pb2.PushLogsResponse.FromString,
-                _registered_method=True)
-        self.SendAppHeartbeat = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/SendAppHeartbeat',
-                request_serializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.FromString,
+        self.PushTaskOutput = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PushTaskOutput',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.FromString,
                 _registered_method=True)
         self.PushObject = channel.unary_unary(
                 '/flwr.proto.ServerAppIo/PushObject',
@@ -120,104 +82,107 @@ class ServerAppIoStub(object):
                 request_serializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedResponse.FromString,
                 _registered_method=True)
+        self.CreateTask = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/CreateTask',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.FromString,
+                _registered_method=True)
+        self.PushTaskMessage = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PushTaskMessage',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageResponse.FromString,
+                _registered_method=True)
+        self.PushTaskEvents = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PushTaskEvents',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskEventsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskEventsResponse.FromString,
+                _registered_method=True)
+        self.PullTaskMessage = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PullTaskMessage',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.FromString,
+                _registered_method=True)
+        self.PushLogs = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PushLogs',
+                request_serializer=flwr_dot_proto_dot_log__pb2.PushLogsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_log__pb2.PushLogsResponse.FromString,
+                _registered_method=True)
+        self.PushMessages = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PushMessages',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.FromString,
+                _registered_method=True)
+        self.PullMessages = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PullMessages',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.FromString,
+                _registered_method=True)
+        self.GetNodes = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/GetNodes',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.GetNodesRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.GetNodesResponse.FromString,
+                _registered_method=True)
 
 
 class ServerAppIoServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def ListAppsToLaunch(self, request, context):
-        """List runs to launch
+    def PullPendingTasks(self, request, context):
+        """///////////////////////////////////////////////////////////////////////////
+        General *AppIo endpoints for SuperExec processes
+        ///////////////////////////////////////////////////////////////////////////
+
+        Pull pending tasks
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def RequestToken(self, request, context):
-        """Request token for a run
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetNodes(self, request, context):
-        """Return a set of nodes
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def PushMessages(self, request, context):
-        """Create one or more messages
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def PullMessages(self, request, context):
-        """Get message results
+    def ClaimTask(self, request, context):
+        """Claim task
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def GetRun(self, request, context):
-        """Get run details
+        """///////////////////////////////////////////////////////////////////////////
+        General *AppIo endpoints for App Executor processes
+        ///////////////////////////////////////////////////////////////////////////
+
+        Get run details
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetFab(self, request, context):
-        """Get FAB
+    def SendTaskHeartbeat(self, request, context):
+        """Task heartbeat
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def PullAppInputs(self, request, context):
-        """Pull ServerApp inputs
+    def PullTaskInput(self, request, context):
+        """Pull task inputs
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def PushAppOutputs(self, request, context):
-        """Push ServerApp outputs
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def UpdateRunStatus(self, request, context):
-        """Update the status of a given run
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetRunStatus(self, request, context):
-        """Get the status of a given run
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def PushLogs(self, request, context):
-        """Push ServerApp logs
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SendAppHeartbeat(self, request, context):
-        """App heartbeat
+    def PushTaskOutput(self, request, context):
+        """Push task outputs
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def PushObject(self, request, context):
-        """Push Object
+        """///////////////////////////////////////////////////////////////////////////
+        Specific endpoints shared by ServerAppIo and ClientAppIo
+        ///////////////////////////////////////////////////////////////////////////
+
+        Push Object
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -237,73 +202,98 @@ class ServerAppIoServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateTask(self, request, context):
+        """Create a task
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def PushTaskMessage(self, request, context):
+        """Push task message
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def PushTaskEvents(self, request, context):
+        """Push task events
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def PullTaskMessage(self, request, context):
+        """Pull task messages
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def PushLogs(self, request, context):
+        """Push task logs
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def PushMessages(self, request, context):
+        """///////////////////////////////////////////////////////////////////////////
+        Message and node endpoints
+        ///////////////////////////////////////////////////////////////////////////
+
+        Push messages
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def PullMessages(self, request, context):
+        """Pull messages
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNodes(self, request, context):
+        """Return a set of nodes
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ServerAppIoServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'ListAppsToLaunch': grpc.unary_unary_rpc_method_handler(
-                    servicer.ListAppsToLaunch,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchResponse.SerializeToString,
+            'PullPendingTasks': grpc.unary_unary_rpc_method_handler(
+                    servicer.PullPendingTasks,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullPendingTasksRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullPendingTasksResponse.SerializeToString,
             ),
-            'RequestToken': grpc.unary_unary_rpc_method_handler(
-                    servicer.RequestToken,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.RequestTokenRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.RequestTokenResponse.SerializeToString,
-            ),
-            'GetNodes': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetNodes,
-                    request_deserializer=flwr_dot_proto_dot_serverappio__pb2.GetNodesRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_serverappio__pb2.GetNodesResponse.SerializeToString,
-            ),
-            'PushMessages': grpc.unary_unary_rpc_method_handler(
-                    servicer.PushMessages,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.SerializeToString,
-            ),
-            'PullMessages': grpc.unary_unary_rpc_method_handler(
-                    servicer.PullMessages,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.SerializeToString,
+            'ClaimTask': grpc.unary_unary_rpc_method_handler(
+                    servicer.ClaimTask,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.ClaimTaskRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.ClaimTaskResponse.SerializeToString,
             ),
             'GetRun': grpc.unary_unary_rpc_method_handler(
                     servicer.GetRun,
                     request_deserializer=flwr_dot_proto_dot_run__pb2.GetRunRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_run__pb2.GetRunResponse.SerializeToString,
             ),
-            'GetFab': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetFab,
-                    request_deserializer=flwr_dot_proto_dot_fab__pb2.GetFabRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_fab__pb2.GetFabResponse.SerializeToString,
+            'SendTaskHeartbeat': grpc.unary_unary_rpc_method_handler(
+                    servicer.SendTaskHeartbeat,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatResponse.SerializeToString,
             ),
-            'PullAppInputs': grpc.unary_unary_rpc_method_handler(
-                    servicer.PullAppInputs,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullAppInputsRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullAppInputsResponse.SerializeToString,
+            'PullTaskInput': grpc.unary_unary_rpc_method_handler(
+                    servicer.PullTaskInput,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputResponse.SerializeToString,
             ),
-            'PushAppOutputs': grpc.unary_unary_rpc_method_handler(
-                    servicer.PushAppOutputs,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushAppOutputsRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushAppOutputsResponse.SerializeToString,
-            ),
-            'UpdateRunStatus': grpc.unary_unary_rpc_method_handler(
-                    servicer.UpdateRunStatus,
-                    request_deserializer=flwr_dot_proto_dot_run__pb2.UpdateRunStatusRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_run__pb2.UpdateRunStatusResponse.SerializeToString,
-            ),
-            'GetRunStatus': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetRunStatus,
-                    request_deserializer=flwr_dot_proto_dot_run__pb2.GetRunStatusRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_run__pb2.GetRunStatusResponse.SerializeToString,
-            ),
-            'PushLogs': grpc.unary_unary_rpc_method_handler(
-                    servicer.PushLogs,
-                    request_deserializer=flwr_dot_proto_dot_log__pb2.PushLogsRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_log__pb2.PushLogsResponse.SerializeToString,
-            ),
-            'SendAppHeartbeat': grpc.unary_unary_rpc_method_handler(
-                    servicer.SendAppHeartbeat,
-                    request_deserializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.SerializeToString,
+            'PushTaskOutput': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushTaskOutput,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.SerializeToString,
             ),
             'PushObject': grpc.unary_unary_rpc_method_handler(
                     servicer.PushObject,
@@ -320,6 +310,46 @@ def add_ServerAppIoServicer_to_server(servicer, server):
                     request_deserializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedResponse.SerializeToString,
             ),
+            'CreateTask': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateTask,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.SerializeToString,
+            ),
+            'PushTaskMessage': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushTaskMessage,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageResponse.SerializeToString,
+            ),
+            'PushTaskEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushTaskEvents,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskEventsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskEventsResponse.SerializeToString,
+            ),
+            'PullTaskMessage': grpc.unary_unary_rpc_method_handler(
+                    servicer.PullTaskMessage,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.SerializeToString,
+            ),
+            'PushLogs': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushLogs,
+                    request_deserializer=flwr_dot_proto_dot_log__pb2.PushLogsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_log__pb2.PushLogsResponse.SerializeToString,
+            ),
+            'PushMessages': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushMessages,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.SerializeToString,
+            ),
+            'PullMessages': grpc.unary_unary_rpc_method_handler(
+                    servicer.PullMessages,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.SerializeToString,
+            ),
+            'GetNodes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNodes,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.GetNodesRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.GetNodesResponse.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'flwr.proto.ServerAppIo', rpc_method_handlers)
@@ -332,7 +362,7 @@ class ServerAppIo(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def ListAppsToLaunch(request,
+    def PullPendingTasks(request,
             target,
             options=(),
             channel_credentials=None,
@@ -345,9 +375,9 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/ListAppsToLaunch',
-            flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchResponse.FromString,
+            '/flwr.proto.ServerAppIo/PullPendingTasks',
+            flwr_dot_proto_dot_appio__pb2.PullPendingTasksRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PullPendingTasksResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -359,7 +389,7 @@ class ServerAppIo(object):
             _registered_method=True)
 
     @staticmethod
-    def RequestToken(request,
+    def ClaimTask(request,
             target,
             options=(),
             channel_credentials=None,
@@ -372,90 +402,9 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/RequestToken',
-            flwr_dot_proto_dot_appio__pb2.RequestTokenRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.RequestTokenResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def GetNodes(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.ServerAppIo/GetNodes',
-            flwr_dot_proto_dot_serverappio__pb2.GetNodesRequest.SerializeToString,
-            flwr_dot_proto_dot_serverappio__pb2.GetNodesResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def PushMessages(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.ServerAppIo/PushMessages',
-            flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def PullMessages(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.ServerAppIo/PullMessages',
-            flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.FromString,
+            '/flwr.proto.ServerAppIo/ClaimTask',
+            flwr_dot_proto_dot_appio__pb2.ClaimTaskRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.ClaimTaskResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -494,7 +443,7 @@ class ServerAppIo(object):
             _registered_method=True)
 
     @staticmethod
-    def GetFab(request,
+    def SendTaskHeartbeat(request,
             target,
             options=(),
             channel_credentials=None,
@@ -507,9 +456,9 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/GetFab',
-            flwr_dot_proto_dot_fab__pb2.GetFabRequest.SerializeToString,
-            flwr_dot_proto_dot_fab__pb2.GetFabResponse.FromString,
+            '/flwr.proto.ServerAppIo/SendTaskHeartbeat',
+            flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -521,7 +470,7 @@ class ServerAppIo(object):
             _registered_method=True)
 
     @staticmethod
-    def PullAppInputs(request,
+    def PullTaskInput(request,
             target,
             options=(),
             channel_credentials=None,
@@ -534,9 +483,9 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PullAppInputs',
-            flwr_dot_proto_dot_appio__pb2.PullAppInputsRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PullAppInputsResponse.FromString,
+            '/flwr.proto.ServerAppIo/PullTaskInput',
+            flwr_dot_proto_dot_appio__pb2.PullTaskInputRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PullTaskInputResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -548,7 +497,7 @@ class ServerAppIo(object):
             _registered_method=True)
 
     @staticmethod
-    def PushAppOutputs(request,
+    def PushTaskOutput(request,
             target,
             options=(),
             channel_credentials=None,
@@ -561,117 +510,9 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PushAppOutputs',
-            flwr_dot_proto_dot_appio__pb2.PushAppOutputsRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PushAppOutputsResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def UpdateRunStatus(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.ServerAppIo/UpdateRunStatus',
-            flwr_dot_proto_dot_run__pb2.UpdateRunStatusRequest.SerializeToString,
-            flwr_dot_proto_dot_run__pb2.UpdateRunStatusResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def GetRunStatus(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.ServerAppIo/GetRunStatus',
-            flwr_dot_proto_dot_run__pb2.GetRunStatusRequest.SerializeToString,
-            flwr_dot_proto_dot_run__pb2.GetRunStatusResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def PushLogs(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.ServerAppIo/PushLogs',
-            flwr_dot_proto_dot_log__pb2.PushLogsRequest.SerializeToString,
-            flwr_dot_proto_dot_log__pb2.PushLogsResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def SendAppHeartbeat(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.ServerAppIo/SendAppHeartbeat',
-            flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.SerializeToString,
-            flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.FromString,
+            '/flwr.proto.ServerAppIo/PushTaskOutput',
+            flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -753,6 +594,222 @@ class ServerAppIo(object):
             '/flwr.proto.ServerAppIo/ConfirmMessageReceived',
             flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedRequest.SerializeToString,
             flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateTask(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/CreateTask',
+            flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PushTaskMessage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/PushTaskMessage',
+            flwr_dot_proto_dot_appio__pb2.PushTaskMessageRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PushTaskMessageResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PushTaskEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/PushTaskEvents',
+            flwr_dot_proto_dot_appio__pb2.PushTaskEventsRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PushTaskEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PullTaskMessage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/PullTaskMessage',
+            flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PushLogs(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/PushLogs',
+            flwr_dot_proto_dot_log__pb2.PushLogsRequest.SerializeToString,
+            flwr_dot_proto_dot_log__pb2.PushLogsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PushMessages(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/PushMessages',
+            flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PullMessages(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/PullMessages',
+            flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNodes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/GetNodes',
+            flwr_dot_proto_dot_appio__pb2.GetNodesRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.GetNodesResponse.FromString,
             options,
             channel_credentials,
             insecure,

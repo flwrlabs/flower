@@ -77,7 +77,7 @@ git lfs install
 Start by cloning the example project:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/fedrag . \
         && rm -rf _tmp \
         && cd fedrag
@@ -127,11 +127,20 @@ All corpora used in this work were derived from the MedRAG toolkit [[4]](#ref4).
 
 ## Run with Simulation Engine
 
+This example is designed to run with two virtual `SuperNodes`. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
+
+```bash
+flwr federation simulation-config --num-supernodes=2
+```
+
 From the top-level directory for this example, launch the simulation:
 
 ```bash
-flwr run .
+flwr run .  --stream
 ```
+
+> [!TIP]
+> Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ## Expected Results
 

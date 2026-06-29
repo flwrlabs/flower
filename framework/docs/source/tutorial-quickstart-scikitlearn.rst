@@ -1,6 +1,6 @@
-:og:description: Learn how to train a logistic regression on MNIST using federated learning with Flower and scikit-learn in this step-by-step tutorial.
+:og:description: Learn how to train a logistic regression on the Iris dataset using federated learning with Flower and scikit-learn in this step-by-step tutorial.
 .. meta::
-    :description: Learn how to train a logistic regression on MNIST using federated learning with Flower and scikit-learn in this step-by-step tutorial.
+    :description: Learn how to train a logistic regression on the Iris dataset using federated learning with Flower and scikit-learn in this step-by-step tutorial.
 
 .. _quickstart-pytorch:
 
@@ -37,13 +37,15 @@
 #########################
 
 In this federated learning tutorial we will learn how to train a Logistic Regression on
-MNIST using Flower and scikit-learn. It is recommended to create a virtual environment
-and run everything within a :doc:`virtualenv <contributor-how-to-set-up-a-virtual-env>`.
+the Iris dataset using Flower and scikit-learn. It is recommended to create a virtual
+environment and run everything within a :doc:`virtualenv
+<contributor-how-to-set-up-a-virtual-env>`.
 
 Let's use ``flwr new`` to create a complete Flower+scikit-learn project. It will
-generate all the files needed to run, by default with the Flower Simulation Engine, a
-federation of 10 nodes using |fedavg_link|_ The dataset will be partitioned using
-|flowerdatasets|_'s |iidpartitioner|_
+generate all the files needed to run a federation of two nodes using |fedavg_link|_. By
+default, the generated app uses a local simulation profile that ``flwr run`` submits to
+a managed local SuperLink, which then executes the run with the Flower Simulation
+Runtime. The dataset will be partitioned using |flowerdatasets|_'s |iidpartitioner|_
 
 Now that we have a rough idea of what this example is about, let's get started. First,
 install Flower in your new environment:
@@ -53,21 +55,19 @@ install Flower in your new environment:
     # In a new Python environment
     $ pip install flwr
 
-Then, run the command below. You will be prompted to select one of the available
-templates (choose ``sklearn``), give a name to your project, and type in your developer
-name:
+Then, run the command below:
 
 .. code-block:: shell
 
-    $ flwr new
+    $ flwr new @flwrlabs/quickstart-sklearn
 
-After running it you'll notice a new directory with your project name has been created.
-It should have the following structure:
+After running it you'll notice a new directory named ``quickstart-sklearn`` has been
+created. It should have the following structure:
 
 .. code-block:: shell
 
-    <your-project-name>
-    ├── <your-project-name>
+    quickstart-sklearn
+    ├── sklearnexample
     │   ├── __init__.py
     │   ├── client_app.py   # Defines your ClientApp
     │   ├── server_app.py   # Defines your ServerApp
@@ -75,99 +75,41 @@ It should have the following structure:
     ├── pyproject.toml      # Project metadata like dependencies and configs
     └── README.md
 
-If you haven't yet installed the project and its dependencies, you can do so by:
-
-.. code-block:: shell
-
-    # From the directory where your pyproject.toml is
-    $ pip install -e .
-
 To run the project, do:
 
 .. code-block:: shell
 
-    # Run with default arguments
-    $ flwr run .
+    $ cd quickstart-sklearn
 
-With default arguments you will see an output like this one:
+    # Run with default arguments and stream logs
+    $ flwr run . --stream
+
+Plain ``flwr run .`` submits the run, prints the run ID, and returns without streaming
+logs. For the full local workflow, see :doc:`how-to-run-flower-locally`.
+
+With default arguments you will see streamed output like this:
 
 .. code-block:: shell
 
-    Loading project configuration...
-    Success
+    Starting local SuperLink on 127.0.0.1:39093...
+    Successfully started run 1859953118041441032
     INFO :      Starting FedAvg strategy:
     INFO :          ├── Number of rounds: 3
-    INFO :          ├── ArrayRecord (0.06 MB)
-    INFO :          ├── ConfigRecord (train): (empty!)
-    INFO :          ├── ConfigRecord (evaluate): (empty!)
-    INFO :          ├──> Sampling:
-    INFO :          │       ├──Fraction: train (1.00) | evaluate ( 1.00)
-    INFO :          │       ├──Minimum nodes: train (2) | evaluate (2)
-    INFO :          │       └──Minimum available nodes: 2
-    INFO :          └──> Keys in records:
-    INFO :                  ├── Weighted by: 'num-examples'
-    INFO :                  ├── ArrayRecord key: 'arrays'
-    INFO :                  └── ConfigRecord key: 'config'
-    INFO :
-    INFO :
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_train: Received 10 results and 0 failures
+    INFO :      configure_train: Sampled 2 nodes (out of 2)
+    INFO :      aggregate_train: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'train_logloss': 1.3937176081476854}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
+    INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
+    INFO :      aggregate_evaluate: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'test_logloss': 1.23306, 'accuracy': 0.69154, 'precision': 0.68659, 'recall': 0.68046, 'f1': 0.65752}
-    INFO :
     INFO :      [ROUND 2/3]
-    INFO :      configure_train: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_train: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_logloss': 0.8565170774432291}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'test_logloss': 0.8805, 'accuracy': 0.73425, 'precision': 0.792371, 'recall': 0.7329, 'f1': 0.70438}
-    INFO :
+    INFO :      ...
     INFO :      [ROUND 3/3]
-    INFO :      configure_train: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_train: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_logloss': 0.703260769576}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'test_logloss': 0.70207, 'accuracy': 0.77250, 'precision': 0.82201, 'recall': 0.76348, 'f1': 0.75069}
-    INFO :
+    INFO :      ...
     INFO :      Strategy execution finished in 17.87s
-    INFO :
     INFO :      Final results:
-    INFO :
-    INFO :          Global Arrays:
-    INFO :                  ArrayRecord (0.060 MB)
-    INFO :
-    INFO :          Aggregated ClientApp-side Train Metrics:
-    INFO :          { 1: {'train_logloss': '1.3937e+00'},
-    INFO :            2: {'train_logloss': '8.5652e-01'},
-    INFO :            3: {'train_logloss': '7.0326e-01'}}
-    INFO :
-    INFO :          Aggregated ClientApp-side Evaluate Metrics:
-    INFO :          { 1: { 'accuracy': '6.9158e-01',
-    INFO :                 'f1': '6.5752e-01',
-    INFO :                 'precision': '6.8659e-01',
-    INFO :                 'recall': '6.8046e-01',
-    INFO :                 'test_logloss': '1.2331e+00'},
-    INFO :            2: { 'accuracy': '7.3425e-01',
-    INFO :                 'f1': '7.0439e-01',
-    INFO :                 'precision': '7.9237e-01',
-    INFO :                 'recall': '7.3295e-01',
-    INFO :                 'test_logloss': '8.8056e-01'},
-    INFO :            3: { 'accuracy': '7.7250e-01',
-    INFO :                 'f1': '7.5069e-01',
-    INFO :                 'precision': '8.2201e-01',
-    INFO :                 'recall': '7.6348e-01',
-    INFO :                 'test_logloss': '7.0208e-01'}}
-    INFO :
     INFO :          ServerApp-side Evaluate Metrics:
     INFO :          {}
-    INFO :
-
-    Saving final model to disk...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
 in ``pyproject.toml`` like this:
@@ -184,43 +126,48 @@ dataset partition, the model, defining the ``ClientApp`` and defining the ``Serv
  The Data
 **********
 
-This tutorial uses |flowerdatasets|_ to easily download and partition the `MNIST
-<https://huggingface.co/datasets/ylecun/mnist>`_ dataset. In this example you'll make
-use of the |iidpartitioner|_ to generate ``num_partitions`` partitions. You can choose
-|otherpartitioners|_ available in Flower Datasets. Each ``ClientApp`` will call this
-function to create dataloaders with the data that correspond to their data partition.
+This tutorial uses |flowerdatasets|_ to easily download and partition the `Iris
+<https://huggingface.co/datasets/scikit-learn/iris>`_ dataset. In this example you'll
+make use of the |iidpartitioner|_ to generate ``num_partitions`` partitions. You can
+choose |otherpartitioners|_ available in Flower Datasets. Each ``ClientApp`` will call
+this function to create dataloaders with the data that correspond to their data
+partition. Note that in this example only a subset of the columns are going to be used.
 
 .. code-block:: python
 
+    FEATURES = ["petal_length", "petal_width", "sepal_length", "sepal_width"]
+
     partitioner = IidPartitioner(num_partitions=num_partitions)
-    fds = FederatedDataset(
-        dataset="mnist",
-        partitioners={"train": partitioner},
-    )
-
-    dataset = fds.load_partition(partition_id, "train").with_format("numpy")
-
-    X, y = dataset["image"].reshape((len(dataset), -1)), dataset["label"]
-
-    # Split the on edge data: 80% train, 20% test
+    fds = FederatedDataset(dataset="hitorilabs/iris", partitioners={"train": partitioner})
+    dataset = fds.load_partition(partition_id, "train").with_format("pandas")[:]
+    X = dataset[FEATURES]
+    y = dataset["species"]
+    # Split the on-edge data: 80% train, 20% test
     X_train, X_test = X[: int(0.8 * len(X))], X[int(0.8 * len(X)) :]
     y_train, y_test = y[: int(0.8 * len(y))], y[int(0.8 * len(y)) :]
+    return X_train.values, y_train.values, X_test.values, y_test.values
 
 ***********
  The Model
 ***********
 
-We define the |logisticregression|_ model from scikit-learn in the ``get_model()``
-function:
+We define the |logisticregression|_ model from scikit-learn in the
+``create_log_reg_and_instantiate_parameters()`` function. This helper function also
+initializes the model parameters using the ``set_initial_params()`` utility function in
+the same file.
 
 .. code-block:: python
 
-    def get_model(penalty: str, local_epochs: int):
-        return LogisticRegression(
+    def create_log_reg_and_instantiate_parameters(penalty):
+        model = LogisticRegression(
             penalty=penalty,
-            max_iter=local_epochs,
-            warm_start=True,
+            max_iter=1,  # local epoch
+            warm_start=True,  # prevent refreshing weights when fitting,
+            solver="saga",
         )
+        # Setting initial parameters, akin to model.compile for keras models
+        set_initial_params(model, n_features=len(FEATURES), n_classes=len(UNIQUE_LABELS))
+        return model
 
 ***************
  The ClientApp
@@ -238,20 +185,22 @@ these conversions:
     @app.train()
     def train(msg: Message, context: Context):
 
-        # Load the model
-        model = get_model()  # construct your scikit-learn model
-        # Extract the ArrayRecord from Message and convert to numpy ndarrays
+        # Create LogisticRegression Model
+        penalty = context.run_config["penalty"]
+        # Create LogisticRegression Model
+        model = create_log_reg_and_instantiate_parameters(penalty)
+
+        # Apply received parameters
         ndarrays = msg.content["arrays"].to_numpy_ndarrays()
-        # Set the model parameters with auxhiliary function
         set_model_params(model, ndarrays)
 
         # Train the model
         ...
 
         # Extract the updated model parameters with auxhiliary function
-        updated_ndarrays = get_model_params(model)
+        ndarrays = get_model_params(model)
         # Pack the updated parameters into an ArrayRecord
-        model_record = ArrayRecord(updated_ndarrays)
+        model_record = ArrayRecord(ndarrays)
 
 The rest of the functionality is directly inspired by the centralized case. The
 |clientapp_link|_ comes with three core methods (``train``, ``evaluate``, and ``query``)
@@ -285,19 +234,17 @@ Runtime and is not directly configurable during simulations.
 
         # Create LogisticRegression Model
         penalty = context.run_config["penalty"]
-        local_epochs = context.run_config["local-epochs"]
-        model = get_model(penalty, local_epochs)
-        # Setting initial parameters, akin to model.compile for keras models
-        set_initial_params(model)
+        # Create LogisticRegression Model
+        model = create_log_reg_and_instantiate_parameters(penalty)
 
-        # Apply received pararameters
+        # Apply received parameters
         ndarrays = msg.content["arrays"].to_numpy_ndarrays()
         set_model_params(model, ndarrays)
 
         # Load the data
         partition_id = context.node_config["partition-id"]
         num_partitions = context.node_config["num-partitions"]
-        X_train, _, y_train, _ = load_data(partition_id, num_partitions)
+        X_train, y_train, _, _ = load_data(partition_id, num_partitions)
 
         # Ignore convergence failure due to low local epochs
         with warnings.catch_warnings():
@@ -307,12 +254,17 @@ Runtime and is not directly configurable during simulations.
 
         # Let's compute train loss
         y_train_pred_proba = model.predict_proba(X_train)
-        train_logloss = log_loss(y_train, y_train_pred_proba)
+        train_logloss = log_loss(y_train, y_train_pred_proba, labels=UNIQUE_LABELS)
+        accuracy = model.score(X_train, y_train)
 
         # Construct and return reply Message
         ndarrays = get_model_params(model)
         model_record = ArrayRecord(ndarrays)
-        metrics = {"num-examples": len(X_train), "train_logloss": train_logloss}
+        metrics = {
+            "num-examples": len(X_train),
+            "train_logloss": train_logloss,
+            "train_accuracy": accuracy,
+        }
         metric_record = MetricRecord(metrics)
         content = RecordDict({"arrays": model_record, "metrics": metric_record})
         return Message(content=content, reply_to=msg)
@@ -340,7 +292,7 @@ invoking its |strategy_start_link|_ method. To it we pass:
 
 - the ``Grid`` object.
 - an ``ArrayRecord`` carrying a randomly initialized model that will serve as the global
-  model to federated.
+  model to federate.
 - a ``ConfigRecord`` with the training hyperparameters to be sent to the clients. The
   strategy will also insert the current round number in this config before sending it to
   the participating nodes.
@@ -360,10 +312,7 @@ invoking its |strategy_start_link|_ method. To it we pass:
 
         # Create LogisticRegression Model
         penalty = context.run_config["penalty"]
-        local_epochs = context.run_config["local-epochs"]
-        model = get_model(penalty, local_epochs)
-        # Setting initial parameters, akin to model.compile for keras models
-        set_initial_params(model)
+        model = create_log_reg_and_instantiate_parameters(penalty)
         # Construct ArrayRecord representation
         arrays = ArrayRecord(get_model_params(model))
 
@@ -377,20 +326,26 @@ invoking its |strategy_start_link|_ method. To it we pass:
             num_rounds=num_rounds,
         )
 
-        # Save final model parameters
-        print("\nSaving final model to disk...")
-        ndarrays = result.arrays.to_numpy_ndarrays()
-        set_model_params(model, ndarrays)
-        joblib.dump(model, "logreg_model.pkl")
+        if context.run_config["save-model"]:
+            # Save final model parameters
+            print("\nSaving final model to disk...")
+            ndarrays = result.arrays.to_numpy_ndarrays()
+            set_model_params(model, ndarrays)
+            joblib.dump(model, "logreg_model.pkl")
 
 Congratulations! You've successfully built and run your first federated learning system
-in scikit-learn on the MNIST dataset using the new Message API.
+in scikit-learn on the Iris dataset using the new Message API.
+
+.. tip::
+
+    Check the :doc:`how-to-run-simulations` documentation to learn more about how to
+    configure and run Flower simulations.
 
 .. note::
 
     Check the source code of another Flower App using ``scikit-learn`` in the `Flower
     GitHub repository
-    <https://github.com/adap/flower/tree/main/examples/quickstart-sklearn-tabular>`_.
+    <https://github.com/flwrlabs/flower/tree/main/examples/quickstart-sklearn-tabular>`_.
 
 .. |flowerdatasets| replace:: Flower Datasets
 
@@ -415,4 +370,4 @@ in scikit-learn on the MNIST dataset using the new Message API.
 .. _otherpartitioners: https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.html
 
 .. meta::
-    :description: Check out this Federated Learning quickstart tutorial for using Flower with scikit-learn to train a linear regression model.
+    :description: Check out this Federated Learning quickstart tutorial for using Flower with scikit-learn to train a logistic regression model.

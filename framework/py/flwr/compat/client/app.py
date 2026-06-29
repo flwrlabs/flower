@@ -19,34 +19,33 @@ import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from logging import ERROR, INFO, WARN
-from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric import ec
 from grpc import RpcError
 
+from flwr.app import Context, Message
 from flwr.app.error import Error
+from flwr.app.user_config import UserConfig
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
-from flwr.client.client import Client
 from flwr.client.message_handler.message_handler import handle_control_message
-from flwr.client.numpy_client import NumPyClient
-from flwr.client.run_info_store import DeprecatedRunInfoStore
-from flwr.client.typing import ClientFnExt
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH, Context, EventType, Message, event
-from flwr.common.address import parse_address
-from flwr.common.constant import (
-    MAX_RETRY_DELAY,
-    TRANSPORT_TYPE_GRPC_BIDI,
-    TRANSPORT_TYPES,
-    ErrorCode,
-)
-from flwr.common.exit import ExitCode, flwr_exit
+from flwr.common.constant import MAX_RETRY_DELAY, ErrorCode
 from flwr.common.logger import log, warn_deprecated_feature
-from flwr.common.retry_invoker import RetryInvoker, RetryState, exponential
-from flwr.common.typing import Fab, Run, RunNotRunningException, UserConfig
+from flwr.compat.client.client import Client
 from flwr.compat.client.grpc_client.connection import grpc_connection
+from flwr.compat.client.numpy_client import NumPyClient
+from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
+from flwr.compat.client.typing import ClientFnExt
+from flwr.compat.common.constant import TRANSPORT_TYPE_GRPC_BIDI, TRANSPORT_TYPES_COMPAT
+from flwr.supercore.address import parse_address
+from flwr.supercore.exit import ExitCode, flwr_exit
+from flwr.supercore.fab import Fab
+from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.retry import RetryInvoker, RetryState, exponential
+from flwr.supercore.run import Run, RunNotRunningException
+from flwr.supercore.telemetry import EventType, event
 from flwr.supernode.nodestate import NodeStateFactory
 
 
@@ -218,7 +217,6 @@ def start_client_internal(
     ) = None,
     max_retries: int | None = None,
     max_wait_time: float | None = None,
-    flwr_path: Path | None = None,
 ) -> None:
     """Start a Flower client node which connects to a Flower server.
 
@@ -269,8 +267,6 @@ def start_client_internal(
         The maximum duration before the client stops trying to
         connect to the server in case of connection error.
         If set to None, there is no limit to the total time.
-    flwr_path: Optional[Path] (default: None)
-        The fully resolved path containing installed Flower Apps.
     """
     if insecure is None:
         insecure = root_certificates is None
@@ -431,7 +427,7 @@ def start_client_internal(
                     if get_fab is not None and run.fab_hash:
                         fab = get_fab(run.fab_hash, run_id)  # pylint: disable=E1102
                         # If `ClientApp` runs in the same process, install the FAB
-                        install_from_fab(fab.content, flwr_path, True)
+                        install_from_fab(fab.content, skip_prompt=True)
                         fab_id, fab_version = get_fab_metadata(fab.content)
                     else:
                         fab = None
@@ -443,7 +439,6 @@ def start_client_internal(
                     run_info_store.register_context(
                         run_id=run_id,
                         run=run,
-                        flwr_path=flwr_path,
                         fab=fab,
                     )
 
@@ -675,7 +670,7 @@ def _init_connection(transport: str | None, server_address: str) -> tuple[
         connection, error_type = grpc_connection, RpcError
     else:
         raise ValueError(
-            f"Unknown transport type: {transport} (possible: {TRANSPORT_TYPES})"
+            f"Unknown transport type: {transport} (possible: {TRANSPORT_TYPES_COMPAT})"
         )
 
     return connection, address, error_type

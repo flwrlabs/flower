@@ -24,15 +24,8 @@ from typing import cast
 
 import numpy as np
 
-from flwr.common import (
-    Array,
-    ArrayRecord,
-    Message,
-    MetricRecord,
-    NDArrays,
-    RecordDict,
-    log,
-)
+from flwr.app import Array, ArrayRecord, Message, MetricRecord, RecordDict
+from flwr.common import NDArrays, log
 
 from .fedavg import FedAvg
 from .multikrum import select_multikrum
@@ -185,7 +178,13 @@ class Bulyan(FedAvg):
 
         # Convert to ArrayRecord
         arrays = ArrayRecord(
-            dict(zip(array_keys, map(Array, aggregated_ndarrays), strict=True))
+            dict(
+                zip(
+                    array_keys,
+                    (Array(np.asarray(arr)) for arr in aggregated_ndarrays),
+                    strict=True,
+                )
+            )
         )
 
         # Aggregate MetricRecords

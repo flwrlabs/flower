@@ -13,19 +13,20 @@
 // limitations under the License.
 // =============================================================================
 
-import nodeCrypto from 'crypto';
 import getRandomValues from 'get-random-values';
+
 import { FailureCode, Message, Result } from '../../typing';
 import { KeyManager } from './keyManager';
 import { NetworkService } from './networkService';
 
-let crypto: Crypto | typeof nodeCrypto = nodeCrypto;
+const webCrypto = (globalThis as { crypto?: Crypto }).crypto;
 
-try {
-  crypto = window.crypto;
-} catch (_) {
-  // fall back to nodeCrypto
-}
+const requireWebCrypto = () => {
+  if (!webCrypto) {
+    throw new Error('Web Crypto API is not available.');
+  }
+  return webCrypto;
+};
 
 const GCM_IV_LENGTH = 12;
 const BIT_TAG_LENGTH = 8 * 16; // 128 bits or 16 bytes
@@ -85,7 +86,7 @@ export class CryptographyHandler {
 
     try {
       const iv = getRandomValues(new Uint8Array(GCM_IV_LENGTH));
-      const aesKey = await crypto.subtle.importKey(
+      const aesKey = await requireWebCrypto().subtle.importKey(
         'raw',
         this.sharedSecretKey,
         { name: CRYPTO_ALG },
@@ -94,7 +95,7 @@ export class CryptographyHandler {
       );
 
       const encodedMessage = new TextEncoder().encode(message);
-      const encryptedData = await crypto.subtle.encrypt(
+      const encryptedData = await requireWebCrypto().subtle.encrypt(
         { name: CRYPTO_ALG, iv, tagLength: BIT_TAG_LENGTH },
         aesKey,
         encodedMessage
@@ -141,7 +142,7 @@ export class CryptographyHandler {
       const iv = data.slice(0, GCM_IV_LENGTH);
       const ciphertext = data.slice(GCM_IV_LENGTH);
 
-      const aesKey = await crypto.subtle.importKey(
+      const aesKey = await requireWebCrypto().subtle.importKey(
         'raw',
         this.sharedSecretKey,
         { name: CRYPTO_ALG },
@@ -149,7 +150,11 @@ export class CryptographyHandler {
         ['decrypt']
       );
 
-      const plaintext = await crypto.subtle.decrypt({ name: CRYPTO_ALG, iv }, aesKey, ciphertext);
+      const plaintext = await requireWebCrypto().subtle.decrypt(
+        { name: CRYPTO_ALG, iv },
+        aesKey,
+        ciphertext
+      );
       return { ok: true, value: new TextDecoder().decode(plaintext) };
     } catch (error: unknown) {
       return {

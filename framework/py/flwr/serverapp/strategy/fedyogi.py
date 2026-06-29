@@ -22,7 +22,7 @@ from collections.abc import Callable, Iterable
 
 import numpy as np
 
-from flwr.common import Array, ArrayRecord, Message, MetricRecord, RecordDict
+from flwr.app import Array, ArrayRecord, Message, MetricRecord, RecordDict
 
 from ..exception import AggregationError
 from .fedopt import FedOpt
@@ -163,6 +163,6 @@ class FedYogi(FedOpt):
         }
 
         return (
-            ArrayRecord({k: Array(v) for k, v in new_arrays.items()}),
+            ArrayRecord({k: Array(np.asarray(v)) for k, v in new_arrays.items()}),
             aggregated_metrics,
         )

@@ -21,14 +21,14 @@ connections used in a deployed Flower federated AI system.
 
     <div id="diagram1" style="display:block;">
         <img class="themed-image"
-             data-light="./_static/flower-network-diagram-subprocess-light.svg"
-             data-dark="./_static/flower-network-diagram-subprocess-dark.svg"
+             data-light="./_static/flower-network-diagram-subprocess-light.png?v=ebde3a5f"
+             data-dark="./_static/flower-network-diagram-subprocess-dark.png?v=a1d9d83a"
              alt="Flower Network Diagram (subprocess)">
     </div>
     <div id="diagram2" style="display:none;">
         <img class="themed-image"
-             data-light="./_static/flower-network-diagram-process-light.svg"
-             data-dark="./_static/flower-network-diagram-process-dark.svg"
+             data-light="./_static/flower-network-diagram-process-light.png?v=d2719101"
+             data-dark="./_static/flower-network-diagram-process-dark.png?v=c68f5263"
              alt="Flower Network Diagram (process)">
     </div>
     <div style="text-align: center; margin-bottom: 1em;">
@@ -135,6 +135,15 @@ runtime, as summarized in the table below.
       - ClientAppIo API
       - Used by the SuperExec and the ``ClientApp`` processes
 
+.. note::
+
+    AppIo APIs enforce runtime version compatibility between the API server and its
+    callers. By default, requests from callers using an incompatible major.minor runtime
+    version are rejected before AppIo communication proceeds. Older callers without
+    runtime metadata are currently accepted by this compatibility check for backward
+    compatibility. Keep the SuperLink, SuperNode, SuperExec, ``ServerApp``, and
+    ``ClientApp`` runtime components on compatible Flower versions.
+
 Isolation Mode
 ==============
 
@@ -169,15 +178,25 @@ communicate with the SuperLink or SuperNode:
 
 .. note::
 
-    In the current version of Flower, both of the connections above are insecure because
-    Flower assumes that the following groups of processes run within the same trusted
-    network:
+    The AppIo links above can run with plaintext communication or with
+    server-authenticated TLS. Without the ``--appio-ssl-*`` options, these links remain
+    unencrypted and should stay inside a trusted network:
 
     - SuperLink + SuperExec + ``ServerApp`` process
     - SuperNode + SuperExec + ``ClientApp`` process
 
-    Each group must remain inside a single trusted network. They should never
-    communicate with each other over untrusted networks (e.g., the public internet).
+    To secure these links, configure the ServerAppIo and ClientAppIo API servers with
+    ``--appio-ssl-certfile``, ``--appio-ssl-keyfile``, and ``--appio-ssl-ca-certfile``.
+    AppIo clients verify server certificates with ``--root-certificates``. In
+    ``subprocess`` isolation mode, the SuperLink and SuperNode pass the CA path to the
+    SuperExec processes they launch. This is not mTLS. See
+    :doc:`how-to-enable-tls-connections` for concrete commands.
+
+.. warning::
+
+    When running without TLS, each group must remain inside a single trusted network.
+    They should never communicate with each other over untrusted networks (e.g., the
+    public internet).
 
 Account Authentication
 ======================

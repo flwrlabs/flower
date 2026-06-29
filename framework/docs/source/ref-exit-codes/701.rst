@@ -1,0 +1,25 @@
+################################
+ [701] SIMULATION_MISSING_EXTRA
+################################
+
+*************
+ Description
+*************
+
+Extra dependencies required for simulation are missing.
+
+****************
+ How to Resolve
+****************
+
+To use simulation with the Ray backend, add ``flwr`` with the ``simulation`` extra to
+the app's ``pyproject.toml`` dependencies:
+
+.. code-block:: toml
+
+    dependencies = [
+        "flwr[simulation]",
+    ]
+
+Then install the app dependencies manually unless automatic runtime dependency
+installation is enabled, and retry.

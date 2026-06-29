@@ -16,39 +16,33 @@
 
 .. |message_link| replace:: ``Message``
 
-.. _message_link: ref-api/flwr.common.Message.html
+.. _message_link: ref-api/flwr.app.Message.html
 
 .. |metricrecord_link| replace:: ``MetricRecord``
 
-.. _metricrecord_link: ref-api/flwr.common.MetricRecord.html
+.. _metricrecord_link: ref-api/flwr.app.MetricRecord.html
 
 .. |configrecord_link| replace:: ``ConfigRecord``
 
-.. _configrecord_link: ref-api/flwr.common.ConfigRecord.html
+.. _configrecord_link: ref-api/flwr.app.ConfigRecord.html
 
 .. |strategy_start_link| replace:: ``start``
 
 .. _strategy_start_link: ref-api/flwr.serverapp.strategy.Strategy.html#flwr.serverapp.strategy.Strategy.start
 
-Welcome to the next part of the federated learning tutorial. In previous parts of this
-tutorial, we introduced federated learning with PyTorch and Flower (:doc:`part 1
-<tutorial-series-get-started-with-flower-pytorch>`).
+Welcome to the next part of the Flower collaborative AI tutorial!
 
-In part 2, we'll begin to customize the federated learning system we built in part 1
-using the Flower framework, Flower Datasets, and PyTorch.
+In the previous tutorials, you created a simulated federation on SuperGrid, ran a Flower
+App from Flower Hub, customized the NumPy demo app, and then ran the PyTorch quickstart
+app on SuperGrid and locally. In this tutorial, you'll customize that PyTorch app by
+changing and extending the federated learning strategy used by the ``ServerApp``.
 
 .. tip::
 
-    `Star Flower on GitHub <https://github.com/adap/flower>`__ ⭐️ and join the Flower
-    community on Flower Discuss and the Flower Slack to connect, ask questions, and get
-    help:
-
-    - `Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear from you in
-      the ``Introduction`` topic! If anything is unclear, post in ``Flower Help -
-      Beginners``.
-    - `Join Flower Slack <https://flower.ai/join-slack>`__ We'd love to hear from you in
-      the ``#introductions`` channel! If anything is unclear, head over to the
-      ``#questions`` channel.
+    `Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and join the
+    Flower community on `Flower Discuss <https://discuss.flower.ai/>`__ or `Flower Slack
+    <https://flower.ai/join-slack>`__ to introduce yourself, ask questions, and get
+    help.
 
 Let's move beyond FedAvg with Flower strategies! 🌼
 
@@ -56,71 +50,40 @@ Let's move beyond FedAvg with Flower strategies! 🌼
  Preparation
 *************
 
-Before we begin with the actual code, let's make sure that we have everything we need.
+This tutorial continues from the :doc:`previous tutorial
+<tutorial-series-write-your-first-flower-app-pytorch>`, where you created and ran the
+``@flwrlabs/quickstart-pytorch`` app. If you completed it, open the existing
+``quickstart-pytorch`` directory and continue from there.
 
-Installing dependencies
-=======================
-
-.. note::
-
-    If you've completed part 1 of the tutorial, you can skip this step.
-
-First, we install the Flower package ``flwr``:
+If you are starting here directly, install Flower and fetch the same app:
 
 .. code-block:: shell
 
-    # In a new Python environment
-    $ pip install -U "flwr[simulation]"
+    # Install Flower
+    $ pip install -U flwr
+    # Fetch the app from Flower Hub
+    $ flwr new @flwrlabs/quickstart-pytorch
+    # Navigate to the app directory
+    $ cd quickstart-pytorch
 
-Then, we create a new Flower app called ``flower-tutorial`` using the PyTorch template.
-We also specify a username (``flwrlabs``) for the project:
-
-.. code-block:: shell
-
-    $ flwr new flower-tutorial --framework pytorch --username flwrlabs
-
-After running the command, a new directory called ``flower-tutorial`` will be created.
-It should have the following structure:
-
-.. code-block:: shell
-
-    flower-tutorial
-    ├── README.md
-    ├── flower_tutorial
-    │   ├── __init__.py
-    │   ├── client_app.py   # Defines your ClientApp
-    │   ├── server_app.py   # Defines your ServerApp
-    │   └── task.py         # Defines your model, training and data loading
-    ├── pyproject.toml      # Project metadata like dependencies and configs
-    └── README.md
-
-Next, we install the project and its dependencies, which are specified in the
-``pyproject.toml`` file:
-
-.. code-block:: shell
-
-    $ cd flower-tutorial
-    $ pip install -e .
-
-So far, everything should look familiar if you've worked through the introductory
-tutorial. With that, we're ready to introduce a number of new features.
+With that, we're ready to introduce a number of new strategy features.
 
 *******************************
  Choosing a different strategy
 *******************************
-
-In part 1, we created a |serverapp_link|_ (in ``server_app.py``). In it, we defined the
-strategy, the model to federatedly train, and then we launched the strategy by calling
-its ``|strategy_start_link|`` method.
 
 The strategy encapsulates the federated learning approach/algorithm, for example,
 |fedavg_link|_. Let's try to use a different strategy this time. Modify the following
 lines in your ``server_app.py`` to switch from ``FedAvg`` to |fedadagrad_link|_.
 
 .. code-block:: python
-    :emphasize-lines: 1,18
+    :emphasize-lines: 3,22
 
+    # ... unchanged
+    # add this to the imports
     from flwr.serverapp.strategy import FedAdagrad
+
+    # ... unchanged
 
 
     @app.main()
@@ -128,16 +91,16 @@ lines in your ``server_app.py`` to switch from ``FedAvg`` to |fedadagrad_link|_.
         """Main entry point for the ServerApp."""
 
         # Read run config
-        fraction_train: float = context.run_config["fraction-train"]
+        fraction_evaluate: float = context.run_config["fraction-evaluate"]
         num_rounds: int = context.run_config["num-server-rounds"]
-        lr: float = context.run_config["lr"]
+        lr: float = context.run_config["learning-rate"]
 
         # Load global model
         global_model = Net()
         arrays = ArrayRecord(global_model.state_dict())
 
         # Initialize FedAdagrad strategy
-        strategy = FedAdagrad(fraction_train=fraction_train)
+        strategy = FedAdagrad(fraction_evaluate=fraction_evaluate)
 
         # Start strategy, run FedAdagrad for `num_rounds`
         result = strategy.start(
@@ -145,18 +108,27 @@ lines in your ``server_app.py`` to switch from ``FedAvg`` to |fedadagrad_link|_.
             initial_arrays=arrays,
             train_config=ConfigRecord({"lr": lr}),
             num_rounds=num_rounds,
+            evaluate_fn=global_evaluate,
         )
 
-        # Save final model to disk
-        print("\nSaving final model to disk...")
-        state_dict = result.arrays.to_torch_state_dict()
-        torch.save(state_dict, "final_model.pt")
-
-Next, run the training with the following command:
+Next, run the app on SuperGrid to confirm that the new strategy is being used:
 
 .. code-block:: shell
 
-    $ flwr run .
+    # Log in if you are not already logged in
+    $ flwr login supergrid
+    # Run the app in SuperGrid
+    $ flwr run . supergrid
+
+Open the `SuperGrid dashboard <https://flower.ai/federations/>`__, select your
+federation, and inspect the logs for the new run. You should see that Flower starts the
+``FedAdagrad`` strategy instead of ``FedAvg``.
+
+You can also run the same app locally while developing or debugging:
+
+.. code-block:: shell
+
+    $ flwr run . local --stream
 
 **************************************
  Server-side parameter **evaluation**
@@ -188,27 +160,26 @@ We've seen how federated evaluation works on the client side (i.e., by implement
 function wrapped with the ``@app.evaluate`` decorator in your ``ClientApp``). Now let's
 see how we can evaluate the aggregated model parameters on the server side.
 
-To do so, we need to create a new function in ``task.py`` that we can name
-``central_evaluate``. This function is a callback that will be passed to the
-|strategy_start_link|_ method of our strategy. This means that the strategy will call
-this function after every round of federated learning passing two arguments: the current
-round of federated learning and the aggregated model parameters.
+To do so, we use the ``global_evaluate`` function defined in ``server_app.py``. This
+function is a callback that will be passed to the |strategy_start_link|_ method of our
+strategy. This means that the strategy will call this function after every round of
+federated learning passing two arguments: the current round of federated learning and
+the aggregated model parameters.
 
-Our ``central_evaluate`` function performs the following steps:
+Our ``global_evaluate`` function performs the following steps:
 
 1. Load the aggregated model parameters into a PyTorch model
-2. Load the entire CIFAR10 test dataset
+2. Load the entire CIFAR-10 test dataset
 3. Evaluate the model on the test dataset
 4. Return the evaluation metrics as a |metricrecord_link|_
 
 .. code-block:: python
 
-    from datasets import load_dataset
     from flwr.app import ArrayRecord, MetricRecord
 
 
-    def central_evaluate(server_round: int, arrays: ArrayRecord) -> MetricRecord:
-        """Evaluate model on the server side."""
+    def global_evaluate(server_round: int, arrays: ArrayRecord) -> MetricRecord:
+        """Evaluate model on central data."""
 
         # Load the model and initialize it with the received weights
         model = Net()
@@ -216,35 +187,22 @@ Our ``central_evaluate`` function performs the following steps:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         model.to(device)
 
-        # Load the entire CIFAR10 test dataset
-        # It's a huggingface dataset, so we can load it directly and apply transforms
-        cifar10_test = load_dataset("cifar10", split="test")
-        pytorch_transforms = Compose(
-            [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
-        )
+        # Load entire test set
+        test_dataloader = load_centralized_dataset()
 
-        # Define transforms and construct DataLoader for the test set
-        def apply_transforms(batch):
-            batch["img"] = [pytorch_transforms(img) for img in batch["img"]]
-            return batch
-
-        testset = cifar10_test.with_transform(apply_transforms)
-        testloader = DataLoader(testset, batch_size=64)
-
-        # Evaluate the model on the test set
-        loss, accuracy = test(model, testloader, device)
+        # Evaluate the global model on the test set
+        test_loss, test_acc = test(model, test_dataloader, device)
 
         # Return the evaluation metrics
-        return MetricRecord({"accuracy": accuracy, "loss": loss})
+        return MetricRecord({"accuracy": test_acc, "loss": test_loss})
 
-Remember we mentioned this ``central_evaluate`` will be called by the strategy. To do so
-we need to pass it to the strategy's ``start`` method as shown below.
+Remember we mentioned this ``global_evaluate`` will be called by the strategy. To do so
+we need to pass it to the strategy's ``start`` method as shown below. The quickstart app
+already does this, so make sure this part remains in ``server_app.py`` after switching
+to ``FedAdagrad``.
 
 .. code-block:: python
-    :emphasize-lines: 1,16
-
-    from flower_tutorial.task import central_evaluate
-
+    :emphasize-lines: 12
 
     @app.main()
     def main(grid: Grid, context: Context) -> None:
@@ -258,16 +216,17 @@ we need to pass it to the strategy's ``start`` method as shown below.
             initial_arrays=arrays,
             train_config=ConfigRecord({"lr": lr}),
             num_rounds=num_rounds,
-            evaluate_fn=central_evaluate,
+            evaluate_fn=global_evaluate,
         )
 
         # .. unchanged
 
-Finally, we run the simulation.
+From here on, we'll run locally so you can iterate faster while editing the app. Run the
+local simulation with:
 
 .. code-block:: shell
 
-    $ flwr run .
+    $ flwr run . local --stream
 
 You'll note that the server logs the metrics returned by the callback after each round.
 Also, at the end of the run, note the ``ServerApp-side Evaluate Metrics`` shown:
@@ -285,10 +244,10 @@ Also, at the end of the run, note the ``ServerApp-side Evaluate Metrics`` shown:
 ***************************************************
 
 In some situations, we want to configure client-side execution (training, evaluation)
-from the server side. One example of this is the server asking the clients to train for
-with a different learning rate based on the current round number. Flower provides a way
-to send configuration values from the server to the clients as part of the
-|message_link|_ that the ``ClientApp`` receives. Let's see how we can do this.
+from the server side. One example of this is the server asking the clients to train with
+a different learning rate based on the current round number. Flower provides a way to
+send configuration values from the server to the clients as part of the |message_link|_
+that the ``ClientApp`` receives. Let's see how we can do this.
 
 To the |strategy_start_link|_ method of our strategy we are already passing a
 |configrecord_link|_ specifying the initial learning rate. This ``ConfigRecord`` will be
@@ -299,8 +258,8 @@ and embed such logic.
 
 To do so, we create a new class inheriting from |fedadagrad_link|_ and override the
 ``configure_train`` method. We then use this new strategy in our ``ServerApp``. Let's
-see how this looks like in code. Create a new file called ``custom_strategy.py`` in the
-``flower_tutorial`` directory and add the following code:
+see how this looks in code. Create a new file called ``custom_strategy.py`` in the
+``pytorchexample`` directory and add the following code:
 
 .. code-block:: python
     :emphasize-lines: 13,14
@@ -324,14 +283,35 @@ see how this looks like in code. Create a new file called ``custom_strategy.py``
             return super().configure_train(server_round, arrays, config, grid)
 
 Next, we use this new strategy in our ``ServerApp`` by importing it in your
-``server_app.py`` and use it instead of the standard ``FedAdagrad``.
+``server_app.py`` and using it instead of the standard ``FedAdagrad``:
 
-Finally, run the training with the following command. Here we increase the number of
-rounds to 15 to see the learning rate decay in action.
+.. code-block:: python
+    :emphasize-lines: 3,15
+
+    # ... unchanged
+    # add this to the imports
+    from pytorchexample.custom_strategy import CustomFedAdagrad
+
+    # ... unchanged
+
+
+    @app.main()
+    def main(grid: Grid, context: Context) -> None:
+        """Main entry point for the ServerApp."""
+
+        # ... unchanged
+
+        # Initialize custom FedAdagrad strategy
+        strategy = CustomFedAdagrad(fraction_evaluate=fraction_evaluate)
+
+        # ... rest unchanged
+
+Run locally again, this time increasing the number of rounds to 15 to see the learning
+rate decay in action.
 
 .. code-block:: shell
 
-    $ flwr run . --run-config="num-server-rounds=15"
+    $ flwr run . local --stream --run-config="num-server-rounds=15"
 
 You'll note that in the ``configure_train`` stage of rounds 5 and 10, the learning rate
 is decreased by a factor of 0.5 and the new learning rate is printed to the terminal.
@@ -363,64 +343,6 @@ How do we know the ``ClientApp`` is using that new learning rate? Recall that in
 Congratulations! You have created your first custom strategy adding dynamism to the
 ``ConfigRecord`` that is sent to clients.
 
-****************************
- Scaling federated learning
-****************************
-
-As a last step in this tutorial, let's see how we can use Flower to experiment with a
-large number of clients. In the ``pyproject.toml``, increase the number of SuperNodes to
-1000:
-
-.. code-block:: toml
-
-    [tool.flwr.federations.local-simulation]
-    options.num-supernodes = 1000
-
-Note that we can reuse the ``ClientApp`` for different ``num-supernodes`` since the
-``Context`` carries the ``num-partitions`` key and for simulations with Flower, the
-number of partitions is equal to the number of SuperNodes.
-
-We now have 1000 partitions, each holding 45 training and 5 validation examples. Given
-that the number of training examples on each client is quite small, we should probably
-train the model a bit longer, so we configure the clients to perform 3 local training
-epochs. We should also adjust the fraction of clients selected for training during each
-round (we don't want all 1000 clients participating in every round), so we adjust
-``fraction_train`` to ``0.025``, which means that only 2.5% of available clients (so 25
-clients) will be selected for training each round. We update the ``fraction-train``
-value in the ``pyproject.toml``:
-
-.. code-block:: toml
-
-    [tool.flwr.app.config]
-    fraction-train = 0.025
-
-Then, we update the initialization of our strategy in ``server_app.py`` to the
-following:
-
-.. code-block:: python
-
-    @app.main()
-    def main(grid: Grid, context: Context) -> None:
-        """Main entry point for the ServerApp."""
-
-        # ... unchanged
-        # Initialize FedAdagrad strategy
-        strategy = CustomFedAdagrad(
-            fraction_train=fraction_train,
-            fraction_evaluate=0.05,  # Evaluate on 50 clients (each round)
-            min_train_nodes=20,  # Optional config
-            min_evaluate_nodes=40,  # Optional config
-            min_available_nodes=1000,  # Optional config
-        )
-
-        # ... rest unchanged
-
-Finally, run the simulation with the following command:
-
-.. code-block:: shell
-
-    $ flwr run .
-
 *******
  Recap
 *******
@@ -432,9 +354,7 @@ so little code, right?
 
 In the later sections, we've seen how we can communicate arbitrary values between server
 and clients to fully customize client-side execution. With that capability, we built a
-large-scale Federated Learning simulation using the Flower Virtual Client Engine and ran
-an experiment involving 1000 clients in the same workload — all in the same Flower
-project!
+larger Federated Learning simulation using the Flower Simulation Runtime.
 
 ************
  Next steps
@@ -447,6 +367,6 @@ Flower Discuss <https://discuss.flower.ai>`__) and on Slack (`Join Slack
 There's a dedicated ``#questions`` Slack channel if you need help, but we'd also love to
 hear who you are in ``#introductions``!
 
-The :doc:`Flower Federated Learning Tutorial - Part 3
+The :doc:`Flower Collaborative AI Tutorial - Part 5: Build a strategy from scratch
 <tutorial-series-build-a-strategy-from-scratch-pytorch>` shows how to build a fully
 custom ``Strategy`` from scratch.

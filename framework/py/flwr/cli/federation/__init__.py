@@ -15,10 +15,22 @@
 """Flower command line interface `federation` command."""
 
 
+from . import invite as invite
+from .add_supernode import add_supernode as add_supernode
+from .archive import archive as archive
+from .create import create as create
 from .ls import ls as ls
-from .show import show as show
+from .remove_account import remove_account as remove_account
+from .remove_supernode import remove_supernode as remove_supernode
+from .simulation_config import simulation_config as simulation_config
 
 __all__ = [
+    "add_supernode",
+    "archive",
+    "create",
+    "invite",
     "ls",
-    "show",
+    "remove_account",
+    "remove_supernode",
+    "simulation_config",
 ]

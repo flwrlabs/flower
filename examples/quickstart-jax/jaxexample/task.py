@@ -123,7 +123,7 @@ def load_data(partition_id, num_partitions, batch_size):
     if fds is None:
         partitioner = IidPartitioner(num_partitions=num_partitions)
         fds = FederatedDataset(
-            dataset="mnist",
+            dataset="ylecun/mnist",
             partitioners={"train": partitioner},
         )
     partition = fds.load_partition(partition_id)
@@ -144,12 +144,12 @@ def load_data(partition_id, num_partitions, batch_size):
 
     train_partition = (
         partition["train"]
-        .batch(batch_size, num_proc=2, drop_last_batch=True)
+        .batch(batch_size, drop_last_batch=True)
         .with_transform(apply_transforms)
     )
     test_partition = (
         partition["test"]
-        .batch(batch_size, num_proc=2, drop_last_batch=True)
+        .batch(batch_size, drop_last_batch=True)
         .with_transform(apply_transforms)
     )
 

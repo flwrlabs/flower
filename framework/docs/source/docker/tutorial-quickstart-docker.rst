@@ -29,14 +29,16 @@ Before you start, make sure that:
 
    .. code-block:: console
 
-       $ flwr new quickstart-docker --framework PyTorch --username flower
+       $ flwr new @flwrlabs/quickstart-pytorch
 
-       🔨 Creating Flower App quickstart-docker...
+       🔗 Requesting download link for @flwrlabs/quickstart-pytorch...
+       🔽 Downloading ZIP into memory...
+       📦 Unpacking into /Users/alice/quickstart-pytorch...
        🎊 Flower App creation successful.
 
        To run your Flower App, first install its dependencies:
 
-               cd quickstart-docker && pip install -e .
+               cd quickstart-pytorch && pip install -e .
 
        then, run the app:
 
@@ -45,7 +47,7 @@ Before you start, make sure that:
        💡 Check the README in your app directory to learn how to
        customize it and how to run it using the Deployment Runtime.
 
-       $ cd quickstart-docker
+       $ cd quickstart-pytorch
 
 2. Create a new Docker bridge network called ``flwr-network``:
 
@@ -305,16 +307,30 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
  Step 6: Run the Quickstart Project
 ************************************
 
-1. Add the following lines to the ``pyproject.toml``:
+1. Find the Flower Configuration TOML file in your machine. This file is automatically
+   create for your when you first use a Flower CLI command. Use ``flwr config list`` to
+   see available SuperLink connections as well as the path to the configuration file.
+
+   .. code-block:: console
+       :emphasize-lines: 3
+
+       $ flwr config list
+
+       Flower Config file: /path/to/.flwr/config.toml
+       SuperLink connections:
+         supergrid
+         local (default)
+
+2. Add the following lines to the ``config.toml`` to add a new SuperLink connection:
 
    .. code-block:: toml
-       :caption: pyproject.toml
+       :caption: config.toml
 
-       [tool.flwr.federations.local-deployment]
+       [superlink.local-deployment]
        address = "127.0.0.1:9093"
        insecure = true
 
-2. Run the ``quickstart-docker`` project and follow the ServerApp logs to track the
+2. Run the ``quickstart-pytorch`` project and follow the ServerApp logs to track the
    execution of the run:
 
    .. code-block:: console
@@ -326,10 +342,10 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
 ********************************
 
 1. Change the application code. For example, change the ``seed`` in
-   ``quickstart_docker/task.py`` to ``43`` and save it:
+   ``pytorchexample/task.py`` to ``43`` and save it:
 
    .. code-block:: python
-       :caption: quickstart_docker/task.py
+       :caption: pytorchexample/task.py
 
        # ...
        partition_train_test = partition.train_test_split(test_size=0.2, seed=43)

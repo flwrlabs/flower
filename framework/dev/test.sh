@@ -17,31 +17,31 @@ echo "- clang-format:  done"
 
 echo "- isort: start"
 if $RUN_FULL_TEST; then
-    python -m isort --check-only --skip py/flwr/proto py/flwr e2e
+    python -m isort \
+        --check-only \
+        --skip py/flwr/proto \
+        --skip-glob "**/.venv/**" \
+        py e2e
 else
-    python -m isort --check-only --skip py/flwr/proto py/flwr
+    python -m isort --check-only --skip py/flwr/proto py
 fi
 echo "- isort: done"
 
 echo "- black: start"
 if $RUN_FULL_TEST; then
-    python -m black --exclude "py\/flwr\/proto" --check py/flwr e2e
+    python -m black \
+        --extend-exclude "py\/flwr\/proto|(^|\/)\.venv\/" \
+        --check py e2e
 else
-    python -m black --exclude "py\/flwr\/proto" --check py/flwr
+    python -m black \
+        --extend-exclude "py\/flwr\/proto" \
+        --check py
 fi
 echo "- black: done"
 
 echo "- init_py_check: start"
-python -m devtool.init_py_check py/flwr py/flwr_tool
+python -m devtool.init_py_check py/flwr
 echo "- init_py_check: done"
-
-echo "- docformatter: start"
-if $RUN_FULL_TEST; then
-    python -m docformatter -c -r py/flwr e2e -e py/flwr/proto
-else
-    python -m docformatter -c -r py/flwr -e py/flwr/proto
-fi
-echo "- docformatter:  done"
 
 echo "- docsig: start"
 docsig py/flwr
@@ -60,7 +60,8 @@ python -m pylint --ignore=py/flwr/proto py/flwr
 echo "- pylint: done"
 
 echo "- pytest: start"
-python -m pytest --cov=py/flwr
+# Ray's uv runtime-env hook can stall under `uv run` during pytest.
+RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 python -m pytest --cov=py/flwr
 echo "- pytest: done"
 
 echo "- All Python checks passed"
@@ -92,6 +93,26 @@ if $RUN_FULL_TEST; then
 fi
 
 echo "- All rST checks passed"
+
+echo "- Start SQLAlchemy schema checks"
+
+# Core schema check
+paracelsus inject py/flwr/supercore/state/schema/README.md dev.get_schema_base:Base \
+  --import-module "flwr.supercore.state.schema.linkstate_tables:*" \
+  --import-module "flwr.supercore.state.schema.corestate_tables:*" \
+  --import-module "flwr.supercore.state.schema.objectstore_tables:*" \
+  --layout elk \
+  --check
+
+# EE schema check (if available)
+if python -c "import flwr.ee.state.alembic.tables" 2>/dev/null; then
+  paracelsus inject py/flwr/ee/state/schema/README.md dev.get_schema_base:EEBase \
+    --import-module "flwr.ee.state.alembic.tables:*" \
+    --layout elk \
+    --check
+fi
+
+echo "- All SQLAlchemy schema checks passed"
 
 echo "- Start license checks"
 

@@ -49,10 +49,11 @@ Network on CIFAR-10 using Flower and PyTorch. It is recommended to create a virt
 environment and run everything within a :doc:`virtualenv
 <contributor-how-to-set-up-a-virtual-env>`.
 
-Let's use `flwr new` to create a complete Flower+PyTorch project. It will generate all
-the files needed to run, by default with the Flower Simulation Engine, a federation of
-10 nodes using |fedavg_link|_. The dataset will be partitioned using Flower Dataset's
-`IidPartitioner
+Let's use ``flwr new`` to create a complete Flower+PyTorch project. It will generate all
+the files needed to run a federation of two nodes using |fedavg_link|_. By default, the
+generated app uses a local simulation profile that ``flwr run`` submits to a managed
+local SuperLink, which then executes the run with the Flower Simulation Runtime. The
+dataset will be partitioned using Flower Dataset's `IidPartitioner
 <https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_.
 
 Now that we have a rough idea of what this example is about, let's get started. First,
@@ -63,21 +64,19 @@ install Flower in your new environment:
     # In a new Python environment
     $ pip install flwr
 
-Then, run the command below. You will be prompted to select one of the available
-templates (choose ``PyTorch``), give a name to your project, and type in your developer
-name:
+Then, run the command below:
 
 .. code-block:: shell
 
-    $ flwr new
+    $ flwr new @flwrlabs/quickstart-pytorch
 
-After running it you'll notice a new directory with your project name has been created.
-It should have the following structure:
+After running it you'll notice a new directory named ``quickstart-pytorch`` has been
+created. It should have the following structure:
 
 .. code-block:: shell
 
-    <your-project-name>
-    ├── <your-project-name>
+    quickstart-pytorch
+    ├── pytorchexample
     │   ├── __init__.py
     │   ├── client_app.py   # Defines your ClientApp
     │   ├── server_app.py   # Defines your ServerApp
@@ -85,87 +84,41 @@ It should have the following structure:
     ├── pyproject.toml      # Project metadata like dependencies and configs
     └── README.md
 
-If you haven't yet installed the project and its dependencies, you can do so by:
-
-.. code-block:: shell
-
-    # From the directory where your pyproject.toml is
-    $ pip install -e .
-
 To run the project, do:
 
 .. code-block:: shell
 
-    # Run with default arguments
-    $ flwr run .
+    $ cd quickstart-pytorch
 
-With default arguments you will see an output like this one:
+    # Run with default arguments and stream logs
+    $ flwr run . --stream
+
+Plain ``flwr run .`` submits the run, prints the run ID, and returns without streaming
+logs. For the full local workflow, see :doc:`how-to-run-flower-locally`.
+
+With default arguments you will see streamed output like this:
 
 .. code-block:: shell
 
-    Loading project configuration...
-    Success
+    Starting local SuperLink on 127.0.0.1:39093...
+    Successfully started run 1859953118041441032
     INFO :      Starting FedAvg strategy:
     INFO :          ├── Number of rounds: 3
-    INFO :          ├── ArrayRecord (0.24 MB)
-    INFO :          ├── ConfigRecord (train): {'lr': 0.01}
-    INFO :          ├── ConfigRecord (evaluate): (empty!)
-    INFO :          ├──> Sampling:
-    INFO :          │       ├──Fraction: train (0.50) | evaluate ( 1.00)
-    INFO :          │       ├──Minimum nodes: train (2) | evaluate (2)
-    INFO :          │       └──Minimum available nodes: 2
-    INFO :          └──> Keys in records:
-    INFO :                  ├── Weighted by: 'num-examples'
-    INFO :                  ├── ArrayRecord key: 'arrays'
-    INFO :                  └── ConfigRecord key: 'config'
-    INFO :
-    INFO :
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 10)
-    INFO :      aggregate_train: Received 5 results and 0 failures
+    INFO :      configure_train: Sampled 2 nodes (out of 2)
+    INFO :      aggregate_train: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'train_loss': 2.149280}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
+    INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
+    INFO :      aggregate_evaluate: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'eval_loss': 2.31319, 'eval_acc': 0.10004}
-    INFO :
     INFO :      [ROUND 2/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 10)
-    INFO :      aggregate_train: Received 5 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_loss': 2.1097401}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'eval_loss': 2.2529, 'eval_acc': 0.142002}
-    INFO :
+    INFO :      ...
     INFO :      [ROUND 3/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 10)
-    INFO :      aggregate_train: Received 5 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_loss': 1.9476833}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'eval_loss': 1.9190, 'eval_acc': 0.2974005}
-    INFO :
+    INFO :      ...
     INFO :      Strategy execution finished in 16.56s
-    INFO :
     INFO :      Final results:
-    INFO :
-    INFO :          Global Arrays:
-    INFO :                  ArrayRecord (0.238 MB)
-    INFO :
-    INFO :          Aggregated Client-side Train Metrics:
-    INFO :          { 1: {'train_loss': '2.1839e+00'},
-    INFO :            2: {'train_loss': '2.0512e+00'},
-    INFO :            3: {'train_loss': '1.9784e+00'}}
-    INFO :
-    INFO :          Aggregated Client-side Evaluate Metrics:
-    INFO :          { 1: {'eval_acc': '1.0770e-01', 'eval_loss': '2.2858e+00'},
-    INFO :            2: {'eval_acc': '2.1810e-01', 'eval_loss': '1.9734e+00'},
-    INFO :            3: {'eval_acc': '2.7140e-01', 'eval_loss': '1.9069e+00'}}
-    INFO :
     INFO :          Server-side Evaluate Metrics:
     INFO :          {}
-    INFO :
-
-    Saving final model to disk...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
 in ``pyproject.toml`` like this:
@@ -210,9 +163,12 @@ the data that correspond to their data partition.
         return batch
 
 
+    # Construct dataloaders
     partition_train_test = partition_train_test.with_transform(apply_transforms)
-    trainloader = DataLoader(partition_train_test["train"], batch_size=32, shuffle=True)
-    testloader = DataLoader(partition_train_test["test"], batch_size=32)
+    trainloader = DataLoader(
+        partition_train_test["train"], batch_size=batch_size, shuffle=True
+    )
+    testloader = DataLoader(partition_train_test["test"], batch_size=batch_size)
 
 ***********
  The Model
@@ -257,7 +213,7 @@ training/testing functions to perform local training or evaluation:
         """Train the model on the training set."""
         net.to(device)  # move model to GPU if available
         criterion = torch.nn.CrossEntropyLoss().to(device)
-        optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+        optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9)
         net.train()
         running_loss = 0.0
         for _ in range(epochs):
@@ -269,7 +225,7 @@ training/testing functions to perform local training or evaluation:
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.item()
-        avg_trainloss = running_loss / len(trainloader)
+        avg_trainloss = running_loss / (epochs * len(trainloader))
         return avg_trainloss
 
 
@@ -355,7 +311,8 @@ Deployment Runtime and is not directly configurable during simulations.
         # Load the data
         partition_id = context.node_config["partition-id"]
         num_partitions = context.node_config["num-partitions"]
-        trainloader, _ = load_data(partition_id, num_partitions)
+        batch_size = context.run_config["batch-size"]
+        trainloader, _ = load_data(partition_id, num_partitions, batch_size)
 
         # Call the training function
         train_loss = train_fn(
@@ -399,17 +356,19 @@ receive as input arguments:
 - a ``Context`` object that provides access to the run configuration.
 
 In this example we use the |fedavg_link|_ and configure it with a specific value of
-``fraction_train`` which is read from the run config. You can find the default value
+``fraction_evaluate`` which is read from the run config. You can find the default value
 defined in the ``pyproject.toml``. Then, the execution of the strategy is launched when
 invoking its |strategy_start_link|_ method. To it we pass:
 
 - the ``Grid`` object.
 - an ``ArrayRecord`` carrying a randomly initialized model that will serve as the global
-  model to federated.
+  model to federate.
 - a ``ConfigRecord`` with the training hyperparameters to be sent to the clients. The
   strategy will also insert the current round number in this config before sending it to
   the participating nodes.
 - the ``num_rounds`` parameter specifying how many rounds of ``FedAvg`` to perform.
+- an ``evaluate_fn`` function that will be called to evaluate the global model on
+  centralized test data after each round.
 
 .. code-block:: python
 
@@ -422,16 +381,16 @@ invoking its |strategy_start_link|_ method. To it we pass:
         """Main entry point for the ServerApp."""
 
         # Read run config
-        fraction_train: float = context.run_config["fraction-train"]
+        fraction_evaluate: float = context.run_config["fraction-evaluate"]
         num_rounds: int = context.run_config["num-server-rounds"]
-        lr: float = context.run_config["lr"]
+        lr: float = context.run_config["learning-rate"]
 
         # Load global model
         global_model = Net()
         arrays = ArrayRecord(global_model.state_dict())
 
         # Initialize FedAvg strategy
-        strategy = FedAvg(fraction_train=fraction_train)
+        strategy = FedAvg(fraction_evaluate=fraction_evaluate)
 
         # Start strategy, run FedAvg for `num_rounds`
         result = strategy.start(
@@ -439,12 +398,14 @@ invoking its |strategy_start_link|_ method. To it we pass:
             initial_arrays=arrays,
             train_config=ConfigRecord({"lr": lr}),
             num_rounds=num_rounds,
+            evaluate_fn=global_evaluate,
         )
 
-        # Save final model to disk
-        print("\nSaving final model to disk...")
-        state_dict = result.arrays.to_torch_state_dict()
-        torch.save(state_dict, "final_model.pt")
+        if context.run_config["save-model"]:
+            # Save final model to disk
+            print("\nSaving final model to disk...")
+            state_dict = result.arrays.to_torch_state_dict()
+            torch.save(state_dict, "final_model.pt")
 
 Note the ``start`` method of the strategy returns a |result_link|_ object. This object
 contains all the relevant information about the FL process, including the final model
@@ -453,9 +414,14 @@ weights as an ``ArrayRecord``, and federated training and evaluation metrics as
 
 Congratulations! You've successfully built and run your first federated learning system.
 
+.. tip::
+
+    Check the :doc:`how-to-run-simulations` documentation to learn more about how to
+    configure and run Flower simulations.
+
 .. note::
 
     Check the `source code
-    <https://github.com/adap/flower/blob/main/examples/quickstart-pytorch>`_ of the
+    <https://github.com/flwrlabs/flower/blob/main/examples/quickstart-pytorch>`_ of the
     extended version of this tutorial in ``examples/quickstart-pytorch`` in the Flower
     GitHub repository.

@@ -206,21 +206,25 @@ class PushMessagesRequest(google.protobuf.message.Message):
     NODE_FIELD_NUMBER: builtins.int
     MESSAGES_LIST_FIELD_NUMBER: builtins.int
     MESSAGE_OBJECT_TREES_FIELD_NUMBER: builtins.int
+    CLIENTAPP_RUNTIME_LIST_FIELD_NUMBER: builtins.int
     @property
     def node(self) -> flwr.proto.node_pb2.Node: ...
     @property
     def messages_list(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.message_pb2.Message]: ...
     @property
     def message_object_trees(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.message_pb2.ObjectTree]: ...
+    @property
+    def clientapp_runtime_list(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.float]: ...
     def __init__(
         self,
         *,
         node: flwr.proto.node_pb2.Node | None = ...,
         messages_list: collections.abc.Iterable[flwr.proto.message_pb2.Message] | None = ...,
         message_object_trees: collections.abc.Iterable[flwr.proto.message_pb2.ObjectTree] | None = ...,
+        clientapp_runtime_list: collections.abc.Iterable[builtins.float] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["node", b"node"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["message_object_trees", b"message_object_trees", "messages_list", b"messages_list", "node", b"node"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["clientapp_runtime_list", b"clientapp_runtime_list", "message_object_trees", b"message_object_trees", "messages_list", b"messages_list", "node", b"node"]) -> None: ...
 
 global___PushMessagesRequest = PushMessagesRequest
 

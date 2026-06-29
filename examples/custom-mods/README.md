@@ -7,7 +7,7 @@ framework: [wandb, tensorboard]
 # Using custom mods 🧪
 
 > 🧪 = This example covers experimental features that might change in future versions of Flower
-> Please consult the regular PyTorch code examples ([quickstart](https://github.com/adap/flower/tree/main/examples/quickstart-pytorch), [advanced](https://github.com/adap/flower/tree/main/examples/advanced-pytorch)) to learn how to use Flower with PyTorch.
+> Please consult the regular PyTorch code examples ([quickstart](https://flower.ai/apps/flwrlabs/quickstart-pytorch/), [advanced](https://github.com/flwrlabs/flower/tree/main/examples/advanced-pytorch)) to learn how to use Flower with PyTorch.
 
 The following steps describe how to write custom Flower Mods and use them in a simple example.
 
@@ -37,15 +37,18 @@ The mods in this example do not modify the `Message` object that the `ClientApp`
 
 ## Set up the project
 
-### Clone the project
+### Fetch the app
 
-Start by cloning the example project:
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
-        && mv _tmp/examples/custom-mods . \
-        && rm -rf _tmp \
-        && cd custom-mods
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/custom-mods
 ```
 
 This will create a new directory called `custom-mods` with the following structure:
@@ -73,7 +76,7 @@ pip install -e .
 ## Run the project
 
 > [!TIP]
-> By default the `ClientApp` uses the TensorBoard mod, if you would like to enable the Weight & Biases mod, please edit the line at the bottom of `custom_mods/client_app.py` and pass the `get_wandb_mod` mod to the constructor of your `ClientApp`.
+> By default the `ClientApp` uses the TensorBoard mod, if you would like to enable the Weight & Biases mod, please edit `custom_mods/client_app.py` and pass the `get_wandb_mod` mod to the constructor of your `ClientApp`.
 
 You can run your Flower project in both _simulation_ and _deployment_ mode without making changes to the code. If you are starting with Flower, we recommend you using the _simulation_ mode as it requires fewer components to be launched manually. By default, `flwr run` will make use of the Simulation Engine.
 

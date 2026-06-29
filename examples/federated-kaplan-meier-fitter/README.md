@@ -32,7 +32,7 @@ the group it comes from therefore to simulate the division that might occur.
 Start by cloning the example project:
 
 ```shell
-$ git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/federated-kaplan-meier-fitter . \
         && rm -rf _tmp \
         && cd federated-kaplan-meier-fitter
@@ -65,20 +65,28 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 
 ### Run with the Simulation Engine
 
+This example is designed to run with two virtual `SuperNodes`. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
+
 ```bash
-flwr run .
+flwr federation simulation-config --num-supernodes=2
+```
+
+Run the app:
+
+```shell
+flwr run .  --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
-```bash
-flwr run . --run-config "num-server-rounds=5"
+```shell
+flwr run . --run-config "num-server-rounds=5"  --stream
 ```
 
 You can also check that the results match the centralized version.
 
 ```shell
-$ python3 centralized.py
+python centralized.py
 ```
 
 ### Run with the Deployment Engine

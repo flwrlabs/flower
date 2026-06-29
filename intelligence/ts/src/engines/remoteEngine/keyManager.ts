@@ -13,17 +13,17 @@
 // limitations under the License.
 // =============================================================================
 
-import nodeCrypto from 'crypto';
 import { FailureCode, Result } from '../../typing';
 import { hkdf } from './cryptoUtils';
 
-let crypto: Crypto | typeof nodeCrypto = nodeCrypto;
+const webCrypto = (globalThis as { crypto?: Crypto }).crypto;
 
-try {
-  crypto = window.crypto;
-} catch (_) {
-  // fall back to nodeCrypto
-}
+const requireWebCrypto = () => {
+  if (!webCrypto) {
+    throw new Error('Web Crypto API is not available.');
+  }
+  return webCrypto;
+};
 
 const KEY_TYPE = 'ECDH';
 const CURVE = 'P-384'; // secp384r1 in Web Crypto
@@ -42,14 +42,14 @@ export class KeyManager {
    * Generate a new ECDH key pair.
    */
   async generateKeyPair() {
-    const keyPair = await crypto.subtle.generateKey(
-      {
-        name: KEY_TYPE,
-        namedCurve: CURVE,
-      },
-      true,
-      ['deriveKey', 'deriveBits']
-    );
+    const keyParams: EcKeyGenParams = {
+      name: KEY_TYPE,
+      namedCurve: CURVE,
+    };
+    const keyPair = await requireWebCrypto().subtle.generateKey(keyParams, true, [
+      'deriveKey',
+      'deriveBits',
+    ]);
 
     this.privateKey = keyPair.privateKey;
     this.publicKey = keyPair.publicKey;
@@ -65,7 +65,7 @@ export class KeyManager {
         failure: { code: FailureCode.EncryptionError, description: 'Public key not generated.' },
       };
     }
-    const exportedKey = await crypto.subtle.exportKey(KEY_FORMAT, this.publicKey);
+    const exportedKey = await requireWebCrypto().subtle.exportKey(KEY_FORMAT, this.publicKey);
     return { ok: true, value: btoa(String.fromCharCode(...new Uint8Array(exportedKey))) };
   }
 
@@ -88,16 +88,20 @@ export class KeyManager {
     );
 
     // Import server's public key
-    const serverPublicKey = await crypto.subtle.importKey(
+    const importParams: EcKeyImportParams = {
+      name: KEY_TYPE,
+      namedCurve: CURVE,
+    };
+    const serverPublicKey = await requireWebCrypto().subtle.importKey(
       KEY_FORMAT,
       serverPublicKeyBuffer,
-      { name: KEY_TYPE, namedCurve: CURVE },
+      importParams,
       false,
       []
     );
 
     // Compute shared secret
-    const sharedSecret = await crypto.subtle.deriveBits(
+    const sharedSecret = await requireWebCrypto().subtle.deriveBits(
       { name: KEY_TYPE, public: serverPublicKey },
       this.privateKey,
       384

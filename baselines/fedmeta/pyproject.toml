@@ -10,7 +10,7 @@ license = "Apache-2.0"
 authors = ["Jinsoo Kim <wlstn25092303@gmail.com>", "Kangyoon Lee <keylee@gachon.ac.kr>"]
 readme = "README.md"
 homepage = "https://flower.ai"
-repository = "https://github.com/adap/flower"
+repository = "https://github.com/flwrlabs/flower"
 documentation = "https://flower.ai"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -48,7 +48,6 @@ torchvision = { url = "https://download.pytorch.org/whl/cu117/torchvision-0.15.2
 [tool.poetry.dev-dependencies]
 isort = "==5.13.2"
 black = "==24.2.0"
-docformatter = "==1.7.5"
 mypy = "==1.4.1"
 pylint = "==2.8.2"
 flake8 = "==3.9.2"
@@ -56,7 +55,7 @@ pytest = "==6.2.4"
 pytest-watch = "==4.2.0"
 ruff = "==0.4.5"
 types-requests = "==2.27.7"
-virtualenv = "==20.21.0"
+virtualenv = "==20.36.1"
 
 [tool.isort]
 line_length = 88
@@ -103,10 +102,6 @@ disallow_untyped_calls = false
 module = "torch.*"
 follow_imports = "skip"
 follow_imports_for_stubs = true
-
-[tool.docformatter]
-wrap-summaries = 88
-wrap-descriptions = 88
 
 [tool.ruff]
 target-version = "py38"
