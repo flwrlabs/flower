@@ -36,7 +36,8 @@ try:
 except ImportError:
     HAS_SCIPY = False
 
-from flwr.common import Array, ArrayRecord, Message, MetricRecord, RecordDict, log
+from flwr.app import Array, ArrayRecord, Message, MetricRecord, RecordDict
+from flwr.common import log
 
 from .fedavg import FedAvg
 
@@ -233,6 +234,11 @@ class FedRDF(FedAvg):
 
     def _ks_proportion(self, sample: np.ndarray) -> float:
         """Return the proportion of K-S tests that detect divergence in a sample."""
+        if not HAS_SCIPY:
+            raise ImportError(
+                "FedRDF with threshold > 0 (adaptive mode) requires scipy for the "
+                "Kolmogorov-Smirnov test. Install it with: pip install scipy>=1.7.0"
+            )
         if len(sample) < 10:
             return 0.0
 
@@ -251,25 +257,23 @@ class FedRDF(FedAvg):
 
     def _compute_skewness(self, arrays: list[np.ndarray]) -> float:
         """Measure the skewness proportion across client weight arrays."""
-        if not HAS_SCIPY:
-            raise ImportError(
-                "FedRDF with threshold > 0 (adaptive mode) requires scipy for the "
-                "Kolmogorov-Smirnov test. Install it with: pip install scipy>=1.7.0"
-            )
-
-        stacked = np.stack([arr.flatten() for arr in arrays], axis=0)
-        means = stacked.mean(axis=0)
-        stds = np.where(stacked.std(axis=0) == 0, 1.0, stacked.std(axis=0))
-        standardized = (stacked - means) / stds
-
-        # Sample positions to avoid testing every parameter of large models
-        n_positions = standardized.shape[1]
+        # Sample positions first to avoid materializing every parameter of
+        # large models when only a subset is tested
+        n_positions = arrays[0].size
         if n_positions > 100:
             sample_indices = np.random.choice(n_positions, size=100, replace=False)
         else:
             sample_indices = np.arange(n_positions)
 
-        proportions = [self._ks_proportion(standardized[:, i]) for i in sample_indices]
+        stacked = np.stack([np.ravel(arr)[sample_indices] for arr in arrays], axis=0)
+        means = stacked.mean(axis=0)
+        stds = np.where(stacked.std(axis=0) == 0, 1.0, stacked.std(axis=0))
+        standardized = (stacked - means) / stds
+
+        proportions = [
+            self._ks_proportion(standardized[:, i])
+            for i in range(standardized.shape[1])
+        ]
         return float(np.mean(proportions))
 
     def _fourier_aggregate(self, arrays: list[np.ndarray]) -> np.ndarray:

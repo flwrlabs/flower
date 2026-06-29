@@ -20,8 +20,12 @@ import pytest
 
 from flwr.common import ArrayRecord
 
-from .fedrdf import FedRDF
+from .fedrdf import HAS_SCIPY, FedRDF
 from .strategy_utils_test import create_mock_reply
+
+requires_scipy = pytest.mark.skipif(
+    not HAS_SCIPY, reason="scipy is an optional dependency, only used in adaptive mode"
+)
 
 
 def test_fedrdf_aggregate_train_with_threshold_zero() -> None:
@@ -68,6 +72,7 @@ def test_fedrdf_aggregate_train_no_replies() -> None:
     assert metrics is None
 
 
+@requires_scipy
 def test_fedrdf_aggregate_train_with_high_threshold() -> None:
     """Test aggregate_train with high threshold (should use weighted FedAvg)."""
     # Prepare
@@ -98,6 +103,7 @@ def test_fedrdf_aggregate_train_with_high_threshold() -> None:
     np.testing.assert_array_almost_equal(aggregated_arrays[0], expected_avg, decimal=1)
 
 
+@requires_scipy
 def test_fedrdf_ks_proportion() -> None:
     """Test _ks_proportion method."""
     # Prepare
@@ -114,6 +120,7 @@ def test_fedrdf_ks_proportion() -> None:
     assert 0.0 <= proportion <= 1.0
 
 
+@requires_scipy
 def test_fedrdf_compute_skewness() -> None:
     """Test _compute_skewness method."""
     # Prepare
@@ -183,6 +190,7 @@ def test_fedrdf_with_poisoned_updates() -> None:
     assert dist_to_benign < dist_to_poisoned
 
 
+@requires_scipy
 def test_fedrdf_weighted_aggregation() -> None:
     """Test FedRDF with different weights (num_examples)."""
     # Prepare
@@ -224,6 +232,7 @@ def test_fedrdf_requires_scipy_only_in_adaptive_mode(
         FedRDF(threshold=0.5)
 
 
+@requires_scipy
 def test_fedrdf_adaptive_switches_to_fourier_on_high_skewness(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
