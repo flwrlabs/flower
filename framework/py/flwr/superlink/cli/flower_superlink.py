@@ -114,7 +114,6 @@ try:
         get_fleet_event_log_writer_plugins,
     )
 except ImportError:
-
     # pylint: disable-next=unused-argument
     def add_ee_args_superlink(parser: argparse.ArgumentParser) -> None:
         """Add EE-specific arguments to the parser."""
@@ -249,6 +248,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self.superexec_process: subprocess.Popen[bytes] | None = None
         self.objectstore_factory: ObjectStoreFactory | None = None
         self.state_factory: LinkStateFactory | None = None
+        self._serverappio_server: grpc.Server | None = None
         self._started = False
 
     def startup(self) -> None:
@@ -293,8 +293,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             if thread.is_alive():
                 log(
                     WARN,
-                    "Background thread %s is still running during SuperLink "
-                    "shutdown.",
+                    "Background thread %s is still running during SuperLink shutdown.",
                     thread.name,
                 )
 
@@ -308,6 +307,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self.grpc_servers.clear()
         self.bckg_threads.clear()
         self.superexec_process = None
+        self._serverappio_server = None
         self._started = False
 
     def wait_until_background_thread_exits(self) -> None:
@@ -345,6 +345,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             certificates=config.appio_certificates,
             superexec_auth_secret=config.superexec_auth_secret,
         )
+        self._serverappio_server = serverappio_server
         self.grpc_servers.append(serverappio_server)
 
     def _start_fleet_api(self) -> None:
@@ -450,8 +451,10 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         if config.isolation != ISOLATION_MODE_SUBPROCESS:
             return
 
-        serverappio_server = self.grpc_servers[1]
-        appio_address = resolve_bind_address(serverappio_server.bound_address)
+        if self._serverappio_server is None:
+            raise RuntimeError("ServerAppIo server is not started.")
+
+        appio_address = resolve_bind_address(self._serverappio_server.bound_address)
         command = _get_superexec_command(
             appio_address=appio_address,
             appio_certificates=config.appio_certificates,
@@ -687,7 +690,7 @@ def flower_superlink() -> None:
     lifespan = SuperLinkLifespan(config)
     try:
         lifespan.startup()
-    except ValueError as err:
+    except Exception as err:  # pylint: disable=broad-except
         lifespan.shutdown()
         flwr_exit(ExitCode.SUPERLINK_INVALID_ARGS, str(err))
 
