@@ -16,6 +16,7 @@
 
 
 import numpy as np
+import pytest
 
 from flwr.common import ArrayRecord
 
@@ -60,9 +61,7 @@ def test_fedrdf_aggregate_train_no_replies() -> None:
     strategy = FedRDF()
 
     # Execute
-    arrays_aggregated, metrics = strategy.aggregate_train(
-        server_round=1, replies=[]
-    )
+    arrays_aggregated, metrics = strategy.aggregate_train(server_round=1, replies=[])
 
     # Assert
     assert arrays_aggregated is None
@@ -86,9 +85,7 @@ def test_fedrdf_aggregate_train_with_high_threshold() -> None:
     ]
 
     # Execute
-    arrays_aggregated, _ = strategy.aggregate_train(
-        server_round=1, replies=replies
-    )
+    arrays_aggregated, _ = strategy.aggregate_train(server_round=1, replies=replies)
 
     # Assert
     assert arrays_aggregated is not None
@@ -98,9 +95,7 @@ def test_fedrdf_aggregate_train_with_high_threshold() -> None:
 
     # With equal weights and low skewness, should be close to weighted average
     expected_avg = np.array([[2.0, 3.0]], dtype=np.float32)
-    np.testing.assert_array_almost_equal(
-        aggregated_arrays[0], expected_avg, decimal=1
-    )
+    np.testing.assert_array_almost_equal(aggregated_arrays[0], expected_avg, decimal=1)
 
 
 def test_fedrdf_ks_proportion() -> None:
@@ -212,6 +207,47 @@ def test_fedrdf_weighted_aggregation() -> None:
     # Expected weighted average: (1.0*10 + 2.0*30) / 40 = 1.75
     #                            (2.0*10 + 3.0*30) / 40 = 2.75
     expected = np.array([[1.75, 2.75]], dtype=np.float32)
-    np.testing.assert_array_almost_equal(
-        aggregated_arrays[0], expected, decimal=2
+    np.testing.assert_array_almost_equal(aggregated_arrays[0], expected, decimal=2)
+
+
+def test_fedrdf_requires_scipy_only_in_adaptive_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that scipy is required only when threshold > 0 (adaptive mode)."""
+    monkeypatch.setattr("flwr.serverapp.strategy.fedrdf.HAS_SCIPY", False)
+
+    # threshold <= 0 (always-FFT) must construct without scipy
+    FedRDF(threshold=0.0)
+
+    # threshold > 0 (adaptive mode) must raise a clear ImportError
+    with pytest.raises(ImportError):
+        FedRDF(threshold=0.5)
+
+
+def test_fedrdf_adaptive_switches_to_fourier_on_high_skewness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that high skewness routes aggregation through the FFT path."""
+    strategy = FedRDF(threshold=0.5)
+    # Force high skewness so the adaptive path selects FFT over FedAvg
+    monkeypatch.setattr(strategy, "_compute_skewness", lambda arrays: 1.0)
+
+    weights0 = np.array([[1.0, 1.0]], dtype=np.float32)
+    weights1 = np.array([[2.0, 2.0]], dtype=np.float32)
+    weights2 = np.array([[100.0, 100.0]], dtype=np.float32)
+
+    replies = [
+        create_mock_reply(ArrayRecord([weights0]), num_examples=10),
+        create_mock_reply(ArrayRecord([weights1]), num_examples=10),
+        create_mock_reply(ArrayRecord([weights2]), num_examples=10),
+    ]
+
+    arrays_aggregated, _ = strategy.aggregate_train(server_round=1, replies=replies)
+
+    # FFT path selects the highest-frequency component of the sorted values,
+    # excluding the poisoned 100.0 (weighted FedAvg would yield ~34.3 instead)
+    assert arrays_aggregated is not None
+    np.testing.assert_array_equal(
+        arrays_aggregated.to_numpy_ndarrays()[0],
+        np.array([[2.0, 2.0]], dtype=np.float32),
     )
