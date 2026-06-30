@@ -17,8 +17,8 @@
 
 import json
 
-from fastapi import HTTPException, status
 import pytest
+from fastapi import HTTPException, status
 
 from .base import ApiErrorCode, FlowerError
 from .catalog import API_ERROR_MAP
