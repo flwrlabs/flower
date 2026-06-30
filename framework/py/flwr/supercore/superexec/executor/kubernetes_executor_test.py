@@ -251,17 +251,12 @@ def test_build_taskexecutor_pod_supports_explicit_env() -> None:
         "EXA_API_KEY",
     ],
 )
-def test_build_taskexecutor_pod_rejects_provider_key_env_names(
+def test_kubernetes_executor_config_rejects_provider_key_env_names(
     env_name: str,
 ) -> None:
     """Test TaskExecutor env rejects exact provider key names."""
     with pytest.raises(ValueError, match="TaskExecutor env name"):
-        _build_taskexecutor_pod(
-            _execution_spec(),
-            _executor_config(env=[{"name": env_name, "value": "not-forwarded"}]),
-            "root-ca",
-            _LAUNCH_ATTEMPT_ID,
-        )
+        _executor_config(env=[{"name": env_name, "value": "not-forwarded"}])
 
 
 @pytest.mark.parametrize(
@@ -285,17 +280,12 @@ def test_build_taskexecutor_pod_rejects_provider_key_env_names(
         ),
     ],
 )
-def test_build_taskexecutor_pod_rejects_invalid_env_entries(
+def test_kubernetes_executor_config_rejects_invalid_env_entries(
     env_entry: object, expected_message: str
 ) -> None:
     """Test TaskExecutor env rejects invalid entries."""
     with pytest.raises(ValueError, match=expected_message):
-        _build_taskexecutor_pod(
-            _execution_spec(),
-            _executor_config(env=[env_entry]),
-            "root-ca",
-            _LAUNCH_ATTEMPT_ID,
-        )
+        _executor_config(env=[env_entry])
 
 
 def test_build_taskexecutor_pod_supports_clientapp_insecure_args() -> None:

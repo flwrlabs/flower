@@ -194,6 +194,11 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     sleep: Callable[[float], None] = time.sleep
     monotonic: Callable[[], float] = time.monotonic
 
+    def __post_init__(self) -> None:
+        """Validate config values used to build TaskExecutor Pods."""
+        if self.env is not None:
+            self.env = _taskexecutor_env(self.env)
+
 
 class KubernetesExecutor:
     """Submit TaskExecutor Pods to Kubernetes."""
@@ -442,7 +447,7 @@ def _build_taskexecutor_pod(
     if config.resources is not None:
         container["resources"] = config.resources
     if config.env is not None:
-        container["env"] = _taskexecutor_env(config.env)
+        container["env"] = config.env
     if config.container_security_context is not None:
         container["securityContext"] = config.container_security_context
 
@@ -507,6 +512,8 @@ def _taskexecutor_args(
 
 def _taskexecutor_env(env: Sequence[object]) -> list[JSONObject]:
     """Build validated TaskExecutor container environment entries."""
+    if not isinstance(env, Sequence) or isinstance(env, (str, bytes)):
+        raise ValueError("TaskExecutor env must be a sequence of mappings.")
     entries: list[JSONObject] = []
     for entry in env:
         if not isinstance(entry, dict):
