@@ -511,6 +511,8 @@ def _taskexecutor_env(env: Sequence[object]) -> list[JSONObject]:
     for entry in env:
         if not isinstance(entry, dict):
             raise ValueError("TaskExecutor env entries must be mappings.")
+        # Keep this path limited to non-secret literal config. Design secret
+        # references separately before allowing them into TaskExecutor Pods.
         if "valueFrom" in entry:
             raise ValueError(
                 "TaskExecutor env entries support literal 'value' only; "
@@ -524,6 +526,7 @@ def _taskexecutor_env(env: Sequence[object]) -> list[JSONObject]:
         value = entry["value"]
         if not isinstance(name, str) or not name.strip():
             raise ValueError("TaskExecutor env names must be non-empty strings.")
+        # Validate env name locally so invalid executor config fails before Pod creation
         if not _KUBERNETES_ENV_NAME_PATTERN.fullmatch(name):
             raise ValueError(
                 f"TaskExecutor env name {name!r} must be a valid Kubernetes "
@@ -531,18 +534,15 @@ def _taskexecutor_env(env: Sequence[object]) -> list[JSONObject]:
             )
         if not isinstance(value, str):
             raise ValueError(f"TaskExecutor env value for {name!r} must be a string.")
-        _raise_if_forbidden_taskexecutor_env_name(name)
+        # Reject task-visible provider API key env names before Pod construction
+        if name in _FORBIDDEN_TASKEXECUTOR_ENV_NAMES:
+            raise ValueError(
+                f"TaskExecutor env name {name!r} is not allowed because it is a "
+                "provider API key."
+            )
+        # Copy only the validated Kubernetes env shape into the generated Pod spec.
         entries.append({"name": name, "value": value})
     return entries
-
-
-def _raise_if_forbidden_taskexecutor_env_name(name: str) -> None:
-    """Reject task-visible provider API key env names before Pod construction."""
-    if name in _FORBIDDEN_TASKEXECUTOR_ENV_NAMES:
-        raise ValueError(
-            f"TaskExecutor env name {name!r} is not allowed because it is a "
-            "provider API key."
-        )
 
 
 def _get_appio_root_certificates(
