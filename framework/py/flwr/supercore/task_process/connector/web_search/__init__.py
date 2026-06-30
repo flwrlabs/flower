@@ -16,14 +16,19 @@
 
 
 import os
+from typing import cast
 
-from flwr.supercore.typing import JSONObject
+import requests
+
+from flwr.supercore.typing import JSONObject, JSONValue
 
 from .brave import BRAVE_API_KEY_ENV, BraveWebSearchProvider
 from .exa import EXA_API_KEY_ENV, ExaWebSearchProvider
 from .tavily import TAVILY_API_KEY_ENV, TavilyWebSearchProvider
 
 WEB_SEARCH_CONNECTOR_NAME = "web_search"
+WEB_SEARCH_ENDPOINT_ENV = "FLWR_WEB_SEARCH_ENDPOINT"
+REQUEST_TIMEOUT = 60.0
 _WEB_SEARCH_API_KEY_ENV_VARS = (
     BRAVE_API_KEY_ENV,
     TAVILY_API_KEY_ENV,
@@ -53,6 +58,10 @@ def make_web_search_tool() -> JSONObject:
 
 def search(query: str) -> JSONObject:
     """Execute one web search request."""
+    proxy_endpoint = os.getenv(WEB_SEARCH_ENDPOINT_ENV, "").strip()
+    if proxy_endpoint:
+        return _search_proxy(proxy_endpoint, query)
+
     if os.getenv(BRAVE_API_KEY_ENV, "").strip():
         return BraveWebSearchProvider().search(query)
     if os.getenv(TAVILY_API_KEY_ENV, "").strip():
@@ -66,4 +75,48 @@ def search(query: str) -> JSONObject:
     )
 
 
-__all__ = ["WEB_SEARCH_CONNECTOR_NAME", "make_web_search_tool", "search"]
+def _search_proxy(endpoint: str, query: str) -> JSONObject:
+    """Execute one web search request through a configured proxy endpoint."""
+    if not query.strip():
+        raise ValueError("web search requires a non-empty query.")
+    query = query.strip()
+
+    try:
+        response = requests.post(
+            endpoint,
+            json={"query": query},
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError(f"web search proxy request failed: {exc}") from exc
+    if response.status_code >= 400:
+        try:
+            detail = cast(JSONValue, response.json())
+        except ValueError:
+            detail = response.text
+        raise RuntimeError(
+            f"web search proxy request failed: {response.status_code} {detail}"
+        )
+
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise RuntimeError("web search proxy returned invalid JSON.") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("web search proxy returned invalid JSON.")
+
+    return _validate_proxy_results(cast(JSONObject, payload))
+
+
+def _validate_proxy_results(payload: JSONObject) -> JSONObject:
+    if not isinstance(payload.get("results"), list):
+        raise RuntimeError("web search proxy response must contain a results list.")
+    return payload
+
+
+__all__ = [
+    "WEB_SEARCH_CONNECTOR_NAME",
+    "WEB_SEARCH_ENDPOINT_ENV",
+    "make_web_search_tool",
+    "search",
+]

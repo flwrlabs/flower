@@ -71,11 +71,10 @@ def invoke_model_provider(
     """
     # Resolve provider configuration from environment variables.
     api_key = os.getenv("FLWR_MODEL_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError("Model API key is not set (FLWR_MODEL_API_KEY).")
-
     responses_url = os.getenv("FLWR_MODEL_API_ENDPOINT", "").strip()
     if not responses_url:
+        if not api_key:
+            raise RuntimeError("Model API key is not set (FLWR_MODEL_API_KEY).")
         responses_url = DEFAULT_MODEL_API_ENDPOINT
     responses_url = responses_url.rstrip("/")
     if not responses_url.endswith("/responses"):
@@ -95,10 +94,9 @@ def invoke_model_provider(
     timeout = max(1.0, timeout)
 
     # Build request metadata once, then execute the shared provider path.
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     payload = dict(request)
     return _invoke_provider_response(
         responses_url=responses_url,

@@ -53,6 +53,48 @@ def _patch_post(monkeypatch: pytest.MonkeyPatch, response: _Response) -> Mock:
     return post_mock
 
 
+def test_invoke_model_provider_requires_key_for_default_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Default model endpoint calls should fail before network without an API key."""
+    post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
+
+    with pytest.raises(RuntimeError, match="FLWR_MODEL_API_KEY"):
+        invoke_model_provider({"model": "model", "input": []})
+
+    post_mock.assert_not_called()
+
+
+def test_invoke_model_provider_omits_auth_for_endpoint_without_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explicit endpoints should support proxy calls without bearer auth."""
+    monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "http://proxy/v1/responses")
+    post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
+
+    result = invoke_model_provider({"model": "model", "input": []})
+
+    assert result == {"id": "resp_1"}
+    assert post_mock.call_args.args == ("http://proxy/v1/responses",)
+    assert post_mock.call_args.kwargs["headers"] == {"Content-Type": "application/json"}
+
+
+def test_invoke_model_provider_keeps_auth_when_key_is_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Direct provider calls should keep sending bearer auth."""
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
+
+    result = invoke_model_provider({"model": "model", "input": []})
+
+    assert result == {"id": "resp_1"}
+    assert post_mock.call_args.kwargs["headers"] == {
+        "Authorization": "Bearer fk_test",
+        "Content-Type": "application/json",
+    }
+
+
 def test_invoke_model_provider_collects_stream_events(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
