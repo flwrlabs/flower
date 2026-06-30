@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower ServerApp process."""
+"""Flower ServerApp runtime."""
 
 
-import argparse
-from logging import DEBUG, ERROR, INFO
+from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
 
@@ -27,25 +26,13 @@ from flwr.app.message import Context, RecordDict
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
-from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.config import (
     get_fused_config_from_dir,
     get_project_config,
     get_project_dir,
 )
-from flwr.common.constant import (
-    RUNTIME_DEPENDENCY_INSTALL,
-    SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
-    SubStatus,
-)
-from flwr.common.logger import (
-    flush_logs,
-    log,
-    mirror_output_to_queue,
-    restore_output,
-    start_log_uploader,
-    stop_log_uploader,
-)
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
+from flwr.common.logger import flush_logs, log, start_log_uploader, stop_log_uploader
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -67,40 +54,7 @@ from flwr.supercore.superexec.dependency_installer import (
     install_app_dependencies,
 )
 from flwr.supercore.telemetry import EventType, event
-from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.superlink.grid import GrpcGrid
-
-
-def flwr_serverapp() -> None:
-    """Run process-isolated Flower ServerApp."""
-    args = _parse_args_run_flwr_serverapp().parse_args()
-    token = try_obtain_flwr_app_token(args)
-
-    # Capture stdout/stderr
-    log_queue: Queue[str | None] = Queue()
-    mirror_output_to_queue(log_queue)
-
-    log(INFO, "Start `flwr-serverapp` process")
-    log(
-        DEBUG,
-        "`flwr-serverapp` will attempt to connect to SuperLink's "
-        "ServerAppIo API at %s",
-        args.serverappio_api_address,
-    )
-    run_serverapp(
-        serverappio_api_address=args.serverappio_api_address,
-        log_queue=log_queue,
-        token=token,
-        insecure=args.insecure,
-        certificates=validate_and_resolve_root_certificates(
-            args.root_certificates, args.insecure
-        ),
-        parent_pid=args.parent_pid,
-        runtime_dependency_install=args.runtime_dependency_install,
-    )
-
-    # Restore stdout/stderr
-    restore_output()
 
 
 def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
@@ -297,19 +251,3 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             "success": exit_code == ExitCode.SUCCESS,
         },
     )
-
-
-def _parse_args_run_flwr_serverapp() -> argparse.ArgumentParser:
-    """Parse flwr-serverapp command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Run a Flower ServerApp",
-    )
-    parser.add_argument(
-        "--serverappio-api-address",
-        default=SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
-        type=str,
-        help="Address of SuperLink's ServerAppIo API (IPv4, IPv6, or a domain name)."
-        f"By default, it is set to {SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
-    )
-    add_args_flwr_app_common(parser=parser)
-    return parser

@@ -16,6 +16,7 @@
 
 
 import argparse
+import importlib
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -23,15 +24,20 @@ import grpc
 import pytest
 
 from flwr.common.constant import FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION
+from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.interceptors import RuntimeVersionServerInterceptor
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.version import package_version
 from flwr.superlink.federation import NoOpFederationManager
 
-from . import app as app_module
-from .app import _obtain_superlink_certificates, _parse_args_run_superlink
-from .superlink.linkstate import LinkStateFactory
+from .flower_superlink import (
+    _obtain_superlink_certificates,
+    _parse_args_run_superlink,
+    _parse_superlink_lifespan_config,
+)
+
+app_module = importlib.import_module("flwr.superlink.cli.flower_superlink")
 
 
 def test_parse_superlink_log_rotation_args_defaults() -> None:
@@ -43,6 +49,48 @@ def test_parse_superlink_log_rotation_args_defaults() -> None:
     assert args.log_file is None
     assert args.log_rotation_interval_hours == 24
     assert args.log_rotation_backup_count == 7
+
+
+def test_parse_superlink_lifespan_config_returns_final_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperLink CLI parsing should return the final lifespan config."""
+    monkeypatch.setattr(app_module.sys, "argv", ["flower-superlink", "--insecure"])
+
+    config = _parse_superlink_lifespan_config()
+
+    assert (
+        config.serverappio_address == app_module.SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
+    )
+    assert config.control_address == app_module.CONTROL_API_DEFAULT_SERVER_ADDRESS
+    assert config.fleet_api_address == app_module.FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
+    assert config.health_server_address is None
+    assert config.certificates is None
+    assert config.appio_certificates is None
+    assert config.superexec_auth_secret is None
+    assert config.enable_supernode_auth is False
+    assert config.simulation is False
+    assert config.database == FLWR_IN_MEMORY_DB_NAME
+
+
+def test_parse_superlink_lifespan_config_maps_exec_api_address(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Deprecated Exec API address should end up as Control API config."""
+    monkeypatch.setattr(
+        app_module.sys,
+        "argv",
+        [
+            "flower-superlink",
+            "--insecure",
+            "--exec-api-address",
+            "127.0.0.1:9099",
+        ],
+    )
+
+    config = _parse_superlink_lifespan_config()
+
+    assert config.control_address == "127.0.0.1:9099"
 
 
 def test_parse_superlink_log_rotation_args_custom_values() -> None:
@@ -134,7 +182,7 @@ def test_parse_superlink_log_rotation_backup_requires_positive_int(
         _parse_args_run_superlink().parse_args(["--log-rotation-backup-count", value])
 
 
-def test_run_superlink_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_flower_superlink_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> None:
     """SuperLink should run the startup update check before parsing arguments."""
 
     class _SentinelError(Exception):
@@ -164,7 +212,7 @@ def test_run_superlink_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(app_module, "warn_if_flwr_update_available", _raise_sentinel)
 
     with pytest.raises(_SentinelError):
-        app_module.run_superlink()
+        app_module.flower_superlink()
 
     assert captured == ["update", "flower-superlink"]
 
