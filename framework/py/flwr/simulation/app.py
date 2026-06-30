@@ -207,6 +207,9 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         if heartbeat_sender and heartbeat_sender.is_running:
             heartbeat_sender.stop()
 
+        # Close the gRPC connection
+        conn._disconnect()
+
         cleanup_app_runtime_environment(runtime_env_dir)
 
     register_signal_handlers(
