@@ -510,10 +510,10 @@ def _taskexecutor_args(
     return args
 
 
-def _taskexecutor_env(env: Sequence[object]) -> list[JSONObject]:
+def _taskexecutor_env(env: list[JSONObject]) -> list[JSONObject]:
     """Build validated TaskExecutor container environment entries."""
-    if not isinstance(env, Sequence) or isinstance(env, (str, bytes)):
-        raise ValueError("TaskExecutor env must be a sequence of mappings.")
+    if not isinstance(env, list):
+        raise ValueError("TaskExecutor env must be a list of mappings.")
     entries: list[JSONObject] = []
     for entry in env:
         if not isinstance(entry, dict):
