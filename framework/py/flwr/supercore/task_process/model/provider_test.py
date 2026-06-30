@@ -24,7 +24,11 @@ import pytest
 
 from flwr.supercore.typing import JSONObject
 
-from .provider import ModelProviderError, invoke_model_provider
+from .provider import (
+    DEFAULT_MODEL_API_ENDPOINT,
+    ModelProviderError,
+    invoke_model_provider,
+)
 
 
 @dataclass
@@ -51,6 +55,59 @@ def _patch_post(monkeypatch: pytest.MonkeyPatch, response: _Response) -> Mock:
         post_mock,
     )
     return post_mock
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        None,
+        DEFAULT_MODEL_API_ENDPOINT,
+        f"{DEFAULT_MODEL_API_ENDPOINT}/",
+    ],
+)
+def test_invoke_model_provider_requires_key_for_default_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+    endpoint: str | None,
+) -> None:
+    """Default model endpoint calls should fail before network without an API key."""
+    if endpoint is not None:
+        monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", endpoint)
+    post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
+
+    with pytest.raises(RuntimeError, match="FLWR_MODEL_API_KEY"):
+        invoke_model_provider({"model": "model", "input": []})
+
+    post_mock.assert_not_called()
+
+
+def test_invoke_model_provider_omits_auth_for_endpoint_without_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explicit endpoints should support proxy calls without bearer auth."""
+    monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "http://proxy/v1/responses")
+    post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
+
+    result = invoke_model_provider({"model": "model", "input": []})
+
+    assert result == {"id": "resp_1"}
+    assert post_mock.call_args.args == ("http://proxy/v1/responses",)
+    assert post_mock.call_args.kwargs["headers"] == {"Content-Type": "application/json"}
+
+
+def test_invoke_model_provider_keeps_auth_when_key_is_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Direct provider calls should keep sending bearer auth."""
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
+
+    result = invoke_model_provider({"model": "model", "input": []})
+
+    assert result == {"id": "resp_1"}
+    assert post_mock.call_args.kwargs["headers"] == {
+        "Authorization": "Bearer fk_test",
+        "Content-Type": "application/json",
+    }
 
 
 def test_invoke_model_provider_collects_stream_events(
