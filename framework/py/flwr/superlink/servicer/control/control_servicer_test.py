@@ -665,7 +665,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         response = self.servicer.ListRunSeries(
-            ListRunSeriesRequest(federation=NOOP_FEDERATION), Mock()
+            ListRunSeriesRequest(federation_id=NOOP_FEDERATION), Mock()
         )
 
         # Assert

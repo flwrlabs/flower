@@ -421,7 +421,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             request.updated_before if request.HasField("updated_before") else None
         )
         limit = request.limit if request.HasField("limit") else None
-        federation_name = request.federation if request.HasField("federation") else None
+        federation_name = (
+            request.federation_id if request.HasField("federation_id") else None
+        )
 
         with rpc_error_translator(context, rpc_name):
             if federation_name is not None:
