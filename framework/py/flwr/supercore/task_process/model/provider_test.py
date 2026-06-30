@@ -57,28 +57,21 @@ def _patch_post(monkeypatch: pytest.MonkeyPatch, response: _Response) -> Mock:
     return post_mock
 
 
-def test_invoke_model_provider_requires_key_for_default_endpoint(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Default model endpoint calls should fail before network without an API key."""
-    post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
-
-    with pytest.raises(RuntimeError, match="FLWR_MODEL_API_KEY"):
-        invoke_model_provider({"model": "model", "input": []})
-
-    post_mock.assert_not_called()
-
-
 @pytest.mark.parametrize(
     "endpoint",
-    [DEFAULT_MODEL_API_ENDPOINT, f"{DEFAULT_MODEL_API_ENDPOINT}/"],
+    [
+        None,
+        DEFAULT_MODEL_API_ENDPOINT,
+        f"{DEFAULT_MODEL_API_ENDPOINT}/",
+    ],
 )
-def test_invoke_model_provider_requires_key_for_explicit_default_endpoint(
+def test_invoke_model_provider_requires_key_for_default_endpoint(
     monkeypatch: pytest.MonkeyPatch,
-    endpoint: str,
+    endpoint: str | None,
 ) -> None:
-    """Explicit default model endpoint calls should fail without an API key."""
-    monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", endpoint)
+    """Default model endpoint calls should fail before network without an API key."""
+    if endpoint is not None:
+        monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", endpoint)
     post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
 
     with pytest.raises(RuntimeError, match="FLWR_MODEL_API_KEY"):
