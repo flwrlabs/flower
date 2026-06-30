@@ -518,7 +518,7 @@ def _taskexecutor_env(env: Sequence[object]) -> list[JSONObject]:
             )
         if set(entry) != {"name", "value"}:
             raise ValueError(
-                "TaskExecutor env entries must contain only 'name' and 'value'."
+                "TaskExecutor env entries must contain exactly 'name' and 'value'."
             )
         name = entry["name"]
         value = entry["value"]
