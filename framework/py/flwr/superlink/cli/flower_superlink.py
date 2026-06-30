@@ -806,9 +806,9 @@ def _run_superlink_http_api(  # pylint: disable=import-outside-toplevel
     except ModuleNotFoundError:
         flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
 
-    superlink_lifespan = (
-        SuperLinkLifespan(lifespan_config) if start_legacy_grpc else None
-    )
+    superlink_lifespan = None
+    if start_legacy_grpc:
+        superlink_lifespan = SuperLinkLifespan(lifespan_config)
     fastapi_app = create_app(
         superlink_lifespan=superlink_lifespan,
         start_legacy_grpc=start_legacy_grpc,
