@@ -16,6 +16,7 @@
 
 
 import importlib
+import re
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -62,6 +63,7 @@ _FORBIDDEN_TASKEXECUTOR_ENV_NAMES = frozenset(
         "EXA_API_KEY",
     }
 )
+_KUBERNETES_ENV_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 class KubernetesList(Protocol):
@@ -522,6 +524,11 @@ def _taskexecutor_env(env: Sequence[object]) -> list[JSONObject]:
         value = entry["value"]
         if not isinstance(name, str) or not name.strip():
             raise ValueError("TaskExecutor env names must be non-empty strings.")
+        if not _KUBERNETES_ENV_NAME_PATTERN.fullmatch(name):
+            raise ValueError(
+                f"TaskExecutor env name {name!r} must be a valid Kubernetes "
+                "environment variable name."
+            )
         if not isinstance(value, str):
             raise ValueError(f"TaskExecutor env value for {name!r} must be a string.")
         _raise_if_forbidden_taskexecutor_env_name(name)

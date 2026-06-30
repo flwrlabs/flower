@@ -82,6 +82,8 @@ def invoke_model_provider(
             "Model API endpoint must include the /responses path "
             "(FLWR_MODEL_API_ENDPOINT)."
         )
+    if not api_key and responses_url == DEFAULT_MODEL_API_ENDPOINT:
+        raise RuntimeError("Model API key is not set (FLWR_MODEL_API_KEY).")
 
     raw_timeout = os.getenv(
         "FLWR_MODEL_API_TIMEOUT",
