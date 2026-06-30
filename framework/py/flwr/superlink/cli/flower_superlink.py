@@ -30,6 +30,7 @@ from time import sleep
 from typing import TypeVar, cast
 
 import grpc
+import uvicorn
 import yaml
 
 from flwr.common.args import (
@@ -74,7 +75,11 @@ from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
     load_superexec_auth_secret,
 )
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    UVICORN_DEFAULT_HOST,
+    UVICORN_DEFAULT_PORT,
+)
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
@@ -95,13 +100,11 @@ from flwr.superlink.auth_plugin import (
     NoOpControlAuthzPlugin,
 )
 from flwr.superlink.federation import FederationManager, NoOpFederationManager
+from flwr.superlink.main import create_app
 from flwr.superlink.servicer.control import run_control_api_grpc
 from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
 
 P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
-
-UVICORN_DEFAULT_HOST = "127.0.0.1"
-UVICORN_DEFAULT_PORT = 8000
 
 
 try:
@@ -779,9 +782,7 @@ def _format_address(address: str) -> tuple[str, str, int]:
     return (f"[{host}]:{port}" if is_v6 else f"{host}:{port}", host, port)
 
 
-def _run_superlink_http_api(  # pylint: disable=import-outside-toplevel
-    lifespan_config: SuperLinkLifespanConfig,
-) -> None:
+def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
     """Run the experimental FastAPI-owned SuperLink service.
 
     In this mode, FastAPI owns process startup and starts the current
@@ -796,16 +797,6 @@ def _run_superlink_http_api(  # pylint: disable=import-outside-toplevel
             ExitCode.SUPERLINK_INVALID_ARGS,
             "`--enable-http-api` cannot be combined with `--fleet-api-type rest`",
         )
-    if importlib.util.find_spec("uvicorn") is None:
-        flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
-
-    try:
-        import uvicorn
-
-        from flwr.superlink.main import create_app
-    except ModuleNotFoundError:
-        flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
-
     superlink_lifespan = None
     if start_legacy_grpc:
         superlink_lifespan = SuperLinkLifespan(lifespan_config)
@@ -1070,8 +1061,6 @@ def _run_fleet_api_rest(
 ) -> None:
     """Run ServerAppIo API (REST-based)."""
     try:
-        import uvicorn
-
         from flwr.server.superlink.fleet.rest_rere.rest_api import app as fast_api_app
     except ModuleNotFoundError:
         flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
