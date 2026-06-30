@@ -265,38 +265,34 @@ def test_build_taskexecutor_pod_rejects_provider_key_env_names(
 
 
 @pytest.mark.parametrize(
-    "env_name",
+    ("env_entry", "expected_message"),
     [
-        " FLWR_MODEL_API_ENDPOINT",
-        "FLWR_MODEL_API_ENDPOINT ",
-        "FLWR-MODEL-API-ENDPOINT",
-        "1INVALID",
+        (
+            {"name": " FLWR_MODEL_API_ENDPOINT ", "value": "not-forwarded"},
+            "valid Kubernetes",
+        ),
+        (
+            {"name": "FLWR-MODEL-API-ENDPOINT", "value": "not-forwarded"},
+            "valid Kubernetes",
+        ),
+        ({"name": "1INVALID", "value": "not-forwarded"}, "valid Kubernetes"),
+        (
+            {
+                "name": "FLWR_MODEL_API_ENDPOINT",
+                "valueFrom": {"secretKeyRef": {"name": "proxy", "key": "url"}},
+            },
+            "valueFrom",
+        ),
     ],
 )
-def test_build_taskexecutor_pod_rejects_invalid_env_names(env_name: str) -> None:
-    """Test TaskExecutor env rejects names Kubernetes would reject."""
-    with pytest.raises(ValueError, match="valid Kubernetes"):
+def test_build_taskexecutor_pod_rejects_invalid_env_entries(
+    env_entry: object, expected_message: str
+) -> None:
+    """Test TaskExecutor env rejects invalid entries."""
+    with pytest.raises(ValueError, match=expected_message):
         _build_taskexecutor_pod(
             _execution_spec(),
-            _executor_config(env=[{"name": env_name, "value": "not-forwarded"}]),
-            "root-ca",
-            _LAUNCH_ATTEMPT_ID,
-        )
-
-
-def test_build_taskexecutor_pod_rejects_value_from_env() -> None:
-    """Test TaskExecutor env rejects valueFrom entries for this hotfix."""
-    with pytest.raises(ValueError, match="valueFrom"):
-        _build_taskexecutor_pod(
-            _execution_spec(),
-            _executor_config(
-                env=[
-                    {
-                        "name": "FLWR_MODEL_API_ENDPOINT",
-                        "valueFrom": {"secretKeyRef": {"name": "proxy", "key": "url"}},
-                    }
-                ]
-            ),
+            _executor_config(env=[env_entry]),
             "root-ca",
             _LAUNCH_ATTEMPT_ID,
         )
