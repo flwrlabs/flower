@@ -68,13 +68,9 @@ class ProxyWebSearchProvider:
                 f"{PROXY_WEB_SEARCH_PROVIDER} web search returned invalid JSON."
             )
 
-        return _validate_proxy_results(cast(JSONObject, payload))
-
-
-def _validate_proxy_results(payload: JSONObject) -> JSONObject:
-    if not isinstance(payload.get("results"), list):
-        raise RuntimeError(
-            f"{PROXY_WEB_SEARCH_PROVIDER} web search response must contain a "
-            "results list."
-        )
-    return payload
+        if not isinstance(payload.get("results"), list):
+            raise RuntimeError(
+                f"{PROXY_WEB_SEARCH_PROVIDER} web search response must contain a "
+                "results list."
+            )
+        return cast(JSONObject, payload)
