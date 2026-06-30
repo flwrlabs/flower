@@ -153,7 +153,7 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         Optional Kubernetes container resource requests and limits.
     env : list[JSONObject] | None
         Optional explicit TaskExecutor container environment. Only literal
-        name/value entries are supported for this hotfix.
+        name/value entries are supported.
     node_selector : dict[str, str] | None
         Optional Kubernetes nodeSelector.
     tolerations : list[JSONObject] | None
