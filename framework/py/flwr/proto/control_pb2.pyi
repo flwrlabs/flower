@@ -221,16 +221,21 @@ class ListRunSeriesRequest(google.protobuf.message.Message):
 
     UPDATED_BEFORE_FIELD_NUMBER: builtins.int
     LIMIT_FIELD_NUMBER: builtins.int
+    FEDERATION_ID_FIELD_NUMBER: builtins.int
     updated_before: builtins.str
     limit: builtins.int
+    federation_id: builtins.str
     def __init__(
         self,
         *,
         updated_before: builtins.str | None = ...,
         limit: builtins.int | None = ...,
+        federation_id: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "_updated_before", b"_updated_before", "limit", b"limit", "updated_before", b"updated_before"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "_updated_before", b"_updated_before", "limit", b"limit", "updated_before", b"updated_before"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_federation_id", b"_federation_id", "_limit", b"_limit", "_updated_before", b"_updated_before", "federation_id", b"federation_id", "limit", b"limit", "updated_before", b"updated_before"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_federation_id", b"_federation_id", "_limit", b"_limit", "_updated_before", b"_updated_before", "federation_id", b"federation_id", "limit", b"limit", "updated_before", b"updated_before"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_federation_id", b"_federation_id"]) -> typing.Literal["federation_id"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
     @typing.overload
