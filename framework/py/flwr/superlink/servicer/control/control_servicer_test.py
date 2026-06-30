@@ -58,6 +58,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunSeriesRequest,
     ListRunsRequest,
     RegisterNodeRequest,
     RejectInvitationRequest,
@@ -655,6 +656,20 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             response.run_dict[run_id].account_name, self.account_info.account_name
         )
+
+    def test_list_run_series_filters_by_federation(self) -> None:
+        """Test ListRunSeries filters by an explicit federation."""
+        # Prepare
+        self._create_dummy_run_series(1, federation=NOOP_FEDERATION)
+        self._create_dummy_run_series(2, federation="other-federation")
+
+        # Execute
+        response = self.servicer.ListRunSeries(
+            ListRunSeriesRequest(federation_id=NOOP_FEDERATION), Mock()
+        )
+
+        # Assert
+        self.assertEqual([entry.series_id for entry in response.entries], [1])
 
     def test_get_run_series_returns_context(self) -> None:
         """Test GetRunSeries returns series metadata and shared Context."""

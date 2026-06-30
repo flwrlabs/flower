@@ -21,9 +21,11 @@ from flwr.supercore.typing import JSONObject
 
 from .brave import BRAVE_API_KEY_ENV, BraveWebSearchProvider
 from .exa import EXA_API_KEY_ENV, ExaWebSearchProvider
+from .proxy import ProxyWebSearchProvider
 from .tavily import TAVILY_API_KEY_ENV, TavilyWebSearchProvider
 
 WEB_SEARCH_CONNECTOR_NAME = "web_search"
+WEB_SEARCH_ENDPOINT_ENV = "FLWR_WEB_SEARCH_ENDPOINT"
 _WEB_SEARCH_API_KEY_ENV_VARS = (
     BRAVE_API_KEY_ENV,
     TAVILY_API_KEY_ENV,
@@ -53,6 +55,8 @@ def make_web_search_tool() -> JSONObject:
 
 def search(query: str) -> JSONObject:
     """Execute one web search request."""
+    if proxy_endpoint := os.getenv(WEB_SEARCH_ENDPOINT_ENV, "").strip():
+        return ProxyWebSearchProvider(proxy_endpoint).search(query)
     if os.getenv(BRAVE_API_KEY_ENV, "").strip():
         return BraveWebSearchProvider().search(query)
     if os.getenv(TAVILY_API_KEY_ENV, "").strip():
@@ -66,4 +70,9 @@ def search(query: str) -> JSONObject:
     )
 
 
-__all__ = ["WEB_SEARCH_CONNECTOR_NAME", "make_web_search_tool", "search"]
+__all__ = [
+    "WEB_SEARCH_CONNECTOR_NAME",
+    "WEB_SEARCH_ENDPOINT_ENV",
+    "make_web_search_tool",
+    "search",
+]

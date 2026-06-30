@@ -212,6 +212,82 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
     assert pod["spec"]["restartPolicy"] == "Never"
 
 
+def test_build_taskexecutor_pod_supports_explicit_env() -> None:
+    """Test Pod construction includes validated explicit container env."""
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            _execution_spec(),
+            _executor_config(
+                env=[
+                    {
+                        "name": "FLWR_MODEL_API_ENDPOINT",
+                        "value": "http://proxy/v1/responses",
+                    },
+                    {
+                        "name": "FLWR_WEB_SEARCH_ENDPOINT",
+                        "value": "http://proxy/v1/web-search",
+                    },
+                    {"name": "UV_INDEX_URL", "value": "https://pypi.org/simple"},
+                ]
+            ),
+            "root-ca",
+            _LAUNCH_ATTEMPT_ID,
+        )
+    )
+
+    assert pod["spec"]["containers"][0]["env"] == [
+        {"name": "FLWR_MODEL_API_ENDPOINT", "value": "http://proxy/v1/responses"},
+        {"name": "FLWR_WEB_SEARCH_ENDPOINT", "value": "http://proxy/v1/web-search"},
+        {"name": "UV_INDEX_URL", "value": "https://pypi.org/simple"},
+    ]
+
+
+@pytest.mark.parametrize(
+    "env_name",
+    [
+        "FLWR_MODEL_API_KEY",
+        "BRAVE_API_KEY",
+        "TAVILY_API_KEY",
+        "EXA_API_KEY",
+    ],
+)
+def test_kubernetes_executor_config_rejects_provider_key_env_names(
+    env_name: str,
+) -> None:
+    """Test TaskExecutor env rejects exact provider key names."""
+    with pytest.raises(ValueError, match="TaskExecutor env name"):
+        _executor_config(env=[{"name": env_name, "value": "not-forwarded"}])
+
+
+@pytest.mark.parametrize(
+    ("env_entry", "expected_message"),
+    [
+        (
+            {"name": " FLWR_MODEL_API_ENDPOINT ", "value": "not-forwarded"},
+            "valid Kubernetes",
+        ),
+        (
+            {"name": "FLWR-MODEL-API-ENDPOINT", "value": "not-forwarded"},
+            "valid Kubernetes",
+        ),
+        ({"name": "1INVALID", "value": "not-forwarded"}, "valid Kubernetes"),
+        (
+            {
+                "name": "FLWR_MODEL_API_ENDPOINT",
+                "valueFrom": {"secretKeyRef": {"name": "proxy", "key": "url"}},
+            },
+            "valueFrom",
+        ),
+    ],
+)
+def test_kubernetes_executor_config_rejects_invalid_env_entries(
+    env_entry: object, expected_message: str
+) -> None:
+    """Test TaskExecutor env rejects invalid entries."""
+    with pytest.raises(ValueError, match=expected_message):
+        _executor_config(env=[env_entry])
+
+
 def test_build_taskexecutor_pod_supports_clientapp_insecure_args() -> None:
     """Test Pod construction for insecure ClientApp launch args."""
     pod = _as_dict(
