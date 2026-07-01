@@ -254,7 +254,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         log(
             INFO,
             "Federation `%s` (%s simulated SuperNodes)",
-            run.federation,
+            run.federation_id,
             num_supernodes,
         )
         # Indicate how to resize federation
@@ -263,7 +263,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             INFO,
             "\tflwr federation simulation-config "
             "%s <superlink> --num-supernodes <N>",
-            run.federation,
+            run.federation_id,
         )
 
         log(DEBUG, "Simulation process starts FAB installation.")
@@ -341,7 +341,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             backend_name=backend_name,
             backend_config=backend_config,
             app_dir=str(app_path),
-            run=replace(run, federation=NOOP_FEDERATION_ID),
+            run=replace(run, federation_id=NOOP_FEDERATION_ID),
             enable_tf_gpu_growth=enable_tf_gpu_growth,
             verbose_logging=verbose,
             server_app_context=context,

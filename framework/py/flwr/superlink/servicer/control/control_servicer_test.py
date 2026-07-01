@@ -951,7 +951,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             Member(account=Account(id=self.aid), role="owner"),
         ]
         mock_federation = SimpleNamespace(
-            name=expected_fed_id,
+            id=expected_fed_id,
             description=description,
             members=mock_members,
             simulation=True,
@@ -1423,7 +1423,7 @@ class TestControlServicerAuth(unittest.TestCase):
         ctx.is_active.return_value = True
         mock_get_run_info = Mock()
         mock_run = Mock(
-            federation=NOOP_FEDERATION_ID,
+            federation_id=NOOP_FEDERATION_ID,
             primary_task_id=456,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
         )
@@ -1459,7 +1459,7 @@ class TestControlServicerAuth(unittest.TestCase):
         ctx = self.make_context()
         ctx.is_active.return_value = True
         mock_run = Mock(
-            federation=NOOP_FEDERATION_ID,
+            federation_id=NOOP_FEDERATION_ID,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
         )
         event_1 = TaskEvent(

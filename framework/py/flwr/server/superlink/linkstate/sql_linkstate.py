@@ -1402,7 +1402,7 @@ def _run_from_row(row: dict[str, Any]) -> Run:
         finished_at=timestamp_to_iso(row["finished_at"]),
         status=_run_status_from_row(row),
         flwr_aid=row["flwr_aid"],
-        federation=row["federation"],
+        federation_id=row["federation"],
         primary_task_id=int64_to_uint64(row["primary_task_id"]),
         bytes_sent=row["bytes_sent"],
         bytes_recv=row["bytes_recv"],

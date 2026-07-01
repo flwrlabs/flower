@@ -297,10 +297,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             log(ERROR, "Could not start run: %s", str(e))
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
 
-        log_msg = f"Created run {run_id} in federation {run.federation}"
+        log_msg = f"Created run {run_id} in federation {run.federation_id}"
         log(INFO, log_msg)
         return StartRunResponse(
-            run_id=run_id, note=note, series_id=series_id, federation=run.federation
+            run_id=run_id, note=note, series_id=series_id, federation=run.federation_id
         )
 
     def StreamLogs(  # pylint: disable=C0103
@@ -325,7 +325,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         with rpc_error_translator(context, rpc_name):
             flwr_aid = _get_flwr_aid(context)
             _validate_federation_membership_in_request(
-                state, flwr_aid, run.federation, context
+                state, flwr_aid, run.federation_id, context
             )
 
         after_timestamp = request.after_timestamp + 1e-6
@@ -390,7 +390,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             # that the run belongs to
             with rpc_error_translator(context, rpc_name):
                 _validate_federation_membership_in_request(
-                    state, flwr_aid, runs[0].federation, context
+                    state, flwr_aid, runs[0].federation_id, context
                 )
 
         # Clear objects of finished runs
@@ -435,7 +435,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 federation_ids = [federation_id]
             else:
                 federations = state.federation_manager.get_federations(flwr_aid)
-                federation_ids = [federation.name for federation in federations]
+                federation_ids = [federation.id for federation in federations]
             entries = state.get_run_series(
                 federation_ids=federation_ids,
                 updated_before=updated_before,
@@ -494,7 +494,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         with rpc_error_translator(context, rpc_name):
             flwr_aid = _get_flwr_aid(context)
             _validate_federation_membership_in_request(
-                state, flwr_aid, run.federation, context
+                state, flwr_aid, run.federation_id, context
             )
 
         if run.status.status == Status.FINISHED:
@@ -699,7 +699,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         return ListFederationsResponse(
             federations=[
                 Federation(
-                    name=fed.name,
+                    name=fed.id,
                     description=fed.description,
                     archived=fed.archived,
                     simulation=fed.simulation,
@@ -796,7 +796,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         return CreateFederationResponse(
             federation=Federation(
-                name=federation.name,
+                name=federation.id,
                 description=federation.description,
                 members=federation.members,
                 simulation=federation.simulation,
@@ -1082,7 +1082,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         with rpc_error_translator(context, rpc_name):
             flwr_aid = _get_flwr_aid(context)
             _validate_federation_membership_in_request(
-                state, flwr_aid, run.federation, context
+                state, flwr_aid, run.federation_id, context
             )
 
         after_task_event_id = None

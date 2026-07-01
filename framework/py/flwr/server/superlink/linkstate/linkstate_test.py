@@ -158,7 +158,7 @@ class StateTest(CoreStateTest):
         # Assert
         assert run.run_id == run_id
         assert run.fab_hash == "9f86d08"
-        assert run.federation == "health-federation"
+        assert run.federation_id == "health-federation"
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
         assert run.series_id > 0

@@ -450,7 +450,7 @@ def _run_simulation(
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         run = Run.create_empty(run_id=run_id)
         run.primary_task_id = task_id
-        run.federation = NOOP_FEDERATION_ID
+        run.federation_id = NOOP_FEDERATION_ID
 
     args = (
         num_supernodes,

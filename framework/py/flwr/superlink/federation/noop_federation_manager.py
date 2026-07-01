@@ -90,7 +90,7 @@ class NoOpFederationManager(FederationManager):
             return []
         return [
             Federation(
-                name=NOOP_FEDERATION_ID,
+                id=NOOP_FEDERATION_ID,
                 description=NOOP_FEDERATION_DESCRIPTION,
                 members=[],
                 nodes=[],
@@ -110,7 +110,7 @@ class NoOpFederationManager(FederationManager):
         nodes = list(self.linkstate.get_node_info(owner_aids=[NOOP_FLWR_AID]))
         only_account = Account(id=NOOP_FLWR_AID, name=NOOP_ACCOUNT_NAME)
         return Federation(
-            name=NOOP_FEDERATION_ID,
+            id=NOOP_FEDERATION_ID,
             description=NOOP_FEDERATION_DESCRIPTION,
             members=[
                 Member(account=only_account, role="owner"),

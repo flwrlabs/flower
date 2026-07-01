@@ -157,7 +157,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
                 return None
 
-            federation_id = self.run_ids[message.metadata.run_id].run.federation
+            federation_id = self.run_ids[message.metadata.run_id].run.federation_id
 
             # Validate destination node ID
             dst_node = self.nodes.get(message.metadata.dst_node_id)
@@ -199,7 +199,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 # same federation
                 src_node_id = message.metadata.src_node_id
                 dst_node_id = message.metadata.dst_node_id
-                federation_id = self.run_ids[message.metadata.run_id].run.federation
+                federation_id = self.run_ids[message.metadata.run_id].run.federation_id
                 filtered = self.federation_manager.filter_nodes(
                     {src_node_id, dst_node_id},
                     federation_id,
@@ -542,7 +542,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         with self.lock:
             if run_id not in self.run_ids:
                 return set()
-            federation_id = self.run_ids[run_id].run.federation
+            federation_id = self.run_ids[run_id].run.federation_id
             node_ids = {
                 node.node_id
                 for node in self.get_node_info(statuses=[NodeStatus.ONLINE])
@@ -651,7 +651,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         details="",
                     ),
                     flwr_aid=flwr_aid if flwr_aid else "",
-                    federation=federation_id,
+                    federation_id=federation_id,
                     primary_task_id=task_id,
                     bytes_sent=0,
                     bytes_recv=0,
@@ -736,7 +736,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 matched_run_ids &= {
                     run_id
                     for run_id in matched_run_ids
-                    if self.run_ids[run_id].run.federation in federation_id_set
+                    if self.run_ids[run_id].run.federation_id in federation_id_set
                 }
 
             runs = [self._get_run(run_id) for run_id in matched_run_ids]

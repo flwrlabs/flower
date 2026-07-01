@@ -139,7 +139,7 @@ def register_messages_into_state(
                 details="",
             ),
             flwr_aid="user123",
-            federation="mock-fed",
+            federation_id="mock-fed",
             primary_task_id=None,
             bytes_sent=0,
             bytes_recv=0,

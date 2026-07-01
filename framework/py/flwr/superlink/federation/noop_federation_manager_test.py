@@ -77,7 +77,7 @@ def test_get_details_with_valid_federation() -> None:
         finished_at="",
         status=RunStatus(status="running", sub_status="", details=""),
         flwr_aid=NOOP_FLWR_AID,
-        federation=NOOP_FEDERATION_ID,
+        federation_id=NOOP_FEDERATION_ID,
         primary_task_id=None,
         bytes_sent=1024,
         bytes_recv=512,
@@ -95,7 +95,7 @@ def test_get_details_with_valid_federation() -> None:
         finished_at="2025-01-02T00:10:00",
         status=RunStatus(status="finished", sub_status="", details=""),
         flwr_aid=NOOP_FLWR_AID,
-        federation=NOOP_FEDERATION_ID,
+        federation_id=NOOP_FEDERATION_ID,
         primary_task_id=None,
         bytes_sent=2048,
         bytes_recv=1024,
@@ -129,7 +129,7 @@ def test_get_details_with_valid_federation() -> None:
 
     # Assert
     assert isinstance(result, Federation)
-    assert result.name == NOOP_FEDERATION_ID
+    assert result.id == NOOP_FEDERATION_ID
     assert result.description == NOOP_FEDERATION_DESCRIPTION
     assert len(result.members) == 1
     assert result.members[0] == Member(
@@ -173,7 +173,7 @@ def test_get_details_with_no_runs() -> None:
     result = manager.get_details(NOOP_FEDERATION_ID)
 
     # Assert
-    assert result.name == NOOP_FEDERATION_ID
+    assert result.id == NOOP_FEDERATION_ID
     assert len(result.members) == 1
     assert result.members[0] == Member(
         account=Account(id=NOOP_FLWR_AID, name=NOOP_ACCOUNT_NAME),
@@ -268,7 +268,7 @@ def test_get_federations() -> None:
     # Assert
     assert len(result) == 0
     assert len(result2) == 1
-    assert result2[0].name == NOOP_FEDERATION_ID
+    assert result2[0].id == NOOP_FEDERATION_ID
     assert result2[0].description == NOOP_FEDERATION_DESCRIPTION
     assert result2[0].archived is False
     assert result2[0].simulation is False
