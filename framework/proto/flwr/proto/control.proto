@@ -159,6 +159,7 @@ message ListRunsResponse {
 message ListRunSeriesRequest {
   optional string updated_before = 1;
   optional uint32 limit = 2;
+  optional string federation_id = 3;
 }
 message ListRunSeriesResponse { repeated RunSeries entries = 1; }
 
