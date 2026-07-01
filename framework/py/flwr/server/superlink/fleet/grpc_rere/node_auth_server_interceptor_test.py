@@ -65,7 +65,7 @@ from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_res_message
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, TaskType
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, TaskType
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -253,7 +253,7 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
             "",
             fab_hash,
             {},
-            NOOP_FEDERATION,
+            NOOP_FEDERATION_ID,
             None,
             "",
             TaskType.SERVER_APP,

@@ -35,7 +35,7 @@ from flwr.proto.control_pb2_grpc import ControlStub
 def reject(
     federation: Annotated[
         str,
-        typer.Argument(help="Name of the federation."),
+        typer.Argument(help="Federation ID."),
     ],
     superlink: Annotated[
         str | None,

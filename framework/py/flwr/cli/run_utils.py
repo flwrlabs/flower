@@ -31,7 +31,7 @@ class RunRow:  # pylint: disable=too-many-instance-attributes
     run_id : int
         The unique identifier for the run.
     federation : str
-        The federation name.
+        The federation ID.
     fab_id : str
         The Flower App Bundle identifier.
     fab_version : str

@@ -39,7 +39,7 @@ def archive(
     ctx: typer.Context,
     federation: Annotated[
         str,
-        typer.Argument(help="Name of the federation to archive."),
+        typer.Argument(help="Federation ID to archive."),
     ],
     superlink: Annotated[
         str | None,
@@ -91,6 +91,8 @@ def _archive_federation(  # pylint: disable=W0613
         _: ArchiveFederationResponse = stub.ArchiveFederation(request)
 
     if is_json:
-        print_json_to_stdout({"success": True, "name": request.federation_name})
+        print_json_to_stdout(
+            {"success": True, "federation-id": request.federation_name}
+        )
     else:
         typer.secho(f"✅ Federation '{request.federation_name}' archived successfully.")

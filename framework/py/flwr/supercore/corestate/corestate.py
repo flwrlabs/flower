@@ -48,7 +48,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         series_ids: Sequence[int] | None = None,
-        federations: Sequence[str] | None = None,
+        federation_ids: Sequence[str] | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -62,8 +62,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         series_ids : Optional[Sequence[int]] (default: None)
             Sequence of RunSeries IDs to filter by.
-        federations : Optional[Sequence[str]] (default: None)
-            Sequence of federation names to filter by.
+        federation_ids : Optional[Sequence[str]] (default: None)
+            Sequence of federation IDs to filter by.
         updated_before : str | None (default: None)
             If set, return only RunSeries updated before this ISO timestamp.
         limit : int | None (default: None)
@@ -107,7 +107,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def store_run_in_series(
         self,
         run_id: int,
-        federation: str,
+        federation_id: str,
         series_id: int | None,
     ) -> int | None:
         """Store a run in a run series and return the series ID.
@@ -116,12 +116,12 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         run_id : int
             Run ID to associate with the run series.
-        federation : str
-            Federation the run series belongs to.
+        federation_id : str
+            Federation ID the run series belongs to.
         series_id : int | None
             Caller-provided series ID. If `None`, a new series ID is generated
             and creation is attempted. If set, the matching series must already
-            exist and belong to `federation`.
+            exist and belong to `federation_id`.
 
         Returns
         -------

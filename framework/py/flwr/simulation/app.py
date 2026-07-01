@@ -64,7 +64,7 @@ from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import NOOP_FEDERATION
+from flwr.supercore.constant import NOOP_FEDERATION_ID
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.superexec.dependency_installer import (
@@ -341,7 +341,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             backend_name=backend_name,
             backend_config=backend_config,
             app_dir=str(app_path),
-            run=replace(run, federation=NOOP_FEDERATION),
+            run=replace(run, federation=NOOP_FEDERATION_ID),
             enable_tf_gpu_growth=enable_tf_gpu_growth,
             verbose_logging=verbose,
             server_app_context=context,

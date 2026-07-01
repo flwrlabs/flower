@@ -126,7 +126,7 @@ class InMemoryCoreState(
         self,
         *,
         series_ids: Sequence[int] | None = None,
-        federations: Sequence[str] | None = None,
+        federation_ids: Sequence[str] | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -136,12 +136,12 @@ class InMemoryCoreState(
         if (
             limit == 0
             or (series_ids is not None and not series_ids)
-            or (federations is not None and not federations)
+            or (federation_ids is not None and not federation_ids)
         ):
             return []
 
         series_id_set = set(series_ids) if series_ids is not None else None
-        federation_set = set(federations) if federations is not None else None
+        federation_id_set = set(federation_ids) if federation_ids is not None else None
 
         with self.lock_run_series_store:
             run_series = []
@@ -149,8 +149,8 @@ class InMemoryCoreState(
                 if series_id_set is not None and record.series_id not in series_id_set:
                     continue
                 if (
-                    federation_set is not None
-                    and record.federation not in federation_set
+                    federation_id_set is not None
+                    and record.federation not in federation_id_set
                 ):
                     continue
                 if updated_before is not None and record.updated_at >= updated_before:
@@ -174,7 +174,7 @@ class InMemoryCoreState(
     def store_run_in_series(
         self,
         run_id: int,
-        federation: str,
+        federation_id: str,
         series_id: int | None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
@@ -185,13 +185,13 @@ class InMemoryCoreState(
                 if existing is None:
                     log(ERROR, "Run series %d not found", series_id)
                     return None
-                if existing.federation != federation:
+                if existing.federation != federation_id:
                     log(
                         ERROR,
                         "Run series %d belongs to federation %r, not %r",
                         series_id,
                         existing.federation,
-                        federation,
+                        federation_id,
                     )
                     return None
                 run_series = existing
@@ -206,7 +206,7 @@ class InMemoryCoreState(
                 timestamp = now().isoformat()
                 run_series = RunSeries(
                     series_id=new_series_id,
-                    federation=federation,
+                    federation=federation_id,
                     description="",
                     created_at=timestamp,
                     updated_at=timestamp,

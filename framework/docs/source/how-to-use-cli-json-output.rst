@@ -157,7 +157,7 @@ To return structured JSON instead:
 Each entry under ``runs`` contains:
 
 - ``run-id``: the run ID
-- ``federation``: the federation identifier
+- ``federation``: the federation ID
 - ``fab-id`` / ``fab-name`` / ``fab-version`` / ``fab-hash``: Flower App metadata
 - ``status``: the current run status
 - ``status-details``: additional status detail text
