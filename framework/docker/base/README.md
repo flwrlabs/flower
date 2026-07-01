@@ -23,6 +23,10 @@
   - points to the last successful build of the `main` branch
 - `nightly`, `<version>.dev<YYYYMMDD>` e.g. `1.33.0.dev20260625`
   - uses Python 3.13 and Ubuntu 24.04
+- `1.32.1-py3.13-alpine3.22`
+- `1.32.1-py3.13-ubuntu24.04`
+- `1.32.1-py3.12-ubuntu24.04`
+- `1.32.1-py3.11-ubuntu24.04`
 - `1.32.0-py3.13-alpine3.22`
 - `1.32.0-py3.13-ubuntu24.04`
 - `1.32.0-py3.12-ubuntu24.04`
