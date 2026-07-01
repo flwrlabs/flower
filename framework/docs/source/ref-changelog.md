@@ -6,7 +6,7 @@
 
 We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
 
-`Chong Shen Ng`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Micah Sheller` <!---TOKEN_v1.33.0-->
+`Chong Shen Ng`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Micah Sheller` <!---TOKEN_v1.32.1-->
 
 ### What's new?
 
