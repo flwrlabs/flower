@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower server app."""
+"""`flower-superlink` command."""
 
+# pylint: disable=too-many-lines
 
 import argparse
 import importlib.util
@@ -22,6 +23,7 @@ import subprocess
 import sys
 import threading
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from logging import INFO, WARN
 from pathlib import Path
 from time import sleep
@@ -59,6 +61,14 @@ from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
 )
 from flwr.proto.grpcadapter_pb2_grpc import add_GrpcAdapterServicer_to_server
 from flwr.server.fleet_event_log_interceptor import FleetEventLogInterceptor
+from flwr.server.superlink.fleet.grpc_adapter.grpc_adapter_servicer import (
+    GrpcAdapterServicer,
+)
+from flwr.server.superlink.fleet.grpc_rere.fleet_servicer import FleetServicer
+from flwr.server.superlink.fleet.grpc_rere.node_auth_server_interceptor import (
+    NodeAuthServerInterceptor,
+)
+from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
@@ -87,13 +97,6 @@ from flwr.superlink.auth_plugin import (
 from flwr.superlink.federation import FederationManager, NoOpFederationManager
 from flwr.superlink.servicer.control import run_control_api_grpc
 from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
-
-from .superlink.fleet.grpc_adapter.grpc_adapter_servicer import GrpcAdapterServicer
-from .superlink.fleet.grpc_rere.fleet_servicer import FleetServicer
-from .superlink.fleet.grpc_rere.node_auth_server_interceptor import (
-    NodeAuthServerInterceptor,
-)
-from .superlink.linkstate import LinkStateFactory
 
 P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
 
@@ -208,11 +211,272 @@ def _get_objectstore_linkstate_factories(
     return objectstore_factory, state_factory
 
 
-# pylint: disable=too-many-branches, too-many-locals, too-many-statements
-def run_superlink() -> None:
-    """Run Flower SuperLink (ServerAppIo API and Fleet API)."""
-    warn_if_flwr_update_available(process_name="flower-superlink")
+@dataclass
+class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
+    """Configuration needed to start the SuperLink lifespan."""
 
+    serverappio_address: str
+    control_address: str
+    health_server_address: str | None
+    certificates: tuple[bytes, bytes, bytes] | None
+    appio_certificates: tuple[bytes, bytes, bytes] | None
+    superexec_auth_secret: bytes | None
+    authn_plugin: ControlAuthnPlugin
+    authz_plugin: ControlAuthzPlugin
+    event_log_plugin: EventLogWriterPlugin | None
+    enable_event_log: bool
+    artifact_provider: ArtifactProvider | None
+    enable_supernode_auth: bool
+    fleet_api_type: str
+    fleet_api_address: str | None
+    fleet_api_num_workers: int
+    simulation: bool
+    ssl_keyfile: str | None
+    ssl_certfile: str | None
+    database: str
+    isolation: str
+    appio_ssl_ca_certfile: str | None
+    runtime_dependency_install: bool
+
+
+class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
+    """Own SuperLink startup resources for the `flower-superlink` process."""
+
+    def __init__(self, config: SuperLinkLifespanConfig) -> None:
+        self.config = config
+        self.grpc_servers: list[grpc.Server] = []
+        self.bckg_threads: list[threading.Thread] = []
+        self.superexec_process: subprocess.Popen[bytes] | None = None
+        self.objectstore_factory: ObjectStoreFactory | None = None
+        self.state_factory: LinkStateFactory | None = None
+        self._serverappio_server: grpc.Server | None = None
+        self._started = False
+
+    def startup(self) -> None:
+        """Start SuperLink services."""
+        log(INFO, "SuperLinkLifespan: start")
+        if self._started:
+            return
+
+        federation_manager = get_federation_manager(
+            is_simulation=self.config.simulation
+        )
+        objectstore_factory, state_factory = _get_objectstore_linkstate_factories(
+            self.config.database, federation_manager
+        )
+        state_factory.state()  # Force initialization before starting network servers
+        self.objectstore_factory = objectstore_factory
+        self.state_factory = state_factory
+
+        self._start_control_api()
+        self._start_serverappio_api()
+        self._start_fleet_api()
+        self._start_superexec_if_needed()
+        self._start_health_server_if_needed()
+        self._started = True
+
+    def shutdown(self) -> None:
+        """Stop resources started by this lifespan."""
+        log(INFO, "SuperLinkLifespan: stop")
+        if (
+            not self._started
+            and not self.grpc_servers
+            and not self.bckg_threads
+            and self.superexec_process is None
+        ):
+            return
+
+        for grpc_server in reversed(self.grpc_servers):
+            grpc_server.stop(grace=1)
+
+        for thread in self.bckg_threads:
+            thread.join(timeout=1.0)
+            if thread.is_alive():
+                log(
+                    WARN,
+                    "Background thread %s is still running during SuperLink shutdown.",
+                    thread.name,
+                )
+
+        if self.superexec_process is not None:
+            self.superexec_process.terminate()
+            try:
+                self.superexec_process.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                log(WARN, "SuperExec subprocess did not terminate within 1 second.")
+
+        self.grpc_servers.clear()
+        self.bckg_threads.clear()
+        self.superexec_process = None
+        self._serverappio_server = None
+        self._started = False
+
+    def wait_until_background_thread_exits(self) -> None:
+        """Block like the historical `flower-superlink` command."""
+        while all(thread.is_alive() for thread in self.bckg_threads):
+            sleep(0.1)
+
+    def _start_control_api(self) -> None:
+        config = self.config
+        if self.state_factory is None or self.objectstore_factory is None:
+            raise RuntimeError("SuperLink lifespan state has not been initialized.")
+
+        control_server: grpc.Server = run_control_api_grpc(
+            address=config.control_address,
+            state_factory=self.state_factory,
+            objectstore_factory=self.objectstore_factory,
+            certificates=config.certificates,
+            authn_plugin=config.authn_plugin,
+            authz_plugin=config.authz_plugin,
+            event_log_plugin=config.event_log_plugin,
+            artifact_provider=config.artifact_provider,
+            fleet_api_type=config.fleet_api_type,
+        )
+        self.grpc_servers.append(control_server)
+
+    def _start_serverappio_api(self) -> None:
+        config = self.config
+        if self.state_factory is None or self.objectstore_factory is None:
+            raise RuntimeError("SuperLink lifespan state has not been initialized.")
+
+        serverappio_server: grpc.Server = run_serverappio_api_grpc(
+            address=config.serverappio_address,
+            state_factory=self.state_factory,
+            objectstore_factory=self.objectstore_factory,
+            certificates=config.appio_certificates,
+            superexec_auth_secret=config.superexec_auth_secret,
+        )
+        self._serverappio_server = serverappio_server
+        self.grpc_servers.append(serverappio_server)
+
+    def _start_fleet_api(self) -> None:
+        config = self.config
+        if config.simulation:
+            return
+        if self.state_factory is None or self.objectstore_factory is None:
+            raise RuntimeError("SuperLink lifespan state has not been initialized.")
+
+        fleet_api_address = config.fleet_api_address
+        if not fleet_api_address:
+            if config.fleet_api_type in [
+                TRANSPORT_TYPE_GRPC_RERE,
+                TRANSPORT_TYPE_GRPC_ADAPTER,
+            ]:
+                fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
+            elif config.fleet_api_type == TRANSPORT_TYPE_REST:
+                fleet_api_address = FLEET_API_REST_DEFAULT_ADDRESS
+
+        fleet_address, host, port = _format_address(cast(str, fleet_api_address))
+        num_workers = config.fleet_api_num_workers
+        if num_workers != 1:
+            log(
+                WARN,
+                "The Fleet API currently supports only 1 worker. "
+                "You have specified %d workers. "
+                "Support for multiple workers will be added in future releases. "
+                "Proceeding with a single worker.",
+                config.fleet_api_num_workers,
+            )
+            num_workers = 1
+
+        if config.fleet_api_type == TRANSPORT_TYPE_REST:
+            self._start_fleet_rest_api(host, port, num_workers)
+        elif config.fleet_api_type == TRANSPORT_TYPE_GRPC_RERE:
+            self._start_fleet_grpc_rere(fleet_address)
+        elif config.fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
+            self._start_fleet_grpc_adapter(fleet_address)
+        else:
+            raise ValueError(f"Unknown fleet_api_type: {config.fleet_api_type}")
+
+    def _start_fleet_rest_api(self, host: str, port: int, num_workers: int) -> None:
+        if self.state_factory is None or self.objectstore_factory is None:
+            raise RuntimeError("SuperLink lifespan state has not been initialized.")
+        if (
+            importlib.util.find_spec("requests")
+            and importlib.util.find_spec("starlette")
+            and importlib.util.find_spec("uvicorn")
+        ) is None:
+            flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
+
+        fleet_thread = threading.Thread(
+            target=_run_fleet_api_rest,
+            args=(
+                host,
+                port,
+                self.config.ssl_keyfile,
+                self.config.ssl_certfile,
+                self.state_factory,
+                self.objectstore_factory,
+                num_workers,
+            ),
+            daemon=True,
+        )
+        fleet_thread.start()
+        self.bckg_threads.append(fleet_thread)
+
+    def _start_fleet_grpc_rere(self, fleet_address: str) -> None:
+        if self.state_factory is None or self.objectstore_factory is None:
+            raise RuntimeError("SuperLink lifespan state has not been initialized.")
+
+        interceptors = [NodeAuthServerInterceptor(self.state_factory)]
+        if self.config.enable_event_log:
+            fleet_log_plugin = _try_obtain_fleet_event_log_writer_plugin()
+            if fleet_log_plugin is not None:
+                interceptors.append(FleetEventLogInterceptor(fleet_log_plugin))
+                log(INFO, "Flower Fleet event logging enabled")
+
+        fleet_server = _run_fleet_api_grpc_rere(
+            address=fleet_address,
+            state_factory=self.state_factory,
+            objectstore_factory=self.objectstore_factory,
+            enable_supernode_auth=self.config.enable_supernode_auth,
+            certificates=self.config.certificates,
+            interceptors=interceptors,
+        )
+        self.grpc_servers.append(fleet_server)
+
+    def _start_fleet_grpc_adapter(self, fleet_address: str) -> None:
+        if self.state_factory is None or self.objectstore_factory is None:
+            raise RuntimeError("SuperLink lifespan state has not been initialized.")
+
+        fleet_server = _run_fleet_api_grpc_adapter(
+            address=fleet_address,
+            state_factory=self.state_factory,
+            objectstore_factory=self.objectstore_factory,
+            certificates=self.config.certificates,
+        )
+        self.grpc_servers.append(fleet_server)
+
+    def _start_superexec_if_needed(self) -> None:
+        config = self.config
+        if config.isolation != ISOLATION_MODE_SUBPROCESS:
+            return
+
+        if self._serverappio_server is None:
+            raise RuntimeError("ServerAppIo server is not started.")
+
+        appio_address = resolve_bind_address(self._serverappio_server.bound_address)
+        command = _get_superexec_command(
+            appio_address=appio_address,
+            appio_certificates=config.appio_certificates,
+            appio_root_certificates_path=config.appio_ssl_ca_certfile,
+            parent_pid=os.getpid(),
+            runtime_dependency_install=config.runtime_dependency_install,
+        )
+        # pylint: disable-next=consider-using-with
+        self.superexec_process = subprocess.Popen(command)
+
+    def _start_health_server_if_needed(self) -> None:
+        if self.config.health_server_address is None:
+            return
+
+        health_server = run_health_server_grpc_no_tls(self.config.health_server_address)
+        self.grpc_servers.append(health_server)
+
+
+# pylint: disable=too-many-branches, too-many-locals, too-many-statements
+def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
+    """Parse SuperLink CLI args and return the startup configuration."""
     args = _parse_args_run_superlink().parse_args()
 
     if args.log_file:
@@ -221,11 +485,6 @@ def run_superlink() -> None:
             interval_hours=args.log_rotation_interval_hours,
             backup_count=args.log_rotation_backup_count,
         )
-
-    log(INFO, "Starting Flower SuperLink")
-
-    event(EventType.RUN_SUPERLINK_ENTER)
-
     # Detect if `--executor*` arguments were set
     if args.executor or args.executor_dir or args.executor_config:
         flwr_exit(
@@ -313,8 +572,6 @@ def run_superlink() -> None:
     # provided
     verify_tls_cert = not getattr(args, "disable_oidc_tls_cert_verification", None)
 
-    authn_plugin: ControlAuthnPlugin | None = None
-    authz_plugin: ControlAuthzPlugin | None = None
     event_log_plugin: EventLogWriterPlugin | None = None
     # Load the auth plugin if the args.account_auth_config is provided
     if cfg_path := getattr(args, "user_auth_config", None):
@@ -385,152 +642,69 @@ def run_superlink() -> None:
             f" to the Flower documentation for more information: {url_v}{page}",
         )
 
-    # Load Federation Manager
-    federation_manager = get_federation_manager(is_simulation=args.simulation)
+    fleet_api_address = args.fleet_api_address
+    if not args.simulation and not fleet_api_address:
+        if args.fleet_api_type in [
+            TRANSPORT_TYPE_GRPC_RERE,
+            TRANSPORT_TYPE_GRPC_ADAPTER,
+        ]:
+            fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
+        elif args.fleet_api_type == TRANSPORT_TYPE_REST:
+            fleet_api_address = FLEET_API_REST_DEFAULT_ADDRESS
 
-    # Initialize backend ObjectStoreFactory and StateFactory
-    try:
-        objectstore_factory, state_factory = _get_objectstore_linkstate_factories(
-            args.database, federation_manager
-        )
-    except ValueError as err:
-        flwr_exit(ExitCode.SUPERLINK_INVALID_ARGS, str(err))
-
-    state_factory.state()  # Force initialization before starting servers
-
-    # Start Control API
-    is_simulation = args.simulation
-    control_server: grpc.Server = run_control_api_grpc(
-        address=control_address,
-        state_factory=state_factory,
-        objectstore_factory=objectstore_factory,
+    return SuperLinkLifespanConfig(
+        serverappio_address=serverappio_address,
+        control_address=control_address,
+        health_server_address=health_server_address,
         certificates=certificates,
+        appio_certificates=appio_certificates,
+        superexec_auth_secret=superexec_auth_secret,
         authn_plugin=authn_plugin,
         authz_plugin=authz_plugin,
         event_log_plugin=event_log_plugin,
+        enable_event_log=getattr(args, "enable_event_log", False),
         artifact_provider=artifact_provider,
+        enable_supernode_auth=enable_supernode_auth,
         fleet_api_type=args.fleet_api_type,
+        fleet_api_address=fleet_api_address,
+        fleet_api_num_workers=args.fleet_api_num_workers,
+        simulation=args.simulation,
+        ssl_keyfile=args.ssl_keyfile,
+        ssl_certfile=args.ssl_certfile,
+        database=args.database,
+        isolation=args.isolation,
+        appio_ssl_ca_certfile=args.appio_ssl_ca_certfile,
+        runtime_dependency_install=args.runtime_dependency_install,
     )
-    grpc_servers = [control_server]
-    bckg_threads: list[threading.Thread] = []
 
-    # Start ServerAppIo API for both deployment and simulation runtimes.
-    serverappio_server: grpc.Server = run_serverappio_api_grpc(
-        address=serverappio_address,
-        state_factory=state_factory,
-        objectstore_factory=objectstore_factory,
-        certificates=appio_certificates,
-        superexec_auth_secret=superexec_auth_secret,
-    )
-    grpc_servers.append(serverappio_server)
 
-    # Start Fleet API
-    if not is_simulation:
-        if not args.fleet_api_address:
-            if args.fleet_api_type in [
-                TRANSPORT_TYPE_GRPC_RERE,
-                TRANSPORT_TYPE_GRPC_ADAPTER,
-            ]:
-                args.fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
-            elif args.fleet_api_type == TRANSPORT_TYPE_REST:
-                args.fleet_api_address = FLEET_API_REST_DEFAULT_ADDRESS
+def flower_superlink() -> None:
+    """Run Flower SuperLink (ServerAppIo API and Fleet API)."""
+    warn_if_flwr_update_available(process_name="flower-superlink")
 
-        fleet_address, host, port = _format_address(args.fleet_api_address)
+    log(INFO, "Starting Flower SuperLink")
 
-        num_workers = args.fleet_api_num_workers
-        if num_workers != 1:
-            log(
-                WARN,
-                "The Fleet API currently supports only 1 worker. "
-                "You have specified %d workers. "
-                "Support for multiple workers will be added in future releases. "
-                "Proceeding with a single worker.",
-                args.fleet_api_num_workers,
-            )
-            num_workers = 1
+    event(EventType.RUN_SUPERLINK_ENTER)
 
-        if args.fleet_api_type == TRANSPORT_TYPE_REST:
-            if (
-                importlib.util.find_spec("requests")
-                and importlib.util.find_spec("starlette")
-                and importlib.util.find_spec("uvicorn")
-            ) is None:
-                flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
+    config = _parse_superlink_lifespan_config()
 
-            fleet_thread = threading.Thread(
-                target=_run_fleet_api_rest,
-                args=(
-                    host,
-                    port,
-                    args.ssl_keyfile,
-                    args.ssl_certfile,
-                    state_factory,
-                    objectstore_factory,
-                    num_workers,
-                ),
-                daemon=True,
-            )
-            fleet_thread.start()
-            bckg_threads.append(fleet_thread)
-        elif args.fleet_api_type == TRANSPORT_TYPE_GRPC_RERE:
-
-            interceptors = [NodeAuthServerInterceptor(state_factory)]
-            if getattr(args, "enable_event_log", None):
-                fleet_log_plugin = _try_obtain_fleet_event_log_writer_plugin()
-                if fleet_log_plugin is not None:
-                    interceptors.append(FleetEventLogInterceptor(fleet_log_plugin))
-                    log(INFO, "Flower Fleet event logging enabled")
-
-            fleet_server = _run_fleet_api_grpc_rere(
-                address=fleet_address,
-                state_factory=state_factory,
-                objectstore_factory=objectstore_factory,
-                enable_supernode_auth=enable_supernode_auth,
-                certificates=certificates,
-                interceptors=interceptors,
-            )
-            grpc_servers.append(fleet_server)
-        elif args.fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
-            fleet_server = _run_fleet_api_grpc_adapter(
-                address=fleet_address,
-                state_factory=state_factory,
-                objectstore_factory=objectstore_factory,
-                certificates=certificates,
-            )
-            grpc_servers.append(fleet_server)
-        else:
-            raise ValueError(f"Unknown fleet_api_type: {args.fleet_api_type}")
-
-    # Launch SuperExec if isolation mode is subprocess
-    if args.isolation == ISOLATION_MODE_SUBPROCESS:
-        # bound_address contains the actual address when the port is set to :0
-        # which means let the OS choose a free port.
-        appio_address = resolve_bind_address(serverappio_server.bound_address)
-        command = _get_superexec_command(
-            appio_address=appio_address,
-            appio_certificates=appio_certificates,
-            appio_root_certificates_path=args.appio_ssl_ca_certfile,
-            parent_pid=os.getpid(),
-            runtime_dependency_install=args.runtime_dependency_install,
-        )
-        # pylint: disable-next=consider-using-with
-        subprocess.Popen(command)
-
-    # Launch gRPC health server
-    if health_server_address is not None:
-        health_server = run_health_server_grpc_no_tls(health_server_address)
-        grpc_servers.append(health_server)
+    lifespan = SuperLinkLifespan(config)
+    try:
+        lifespan.startup()
+    except Exception as err:  # pylint: disable=broad-except
+        lifespan.shutdown()
+        flwr_exit(ExitCode.SUPERLINK_INVALID_ARGS, str(err))
 
     # Graceful shutdown
     register_signal_handlers(
         event_type=EventType.RUN_SUPERLINK_LEAVE,
         exit_message="SuperLink terminated gracefully.",
-        grpc_servers=grpc_servers,
+        grpc_servers=lifespan.grpc_servers,
+        exit_handlers=[lifespan.shutdown],
     )
 
     # Block until a thread exits prematurely
-    while all(thread.is_alive() for thread in bckg_threads):
-        sleep(0.1)
+    lifespan.wait_until_background_thread_exits()
 
     # Exit if any thread has exited prematurely
     # This code will not be reached if the SuperLink stops gracefully

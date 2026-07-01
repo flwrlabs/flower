@@ -23,9 +23,9 @@ import pytest
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
 
-from .app import _parse_args_run_flwr_serverapp
+from .flwr_serverapp import _parse_args_run_flwr_serverapp
 
-serverapp_module = importlib.import_module("flwr.server.serverapp.app")
+serverapp_module = importlib.import_module("flwr.superlink.cli.flwr_serverapp")
 
 
 def test_parse_flwr_serverapp_requires_token() -> None:
