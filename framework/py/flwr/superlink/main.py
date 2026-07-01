@@ -20,14 +20,17 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from logging import INFO
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 
 from flwr import __version__
 from flwr.common import log
 from flwr.supercore.routers import health
-from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
 from flwr.superlink.routers import control, runtime
+
+if TYPE_CHECKING:
+    from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
 
 
 def create_app(
