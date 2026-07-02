@@ -321,6 +321,18 @@ def _remove_path(path: str) -> None:
         shutil.rmtree(path)
 
 
+def remove_empty_dirs_up_to(path: str, stop_dir: str) -> None:
+    """Remove empty parent directories from path up to, but not including, stop_dir."""
+    current = os.path.abspath(path)
+    stop = os.path.abspath(stop_dir)
+    while current != stop and os.path.commonpath([current, stop]) == stop:
+        try:
+            os.rmdir(current)
+        except OSError:
+            break
+        current = os.path.dirname(current)
+
+
 def cleanup_layer_paths(layer_paths: list[str]) -> None:
     """Remove layer files tracked for layer-wise communication."""
     for layer_path in dict.fromkeys(str(path) for path in layer_paths if path):
@@ -913,8 +925,14 @@ def run_torchtitan_training(
             "scheduler.flux.script-template containing the training command."
         )
 
+    # Clear stale handoff artifacts before launching TorchTitan. Otherwise a
+    # previous successful or failed run could be mistaken for fresh output.
+    _remove_path(input_state_path)
+    _remove_path(output_state_path)
+    _remove_path(input_dcp_dir)
+    _remove_path(output_dcp_dir)
+
     if dcp_enabled:
-        _remove_path(output_dcp_dir)
         if round_id <= 1 and _dcp_checkpoint_exists(dcp_cache_dir):
             _replace_symlink(input_dcp_dir, dcp_cache_dir)
         else:
@@ -1024,7 +1042,9 @@ def run_torchtitan_training(
         trained_state = extract_state_dict(payload)
         _remove_path(input_state_path)
         _remove_path(output_state_path)
-        return _normalize_state_dict_for_hf(trained_state)
+        trained_state = _normalize_state_dict_for_hf(trained_state)
+        _remove_path(output_dir)
+        return trained_state
 
     if os.path.isdir(output_dcp_dir):
         trained_state = _load_state_dict_from_dcp(
@@ -1034,6 +1054,7 @@ def run_torchtitan_training(
             reference_state_dict=state_dict,
         )
         _remove_path(output_dcp_dir)
+        _remove_path(output_dir)
         return trained_state
 
     if os.path.islink(output_dcp_dir):

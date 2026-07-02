@@ -28,6 +28,7 @@ from flowertune_llm.task import (
     load_layer_from_disk,
     load_state_dict_from_layer_files,
     parse_chunk_ranges,
+    remove_empty_dirs_up_to,
     run_torchtitan_training,
     sanitize_layer_name,
     shape_from_text,
@@ -120,6 +121,9 @@ def _cleanup_layer_files_for_context(
     _flush_download_caches_for_context(context)
     _flush_comms_caches_for_context(context)
     cleanup_layer_paths(layer_paths)
+    node_layer_dir = layer_dir(context)
+    layer_base_dir = os.path.dirname(os.path.dirname(node_layer_dir))
+    remove_empty_dirs_up_to(node_layer_dir, layer_base_dir)
     context.state.pop(STATE_LAYER_NAMES, None)
     context.state.pop(STATE_LAYER_PATHS, None)
     context.state.pop(STATE_LAYER_IDX, None)
@@ -280,8 +284,11 @@ def train_download(msg: Message, context: Context):
             cached.tensor[start:end] = incoming
         cached.dirty = True
 
+        # Persist every chunk because deployment can execute each download
+        # message in a fresh ClientApp process. Keeping partial chunks only in
+        # the process-local cache can corrupt split layers.
+        flush_cached_layer(_DOWNLOAD_LAYER_CACHE, cache_key)
         if is_last_chunk:
-            flush_cached_layer(_DOWNLOAD_LAYER_CACHE, cache_key)
             _DOWNLOAD_LAYER_CACHE.pop(cache_key, None)
 
         if file_path not in touched_layer_paths_seen:

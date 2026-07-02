@@ -42,6 +42,10 @@ def test_run_torchtitan_training_cleans_successful_dcp_handoff(
             torchtitan=types.SimpleNamespace(command="true", workdir="")
         )
     )
+    torchtitan_dir = layer_base / "10" / "20" / "torchtitan"
+    torchtitan_dir.mkdir(parents=True)
+    stale_output_state = torchtitan_dir / "output_state.pt"
+    torch.save({"weight": torch.full((1,), -1.0)}, stale_output_state)
 
     paths: dict[str, str] = {}
 
@@ -57,6 +61,7 @@ def test_run_torchtitan_training_cleans_successful_dcp_handoff(
             "output": env["FLWR_TORCHTITAN_OUTPUT_DCP_DIR"],
             "step0": env["FLWR_TORCHTITAN_STEP0_DCP_DIR"],
         })
+        assert not stale_output_state.exists()
         os.makedirs(os.path.dirname(paths["step0"]), exist_ok=True)
         os.symlink(env["FLWR_TORCHTITAN_INPUT_DCP_DIR"], paths["step0"])
         os.makedirs(env["FLWR_TORCHTITAN_OUTPUT_DCP_DIR"], exist_ok=True)
@@ -87,3 +92,4 @@ def test_run_torchtitan_training_cleans_successful_dcp_handoff(
     assert not os.path.lexists(paths["input"])
     assert not os.path.lexists(paths["output"])
     assert not os.path.lexists(paths["step0"])
+    assert not torchtitan_dir.exists()
