@@ -177,6 +177,7 @@ erDiagram
   }
 
   task_usage {
+    INTEGER id PK
     BIGINT task_id FK
     TIMESTAMP created_at
     BIGINT input_tokens "nullable"
@@ -184,7 +185,6 @@ erDiagram
     TIMESTAMP reported_at "nullable"
     BIGINT run_id
     BIGINT total_tokens "nullable"
-    VARCHAR usage_id UK
   }
 
   run ||--o| context : run_id

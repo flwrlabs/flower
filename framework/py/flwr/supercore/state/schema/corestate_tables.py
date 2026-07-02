@@ -181,7 +181,7 @@ def create_corestate_metadata() -> MetaData:
     task_usage = Table(
         "task_usage",
         metadata,
-        Column("usage_id", String, nullable=False, unique=True),
+        Column("id", Integer, primary_key=True, autoincrement=True),
         Column("run_id", BigInteger, nullable=False),
         Column(
             "task_id",
