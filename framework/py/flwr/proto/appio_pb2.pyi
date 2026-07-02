@@ -330,6 +330,35 @@ class PullTaskMessageResponse(google.protobuf.message.Message):
 global___PullTaskMessageResponse = PullTaskMessageResponse
 
 @typing.final
+class RecordTaskUsageRequest(google.protobuf.message.Message):
+    """RecordTaskUsage messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_USAGE_FIELD_NUMBER: builtins.int
+    @property
+    def task_usage(self) -> flwr.proto.task_pb2.TaskUsage: ...
+    def __init__(
+        self,
+        *,
+        task_usage: flwr.proto.task_pb2.TaskUsage | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["task_usage", b"task_usage"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["task_usage", b"task_usage"]) -> None: ...
+
+global___RecordTaskUsageRequest = RecordTaskUsageRequest
+
+@typing.final
+class RecordTaskUsageResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___RecordTaskUsageResponse = RecordTaskUsageResponse
+
+@typing.final
 class PullTaskInputRequest(google.protobuf.message.Message):
     """PullTaskInput messages"""
 

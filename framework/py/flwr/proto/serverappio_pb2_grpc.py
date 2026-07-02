@@ -102,6 +102,11 @@ class ServerAppIoStub(object):
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.FromString,
                 _registered_method=True)
+        self.RecordTaskUsage = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/RecordTaskUsage',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageResponse.FromString,
+                _registered_method=True)
         self.PushLogs = channel.unary_unary(
                 '/flwr.proto.ServerAppIo/PushLogs',
                 request_serializer=flwr_dot_proto_dot_log__pb2.PushLogsRequest.SerializeToString,
@@ -230,6 +235,13 @@ class ServerAppIoServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RecordTaskUsage(self, request, context):
+        """Record task usage
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def PushLogs(self, request, context):
         """Push task logs
         """
@@ -329,6 +341,11 @@ def add_ServerAppIoServicer_to_server(servicer, server):
                     servicer.PullTaskMessage,
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.SerializeToString,
+            ),
+            'RecordTaskUsage': grpc.unary_unary_rpc_method_handler(
+                    servicer.RecordTaskUsage,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageResponse.SerializeToString,
             ),
             'PushLogs': grpc.unary_unary_rpc_method_handler(
                     servicer.PushLogs,
@@ -702,6 +719,33 @@ class ServerAppIo(object):
             '/flwr.proto.ServerAppIo/PullTaskMessage',
             flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RecordTaskUsage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/RecordTaskUsage',
+            flwr_dot_proto_dot_appio__pb2.RecordTaskUsageRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.RecordTaskUsageResponse.FromString,
             options,
             channel_credentials,
             insecure,

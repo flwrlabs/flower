@@ -48,3 +48,9 @@ message TaskEvent {
   string event = 5;
   string data = 6;
 }
+
+message TaskUsage {
+  optional uint64 input_tokens = 1;
+  optional uint64 output_tokens = 2;
+  optional uint64 total_tokens = 3;
+}
