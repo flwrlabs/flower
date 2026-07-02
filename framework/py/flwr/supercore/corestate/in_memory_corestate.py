@@ -37,7 +37,12 @@ from flwr.common.constant import (
 )
 from flwr.common.logger import log
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    Task,
+    TaskEvent,
+    TaskStatus,
+    TaskUsage,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 
@@ -56,6 +61,18 @@ class TokenRecord:
 
     token: str
     active_until: datetime
+
+
+@dataclass
+class TaskUsageRecord:
+    """Record containing task usage and reporting metadata."""
+
+    id: int
+    task_id: int
+    run_id: int
+    usage: TaskUsage
+    created_at: datetime
+    reported_at: datetime | None
 
 
 class InMemoryCoreState(
@@ -80,6 +97,9 @@ class InMemoryCoreState(
         self.task_token_to_task_id: dict[str, int] = {}
         self.task_logs: dict[int, list[tuple[float, str]]] = {}
         self.log_lock = Lock()
+        self.task_usage_store: dict[int, TaskUsageRecord] = {}
+        self.lock_task_usage_store = Lock()
+        self._next_task_usage_id = 1
         self.lock_task_store = Lock()
         self.task_message_store: dict[str, Message] = {}
         self.lock_task_message_store = Lock()
@@ -353,6 +373,95 @@ class InMemoryCoreState(
                 task_copy = Task()
                 task_copy.CopyFrom(task)
                 result.append(task_copy)
+            return result
+
+    def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
+        """Record usage for the specified task."""
+        with self.lock_task_store:
+            task = self.task_store.get(task_id)
+            if task is None:
+                raise ValueError(f"Task {task_id} not found")
+            run_id = task.run_id
+
+        with self.lock_task_usage_store:
+            if task_id in self.task_usage_store:
+                return
+
+            usage_copy = TaskUsage()
+            usage_copy.CopyFrom(usage)
+            self.task_usage_store[task_id] = TaskUsageRecord(
+                id=self._next_task_usage_id,
+                task_id=task_id,
+                run_id=run_id,
+                usage=usage_copy,
+                created_at=now(),
+                reported_at=None,
+            )
+            self._next_task_usage_id += 1
+
+    def get_task_usage(
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        task_ids: Sequence[int] | None = None,
+        usage_types: Sequence[str] | None = None,
+        reported: bool | None = None,
+        created_before: str | None = None,
+        limit: int | None = None,
+    ) -> Sequence[TaskUsage]:
+        """Retrieve task usage records based on the specified filters."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if (
+            limit == 0
+            or (run_ids is not None and not run_ids)
+            or (task_ids is not None and not task_ids)
+            or (usage_types is not None and not usage_types)
+        ):
+            return []
+
+        run_id_set = set(run_ids) if run_ids is not None else None
+        task_id_set = set(task_ids) if task_ids is not None else None
+        usage_type_set = set(usage_types) if usage_types is not None else None
+        created_before_dt = (
+            datetime.fromisoformat(created_before)
+            if created_before is not None
+            else None
+        )
+
+        with self.lock_task_usage_store:
+            records = []
+            for record in self.task_usage_store.values():
+                if run_id_set is not None and record.run_id not in run_id_set:
+                    continue
+                if task_id_set is not None and record.task_id not in task_id_set:
+                    continue
+                if (
+                    usage_type_set is not None
+                    and record.usage.usage_type not in usage_type_set
+                ):
+                    continue
+                if (
+                    reported is not None
+                    and (record.reported_at is not None) is not reported
+                ):
+                    continue
+                if (
+                    created_before_dt is not None
+                    and record.created_at >= created_before_dt
+                ):
+                    continue
+                records.append(record)
+
+            records.sort(key=lambda record: record.id)
+            if limit is not None:
+                records = records[:limit]
+
+            result: list[TaskUsage] = []
+            for record in records:
+                usage_copy = TaskUsage()
+                usage_copy.CopyFrom(record.usage)
+                result.append(usage_copy)
             return result
 
     def claim_task(self, task_id: int) -> str | None:

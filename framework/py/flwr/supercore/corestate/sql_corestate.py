@@ -48,7 +48,12 @@ from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    Task,
+    TaskEvent,
+    TaskStatus,
+    TaskUsage,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
@@ -503,6 +508,139 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def get_metadata(self) -> MetaData:
         """Return SQLAlchemy MetaData needed for CoreState tables."""
         return create_corestate_metadata()
+
+    def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
+        """Record usage for the specified task."""
+        sint64_task_id = uint64_to_int64(task_id)
+
+        try:
+            with self.session():
+                task_rows = self.query(
+                    """
+                    SELECT run_id
+                    FROM task
+                    WHERE task_id = :task_id
+                    """,
+                    {"task_id": sint64_task_id},
+                )
+                if not task_rows:
+                    raise ValueError(f"Task {task_id} not found")
+
+                existing_rows = self.query(
+                    """
+                    SELECT id
+                    FROM task_usage
+                    WHERE task_id = :task_id
+                    """,
+                    {"task_id": sint64_task_id},
+                )
+                if existing_rows:
+                    return
+
+                self.query(
+                    """
+                    INSERT INTO task_usage (
+                        run_id, task_id, input_tokens, output_tokens, total_tokens,
+                        usage_type, created_at, reported_at
+                    )
+                    VALUES (
+                        :run_id, :task_id, :input_tokens, :output_tokens,
+                        :total_tokens, :usage_type, :created_at, :reported_at
+                    )
+                    """,
+                    {
+                        **_task_usage_to_row(usage),
+                        "run_id": task_rows[0]["run_id"],
+                        "task_id": sint64_task_id,
+                        "created_at": now(),
+                        "reported_at": None,
+                    },
+                )
+        except IntegrityError:
+            rows = self.query(
+                """
+                SELECT id
+                FROM task_usage
+                WHERE task_id = :task_id
+                """,
+                {"task_id": sint64_task_id},
+            )
+            if rows:
+                return
+            raise
+
+    def get_task_usage(
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        task_ids: Sequence[int] | None = None,
+        usage_types: Sequence[str] | None = None,
+        reported: bool | None = None,
+        created_before: str | None = None,
+        limit: int | None = None,
+    ) -> Sequence[TaskUsage]:
+        """Retrieve task usage records based on the specified filters."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if (
+            limit == 0
+            or (run_ids is not None and not run_ids)
+            or (task_ids is not None and not task_ids)
+            or (usage_types is not None and not usage_types)
+        ):
+            return []
+
+        conditions = []
+        params: dict[str, Any] = {}
+
+        if run_ids is not None:
+            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
+            placeholders = ",".join([f":rid_{i}" for i in range(len(sint64_run_ids))])
+            conditions.append(f"run_id IN ({placeholders})")
+            params.update(
+                {f"rid_{i}": run_id for i, run_id in enumerate(sint64_run_ids)}
+            )
+
+        if task_ids is not None:
+            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
+            placeholders = ",".join([f":tid_{i}" for i in range(len(sint64_task_ids))])
+            conditions.append(f"task_id IN ({placeholders})")
+            params.update(
+                {f"tid_{i}": task_id for i, task_id in enumerate(sint64_task_ids)}
+            )
+
+        if usage_types is not None:
+            placeholders = ",".join([f":ut_{i}" for i in range(len(usage_types))])
+            conditions.append(f"usage_type IN ({placeholders})")
+            params.update(
+                {
+                    f"ut_{i}": usage_type
+                    for i, usage_type in enumerate(usage_types)
+                }
+            )
+
+        if reported is True:
+            conditions.append("reported_at IS NOT NULL")
+        elif reported is False:
+            conditions.append("reported_at IS NULL")
+
+        if created_before is not None:
+            conditions.append("created_at < :created_before")
+            params["created_before"] = datetime.fromisoformat(created_before)
+
+        query = """
+            SELECT input_tokens, output_tokens, total_tokens, usage_type
+            FROM task_usage
+        """
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY id ASC"
+        if limit is not None:
+            query += " LIMIT :limit"
+            params["limit"] = limit
+
+        rows = self.query(query, params)
+        return [_task_usage_from_row(row) for row in rows]
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
@@ -967,6 +1105,41 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
     )
+
+
+def _task_usage_to_row(usage: TaskUsage) -> dict[str, int | str | None]:
+    """Convert a TaskUsage proto to database row values."""
+    return {
+        "input_tokens": (
+            uint64_to_int64(usage.input_tokens)
+            if usage.HasField("input_tokens")
+            else None
+        ),
+        "output_tokens": (
+            uint64_to_int64(usage.output_tokens)
+            if usage.HasField("output_tokens")
+            else None
+        ),
+        "total_tokens": (
+            uint64_to_int64(usage.total_tokens)
+            if usage.HasField("total_tokens")
+            else None
+        ),
+        "usage_type": usage.usage_type,
+    }
+
+
+def _task_usage_from_row(row: dict[str, Any]) -> TaskUsage:
+    """Convert a task_usage row to a TaskUsage proto."""
+    usage = TaskUsage()
+    if row["input_tokens"] is not None:
+        usage.input_tokens = int64_to_uint64(row["input_tokens"])
+    if row["output_tokens"] is not None:
+        usage.output_tokens = int64_to_uint64(row["output_tokens"])
+    if row["total_tokens"] is not None:
+        usage.total_tokens = int64_to_uint64(row["total_tokens"])
+    usage.usage_type = row["usage_type"]
+    return usage
 
 
 def _task_message_to_row(message: Message) -> dict[str, Any]:

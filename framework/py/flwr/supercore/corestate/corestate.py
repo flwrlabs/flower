@@ -21,7 +21,7 @@ from typing import Literal
 
 from flwr.app import Context, Message
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
 
 from ..object_store import ObjectStore
@@ -246,6 +246,66 @@ class CoreState(ABC):  # pylint: disable=R0904
         Sequence[Task]
             A sequence of Task objects representing tasks matching the specified
             filters.
+        """
+
+    @abstractmethod
+    def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
+        """Record usage for the specified task.
+
+        Parameters
+        ----------
+        task_id : int
+            The identifier of the task that incurred the usage.
+        usage : TaskUsage
+            Usage payload to persist.
+
+        Raises
+        ------
+        ValueError
+            Raised if `task_id` does not identify an existing task.
+
+        Notes
+        -----
+        Duplicate writes for the same task are successful no-ops.
+        """
+
+    @abstractmethod
+    def get_task_usage(
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        task_ids: Sequence[int] | None = None,
+        usage_types: Sequence[str] | None = None,
+        reported: bool | None = None,
+        created_before: str | None = None,
+        limit: int | None = None,
+    ) -> Sequence[TaskUsage]:
+        """Retrieve task usage records based on the specified filters.
+
+        - If a filter is set to None, it is ignored.
+        - If multiple filters are provided, they are combined using AND logic.
+        - Within each filter, provided values are combined using OR logic.
+
+        Parameters
+        ----------
+        run_ids : Optional[Sequence[int]] (default: None)
+            Sequence of run IDs to filter by.
+        task_ids : Optional[Sequence[int]] (default: None)
+            Sequence of task IDs to filter by.
+        usage_types : Optional[Sequence[str]] (default: None)
+            Sequence of usage types to filter by.
+        reported : bool | None (default: None)
+            If set, filter by whether usage has been reported.
+        created_before : str | None (default: None)
+            If set, return only usage records created before this ISO timestamp.
+        limit : Optional[int] (default: None)
+            Maximum number of usage records to return. If `None`, no limit is
+            applied.
+
+        Returns
+        -------
+        Sequence[TaskUsage]
+            Usage records ordered by insertion order.
         """
 
     @abstractmethod

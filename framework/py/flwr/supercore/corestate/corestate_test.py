@@ -31,7 +31,11 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto.task_pb2 import TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    TaskEvent,
+    TaskStatus,
+    TaskUsage,
+)
 from flwr.supercore.constant import TaskType
 from flwr.supercore.date import now
 
@@ -284,6 +288,128 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(reloaded_tasks), 1)
         reloaded = reloaded_tasks[0]
         self.assertEqual(reloaded.fab_hash, "fab-hash")
+
+    def test_add_and_get_task_usage_records_model_tokens(self) -> None:
+        """Task usage should preserve model token fields."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+
+        state.add_task_usage(
+            task_id,
+            TaskUsage(
+                input_tokens=10,
+                output_tokens=20,
+                total_tokens=30,
+                usage_type="token",
+            ),
+        )
+
+        usages = state.get_task_usage(task_ids=[task_id])
+
+        self.assertEqual(len(usages), 1)
+        usage = usages[0]
+        self.assertTrue(usage.HasField("input_tokens"))
+        self.assertTrue(usage.HasField("output_tokens"))
+        self.assertTrue(usage.HasField("total_tokens"))
+        self.assertEqual(usage.input_tokens, 10)
+        self.assertEqual(usage.output_tokens, 20)
+        self.assertEqual(usage.total_tokens, 30)
+        self.assertEqual(usage.usage_type, "token")
+
+    def test_add_and_get_task_usage_preserves_request_usage_type(self) -> None:
+        """Connector request usage should preserve usage_type."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+
+        state.add_task_usage(task_id, TaskUsage(usage_type="request"))
+
+        usages = state.get_task_usage(task_ids=[task_id])
+
+        self.assertEqual(len(usages), 1)
+        self.assertFalse(usages[0].HasField("input_tokens"))
+        self.assertFalse(usages[0].HasField("output_tokens"))
+        self.assertFalse(usages[0].HasField("total_tokens"))
+        self.assertEqual(usages[0].usage_type, "request")
+
+    def test_add_task_usage_rejects_unknown_task(self) -> None:
+        """Usage writes should reject unknown task IDs."""
+        state = self.state_factory()
+        missing_task_id = 61016
+        while state.get_tasks(task_ids=[missing_task_id]):
+            missing_task_id += 1
+
+        with self.assertRaises(ValueError):
+            state.add_task_usage(missing_task_id, TaskUsage())
+
+    def test_add_task_usage_duplicate_is_noop_and_returns_copy(self) -> None:
+        """Duplicate usage writes should not overwrite the first usage record."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+
+        state.add_task_usage(task_id, TaskUsage(input_tokens=1, usage_type="token"))
+        state.add_task_usage(task_id, TaskUsage(input_tokens=999, usage_type="token"))
+        usages = state.get_task_usage(task_ids=[task_id])
+        usages[0].input_tokens = 123
+        reloaded = state.get_task_usage(task_ids=[task_id])
+
+        self.assertEqual(len(usages), 1)
+        self.assertEqual(len(reloaded), 1)
+        self.assertEqual(reloaded[0].input_tokens, 1)
+
+    def test_get_task_usage_filters(self) -> None:
+        """Task usage lookup should support all filters."""
+        state = self.state_factory()
+        run_id_1 = self.task_run_id(state)
+        run_id_2 = self.other_task_run_id(state)
+        task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_1)
+        task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_2)
+        assert task_id_1 is not None and task_id_2 is not None
+
+        state.add_task_usage(task_id_1, TaskUsage(input_tokens=10, usage_type="token"))
+        state.add_task_usage(
+            task_id_2,
+            TaskUsage(output_tokens=20, usage_type="request"),
+        )
+        future = (now() + timedelta(seconds=1)).isoformat()
+        past = (now() - timedelta(seconds=1)).isoformat()
+
+        run_matches = state.get_task_usage(run_ids=[run_id_1])
+        task_matches = state.get_task_usage(task_ids=[task_id_2])
+        usage_type_matches = state.get_task_usage(usage_types=["request"])
+
+        self.assertEqual([usage.input_tokens for usage in run_matches], [10])
+        self.assertEqual([usage.output_tokens for usage in task_matches], [20])
+        self.assertEqual(
+            [usage.usage_type for usage in usage_type_matches],
+            ["request"],
+        )
+        self.assertEqual(len(state.get_task_usage(reported=False)), 2)
+        self.assertEqual(state.get_task_usage(reported=True), [])
+        self.assertEqual(len(state.get_task_usage(created_before=future)), 2)
+        self.assertEqual(state.get_task_usage(created_before=past), [])
+        self.assertEqual(len(state.get_task_usage(limit=1)), 1)
+        self.assertEqual(state.get_task_usage(run_ids=[]), [])
+        self.assertEqual(state.get_task_usage(task_ids=[]), [])
+        self.assertEqual(state.get_task_usage(usage_types=[]), [])
+
+    def test_get_task_usage_negative_limit_raises(self) -> None:
+        """Negative task usage limits should be rejected consistently."""
+        state = self.state_factory()
+
+        with self.assertRaises(AssertionError):
+            _ = state.get_task_usage(limit=-1)
 
     def test_add_and_get_task_log(self) -> None:
         """Adding and retrieving task logs should preserve concatenation order."""
