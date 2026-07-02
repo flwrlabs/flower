@@ -1627,23 +1627,19 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
 
     def test_validate_membership_raises_when_federation_not_found(self) -> None:
         """Test raises when federation does not exist."""
-        ctx = self._make_context()
         with self.assertRaises(FlowerError) as cm:
             _validate_federation_membership_in_request(
                 self.state, self.aid, "@me/missing"
             )
         self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
-        ctx.abort.assert_not_called()
 
     def test_validate_membership_raises_when_not_a_member(self) -> None:
         """Test raises when flwr_aid is not a member of the federation."""
-        ctx = self._make_context()
         with self.assertRaises(FlowerError) as cm:
             _validate_federation_membership_in_request(
                 self.state, "wrong-aid", NOOP_FEDERATION_ID
             )
         self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
-        ctx.abort.assert_not_called()
 
     # --- _validate_federation_and_node_in_request tests ---
 
@@ -1657,23 +1653,19 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         """Test raises when a node is not owned by the requester."""
         # Create a node owned by someone else
         node_id = self._create_owned_node("other-aid")
-        ctx = self._make_context()
         with self.assertRaises(FlowerError) as cm:
             _validate_federation_and_node_in_request(
                 self.state, self.aid, NOOP_FEDERATION_ID, node_id
             )
         self.assertEqual(cm.exception.code, ApiErrorCode.NODE_NOT_FOUND_OR_NOT_OWNER)
-        ctx.abort.assert_not_called()
 
     def test_validate_raises_when_node_does_not_exist(self) -> None:
         """Test raises when a node ID does not exist."""
-        ctx = self._make_context()
         with self.assertRaises(FlowerError) as cm:
             _validate_federation_and_node_in_request(
                 self.state, self.aid, NOOP_FEDERATION_ID, 999999
             )
         self.assertEqual(cm.exception.code, ApiErrorCode.NODE_NOT_FOUND_OR_NOT_OWNER)
-        ctx.abort.assert_not_called()
 
     # --- AddNodeToFederation / RemoveNodeFromFederation integration tests ---
 
@@ -1700,8 +1692,8 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         self.assertIsInstance(response, AddNodeToFederationResponse)
         ctx.abort.assert_not_called()
 
-    def test_add_node_to_federation_aborts_no_federation(self) -> None:
-        """Test AddNodeToFederation aborts when no federation is specified."""
+    def test_add_node_to_federation_raises_no_federation(self) -> None:
+        """Test AddNodeToFederation raises when no federation is specified."""
         request = AddNodeToFederationRequest(federation_name="", node_id=1)
         ctx = self._make_context()
         with self.assertRaises(FlowerError) as cm:
@@ -1731,8 +1723,8 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         self.assertIsInstance(response, RemoveNodeFromFederationResponse)
         ctx.abort.assert_not_called()
 
-    def test_remove_node_from_federation_aborts_no_federation(self) -> None:
-        """Test RemoveNodeFromFederation aborts when no federation is specified."""
+    def test_remove_node_from_federation_raises_no_federation(self) -> None:
+        """Test RemoveNodeFromFederation raises when no federation is specified."""
         request = RemoveNodeFromFederationRequest(federation_name="", node_id=1)
         ctx = self._make_context()
         with self.assertRaises(FlowerError) as cm:
