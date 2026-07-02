@@ -44,14 +44,12 @@ msgstr ""
 "atteindre un objectif précis."
 
 #: ../../source/contribute.rst:18
-#, fuzzy
 msgid "Contributor tutorials"
-msgstr "Documents du contributeur"
+msgstr ""
 
 #: ../../source/contribute.rst:50
-#, fuzzy
 msgid "Contributor explanations"
-msgstr "Contribuer aux traductions"
+msgstr ""
 
 #: ../../source/contribute.rst:62
 msgid "Contributor references"
@@ -1217,7 +1215,7 @@ msgstr "Révision des Migrations Générées"
 
 #: ../../source/contributor-how-to-migrate-database.rst:44
 msgid "Always review the generated migration file before committing:"
-msgstr "Vérifiez toujours le fichier de migration généré avant de commitir : "
+msgstr "Vérifiez toujours le fichier de migration généré avant de committer : "
 
 #: ../../source/contributor-how-to-migrate-database.rst:46
 msgid "Check that the detected changes match your intent"
@@ -1698,9 +1696,8 @@ msgid "Examples: See below."
 msgstr "Exemples : voir ci-dessous."
 
 #: ../../source/contributor-ref-good-first-contributions.rst:24
-#, fuzzy
 msgid "Flower Baselines"
-msgstr "**Update Flower Baselines**"
+msgstr ""
 
 #: ../../source/contributor-ref-good-first-contributions.rst:26
 msgid ""
@@ -1827,7 +1824,7 @@ msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:33
 msgid "**Forking the Flower repository**"
-msgstr "**Fourche le dépôt de Flower**"
+msgstr "**Créer un fork du dépôt Flower**"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:34
 msgid ""
@@ -1836,10 +1833,10 @@ msgid ""
 "connected to your GitHub account) and click the ``Fork`` button situated "
 "on the top right of the page."
 msgstr ""
-"Une branche est une copie personnelle d'un dépôt GitHub. Pour créer une "
-"pour Flower, vous devez naviguer vers https://github.com/flwrlabs/flower "
-"(tandis que connecté à votre compte GitHub) et cliquer sur le bouton "
-"``Fork`` situé en haut à droite de la page."
+"Un fork est une copie personnelle d'un dépôt GitHub. Pour en créer un "
+"pour Flower, allez sur https://github.com/flwrlabs/flower (en étant "
+"connecté à votre compte GitHub) et cliquez sur le bouton ``Fork`` situé "
+"en haut à droite de la page."
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:41
 msgid ""
@@ -2041,7 +2038,7 @@ msgstr "Pour ce faire, nous avons écrit quelques scripts que tu peux exécuter 
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:154
 msgid "**Stage changes**"
-msgstr "**Changements de scène**"
+msgstr "**Indexer les modifications**"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:155
 msgid ""
@@ -2075,7 +2072,7 @@ msgid ""
 " you can finally create your commit using this command:"
 msgstr ""
 "Une fois que vous avez ajouté tous les fichiers que vous avez voulu "
-"commiter en utilisant ``git add``, vous pouvez finalement créer votre "
+"committer en utilisant ``git add``, vous pouvez finalement créer votre "
 "commit avec cette commande :"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:175
@@ -2090,7 +2087,7 @@ msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:178
 msgid "**Push the changes to the fork**"
-msgstr "**Pousser les changements vers la fourche**"
+msgstr "**Pousser les changements vers le fork**"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:179
 msgid ""
@@ -2450,7 +2447,7 @@ msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:347
 msgid "Push the changes to your fork"
-msgstr "Transmets les changements à ta fourchette"
+msgstr "Poussez les changements vers votre fork"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:348
 msgid ""
@@ -6950,9 +6947,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/explanation-superlink-high-availability.rst:23
-#, fuzzy
 msgid "Architecture"
-msgstr "Flower Architecture (architecture de Flower)"
+msgstr ""
 
 #: ../../source/explanation-superlink-high-availability.rst:25
 msgid ""
@@ -6970,14 +6966,12 @@ msgid "SuperLink High Availability architecture"
 msgstr ""
 
 #: ../../source/explanation-superlink-high-availability.rst:37
-#, fuzzy
 msgid "SuperLink High Availability architecture (dark theme)"
-msgstr "Architecture Flower de base (thème sombre)"
+msgstr ""
 
 #: ../../source/explanation-superlink-high-availability.rst:42
-#, fuzzy
 msgid "The main components are:"
-msgstr "Composants d'application"
+msgstr ""
 
 #: ../../source/explanation-superlink-high-availability.rst:44
 msgid ""
@@ -7008,9 +7002,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/explanation-superlink-high-availability.rst:56
-#, fuzzy
 msgid "Operational properties"
-msgstr "Améliorations facultatives"
+msgstr ""
 
 #: ../../source/explanation-superlink-high-availability.rst:58
 msgid ""
@@ -7956,9 +7949,8 @@ msgstr ""
 #: flwr.clientapp.client_app.ClientApp.query
 #: flwr.clientapp.client_app.ClientApp.train
 #: flwr.serverapp.grid.grid.Grid.send_and_receive of
-#, fuzzy
 msgid "Parameters"
-msgstr "Paramètres Helm"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:683
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:238
@@ -11813,9 +11805,8 @@ msgid "Configure the logging level for your Flower processes."
 msgstr "Configurez le niveau de journalisation pour vos processus Flower."
 
 #: ../../source/how-to-configure-logging.rst:7
-#, fuzzy
 msgid "Configure logging"
-msgstr "Configurez la journalisation gRPC"
+msgstr ""
 
 #: ../../source/how-to-configure-logging.rst:9
 msgid ""
@@ -12681,9 +12672,8 @@ msgstr "SuperNode ajouté à la fédération"
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:211
 #: ../../source/how-to-create-and-manage-federations.rst:159
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:143
-#, fuzzy
 msgid "Advanced"
-msgstr "Options avancées"
+msgstr ""
 
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:213
 #: ../../source/how-to-create-and-manage-federations.rst:161
@@ -12696,29 +12686,24 @@ msgstr ""
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:216
 #: ../../source/how-to-create-and-manage-federations.rst:164
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:148
-#, fuzzy
 msgid "Log in to SuperGrid:"
-msgstr "Connectez-vous au SuperLink"
+msgstr ""
 
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:222
-#, fuzzy
 msgid "Register a SuperNode public key:"
-msgstr "Dialogue d'enregistrement du SuperNode avec une clé publique"
+msgstr ""
 
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:229
-#, fuzzy
 msgid "List registered SuperNodes and note the SuperNode ID:"
-msgstr "Enregistrer les SuperNodes avec la grille SuperGrid"
+msgstr ""
 
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:236
-#, fuzzy
 msgid "Add the SuperNode to a deployment federation you are a member of:"
-msgstr "Ajouter un SuperNode à une Fédération de Déploiement"
+msgstr ""
 
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:243
-#, fuzzy
 msgid "Optionally, remove the SuperNode from a federation or unregister it:"
-msgstr "Supprimer un SuperNode d'une fédération."
+msgstr ""
 
 #: ../../source/how-to-create-and-manage-federations.rst:-1
 msgid "Create and manage Flower federations in SuperGrid."
@@ -13038,14 +13023,12 @@ msgstr ""
 " peuvent plus être ajoutés ou supprimés."
 
 #: ../../source/how-to-create-and-manage-federations.rst:170
-#, fuzzy
 msgid "Create federations:"
-msgstr "Créer une Fédération"
+msgstr ""
 
 #: ../../source/how-to-create-and-manage-federations.rst:183
-#, fuzzy
 msgid "List federations and show federation details:"
-msgstr "``federation``: l'identifiant de fédération"
+msgstr ""
 
 #: ../../source/how-to-create-and-manage-federations.rst:192
 msgid ""
@@ -13054,20 +13037,15 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-create-and-manage-federations.rst:202
-#, fuzzy
 msgid ""
 "For more Simulation Runtime options, see the ``Customize the Simulation "
 "Runtime`` section in the :doc:`Simulation Runtime documentation <how-to-"
 "run-simulations>`."
 msgstr ""
-"Pour plus de détails sur le Runtime Simulation et sa configuration, "
-"consultez la :doc:`Simulation Runtime documentation <how-to-run-"
-"simulations>`."
 
 #: ../../source/how-to-create-and-manage-federations.rst:205
-#, fuzzy
 msgid "Manage federation invitations:"
-msgstr "Gérez les Invitations de Fédération"
+msgstr ""
 
 #: ../../source/how-to-create-and-manage-federations.rst:220
 msgid ""
@@ -13076,13 +13054,10 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-create-and-manage-federations.rst:227
-#, fuzzy
 msgid ""
 "Archive a federation. This action can only be done by the federation "
 "owner and cannot be undone."
 msgstr ""
-"Archivez une fédération lorsque un projet ou une collaboration est "
-"terminé. Seul le propriétaire de la fédération peut l'archiver."
 
 #: ../../source/how-to-design-stateful-clients.rst:-1
 msgid ""
@@ -13997,9 +13972,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-install-app-dependencies-at-runtime.rst:7
-#, fuzzy
 msgid "Install Flower App dependencies at runtime"
-msgstr "Installez les dépendances"
+msgstr ""
 
 #: ../../source/how-to-install-app-dependencies-at-runtime.rst:9
 msgid ""
@@ -14041,9 +14015,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-install-app-dependencies-at-runtime.rst:36
-#, fuzzy
 msgid "Declare app dependencies"
-msgstr "Installez les dépendances"
+msgstr ""
 
 #: ../../source/how-to-install-app-dependencies-at-runtime.rst:38
 msgid ""
@@ -14067,9 +14040,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-install-app-dependencies-at-runtime.rst:65
-#, fuzzy
 msgid "Enable it for SuperNodes"
-msgstr "Activer ou désactiver SuperNode"
+msgstr ""
 
 #: ../../source/how-to-install-app-dependencies-at-runtime.rst:67
 msgid ""
@@ -14101,9 +14073,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-install-app-dependencies-at-runtime.rst:103
-#, fuzzy
 msgid "How installation works"
-msgstr "Vérifie l'installation"
+msgstr ""
 
 #: ../../source/how-to-install-app-dependencies-at-runtime.rst:105
 msgid "When runtime dependency installation is enabled, Flower:"
@@ -14159,9 +14130,8 @@ msgid "Install Flower"
 msgstr "Installez Flower"
 
 #: ../../source/how-to-install-flower.rst:11
-#, fuzzy
 msgid "Python version"
-msgstr "Version Python"
+msgstr ""
 
 #: ../../source/how-to-install-flower.rst:17
 msgid "Install stable release"
@@ -15050,9 +15020,8 @@ msgstr ""
 "``pyproject.toml``, voir :doc:`how-to-configure-pyproject-toml`."
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:154
-#, fuzzy
 msgid "Run an app directly from Flower Hub:"
-msgstr "Lancer des applications Flower à partir de la plateforme Flower"
+msgstr ""
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:162
 msgid "Inspect runs and logs from the terminal:"
@@ -15161,9 +15130,8 @@ msgstr ""
 "l'environnement variable ``FLWR_LOCAL_CONTROL_API_PORT``."
 
 #: ../../source/how-to-run-flower-locally.rst:46
-#, fuzzy
 msgid "Runtime dependency installation"
-msgstr "`superexec.allowRuntimeDependencyInstallation`"
+msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:48
 msgid ""
@@ -18341,9 +18309,8 @@ msgstr ""
 "système."
 
 #: ../../source/how-to-run-simulations.rst:31
-#, fuzzy
 msgid "Run simulations"
-msgstr "FAQ pour les simulations"
+msgstr ""
 
 #: ../../source/how-to-run-simulations.rst:33
 msgid ""
@@ -18379,11 +18346,11 @@ msgid ""
 "us/powershell/scripting/overview?view=powershell-7.5>`_, we recommend "
 "using `WSL2 <https://learn.microsoft.com/en-us/windows/wsl/about>`_."
 msgstr ""
-"La ``Simulation Runtime`` de Flower est construite sur top de `Ray "
-"<https://www.ray.io/>`_, un cadre open-source pour des workloads Python "
-"scalables. Flower prend en charge pleinement Linux et macOS. Sur Windows,"
-" le support Ray reste expérimental, et même si vous pouvez exécuter les "
-"simulations directement à partir du `PowerShell "
+"La ``Simulation Runtime`` de Flower est construite sur `Ray "
+"<https://www.ray.io/>`_, un framework open-source pour des charges de "
+"travail Python scalables. Flower prend en charge pleinement Linux et "
+"macOS. Sur Windows, le support Ray reste expérimental, et même si vous "
+"pouvez exécuter les simulations directement à partir du `PowerShell "
 "<https://learn.microsoft.com/en-"
 "us/powershell/scripting/overview?view=powershell-7.5>`_, nous "
 "recommandons d'utiliser `WSL2 <https://learn.microsoft.com/en-"
@@ -18503,13 +18470,10 @@ msgid "Launch your Flower simulation"
 msgstr "Lancer votre simulation Flower"
 
 #: ../../source/how-to-run-simulations.rst:102
-#, fuzzy
 msgid ""
 "If you haven't already, install Flower via ``pip install -U flwr`` in a "
 "Python environment."
 msgstr ""
-"Si vous n'avez pas déjà fait cela, installez Flower via ``pip install -U "
-"\"flwr[simulation]\"`` dans un environnement Python."
 
 #: ../../source/how-to-run-simulations.rst:105
 msgid ""
@@ -18571,9 +18535,8 @@ msgstr ""
 " un SuperLink à l'aide d'une base de données en mémoire."
 
 #: ../../source/how-to-run-simulations.rst:133
-#, fuzzy
 msgid "Simulation examples"
-msgstr "Exemple de simulation locale"
+msgstr ""
 
 #: ../../source/how-to-run-simulations.rst:135
 msgid ""
@@ -18644,18 +18607,12 @@ msgid "Customize the Simulation Runtime"
 msgstr "Personnaliser le Simulation Runtime"
 
 #: ../../source/how-to-run-simulations.rst:160
-#, fuzzy
 msgid ""
 "By default, the Simulation Runtime simulates a cohort of two SuperNodes "
 "and assigns two CPU cores to each backend worker. This means that if your"
 " system has four or more CPU cores, all backend workers can be running in"
 " parallel, each executing a different ``ClientApp`` instance."
 msgstr ""
-"Par défaut, le Simulation Runtime simule un lot de 10 SuperNodes et "
-"affecte deux cœurs CPU à chaque worker backend. Cela signifie que si "
-"votre système a 12 cœurs CPU, six workers backend peuvent être en cours "
-"d'exécution parallèlement, chacun exécutant une instance différente de "
-"``ClientApp``."
 
 #: ../../source/how-to-run-simulations.rst:165
 msgid ""
@@ -18740,7 +18697,7 @@ msgstr ""
 
 #: ../../source/how-to-run-simulations.rst:204
 msgid "Per-run override of Simulation Runtime configuration"
-msgstr "Survolage de la configuration de Simulation Runtime"
+msgstr "Surcharge de la configuration du Simulation Runtime par exécution"
 
 #: ../../source/how-to-run-simulations.rst:206
 msgid ""
@@ -19334,9 +19291,8 @@ msgid "PyTorch"
 msgstr ""
 
 #: ../../source/how-to-save-and-load-model-checkpoints.rst:49
-#, fuzzy
 msgid "TensorFlow"
-msgstr "quickstart-tensorflow"
+msgstr ""
 
 #: ../../source/how-to-save-and-load-model-checkpoints.rst:62
 msgid "NumPy"
@@ -21859,9 +21815,8 @@ msgstr ""
 "développement Python facile pour l'apprentissage fédéré."
 
 #: ../../source/index.rst:3
-#, fuzzy
 msgid "Flower Framework Documentation"
-msgstr "Communication réseau de Flower"
+msgstr ""
 
 #: ../../source/index.rst:8
 msgid ""
@@ -21937,9 +21892,8 @@ msgstr ""
 "quickstart-android>` | :doc:`iOS <tutorial-quickstart-ios>`"
 
 #: ../../source/ref-api-cli.rst:3
-#, fuzzy
 msgid "Flower CLI reference"
-msgstr "Client de Flower"
+msgstr ""
 
 #: ../../source/ref-api-cli.rst:7
 msgid "Basic Commands"
@@ -21954,9 +21908,8 @@ msgid "flwr is the Flower command line interface."
 msgstr "flwr est l'interface de ligne de commande de Flower."
 
 #: ../../source/ref-api-cli.rst
-#, fuzzy
 msgid "Options"
-msgstr "Solution"
+msgstr ""
 
 #: ../../flwr:1
 msgid "Install completion for the current shell."
@@ -21995,9 +21948,8 @@ msgstr "Arguments"
 #: install:1 invite list:1 log:1 login:1 new:1 publish:1 pull:1 register:1
 #: reject:1 remove-account:1 remove-supernode:1 revoke:1 run:1
 #: simulation-config:1 stop:1 supernode unregister:1
-#, fuzzy
 msgid "Optional argument"
-msgstr "Améliorations facultatives"
+msgstr ""
 
 #: ../../flwr app publish:1
 msgid "Project directory to upload (defaults to current directory)."
@@ -22014,9 +21966,8 @@ msgstr ""
 #: ../../flwr accept:1 add-supernode:1 app archive:1 create:1 federation invite
 #: log:1 pull:1 register:1 reject:1 remove-account:1 remove-supernode:1
 #: review:1 revoke:1 stop:1 supernode unregister:1
-#, fuzzy
 msgid "Required argument"
-msgstr "Argument de construction"
+msgstr ""
 
 #: ../../flwr app review:1
 msgid ""
@@ -22073,9 +22024,8 @@ msgstr "Formatez la sortie en utilisant la vue 'par défaut' ou 'json'"
 #: ../../flwr accept add-supernode archive config create federation invite list
 #: log register reject remove-account remove-supernode revoke run
 #: simulation-config stop supernode unregister
-#, fuzzy
 msgid "default"
-msgstr "Port par défaut"
+msgstr ""
 
 #: ../../flwr accept:1 add-supernode:1 archive:1 config create:1 federation
 #: invite list:1 register:1 reject:1 remove-account:1 remove-supernode:1
@@ -22086,9 +22036,8 @@ msgstr "``'default'``"
 #: ../../flwr accept add-supernode archive config create federation invite list
 #: register reject remove-account remove-supernode revoke run simulation-config
 #: stop supernode unregister
-#, fuzzy
 msgid "options"
-msgstr "Solution"
+msgstr ""
 
 #: ../../flwr accept:1 add-supernode:1 archive:1 config create:1 federation
 #: invite list:1 register:1 reject:1 remove-account:1 remove-supernode:1
@@ -22110,9 +22059,8 @@ msgstr "ID du SuperNode à ajouter."
 
 #: ../../flwr accept:1 add-supernode:1 create:1 federation invite reject:1
 #: remove-supernode:1 revoke:1
-#, fuzzy
 msgid "Name of the federation."
-msgstr "Nom de la fédération à créer."
+msgstr ""
 
 #: ../../flwr accept:1 add-supernode:1 archive:1 create:1 federation invite
 #: list:1 log:1 login:1 pull:1 register:1 reject:1 remove-account:1
@@ -22142,9 +22090,8 @@ msgid "Create this federation for simulation use."
 msgstr "Créez cette fédération pour usage de simulation."
 
 #: ../../flwr create:1 federation invite list:1 run:1 supernode
-#, fuzzy
 msgid "``False``"
-msgstr "`false`"
+msgstr ""
 
 #: ../../flwr create:1 federation
 msgid "Name of the federation to create."
@@ -22281,9 +22228,8 @@ msgid "Name of the federation; must be in the format `@<account>/<federation>`."
 msgstr "Nom de la fédération ; doit être sous la forme `@<compte>/<fédération>`."
 
 #: ../../flwr install:1
-#, fuzzy
 msgid "Install a Flower App Bundle."
-msgstr "Installez Flower"
+msgstr ""
 
 #: ../../flwr install:1
 msgid "It can be run with a single FAB file argument:"
@@ -22391,18 +22337,16 @@ msgid "``True``"
 msgstr "``True``"
 
 #: ../../flwr log:1
-#, fuzzy
 msgid "The Flower run ID to query"
-msgstr "ID de run de Flower à arrêter"
+msgstr ""
 
 #: ../../flwr login:1
 msgid "Login to Flower SuperLink."
 msgstr "Se connecter à l'application Flower SuperLink."
 
 #: ../../flwr new:1
-#, fuzzy
 msgid "Create new Flower App."
-msgstr "Créer une nouvelle application Flower (PyTorch) :"
+msgstr ""
 
 #: ../../flwr new:1
 msgid "Deprecated. The ML framework to use"
@@ -22440,9 +22384,8 @@ msgid "Run ID to pull artifacts from."
 msgstr "ID du run pour extraire les artefacts."
 
 #: ../../flwr run:1
-#, fuzzy
 msgid "Run Flower App."
-msgstr "Exécutez l'application Flower"
+msgstr ""
 
 #: ../../flwr run:1
 msgid ""
@@ -22481,11 +22424,10 @@ msgstr ""
 "clé-valeur de surcharge."
 
 #: ../../flwr run:1
-#, fuzzy
 msgid ""
 "Override federation configuration values using one of the following "
 "formats:"
-msgstr "Configurez les valeurs de run en utilisant l'un des formats suivants :"
+msgstr ""
 
 #: ../../flwr run:1
 msgid ""
@@ -22573,14 +22515,12 @@ msgid "Advanced Commands"
 msgstr "Commandes avancées"
 
 #: ../../source/ref-api-cli.rst:45
-#, fuzzy
 msgid "``flower-superexec``"
-msgstr "``flower-supernode``"
+msgstr ""
 
 #: ../../source/ref-api/flwr.rst:2
-#, fuzzy
 msgid "flwr"
-msgstr "Flower"
+msgstr ""
 
 #: ../../source/reference.rst:18:<autosummary>:1 flwr:1 of
 msgid "Flower main package."
@@ -22666,14 +22606,12 @@ msgstr ""
 "l'agent."
 
 #: ../../source/ref-api/flwr.agentapp.rst:31
-#, fuzzy
 msgid "Exceptions"
-msgstr "Explications"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:35:<autosummary>:1
-#, fuzzy
 msgid ":py:obj:`LoadAgentAppError <flwr.agentapp.LoadAgentAppError>`\\"
-msgstr ":py:obj:`AgentApp <flwr.agentapp.AgentApp>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:35:<autosummary>:1
 #: flwr.agentapp.agent_app.LoadAgentAppError:1 of
@@ -22826,9 +22764,8 @@ msgstr ""
 #: flwr.clientapp.client_app.ClientApp.query
 #: flwr.clientapp.client_app.ClientApp.train
 #: flwr.serverapp.grid.grid.Grid.send_and_receive of
-#, fuzzy
 msgid "Returns"
-msgstr "Type de retour"
+msgstr ""
 
 #: flwr.agentapp.base.AgentResponses.create:9 of
 msgid "**response** -- Open Responses-compatible response."
@@ -22899,9 +22836,8 @@ msgid "Model response creation API."
 msgstr "API de création de réponse de modèle."
 
 #: ../../source/ref-api/flwr.agentapp.LoadAgentAppError.rst:2
-#, fuzzy
 msgid "LoadAgentAppError"
-msgstr "AgentApp"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.rst:2
 msgid "app"
@@ -25484,8 +25420,8 @@ msgstr ""
 #: of
 msgid "Strategy wrapper for central DP with client-side adaptive clipping."
 msgstr ""
-"Wrapper stratégique pour le DP centralisé avec une éclissure client "
-"adaptative."
+"Wrapper de stratégie pour le DP centralisé avec clipping adaptatif côté "
+"client."
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 msgid ""
@@ -25501,7 +25437,7 @@ msgstr ""
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:1
 #: of
 msgid "Strategy wrapper for central DP with client-side fixed clipping."
-msgstr "Wrapper stratégique pour le DP centralisé avec une éclissure client fixe."
+msgstr "Wrapper de stratégie pour le DP centralisé avec clipping fixe côté client."
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 msgid ""
@@ -25517,7 +25453,7 @@ msgstr ""
 #: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:1
 #: of
 msgid "Message-based central DP with server-side adaptive clipping."
-msgstr "DP centralisé basé sur les messages avec une éclissure serveur adaptative."
+msgstr "DP centralisé basé sur les messages avec clipping adaptatif côté serveur."
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 msgid ""
@@ -25533,7 +25469,7 @@ msgstr ""
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:1
 #: of
 msgid "Strategy wrapper for central DP with server-side fixed clipping."
-msgstr "Stratégie enveloppe pour le DP central avec couper côté serveur fixe."
+msgstr "Wrapper de stratégie pour le DP centralisé avec clipping fixe côté serveur."
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 msgid ""
@@ -25545,11 +25481,8 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 #: flwr.serverapp.strategy.fedadagrad.FedAdagrad:1 of
-#, fuzzy
 msgid "FedAdagrad strategy - Adaptive Federated Optimization using Adagrad."
 msgstr ""
-"`FedAdam` et `FedAdam` correspondent à la dernière version de l'article "
-"sur l'optimisation fédérée adaptative."
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 msgid ""
@@ -25587,9 +25520,8 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:1 of
-#, fuzzy
 msgid "Federated Averaging with Momentum strategy."
-msgstr "Stratégie d'agrégation fédérée."
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 msgid ""
@@ -25614,9 +25546,8 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 #: flwr.serverapp.strategy.fedprox.FedProx:1 of
-#, fuzzy
 msgid "Federated Optimization strategy."
-msgstr "Stratégie d'agrégation fédérée."
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 msgid ""
@@ -25669,9 +25600,8 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 #: flwr.serverapp.strategy.fedyogi.FedYogi:1 of
-#, fuzzy
 msgid "FedYogi [Reddi et al., 2020] strategy."
-msgstr "Stratégie Krum [Blanchard et al., 2017]."
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 msgid ""
@@ -26013,7 +25943,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid "Aggregate MetricRecords in the received Messages."
-msgstr "Aggrégation des MetricRecords reçus dans les Messages."
+msgstr "Agrège les MetricRecords dans les Messages reçus."
 
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
@@ -26047,7 +25977,7 @@ msgstr ""
 #: flwr.serverapp.strategy.multikrum.MultiKrum.aggregate_train:1
 #: flwr.serverapp.strategy.qfedavg.QFedAvg.aggregate_train:1 of
 msgid "Aggregate ArrayRecords and MetricRecords in the received Messages."
-msgstr "Aggrégation des ArrayRecords et des MetricRecords reçus dans les Messages."
+msgstr "Agrège les ArrayRecords et les MetricRecords dans les Messages reçus."
 
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
@@ -26688,9 +26618,8 @@ msgstr "Bases : :py:class:`~flwr.serverapp.strategy.fedopt.FedOpt`"
 #: flwr.serverapp.strategy.fedadagrad.FedAdagrad:3
 #: flwr.serverapp.strategy.fedadam.FedAdam:3
 #: flwr.serverapp.strategy.fedyogi.FedYogi:3 of
-#, fuzzy
 msgid "Implementation based on https://arxiv.org/abs/2003.00295v5"
-msgstr "Implémentation sur https://arxiv.org/abs/1703.02757"
+msgstr ""
 
 #: flwr.serverapp.strategy.fedadagrad.FedAdagrad:19
 #: flwr.serverapp.strategy.fedadam.FedAdam:19
@@ -26940,7 +26869,7 @@ msgstr ""
 
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:38 of
 msgid "Server-side momentum factor used for FedAvgM."
-msgstr "Facteur de momente côté-serveur utilisé pour FedAvgM."
+msgstr "Facteur de momentum côté serveur utilisé pour FedAvgM."
 
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
@@ -27863,9 +27792,8 @@ msgstr ""
 
 #: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
 #: flwr.serverapp.strategy.strategy.Strategy.configure_evaluate:1 of
-#, fuzzy
 msgid "Configure the next round of evaluation."
-msgstr "Configuration du prochain tour d'évaluation fédérée."
+msgstr ""
 
 #: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
 #: of
@@ -27895,9 +27823,8 @@ msgstr ":py:obj:`summary <flwr.serverapp.strategy.Strategy.summary>`\\ \\(\\)"
 #: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:3
 #: flwr.serverapp.strategy.strategy.Strategy.configure_evaluate:3
 #: flwr.serverapp.strategy.strategy.Strategy.configure_train:3 of
-#, fuzzy
 msgid "The current round of federated learning."
-msgstr "La ronde actuelle d'apprentissage fédéré, commençant à 1."
+msgstr ""
 
 #: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:5 of
 msgid ""
@@ -27988,9 +27915,8 @@ msgid "Changelog"
 msgstr "Changelog"
 
 #: ../../source/ref-changelog.md:3
-#, fuzzy
 msgid "v1.32.1 (2026-07-01)"
-msgstr "v1.26.1 (2026-02-07)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:5 ../../source/ref-changelog.md:23
 #: ../../source/ref-changelog.md:77 ../../source/ref-changelog.md:133
@@ -28043,13 +27969,10 @@ msgstr ""
 "shortlog`) :"
 
 #: ../../source/ref-changelog.md:9
-#, fuzzy
 msgid ""
 "`Chong Shen Ng`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Micah "
 "Sheller` <!---TOKEN_v1.32.1-->"
 msgstr ""
-"`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Heng Pan`, "
-"`Javier`, `Taner Topal` <!---TOKEN_v1.26.1-->"
 
 #: ../../source/ref-changelog.md:11 ../../source/ref-changelog.md:29
 #: ../../source/ref-changelog.md:83 ../../source/ref-changelog.md:139
@@ -28078,13 +28001,10 @@ msgid "What's new?"
 msgstr "Quoi de neuf ?"
 
 #: ../../source/ref-changelog.md:13
-#, fuzzy
 msgid ""
 "**Fix `flwr-simulation` failing to exit** "
 "([#7504](https://github.com/flwrlabs/flower/pull/7504))"
 msgstr ""
-"**Retirez l'entréepoint CLI `flower-simulation`** "
-"([#6628](https://github.com/flwrlabs/flower/pull/6628))"
 
 #: ../../source/ref-changelog.md:15
 msgid ""
@@ -28093,17 +28013,12 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:17
-#, fuzzy
 msgid ""
 "**Improve agent reliability and security** "
 "([#7505](https://github.com/flwrlabs/flower/pull/7505), "
 "[#7507](https://github.com/flwrlabs/flower/pull/7507), "
 "[#7509](https://github.com/flwrlabs/flower/pull/7509))"
 msgstr ""
-"**Improve SuperNode authentication** "
-"([#4043](https://github.com/flwrlabs/flower/pull/4043), "
-"[#4047](https://github.com/flwrlabs/flower/pull/4047), "
-"[#4074](https://github.com/flwrlabs/flower/pull/4074))"
 
 #: ../../source/ref-changelog.md:19
 msgid ""
@@ -28112,12 +28027,10 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:21
-#, fuzzy
 msgid "v1.32.0 (2026-06-25)"
 msgstr ""
 
 #: ../../source/ref-changelog.md:27
-#, fuzzy
 msgid ""
 "`Aleksei Balan`, `Charles Beauville`, `Chong Shen Ng`, `Daniel J. "
 "Beutel`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Julian Rußmeyer`, "
@@ -28126,7 +28039,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:31
-#, fuzzy
 msgid ""
 "**Introduce default federations on SuperGrid** "
 "([#7436](https://github.com/flwrlabs/flower/pull/7436), "
@@ -28149,7 +28061,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:35
-#, fuzzy
 msgid ""
 "**Enable runtime installation of Flower App dependencies** "
 "([#7372](https://github.com/flwrlabs/flower/pull/7372), "
@@ -28172,7 +28083,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:39
-#, fuzzy
 msgid ""
 "**Add experimental next-gen Kubernetes executor support** "
 "([#7269](https://github.com/flwrlabs/flower/pull/7269), "
@@ -28194,7 +28104,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:43
-#, fuzzy
 msgid ""
 "**Expand experimental Flower Agent support in SuperGrid** "
 "([#7336](https://github.com/flwrlabs/flower/pull/7336), "
@@ -28225,7 +28134,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:47
-#, fuzzy
 msgid ""
 "**Improve SuperLink high availability** "
 "([#7308](https://github.com/flwrlabs/flower/pull/7308), "
@@ -28244,7 +28152,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:51
-#, fuzzy
 msgid ""
 "**Update and fix Flower examples** "
 "([#7364](https://github.com/flwrlabs/flower/pull/7364), "
@@ -28258,14 +28165,12 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:55
-#, fuzzy
 msgid ""
 "**Show SuperLink name and address in Flower CLI** "
 "([#7485](https://github.com/flwrlabs/flower/pull/7485))"
 msgstr ""
 
 #: ../../source/ref-changelog.md:57
-#, fuzzy
 msgid ""
 "**Restructure Flower framework packages** "
 "([#7288](https://github.com/flwrlabs/flower/pull/7288), "
@@ -28289,7 +28194,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:59
-#, fuzzy
 msgid ""
 "**Update documentation and translations** "
 "([#7340](https://github.com/flwrlabs/flower/pull/7340), "
@@ -28381,7 +28285,6 @@ msgid "Incompatible changes"
 msgstr "Changements incompatibles"
 
 #: ../../source/ref-changelog.md:67
-#, fuzzy
 msgid ""
 "**Remove `owner-aid` from `flwr supernode ls` JSON output** "
 "([#7373](https://github.com/flwrlabs/flower/pull/7373))"
@@ -28394,7 +28297,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:71
-#, fuzzy
 msgid ""
 "**Default simulations to 2 SuperNodes** "
 "([#7476](https://github.com/flwrlabs/flower/pull/7476), "
@@ -28413,12 +28315,10 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:75
-#, fuzzy
 msgid "v1.31.0 (2026-06-08)"
 msgstr ""
 
 #: ../../source/ref-changelog.md:81
-#, fuzzy
 msgid ""
 "`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata "
 "Nugraha`, `Gustavo Bertoli`, `Heng Pan`, `Javier`, `Leandro`, `Lorenzo "
@@ -28428,7 +28328,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:85
-#, fuzzy
 msgid ""
 "**Prepare support for Flower Agent** "
 "([#7215](https://github.com/flwrlabs/flower/pull/7215), "
@@ -28461,7 +28360,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:89
-#, fuzzy
 msgid ""
 "**Add SuperGrid guides** "
 "([#7188](https://github.com/flwrlabs/flower/pull/7188), "
@@ -28482,7 +28380,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:93
-#, fuzzy
 msgid ""
 "**Add Executor Abstraction for SuperExecs** "
 "([#7174](https://github.com/flwrlabs/flower/pull/7174), "
@@ -28506,7 +28403,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:97
-#, fuzzy
 msgid ""
 "**Improve high availability** "
 "([#7169](https://github.com/flwrlabs/flower/pull/7169), "
@@ -28526,7 +28422,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:101
-#, fuzzy
 msgid ""
 "**Track `ClientApp` runtime metrics in simulation runs** "
 "([#7248](https://github.com/flwrlabs/flower/pull/7248), "
@@ -28543,7 +28438,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:105
-#, fuzzy
 msgid ""
 "**Add task-to-task communication** "
 "([#7156](https://github.com/flwrlabs/flower/pull/7156), "
@@ -28559,7 +28453,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:109
-#, fuzzy
 msgid ""
 "**Restructure framework modules** "
 "([#7242](https://github.com/flwrlabs/flower/pull/7242), "
@@ -28575,7 +28468,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:113
-#, fuzzy
 msgid ""
 "**Migrate framework CI/CD to uv** "
 "([#6693](https://github.com/flwrlabs/flower/pull/6693), "
@@ -28592,7 +28484,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:117
-#, fuzzy
 msgid ""
 "**Update translations** "
 "([#7222](https://github.com/flwrlabs/flower/pull/7222), "
@@ -28611,14 +28502,12 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:119
-#, fuzzy
 msgid ""
 "**Upgrade Ray to 2.55.1** "
 "([#7181](https://github.com/flwrlabs/flower/pull/7181))"
 msgstr ""
 
 #: ../../source/ref-changelog.md:121
-#, fuzzy
 msgid ""
 "**General improvements** "
 "([#7155](https://github.com/flwrlabs/flower/pull/7155), "
@@ -28636,7 +28525,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:127
-#, fuzzy
 msgid ""
 "**Drop Python 3.10 support** "
 "([#7190](https://github.com/flwrlabs/flower/pull/7190))"
@@ -41609,12 +41497,10 @@ msgstr ""
 "with existing framework integrations or strategies."
 
 #: ../../source/ref-changelog.md:2073
-#, fuzzy
 msgid "**Deprecate Python 3.7**"
 msgstr ""
 
 #: ../../source/ref-changelog.md:2075
-#, fuzzy
 msgid ""
 "Since Python 3.7 reached its end of life (EOL) on 2023-06-27, support for"
 " Python 3.7 is now deprecated and will be removed in an upcoming release."
@@ -41717,7 +41603,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-changelog.md:2099
-#, fuzzy
 msgid ""
 "Please note: The gRPC request-response API is still experimental and will"
 " likely change significantly over time."
@@ -45108,9 +44993,8 @@ msgstr ""
 "([#470](https://github.com/flwrlabs/flower/pull/470))."
 
 #: ../../source/ref-example-projects.rst:3
-#, fuzzy
 msgid "Example projects"
-msgstr "Example ``pyproject.toml``"
+msgstr ""
 
 #: ../../source/ref-example-projects.rst:5
 msgid ""
@@ -45132,9 +45016,8 @@ msgid "The following examples are available as standalone projects."
 msgstr "Les exemples suivants sont disponibles sous forme de projets autonomes."
 
 #: ../../source/ref-example-projects.rst:14
-#, fuzzy
 msgid "Quickstart TensorFlow/Keras"
-msgstr "Quickstart TensorFlow"
+msgstr ""
 
 #: ../../source/ref-example-projects.rst:16
 msgid ""
@@ -45250,26 +45133,26 @@ msgstr ""
 
 #: ../../source/ref-exit-codes-dir.rst:3
 msgid "Exit Codes"
-msgstr "Codes d'exit"
+msgstr "Codes de sortie"
 
 #: ../../source/ref-exit-codes-dir.rst:5
 msgid ""
 "This reference provides an index of all exit codes and recommended "
 "resolutions."
 msgstr ""
-"Cette référence fournit un index de tous les codes d'exit et des "
+"Cette référence fournit un index de tous les codes de sortie et des "
 "recommandations de résolution."
 
 #: ../../source/ref-exit-codes-dir.rst:9
 msgid "Categories"
-msgstr "Categories"
+msgstr "Catégories"
 
 #: ../../source/ref-exit-codes-dir.rst:11
 msgid ""
 "**Success exit codes (0-99)**: Indicate successful completion of "
 "processes."
 msgstr ""
-"**Codes d'exit de réussite (0-99)** : Indiquent une fin réussie des "
+"**Codes de sortie de réussite (0-99)** : Indiquent une fin réussie des "
 "processus."
 
 #: ../../source/ref-exit-codes-dir.rst:12
@@ -45299,7 +45182,7 @@ msgstr ""
 #: ../../source/ref-exit-codes-dir.rst:18
 msgid "**Common exit codes (600-699)**: Shared across multiple components."
 msgstr ""
-"**Codes d'exit courants (600-699)** : Partagés à travers plusieurs "
+"**Codes de sortie courants (600-699)** : Partagés entre plusieurs "
 "composants."
 
 #: ../../source/ref-exit-codes-dir.rst:22
@@ -45308,7 +45191,7 @@ msgstr "Indices"
 
 #: ../../source/ref-exit-codes/0.rst:3
 msgid "[0] SUCCESS"
-msgstr "[0] SUCCÈS"
+msgstr "[0] SUCCESS"
 
 #: ../../source/ref-exit-codes/0.rst:9
 msgid "The process completed successfully."
@@ -45316,7 +45199,7 @@ msgstr "Le processus s'est terminé avec succès."
 
 #: ../../source/ref-exit-codes/1.rst:3
 msgid "[1] GRACEFUL_EXIT_SIGINT"
-msgstr "[1] SORTIE GRACIEUSE SIGINT"
+msgstr "[1] GRACEFUL_EXIT_SIGINT"
 
 #: ../../source/ref-exit-codes/1.rst:9
 msgid "The process exited gracefully, triggered by ``SIGINT``."
@@ -45650,7 +45533,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/201.rst:3
 msgid "[201] SERVERAPP_EXCEPTION"
-msgstr "[201] EXCEPTION_SERVERAPP"
+msgstr "[201] SERVERAPP_EXCEPTION"
 
 #: ../../source/ref-exit-codes/201.rst:9
 msgid ""
@@ -45673,7 +45556,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/202.rst:3
 msgid "[202] SERVERAPP_STRATEGY_AGGREGATION_ERROR"
-msgstr "[202] ERREUR_D_AGGREGATION_STRATEGIE_SERVERAPP"
+msgstr "[202] SERVERAPP_STRATEGY_AGGREGATION_ERROR"
 
 #: ../../source/ref-exit-codes/202.rst:9
 msgid "The strategy encountered an error during aggregation."
@@ -45689,7 +45572,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/203.rst:3
 msgid "[203] SERVERAPP_RUN_START_REJECTED"
-msgstr "[203] DEMARRAGE_DE_RUN_REFUSE_SUPERLINK"
+msgstr "[203] SERVERAPP_RUN_START_REJECTED"
 
 #: ../../source/ref-exit-codes/203.rst:9
 msgid ""
@@ -45722,7 +45605,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/250.rst:3
 msgid "[250] CLIENTAPP_COMMUNICATION_ERROR"
-msgstr "[250] ERREUR_COMMUNICATION_CLIENTAPP"
+msgstr "[250] CLIENTAPP_COMMUNICATION_ERROR"
 
 #: ../../source/ref-exit-codes/250.rst:9
 msgid ""
@@ -45760,7 +45643,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/3.rst:3
 msgid "[3] GRACEFUL_EXIT_SIGTERM"
-msgstr "[3] SORTIE_GRACEFUL_SIGTERM"
+msgstr "[3] GRACEFUL_EXIT_SIGTERM"
 
 #: ../../source/ref-exit-codes/3.rst:9
 msgid "The process exited gracefully, triggered by ``SIGTERM``."
@@ -45768,7 +45651,7 @@ msgstr "Le processus a quitté de manière gracieuse, déclenché par ``SIGTERM`
 
 #: ../../source/ref-exit-codes/300.rst:3
 msgid "[300] SUPERNODE_REST_ADDRESS_INVALID"
-msgstr "[300] ADDRESSE_REST_SUPERNODE_INVALIDE"
+msgstr "[300] SUPERNODE_REST_ADDRESS_INVALID"
 
 #: ../../source/ref-exit-codes/300.rst:9
 msgid ""
@@ -45805,7 +45688,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/302.rst:3
 msgid "[302] SUPERNODE_NODE_AUTH_KEY_INVALID"
-msgstr "[302] CLÉ_D_AUTHENTIFICATION_SUPERNODE_INVALIDE"
+msgstr "[302] SUPERNODE_NODE_AUTH_KEY_INVALID"
 
 #: ../../source/ref-exit-codes/302.rst:9
 msgid ""
@@ -45842,7 +45725,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/303.rst:3
 msgid "[303] SUPERNODE_STARTED_WITHOUT_TLS_BUT_NODE_AUTH_ENABLED"
-msgstr "[303] SUPERNODE_DÉMARRÉ_SANS_TLS_MAS_AUTH_NODE_ACTIVÉ"
+msgstr "[303] SUPERNODE_STARTED_WITHOUT_TLS_BUT_NODE_AUTH_ENABLED"
 
 #: ../../source/ref-exit-codes/303.rst:9
 msgid ""
@@ -46032,9 +45915,8 @@ msgstr ""
 "au fichier ou de la validation."
 
 #: ../../source/ref-exit-codes/402.rst:3
-#, fuzzy
 msgid "[402] SUPEREXEC_INVALID_EXECUTOR_CONFIG"
-msgstr "[400] SUPEREXEC_INVALID_PLUGIN_CONFIG"
+msgstr ""
 
 #: ../../source/ref-exit-codes/402.rst:9
 msgid ""
@@ -46049,28 +45931,20 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-exit-codes/402.rst:17
-#, fuzzy
 msgid "Confirm that the ``--executor-config`` path exists and is readable."
 msgstr ""
-"Confirmez que le chemin ``--superexec-auth-secret-file`` existe et est "
-"lisible."
 
 #: ../../source/ref-exit-codes/402.rst:18
-#, fuzzy
 msgid "Ensure the file is valid YAML."
-msgstr "Assurez-vous que le fichier est un document YAML valide."
+msgstr ""
 
 #: ../../source/ref-exit-codes/402.rst:19
-#, fuzzy
 msgid "Ensure the YAML document is a mapping."
-msgstr "Assurez-vous que le fichier est un document YAML valide."
+msgstr ""
 
 #: ../../source/ref-exit-codes/402.rst:20
-#, fuzzy
 msgid "Review the accompanying error message for the exact failure."
 msgstr ""
-"Vérifiez le message d'erreur accompagnant pour l'échec exact de l'accès "
-"au fichier ou de la validation."
 
 #: ../../source/ref-exit-codes/500.rst:3
 msgid "[500] FLWRCLI_NODE_AUTH_PUBLIC_KEY_INVALID"
@@ -46292,9 +46166,8 @@ msgid "Otherwise, upgrade Flower:"
 msgstr "Sinon, mettez à jour Flower :"
 
 #: ../../source/ref-exit-codes/607.rst:3
-#, fuzzy
 msgid "[607] COMMON_APP_IMPORT_ERROR"
-msgstr "[607] COMMON_APP_IMPORT_ERROR"
+msgstr ""
 
 #: ../../source/ref-exit-codes/607.rst:9
 msgid ""
@@ -46332,9 +46205,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-exit-codes/607.rst:31
-#, fuzzy
 msgid "Library dependency"
-msgstr "Installez les dépendances"
+msgstr ""
 
 #: ../../source/ref-exit-codes/607.rst:33
 msgid ""
@@ -46360,16 +46232,12 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-exit-codes/608.rst:3
-#, fuzzy
 msgid "[608] COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR"
-msgstr "[608] COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR"
+msgstr ""
 
 #: ../../source/ref-exit-codes/608.rst:9
-#, fuzzy
 msgid "Runtime installation of Flower App dependencies failed."
 msgstr ""
-"L'installation à l'exécution des dépendances des applications Flower a "
-"échoué."
 
 #: ../../source/ref-exit-codes/608.rst:15
 msgid ""
@@ -46398,7 +46266,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/700.rst:3
 msgid "[700] SIMULATION_EXCEPTION"
-msgstr "[700] EXCEPTION_SIMULATION"
+msgstr "[700] SIMULATION_EXCEPTION"
 
 #: ../../source/ref-exit-codes/700.rst:9
 msgid "An unhandled exception occurred when running the simulation."
@@ -46439,13 +46307,10 @@ msgid "Extra dependencies required for simulation are missing."
 msgstr "Les dépendances supplémentaires requises pour la simulation manquent."
 
 #: ../../source/ref-exit-codes/701.rst:15
-#, fuzzy
 msgid ""
 "To use simulation with the Ray backend, add ``flwr`` with the "
 "``simulation`` extra to the app's ``pyproject.toml`` dependencies:"
 msgstr ""
-"Pour utiliser la simulation avec le backend Ray, installez ``flwr`` avec "
-"l'extra ``simulation``: "
 
 #: ../../source/ref-exit-codes/701.rst:24
 msgid ""
@@ -46454,16 +46319,12 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-exit-codes/800.rst:3
-#, fuzzy
 msgid "[800] TASK_PROC_EXCEPTION"
-msgstr "[700] EXCEPTION_SIMULATION"
+msgstr ""
 
 #: ../../source/ref-exit-codes/800.rst:9
-#, fuzzy
 msgid "An unhandled exception occurred in a task process."
 msgstr ""
-"Une exception non gérée s'est produite lors de l'exécution de la "
-"simulation."
 
 #: ../../source/ref-exit-codes/800.rst:15
 msgid ""
@@ -46976,7 +46837,6 @@ msgid "**Basic simulation configuration**"
 msgstr "**Configuration de simulation de base**"
 
 #: ../../source/ref-flower-configuration.rst:134
-#, fuzzy
 msgid ""
 "This creates a managed local SuperLink profile using the default "
 "simulation configuration, which involves running two simulated SuperNodes"
@@ -46984,12 +46844,6 @@ msgid ""
 "<how-to-run-simulations>` to learn how to customize the number of "
 "SuperNodes and resources (CPU/GPU) allocated to your simulations."
 msgstr ""
-"Cela crée un profil local géré de SuperLink en utilisant la configuration"
-" de simulation par défaut, qui implique l'exécution de 10 SuperNodes "
-"simulés à travers le Simulation Runtime. Consultez le :doc:`Simulation "
-"Runtime docs <how-to-run-simulations>` pour apprendre à personnaliser le "
-"nombre de SuperNodes et les ressources (CPU/GPU) allouées à vos "
-"simulations."
 
 #: ../../source/ref-flower-configuration.rst:142
 msgid "**Simulation with in-memory local state**"
@@ -47145,7 +46999,7 @@ msgstr ""
 
 #: ../../source/ref-flower-configuration.rst:208
 msgid "Only set ``insecure = true`` for local testing environments."
-msgstr "Only set ``insecure = true`` for local testing environments."
+msgstr "Ne définissez ``insecure = true`` que pour les environnements de test locaux."
 
 #: ../../source/ref-flower-configuration.rst:210
 msgid ""
@@ -47362,7 +47216,7 @@ msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:116
 msgid "Component"
-msgstr "Component"
+msgstr "Composant"
 
 #: ../../source/ref-flower-network-communication.rst:117
 msgid "Default Port"
@@ -47374,7 +47228,7 @@ msgstr "API"
 
 #: ../../source/ref-flower-network-communication.rst:119
 msgid "Purpose"
-msgstr "Purpose"
+msgstr "Objectif"
 
 #: ../../source/ref-flower-network-communication.rst:120
 msgid "SuperLink"
@@ -47762,7 +47616,7 @@ msgstr ""
 
 #: ../../source/ref-flower-runtime-comparison.rst:7
 msgid "Flower Runtime Comparison"
-msgstr "Flower Runtime Comparison"
+msgstr "Comparaison des runtimes Flower"
 
 #: ../../source/ref-flower-runtime-comparison.rst:9
 msgid ""
@@ -48324,7 +48178,7 @@ msgstr "Simulez en utilisant Flower Simulation Runtime"
 
 #: ../../source/tutorial-quickstart.rst:3
 msgid "Quickstart tutorials"
-msgstr "Quickstart tutorials"
+msgstr "Tutoriels de démarrage rapide"
 
 #: ../../source/tutorial-quickstart-android.rst:-1
 msgid ""
@@ -48335,9 +48189,8 @@ msgstr ""
 "application Android à l'aide de Flower."
 
 #: ../../source/tutorial-quickstart-android.rst:5
-#, fuzzy
 msgid "Quickstart Android"
-msgstr "Quickstart Pandas"
+msgstr ""
 
 #: ../../source/tutorial-quickstart-android.rst:12
 msgid ""
@@ -48418,7 +48271,6 @@ msgstr ""
 "environnement :"
 
 #: ../../source/tutorial-quickstart-fastai.rst:39
-#, fuzzy
 msgid ""
 "This example uses a local simulation profile that ``flwr run`` submits to"
 " a managed local SuperLink, which then executes the run with the Flower "
@@ -48430,15 +48282,6 @@ msgid ""
 "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 " Let's run the project:"
 msgstr ""
-"Cet exemple utilise un profil de simulation local qui ``flwr run`` soumet"
-" à un SuperLink géré local, qui exécute ensuite l'exécution avec le "
-"Simulation Runtime Flower, créant une fédération de 10 nœuds en utilisant"
-" `FedAvg <https://flower.ai/docs/framework/ref-"
-"api/flwr.serverapp.strategy.FedAvg.html#flwr.server.strategy.FedAvg>`_ "
-"comme stratégie d'agrégation. Le dataset sera partitionné en utilisant le"
-" `IidPartitioner <https://flower.ai/docs/datasets/ref-"
-"api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_"
-" du Dataset Flower. Laissez-nous exécuter le projet :"
 
 #: ../../source/tutorial-quickstart-fastai.rst:55
 #: ../../source/tutorial-quickstart-huggingface.rst:60
@@ -48541,7 +48384,6 @@ msgstr ""
 ":doc:`virtualenv <contributor-how-to-set-up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-huggingface.rst:16
-#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+🤗 Hugging Face "
 "project. It will generate all the files needed to run a federation of two"
@@ -48551,13 +48393,6 @@ msgid ""
 "Runtime. The dataset will be partitioned using |flowerdatasets|_'s "
 "|iidpartitioner|_."
 msgstr ""
-"Laissez-nous utiliser ``flwr new`` pour créer un projet complet Flower+🤗 "
-"Hugging Face. Cela générera tous les fichiers nécessaires pour exécuter "
-"une fédération de 10 nœuds en utilisant |fedavg|_. Par défaut, "
-"l'application générée utilise un profil de simulation local qui ``flwr "
-"run`` soumet à un SuperLink géré local, qui exécute ensuite l'exécution "
-"avec Flower Simulation Runtime. Le dataset sera partitionné en utilisant "
-"le |flowerdatasets|_ du |iidpartitioner|_."
 
 #: ../../source/tutorial-quickstart-huggingface.rst:37
 msgid ""
@@ -48983,9 +48818,8 @@ msgstr ""
 " MNIST."
 
 #: ../../source/tutorial-quickstart-ios.rst:5
-#, fuzzy
 msgid "Quickstart iOS"
-msgstr "Quickstart XGBoost"
+msgstr ""
 
 #: ../../source/tutorial-quickstart-ios.rst:12
 msgid ""
@@ -49040,15 +48874,11 @@ msgid ""
 msgstr ""
 
 #: ../../source/tutorial-quickstart-ios.rst:35
-#, fuzzy
 msgid ""
 "Now that we have a rough idea of what is going on, let's get started to "
 "setup our Flower server environment. We first need to install Flower. You"
 " can do this by using pip:"
 msgstr ""
-"Maintenant que nous avons une idée approximative de ce que cet exemple "
-"est sur, allons-y. Tout d'abord, installez Flower dans votre nouvel "
-"environnement :"
 
 #: ../../source/tutorial-quickstart-ios.rst:42
 msgid "Or uv:"
@@ -49240,7 +49070,6 @@ msgstr ""
 "dans un :doc:`virtualenv <contributor-how-to-set-up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-jax.rst:17
-#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+JAX project. It will "
 "generate all the files needed to run a federation of two nodes using "
@@ -49249,13 +49078,6 @@ msgid ""
 "executes the run with the Flower Simulation Runtime. The MNIST dataset "
 "will be partitioned using |flowerdatasets|_'s |iidpartitioner|_."
 msgstr ""
-"Utilisons ``flwr new`` pour créer un projet complet Flower+JAX. Cela "
-"générera tous les fichiers nécessaires pour exécuter une fédération de 50"
-" nœuds en utilisant |fedavg|_. Par défaut, l'application générée utilise "
-"un profil de simulation local qui ``flwr run`` soumet à un SuperLink géré"
-" local, qui exécute ensuite l’exécution avec le runtime d'exécution "
-"Flower Simulation. Le jeu de données MNIST sera partitionné en utilisant "
-"|flowerdatasets|_'s |iidpartitioner|_."
 
 #: ../../source/tutorial-quickstart-jax.rst:37
 msgid ""
@@ -49359,7 +49181,7 @@ msgid ""
 "is set to ``true``, save the global model NumPy arrays using "
 "``np.savez()`` as shown above."
 msgstr ""
-"Notez que le méthode ``start`` du stratégie retourne un objet résultat. "
+"Notez que la méthode ``start`` de la stratégie retourne un objet résultat. "
 "Cet objet contient toutes les informations pertinentes sur le processus "
 "FL, y compris les poids de modèle final sous forme de ``ArrayRecord``, et"
 " les métriques de formation et d'évaluation fédérées comme des "
@@ -49410,7 +49232,6 @@ msgstr ""
 ":doc:`virtualenv <contributor-how-to-set-up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-mlx.rst:51
-#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+MLX project. It will "
 "generate all the files needed to run a federation of two nodes using "
@@ -49421,15 +49242,6 @@ msgid ""
 "<https://flower.ai/docs/datasets/ref-"
 "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 msgstr ""
-"Utilisons ``flwr new`` pour créer un projet complet Flower+MLX. Cela "
-"générera tous les fichiers nécessaires pour exécuter une fédération de 10"
-" nœuds en utilisant |fedavg_link|_. Par défaut, l'application générée "
-"utilise un profil de simulation local qui ``flwr run`` soumet à un "
-"SuperLink géré local, qui exécute ensuite l’exécution avec Flower "
-"Simulation Runtime. Le dataset sera partitionné en utilisant les "
-"partitions de Flower Dataset's `IidPartitioner "
-"<https://flower.ai/docs/datasets/ref-"
-"api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 
 #: ../../source/tutorial-quickstart-mlx.rst:72
 msgid ""
@@ -49671,7 +49483,7 @@ msgid ""
 "process, including the final model weights as an ``ArrayRecord``, and "
 "federated training and evaluation metrics as ``MetricRecords``."
 msgstr ""
-"Notez que la méthode ``start`` du stratégie retourne un objet "
+"Notez que la méthode ``start`` de la stratégie retourne un objet "
 "|result_link|_. Cet objet contient toutes les informations pertinentes "
 "sur le processus FL, y compris les poids du modèle final sous forme de "
 "``ArrayRecord``, et des métriques d'entraînement et d'évaluation fédérées"
@@ -49749,7 +49561,6 @@ msgstr ""
 "-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-pytorch.rst:52
-#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+PyTorch project. It "
 "will generate all the files needed to run a federation of two nodes using"
@@ -49760,15 +49571,6 @@ msgid ""
 "<https://flower.ai/docs/datasets/ref-"
 "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 msgstr ""
-"Utilisez ``flwr new`` pour créer un projet complet Flower+PyTorch. Il "
-"générera tous les fichiers nécessaires pour exécuter une fédération de 10"
-" nœuds en utilisant |fedavg_link|_. Par défaut, l'application générée "
-"utilise un profil de simulation local qui ``flwr run`` soumet à un "
-"SuperLink géré local, qui exécute ensuite l’exécution avec Flower "
-"Simulation Runtime. Le dataset sera partitionné en utilisant le "
-"`IidPartitioner <https://flower.ai/docs/datasets/ref-"
-"api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_"
-" de Flower Dataset."
 
 #: ../../source/tutorial-quickstart-pytorch.rst:73
 msgid ""
@@ -49930,12 +49732,10 @@ msgstr ""
 "up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-pytorch-lightning.rst:40
-#, fuzzy
 msgid "Next, activate your environment and navigate to the example directory:"
-msgstr "Ensuite, activez votre environnement, puis exécutez :"
+msgstr ""
 
 #: ../../source/tutorial-quickstart-pytorch-lightning.rst:46
-#, fuzzy
 msgid ""
 "By default, this project uses a local simulation profile that ``flwr "
 "run`` submits to a managed local SuperLink, which then executes the run "
@@ -49944,12 +49744,6 @@ msgid ""
 "be partitioned using Flower Dataset's |iidpartitioner|_. To run the "
 "project, do:"
 msgstr ""
-"Par défaut, ce projet utilise un profil de simulation local que ``flwr "
-"run`` soumet à un SuperLink local géré, qui exécute ensuite l'exécution "
-"avec le Flower Simulation Runtime. Il crée une fédération de 4 nœuds en "
-"utilisant |fedavg|_ comme stratégie d'agrégation. Le jeu de données est "
-"partitionné avec |iidpartitioner|_ de Flower Datasets. Pour exécuter le "
-"projet :"
 
 #: ../../source/tutorial-quickstart-pytorch-lightning.rst:84
 msgid ""
@@ -50008,7 +49802,6 @@ msgstr ""
 "how-to-set-up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-scikitlearn.rst:44
-#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+scikit-learn project. "
 "It will generate all the files needed to run a federation of two nodes "
@@ -50018,13 +49811,6 @@ msgid ""
 "Runtime. The dataset will be partitioned using |flowerdatasets|_'s "
 "|iidpartitioner|_"
 msgstr ""
-"Utilisez ``flwr new`` pour créer un projet complet Flower+scikit-learn. "
-"Il générera tous les fichiers nécessaires pour exécuter une fédération de"
-" 10 nœuds en utilisant |fedavg_link|_. Par défaut, l'application générée "
-"utilise un profil de simulation local qui ``flwr run`` soumet à un "
-"SuperLink géré local, qui exécute ensuite l’exécution avec Flower "
-"Simulation Runtime. Le dataset sera partitionné en utilisant le "
-"|flowerdatasets|_ de |iidpartitioner|_."
 
 #: ../../source/tutorial-quickstart-scikitlearn.rst:64
 msgid ""
@@ -50167,7 +49953,6 @@ msgstr ""
 "set-up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-tensorflow.rst:44
-#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+TensorFlow project. It"
 " will generate all the files needed to run a federation of two nodes "
@@ -50178,15 +49963,6 @@ msgid ""
 "`IidPartitioner <https://flower.ai/docs/datasets/ref-"
 "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 msgstr ""
-"Utilisons ``flwr new`` pour créer un projet complet Flower+TensorFlow. Il"
-" générera tous les fichiers nécessaires pour exécuter une fédération de "
-"10 nœuds en utilisant la stratégie |fedavg_link|_. Par défaut, "
-"l'application générée utilise un profil de simulation local qui soumet à "
-"un SuperLink géré local, qui exécute ensuite le run avec le runtime "
-"d'exécution Simulation Flower. Le jeu de données sera partitionné en "
-"utilisant les partitions de Flower Dataset's `IidPartitioner "
-"<https://flower.ai/docs/datasets/ref-"
-"api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 
 #: ../../source/tutorial-quickstart-tensorflow.rst:65
 msgid ""
@@ -50268,7 +50044,7 @@ msgid ""
 "<https://docs.python.org/3/library/pprint.html>`_ and save the final "
 "model weights using Tensorflow's ``save()`` function."
 msgstr ""
-"Notez que la méthode ``start`` du stratégie retourne un objet de "
+"Notez que la méthode ``start`` de la stratégie retourne un objet de "
 "résultat. Cet objet contient toutes les informations pertinentes sur le "
 "processus FL, y compris les poids finaux du modèle comme un "
 "``ArrayRecord``, et des métriques d'entraînement et d'évaluation fédérées"
@@ -50312,7 +50088,6 @@ msgstr ""
 "set-up-a-virtual-env>`."
 
 #: ../../source/tutorial-quickstart-xgboost.rst:52
-#, fuzzy
 msgid ""
 "Let's use ``flwr new`` to create a complete Flower+XGBoost project. It "
 "will generate all the files needed to run a federation of two nodes using"
@@ -50323,15 +50098,6 @@ msgid ""
 "`IidPartitioner <https://flower.ai/docs/datasets/ref-"
 "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 msgstr ""
-"Utilisons ``flwr new`` pour créer un projet complet Flower+XGBoost. Il "
-"générera tous les fichiers nécessaires pour exécuter une fédération de 10"
-" nœuds en utilisant la stratégie |fedxgbbagging_link|_. Par défaut, "
-"l'application générée utilise un profil de simulation local qui soumet à "
-"un SuperLink géré local, qui exécute ensuite le run avec le runtime "
-"d'exécution Simulation Flower. Le jeu de données sera partitionné en "
-"utilisant les partitions de Flower Dataset's `IidPartitioner "
-"<https://flower.ai/docs/datasets/ref-"
-"api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 
 #: ../../source/tutorial-quickstart-xgboost.rst:59
 msgid ""
@@ -50621,7 +50387,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:76
-#, fuzzy
 msgid ""
 "If this is your first time installing ``wandb``, you might be asked to "
 "create an account and then log in to your system. You can start this "
@@ -50629,9 +50394,6 @@ msgid ""
 " you might want to do this in your current environment before starting "
 "your run."
 msgstr ""
-"Si c'est la première fois que vous installez ``wandb``, vous pourriez "
-"être invité à créer un compte puis à vous connecter à votre système. Vous"
-" pouvez démarrer ce processus en tapant cela dans votre terminal:"
 
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:87
 msgid "Customize the ``start`` method of a strategy"
@@ -51272,7 +51034,7 @@ msgstr ""
 "n'aurez pas besoin d'écrire de code pour terminer le tutoriel, mais vous "
 "obtiendrez toujours une introduction pratique aux concepts clés de "
 "l'intelligence artificielle collaborative avec Flower. Vous obtiendrez "
-"également un aperçu derrière les scènes pour comprendre comment Flower "
+"également un aperçu des coulisses pour comprendre comment Flower "
 "exécute votre application et comment les différents composants "
 "interagissent entre eux."
 
@@ -51301,7 +51063,6 @@ msgid "Run a Flower App"
 msgstr "Exécutez une Application Flower"
 
 #: ../../source/tutorial-series-get-started-with-flower.rst:34
-#, fuzzy
 msgid ""
 "Once you have logged into flower.ai, you are ready to start running "
 "Flower Apps. A Flower App is a Python project that defines the logic of "
@@ -51310,15 +51071,6 @@ msgid ""
 "defines what happens on the server (SuperGrid) and SuperNodes during your"
 " collaborative AI workload."
 msgstr ""
-"Avec votre fédération créée, vous pouvez maintenant exécuter une "
-"Application Flower à travers les SuperNodes simulés dans votre "
-"fédération. Tout d'abord, vous avez besoin d'une Application Flower. Une "
-"Application Flower est un projet Python qui définit la logique de votre "
-"charge de travail IA collaborative. Plus de détails seront abordés dans "
-"le prochain tutoriel, mais pour l'instant, vous pouvez penser à une "
-"Application Flower comme au code qui définit ce qui se passe sur le "
-"serveur (SuperGrid) et les SuperNodes pendant votre charge de travail IA "
-"collaborative."
 
 #: ../../source/tutorial-series-get-started-with-flower.rst:40
 msgid ""
@@ -51341,16 +51093,12 @@ msgid "Demo app on Flower Hub"
 msgstr "Application de démonstration sur Flower Hub"
 
 #: ../../source/tutorial-series-get-started-with-flower.rst:51
-#, fuzzy
 msgid ""
 "When you click the ``🚀 Run`` button, you'll be asked which federation to "
 "run the app on. Select ``@<your-account>/workspace`` (this is a "
 "federation created automatically by SuperGrid under your profile), then "
 "click ``Run app``."
 msgstr ""
-"Lorsque vous cliquez sur le bouton ``🚀 Run``, vous serez invité à choisir"
-" quelle fédération exécuter l'application. Sélectionnez la fédération que"
-" vous venez de créer, puis cliquez sur ``Run app``."
 
 #: ../../source/tutorial-series-get-started-with-flower.rst:60
 msgid ""
@@ -51364,7 +51112,6 @@ msgstr ""
 "l'exécution de votre application."
 
 #: ../../source/tutorial-series-get-started-with-flower.rst:69
-#, fuzzy
 msgid ""
 "If you click the ``Logs`` tab, you'll see the logs from the app "
 "execution. This demo app ran for three rounds and sampled all two "
@@ -51373,13 +51120,6 @@ msgid ""
 "the ``'random_metric'`` key. At the end, the logs show the aggregated "
 "results from all rounds."
 msgstr ""
-"Si vous cliquez sur la tab ``Logs``, vous verrez les journaux de "
-"l'exécution de l'application. Cette application de démonstration a été "
-"lancée trois fois et a échantillonné tous les 10 SuperNodes dans chaque "
-"tour. Dans chaque tour, le serveur a agrégé des métriques différentes "
-"reçues par les clients. Vous pouvez voir ces informations dans les "
-"journaux sous la clé ``'random_metric'``. À la fin, les journaux montrent"
-" les résultats agrégés de toutes les tours."
 
 #: ../../source/tutorial-series-get-started-with-flower.rst:82
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:591
@@ -51785,20 +51525,12 @@ msgstr ""
 "code, n'est-ce pas ?"
 
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:355
-#, fuzzy
 msgid ""
 "In the later sections, we've seen how we can communicate arbitrary values"
 " between server and clients to fully customize client-side execution. "
 "With that capability, we built a larger Federated Learning simulation "
 "using the Flower Simulation Runtime."
 msgstr ""
-"Dans les sections suivantes, nous avons vu comment nous pouvons "
-"communiquer des valeurs arbitraires entre le serveur et les clients pour "
-"personnaliser complètement l'exécution côté-client. Avec cette capacité, "
-"nous avons construit une plus grande simulation d'apprentissage fédéré en"
-" utilisant Flower Simulation Runtime et exécuté un experiment impliquant "
-"50 clients dans le même workload -- tout cela dans le même projet Flower "
-"!"
 
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:370
 msgid ""
@@ -52489,18 +52221,12 @@ msgstr ""
 "artificielle collaborative de Flower !"
 
 #: ../../source/tutorial-series-write-your-first-flower-app.rst:7
-#, fuzzy
 msgid ""
 "In the previous tutorial, you ran an existing Flower App on SuperGrid "
 "using your default workspace simulation federation. This allowed you to "
 "experiment with simulated SuperNodes and explore the dashboard to follow "
 "the app's progress and view its logs."
 msgstr ""
-"Dans le tutoriel précédent, vous avez créé votre première fédération sur "
-"SuperGrid à l'aide du Simulation Runtime. Cela vous a permis "
-"d'expérimenter avec des nœuds Super simulés, d'exécuter une application "
-"Flower existante sur SuperGrid et d'explorer l'interface de dashboard "
-"pour suivre son progression et visualiser ses journaux."
 
 #: ../../source/tutorial-series-write-your-first-flower-app.rst:11
 msgid ""
@@ -52618,27 +52344,18 @@ msgstr ""
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:149
 #: ../../source/tutorial-series-write-your-first-flower-app.rst:93
-#, fuzzy
 msgid ""
 "Once you are logged in, run the following command to run the app on "
 "SuperGrid:"
 msgstr ""
-"Une fois que vous êtes connecté, exécutez la commande suivante pour "
-"exécuter l'application sur SuperGrid et dans la fédération que vous avez "
-"créée dans le tutoriel précédent :"
 
 #: ../../source/tutorial-series-write-your-first-flower-app.rst:102
-#, fuzzy
 msgid ""
 "Then, if you navigate to the `SuperGrid dashboard "
 "<https://flower.ai/federations/>`__, you should see a new run in "
 "``@<your-account>/workspace``. Click on it to see the run details and "
 "logs."
 msgstr ""
-"Ensuite, si vous naviguez vers le répertoire `SuperGrid dashboard "
-"<https://flower.ai/federations/>`__, vous devriez voir une nouvelle "
-"exécution dans la liste des exécutions de votre fédération. Cliquez "
-"dessus pour voir les détails et les journaux."
 
 #: ../../source/tutorial-series-write-your-first-flower-app.rst:111
 msgid ""
@@ -53226,7 +52943,6 @@ msgstr ""
 "localement pendant que vous développez ou déboguez."
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:195
-#, fuzzy
 msgid ""
 "Navigate to the directory where the app was downloaded, then run the app "
 "locally with the command below. Flower will start a managed local "
@@ -53236,13 +52952,6 @@ msgid ""
 "of your App. With the flag ``--stream``, you can see the logs from the "
 "local run in your terminal."
 msgstr ""
-"Exécutez ensuite l'application localement avec la commande suivante. "
-"Flower lancera une instance locale gérée de type SuperLink — une version "
-"distillée de SuperGrid — et exécuterez l'application avec des SuperNodes "
-"simulés sur votre machine. La première exécution peut prendre plus de "
-"temps car l'application doit télécharger CIFAR-10. Avec la flague "
-"``--stream``, vous pouvez voir les journaux de l'exécution locale dans "
-"votre terminal."
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:207
 msgid "The streamed output should include logs similar to this:"
@@ -53535,9 +53244,8 @@ msgstr ""
 "automatiquement."
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:416
-#, fuzzy
 msgid "Evaluation"
-msgstr "**Évaluation**"
+msgstr ""
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:418
 msgid ""
@@ -53683,7 +53391,6 @@ msgstr ""
 "simulation ?"
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:547
-#, fuzzy
 msgid ""
 "When we execute ``flwr run`` against the default local connection "
 "configuration, Flower submits the run to the managed local SuperLink. By "
@@ -53691,11 +53398,6 @@ msgid ""
 " two SuperNodes. Each will run an instance of the ``ClientApp`` we "
 "defined earlier."
 msgstr ""
-"Lorsque nous exécutons ``flwr run`` contre la configuration de connexion "
-"locale par défaut, Flower soumet l'exécution à la connexion locale gérée "
-"SuperLink. Par défaut, la connexion locale SuperLink configurera le "
-"Simulation Runtime pour utiliser 10 clients. Chacun d'eux exécutera une "
-"instance du modèle ``ClientApp`` que nous avons défini plus tôt."
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:552
 msgid ""
@@ -53709,11 +53411,9 @@ msgstr ""
 "configuré avec deux paramètres clés :"
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:556
-#, fuzzy, python-format
+#, python-format
 msgid "``fraction-train=1.0`` → select 100% of the available clients for training"
 msgstr ""
-"``fraction-train=0.5`` → sélectionner 50% des clients disponibles pour "
-"l'entraînement"
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:557
 #, python-format
@@ -53725,14 +53425,10 @@ msgstr ""
 "pour l'évaluation"
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:559
-#, fuzzy
 msgid ""
 "This means in our example, all clients (SuperNodes) will be sampled for "
 "both a round of training and evaluation."
 msgstr ""
-"Cela signifie dans notre exemple, 5 clients sur 10 seront sélectionnés "
-"pour l'entraînement, et tous les 10 clients participeront plus tard à "
-"l'évaluation."
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:562
 msgid "A typical round looks like this:"
@@ -53744,9 +53440,8 @@ msgstr "**Entraînement**"
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:566
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:577
-#, fuzzy
 msgid "``FedAvg`` selects all clients (2 out of 2)."
-msgstr "``FedAvg`` selects all 10 clients (100%)."
+msgstr ""
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:567
 msgid "Flower sends a ``TRAIN`` message to each selected ``ClientApp``."
@@ -54114,4 +53809,3 @@ msgstr ""
 
 #~ msgid "Unreleased"
 #~ msgstr ""
-
