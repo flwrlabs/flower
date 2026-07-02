@@ -1401,9 +1401,9 @@ class TestControlServicerAuth(unittest.TestCase):
             ),
         ):
             gen = self.servicer.StreamLogs(request, ctx)
-            with self.assertRaises(RuntimeError) as cm:
+            with self.assertRaises(FlowerError) as cm:
                 next(gen)
-            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
+            self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
     def test_streamlogs_auth_successful(self) -> None:
         """Test StreamLogs succeeds for a federation member."""
@@ -1510,9 +1510,9 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state.federation_manager, "has_member", return_value=False
             ),
         ):
-            with self.assertRaises(RuntimeError) as cm:
+            with self.assertRaises(FlowerError) as cm:
                 self.servicer.StopRun(request, ctx)
-            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
+            self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
     def test_stoprun_auth_successful(self) -> None:
         """Test StopRun succeeds for a federation member."""
@@ -1553,9 +1553,9 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state.federation_manager, "has_member", return_value=False
             ),
         ):
-            with self.assertRaises(RuntimeError) as cm:
+            with self.assertRaises(FlowerError) as cm:
                 self.servicer.ListRuns(request, ctx)
-            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
+            self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
     def test_listruns_auth_run_success(self) -> None:
         """Test ListRuns succeeds for a federation member."""
@@ -1604,12 +1604,8 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         self.state = self.servicer.linkstate_factory.state()
 
     def _make_context(self) -> MagicMock:
-        """Create a mock gRPC context that raises on abort."""
-        ctx = MagicMock(spec=grpc.ServicerContext)
-        ctx.abort.side_effect = lambda code, msg: (_ for _ in ()).throw(
-            RuntimeError(f"{code}:{msg}")
-        )
-        return ctx
+        """Create a mock gRPC context."""
+        return MagicMock(spec=grpc.ServicerContext)
 
     def _create_owned_node(self, owner_aid: str) -> int:
         """Create a node owned by the given flwr_aid."""
@@ -1625,61 +1621,59 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
 
     def test_validate_membership_raises_when_federation_not_specified(self) -> None:
         """Test raises FlowerError when federation name is empty."""
-        ctx = self._make_context()
         with self.assertRaises(FlowerError) as cm:
-            _validate_federation_membership_in_request(self.state, self.aid, "", ctx)
+            _validate_federation_membership_in_request(self.state, self.aid, "")
         self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
 
-    def test_validate_membership_aborts_when_federation_not_found(self) -> None:
-        """Test abort when federation does not exist."""
+    def test_validate_membership_raises_when_federation_not_found(self) -> None:
+        """Test raises when federation does not exist."""
         ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(FlowerError) as cm:
             _validate_federation_membership_in_request(
-                self.state, self.aid, "@me/missing", ctx
+                self.state, self.aid, "@me/missing"
             )
-        ctx.abort.assert_called_once()
-        self.assertIn("@me/missing", str(cm.exception))
+        self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
+        ctx.abort.assert_not_called()
 
-    def test_validate_membership_aborts_when_not_a_member(self) -> None:
-        """Test abort when flwr_aid is not a member of the federation."""
+    def test_validate_membership_raises_when_not_a_member(self) -> None:
+        """Test raises when flwr_aid is not a member of the federation."""
         ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(FlowerError) as cm:
             _validate_federation_membership_in_request(
-                self.state, "wrong-aid", NOOP_FEDERATION_ID, ctx
+                self.state, "wrong-aid", NOOP_FEDERATION_ID
             )
-        ctx.abort.assert_called_once()
-        self.assertIn("does not exist", str(cm.exception))
+        self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
+        ctx.abort.assert_not_called()
 
     # --- _validate_federation_and_node_in_request tests ---
 
     def test_validate_raises_when_federation_not_specified(self) -> None:
         """Test raises FlowerError when federation name is empty."""
-        ctx = self._make_context()
         with self.assertRaises(FlowerError) as cm:
-            _validate_federation_and_node_in_request(self.state, self.aid, "", 1, ctx)
+            _validate_federation_and_node_in_request(self.state, self.aid, "", 1)
         self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
 
-    def test_validate_aborts_when_node_not_owned(self) -> None:
-        """Test abort when a node is not owned by the requester."""
+    def test_validate_raises_when_node_not_owned(self) -> None:
+        """Test raises when a node is not owned by the requester."""
         # Create a node owned by someone else
         node_id = self._create_owned_node("other-aid")
         ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(FlowerError) as cm:
             _validate_federation_and_node_in_request(
-                self.state, self.aid, NOOP_FEDERATION_ID, node_id, ctx
+                self.state, self.aid, NOOP_FEDERATION_ID, node_id
             )
-        ctx.abort.assert_called_once()
-        self.assertIn("not found or you are not its owner", str(cm.exception))
+        self.assertEqual(cm.exception.code, ApiErrorCode.NODE_NOT_FOUND_OR_NOT_OWNER)
+        ctx.abort.assert_not_called()
 
-    def test_validate_aborts_when_node_does_not_exist(self) -> None:
-        """Test abort when a node ID does not exist."""
+    def test_validate_raises_when_node_does_not_exist(self) -> None:
+        """Test raises when a node ID does not exist."""
         ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(FlowerError) as cm:
             _validate_federation_and_node_in_request(
-                self.state, self.aid, NOOP_FEDERATION_ID, 999999, ctx
+                self.state, self.aid, NOOP_FEDERATION_ID, 999999
             )
-        ctx.abort.assert_called_once()
-        self.assertIn("not found or you are not its owner", str(cm.exception))
+        self.assertEqual(cm.exception.code, ApiErrorCode.NODE_NOT_FOUND_OR_NOT_OWNER)
+        ctx.abort.assert_not_called()
 
     # --- AddNodeToFederation / RemoveNodeFromFederation integration tests ---
 

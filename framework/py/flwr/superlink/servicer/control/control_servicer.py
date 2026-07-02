@@ -184,7 +184,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             fab_file, verification_dict = builtin_agent_fab
         elif request.app_spec:
             fab_file, verification_dict, note = _get_remote_fab(
-                self.fleet_api_type, request.app_spec, context
+                self.fleet_api_type, request.app_spec
             )
         else:
             fab_file = request.fab.content
@@ -197,7 +197,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             )
             return StartRunResponse()
 
-        account = _get_account(context)
+        account = _get_account()
         flwr_aid = cast(str, account.flwr_aid)
         account_name = cast(str, account.account_name)
         override_config = user_config_from_proto(request.override_config)
@@ -316,10 +316,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         run = runs[0]
         task_id = cast(int, run.primary_task_id)
 
-        flwr_aid = _get_flwr_aid(context)
-        _validate_federation_membership_in_request(
-            state, flwr_aid, run.federation_id, context
-        )
+        flwr_aid = _get_flwr_aid()
+        _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
 
         after_timestamp = request.after_timestamp + 1e-6
         while context.is_active():
@@ -355,7 +353,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # Init link state
         state = self.linkstate_factory.state()
 
-        account = _get_account(context)
+        account = _get_account()
         flwr_aid = cast(str, account.flwr_aid)
         account_name = cast(str, account.account_name)
         # Build a set of run IDs for `flwr ls --runs`
@@ -382,7 +380,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             # Check if requester is a member of the federation
             # that the run belongs to
             _validate_federation_membership_in_request(
-                state, flwr_aid, runs[0].federation_id, context
+                state, flwr_aid, runs[0].federation_id
             )
 
         # Clear objects of finished runs
@@ -410,7 +408,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         log(INFO, self.ListRunSeries.__qualname__)
 
         state = self.linkstate_factory.state()
-        flwr_aid = _get_flwr_aid(context)
+        flwr_aid = _get_flwr_aid()
         updated_before = (
             request.updated_before if request.HasField("updated_before") else None
         )
@@ -420,9 +418,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         )
 
         if federation_id is not None:
-            _validate_federation_membership_in_request(
-                state, flwr_aid, federation_id, context
-            )
+            _validate_federation_membership_in_request(state, flwr_aid, federation_id)
             federation_ids = [federation_id]
         else:
             federations = state.federation_manager.get_federations(flwr_aid)
@@ -442,7 +438,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         log(INFO, self.GetRunSeries.__qualname__)
 
         state = self.linkstate_factory.state()
-        flwr_aid = _get_flwr_aid(context)
+        flwr_aid = _get_flwr_aid()
         series_matches = state.get_run_series(series_ids=[request.series_id])
 
         # The caller must be a member of the federation
@@ -481,10 +477,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             raise grpc.RpcError()  # This line is unreachable
         run = runs[0]
 
-        flwr_aid = _get_flwr_aid(context)
-        _validate_federation_membership_in_request(
-            state, flwr_aid, run.federation_id, context
-        )
+        flwr_aid = _get_flwr_aid()
+        _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
 
         if run.status.status == Status.FINISHED:
             context.abort(
@@ -580,7 +574,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Check if `flwr_aid` matches the run's `flwr_aid`
         flwr_aid = get_current_account_info().flwr_aid
-        _check_flwr_aid_in_run(flwr_aid=flwr_aid, run=run, context=context)
+        _check_flwr_aid_in_run(flwr_aid=flwr_aid, run=run)
 
         # Call artifact provider
         download_url = self.artifact_provider.get_url(run_id)
@@ -609,7 +603,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
         node_id = 0
 
-        flwr_aid = _get_flwr_aid(context)
+        flwr_aid = _get_flwr_aid()
         state.federation_manager.can_execute(
             flwr_aid,
             ActionType.REGISTER_SUPERNODE,
@@ -645,7 +639,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # Init link state
         state = self.linkstate_factory.state()
 
-        flwr_aid = _get_flwr_aid(context)
+        flwr_aid = _get_flwr_aid()
         try:
             state.delete_node(owner_aid=flwr_aid, node_id=request.node_id)
         except ValueError:
@@ -665,7 +659,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         # Retrieve all nodes for the account
-        nodes_info = state.get_node_info(owner_aids=[_get_flwr_aid(context)])
+        nodes_info = state.get_node_info(owner_aids=[_get_flwr_aid()])
 
         return ListNodesResponse(nodes_info=nodes_info, now=now().isoformat())
 
@@ -677,7 +671,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Init link state
         state = self.linkstate_factory.state()
-        flwr_aid = _get_flwr_aid(context)
+        flwr_aid = _get_flwr_aid()
 
         # Get federations the account is a member of
         state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
@@ -706,7 +700,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Ensure flwr_aid is a member of the requested federation
         federation_id = request.federation_name
-        flwr_aid = _get_flwr_aid(context)
+        flwr_aid = _get_flwr_aid()
         state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
         if not state.federation_manager.has_member(flwr_aid, federation_id):
             context.abort(
@@ -755,7 +749,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         # Construct federation ID
-        account = _get_account(context)
+        account = _get_account()
         flwr_aid = cast(str, account.flwr_aid)
         state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
         federation_id = f"@{account.account_name}/{request.federation_name}"
@@ -803,7 +797,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Archive federation
         state.federation_manager.archive_federation(
-            flwr_aid=_get_flwr_aid(context),
+            flwr_aid=_get_flwr_aid(),
             federation_id=request.federation_name,
         )
         for run in state.get_run_info(federation_ids=[request.federation_name]):
@@ -822,10 +816,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         # Validate federation, node ID, and ownership
-        flwr_aid = _get_flwr_aid(context)
+        flwr_aid = _get_flwr_aid()
         state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
         _validate_federation_and_node_in_request(
-            state, flwr_aid, request.federation_name, request.node_id, context
+            state, flwr_aid, request.federation_name, request.node_id
         )
 
         # Add node to the federation
@@ -847,9 +841,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         # Validate federation, node ID, and ownership
-        flwr_aid = _get_flwr_aid(context)
+        flwr_aid = _get_flwr_aid()
         _validate_federation_and_node_in_request(
-            state, flwr_aid, request.federation_name, request.node_id, context
+            state, flwr_aid, request.federation_name, request.node_id
         )
 
         # Remove node from the federation
@@ -872,7 +866,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         target_account = None if not request.account_name else request.account_name
 
         removed_flwr_aid = state.federation_manager.remove_account(
-            flwr_aid=_get_flwr_aid(context),
+            flwr_aid=_get_flwr_aid(),
             federation_id=request.federation_name,
             target_account_name=target_account,
         )
@@ -894,7 +888,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         state = self.linkstate_factory.state()
 
-        flwr_aid = _get_flwr_aid(context)
+        flwr_aid = _get_flwr_aid()
         state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
         federation_id = request.federation_name
         invitee_account_name = request.invitee_account_name
@@ -931,7 +925,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         created_invitations, received_invitations = (
-            state.federation_manager.list_invitations(_get_flwr_aid(context))
+            state.federation_manager.list_invitations(_get_flwr_aid())
         )
         return ListInvitationsResponse(
             created_invitations=created_invitations,
@@ -946,7 +940,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         state = self.linkstate_factory.state()
 
-        flwr_aid = _get_flwr_aid(context)
+        flwr_aid = _get_flwr_aid()
         federation_id = request.federation_name
 
         runtime = (
@@ -965,7 +959,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         )
 
         state.federation_manager.accept_invitation(
-            flwr_aid=_get_flwr_aid(context),
+            flwr_aid=_get_flwr_aid(),
             federation_id=request.federation_name,
         )
         return AcceptInvitationResponse()
@@ -979,7 +973,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         state.federation_manager.reject_invitation(
-            flwr_aid=_get_flwr_aid(context),
+            flwr_aid=_get_flwr_aid(),
             federation_id=request.federation_name,
         )
         return RejectInvitationResponse()
@@ -993,7 +987,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         state.federation_manager.revoke_invitation(
-            flwr_aid=_get_flwr_aid(context),
+            flwr_aid=_get_flwr_aid(),
             federation_id=request.federation_name,
             invitee_account_name=request.invitee_account_name,
         )
@@ -1010,7 +1004,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         # Get caller's account info
-        account = _get_account(context)
+        account = _get_account()
         flwr_aid = cast(str, account.flwr_aid)
         account_name = cast(str, account.account_name)
 
@@ -1054,10 +1048,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             raise grpc.RpcError()  # This line is unreachable
         run = runs[0]
 
-        flwr_aid = _get_flwr_aid(context)
-        _validate_federation_membership_in_request(
-            state, flwr_aid, run.federation_id, context
-        )
+        flwr_aid = _get_flwr_aid()
+        _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
 
         after_task_event_id = None
         if request.HasField("after_task_event_id"):
@@ -1116,15 +1108,16 @@ def _validate_federation_and_node_in_request(
     flwr_aid: str,
     federation_id: str,
     node_id: int,
-    context: grpc.ServicerContext,
 ) -> None:
     """Validate federation membership and node ownership for federation updates."""
-    _validate_federation_membership_in_request(state, flwr_aid, federation_id, context)
+    _validate_federation_membership_in_request(state, flwr_aid, federation_id)
     nodes_info = state.get_node_info(node_ids=[node_id])
     if not nodes_info or nodes_info[0].owner_aid != flwr_aid:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Node {node_id} not found or you are not its owner.",
+        details = f"Node {node_id} not found or you are not its owner."
+        raise FlowerError(
+            ApiErrorCode.NODE_NOT_FOUND_OR_NOT_OWNER,
+            details,
+            public_details=details,
         )
 
 
@@ -1132,7 +1125,6 @@ def _validate_federation_membership_in_request(
     state: LinkState,
     flwr_aid: str,
     federation_id: str,
-    context: grpc.ServicerContext,
 ) -> None:
     """Validate that a federation exists and the requester is one of its members."""
     if not federation_id:
@@ -1140,16 +1132,20 @@ def _validate_federation_membership_in_request(
 
     # Check that the federation exists
     if not state.federation_manager.exists(federation_id):
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            FEDERATION_NOT_FOUND_MESSAGE % federation_id,
+        details = FEDERATION_NOT_FOUND_MESSAGE % federation_id
+        raise FlowerError(
+            ApiErrorCode.FEDERATION_NOT_FOUND,
+            details,
+            public_details=details,
         )
 
     # Check that the requester is a member of the federation
     if not state.federation_manager.has_member(flwr_aid, federation_id):
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            FEDERATION_NOT_FOUND_MESSAGE % federation_id,
+        details = FEDERATION_NOT_FOUND_MESSAGE % federation_id
+        raise FlowerError(
+            ApiErrorCode.FEDERATION_NOT_FOUND,
+            details,
+            public_details=details,
         )
 
 
@@ -1170,39 +1166,36 @@ def _with_last_run_statuses(
     return result
 
 
-def _get_account(context: grpc.ServicerContext) -> AccountInfo:
+def _get_account() -> AccountInfo:
     """Guard clause to check if account information exists."""
     account = get_current_account_info()
     if account.flwr_aid is None:
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
+        raise FlowerError(
+            ApiErrorCode.ACCOUNT_INFO_NOT_FOUND,
             "️⛔️ Failed to fetch the account information.",
         )
-        raise RuntimeError  # This line is unreachable
     return account
 
 
-def _get_flwr_aid(context: grpc.ServicerContext) -> str:
+def _get_flwr_aid() -> str:
     """Guard clause to check if `flwr_aid` exists."""
-    return cast(str, _get_account(context).flwr_aid)
+    return cast(str, _get_account().flwr_aid)
 
 
-def _check_flwr_aid_in_run(
-    flwr_aid: str | None, run: Run, context: grpc.ServicerContext
-) -> None:
+def _check_flwr_aid_in_run(flwr_aid: str | None, run: Run) -> None:
     """Guard clause to check if `flwr_aid` matches the run's `flwr_aid`."""
     # `run.flwr_aid` must not be an empty string. Abort if it is empty.
     run_flwr_aid = run.flwr_aid
     if not run_flwr_aid:
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
+        raise FlowerError(
+            ApiErrorCode.RUN_NOT_ASSOCIATED_WITH_ACCOUNT,
             "⛔️ Run is not associated with a `flwr_aid`.",
         )
 
     # Exit if `flwr_aid` does not match the run's `flwr_aid`
     if run_flwr_aid != flwr_aid:
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_BELONG_TO_ACCOUNT,
             "⛔️ Run ID does not belong to the account",
         )
 
@@ -1224,12 +1217,11 @@ def _format_verification(verifications: list[dict[str, str]]) -> dict[str, str]:
 def _get_remote_fab(
     fleet_api_type: str | None,
     app_spec: str,
-    context: grpc.ServicerContext,
 ) -> tuple[bytes, dict[str, str], str | None]:
     """Get remote FAB from Flower Hub."""
     if fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
+        raise FlowerError(
+            ApiErrorCode.UNSUPPORTED_FAB_HUB_TRANSPORT,
             "The selected SuperLink transport type is not "
             "supported for connecting to Flower Hub.",
         )
@@ -1238,10 +1230,11 @@ def _get_remote_fab(
     try:
         app_id, app_version = parse_app_spec(app_spec)
     except ValueError as e:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"{e}",
-        )
+        raise FlowerError(
+            ApiErrorCode.INVALID_APP_SPEC,
+            "Invalid app specification.",
+            public_details=str(e),
+        ) from e
 
     # Request download link and verification information
     url = f"{PLATFORM_API_URL}/hub/fetch-fab"
@@ -1250,10 +1243,11 @@ def _get_remote_fab(
             app_id, app_version, url, "fab_url"
         )
     except ValueError as e:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"{e}",
-        )
+        raise FlowerError(
+            ApiErrorCode.FAB_DOWNLOAD_LINK_FAILURE,
+            "Failed to request FAB download link.",
+            public_details=str(e),
+        ) from e
 
     # Format verification information
     verification_dict = (
@@ -1267,9 +1261,11 @@ def _get_remote_fab(
         r = requests.get(presigned_url, timeout=60)
         r.raise_for_status()
     except requests.RequestException as e:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"FAB download failed: {str(e)}",
-        )
+        details = f"FAB download failed: {str(e)}"
+        raise FlowerError(
+            ApiErrorCode.FAB_DOWNLOAD_FAILURE,
+            details,
+            public_details=details,
+        ) from e
     fab_file = r.content
     return fab_file, verification_dict, note
