@@ -14,6 +14,7 @@
 # ==============================================================================
 """Health API router implementation."""
 
+
 from fastapi import APIRouter, Response, status
 
 router = APIRouter(tags=["health"])
