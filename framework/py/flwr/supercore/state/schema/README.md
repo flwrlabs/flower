@@ -185,6 +185,7 @@ erDiagram
     TIMESTAMP reported_at "nullable"
     BIGINT run_id
     BIGINT total_tokens "nullable"
+    VARCHAR usage_type
   }
 
   run ||--o| context : run_id

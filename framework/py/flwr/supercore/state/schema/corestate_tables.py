@@ -193,6 +193,7 @@ def create_corestate_metadata() -> MetaData:
         Column("input_tokens", BigInteger, nullable=True),
         Column("output_tokens", BigInteger, nullable=True),
         Column("total_tokens", BigInteger, nullable=True),
+        Column("usage_type", String, nullable=False),
         Column("created_at", TIMESTAMP(timezone=True), nullable=False),
         Column("reported_at", TIMESTAMP(timezone=True), nullable=True),
     )

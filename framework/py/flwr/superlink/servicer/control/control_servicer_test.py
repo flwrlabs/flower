@@ -94,7 +94,6 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, EntitlementError, FlowerError
-from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.typing import (
@@ -553,19 +552,16 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                     entitlement_code=101,
                 ),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(EntitlementError) as cm,
         ):
             mock_get_fab_config.return_value = {
                 "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
             }
             self.servicer.StartRun(request, context)
 
-        _assert_abort_with_flwr_err(
-            context,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Start run not permitted.",
-            entitlement_code=101,
-        )
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(cm.exception.public_details, "Start run not permitted.")
+        self.assertEqual(cm.exception.entitlement_code, 101)
 
     @parameterized.expand(
         [
@@ -793,16 +789,13 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                     entitlement_code=102,
                 ),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(EntitlementError) as cm,
         ):
             self.servicer.RegisterNode(req, ctx)
 
-        _assert_abort_with_flwr_err(
-            ctx,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Register node not permitted.",
-            entitlement_code=102,
-        )
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(cm.exception.public_details, "Register node not permitted.")
+        self.assertEqual(cm.exception.entitlement_code, 102)
         mock_create_node.assert_not_called()
 
     def test_register_node_calls_can_execute_with_expected_args(self) -> None:
@@ -1020,7 +1013,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         mock_context.abort.side_effect = grpc.RpcError()
 
         # Execute & Assert
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(FlowerError):
             self.servicer.CreateFederation(request, mock_context)
 
     def test_create_federation_denied_when_not_entitled(self) -> None:
@@ -1043,16 +1036,15 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                     entitlement_code=103,
                 ),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(EntitlementError) as cm,
         ):
             self.servicer.CreateFederation(request, context)
 
-        _assert_abort_with_flwr_err(
-            context,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Create federation not permitted.",
-            entitlement_code=103,
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(
+            cm.exception.public_details, "Create federation not permitted."
         )
+        self.assertEqual(cm.exception.entitlement_code, 103)
 
     def test_create_federation_raises_on_invalid_name(self) -> None:
         """Test CreateFederation aborts when federation name is invalid."""
@@ -1102,7 +1094,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         mock_context.abort.side_effect = grpc.RpcError()
 
         # Execute & Assert
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(FlowerError):
             self.servicer.ArchiveFederation(request, mock_context)
 
     def test_archive_federation_stops_active_runs(self) -> None:
@@ -1257,15 +1249,14 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             entitlement_code=104,
         )
 
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(EntitlementError) as cm:
             self.servicer.CreateInvitation(request, context)
 
-        _assert_abort_with_flwr_err(
-            context,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Create invitation not permitted.",
-            entitlement_code=104,
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(
+            cm.exception.public_details, "Create invitation not permitted."
         )
+        self.assertEqual(cm.exception.entitlement_code, 104)
         self.state.federation_manager.create_invitation.assert_not_called()
 
     def test_list_invitations_success(self) -> None:
@@ -1317,15 +1308,14 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             entitlement_code=105,
         )
 
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(EntitlementError) as cm:
             self.servicer.AcceptInvitation(request, context)
 
-        _assert_abort_with_flwr_err(
-            context,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Accept invitation not permitted.",
-            entitlement_code=105,
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(
+            cm.exception.public_details, "Accept invitation not permitted."
         )
+        self.assertEqual(cm.exception.entitlement_code, 105)
         self.state.federation_manager.accept_invitation.assert_not_called()
 
     def test_reject_invitation_success(self) -> None:
@@ -1720,9 +1710,9 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         """Test AddNodeToFederation aborts when no federation is specified."""
         request = AddNodeToFederationRequest(federation_name="", node_id=1)
         ctx = self._make_context()
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(FlowerError) as cm:
             self.servicer.AddNodeToFederation(request, ctx)
-        _assert_abort_with_flwr_err(ctx, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
+        self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
 
     def test_remove_node_from_federation_success(self) -> None:
         """Test RemoveNodeFromFederation succeeds with valid inputs."""
@@ -1751,9 +1741,9 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         """Test RemoveNodeFromFederation aborts when no federation is specified."""
         request = RemoveNodeFromFederationRequest(federation_name="", node_id=1)
         ctx = self._make_context()
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(FlowerError) as cm:
             self.servicer.RemoveNodeFromFederation(request, ctx)
-        _assert_abort_with_flwr_err(ctx, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
+        self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
 
 
 def test_format_verification_compact() -> None:
@@ -1772,25 +1762,3 @@ def test_format_verification_compact() -> None:
     v2: dict[str, str] = json.loads(out["key2"])
     assert v1 == {"sig": "abc", "algo": "ed25519"}
     assert v2 == {"sig": "def", "algo": "ed25519"}
-
-
-def _assert_abort_with_flwr_err(
-    ctx: MagicMock,
-    code: int,
-    public_details: str | None = None,
-    entitlement_code: int | None = None,
-) -> None:
-    """Assert that ctx.abort was called with a translated FlowerError."""
-    spec = API_ERROR_MAP[code]
-    payload: dict[str, int | str | None] = {
-        "code": code,
-        "public_message": spec.public_message,
-        "public_details": public_details,
-    }
-    if entitlement_code is not None:
-        payload["entitlement_code"] = entitlement_code
-
-    ctx.abort.assert_called_once()
-    status_code, raw_payload = ctx.abort.call_args.args
-    assert status_code == spec.status_code
-    assert json.loads(raw_payload) == payload

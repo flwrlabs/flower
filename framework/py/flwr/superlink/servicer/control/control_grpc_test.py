@@ -18,14 +18,17 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from flwr.supercore.interceptors import RuntimeVersionServerInterceptor
+from flwr.supercore.interceptors import (
+    RpcErrorTranslationServerInterceptor,
+    RuntimeVersionServerInterceptor,
+)
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin, NoOpControlAuthzPlugin
 
 from .control_grpc import run_control_api_grpc
 
 
-def test_run_control_api_grpc_adds_runtime_version_interceptor() -> None:
-    """Control API server should observe runtime-version metadata."""
+def test_run_control_api_grpc_adds_expected_interceptors() -> None:
+    """Control API server should install shared server interceptors."""
     grpc_server = Mock()
     grpc_server.bound_address = "127.0.0.1:9093"
     with (
@@ -48,6 +51,10 @@ def test_run_control_api_grpc_adds_runtime_version_interceptor() -> None:
         )
 
     interceptors = create_grpc_server.call_args.kwargs["interceptors"]
+    assert any(
+        isinstance(interceptor, RpcErrorTranslationServerInterceptor)
+        for interceptor in interceptors
+    )
     assert any(
         isinstance(interceptor, RuntimeVersionServerInterceptor)
         for interceptor in interceptors

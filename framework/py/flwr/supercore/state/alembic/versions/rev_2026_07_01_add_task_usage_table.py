@@ -43,6 +43,7 @@ def upgrade() -> None:
         sa.Column("input_tokens", sa.BigInteger(), nullable=True),
         sa.Column("output_tokens", sa.BigInteger(), nullable=True),
         sa.Column("total_tokens", sa.BigInteger(), nullable=True),
+        sa.Column("usage_type", sa.String(), nullable=False),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("reported_at", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(
