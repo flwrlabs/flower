@@ -30,6 +30,7 @@ from time import sleep
 from typing import TypeVar, cast
 
 import grpc
+import uvicorn
 import yaml
 
 from flwr.common.args import (
@@ -74,7 +75,11 @@ from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
     load_superexec_auth_secret,
 )
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    UVICORN_DEFAULT_HOST,
+    UVICORN_DEFAULT_PORT,
+)
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
@@ -95,6 +100,7 @@ from flwr.superlink.auth_plugin import (
     NoOpControlAuthzPlugin,
 )
 from flwr.superlink.federation import FederationManager, NoOpFederationManager
+from flwr.superlink.main import create_app
 from flwr.superlink.servicer.control import run_control_api_grpc
 from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
 
@@ -218,6 +224,11 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     serverappio_address: str
     control_address: str
     health_server_address: str | None
+    enable_http_api: bool
+    disable_grpc_api: bool
+    host: str
+    port: int
+    insecure: bool
     certificates: tuple[bytes, bytes, bytes] | None
     appio_certificates: tuple[bytes, bytes, bytes] | None
     superexec_auth_secret: bytes | None
@@ -240,7 +251,13 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
 
 
 class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
-    """Own SuperLink startup resources for the `flower-superlink` process."""
+    """Own the shared SuperLink lifespan state and legacy network servers.
+
+    Long-term, the gRPC-specific parts of this class should shrink until it only
+    initializes shared services used by FastAPI routers. During the migration,
+    FastAPI lifespan can use this object to start the existing gRPC APIs as
+    compatibility adapters.
+    """
 
     def __init__(self, config: SuperLinkLifespanConfig) -> None:
         self.config = config
@@ -253,7 +270,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self._started = False
 
     def startup(self) -> None:
-        """Start SuperLink services."""
+        """Start shared lifespan and legacy SuperLink gRPC servers."""
         log(INFO, "SuperLinkLifespan: start")
         if self._started:
             return
@@ -276,7 +293,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self._started = True
 
     def shutdown(self) -> None:
-        """Stop resources started by this lifespan."""
+        """Stop legacy gRPC servers started by this lifespan."""
         log(INFO, "SuperLinkLifespan: stop")
         if (
             not self._started
@@ -286,15 +303,22 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         ):
             return
 
+        # Stop in reverse startup order so dependent services disappear before
+        # their backing state is considered unavailable.
         for grpc_server in reversed(self.grpc_servers):
             grpc_server.stop(grace=1)
 
+        # The old REST Fleet server uses `uvicorn.run` in a daemon thread and
+        # does not expose a clean stop handle. Keep the join bounded so FastAPI
+        # shutdown cannot hang forever while this temporary compatibility path
+        # still exists.
         for thread in self.bckg_threads:
             thread.join(timeout=1.0)
             if thread.is_alive():
                 log(
                     WARN,
-                    "Background thread %s is still running during SuperLink shutdown.",
+                    "Background thread %s is still running during SuperLink "
+                    "runtime shutdown.",
                     thread.name,
                 )
 
@@ -312,7 +336,12 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self._started = False
 
     def wait_until_background_thread_exits(self) -> None:
-        """Block like the historical `flower-superlink` command."""
+        """Block like the historical `flower-superlink` command.
+
+        With only gRPC servers, `self.bckg_threads` is empty and `all([])` is
+        intentionally true, so this loop blocks until a signal handler exits the
+        process. This preserves the current CLI behavior.
+        """
         while all(thread.is_alive() for thread in self.bckg_threads):
             sleep(0.1)
 
@@ -380,15 +409,22 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             num_workers = 1
 
         if config.fleet_api_type == TRANSPORT_TYPE_REST:
-            self._start_fleet_rest_api(host, port, num_workers)
+            self._start_legacy_fleet_rest_api(host, port, num_workers)
         elif config.fleet_api_type == TRANSPORT_TYPE_GRPC_RERE:
-            self._start_fleet_grpc_rere(fleet_address)
+            self._start_legacy_fleet_grpc_rere(fleet_address)
         elif config.fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
-            self._start_fleet_grpc_adapter(fleet_address)
+            self._start_legacy_fleet_grpc_adapter(fleet_address)
         else:
             raise ValueError(f"Unknown fleet_api_type: {config.fleet_api_type}")
 
-    def _start_fleet_rest_api(self, host: str, port: int, num_workers: int) -> None:
+    def _start_legacy_fleet_rest_api(
+        self, host: str, port: int, num_workers: int
+    ) -> None:
+        """Start the old Fleet REST API compatibility server.
+
+        TODO: Replace this separate uvicorn server with `flwr.superlink.routers.fleet`
+        routes mounted in the main FastAPI app.
+        """
         if self.state_factory is None or self.objectstore_factory is None:
             raise RuntimeError("SuperLink lifespan state has not been initialized.")
         if (
@@ -414,7 +450,8 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         fleet_thread.start()
         self.bckg_threads.append(fleet_thread)
 
-    def _start_fleet_grpc_rere(self, fleet_address: str) -> None:
+    def _start_legacy_fleet_grpc_rere(self, fleet_address: str) -> None:
+        """Start the current Fleet gRPC request-response API."""
         if self.state_factory is None or self.objectstore_factory is None:
             raise RuntimeError("SuperLink lifespan state has not been initialized.")
 
@@ -435,7 +472,8 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         )
         self.grpc_servers.append(fleet_server)
 
-    def _start_fleet_grpc_adapter(self, fleet_address: str) -> None:
+    def _start_legacy_fleet_grpc_adapter(self, fleet_address: str) -> None:
+        """Start the current Fleet GrpcAdapter compatibility API."""
         if self.state_factory is None or self.objectstore_factory is None:
             raise RuntimeError("SuperLink lifespan state has not been initialized.")
 
@@ -485,6 +523,9 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             interval_hours=args.log_rotation_interval_hours,
             backup_count=args.log_rotation_backup_count,
         )
+
+    _validate_http_api_args(args)
+
     # Detect if `--executor*` arguments were set
     if args.executor or args.executor_dir or args.executor_config:
         flwr_exit(
@@ -656,6 +697,11 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         serverappio_address=serverappio_address,
         control_address=control_address,
         health_server_address=health_server_address,
+        enable_http_api=args.enable_http_api,
+        disable_grpc_api=args.disable_grpc_api,
+        host=args.host,
+        port=args.port,
+        insecure=args.insecure,
         certificates=certificates,
         appio_certificates=appio_certificates,
         superexec_auth_secret=superexec_auth_secret,
@@ -682,29 +728,43 @@ def flower_superlink() -> None:
     """Run Flower SuperLink (ServerAppIo API and Fleet API)."""
     warn_if_flwr_update_available(process_name="flower-superlink")
 
+    config = _parse_superlink_lifespan_config()
+
     log(INFO, "Starting Flower SuperLink")
 
     event(EventType.RUN_SUPERLINK_ENTER)
 
-    config = _parse_superlink_lifespan_config()
+    ###########################################################################
+    # Run SuperLink in Compatibility Mode (FastAPI + gRPC)
+    ###########################################################################
 
-    lifespan = SuperLinkLifespan(config)
+    # Enable this mode by running `flower-superlink --enable-http-api`
+    if config.enable_http_api:
+        # Blocking: this will run uvicorn.run()
+        _run_superlink_http_api(lifespan_config=config)
+        return
+
+    ###########################################################################
+    # Run SuperLink in Legacy Mode (Only gRPC)
+    ###########################################################################
+
+    superlink_lifespan = SuperLinkLifespan(config)
     try:
-        lifespan.startup()
+        superlink_lifespan.startup()
     except Exception as err:  # pylint: disable=broad-except
-        lifespan.shutdown()
+        superlink_lifespan.shutdown()
         flwr_exit(ExitCode.SUPERLINK_INVALID_ARGS, str(err))
 
     # Graceful shutdown
     register_signal_handlers(
         event_type=EventType.RUN_SUPERLINK_LEAVE,
         exit_message="SuperLink terminated gracefully.",
-        grpc_servers=lifespan.grpc_servers,
-        exit_handlers=[lifespan.shutdown],
+        grpc_servers=superlink_lifespan.grpc_servers,
+        exit_handlers=[superlink_lifespan.shutdown],
     )
 
     # Block until a thread exits prematurely
-    lifespan.wait_until_background_thread_exits()
+    superlink_lifespan.wait_until_background_thread_exits()
 
     # Exit if any thread has exited prematurely
     # This code will not be reached if the SuperLink stops gracefully
@@ -720,6 +780,71 @@ def _format_address(address: str) -> tuple[str, str, int]:
         )
     host, port, is_v6 = parsed_address
     return (f"[{host}]:{port}" if is_v6 else f"{host}:{port}", host, port)
+
+
+def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
+    """Run the experimental FastAPI-owned SuperLink service.
+
+    In this mode, FastAPI owns process startup and starts the current
+    gRPC APIs from its lifespan as legacy compatibility adapters. Later, the
+    REST routers should call shared SuperLink services directly and this runtime
+    should no longer bind gRPC ports.
+    """
+    start_legacy_grpc = not lifespan_config.disable_grpc_api
+
+    if start_legacy_grpc and lifespan_config.fleet_api_type == TRANSPORT_TYPE_REST:
+        flwr_exit(
+            ExitCode.SUPERLINK_INVALID_ARGS,
+            "`--enable-http-api` cannot be combined with `--fleet-api-type rest`",
+        )
+    superlink_lifespan = None
+    if start_legacy_grpc:
+        superlink_lifespan = SuperLinkLifespan(lifespan_config)
+    fastapi_app = create_app(
+        superlink_lifespan=superlink_lifespan,
+        start_legacy_grpc=start_legacy_grpc,
+    )
+
+    if start_legacy_grpc:
+        log(
+            WARN,
+            "EXPERIMENTAL: Starting the combined SuperLink FastAPI service on %s:%s. "
+            "The legacy gRPC APIs are started from FastAPI lifespan.",
+            lifespan_config.host,
+            lifespan_config.port,
+        )
+    else:
+        log(
+            WARN,
+            "EXPERIMENTAL: Starting the SuperLink FastAPI service on %s:%s. "
+            "The legacy gRPC APIs are disabled.",
+            lifespan_config.host,
+            lifespan_config.port,
+        )
+
+    # Uvicorn workers must stay at 1 while the lifespan starts gRPC servers. With
+    # multiple workers, every worker process would try to bind the same Control,
+    # Fleet, and ServerAppIo ports.
+    uvicorn.run(
+        app=fastapi_app,
+        host=lifespan_config.host,
+        port=lifespan_config.port,
+        reload=False,
+        access_log=True,
+        ssl_keyfile=None if lifespan_config.insecure else lifespan_config.ssl_keyfile,
+        ssl_certfile=None if lifespan_config.insecure else lifespan_config.ssl_certfile,
+        workers=1,
+    )
+
+
+def _validate_http_api_args(args: argparse.Namespace) -> None:
+    """Validate relationships between experimental HTTP API CLI flags."""
+    if args.disable_grpc_api and not args.enable_http_api:
+        flwr_exit(
+            ExitCode.SUPERLINK_INVALID_ARGS,
+            "`--disable-grpc-api` can only be used together with "
+            "`--enable-http-api`.",
+        )
 
 
 def _obtain_superlink_certificates(
@@ -934,10 +1059,8 @@ def _run_fleet_api_rest(
     objectstore_factory: ObjectStoreFactory,
     num_workers: int,
 ) -> None:
-    """Run ServerAppIo API (REST-based)."""
+    """Run Fleet API (REST-based)."""
     try:
-        import uvicorn
-
         from flwr.server.superlink.fleet.rest_rere.rest_api import app as fast_api_app
     except ModuleNotFoundError:
         flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
@@ -974,6 +1097,7 @@ def _parse_args_run_superlink() -> argparse.ArgumentParser:
 
     _add_args_common(parser=parser)
     add_ee_args_superlink(parser=parser)
+    _add_args_http_api(parser=parser)
     _add_args_serverappio_api(parser=parser)
     _add_args_fleet_api(parser=parser)
     _add_args_control_api(parser=parser)
@@ -1071,6 +1195,44 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
     add_superexec_auth_secret_args(parser)
 
 
+def _add_args_http_api(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--enable-http-api",
+        action="store_true",
+        default=False,
+        help=(
+            "EXPERIMENTAL: Start one FastAPI HTTP server and let its lifespan "
+            "start the legacy SuperLink gRPC APIs."
+        ),
+    )
+    parser.add_argument(
+        "--disable-grpc-api",
+        action="store_true",
+        default=False,
+        help=(
+            "EXPERIMENTAL: When used with `--enable-http-api`, start only the "
+            "HTTP API and do not start the legacy SuperLink gRPC APIs."
+        ),
+    )
+    parser.add_argument(
+        "--host",
+        default=UVICORN_DEFAULT_HOST,
+        help=(
+            "Host for the experimental FastAPI HTTP server. "
+            f"By default, it is set to {UVICORN_DEFAULT_HOST}."
+        ),
+    )
+    parser.add_argument(
+        "--port",
+        type=_port_int,
+        default=UVICORN_DEFAULT_PORT,
+        help=(
+            "Port for the experimental FastAPI HTTP server. "
+            f"By default, it is set to {UVICORN_DEFAULT_PORT}."
+        ),
+    )
+
+
 def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--serverappio-api-address",
@@ -1108,6 +1270,13 @@ def _positive_int(value: str) -> int:
     parsed = int(value)
     if parsed < 1:
         raise argparse.ArgumentTypeError("value must be >= 1")
+    return parsed
+
+
+def _port_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0 or parsed > 65535:
+        raise argparse.ArgumentTypeError("value must be between 0 and 65535")
     return parsed
 
 
