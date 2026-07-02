@@ -196,7 +196,7 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
     ApiErrorCode.UNSUPPORTED_FAB_HUB_TRANSPORT: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
-        public_message="Selected SuperLink transport type is not supported for "
+        public_message="The selected SuperLink transport type is not supported for "
         "connecting to Flower Hub.",
     ),
     ApiErrorCode.INVALID_APP_SPEC: ApiErrorSpec(
