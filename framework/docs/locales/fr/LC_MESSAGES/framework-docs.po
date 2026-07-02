@@ -46034,24 +46034,18 @@ msgid "[601] COMMON_MISSING_EXTRA_REST"
 msgstr "[601] COMMON_MISSING_EXTRA_REST"
 
 #: ../../source/ref-exit-codes/601.rst:9
-msgid ""
-"Extra dependencies required for using the REST-based Fleet API are "
-"missing."
+msgid "Dependencies required for using the REST-based Fleet API are missing."
 msgstr ""
-"Les dépendances supplémentaires requises pour utiliser l'API Fleet basée "
-"sur REST manquent."
+"Les dépendances requises pour utiliser l'API Fleet basée sur REST sont "
+"manquantes."
 
 #: ../../source/ref-exit-codes/601.rst:15
-msgid ""
-"To enable the REST-based Fleet API, install ``flwr`` with the ``rest`` "
-"extra:"
-msgstr ""
-"Pour activer la Fleet API basée sur REST, installez ``flwr`` avec "
-"l'extrait ``rest``:"
+msgid "Reinstall or upgrade ``flwr``, then retry:"
+msgstr "Réinstallez ou mettez à niveau ``flwr``, puis réessayez :"
 
-#: ../../source/ref-exit-codes/601.rst:21
-msgid "Ensure that the installation completes successfully, and then retry."
-msgstr "Assurez-vous que l'installation se termine avec succès, puis réessayez."
+#: ../../source/ref-exit-codes/601.rst:19
+msgid "python -m pip install -U flwr"
+msgstr "python -m pip install -U flwr"
 
 #: ../../source/ref-exit-codes/602.rst:3
 msgid "[602] COMMON_TLS_NOT_SUPPORTED"

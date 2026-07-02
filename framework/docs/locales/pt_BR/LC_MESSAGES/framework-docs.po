@@ -34244,19 +34244,15 @@ msgid "[601] COMMON_MISSING_EXTRA_REST"
 msgstr ""
 
 #: ../../source/ref-exit-codes/601.rst:9
-msgid ""
-"Extra dependencies required for using the REST-based Fleet API are "
-"missing."
+msgid "Dependencies required for using the REST-based Fleet API are missing."
 msgstr ""
 
 #: ../../source/ref-exit-codes/601.rst:15
-msgid ""
-"To enable the REST-based Fleet API, install ``flwr`` with the ``rest`` "
-"extra:"
+msgid "Reinstall or upgrade ``flwr``, then retry:"
 msgstr ""
 
-#: ../../source/ref-exit-codes/601.rst:21
-msgid "Ensure that the installation completes successfully, and then retry."
+#: ../../source/ref-exit-codes/601.rst:19
+msgid "python -m pip install -U flwr"
 msgstr ""
 
 #: ../../source/ref-exit-codes/602.rst:3
@@ -80338,4 +80334,3 @@ msgstr ""
 
 #~ msgid "``FedAvg`` selects all 10 clients (100%)."
 #~ msgstr ""
-
