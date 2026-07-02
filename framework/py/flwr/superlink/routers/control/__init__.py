@@ -12,18 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Runtime API router."""
+"""Control API router."""
 
 
-from fastapi import APIRouter, HTTPException, Response, status
+from .router import router
 
-router = APIRouter(prefix="/runtime", tags=["runtime"])
-
-
-@router.post("/messages")
-def pull_messages() -> Response:
-    """Pull messages for the ClientApp."""
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Not implemented",
-    )
+__all__ = ["router"]

@@ -67,6 +67,10 @@ FLWR_UPDATE_CHECK_CACHE_DIR = ".cache"
 FLWR_UPDATE_CHECK_CACHE_FILENAME = "update-check.json"
 FLWR_UPDATE_CHECK_SHOW_INTERVAL_SECONDS = 12 * 60 * 60
 
+# Constants for Uvicorn-backed API servers
+UVICORN_DEFAULT_HOST = "127.0.0.1"
+UVICORN_DEFAULT_PORT = 8000
+
 # SuperGrid constants
 SUPERGRID_ADDRESS = "supergrid.flower.ai"
 

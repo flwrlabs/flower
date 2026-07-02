@@ -46,10 +46,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # SuperCore API routers
+    # Core APIs
     fastapi_app.include_router(health.router)
 
-    # SuperNode API routers
+    # SuperNode APIs
     fastapi_app.include_router(runtime.router)
 
     return fastapi_app

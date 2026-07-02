@@ -71,6 +71,10 @@ message PushTaskEventsResponse {}
 message PullTaskMessageRequest { optional uint64 limit = 1; }
 message PullTaskMessageResponse { repeated Message messages = 1; }
 
+// RecordTaskUsage messages
+message RecordTaskUsageRequest { TaskUsage task_usage = 1; }
+message RecordTaskUsageResponse {}
+
 // PullTaskInput messages
 message PullTaskInputRequest {}
 message PullTaskInputResponse {
