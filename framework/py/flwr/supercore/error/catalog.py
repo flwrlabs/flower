@@ -116,7 +116,7 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
     ApiErrorCode.RUN_ID_NOT_FOUND: ApiErrorSpec(
         status_code=StatusCode.NOT_FOUND,
         http_status_code=status.HTTP_404_NOT_FOUND,
-        public_message="Run ID not found",
+        public_message="Run ID not found.",
     ),
     ApiErrorCode.RUN_SERIES_ID_NOT_FOUND: ApiErrorSpec(
         status_code=StatusCode.NOT_FOUND,
@@ -131,32 +131,32 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
     ApiErrorCode.NO_ACCOUNT_AUTH: ApiErrorSpec(
         status_code=StatusCode.UNIMPLEMENTED,
         http_status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        public_message="ControlServicer initialized without account authentication",
+        public_message="ControlServicer initialized without account authentication.",
     ),
     ApiErrorCode.NO_ARTIFACT_PROVIDER: ApiErrorSpec(
         status_code=StatusCode.UNIMPLEMENTED,
         http_status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        public_message="ControlServicer initialized without artifact provider",
+        public_message="ControlServicer initialized without artifact provider.",
     ),
     ApiErrorCode.PULL_UNFINISHED_RUN: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
-        public_message="Cannot pull artifacts for an unfinished run",
+        public_message="Cannot pull artifacts for an unfinished run.",
     ),
     ApiErrorCode.PUBLIC_KEY_NOT_VALID: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
-        public_message="The provided public key is not valid",
+        public_message="The provided public key is not valid.",
     ),
     ApiErrorCode.PUBLIC_KEY_ALREADY_IN_USE: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
-        public_message="Public key already in use",
+        public_message="Public key already in use.",
     ),
     ApiErrorCode.NODE_NOT_FOUND: ApiErrorSpec(
         status_code=StatusCode.NOT_FOUND,
         http_status_code=status.HTTP_404_NOT_FOUND,
-        public_message="Node ID not found for account",
+        public_message="Node ID not found for account.",
     ),
     ApiErrorCode.FEDERATION_NOT_FOUND: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
