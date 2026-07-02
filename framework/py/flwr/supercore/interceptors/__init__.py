@@ -32,6 +32,7 @@ from .runtime_version_interceptor import (
     create_fleet_runtime_version_server_interceptor,
     create_serverappio_runtime_version_server_interceptor,
 )
+from .rpc_error_translation_interceptor import RpcErrorTranslationServerInterceptor
 from .superexec_auth_interceptor import (
     SuperExecAuthClientInterceptor,
     SuperExecAuthServerInterceptor,
@@ -45,6 +46,7 @@ __all__ = [
     "AppIoTokenServerInterceptor",
     "RuntimeVersionClientInterceptor",
     "RuntimeVersionServerInterceptor",
+    "RpcErrorTranslationServerInterceptor",
     "SuperExecAuthClientInterceptor",
     "SuperExecAuthServerInterceptor",
     "TASK_TOKEN_HEADER",
