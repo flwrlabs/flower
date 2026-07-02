@@ -36,6 +36,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushTaskEventsResponse,
     PushTaskMessageRequest,
     PushTaskMessageResponse,
+    RecordTaskUsageRequest,
+    RecordTaskUsageResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
@@ -171,6 +173,14 @@ class AppIoServicer(ABC):
             )
 
         return PushTaskEventsResponse()
+
+    def RecordTaskUsage(
+        self, request: RecordTaskUsageRequest, context: grpc.ServicerContext
+    ) -> RecordTaskUsageResponse:
+        """Record task usage."""
+        log(DEBUG, "AppIoServicer.RecordTaskUsage")
+
+        return RecordTaskUsageResponse()
 
     def PullTaskMessage(
         self, request: PullTaskMessageRequest, context: grpc.ServicerContext
