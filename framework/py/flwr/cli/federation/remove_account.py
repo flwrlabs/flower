@@ -36,7 +36,7 @@ from ..utils import (
 def remove_account(
     federation: Annotated[
         str,
-        typer.Argument(help="Name of the federation to remove an account from."),
+        typer.Argument(help="Federation ID to remove an account from."),
     ],
     account_name: Annotated[
         str | None,

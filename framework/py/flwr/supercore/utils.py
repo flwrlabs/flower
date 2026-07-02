@@ -347,23 +347,23 @@ def humanize_bytes(num_bytes: int) -> str:
     raise RuntimeError("Unreachable code")  # Make mypy happy
 
 
-def check_federation_format(federation: str) -> None:
-    """Check if the federation string is valid.
+def check_federation_format(federation_id: str) -> None:
+    """Check if the federation ID string is valid.
 
     Parameters
     ----------
-    federation : str
-        The federation string to check.
+    federation_id : str
+        The federation ID string to check.
 
     Raises
     ------
     ValueError
-        If the federation string is not valid. The expected
+        If the federation ID string is not valid. The expected
         format is '@<account-name>/<federation-name>'.
     """
-    if not re.match(r"^@[a-zA-Z0-9\-_]+/[a-zA-Z0-9\-_]+$", federation):
+    if not re.match(r"^@[a-zA-Z0-9\-_]+/[a-zA-Z0-9\-_]+$", federation_id):
         raise ValueError(
-            f"Invalid federation format: {federation}. "
+            f"Invalid federation ID format: {federation_id}. "
             f"Expected format: '@<account-name>/<federation-name>'."
         )
 

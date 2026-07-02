@@ -103,7 +103,7 @@ To return structured JSON instead:
       "runs": [
         {
           "run-id": "1859953118041441032",
-          "federation": "@none/default",
+          "federation-id": "@none/default",
           "fab-id": "flwrlabs/myawesomeapp",
           "fab-name": "myawesomeapp",
           "fab-version": "1.0.0",
@@ -157,7 +157,7 @@ To return structured JSON instead:
 Each entry under ``runs`` contains:
 
 - ``run-id``: the run ID
-- ``federation``: the federation identifier
+- ``federation-id``: the federation ID
 - ``fab-id`` / ``fab-name`` / ``fab-version`` / ``fab-hash``: Flower App metadata
 - ``status``: the current run status
 - ``status-details``: additional status detail text

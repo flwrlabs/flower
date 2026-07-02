@@ -66,7 +66,7 @@ from flwr.server.superlink.linkstate.linkstate_test import (
 from flwr.server.superlink.utils import _STATUS_TO_MSG
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
-    NOOP_FEDERATION,
+    NOOP_FEDERATION_ID,
     NodeStatus,
     TaskType,
 )
@@ -196,7 +196,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
             fab_version="",
             fab_hash=fab_hash,
             override_config={},
-            federation=NOOP_FEDERATION,
+            federation_id=NOOP_FEDERATION_ID,
             federation_config=None,
             flwr_aid="",
             primary_task_type=TaskType.SERVER_APP,

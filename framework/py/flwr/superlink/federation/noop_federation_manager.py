@@ -26,8 +26,8 @@ from flwr.proto.federation_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
-    NOOP_FEDERATION,
     NOOP_FEDERATION_DESCRIPTION,
+    NOOP_FEDERATION_ID,
     ActionType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -58,26 +58,26 @@ class NoOpFederationManager(FederationManager):
             self._simulation_config = SimulationConfig()
             self._simulation_config.CopyFrom(DEFAULT_SIMULATION_CONFIG)
 
-    def exists(self, federation: str) -> bool:
+    def exists(self, federation_id: str) -> bool:
         """Check if a federation exists."""
-        return federation == NOOP_FEDERATION
+        return federation_id == NOOP_FEDERATION_ID
 
-    def has_member(self, flwr_aid: str, federation: str) -> bool:
+    def has_member(self, flwr_aid: str, federation_id: str) -> bool:
         """Check if the given account is a member of the federation."""
-        if not self.exists(federation):
-            raise ValueError(f"Federation '{federation}' does not exist.")
+        if not self.exists(federation_id):
+            raise ValueError(f"Federation '{federation_id}' does not exist.")
         return flwr_aid == NOOP_FLWR_AID
 
-    def filter_nodes(self, node_ids: set[int], federation: str) -> set[int]:
+    def filter_nodes(self, node_ids: set[int], federation_id: str) -> set[int]:
         """Given a list of node IDs, return sublist with nodes in federation."""
-        if not self.exists(federation):
-            raise ValueError(f"Federation '{federation}' does not exist.")
+        if not self.exists(federation_id):
+            raise ValueError(f"Federation '{federation_id}' does not exist.")
         return node_ids
 
-    def has_node(self, node_id: int, federation: str) -> bool:
+    def has_node(self, node_id: int, federation_id: str) -> bool:
         """Given a node ID, check if it is in the federation."""
-        if not self.exists(federation):
-            raise ValueError(f"Federation '{federation}' does not exist.")
+        if not self.exists(federation_id):
+            raise ValueError(f"Federation '{federation_id}' does not exist.")
         return True
 
     def ensure_default_federations_exist(self, flwr_aid: str) -> None:
@@ -90,7 +90,7 @@ class NoOpFederationManager(FederationManager):
             return []
         return [
             Federation(
-                name=NOOP_FEDERATION,
+                id=NOOP_FEDERATION_ID,
                 description=NOOP_FEDERATION_DESCRIPTION,
                 members=[],
                 nodes=[],
@@ -101,16 +101,16 @@ class NoOpFederationManager(FederationManager):
             )
         ]
 
-    def get_details(self, federation: str) -> Federation:
+    def get_details(self, federation_id: str) -> Federation:
         """Get details of the federation."""
-        if federation != NOOP_FEDERATION:
-            raise ValueError(f"Federation '{federation}' does not exist.")
+        if federation_id != NOOP_FEDERATION_ID:
+            raise ValueError(f"Federation '{federation_id}' does not exist.")
 
         runs = list(self.linkstate.get_run_info(flwr_aids=[NOOP_FLWR_AID]))
         nodes = list(self.linkstate.get_node_info(owner_aids=[NOOP_FLWR_AID]))
         only_account = Account(id=NOOP_FLWR_AID, name=NOOP_ACCOUNT_NAME)
         return Federation(
-            name=NOOP_FEDERATION,
+            id=NOOP_FEDERATION_ID,
             description=NOOP_FEDERATION_DESCRIPTION,
             members=[
                 Member(account=only_account, role="owner"),
@@ -122,12 +122,13 @@ class NoOpFederationManager(FederationManager):
             config=self._simulation_config,
         )
 
-    def get_simulation_config(self, federation: str) -> SimulationConfig | None:
+    def get_simulation_config(self, federation_id: str) -> SimulationConfig | None:
         """Get the simulation configuration."""
-        if federation != NOOP_FEDERATION:
+        if federation_id != NOOP_FEDERATION_ID:
             raise FlowerError(
                 ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
-                f"Simulation configuration unavailable for federation '{federation}'.",
+                "Simulation configuration unavailable for federation "
+                f"'{federation_id}'.",
             ) from None
 
         if not self._simulation:
@@ -138,21 +139,22 @@ class NoOpFederationManager(FederationManager):
         return config
 
     def set_simulation_config(
-        self, flwr_aid: str, federation: str, config: SimulationConfig
+        self, flwr_aid: str, federation_id: str, config: SimulationConfig
     ) -> None:
         """Set the simulation configuration."""
         _ = flwr_aid
-        if federation != NOOP_FEDERATION or not self._simulation:
+        if federation_id != NOOP_FEDERATION_ID or not self._simulation:
             raise FlowerError(
                 ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
-                f"Cannot set simulation configuration for federation '{federation}'.",
+                "Cannot set simulation configuration for federation "
+                f"'{federation_id}'.",
             ) from None
         cast(SimulationConfig, self._simulation_config).MergeFrom(config)
 
     def create_federation(
         self,
         flwr_aid: str,
-        name: str,
+        federation_id: str,
         description: str,
         simulation: bool | None = None,
     ) -> Federation:
@@ -161,26 +163,26 @@ class NoOpFederationManager(FederationManager):
             "`create_federation` is not supported by NoOpFederationManager."
         )
 
-    def archive_federation(self, flwr_aid: str, name: str) -> None:
+    def archive_federation(self, flwr_aid: str, federation_id: str) -> None:
         """Archive an existing federation."""
         raise UnsupportedError(
             "`archive_federation` is not supported by NoOpFederationManager."
         )
 
-    def add_supernode(self, flwr_aid: str, federation: str, node_id: int) -> None:
+    def add_supernode(self, flwr_aid: str, federation_id: str, node_id: int) -> None:
         """Add a SuperNode to a federation."""
         raise UnsupportedError(
             "`add_supernode` is not supported by NoOpFederationManager."
         )
 
-    def remove_supernode(self, flwr_aid: str, federation: str, node_id: int) -> None:
+    def remove_supernode(self, flwr_aid: str, federation_id: str, node_id: int) -> None:
         """Remove a SuperNode from a federation."""
         raise UnsupportedError(
             "`remove_supernode` is not supported by NoOpFederationManager."
         )
 
     def remove_account(
-        self, flwr_aid: str, federation: str, target_account_name: str | None
+        self, flwr_aid: str, federation_id: str, target_account_name: str | None
     ) -> str:
         """Remove an account from a federation."""
         raise UnsupportedError(
@@ -188,7 +190,7 @@ class NoOpFederationManager(FederationManager):
         )
 
     def create_invitation(
-        self, flwr_aid: str, federation: str, invitee_account_name: str
+        self, flwr_aid: str, federation_id: str, invitee_account_name: str
     ) -> None:
         """Create an invitation for an account to join a federation."""
         raise UnsupportedError(
@@ -203,20 +205,20 @@ class NoOpFederationManager(FederationManager):
             "`list_invitations` is not supported by NoOpFederationManager."
         )
 
-    def accept_invitation(self, flwr_aid: str, federation: str) -> None:
+    def accept_invitation(self, flwr_aid: str, federation_id: str) -> None:
         """Accept a pending invitation to join a federation."""
         raise UnsupportedError(
             "`accept_invitation` is not supported by NoOpFederationManager."
         )
 
-    def reject_invitation(self, flwr_aid: str, federation: str) -> None:
+    def reject_invitation(self, flwr_aid: str, federation_id: str) -> None:
         """Reject a pending invitation to join a federation."""
         raise UnsupportedError(
             "`reject_invitation` is not supported by NoOpFederationManager."
         )
 
     def revoke_invitation(
-        self, flwr_aid: str, federation: str, invitee_account_name: str
+        self, flwr_aid: str, federation_id: str, invitee_account_name: str
     ) -> None:
         """Revoke a pending invitation."""
         raise UnsupportedError(

@@ -55,7 +55,7 @@ from flwr.simulation.ray_transport.utils import (
 from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
     FLWR_IN_MEMORY_DB_NAME,
-    NOOP_FEDERATION,
+    NOOP_FEDERATION_ID,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -450,7 +450,7 @@ def _run_simulation(
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         run = Run.create_empty(run_id=run_id)
         run.primary_task_id = task_id
-        run.federation = NOOP_FEDERATION
+        run.federation_id = NOOP_FEDERATION_ID
 
     args = (
         num_supernodes,
