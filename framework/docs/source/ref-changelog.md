@@ -1,6 +1,22 @@
 # Changelog
 
-## Unreleased
+## v1.32.1 (2026-07-01)
+
+### Thanks to our contributors
+
+We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
+
+`Chong Shen Ng`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Micah Sheller` <!---TOKEN_v1.32.1-->
+
+### What's new?
+
+- **Fix `flwr-simulation` failing to exit** ([#7504](https://github.com/flwrlabs/flower/pull/7504))
+
+  Closes the gRPC channel on exit, preventing `flwr-simulation` from hanging in some cases.
+
+- **Improve agent reliability and security** ([#7505](https://github.com/flwrlabs/flower/pull/7505), [#7507](https://github.com/flwrlabs/flower/pull/7507), [#7509](https://github.com/flwrlabs/flower/pull/7509))
+
+  Improves agent reliability and security with several small enhancements and fixes.
 
 ## v1.32.0 (2026-06-25)
 

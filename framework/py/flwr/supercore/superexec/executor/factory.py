@@ -36,6 +36,7 @@ _KUBERNETES_CONFIG_FIELD_MAP = {
     "capacity-log-interval": "capacity_log_interval",
     "labels": "labels",
     "annotations": "annotations",
+    "env": "env",
     "resources": "resources",
     "node-selector": "node_selector",
     "tolerations": "tolerations",
