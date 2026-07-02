@@ -481,7 +481,7 @@ def test_run_serialization_deserialization() -> None:
         finished_at="",
         status=RunStatus(status="running", sub_status="", details="OK"),
         flwr_aid="user123",
-        federation="mock-fed",
+        federation_id="@me/fed",
         primary_task_id=42,
         bytes_sent=2048,
         bytes_recv=1024,

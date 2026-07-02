@@ -37,7 +37,7 @@ from flwr.server.superlink.linkstate import (
 )
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, TaskType
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, TaskType
 from flwr.supercore.date import now
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run, RunStatus
@@ -104,7 +104,7 @@ class TestInMemoryGrid(unittest.TestCase):
             finished_at="",
             status=RunStatus(status=Status.PENDING, sub_status="", details=""),
             flwr_aid="user123",
-            federation="mock-fed",
+            federation_id="@me/fed",
             primary_task_id=None,
             bytes_sent=0,
             bytes_recv=0,
@@ -220,7 +220,7 @@ class TestInMemoryGrid(unittest.TestCase):
             "", NoOpFederationManager(), ObjectStoreFactory()
         ).state()
         run_id = state.create_run(
-            "", "", "", {}, NOOP_FEDERATION, None, "", TaskType.SERVER_APP
+            "", "", "", {}, NOOP_FEDERATION_ID, None, "", TaskType.SERVER_APP
         )
         self.grid = InMemoryGrid(MagicMock(state=lambda: state))
         runs = state.get_run_info(run_ids=[run_id])
@@ -253,7 +253,7 @@ class TestInMemoryGrid(unittest.TestCase):
         )
         state = state_factory.state()
         run_id = state.create_run(
-            "", "", "", {}, NOOP_FEDERATION, None, "", TaskType.SERVER_APP
+            "", "", "", {}, NOOP_FEDERATION_ID, None, "", TaskType.SERVER_APP
         )
         self.grid = InMemoryGrid(state_factory)
         runs = state.get_run_info(run_ids=[run_id])

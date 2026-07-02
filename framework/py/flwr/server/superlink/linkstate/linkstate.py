@@ -263,7 +263,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         fab_version: str | None,
         fab_hash: str | None,
         override_config: UserConfig,
-        federation: str,
+        federation_id: str,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         primary_task_type: str,
@@ -281,8 +281,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             The SHA256 hex hash of the FAB.
         override_config : UserConfig
             Configuration overrides for the run config.
-        federation : str
-            The federation this run belongs to.
+        federation_id : str
+            The federation ID this run belongs to.
         federation_config : SimulationConfig | None
             Optional resolved federation configuration for the run.
         flwr_aid : str | None
@@ -312,7 +312,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
-        federations: Sequence[str] | None = None,
+        federation_ids: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
@@ -331,8 +331,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Sequence of run status values to filter by.
         flwr_aids : Optional[Sequence[str]] (default: None)
             Sequence of Flower Account IDs to filter by.
-        federations : Optional[Sequence[str]] (default: None)
-            Sequence of federation names to filter by.
+        federation_ids : Optional[Sequence[str]] (default: None)
+            Sequence of federation IDs to filter by.
         order_by : Optional[Literal["pending_at"]] (default: None)
             Field used to order the result.
         ascending : bool (default: True)

@@ -145,7 +145,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         *,
         series_ids: Sequence[int] | None = None,
-        federations: Sequence[str] | None = None,
+        federation_ids: Sequence[str] | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -156,7 +156,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if (
             limit == 0
             or (series_ids is not None and not series_ids)
-            or (federations is not None and not federations)
+            or (federation_ids is not None and not federation_ids)
         ):
             return []
 
@@ -172,10 +172,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             params.update(
                 {f"sid_{i}": series_id for i, series_id in enumerate(sint64_series_ids)}
             )
-        if federations is not None:
-            placeholders = ",".join([f":fed_{i}" for i in range(len(federations))])
+        if federation_ids is not None:
+            placeholders = ",".join([f":fed_{i}" for i in range(len(federation_ids))])
             conditions.append(f"federation IN ({placeholders})")
-            params.update({f"fed_{i}": fed for i, fed in enumerate(federations)})
+            params.update({f"fed_{i}": _id for i, _id in enumerate(federation_ids)})
         if updated_before is not None:
             conditions.append("updated_at < :updated_before")
             params["updated_before"] = datetime.fromisoformat(updated_before)
@@ -249,7 +249,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def store_run_in_series(
         self,
         run_id: int,
-        federation: str,
+        federation_id: str,
         series_id: int | None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
@@ -272,7 +272,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         insert_query,
                         {
                             "series_id": uint64_to_int64(candidate),
-                            "federation": federation,
+                            "federation": federation_id,
                             "description": None,
                             "created_at": timestamp,
                             "updated_at": timestamp,
@@ -293,7 +293,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         """,
                         {
                             "series_id": uint64_to_int64(series_id),
-                            "federation": federation,
+                            "federation": federation_id,
                             "updated_at": now(),
                         },
                     )
@@ -302,7 +302,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                             ERROR,
                             "Run series %d not found in federation %r",
                             series_id,
-                            federation,
+                            federation_id,
                         )
                         return None
                     resolved_series_id = series_id

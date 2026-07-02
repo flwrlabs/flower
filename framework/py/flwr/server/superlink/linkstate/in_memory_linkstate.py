@@ -157,7 +157,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
                 return None
 
-            federation = self.run_ids[message.metadata.run_id].run.federation
+            federation_id = self.run_ids[message.metadata.run_id].run.federation_id
 
             # Validate destination node ID
             dst_node = self.nodes.get(message.metadata.dst_node_id)
@@ -167,7 +167,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 # Node must be online or offline
                 or dst_node.status not in (NodeStatus.ONLINE, NodeStatus.OFFLINE)
                 # Node must belong to the same federation
-                or not self.federation_manager.has_node(dst_node.node_id, federation)
+                or not self.federation_manager.has_node(dst_node.node_id, federation_id)
             ):
                 log(
                     ERROR,
@@ -199,9 +199,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 # same federation
                 src_node_id = message.metadata.src_node_id
                 dst_node_id = message.metadata.dst_node_id
+                federation_id = self.run_ids[message.metadata.run_id].run.federation_id
                 filtered = self.federation_manager.filter_nodes(
                     {src_node_id, dst_node_id},
-                    self.run_ids[message.metadata.run_id].run.federation,
+                    federation_id,
                 )
                 if len(filtered) != 2:  # Not both nodes are in the federation
                     invalid_msg_ids.add(msg_id)
@@ -541,12 +542,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         with self.lock:
             if run_id not in self.run_ids:
                 return set()
-            federation = self.run_ids[run_id].run.federation
+            federation_id = self.run_ids[run_id].run.federation_id
             node_ids = {
                 node.node_id
                 for node in self.get_node_info(statuses=[NodeStatus.ONLINE])
             }
-            return self.federation_manager.filter_nodes(node_ids, federation)
+            return self.federation_manager.filter_nodes(node_ids, federation_id)
 
     def get_node_info(
         self,
@@ -604,7 +605,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         fab_version: str | None,
         fab_hash: str | None,
         override_config: UserConfig,
-        federation: str,
+        federation_id: str,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         primary_task_type: str,
@@ -623,7 +624,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             current = now().isoformat()
             resolved_series_id = self.store_run_in_series(
                 run_id=run_id,
-                federation=federation,
+                federation_id=federation_id,
                 series_id=series_id,
             )
             if resolved_series_id is None:
@@ -650,7 +651,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         details="",
                     ),
                     flwr_aid=flwr_aid if flwr_aid else "",
-                    federation=federation,
+                    federation_id=federation_id,
                     primary_task_id=task_id,
                     bytes_sent=0,
                     bytes_recv=0,
@@ -688,7 +689,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
-        federations: Sequence[str] | None = None,
+        federation_ids: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
@@ -727,15 +728,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     aid_matched |= self.flwr_aid_to_run_ids.get(flwr_aid, set())
                 matched_run_ids &= aid_matched
 
-            # Filter by federations
-            if federations is not None:
-                if not federations:
+            # Filter by federation IDs
+            if federation_ids is not None:
+                if not federation_ids:
                     return []
-                federation_set = set(federations)
+                federation_id_set = set(federation_ids)
                 matched_run_ids &= {
                     run_id
                     for run_id in matched_run_ids
-                    if self.run_ids[run_id].run.federation in federation_set
+                    if self.run_ids[run_id].run.federation_id in federation_id_set
                 }
 
             runs = [self._get_run(run_id) for run_id in matched_run_ids]
