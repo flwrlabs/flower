@@ -36,17 +36,9 @@ from flwr.common.config import (
 )
 from flwr.common.constant import (
     FAB_MAX_SIZE,
-    FEDERATION_NOT_FOUND_MESSAGE,
     HEARTBEAT_DEFAULT_INTERVAL,
     LOG_STREAM_INTERVAL,
-    NO_ACCOUNT_AUTH_MESSAGE,
-    NO_ARTIFACT_PROVIDER_MESSAGE,
-    NODE_NOT_FOUND_MESSAGE,
-    PUBLIC_KEY_ALREADY_IN_USE_MESSAGE,
-    PUBLIC_KEY_NOT_VALID,
-    PULL_UNFINISHED_RUN_MESSAGE,
     RUN_EVENTS_STREAM_INTERVAL,
-    RUN_ID_NOT_FOUND_MESSAGE,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
 )
@@ -279,8 +271,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             )
 
             if run_id == 0:
-                context.abort(
-                    grpc.StatusCode.INTERNAL,
+                raise FlowerError(
+                    ApiErrorCode.FAILED_TO_CREATE_RUN,
                     "Failed to create or initialize the run.",
                 )
 
@@ -289,7 +281,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         except ValueError as e:
             log(ERROR, "Could not start run: %s", str(e))
-            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
+            raise FlowerError(
+                ApiErrorCode.INVALID_RUN_CONFIG,
+                "Could not start run.",
+                public_details=str(e),
+            ) from e
 
         log_msg = f"Created run {run_id} in federation {run.federation_id}"
         log(INFO, log_msg)
@@ -312,7 +308,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Exit if `run_id` not found
         if not runs:
-            context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
+            raise FlowerError(ApiErrorCode.RUN_ID_NOT_FOUND, "Run ID not found.")
         run = runs[0]
         task_id = cast(int, run.primary_task_id)
 
@@ -374,8 +370,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             # Exit if `run_id` not found
             if not runs:
-                context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
-                raise grpc.RpcError()  # This line is unreachable
+                raise FlowerError(ApiErrorCode.RUN_ID_NOT_FOUND, "Run ID not found.")
 
             # Check if requester is a member of the federation
             # that the run belongs to
@@ -445,8 +440,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         if not series_matches or not state.federation_manager.has_member(
             flwr_aid, series_matches[0].federation
         ):
-            context.abort(grpc.StatusCode.NOT_FOUND, "Run series ID not found.")
-            raise grpc.RpcError()  # This line is unreachable
+            raise FlowerError(
+                ApiErrorCode.RUN_SERIES_ID_NOT_FOUND,
+                "Run series ID not found.",
+            )
 
         # Get the run series context and construct the response
         # Run series context is created atomically by LinkState.create_run(...)
@@ -473,17 +470,18 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Exit if `run_id` not found
         if not runs:
-            context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
-            raise grpc.RpcError()  # This line is unreachable
+            raise FlowerError(ApiErrorCode.RUN_ID_NOT_FOUND, "Run ID not found.")
         run = runs[0]
 
         flwr_aid = _get_flwr_aid()
         _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
 
         if run.status.status == Status.FINISHED:
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                f"Run ID {run_id} is already finished",
+            details = f"Run ID {run_id} is already finished"
+            raise FlowerError(
+                ApiErrorCode.RUN_ALREADY_FINISHED,
+                details,
+                public_details=details,
             )
 
         return StopRunResponse(success=state.stop_run(run_id))
@@ -494,11 +492,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         """Start login."""
         log(INFO, "ControlServicer.GetLoginDetails")
         if self.authn_plugin is None:
-            context.abort(
-                grpc.StatusCode.UNIMPLEMENTED,
-                NO_ACCOUNT_AUTH_MESSAGE,
+            raise FlowerError(
+                ApiErrorCode.NO_ACCOUNT_AUTH,
+                "ControlServicer initialized without account authentication.",
             )
-            raise grpc.RpcError()  # This line is unreachable
 
         # Get login details
         details = self.authn_plugin.get_login_details()
@@ -521,11 +518,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         """Get auth token."""
         log(INFO, "ControlServicer.GetAuthTokens")
         if self.authn_plugin is None:
-            context.abort(
-                grpc.StatusCode.UNIMPLEMENTED,
-                NO_ACCOUNT_AUTH_MESSAGE,
+            raise FlowerError(
+                ApiErrorCode.NO_ACCOUNT_AUTH,
+                "ControlServicer initialized without account authentication.",
             )
-            raise grpc.RpcError()  # This line is unreachable
 
         # Get auth tokens
         credentials = self.authn_plugin.get_auth_tokens(request.device_code)
@@ -547,11 +543,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Check if artifact provider is configured
         if self.artifact_provider is None:
-            context.abort(
-                grpc.StatusCode.UNIMPLEMENTED,
-                NO_ARTIFACT_PROVIDER_MESSAGE,
+            raise FlowerError(
+                ApiErrorCode.NO_ARTIFACT_PROVIDER,
+                "ControlServicer initialized without artifact provider.",
             )
-            raise grpc.RpcError()  # This line is unreachable
 
         # Init link state
         state = self.linkstate_factory.state()
@@ -562,14 +557,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Exit if `run_id` not found
         if not runs:
-            context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
-            raise grpc.RpcError()  # This line is unreachable
+            raise FlowerError(ApiErrorCode.RUN_ID_NOT_FOUND, "Run ID not found.")
         run = runs[0]
 
         # Exit if the run is not finished yet
         if run.status.status != Status.FINISHED:
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION, PULL_UNFINISHED_RUN_MESSAGE
+            raise FlowerError(
+                ApiErrorCode.PULL_UNFINISHED_RUN,
+                "Cannot pull artifacts for an unfinished run.",
             )
 
         # Check if `flwr_aid` matches the run's `flwr_aid`
@@ -597,7 +592,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 raise ValueError(err_msg)
         except (ValueError, AttributeError) as err:
             log(ERROR, "%s", err)
-            context.abort(grpc.StatusCode.FAILED_PRECONDITION, PUBLIC_KEY_NOT_VALID)
+            raise FlowerError(
+                ApiErrorCode.PUBLIC_KEY_NOT_VALID,
+                "The provided public key is not valid.",
+            ) from err
 
         # Init link state
         state = self.linkstate_factory.state()
@@ -620,12 +618,13 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 heartbeat_interval=HEARTBEAT_DEFAULT_INTERVAL,
             )
 
-        except ValueError:
+        except ValueError as err:
             # Public key already in use
-            log(ERROR, PUBLIC_KEY_ALREADY_IN_USE_MESSAGE)
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION, PUBLIC_KEY_ALREADY_IN_USE_MESSAGE
-            )
+            log(ERROR, "Public key already in use")
+            raise FlowerError(
+                ApiErrorCode.PUBLIC_KEY_ALREADY_IN_USE,
+                "Public key already in use.",
+            ) from err
         log(INFO, "[ControlServicer.RegisterNode] Created node_id=%s", node_id)
 
         return RegisterNodeResponse(node_id=node_id)
@@ -642,9 +641,12 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         flwr_aid = _get_flwr_aid()
         try:
             state.delete_node(owner_aid=flwr_aid, node_id=request.node_id)
-        except ValueError:
-            log(ERROR, NODE_NOT_FOUND_MESSAGE)
-            context.abort(grpc.StatusCode.NOT_FOUND, NODE_NOT_FOUND_MESSAGE)
+        except ValueError as err:
+            log(ERROR, "Node ID not found for account")
+            raise FlowerError(
+                ApiErrorCode.NODE_NOT_FOUND,
+                "Node ID not found for account.",
+            ) from err
 
         return UnregisterNodeResponse()
 
@@ -703,10 +705,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         flwr_aid = _get_flwr_aid()
         state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
         if not state.federation_manager.has_member(flwr_aid, federation_id):
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
+            details = (
                 f"Federation '{federation_id}' does not exist or you are "
-                "not a member of it.",
+                "not a member of it."
+            )
+            raise FlowerError(
+                ApiErrorCode.FEDERATION_NOT_FOUND_OR_NOT_MEMBER,
+                details,
+                public_details=details,
             )
 
         # Fetch federation details
@@ -740,9 +746,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # Ensure valid federation name is provided
         success, err_msg = validate_federation_name(request.federation_name)
         if not success:
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                f"Invalid federation name: '{request.federation_name}'. {err_msg}",
+            details = f"Invalid federation name: '{request.federation_name}'. {err_msg}"
+            raise FlowerError(
+                ApiErrorCode.INVALID_FEDERATION_NAME,
+                details,
+                public_details=details,
             )
 
         # Init link state
@@ -1044,8 +1052,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Exit if `run_id` not found
         if not runs:
-            context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
-            raise grpc.RpcError()  # This line is unreachable
+            raise FlowerError(ApiErrorCode.RUN_ID_NOT_FOUND, "Run ID not found.")
         run = runs[0]
 
         flwr_aid = _get_flwr_aid()
@@ -1132,7 +1139,7 @@ def _validate_federation_membership_in_request(
 
     # Check that the federation exists
     if not state.federation_manager.exists(federation_id):
-        details = FEDERATION_NOT_FOUND_MESSAGE % federation_id
+        details = f"Federation '{federation_id}' does not exist"
         raise FlowerError(
             ApiErrorCode.FEDERATION_NOT_FOUND,
             details,
@@ -1141,7 +1148,7 @@ def _validate_federation_membership_in_request(
 
     # Check that the requester is a member of the federation
     if not state.federation_manager.has_member(flwr_aid, federation_id):
-        details = FEDERATION_NOT_FOUND_MESSAGE % federation_id
+        details = f"Federation '{federation_id}' does not exist"
         raise FlowerError(
             ApiErrorCode.FEDERATION_NOT_FOUND,
             details,
