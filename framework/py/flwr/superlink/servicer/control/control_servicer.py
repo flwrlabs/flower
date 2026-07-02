@@ -1172,7 +1172,7 @@ def _get_account() -> AccountInfo:
     if account.flwr_aid is None:
         raise FlowerError(
             ApiErrorCode.ACCOUNT_INFO_NOT_FOUND,
-            "️⛔️ Failed to fetch the account information.",
+            "⛔️ Failed to fetch the account information.",
         )
     return account
 
