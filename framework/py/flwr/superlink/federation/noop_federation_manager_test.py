@@ -151,7 +151,7 @@ def test_get_details_with_invalid_federation() -> None:
     manager = NoOpFederationManager()
     mock_linkstate = Mock()
     manager.linkstate = mock_linkstate
-    invalid_federation_id = "invalid_federation"
+    invalid_federation_id = "@me/invalid"
 
     # Execute & Assert
     with pytest.raises(ValueError):
@@ -331,11 +331,11 @@ def test_simulation_config_returns_none_when_simulation_is_disabled() -> None:
 
 
 def test_get_simulation_config_fails_for_invalid_federation() -> None:
-    """Test get_simulation_config fails for invalid federation names."""
+    """Test get_simulation_config fails for invalid federation IDs."""
     manager = NoOpFederationManager(simulation=True)
 
     with pytest.raises(FlowerError) as err:
-        manager.get_simulation_config("invalid_federation")
+        manager.get_simulation_config("@me/invalid")
 
     assert err.value.code == ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION
 

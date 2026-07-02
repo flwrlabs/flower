@@ -104,7 +104,7 @@ class TestInMemoryGrid(unittest.TestCase):
             finished_at="",
             status=RunStatus(status=Status.PENDING, sub_status="", details=""),
             flwr_aid="user123",
-            federation_id="mock-fed",
+            federation_id="@me/fed",
             primary_task_id=None,
             bytes_sent=0,
             bytes_recv=0,
