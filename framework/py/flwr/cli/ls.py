@@ -202,7 +202,7 @@ def _to_table(run_list: list[RunRow]) -> Table:
 
         formatted_row = (
             f"[bold]{row.run_id}[/bold]",
-            row.federation,
+            row.federation_id,
             f"@{row.fab_id}=={row.fab_version}",
             f"[{status_style}]{row.status_text}[/{status_style}]",
             humanize_duration(row.elapsed),
@@ -235,7 +235,7 @@ def _to_detail_table(run: RunRow) -> Table:
 
     # Add rows with all details
     table.add_row("Run ID", f"[bold]{run.run_id}[/bold]")
-    table.add_row("Federation", run.federation)
+    table.add_row("Federation", run.federation_id)
     table.add_row("App", f"@{run.fab_id}=={run.fab_version}")
     table.add_row("FAB Hash", f"{run.fab_hash[:8]}...{run.fab_hash[-8:]}")
     table.add_row("Status", f"[{status_style}]{run.status_text}[/{status_style}]")
@@ -295,7 +295,7 @@ def _to_json(run_list: list[RunRow]) -> str:
         runs_list.append(
             {
                 "run-id": f"{row.run_id}",
-                "federation": row.federation,
+                "federation-id": row.federation_id,
                 "fab-id": row.fab_id,
                 "fab-name": row.fab_id.split("/")[-1],
                 "fab-version": row.fab_version,

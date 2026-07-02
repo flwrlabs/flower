@@ -175,7 +175,7 @@ def _to_json(
         "success": True,
         "created-invitations": [
             {
-                "federation-name": invitation.federation_name,
+                "federation-id": invitation.federation_name,
                 "invited": invitation.invitee.name,
                 "status": invitation.status,
                 "created-at": _format_datetime(invitation.created_at),
@@ -185,7 +185,7 @@ def _to_json(
         ],
         "received-invitations": [
             {
-                "federation-name": invitation.federation_name,
+                "federation-id": invitation.federation_name,
                 "invited-by": invitation.inviter.name,
                 "status": invitation.status,
                 "created-at": _format_datetime(invitation.created_at),

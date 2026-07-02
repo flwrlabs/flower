@@ -47,7 +47,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, TaskType
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, TaskType
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     TASK_TOKEN_HEADER,
@@ -128,7 +128,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         self, primary_task_type: str = TaskType.SERVER_APP
     ) -> tuple[int, str]:
         run_id = self.state.create_run(
-            "", "", "", {}, NOOP_FEDERATION, None, "", primary_task_type
+            "", "", "", {}, NOOP_FEDERATION_ID, None, "", primary_task_type
         )
         run = self.state.get_run_info(run_ids=[run_id])[0]
         assert run.primary_task_id is not None
