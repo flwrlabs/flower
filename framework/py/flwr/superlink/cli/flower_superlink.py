@@ -1059,7 +1059,7 @@ def _run_fleet_api_rest(
     objectstore_factory: ObjectStoreFactory,
     num_workers: int,
 ) -> None:
-    """Run ServerAppIo API (REST-based)."""
+    """Run Fleet API (REST-based)."""
     try:
         from flwr.server.superlink.fleet.rest_rere.rest_api import app as fast_api_app
     except ModuleNotFoundError:
