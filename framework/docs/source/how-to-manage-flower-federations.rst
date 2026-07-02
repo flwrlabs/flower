@@ -23,8 +23,8 @@ execute runs (e.g. to federate the training of an AI model) across all SuperNode
 are part of it.
 
 Federations can be addressed by their federation ID, which has the form
-``@<account-name>/<federation-name>``. The ``<account-name>`` is the name of the
-account that created the federation, and ``<federation-name>`` is the name of the federation.
+``@<account-name>/<federation-name>``. The ``<account-name>`` is the name of the account
+that created the federation, and ``<federation-name>`` is the name of the federation.
 
 In this how-to guide, you will:
 
@@ -65,16 +65,16 @@ In this case there is one federation: ``@none/default``. Its federation name is
  Inspect a Federation
 **********************
 
-You can inspect a specific federation by passing its federation ID to
-``flwr federation list``. With this command, you will be able to see the
-following information about a federation:
+You can inspect a specific federation by passing its federation ID to ``flwr federation
+list``. With this command, you will be able to see the following information about a
+federation:
 
 - The members of the federation.
 - The SuperNodes registered with the federation and their status.
 - The runs executed via the federation.
 
-The ``flwr federation list --federation <federation-id>`` command expects the
-federation ID as an argument:
+The ``flwr federation list --federation <federation-id>`` command expects the federation
+ID as an argument:
 
 .. code-block:: shell
 

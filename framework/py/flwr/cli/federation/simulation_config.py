@@ -185,7 +185,7 @@ def _configure_federation_for_simulation(
         federation_id = response.federation_name
 
     if is_json:
-        print_json_to_stdout({"success": True, "federation": federation_id})
+        print_json_to_stdout({"success": True, "federation-id": federation_id})
     else:
         message = "✅ Updated simulation configuration"
         if federation_id and federation_id != NOOP_FEDERATION_ID:

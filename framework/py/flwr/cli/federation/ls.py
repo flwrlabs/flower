@@ -201,7 +201,7 @@ def _to_json(  # pylint: disable=R0913,R0917
         return {
             "federations": [
                 {
-                    "name": federation.name,
+                    "id": federation.name,
                     "description": federation.description,
                     "archived": federation.archived,
                     "simulation": federation.simulation,

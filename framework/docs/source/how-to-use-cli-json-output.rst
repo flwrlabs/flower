@@ -103,7 +103,7 @@ To return structured JSON instead:
       "runs": [
         {
           "run-id": "1859953118041441032",
-          "federation": "@none/default",
+          "federation-id": "@none/default",
           "fab-id": "flwrlabs/myawesomeapp",
           "fab-name": "myawesomeapp",
           "fab-version": "1.0.0",

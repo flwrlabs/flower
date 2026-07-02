@@ -91,8 +91,8 @@ authenticate with your SuperGrid account. Finally, run the app with ``flwr run``
 
 .. note::
 
-    Replace ``@<username>/<federation-name>`` with your federation ID,
-    for example ``@peter123/my-federation``.
+    Replace ``@<username>/<federation-name>`` with your federation ID, for example
+    ``@peter123/my-federation``.
 
 .. code-block:: shell
 

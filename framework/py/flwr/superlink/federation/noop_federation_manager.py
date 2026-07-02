@@ -26,8 +26,8 @@ from flwr.proto.federation_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
-    NOOP_FEDERATION_ID,
     NOOP_FEDERATION_DESCRIPTION,
+    NOOP_FEDERATION_ID,
     ActionType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
