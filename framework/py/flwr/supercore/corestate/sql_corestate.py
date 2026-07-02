@@ -169,7 +169,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         if federation_ids is not None:
             placeholders = ",".join([f":fed_{i}" for i in range(len(federation_ids))])
-            conditions.append(f"federation IN ({placeholders})")
+            conditions.append(f"federation_id IN ({placeholders})")
             params.update({f"fed_{i}": _id for i, _id in enumerate(federation_ids)})
         if updated_before is not None:
             conditions.append("updated_at < :updated_before")
@@ -184,7 +184,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         # Select the requested page before joining run IDs so limit applies to series.
         run_series_cte = f"""
             run_series_cte AS (
-                SELECT series_id, federation, description, created_at, updated_at
+                SELECT series_id, federation_id, description, created_at, updated_at
                 FROM run_series
                 {where_clause}
                 ORDER BY updated_at DESC
@@ -250,9 +250,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Store a run in a run series and return the series ID."""
         insert_query = """
             INSERT INTO run_series
-            (series_id, federation, description, created_at, updated_at)
+            (series_id, federation_id, description, created_at, updated_at)
             VALUES
-            (:series_id, :federation, :description, :created_at, :updated_at)
+            (:series_id, :federation_id, :description, :created_at, :updated_at)
             ON CONFLICT(series_id) DO NOTHING
             RETURNING series_id
         """
@@ -267,7 +267,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         insert_query,
                         {
                             "series_id": uint64_to_int64(candidate),
-                            "federation": federation_id,
+                            "federation_id": federation_id,
                             "description": None,
                             "created_at": timestamp,
                             "updated_at": timestamp,
@@ -283,12 +283,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         """
                         UPDATE run_series
                         SET updated_at = :updated_at
-                        WHERE series_id = :series_id AND federation = :federation
+                        WHERE series_id = :series_id AND federation_id = :federation_id
                         RETURNING series_id
                         """,
                         {
                             "series_id": uint64_to_int64(series_id),
-                            "federation": federation_id,
+                            "federation_id": federation_id,
                             "updated_at": now(),
                         },
                     )
@@ -962,7 +962,7 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     """Convert a database row to a RunSeries object."""
     return RunSeries(
         series_id=int64_to_uint64(row["series_id"]),
-        federation=row["federation"],
+        federation=row["federation_id"],
         description=row["description"] or "",
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
