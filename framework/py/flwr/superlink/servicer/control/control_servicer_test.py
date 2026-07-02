@@ -661,7 +661,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         """Test ListRunSeries filters by an explicit federation."""
         # Prepare
         self._create_dummy_run_series(1, federation_id=NOOP_FEDERATION_ID)
-        self._create_dummy_run_series(2, federation_id="other-federation")
+        self._create_dummy_run_series(2, federation_id="@me/other")
 
         # Execute
         response = self.servicer.ListRunSeries(
@@ -1075,7 +1075,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         """Test ArchiveFederation succeeds when federation_manager.archive_federation
         works."""
         # Prepare
-        request = ArchiveFederationRequest(federation_name="test-federation")
+        request = ArchiveFederationRequest(federation_name="@me/fed")
 
         # Execute
         with patch.object(
@@ -1088,7 +1088,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         mock_archive.assert_called_once_with(
             flwr_aid=self.aid,
-            federation_id="test-federation",
+            federation_id="@me/fed",
         )
         self.assertIsNotNone(response)
 
@@ -1096,8 +1096,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         """Test ArchiveFederation aborts when federation_manager.archive_federation
         raises."""
         # Prepare
-        name = "test-federation"
-        request = ArchiveFederationRequest(federation_name=name)
+        federation_id = "@me/fed"
+        request = ArchiveFederationRequest(federation_name=federation_id)
         mock_context = Mock()
         mock_context.abort.side_effect = grpc.RpcError()
 
@@ -1107,7 +1107,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_archive_federation_stops_active_runs(self) -> None:
         """Test ArchiveFederation stops unfinished runs in the federation."""
-        request = ArchiveFederationRequest(federation_name="test-federation")
+        request = ArchiveFederationRequest(federation_name="@me/fed")
         # Create an unfinished run in the federation and give it a live token,
         # matching the state that StopRun would normally have to clean up.
         run_id = self.state.create_run(
@@ -1115,7 +1115,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             "v0.0.1",
             "hash123",
             {},
-            "test-federation",
+            "@me/fed",
             None,
             self.aid,
             TaskType.SERVER_APP,
@@ -1137,7 +1137,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_remove_account_from_federation_success(self) -> None:
         """Test RemoveAccountFromFederation succeeds when manager call works."""
         request = RemoveAccountFromFederationRequest(
-            federation_name="test-federation",
+            federation_name="@me/fed",
             account_name="target-account",
         )
         target_flwr_aid = "target-aid"
@@ -1151,7 +1151,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         mock_remove_account.assert_called_once_with(
             flwr_aid=self.aid,
-            federation_id="test-federation",
+            federation_id="@me/fed",
             target_account_name="target-account",
         )
         self.assertIsInstance(response, RemoveAccountFromFederationResponse)
@@ -1159,7 +1159,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_remove_account_from_federation_stops_removed_account_runs(self) -> None:
         """Test removing an account stops that account's unfinished federation runs."""
         request = RemoveAccountFromFederationRequest(
-            federation_name="test-federation",
+            federation_name="@me/fed",
             account_name="target-account",
         )
         target_flwr_aid = "target-aid"
@@ -1168,7 +1168,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             "v0.0.1",
             "hash123",
             {},
-            "test-federation",
+            "@me/fed",
             None,
             target_flwr_aid,
             TaskType.SERVER_APP,
@@ -1216,7 +1216,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         """Test CreateInvitation success path."""
         request = CreateInvitationRequest(
             invitee_account_name="invitee-aid",
-            federation_name="test-federation",
+            federation_name="@me/fed",
         )
         context = Mock()
         self.state.federation_manager.can_execute.return_value = None
@@ -1231,14 +1231,14 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             flwr_aid=self.flwr_aid,
             action=ActionType.CREATE_INVITATION,
             context=CreateInvitationContext(
-                federation_id="test-federation",
+                federation_id="@me/fed",
                 invitee_account_name="invitee-aid",
                 runtime=RunTime.DEPLOYMENT,
             ),
         )
         self.state.federation_manager.create_invitation.assert_called_once_with(
             flwr_aid=self.flwr_aid,
-            federation_id="test-federation",
+            federation_id="@me/fed",
             invitee_account_name="invitee-aid",
         )
         self.assertIsInstance(response, CreateInvitationResponse)
@@ -1247,7 +1247,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         """Test CreateInvitation aborts when can_execute returns False."""
         request = CreateInvitationRequest(
             invitee_account_name="invitee-aid",
-            federation_name="test-federation",
+            federation_name="@me/fed",
         )
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
@@ -1285,7 +1285,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
 
     def test_accept_invitation_success(self) -> None:
         """Test AcceptInvitation success path."""
-        request = AcceptInvitationRequest(federation_name="test-federation")
+        request = AcceptInvitationRequest(federation_name="@me/fed")
         context = Mock()
         self.state.federation_manager.can_execute.return_value = None
         self.state.federation_manager.get_simulation_config.return_value = None
@@ -1296,19 +1296,19 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             flwr_aid=self.flwr_aid,
             action=ActionType.ACCEPT_INVITATION,
             context=AcceptInvitationContext(
-                federation_id="test-federation",
+                federation_id="@me/fed",
                 runtime=RunTime.DEPLOYMENT,
             ),
         )
         self.state.federation_manager.accept_invitation.assert_called_once_with(
             flwr_aid=self.flwr_aid,
-            federation_id="test-federation",
+            federation_id="@me/fed",
         )
         self.assertIsInstance(response, AcceptInvitationResponse)
 
     def test_accept_invitation_denied_when_not_permitted(self) -> None:
         """Test AcceptInvitation aborts when can_execute returns False."""
-        request = AcceptInvitationRequest(federation_name="test-federation")
+        request = AcceptInvitationRequest(federation_name="@me/fed")
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
         self.state.federation_manager.can_execute.side_effect = EntitlementError(
@@ -1330,14 +1330,14 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
 
     def test_reject_invitation_success(self) -> None:
         """Test RejectInvitation success path."""
-        request = RejectInvitationRequest(federation_name="test-federation")
+        request = RejectInvitationRequest(federation_name="@me/fed")
         context = Mock()
 
         response = self.servicer.RejectInvitation(request, context)
 
         self.state.federation_manager.reject_invitation.assert_called_once_with(
             flwr_aid=self.flwr_aid,
-            federation_id="test-federation",
+            federation_id="@me/fed",
         )
         self.assertIsInstance(response, RejectInvitationResponse)
 
@@ -1345,7 +1345,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         """Test RevokeInvitation success path."""
         request = RevokeInvitationRequest(
             invitee_account_name="invitee-aid",
-            federation_name="test-federation",
+            federation_name="@me/fed",
         )
         context = Mock()
 
@@ -1353,7 +1353,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
 
         self.state.federation_manager.revoke_invitation.assert_called_once_with(
             flwr_aid=self.flwr_aid,
-            federation_id="test-federation",
+            federation_id="@me/fed",
             invitee_account_name="invitee-aid",
         )
         self.assertIsInstance(response, RevokeInvitationResponse)
@@ -1645,10 +1645,10 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         ctx = self._make_context()
         with self.assertRaises(RuntimeError) as cm:
             _validate_federation_membership_in_request(
-                self.state, self.aid, "nonexistent-fed", ctx
+                self.state, self.aid, "@me/missing", ctx
             )
         ctx.abort.assert_called_once()
-        self.assertIn("nonexistent-fed", str(cm.exception))
+        self.assertIn("@me/missing", str(cm.exception))
 
     def test_validate_membership_aborts_when_not_a_member(self) -> None:
         """Test abort when flwr_aid is not a member of the federation."""
