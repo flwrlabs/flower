@@ -177,11 +177,9 @@ EXIT_CODE_HELP = {
         "Please provide a valid URL, IPv4 or IPv6 address."
     ),
     ExitCode.COMMON_MISSING_EXTRA_REST: """
-Extra dependencies required for using the REST-based Fleet API are missing.
+Dependencies required for using the REST-based Fleet API are missing.
 
-To use the REST API, install `flwr` with the `rest` extra:
-
-    `pip install "flwr[rest]"`.
+Please reinstall or upgrade `flwr`.
 """,
     ExitCode.COMMON_TLS_NOT_SUPPORTED: "Please use the '--insecure' flag.",
     ExitCode.COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE: (

@@ -6,16 +6,14 @@
  Description
 *************
 
-Extra dependencies required for using the REST-based Fleet API are missing.
+Dependencies required for using the REST-based Fleet API are missing.
 
 ****************
  How to Resolve
 ****************
 
-To enable the REST-based Fleet API, install ``flwr`` with the ``rest`` extra:
+Reinstall or upgrade ``flwr``, then retry:
 
 .. code-block:: bash
 
-    pip install "flwr[rest]"
-
-Ensure that the installation completes successfully, and then retry.
+    python -m pip install -U flwr
