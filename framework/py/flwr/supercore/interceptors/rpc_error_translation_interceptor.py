@@ -48,7 +48,7 @@ class RpcErrorTranslationServerInterceptor(grpc.ServerInterceptor):  # type: ign
                 request: GrpcMessage, context: grpc.ServicerContext
             ) -> GrpcMessage:
                 with rpc_error_translator(context, rpc_name):
-                    return unary_unary_handler(request, context)
+                    return unary_unary_handler(request, context)  # type: ignore
 
             return grpc.unary_unary_rpc_method_handler(
                 unary_unary,
