@@ -12,18 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Runtime API router."""
+"""Control API router."""
+
+from fastapi import APIRouter, HTTPException
+
+router = APIRouter(prefix="/control", tags=["control"])
 
 
-from fastapi import APIRouter, HTTPException, Response, status
+@router.get("/runs")
+def list_runs() -> dict[str, str]:
+    """List runs.
 
-router = APIRouter(prefix="/runtime", tags=["runtime"])
-
-
-@router.post("/messages")
-def pull_messages() -> Response:
-    """Pull messages for the ClientApp."""
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Not implemented",
-    )
+    Returns
+    -------
+    dict[str, str]
+        Not yet implemented.
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
