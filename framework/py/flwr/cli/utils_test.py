@@ -41,6 +41,8 @@ from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 
 from .utils import (
+    _flower_error_from_grpc_error,
+    _format_flower_error,
     _format_grpc_error,
     build_pathspec,
     cli_output_handler,
@@ -57,29 +59,20 @@ from .utils import (
 )
 
 
-class _GrpcErrorWithDetails(grpc.RpcError):  # type: ignore[misc]
+class _GrpcErrorWithDetails:
     """Test helper object carrying a gRPC-like details string."""
 
-    def __init__(
-        self,
-        details: str,
-        status_code: grpc.StatusCode = grpc.StatusCode.UNKNOWN,
-    ) -> None:
+    def __init__(self, details: str) -> None:
         self._details = details
-        self._status_code = status_code
 
     def details(self) -> str:
         """Return the stored gRPC details string."""
         return self._details
 
-    def code(self) -> grpc.StatusCode:
-        """Return the stored gRPC status code."""
-        return self._status_code
-
 
 def _grpc_error_with_details(details: str) -> grpc.RpcError:
     """Return a grpc.RpcError-compatible test helper with a details method."""
-    return _GrpcErrorWithDetails(details)
+    return cast(grpc.RpcError, _GrpcErrorWithDetails(details))
 
 
 def _flower_error_details(code: ApiErrorCode, public_details: str | None = None) -> str:
@@ -308,58 +301,42 @@ def test_custom_grpc_err_handler() -> None:
     mock_handler.assert_called_once_with(grpc_error)
 
 
-def test_format_grpc_error_falls_back_to_plain_string() -> None:
-    """Non-JSON errors fall back to their normal string form."""
-    err = _grpc_error_with_details("plain failure")
-
-    assert _format_grpc_error(err) == "plain failure"
-
-
-@pytest.mark.parametrize(
-    "code",
-    [
-        ApiErrorCode.NO_ACCOUNT_AUTH,
-        ApiErrorCode.NO_ARTIFACT_PROVIDER,
-        ApiErrorCode.NODE_NOT_FOUND,
-        ApiErrorCode.PULL_UNFINISHED_RUN,
-        ApiErrorCode.PUBLIC_KEY_ALREADY_IN_USE,
-        ApiErrorCode.PUBLIC_KEY_NOT_VALID,
-    ],
-)
-def test_flwr_cli_grpc_exc_handler_uses_flower_error_public_message(
-    code: ApiErrorCode,
-) -> None:
-    """CLI messages come from the serialized FlowerError public message."""
-    err = _GrpcErrorWithDetails(
-        _flower_error_details(code),
-        API_ERROR_MAP[code].status_code,
-    )
-
-    with pytest.raises(click.ClickException) as exc_info:
-        with flwr_cli_grpc_exc_handler():
-            raise err
-
-    assert exc_info.value.message == API_ERROR_MAP[code].public_message
-
-
-def test_flwr_cli_grpc_exc_handler_preserves_public_details() -> None:
-    """Structured FlowerError public details are shown to the CLI user."""
-    err = _GrpcErrorWithDetails(
+def test_flower_error_from_grpc_error() -> None:
+    """Deserialize FlowerError from gRPC error details."""
+    err = _grpc_error_with_details(
         _flower_error_details(
             ApiErrorCode.INVALID_RUN_CONFIG,
             "Unknown override key: tool.invalid-key",
-        ),
-        API_ERROR_MAP[ApiErrorCode.INVALID_RUN_CONFIG].status_code,
+        )
     )
 
-    with pytest.raises(click.ClickException) as exc_info:
-        with flwr_cli_grpc_exc_handler():
-            raise err
+    flower_error = _flower_error_from_grpc_error(err)
+
+    assert flower_error is not None
+    assert flower_error.code == ApiErrorCode.INVALID_RUN_CONFIG
+    assert flower_error.message == "Invalid run configuration."
+    assert flower_error.public_details == "Unknown override key: tool.invalid-key"
+
+
+def test_format_flower_error() -> None:
+    """Format FlowerError message and public details."""
+    err = FlowerError(
+        ApiErrorCode.INVALID_RUN_CONFIG,
+        "Invalid run configuration.",
+        "Unknown override key: tool.invalid-key",
+    )
 
     assert (
-        exc_info.value.message
+        _format_flower_error(err)
         == "Invalid run configuration.\nUnknown override key: tool.invalid-key"
     )
+
+
+def test_format_grpc_error() -> None:
+    """Format gRPC error details."""
+    err = _grpc_error_with_details("plain failure")
+
+    assert _format_grpc_error(err) == "plain failure"
 
 
 def test_cli_output_handler_raises_click_exception_for_json_error() -> None:
