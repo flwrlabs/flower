@@ -67,6 +67,10 @@ FLWR_UPDATE_CHECK_CACHE_DIR = ".cache"
 FLWR_UPDATE_CHECK_CACHE_FILENAME = "update-check.json"
 FLWR_UPDATE_CHECK_SHOW_INTERVAL_SECONDS = 12 * 60 * 60
 
+# Constants for Uvicorn-backed API servers
+UVICORN_DEFAULT_HOST = "127.0.0.1"
+UVICORN_DEFAULT_PORT = 8000
+
 # SuperGrid constants
 SUPERGRID_ADDRESS = "supergrid.flower.ai"
 
@@ -102,7 +106,7 @@ MIME_MAP = {
 MAX_NAME_LENGTH = 32  # max length for app names; also used for federation names
 
 # Constants for federations
-NOOP_FEDERATION = f"@{NOOP_ACCOUNT_NAME}/default"
+NOOP_FEDERATION_ID = f"@{NOOP_ACCOUNT_NAME}/default"
 NOOP_FEDERATION_DESCRIPTION = "A federation for testing and development purposes."
 DEFAULT_SIMULATION_CONFIG = SimulationConfig(
     num_supernodes=2,

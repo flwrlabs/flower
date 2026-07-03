@@ -65,7 +65,7 @@ def create_corestate_metadata() -> MetaData:
         "run_series",
         metadata,
         Column("series_id", BigInteger, primary_key=True, nullable=False),
-        Column("federation", String, nullable=False),
+        Column("federation_id", String, nullable=False),
         Column("description", String, nullable=True),
         Column("created_at", TIMESTAMP(timezone=True), nullable=False),
         Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
@@ -174,5 +174,30 @@ def create_corestate_metadata() -> MetaData:
         Column("log", String, nullable=False),
     )
     Index("idx_task_logs_task_id_timestamp", task_logs.c.task_id, task_logs.c.timestamp)
+
+    # --------------------------------------------------------------------------
+    #  Table: task_usage
+    # --------------------------------------------------------------------------
+    task_usage = Table(
+        "task_usage",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("run_id", BigInteger, nullable=False),
+        Column(
+            "task_id",
+            BigInteger,
+            ForeignKey("task.task_id"),
+            nullable=False,
+            unique=True,
+        ),
+        Column("input_tokens", BigInteger, nullable=True),
+        Column("output_tokens", BigInteger, nullable=True),
+        Column("total_tokens", BigInteger, nullable=True),
+        Column("usage_type", String, nullable=False),
+        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("reported_at", TIMESTAMP(timezone=True), nullable=True),
+    )
+    Index("idx_task_usage_run_id", task_usage.c.run_id)
+    Index("idx_task_usage_reported_at", task_usage.c.reported_at)
 
     return metadata

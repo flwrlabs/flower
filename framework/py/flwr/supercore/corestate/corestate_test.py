@@ -79,7 +79,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
 
         series_id = state.store_run_in_series(
-            run_id=123, federation="federation-a", series_id=None
+            run_id=123, federation_id="@me/fed-a", series_id=None
         )
 
         self.assertIsNotNone(series_id)
@@ -93,7 +93,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         with self.assertLogs("flwr", level="ERROR") as logs:
             series_id = state.store_run_in_series(
                 run_id=123,
-                federation="federation-a",
+                federation_id="@me/fed-a",
                 series_id=123,
             )
 
@@ -104,35 +104,35 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Storing the same run ID twice should return None."""
         state = self.state_factory()
         series_id = state.store_run_in_series(
-            run_id=123, federation="federation-a", series_id=None
+            run_id=123, federation_id="@me/fed-a", series_id=None
         )
         assert series_id is not None
 
         stored = state.store_run_in_series(
             run_id=123,
-            federation="federation-a",
+            federation_id="@me/fed-a",
             series_id=series_id,
         )
 
         self.assertIsNone(stored)
 
-    def test_get_run_series_filters_by_series_ids_and_federations(self) -> None:
-        """RunSeries lookup should filter by IDs and federations."""
+    def test_get_run_series_filters_by_series_ids_and_federation_ids(self) -> None:
+        """RunSeries lookup should filter by series IDs and federation IDs."""
         state = self.state_factory()
         series_id_a = state.store_run_in_series(
-            run_id=123, federation="federation-a", series_id=None
+            run_id=123, federation_id="@me/fed-a", series_id=None
         )
         series_id_b = state.store_run_in_series(
-            run_id=456, federation="federation-b", series_id=None
+            run_id=456, federation_id="@me/fed-b", series_id=None
         )
         series_id_c = state.store_run_in_series(
-            run_id=789, federation="federation-a", series_id=None
+            run_id=789, federation_id="@me/fed-a", series_id=None
         )
         assert series_id_a is not None
         assert series_id_b is not None
         assert series_id_c is not None
 
-        fed_a_series = state.get_run_series(federations=["federation-a"])
+        fed_a_series = state.get_run_series(federation_ids=["@me/fed-a"])
         self.assertSetEqual(
             {entry.series_id for entry in fed_a_series},
             {series_id_a, series_id_c},
@@ -146,12 +146,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         combined_series = state.get_run_series(
             series_ids=[series_id_a, series_id_b],
-            federations=["federation-a"],
+            federation_ids=["@me/fed-a"],
         )
         self.assertEqual([entry.series_id for entry in combined_series], [series_id_a])
 
         self.assertEqual(state.get_run_series(series_ids=[]), [])
-        self.assertEqual(state.get_run_series(federations=[]), [])
+        self.assertEqual(state.get_run_series(federation_ids=[]), [])
 
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""

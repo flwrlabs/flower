@@ -97,8 +97,8 @@ erDiagram
     VARCHAR fab_hash "nullable"
     VARCHAR fab_id "nullable"
     VARCHAR fab_version "nullable"
-    VARCHAR federation "nullable"
     VARCHAR federation_config "nullable"
+    VARCHAR federation_id "nullable"
     VARCHAR flwr_aid "nullable"
     VARCHAR override_config "nullable"
     BIGINT primary_task_id
@@ -116,7 +116,7 @@ erDiagram
     BIGINT series_id PK
     TIMESTAMP created_at
     VARCHAR description "nullable"
-    VARCHAR federation
+    VARCHAR federation_id
     TIMESTAMP updated_at
   }
 
@@ -176,6 +176,18 @@ erDiagram
     FLOAT ttl
   }
 
+  task_usage {
+    INTEGER id PK
+    BIGINT task_id FK
+    TIMESTAMP created_at
+    BIGINT input_tokens "nullable"
+    BIGINT output_tokens "nullable"
+    TIMESTAMP reported_at "nullable"
+    BIGINT run_id
+    BIGINT total_tokens "nullable"
+    VARCHAR usage_type
+  }
+
   run ||--o| context : run_id
   run ||--o{ logs : run_id
   run ||--o{ message_ins : run_id
@@ -187,6 +199,7 @@ erDiagram
   task ||--o{ task_logs : task_id
   task ||--o{ task_message : src_task_id
   task ||--o{ task_message : dst_task_id
+  task ||--o| task_usage : task_id
 
 ```
 <!-- END_SQLALCHEMY_DOCS -->

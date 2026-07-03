@@ -53,6 +53,12 @@ def test_get_executor_builds_kubernetes_executor_from_config(
             "image-pull-policy": "IfNotPresent",
             "active-pod-budget": 5,
             "appio-root-certificates-path": str(root_certificates_path),
+            "env": [
+                {
+                    "name": "FLWR_MODEL_API_ENDPOINT",
+                    "value": "http://proxy/v1/responses",
+                }
+            ],
             "resources": {"requests": {"cpu": "1"}},
             "node-selector": {"kubernetes.io/os": "linux"},
             "unknown-field": "ignored",
@@ -67,6 +73,9 @@ def test_get_executor_builds_kubernetes_executor_from_config(
     assert config.image_pull_policy == "IfNotPresent"
     assert config.active_pod_budget == 5
     assert config.appio_root_certificates == "root-ca"
+    assert config.env == [
+        {"name": "FLWR_MODEL_API_ENDPOINT", "value": "http://proxy/v1/responses"}
+    ]
     assert config.resources == {"requests": {"cpu": "1"}}
     assert config.node_selector == {"kubernetes.io/os": "linux"}
     assert not hasattr(config, "unknown_field")

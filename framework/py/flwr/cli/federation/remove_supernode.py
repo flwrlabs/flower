@@ -43,7 +43,7 @@ def remove_supernode(
     ],
     federation: Annotated[
         str,
-        typer.Argument(help="Name of the federation."),
+        typer.Argument(help="Federation ID."),
     ],
     superlink: Annotated[
         str | None,

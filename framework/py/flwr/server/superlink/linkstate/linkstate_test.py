@@ -53,7 +53,7 @@ from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
-from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, TaskType
+from flwr.supercore.constant import NOOP_FEDERATION_ID, NodeStatus, TaskType
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.date import now
@@ -146,7 +146,7 @@ class StateTest(CoreStateTest):
             None,
             "9f86d08",
             {"test_key": "test_value"},
-            "health-federation",
+            "@me/health",
             None,
             "i1r9f",
             TaskType.SERVER_APP,
@@ -158,7 +158,7 @@ class StateTest(CoreStateTest):
         # Assert
         assert run.run_id == run_id
         assert run.fab_hash == "9f86d08"
-        assert run.federation == "health-federation"
+        assert run.federation_id == "@me/health"
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
         assert run.series_id > 0
@@ -167,13 +167,13 @@ class StateTest(CoreStateTest):
         """Test create_run links the run to an existing run series."""
         # Prepare
         state = self.state_factory()
-        initial_run_id = create_dummy_run(state, federation="health-federation")
+        initial_run_id = create_dummy_run(state, federation_id="@me/health")
         series_id = state.get_run_info(run_ids=[initial_run_id])[0].series_id
 
         # Execute
         run_id = create_dummy_run(
             state,
-            federation="health-federation",
+            federation_id="@me/health",
             series_id=series_id,
         )
 
@@ -189,12 +189,12 @@ class StateTest(CoreStateTest):
         # Execute
         run_id_1 = create_dummy_run(
             state,
-            federation="health-federation",
+            federation_id="@me/health",
         )
         first_run = state.get_run_info(run_ids=[run_id_1])[0]
         run_id_2 = create_dummy_run(
             state,
-            federation="health-federation",
+            federation_id="@me/health",
             series_id=first_run.series_id,
         )
 
@@ -242,8 +242,8 @@ class StateTest(CoreStateTest):
         """Test get_run_info returns all runs when no filter is provided."""
         # Prepare
         state = self.state_factory()
-        run_id1 = create_dummy_run(state, flwr_aid="aid-1", federation="federation-1")
-        run_id2 = create_dummy_run(state, flwr_aid="aid-2", federation="federation-2")
+        run_id1 = create_dummy_run(state, flwr_aid="aid-1", federation_id="@me/other")
+        run_id2 = create_dummy_run(state, flwr_aid="aid-2", federation_id="@me/fed")
 
         # Execute
         runs = state.get_run_info()
@@ -270,10 +270,10 @@ class StateTest(CoreStateTest):
         # Prepare
         state = self.state_factory()
 
-        _ = create_dummy_run(state, flwr_aid="aid-1", federation="federation-a")
-        run_id2 = create_dummy_run(state, flwr_aid="aid-1", federation="federation-b")
-        run_id3 = create_dummy_run(state, flwr_aid="aid-2", federation="federation-a")
-        run_id4 = create_dummy_run(state, flwr_aid="aid-2", federation="federation-b")
+        _ = create_dummy_run(state, flwr_aid="aid-1", federation_id="@me/fed-a")
+        run_id2 = create_dummy_run(state, flwr_aid="aid-1", federation_id="@me/fed-b")
+        run_id3 = create_dummy_run(state, flwr_aid="aid-2", federation_id="@me/fed-a")
+        run_id4 = create_dummy_run(state, flwr_aid="aid-2", federation_id="@me/fed-b")
 
         transition_run_status(state, run_id2, 1)  # STARTING
         transition_run_status(state, run_id3, 1)  # STARTING
@@ -283,7 +283,7 @@ class StateTest(CoreStateTest):
         runs = state.get_run_info(
             statuses=[Status.STARTING, Status.RUNNING],
             flwr_aids=["aid-2"],
-            federations=["federation-a", "federation-b"],
+            federation_ids=["@me/fed-a", "@me/fed-b"],
         )
 
         # Assert
@@ -318,16 +318,16 @@ class StateTest(CoreStateTest):
                     expected_run_ids,
                 )
 
-    def test_get_run_info_filter_by_federations(self) -> None:
-        """Test get_run_info filters correctly by federations only."""
+    def test_get_run_info_filter_by_federation_ids(self) -> None:
+        """Test get_run_info filters correctly by federation IDs only."""
         # Prepare
         state = self.state_factory()
-        run_id1 = create_dummy_run(state, federation="federation-a")
-        _ = create_dummy_run(state, federation="federation-b")
-        run_id3 = create_dummy_run(state, federation="federation-a")
+        run_id1 = create_dummy_run(state, federation_id="@me/fed-a")
+        _ = create_dummy_run(state, federation_id="@me/fed-b")
+        run_id3 = create_dummy_run(state, federation_id="@me/fed-a")
 
         # Execute
-        runs = state.get_run_info(federations=["federation-a"])
+        runs = state.get_run_info(federation_ids=["@me/fed-a"])
 
         # Assert
         self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id3})
@@ -402,8 +402,8 @@ class StateTest(CoreStateTest):
         """Test get_run_info returns empty when any filter list is empty."""
         # Prepare
         state = self.state_factory()
-        _ = create_dummy_run(state, flwr_aid="aid-1", federation="federation-a")
-        _ = create_dummy_run(state, flwr_aid="aid-2", federation="federation-b")
+        _ = create_dummy_run(state, flwr_aid="aid-1", federation_id="@me/fed-a")
+        _ = create_dummy_run(state, flwr_aid="aid-2", federation_id="@me/fed-b")
 
         # Execute & Assert
         runs_statuses_empty = state.get_run_info(statuses=[])
@@ -412,8 +412,8 @@ class StateTest(CoreStateTest):
         runs_flwr_aids_empty = state.get_run_info(flwr_aids=[])
         self.assertEqual(list(runs_flwr_aids_empty), [])
 
-        runs_federations_empty = state.get_run_info(federations=[])
-        self.assertEqual(list(runs_federations_empty), [])
+        runs_federation_ids_empty = state.get_run_info(federation_ids=[])
+        self.assertEqual(list(runs_federation_ids_empty), [])
 
         runs_run_ids_empty = state.get_run_info(run_ids=[])
         self.assertEqual(list(runs_run_ids_empty), [])
@@ -977,7 +977,7 @@ class StateTest(CoreStateTest):
         """Test that get_nodes respects federation manager filtering."""
         # Prepare
         state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state, federation="test-federation")
+        run_id = create_dummy_run(state, federation_id="@me/fed")
 
         # Create 5 nodes
         node_ids = [create_dummy_node(state) for _ in range(5)]
@@ -991,7 +991,7 @@ class StateTest(CoreStateTest):
         retrieved_node_ids = state.get_nodes(run_id)
 
         # Assert
-        mock_filter.assert_called_once_with(set(node_ids), "test-federation")
+        mock_filter.assert_called_once_with(set(node_ids), "@me/fed")
         assert retrieved_node_ids == subset_node_ids
 
     def test_create_node_public_key(self) -> None:
@@ -2037,7 +2037,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     fab_version: str | None = "mock_fab_version",
     fab_hash: str | None = "mock_fab_hash",
     override_config: UserConfig | None = None,
-    federation: str = NOOP_FEDERATION,
+    federation_id: str = NOOP_FEDERATION_ID,
     federation_config: SimulationConfig | None = None,
     flwr_aid: str | None = "mock_flwr_aid",
     primary_task_type: str = TaskType.SERVER_APP,
@@ -2049,7 +2049,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         fab_version=fab_version,
         fab_hash=fab_hash,
         override_config=override_config or {},
-        federation=federation,
+        federation_id=federation_id,
         federation_config=federation_config,
         flwr_aid=flwr_aid,
         primary_task_type=primary_task_type,

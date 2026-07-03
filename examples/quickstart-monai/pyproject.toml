@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-monai"
-version = "1.1.6"
+version = "1.1.7"
 description = "Federated Learning with MONAI and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 dependencies = [
@@ -21,7 +21,7 @@ packages = ["."]
 [tool.flwr.app]
 publisher = "flwrlabs"
 fab-format-version = 1
-flwr-version-target = "1.32.0"
+flwr-version-target = "1.32.1"
 
 [tool.flwr.app.components]
 serverapp = "monaiexample.server_app:app"

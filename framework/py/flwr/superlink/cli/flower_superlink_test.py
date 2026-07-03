@@ -68,9 +68,29 @@ def test_parse_superlink_lifespan_config_returns_final_defaults(
     assert config.certificates is None
     assert config.appio_certificates is None
     assert config.superexec_auth_secret is None
+    assert config.enable_http_api is False
+    assert config.disable_grpc_api is False
+    assert config.host == app_module.UVICORN_DEFAULT_HOST
+    assert config.port == app_module.UVICORN_DEFAULT_PORT
+    assert config.insecure is True
     assert config.enable_supernode_auth is False
     assert config.simulation is False
     assert config.database == FLWR_IN_MEMORY_DB_NAME
+
+
+def test_parse_superlink_lifespan_config_keeps_fleet_address_unset_for_simulation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Simulation config should not synthesize a Fleet API address."""
+    monkeypatch.setattr(
+        app_module.sys,
+        "argv",
+        ["flower-superlink", "--insecure", "--simulation"],
+    )
+
+    config = _parse_superlink_lifespan_config()
+
+    assert config.fleet_api_address is None
 
 
 def test_parse_superlink_lifespan_config_maps_exec_api_address(

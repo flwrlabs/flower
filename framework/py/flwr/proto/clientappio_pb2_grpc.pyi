@@ -129,6 +129,12 @@ class ClientAppIoStub:
     ]
     """Pull task messages"""
 
+    RecordTaskUsage: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.RecordTaskUsageRequest,
+        flwr.proto.appio_pb2.RecordTaskUsageResponse,
+    ]
+    """Record task usage"""
+
     PushLogs: grpc.UnaryUnaryMultiCallable[
         flwr.proto.log_pb2.PushLogsRequest,
         flwr.proto.log_pb2.PushLogsResponse,
@@ -251,6 +257,12 @@ class ClientAppIoAsyncStub:
         flwr.proto.appio_pb2.PullTaskMessageResponse,
     ]
     """Pull task messages"""
+
+    RecordTaskUsage: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.RecordTaskUsageRequest,
+        flwr.proto.appio_pb2.RecordTaskUsageResponse,
+    ]
+    """Record task usage"""
 
     PushLogs: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.log_pb2.PushLogsRequest,
@@ -400,6 +412,14 @@ class ClientAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.PullTaskMessageResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullTaskMessageResponse]]:
         """Pull task messages"""
+
+    @abc.abstractmethod
+    def RecordTaskUsage(
+        self,
+        request: flwr.proto.appio_pb2.RecordTaskUsageRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.RecordTaskUsageResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.RecordTaskUsageResponse]]:
+        """Record task usage"""
 
     @abc.abstractmethod
     def PushLogs(
