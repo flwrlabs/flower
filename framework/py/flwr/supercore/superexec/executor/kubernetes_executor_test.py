@@ -212,6 +212,33 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
     assert pod["spec"]["restartPolicy"] == "Never"
 
 
+def test_build_taskexecutor_pod_includes_configured_volumes() -> None:
+    """Test configured Pod volumes and container volume mounts are included."""
+    spec = _execution_spec()
+    config = _executor_config(
+        volumes=[
+            {
+                "name": "shmem",
+                "emptyDir": {"medium": "Memory", "sizeLimit": "10Gi"},
+            }
+        ],
+        volume_mounts=[{"name": "shmem", "mountPath": "/dev/shm"}],
+    )
+
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            spec, config, _appio_root_certificates(spec, config), _LAUNCH_ATTEMPT_ID
+        )
+    )
+    container = pod["spec"]["containers"][0]
+
+    assert {
+        "name": "shmem",
+        "emptyDir": {"medium": "Memory", "sizeLimit": "10Gi"},
+    } in pod["spec"]["volumes"]
+    assert {"name": "shmem", "mountPath": "/dev/shm"} in container["volumeMounts"]
+
+
 def test_build_taskexecutor_pod_supports_explicit_env() -> None:
     """Test Pod construction includes validated explicit container env."""
     pod = _as_dict(

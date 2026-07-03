@@ -154,6 +154,10 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     env : list[JSONObject] | None
         Optional explicit TaskExecutor container environment. Only literal
         name/value entries are supported.
+    volumes : list[JSONObject] | None
+        Optional Kubernetes Pod volumes.
+    volume_mounts : list[JSONObject] | None
+        Optional Kubernetes TaskExecutor container volume mounts.
     node_selector : dict[str, str] | None
         Optional Kubernetes nodeSelector.
     tolerations : list[JSONObject] | None
@@ -180,6 +184,8 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     resource_pool: str | None = None
     resources: JSONObject | None = None
     env: list[JSONObject] | None = None
+    volumes: list[JSONObject] | None = None
+    volume_mounts: list[JSONObject] | None = None
     node_selector: dict[str, str] | None = None
     tolerations: list[JSONObject] | None = None
     affinity: JSONObject | None = None
@@ -429,18 +435,22 @@ def _build_taskexecutor_pod(
     launch_attempt_id: str,
 ) -> JSONObject:
     """Build the TaskExecutor Pod for a claimed SuperExec task."""
+    volume_mounts: list[JSONObject] = [
+        {
+            "name": "appio-credentials",
+            "mountPath": APPIO_CREDENTIALS_MOUNT_PATH,
+            "readOnly": True,
+        }
+    ]
+    if config.volume_mounts is not None:
+        volume_mounts.extend(config.volume_mounts)
+
     container: JSONObject = {
         "name": "taskexecutor",
         "image": config.image,
         "command": [TASK_TYPE_TO_COMMAND[spec.task_type]],
         "args": _taskexecutor_args(spec, appio_root_certificates),
-        "volumeMounts": [
-            {
-                "name": "appio-credentials",
-                "mountPath": APPIO_CREDENTIALS_MOUNT_PATH,
-                "readOnly": True,
-            }
-        ],
+        "volumeMounts": volume_mounts,
     }
     if config.image_pull_policy is not None:
         container["imagePullPolicy"] = config.image_pull_policy
@@ -451,19 +461,23 @@ def _build_taskexecutor_pod(
     if config.container_security_context is not None:
         container["securityContext"] = config.container_security_context
 
+    volumes: list[JSONObject] = [
+        {
+            "name": "appio-credentials",
+            "secret": {
+                "secretName": _credential_secret_name(spec, launch_attempt_id),
+                "defaultMode": 0o444,
+            },
+        }
+    ]
+    if config.volumes is not None:
+        volumes.extend(config.volumes)
+
     pod_spec: JSONObject = {
         "automountServiceAccountToken": False,
         "restartPolicy": "Never",
         "containers": [container],
-        "volumes": [
-            {
-                "name": "appio-credentials",
-                "secret": {
-                    "secretName": _credential_secret_name(spec, launch_attempt_id),
-                    "defaultMode": 0o444,
-                },
-            }
-        ],
+        "volumes": volumes,
     }
     if config.service_account_name is not None:
         pod_spec["serviceAccountName"] = config.service_account_name
