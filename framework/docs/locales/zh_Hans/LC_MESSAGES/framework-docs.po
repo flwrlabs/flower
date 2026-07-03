@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-02 00:30+0000\n"
+"POT-Creation-Date: 2026-07-03 00:26+0000\n"
 "PO-Revision-Date: 2026-06-11 04:01+0000\n"
 "Last-Translator: reducedradius <feixiang512@outlook.com>\n"
 "Language: zh_Hans\n"
@@ -11254,7 +11254,7 @@ msgstr "flower-superlink"
 msgid ""
 "The invited user will see the invitation when they sign in to `flower.ai "
 "<https://flower.ai/>`__ and open their profile page. The invitation shows"
-" the federation name and the username of the user who sent it."
+" the federation ID and the username of the user who sent it."
 msgstr ""
 
 #: ../../source/how-to-create-and-manage-federations.rst:122
@@ -12313,48 +12313,49 @@ msgstr ""
 
 #: ../../source/how-to-manage-flower-federations.rst:25
 msgid ""
-"Federations can be addressed by their unique identifier, which has the "
-"form ``@<account-name>/<federation-name>`` being ``<account-name>`` the "
-"name of the account that created the federation and ``<federation-name>``"
-" the name given to the federation at creation time."
+"Federations can be addressed by their federation ID, which has the form "
+"``@<account-name>/<federation-name>``. The ``<account-name>`` is the name"
+" of the account that created the federation, and ``<federation-name>`` is"
+" the name of the federation."
 msgstr ""
 
-#: ../../source/how-to-manage-flower-federations.rst:30
+#: ../../source/how-to-manage-flower-federations.rst:29
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:13
 msgid "In this how-to guide, you will:"
 msgstr ""
 
-#: ../../source/how-to-manage-flower-federations.rst:32
+#: ../../source/how-to-manage-flower-federations.rst:31
 msgid "Learn how to see the federations you are part of."
 msgstr ""
 
-#: ../../source/how-to-manage-flower-federations.rst:33
+#: ../../source/how-to-manage-flower-federations.rst:32
 msgid "Learn how to display information about a specific federation."
 msgstr ""
 
-#: ../../source/how-to-manage-flower-federations.rst:37
+#: ../../source/how-to-manage-flower-federations.rst:36
 msgid ""
 "This guide covers inspecting federations through the Flower CLI when "
 "using a self-hosted SuperLink. To create and manage federations in the "
 "SuperGrid dashboard, see :doc:`how-to-create-and-manage-federations`."
 msgstr ""
 
-#: ../../source/how-to-manage-flower-federations.rst:43
+#: ../../source/how-to-manage-flower-federations.rst:42
 #, fuzzy
 msgid "List Federations"
 msgstr "运行模拟"
 
-#: ../../source/how-to-manage-flower-federations.rst:45
+#: ../../source/how-to-manage-flower-federations.rst:44
 msgid ""
 "With the |flower_cli_federation_link|_, you can easily inspect the "
 "federations your Flower account is part of:"
 msgstr ""
 
-#: ../../source/how-to-manage-flower-federations.rst:52
+#: ../../source/how-to-manage-flower-federations.rst:51
 msgid ""
 "The above command will display a table with a row for each federation you"
-" are part of. In this case there is only one federation named ``default``"
-" under the account ``none``:"
+" are part of. In this case there is one federation: ``@none/default``. "
+"Its federation name is ``default``, and it belongs to the ``none`` "
+"account:"
 msgstr ""
 
 #: ../../source/how-to-manage-flower-federations.rst:66
@@ -12364,9 +12365,9 @@ msgstr "运行模拟"
 
 #: ../../source/how-to-manage-flower-federations.rst:68
 msgid ""
-"You can inspect a specific federation by providing the identifier of the "
-"federation to the ``flwr federation list`` command. With this command, "
-"you will be able to see the following information about a federation:"
+"You can inspect a specific federation by passing its federation ID to "
+"``flwr federation list``. With this command, you will be able to see the "
+"following information about a federation:"
 msgstr ""
 
 #: ../../source/how-to-manage-flower-federations.rst:72
@@ -12386,8 +12387,8 @@ msgstr "flower-superlink"
 
 #: ../../source/how-to-manage-flower-federations.rst:76
 msgid ""
-"The ``flwr federation list --federation <federation>`` command requires "
-"the identifier of the federation to inspect as an argument:"
+"The ``flwr federation list --federation <federation-id>`` command expects"
+" the federation ID as an argument:"
 msgstr ""
 
 #: ../../source/how-to-manage-flower-federations.rst:83
@@ -12797,13 +12798,13 @@ msgid ""
 "Then, log in to SuperGrid with ``flwr login``. This opens a browser "
 "window where you can authenticate with your SuperGrid account. Finally, "
 "run the app with ``flwr run`` and use ``--federation`` to choose the "
-"federation:"
+"target federation:"
 msgstr ""
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:94
 msgid ""
-"Replace ``@<username>/<federation-name>`` with the unique name of your "
-"federation, for example ``@peter123/my-federation``."
+"Replace ``@<username>/<federation-name>`` with your federation ID, for "
+"example ``@peter123/my-federation``."
 msgstr ""
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:105
@@ -17513,7 +17514,7 @@ msgstr ""
 
 #: ../../source/how-to-use-cli-json-output.rst:160
 #, fuzzy
-msgid "``federation``: the federation identifier"
+msgid "``federation-id``: the federation ID"
 msgstr "基础镜像的存储库名称。"
 
 #: ../../source/how-to-use-cli-json-output.rst:161
@@ -18280,8 +18281,8 @@ msgstr "然后，我们启动服务器："
 #: ../../flwr accept:1 add-supernode:1 create:1 federation invite reject:1
 #: remove-supernode:1 revoke:1
 #, fuzzy
-msgid "Name of the federation."
-msgstr "flower-superlink"
+msgid "Federation ID."
+msgstr "运行模拟"
 
 #: ../../flwr accept:1 add-supernode:1 archive:1 create:1 federation invite
 #: list:1 log:1 login:1 pull:1 register:1 reject:1 remove-account:1
@@ -18298,7 +18299,7 @@ msgstr "使用现有策略"
 
 #: ../../flwr archive:1 federation
 #, fuzzy
-msgid "Name of the federation to archive."
+msgid "Federation ID to archive."
 msgstr "flower-superlink"
 
 #: ../../flwr create:1 federation
@@ -18378,7 +18379,7 @@ msgstr ""
 
 #: ../../flwr federation list:1
 #, fuzzy
-msgid "Name of the federation to display"
+msgid "Federation ID to display"
 msgstr "flower-superlink"
 
 #: ../../flwr federation list:1
@@ -18392,7 +18393,7 @@ msgstr "flower-superlink"
 
 #: ../../flwr federation remove-account:1
 #, fuzzy
-msgid "Name of the federation to remove an account from."
+msgid "Federation ID to remove an account from."
 msgstr "flower-superlink"
 
 #: ../../flwr federation remove-account:1
@@ -18465,7 +18466,7 @@ msgstr ""
 
 #: ../../flwr federation simulation-config:1
 #, fuzzy
-msgid "Name of the federation; must be in the format `@<account>/<federation>`."
+msgid "Federation ID; must be in the format `@<account>/<federation-name>`."
 msgstr "flower-superlink"
 
 #: ../../flwr install:1
@@ -18616,10 +18617,11 @@ msgid "Run Flower App."
 msgstr "Flower 服务器。"
 
 #: ../../flwr run:1
+#, fuzzy
 msgid ""
-"The federation to submit the run to; must be in the format "
-"`@<account>/<federation>`."
-msgstr ""
+"The federation ID to submit the run to; must be in the format `@<account"
+">/<federation-name>`."
+msgstr "flower-superlink"
 
 #: ../../flwr run:1
 #, fuzzy
@@ -39647,10 +39649,6 @@ msgstr ""
 msgid "Reinstall or upgrade ``flwr``, then retry:"
 msgstr ""
 
-#: ../../source/ref-exit-codes/601.rst:19
-msgid "python -m pip install -U flwr"
-msgstr ""
-
 #: ../../source/ref-exit-codes/602.rst:3
 msgid "[602] COMMON_TLS_NOT_SUPPORTED"
 msgstr ""
@@ -44855,9 +44853,9 @@ msgstr ""
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:182
 msgid ""
-"In SuperGrid, use the ``--federation`` flag to choose which federation "
-"runs your app. If you omit it, Flower uses ``@<your-account>/workspace``."
-" Learn more in :doc:`Create and Manage Federations on SuperGrid <how-to-"
+"In SuperGrid, use the ``--federation`` flag with the federation ID to run"
+" your app. If you omit it, Flower uses ``@<your-account>/workspace``. "
+"Learn more in :doc:`Create and Manage Federations on SuperGrid <how-to-"
 "create-and-manage-federations>`."
 msgstr ""
 
@@ -75502,3 +75500,83 @@ msgstr ""
 
 #~ msgid "``FedAvg`` selects all 10 clients (100%)."
 #~ msgstr ""
+
+#~ msgid ""
+#~ "The invited user will see the "
+#~ "invitation when they sign in to "
+#~ "`flower.ai <https://flower.ai/>`__ and open "
+#~ "their profile page. The invitation shows"
+#~ " the federation name and the username"
+#~ " of the user who sent it."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Federations can be addressed by their"
+#~ " unique identifier, which has the "
+#~ "form ``@<account-name>/<federation-name>`` "
+#~ "being ``<account-name>`` the name of "
+#~ "the account that created the federation"
+#~ " and ``<federation-name>`` the name "
+#~ "given to the federation at creation "
+#~ "time."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The above command will display a "
+#~ "table with a row for each "
+#~ "federation you are part of. In "
+#~ "this case there is only one "
+#~ "federation named ``default`` under the "
+#~ "account ``none``:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "You can inspect a specific federation"
+#~ " by providing the identifier of the"
+#~ " federation to the ``flwr federation "
+#~ "list`` command. With this command, you"
+#~ " will be able to see the "
+#~ "following information about a federation:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The ``flwr federation list --federation "
+#~ "<federation>`` command requires the identifier"
+#~ " of the federation to inspect as "
+#~ "an argument:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Then, log in to SuperGrid with "
+#~ "``flwr login``. This opens a browser "
+#~ "window where you can authenticate with"
+#~ " your SuperGrid account. Finally, run "
+#~ "the app with ``flwr run`` and use"
+#~ " ``--federation`` to choose the federation:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Replace ``@<username>/<federation-name>`` with "
+#~ "the unique name of your federation, "
+#~ "for example ``@peter123/my-federation``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The federation to submit the run "
+#~ "to; must be in the format "
+#~ "`@<account>/<federation>`."
+#~ msgstr ""
+
+#~ msgid "python -m pip install -U flwr"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In SuperGrid, use the ``--federation`` "
+#~ "flag to choose which federation runs "
+#~ "your app. If you omit it, Flower"
+#~ " uses ``@<your-account>/workspace``. Learn "
+#~ "more in :doc:`Create and Manage "
+#~ "Federations on SuperGrid <how-to-"
+#~ "create-and-manage-federations>`."
+#~ msgstr ""
+
