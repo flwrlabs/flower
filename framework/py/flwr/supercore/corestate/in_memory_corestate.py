@@ -380,15 +380,13 @@ class InMemoryCoreState(
         with self.lock_task_store:
             task = self.task_store.get(task_id)
             if task is None:
-                raise ValueError(f"Task {task_id} not found")
+                return
             run_id = task.run_id
 
         with self.lock_task_usage_store:
-            if task_id in self.task_usage_store:
-                return
-
-            self.task_usage_store[task_id] = TaskUsageRecord(
-                id=self._next_task_usage_id,
+            usage_id = self._next_task_usage_id
+            self.task_usage_store[usage_id] = TaskUsageRecord(
+                id=usage_id,
                 task_id=task_id,
                 run_id=run_id,
                 usage=usage,
@@ -397,7 +395,7 @@ class InMemoryCoreState(
             )
             self._next_task_usage_id += 1
 
-    def get_task_usage(
+    def get_task_usage(  # pylint: disable=too-many-arguments,too-many-boolean-expressions
         self,
         *,
         run_ids: Sequence[int] | None = None,

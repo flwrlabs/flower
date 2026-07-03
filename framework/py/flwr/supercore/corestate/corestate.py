@@ -259,18 +259,13 @@ class CoreState(ABC):  # pylint: disable=R0904
         usage : TaskUsage
             Usage payload to persist.
 
-        Raises
-        ------
-        ValueError
-            Raised if `task_id` does not identify an existing task.
-
         Notes
         -----
-        Duplicate writes for the same task are successful no-ops.
+        Each successful call appends a new usage record for the task.
         """
 
     @abstractmethod
-    def get_task_usage(
+    def get_task_usage(  # pylint: disable=too-many-arguments
         self,
         *,
         run_ids: Sequence[int] | None = None,

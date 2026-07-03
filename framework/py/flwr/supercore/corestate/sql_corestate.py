@@ -513,62 +513,28 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Record usage for the specified task."""
         sint64_task_id = uint64_to_int64(task_id)
 
-        try:
-            with self.session():
-                rows = self.query(
-                    """
-                    INSERT INTO task_usage (
-                        run_id, task_id, input_tokens, output_tokens, total_tokens,
-                        usage_type, created_at, reported_at
-                    )
-                    SELECT
-                        run_id, task_id, :input_tokens, :output_tokens,
-                        :total_tokens, :usage_type, :created_at, :reported_at
-                    FROM task
-                    WHERE task_id = :task_id
-                        AND NOT EXISTS (
-                            SELECT 1
-                            FROM task_usage
-                            WHERE task_usage.task_id = :task_id
-                        )
-                    RETURNING id
-                    """,
-                    {
-                        **_task_usage_to_row(usage),
-                        "task_id": sint64_task_id,
-                        "created_at": now().isoformat(),
-                        "reported_at": None,
-                    },
-                )
-                if rows:
-                    return
-
-                rows = self.query(
-                    """
-                    SELECT id
-                    FROM task_usage
-                    WHERE task_id = :task_id
-                    """,
-                    {"task_id": sint64_task_id},
-                )
-                if rows:
-                    return
-
-                raise ValueError(f"Task {task_id} not found")
-        except IntegrityError:
-            rows = self.query(
+        with self.session():
+            self.query(
                 """
-                SELECT id
-                FROM task_usage
+                INSERT INTO task_usage (
+                    run_id, task_id, input_tokens, output_tokens, total_tokens,
+                    usage_type, created_at, reported_at
+                )
+                SELECT
+                    run_id, task_id, :input_tokens, :output_tokens,
+                    :total_tokens, :usage_type, :created_at, :reported_at
+                FROM task
                 WHERE task_id = :task_id
                 """,
-                {"task_id": sint64_task_id},
+                {
+                    **_task_usage_to_row(usage),
+                    "task_id": sint64_task_id,
+                    "created_at": now().isoformat(),
+                    "reported_at": None,
+                },
             )
-            if rows:
-                return
-            raise
 
-    def get_task_usage(
+    def get_task_usage(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         *,
         run_ids: Sequence[int] | None = None,
@@ -1107,24 +1073,12 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     )
 
 
-def _task_usage_to_row(usage: TaskUsage) -> dict[str, int | str | None]:
+def _task_usage_to_row(usage: TaskUsage) -> dict[str, int | str]:
     """Convert a TaskUsage proto to database row values."""
     return {
-        "input_tokens": (
-            uint64_to_int64(usage.input_tokens)
-            if usage.HasField("input_tokens")
-            else None
-        ),
-        "output_tokens": (
-            uint64_to_int64(usage.output_tokens)
-            if usage.HasField("output_tokens")
-            else None
-        ),
-        "total_tokens": (
-            uint64_to_int64(usage.total_tokens)
-            if usage.HasField("total_tokens")
-            else None
-        ),
+        "input_tokens": usage.input_tokens,
+        "output_tokens": usage.output_tokens,
+        "total_tokens": usage.total_tokens,
         "usage_type": usage.usage_type,
     }
 

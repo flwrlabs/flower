@@ -188,7 +188,6 @@ def create_corestate_metadata() -> MetaData:
             BigInteger,
             ForeignKey("task.task_id"),
             nullable=False,
-            unique=True,
         ),
         Column("input_tokens", BigInteger, nullable=True),
         Column("output_tokens", BigInteger, nullable=True),

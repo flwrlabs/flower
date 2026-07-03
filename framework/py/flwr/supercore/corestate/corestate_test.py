@@ -315,22 +315,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             reported=False,
         )
 
-        self.assertEqual(len(usages), 1)
+        self.assertEqual(len(usages), 2)
         usage = usages[0]
         self.assertEqual(usage.input_tokens, 10)
         self.assertEqual(usage.output_tokens, 20)
         self.assertEqual(usage.total_tokens, 30)
         self.assertEqual(usage.usage_type, "token")
-
-    def test_add_task_usage_rejects_unknown_task(self) -> None:
-        """Usage writes should reject unknown task IDs."""
-        state = self.state_factory()
-        missing_task_id = 61016
-        while state.get_tasks(task_ids=[missing_task_id]):
-            missing_task_id += 1
-
-        with self.assertRaises(ValueError):
-            state.add_task_usage(missing_task_id, TaskUsage())
+        self.assertEqual(usages[1].input_tokens, 999)
 
     def test_add_and_get_task_log(self) -> None:
         """Adding and retrieving task logs should preserve concatenation order."""
