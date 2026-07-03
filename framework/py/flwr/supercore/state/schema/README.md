@@ -97,8 +97,8 @@ erDiagram
     VARCHAR fab_hash "nullable"
     VARCHAR fab_id "nullable"
     VARCHAR fab_version "nullable"
-    VARCHAR federation "nullable"
     VARCHAR federation_config "nullable"
+    VARCHAR federation_id "nullable"
     VARCHAR flwr_aid "nullable"
     VARCHAR override_config "nullable"
     BIGINT primary_task_id
@@ -116,7 +116,7 @@ erDiagram
     BIGINT series_id PK
     TIMESTAMP created_at
     VARCHAR description "nullable"
-    VARCHAR federation
+    VARCHAR federation_id
     TIMESTAMP updated_at
   }
 
