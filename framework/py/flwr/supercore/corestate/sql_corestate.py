@@ -1036,7 +1036,7 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
 
 def _task_usage_to_row(
     task_id: int, usage: TaskUsage
-) -> dict[str, datetime | int | str | None]:
+) -> dict[str, Any]:
     """Convert a TaskUsage proto to database row values."""
     return {
         "task_id": uint64_to_int64(task_id),
