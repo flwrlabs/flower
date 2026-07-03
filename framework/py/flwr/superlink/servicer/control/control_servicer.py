@@ -273,7 +273,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             if run_id == 0:
                 raise FlowerError(
                     ApiErrorCode.FAILED_TO_CREATE_RUN,
-                    "Failed to create or initialize the run.",
+                    "Failed to create or initialize run for "
+                    f"flwr_aid={flwr_aid}, federation_id={federation_id}, "
+                    f"fab_id={fab_id}, fab_version={fab_version}, "
+                    f"fab_hash={fab_hash}, primary_task_type={primary_task_type}.",
                 )
 
             run = state.get_run_info(run_ids=[run_id])[0]
@@ -283,7 +286,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             log(ERROR, "Could not start run: %s", str(e))
             raise FlowerError(
                 ApiErrorCode.INVALID_RUN_CONFIG,
-                "Could not start run.",
+                "Could not start run for "
+                f"flwr_aid={flwr_aid}, federation_id={federation_id}: {e}",
                 public_details=str(e),
             ) from e
 
@@ -308,7 +312,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Exit if `run_id` not found
         if not runs:
-            raise FlowerError(ApiErrorCode.RUN_ID_NOT_FOUND, "Run ID not found.")
+            raise FlowerError(
+                ApiErrorCode.RUN_ID_NOT_FOUND,
+                f"Run {run_id} not found while streaming logs.",
+            )
         run = runs[0]
         task_id = cast(int, run.primary_task_id)
 
@@ -366,11 +373,15 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # Build a set of run IDs for `flwr ls --run-id <run_id>`
         else:
             # Retrieve run ID and run
-            runs = state.get_run_info(run_ids=[request.run_id])
+            run_id = request.run_id
+            runs = state.get_run_info(run_ids=[run_id])
 
             # Exit if `run_id` not found
             if not runs:
-                raise FlowerError(ApiErrorCode.RUN_ID_NOT_FOUND, "Run ID not found.")
+                raise FlowerError(
+                    ApiErrorCode.RUN_ID_NOT_FOUND,
+                    f"Run {run_id} not found while listing runs for {flwr_aid}.",
+                )
 
             # Check if requester is a member of the federation
             # that the run belongs to
@@ -434,7 +445,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         state = self.linkstate_factory.state()
         flwr_aid = _get_flwr_aid()
-        series_matches = state.get_run_series(series_ids=[request.series_id])
+        series_id = request.series_id
+        series_matches = state.get_run_series(series_ids=[series_id])
 
         # The caller must be a member of the federation
         if not series_matches or not state.federation_manager.has_member(
@@ -442,7 +454,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         ):
             raise FlowerError(
                 ApiErrorCode.RUN_SERIES_ID_NOT_FOUND,
-                "Run series ID not found.",
+                f"Run series {series_id} not found for {flwr_aid}.",
             )
 
         # Get the run series context and construct the response
@@ -470,7 +482,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Exit if `run_id` not found
         if not runs:
-            raise FlowerError(ApiErrorCode.RUN_ID_NOT_FOUND, "Run ID not found.")
+            raise FlowerError(
+                ApiErrorCode.RUN_ID_NOT_FOUND,
+                f"Run {run_id} not found while stopping run.",
+            )
         run = runs[0]
 
         flwr_aid = _get_flwr_aid()
@@ -480,7 +495,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             details = f"Run ID {run_id} is already finished"
             raise FlowerError(
                 ApiErrorCode.RUN_ALREADY_FINISHED,
-                details,
+                f"Cannot stop run {run_id} for flwr_aid={flwr_aid}; "
+                f"run is already finished with status={run.status}.",
                 public_details=details,
             )
 
@@ -557,14 +573,18 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Exit if `run_id` not found
         if not runs:
-            raise FlowerError(ApiErrorCode.RUN_ID_NOT_FOUND, "Run ID not found.")
+            raise FlowerError(
+                ApiErrorCode.RUN_ID_NOT_FOUND,
+                f"Run {run_id} not found while pulling artifacts.",
+            )
         run = runs[0]
 
         # Exit if the run is not finished yet
         if run.status.status != Status.FINISHED:
             raise FlowerError(
                 ApiErrorCode.PULL_UNFINISHED_RUN,
-                "Cannot pull artifacts for an unfinished run.",
+                f"Cannot pull artifacts for run {run_id}; "
+                f"status={run.status.status}, owner_aid={run.flwr_aid}.",
             )
 
         # Check if `flwr_aid` matches the run's `flwr_aid`
@@ -594,7 +614,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             log(ERROR, "%s", err)
             raise FlowerError(
                 ApiErrorCode.PUBLIC_KEY_NOT_VALID,
-                "The provided public key is not valid.",
+                f"Invalid public key in RegisterNode request: {err}",
             ) from err
 
         # Init link state
@@ -623,7 +643,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             log(ERROR, "Public key already in use")
             raise FlowerError(
                 ApiErrorCode.PUBLIC_KEY_ALREADY_IN_USE,
-                "Public key already in use.",
+                f"Public key already in use while registering node for "
+                f"flwr_aid={flwr_aid}, account_name={account_name}.",
             ) from err
         log(INFO, "[ControlServicer.RegisterNode] Created node_id=%s", node_id)
 
@@ -645,7 +666,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             log(ERROR, "Node ID not found for account")
             raise FlowerError(
                 ApiErrorCode.NODE_NOT_FOUND,
-                "Node ID not found for account.",
+                f"Node {request.node_id} not found for flwr_aid={flwr_aid}.",
             ) from err
 
         return UnregisterNodeResponse()
@@ -705,14 +726,15 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         flwr_aid = _get_flwr_aid()
         state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
         if not state.federation_manager.has_member(flwr_aid, federation_id):
-            details = (
+            public_details = (
                 f"Federation '{federation_id}' does not exist or you are "
                 "not a member of it."
             )
             raise FlowerError(
                 ApiErrorCode.FEDERATION_NOT_FOUND_OR_NOT_MEMBER,
-                details,
-                public_details=details,
+                f"Federation '{federation_id}' not found or flwr_aid={flwr_aid} "
+                "is not a member.",
+                public_details=public_details,
             )
 
         # Fetch federation details
@@ -749,7 +771,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             details = f"Invalid federation name: '{request.federation_name}'. {err_msg}"
             raise FlowerError(
                 ApiErrorCode.INVALID_FEDERATION_NAME,
-                details,
+                f"Invalid federation name in CreateFederation request: "
+                f"federation_name={request.federation_name}. {err_msg}",
                 public_details=details,
             )
 
@@ -1052,7 +1075,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         # Exit if `run_id` not found
         if not runs:
-            raise FlowerError(ApiErrorCode.RUN_ID_NOT_FOUND, "Run ID not found.")
+            raise FlowerError(
+                ApiErrorCode.RUN_ID_NOT_FOUND,
+                f"Run {run_id} not found while streaming run events.",
+            )
         run = runs[0]
 
         flwr_aid = _get_flwr_aid()
@@ -1263,7 +1289,7 @@ def _get_remote_fab(
     except requests.RequestException as e:
         raise FlowerError(
             ApiErrorCode.FAB_DOWNLOAD_FAILURE,
-            f"FAB download failed: {str(e)}",
+            f"FAB download failed for app_id={app_id}, app_version={app_version}: {e}",
         ) from e
     fab_file = r.content
     return fab_file, verification_dict, note
