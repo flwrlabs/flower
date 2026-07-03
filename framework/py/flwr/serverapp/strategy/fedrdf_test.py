@@ -114,7 +114,7 @@ def test_fedrdf_ks_proportion() -> None:
     sample = np.random.normal(0, 1, 100)
 
     # Execute
-    proportion = strategy._ks_proportion(sample)
+    proportion = strategy._ks_proportion(sample)  # pylint: disable=W0212
 
     # Assert - proportion should be between 0 and 1
     assert 0.0 <= proportion <= 1.0
@@ -131,7 +131,7 @@ def test_fedrdf_compute_skewness() -> None:
     arrays = [np.random.normal(0, 1, (5, 5)) for _ in range(3)]
 
     # Execute
-    skewness = strategy._compute_skewness(arrays)
+    skewness = strategy._compute_skewness(arrays)  # pylint: disable=W0212
 
     # Assert - skewness should be between 0 and 1
     assert 0.0 <= skewness <= 1.0
@@ -150,7 +150,7 @@ def test_fedrdf_fourier_aggregate() -> None:
     ]
 
     # Execute
-    result = strategy._fourier_aggregate(arrays)
+    result = strategy._fourier_aggregate(arrays)  # pylint: disable=W0212
 
     # Assert
     assert result.shape == arrays[0].shape
@@ -167,6 +167,39 @@ def test_fedrdf_with_poisoned_updates() -> None:
     benign2 = np.array([[1.1, 2.1], [3.1, 4.1]], dtype=np.float32)
     benign3 = np.array([[0.9, 1.9], [2.9, 3.9]], dtype=np.float32)
     poisoned = np.array([[100.0, 200.0], [300.0, 400.0]], dtype=np.float32)  # Outlier
+
+    replies = [
+        create_mock_reply(ArrayRecord([benign1]), num_examples=10),
+        create_mock_reply(ArrayRecord([benign2]), num_examples=10),
+        create_mock_reply(ArrayRecord([benign3]), num_examples=10),
+        create_mock_reply(ArrayRecord([poisoned]), num_examples=10),
+    ]
+
+    # Execute
+    arrays_aggregated, _ = strategy.aggregate_train(server_round=1, replies=replies)
+
+    # Assert - aggregated result should be closer to benign updates than poisoned
+    assert arrays_aggregated is not None
+    aggregated_arrays = arrays_aggregated.to_numpy_ndarrays()
+
+    benign_mean = (benign1 + benign2 + benign3) / 3
+    dist_to_benign = np.mean(np.abs(aggregated_arrays[0] - benign_mean))
+    dist_to_poisoned = np.mean(np.abs(aggregated_arrays[0] - poisoned))
+
+    # FedRDF should keep aggregation closer to benign clients
+    assert dist_to_benign < dist_to_poisoned
+
+
+def test_fedrdf_with_negative_poisoned_updates() -> None:
+    """Test FedRDF robustness against a negative-scaled poisoned update."""
+    # Prepare
+    strategy = FedRDF(threshold=0.0)  # Always use FFT
+
+    # Create benign and poisoned updates (outlier on the negative side)
+    benign1 = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+    benign2 = np.array([[1.1, 2.1], [3.1, 4.1]], dtype=np.float32)
+    benign3 = np.array([[0.9, 1.9], [2.9, 3.9]], dtype=np.float32)
+    poisoned = np.array([[-100.0, -200.0], [-300.0, -400.0]], dtype=np.float32)
 
     replies = [
         create_mock_reply(ArrayRecord([benign1]), num_examples=10),
@@ -253,10 +286,8 @@ def test_fedrdf_adaptive_switches_to_fourier_on_high_skewness(
 
     arrays_aggregated, _ = strategy.aggregate_train(server_round=1, replies=replies)
 
-    # FFT path selects the highest-frequency component of the sorted values,
+    # The Fourier path selects a weight from the benign high-density region,
     # excluding the poisoned 100.0 (weighted FedAvg would yield ~34.3 instead)
     assert arrays_aggregated is not None
-    np.testing.assert_array_equal(
-        arrays_aggregated.to_numpy_ndarrays()[0],
-        np.array([[2.0, 2.0]], dtype=np.float32),
-    )
+    result = arrays_aggregated.to_numpy_ndarrays()[0]
+    assert np.all(np.isin(result, [1.0, 2.0]))

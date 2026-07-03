@@ -37,9 +37,17 @@ except ImportError:
     HAS_SCIPY = False
 
 from flwr.app import Array, ArrayRecord, Message, MetricRecord, RecordDict
-from flwr.common import log
+from flwr.common import NDArray, log
 
 from .fedavg import FedAvg
+from .strategy_utils import aggregate_arrayrecords
+
+# Number of harmonics and Gaussian smoothing bandwidth (as a fraction of the
+# unit period) used by the Fourier-based density estimation, and the number of
+# coordinates processed per chunk to bound peak memory
+_FOURIER_MODES = 8
+_FOURIER_BANDWIDTH = 0.05
+_FOURIER_CHUNK = 65536
 
 
 class FedRDF(FedAvg):
@@ -51,7 +59,7 @@ class FedRDF(FedAvg):
     FFT aggregation mechanism.
 
     The strategy analyzes client weight distributions using statistical tests
-    (Kolmogorov-Smirnov) to compute skewness. When skewness exceeds a threshold,
+    (Kolmogorov-Smirnov) to compute skewness. When skewness reaches a threshold,
     it applies Fourier Transform-based aggregation to mitigate the impact of
     poisoned updates.
 
@@ -91,7 +99,10 @@ class FedRDF(FedAvg):
     threshold : float (default: 0.0)
         Skewness threshold for switching between FedAvg and FFT aggregation.
         - If threshold <= 0: Always use FFT-based robust aggregation
-        - If threshold > 0: Use FFT only when detected skewness > threshold
+        - If threshold > 0: Use FFT only when the detected skewness reaches the
+          threshold. The Kolmogorov-Smirnov based detection requires at least
+          10 replies per round; with fewer replies the detected skewness is 0.0
+          and FedAvg is used.
 
     Reference
     ---------
@@ -145,6 +156,7 @@ class FedRDF(FedAvg):
             evaluate_metrics_aggr_fn=evaluate_metrics_aggr_fn,
         )
         self.threshold = threshold
+        self._rng = np.random.default_rng()
 
     def aggregate_train(
         self,
@@ -176,19 +188,10 @@ class FedRDF(FedAvg):
         if not valid_replies:
             return None, None
 
+        # Replies are already validated to hold one ArrayRecord and one MetricRecord
         reply_contents = [msg.content for msg in valid_replies]
 
-        # Replies are already validated to hold one ArrayRecord and one MetricRecord
-        arrays_and_weights = []
-        for record_dict in reply_contents:
-            arrayrecord = next(iter(record_dict.array_records.values()))
-            metricrecord = next(iter(record_dict.metric_records.values()))
-            weight = float(metricrecord[self.weighted_by_key])
-            arrays_and_weights.append((arrayrecord, weight))
-
-        aggregated_arrayrecord = self._aggregate_fedrdf(
-            arrays_and_weights, server_round
-        )
+        aggregated_arrayrecord = self._aggregate_fedrdf(reply_contents, server_round)
 
         # Aggregate metrics using parent's method
         metrics = self.train_metrics_aggr_fn(reply_contents, self.weighted_by_key)
@@ -197,16 +200,16 @@ class FedRDF(FedAvg):
 
     def _aggregate_fedrdf(
         self,
-        arrays_and_weights: list[tuple[ArrayRecord, float]],
+        records: list[RecordDict],
         server_round: int,
     ) -> ArrayRecord:
         """Aggregate layers via Fourier-based selection or weighted FedAvg."""
-        keys = list(arrays_and_weights[0][0].keys())
-        layers = {
-            key: [arrayrecord[key].numpy() for arrayrecord, _ in arrays_and_weights]
+        arrayrecords = [next(iter(record.array_records.values())) for record in records]
+        keys = list(arrayrecords[0].keys())
+        layers: dict[str, list[NDArray]] = {
+            key: [arrayrecord[key].numpy() for arrayrecord in arrayrecords]
             for key in keys
         }
-        weights = [weight for _, weight in arrays_and_weights]
 
         use_fourier = self.threshold <= 0
         if not use_fourier:
@@ -220,19 +223,12 @@ class FedRDF(FedAvg):
                 self.threshold,
             )
 
-        if use_fourier:
-            aggregated = {k: self._fourier_aggregate(layers[k]) for k in keys}
-        else:
-            total = sum(weights)
-            aggregated = {
-                k: sum(layer * w for layer, w in zip(layers[k], weights, strict=True))
-                / total
-                for k in keys
-            }
+        if not use_fourier:
+            return aggregate_arrayrecords(records, self.weighted_by_key)
 
-        return ArrayRecord({k: Array(np.asarray(v)) for k, v in aggregated.items()})
+        return ArrayRecord({k: Array(self._fourier_aggregate(layers[k])) for k in keys})
 
-    def _ks_proportion(self, sample: np.ndarray) -> float:
+    def _ks_proportion(self, sample: NDArray) -> float:
         """Return the proportion of K-S tests that detect divergence in a sample."""
         if not HAS_SCIPY:
             raise ImportError(
@@ -247,7 +243,7 @@ class FedRDF(FedAvg):
             n_random = int(len(sample) * 0.3)
             if n_random < 3 or len(sample) - n_random < 3:
                 continue
-            random_indices = np.random.choice(len(sample), size=n_random, replace=False)
+            random_indices = self._rng.choice(len(sample), size=n_random, replace=False)
             random_points = sample[random_indices]
             generated_points = np.delete(sample, random_indices)
             _, p_value = ks_2samp(generated_points, random_points)
@@ -255,13 +251,13 @@ class FedRDF(FedAvg):
 
         return float(np.mean(total)) if total else 0.0
 
-    def _compute_skewness(self, arrays: list[np.ndarray]) -> float:
+    def _compute_skewness(self, arrays: list[NDArray]) -> float:
         """Measure the skewness proportion across client weight arrays."""
         # Sample positions first to avoid materializing every parameter of
         # large models when only a subset is tested
         n_positions = arrays[0].size
         if n_positions > 100:
-            sample_indices = np.random.choice(n_positions, size=100, replace=False)
+            sample_indices = self._rng.choice(n_positions, size=100, replace=False)
         else:
             sample_indices = np.arange(n_positions)
 
@@ -276,13 +272,38 @@ class FedRDF(FedAvg):
         ]
         return float(np.mean(proportions))
 
-    def _fourier_aggregate(self, arrays: list[np.ndarray]) -> np.ndarray:
-        """Select the client weight exhibiting the highest frequency per coordinate.
+    def _fourier_aggregate(self, arrays: list[NDArray]) -> NDArray:
+        """Select per coordinate the client weight exhibiting the highest density.
 
-        Projects the sorted per-coordinate client weights into the frequency domain
-        to ascertain their density function and selects the one exhibiting the
-        highest frequency, so malicious clients' weights are excluded.
+        Following Eq. 11 of the paper, the sorted per-coordinate client weights
+        are projected into the frequency domain to ascertain their density
+        function (Nanbu, 1995), and the weight where the estimated density
+        peaks is selected, so weights isolated from the high-density regions
+        (malicious clients) are excluded.
         """
-        stacked = np.sort(np.stack([arr.flatten() for arr in arrays]), axis=0)
-        index = int(np.argmax(np.abs(np.fft.fftfreq(stacked.shape[0]))))
-        return stacked[index].reshape(arrays[0].shape)
+        stacked = np.sort(np.stack([arr.ravel() for arr in arrays]), axis=0)
+        low, span = stacked[0], stacked[-1] - stacked[0]
+        span = np.where(span == 0, 1.0, span)
+
+        damping = np.exp(
+            -2.0 * (np.pi * np.arange(1, _FOURIER_MODES + 1) * _FOURIER_BANDWIDTH) ** 2
+        )
+
+        result = np.empty(stacked.shape[1], dtype=stacked.dtype)
+        for start in range(0, stacked.shape[1], _FOURIER_CHUNK):
+            chunk = slice(start, start + _FOURIER_CHUNK)
+            values = stacked[:, chunk]
+            # Map into [1/4, 3/4] of the unit period so the smallest and
+            # largest weights do not become periodic neighbours
+            phase = 0.25 + 0.5 * (values - low[chunk]) / span[chunk]
+            base = np.exp(-2j * np.pi * phase)
+            harmonics = base.copy()
+            density = np.zeros(phase.shape)
+            for weight in damping:
+                density += weight * (harmonics.mean(axis=0) * harmonics.conj()).real
+                harmonics *= base
+            result[chunk] = values[
+                np.argmax(density, axis=0), np.arange(values.shape[1])
+            ]
+
+        return result.reshape(arrays[0].shape)
