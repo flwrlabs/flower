@@ -26,6 +26,7 @@ from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.interceptors import (
+    RpcErrorTranslationServerInterceptor,
     create_control_runtime_version_server_interceptor,
 )
 from flwr.supercore.license_plugin import LicensePlugin
@@ -74,7 +75,10 @@ def run_control_api_grpc(
         artifact_provider=artifact_provider,
         fleet_api_type=fleet_api_type,
     )
-    interceptors = [ControlAccountAuthInterceptor(authn_plugin, authz_plugin)]
+    interceptors = [
+        RpcErrorTranslationServerInterceptor(),
+        ControlAccountAuthInterceptor(authn_plugin, authz_plugin),
+    ]
     if license_plugin is not None:
         interceptors.append(ControlLicenseInterceptor(license_plugin))
     # Event log interceptor must be added after account auth interceptor

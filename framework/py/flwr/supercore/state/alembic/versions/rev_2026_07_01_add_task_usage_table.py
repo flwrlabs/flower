@@ -51,7 +51,6 @@ def upgrade() -> None:
             ["task.task_id"],
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("task_id"),
     )
     with op.batch_alter_table("task_usage", schema=None) as batch_op:
         batch_op.create_index(

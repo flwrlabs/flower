@@ -259,14 +259,9 @@ class CoreState(ABC):  # pylint: disable=R0904
         usage : TaskUsage
             Usage payload to persist.
 
-        Raises
-        ------
-        ValueError
-            Raised if `task_id` does not identify an existing task.
-
         Notes
         -----
-        Duplicate writes for the same task are successful no-ops.
+        Each successful call appends a new usage record for the task.
         """
 
     @abstractmethod
@@ -275,10 +270,6 @@ class CoreState(ABC):  # pylint: disable=R0904
         *,
         run_ids: Sequence[int] | None = None,
         task_ids: Sequence[int] | None = None,
-        usage_types: Sequence[str] | None = None,
-        reported: bool | None = None,
-        created_before: str | None = None,
-        limit: int | None = None,
     ) -> Sequence[TaskUsage]:
         """Retrieve task usage records based on the specified filters.
 
@@ -292,15 +283,6 @@ class CoreState(ABC):  # pylint: disable=R0904
             Sequence of run IDs to filter by.
         task_ids : Optional[Sequence[int]] (default: None)
             Sequence of task IDs to filter by.
-        usage_types : Optional[Sequence[str]] (default: None)
-            Sequence of usage types to filter by.
-        reported : bool | None (default: None)
-            If set, filter by whether usage has been reported.
-        created_before : str | None (default: None)
-            If set, return only usage records created before this ISO timestamp.
-        limit : Optional[int] (default: None)
-            Maximum number of usage records to return. If `None`, no limit is
-            applied.
 
         Returns
         -------

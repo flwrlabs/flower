@@ -71,8 +71,8 @@ class TaskUsageRecord:
     task_id: int
     run_id: int
     usage: TaskUsage
-    created_at: str
-    reported_at: str | None
+    created_at: datetime
+    reported_at: datetime | None
 
 
 class InMemoryCoreState(
@@ -380,19 +380,17 @@ class InMemoryCoreState(
         with self.lock_task_store:
             task = self.task_store.get(task_id)
             if task is None:
-                raise ValueError(f"Task {task_id} not found")
+                return
             run_id = task.run_id
 
         with self.lock_task_usage_store:
-            if task_id in self.task_usage_store:
-                return
-
-            self.task_usage_store[task_id] = TaskUsageRecord(
-                id=self._next_task_usage_id,
+            usage_id = self._next_task_usage_id
+            self.task_usage_store[usage_id] = TaskUsageRecord(
+                id=usage_id,
                 task_id=task_id,
                 run_id=run_id,
                 usage=usage,
-                created_at=now().isoformat(),
+                created_at=now(),
                 reported_at=None,
             )
             self._next_task_usage_id += 1
@@ -402,38 +400,21 @@ class InMemoryCoreState(
         *,
         run_ids: Sequence[int] | None = None,
         task_ids: Sequence[int] | None = None,
-        usage_types: Sequence[str] | None = None,
-        reported: bool | None = None,
-        created_before: str | None = None,
-        limit: int | None = None,
     ) -> Sequence[TaskUsage]:
         """Retrieve task usage records based on the specified filters."""
-        if limit is not None and limit < 0:
-            raise AssertionError("`limit` must be >= 0")
-        if (
-            limit == 0
-            or (run_ids is not None and not run_ids)
-            or (task_ids is not None and not task_ids)
-            or (usage_types is not None and not usage_types)
+        if (run_ids is not None and not run_ids) or (
+            task_ids is not None and not task_ids
         ):
             return []
 
-        def matches(record: TaskUsageRecord) -> bool:
-            return (
-                (run_ids is None or record.run_id in run_ids)
-                and (task_ids is None or record.task_id in task_ids)
-                and (usage_types is None or record.usage.usage_type in usage_types)
-                and (reported is None or (record.reported_at is not None) is reported)
-                and (created_before is None or record.created_at < created_before)
-            )
-
         with self.lock_task_usage_store:
-            records = [
-                record for record in self.task_usage_store.values() if matches(record)
-            ]
-            records.sort(key=lambda record: record.id)
-            if limit is not None:
-                records = records[:limit]
+            records = sorted(
+                self.task_usage_store.values(), key=lambda record: record.id
+            )
+            if run_ids is not None:
+                records = [record for record in records if record.run_id in run_ids]
+            if task_ids is not None:
+                records = [record for record in records if record.task_id in task_ids]
             return [record.usage for record in records]
 
     def claim_task(self, task_id: int) -> str | None:
