@@ -31,13 +31,19 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushTaskEventsRequest,
     PushTaskEventsResponse,
     PushTaskMessageRequest,
+    RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
 )
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
 )
-from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    Task,
+    TaskEvent,
+    TaskStatus,
+    TaskUsage,
+)
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
 from flwr.supercore.corestate.utils_test import create_task_message
 
@@ -403,6 +409,50 @@ class TestAppIoServicer(unittest.TestCase):
             123,
             789,
         )
+
+    def test_record_task_usage_stores_usage_for_authenticated_metered_task(
+        self,
+    ) -> None:
+        """RecordTaskUsage should store usage for model and connector tasks."""
+        usage = TaskUsage(
+            usage_type="token",
+            input_tokens=10,
+            output_tokens=20,
+            total_tokens=30,
+        )
+        request = RecordTaskUsageRequest(task_usage=usage)
+
+        with patch(
+            "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+            return_value=Task(task_id=123, run_id=789, type=TaskType.MODEL),
+        ):
+            response = self.servicer.RecordTaskUsage(request, Mock())
+
+        self.state.add_task_usage.assert_called_once_with(123, usage)
+        self.assertIsNotNone(response)
+
+    def test_record_task_usage_rejects_untrusted_task_type(self) -> None:
+        """RecordTaskUsage should reject user-code task types."""
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+                return_value=Task(task_id=123, run_id=789, type=TaskType.AGENT_APP),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.RecordTaskUsage(
+                RecordTaskUsageRequest(task_usage=TaskUsage(usage_type="token")),
+                context,
+            )
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.PERMISSION_DENIED,
+            f"Task type '{TaskType.AGENT_APP}' is not allowed to record usage.",
+        )
+        self.state.add_task_usage.assert_not_called()
 
     def test_pull_task_message_uses_authenticated_task_destination(self) -> None:
         """PullTaskMessage should query messages for the authenticated task."""

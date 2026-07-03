@@ -16,15 +16,19 @@
 
 from collections.abc import Callable
 
+from flwr.supercore.task_process.usage import (
+    ConnectorInvocationResult,
+    TaskUsageRecorder,
+)
 from flwr.supercore.typing import JSONObject, JSONValue
 
 from . import browser_use, web_fetch, web_search
 
-ConnectorHandler = Callable[..., JSONValue]
+ConnectorHandler = Callable[..., JSONValue | ConnectorInvocationResult]
 ConnectorToolFactory = Callable[[], JSONObject]
 
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
-    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
+    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search_with_usage,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
 }
@@ -35,12 +39,21 @@ _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
 }
 
 
-def invoke_connector(name: str, arguments: JSONObject) -> JSONValue:
+def invoke_connector(
+    name: str,
+    arguments: JSONObject,
+    usage_recorder: TaskUsageRecorder | None = None,
+) -> JSONValue:
     """Invoke one connector by name."""
     handler = _CONNECTOR_HANDLERS.get(name)
     if handler is None:
         raise ValueError(f"Unsupported connector '{name}'.")
-    return handler(**arguments)
+    result = handler(**arguments)
+    if isinstance(result, ConnectorInvocationResult):
+        if usage_recorder is not None and result.usage is not None:
+            usage_recorder.record(result.usage)
+        return result.output
+    return result
 
 
 def get_builtin_connector_tools() -> list[JSONObject]:

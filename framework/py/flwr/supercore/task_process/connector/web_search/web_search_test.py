@@ -22,8 +22,10 @@ from unittest.mock import Mock
 import pytest
 import requests
 
-from . import WEB_SEARCH_ENDPOINT_ENV, search
+from . import WEB_SEARCH_ENDPOINT_ENV, search, search_with_usage
 from .brave import BRAVE_API_KEY_ENV, BRAVE_WEB_SEARCH_URL
+from .exa import EXA_API_KEY_ENV, EXA_SEARCH_URL
+from .tavily import TAVILY_API_KEY_ENV
 
 _PROXY_ENDPOINT = "http://proxy/v1/web-search"
 
@@ -93,7 +95,32 @@ def test_search_uses_direct_providers_when_proxy_endpoint_is_absent(
     monkeypatch.setattr(requests, "get", get_mock)
     monkeypatch.setattr(requests, "post", post_mock)
 
-    assert search("Flower") == {"results": []}
+    result = search_with_usage("Flower")
+
+    assert result.output == {"results": []}
+    assert result.usage is not None
+    assert result.usage.usage_type == "brave_web_search"
     get_mock.assert_called_once()
     assert get_mock.call_args.args == (BRAVE_WEB_SEARCH_URL,)
     post_mock.assert_not_called()
+
+
+def test_search_with_usage_records_exa_provider_usage_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Exa provider usage should be recorded with a provider-specific type."""
+    monkeypatch.delenv(WEB_SEARCH_ENDPOINT_ENV, raising=False)
+    monkeypatch.delenv(BRAVE_API_KEY_ENV, raising=False)
+    monkeypatch.delenv(TAVILY_API_KEY_ENV, raising=False)
+    monkeypatch.setenv(EXA_API_KEY_ENV, "exa_test_key")
+    response = _Response(body={"results": []})
+    post_mock = Mock(return_value=response)
+    monkeypatch.setattr(requests, "post", post_mock)
+
+    result = search_with_usage("Flower")
+
+    assert result.output == {"results": []}
+    assert result.usage is not None
+    assert result.usage.usage_type == "exa_web_search"
+    post_mock.assert_called_once()
+    assert post_mock.call_args.args == (EXA_SEARCH_URL,)

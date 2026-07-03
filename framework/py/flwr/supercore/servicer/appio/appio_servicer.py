@@ -180,6 +180,24 @@ class AppIoServicer(ABC):
         """Record task usage."""
         log(DEBUG, "AppIoServicer.RecordTaskUsage")
 
+        task = get_authenticated_task()
+        if task.type not in (TaskType.MODEL, TaskType.CONNECTOR):
+            context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                f"Task type '{task.type}' is not allowed to record usage.",
+            )
+        if not request.HasField("task_usage"):
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "`task_usage` is required.",
+            )
+        if not request.task_usage.usage_type:
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "`task_usage.usage_type` is required.",
+            )
+
+        self.state().add_task_usage(task.task_id, request.task_usage)
         return RecordTaskUsageResponse()
 
     def PullTaskMessage(
