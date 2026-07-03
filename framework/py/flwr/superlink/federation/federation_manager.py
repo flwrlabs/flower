@@ -45,19 +45,19 @@ class FederationManager(ABC):
         self._linkstate = linkstate
 
     @abstractmethod
-    def exists(self, federation: str) -> bool:
+    def exists(self, federation_id: str) -> bool:
         """Check if a federation exists."""
 
     @abstractmethod
-    def has_member(self, flwr_aid: str, federation: str) -> bool:
+    def has_member(self, flwr_aid: str, federation_id: str) -> bool:
         """Check if the given account is a member of the federation."""
 
     @abstractmethod
-    def filter_nodes(self, node_ids: set[int], federation: str) -> set[int]:
+    def filter_nodes(self, node_ids: set[int], federation_id: str) -> set[int]:
         """Given a list of node IDs, return sublist with nodes in federation."""
 
     @abstractmethod
-    def has_node(self, node_id: int, federation: str) -> bool:
+    def has_node(self, node_id: int, federation_id: str) -> bool:
         """Given a node ID, check if it is in the federation."""
 
     @abstractmethod
@@ -74,15 +74,15 @@ class FederationManager(ABC):
     def get_federations(self, flwr_aid: str) -> list[Federation]:
         """Get federations of which the account is a member.
 
-        Only the name, description and whether the federation is archived are returned.
+        Only the ID, description, and whether the federation is archived are returned.
         """
 
     @abstractmethod
-    def get_details(self, federation: str) -> Federation:
+    def get_details(self, federation_id: str) -> Federation:
         """Get details of the federation."""
 
     @abstractmethod
-    def get_simulation_config(self, federation: str) -> SimulationConfig | None:
+    def get_simulation_config(self, federation_id: str) -> SimulationConfig | None:
         """Get the simulation configuration for a federation. This method is called by
         the SuperLink only.
 
@@ -91,8 +91,8 @@ class FederationManager(ABC):
 
         Parameters
         ----------
-        federation : str
-            The name of the federation.
+        federation_id : str
+            The federation ID.
 
         Returns
         -------
@@ -108,7 +108,7 @@ class FederationManager(ABC):
 
     @abstractmethod
     def set_simulation_config(
-        self, flwr_aid: str, federation: str, config: SimulationConfig
+        self, flwr_aid: str, federation_id: str, config: SimulationConfig
     ) -> None:
         """Set the simulation configuration for a federation.
 
@@ -116,8 +116,8 @@ class FederationManager(ABC):
         ----------
         flwr_aid : str
             The ID of the account setting the simulation configuration.
-        federation : str
-            The name of the federation.
+        federation_id : str
+            The federation ID.
         config : SimulationConfig
             The simulation configuration to store for the federation.
 
@@ -132,7 +132,7 @@ class FederationManager(ABC):
     def create_federation(
         self,
         flwr_aid: str,
-        name: str,
+        federation_id: str,
         description: str,
         simulation: bool | None = None,
     ) -> Federation:
@@ -142,8 +142,8 @@ class FederationManager(ABC):
         ----------
         flwr_aid : str
             The ID of the account creating the federation.
-        name : str
-            The unique name of the federation.
+        federation_id : str
+            The federation ID.
         description : str
             A human-readable description of the federation.
         simulation : bool | None
@@ -157,48 +157,48 @@ class FederationManager(ABC):
         """
 
     @abstractmethod
-    def archive_federation(self, flwr_aid: str, name: str) -> None:
+    def archive_federation(self, flwr_aid: str, federation_id: str) -> None:
         """Archive an existing federation.
 
         Parameters
         ----------
         flwr_aid : str
             The ID of the account archiving the federation.
-        name : str
-            The name of the federation to archive.
+        federation_id : str
+            The federation ID to archive.
         """
 
     @abstractmethod
-    def add_supernode(self, flwr_aid: str, federation: str, node_id: int) -> None:
+    def add_supernode(self, flwr_aid: str, federation_id: str, node_id: int) -> None:
         """Add a SuperNode to a federation.
 
         Parameters
         ----------
         flwr_aid : str
             The ID of the account adding the SuperNode.
-        federation : str
-            The name of the federation.
+        federation_id : str
+            The federation ID.
         node_id : int
             The ID of the SuperNode to add.
         """
 
     @abstractmethod
-    def remove_supernode(self, flwr_aid: str, federation: str, node_id: int) -> None:
+    def remove_supernode(self, flwr_aid: str, federation_id: str, node_id: int) -> None:
         """Remove a SuperNode from a federation.
 
         Parameters
         ----------
         flwr_aid : str
             The ID of the account removing the SuperNode.
-        federation : str
-            The name of the federation.
+        federation_id : str
+            The federation ID.
         node_id : int
             The ID of the SuperNode to remove.
         """
 
     @abstractmethod
     def remove_account(
-        self, flwr_aid: str, federation: str, target_account_name: str | None
+        self, flwr_aid: str, federation_id: str, target_account_name: str | None
     ) -> str:
         """Remove an account from a federation.
 
@@ -211,8 +211,8 @@ class FederationManager(ABC):
         ----------
         flwr_aid : str
             The ID of the account initiating the removal (or leaving).
-        federation : str
-            The name of the federation.
+        federation_id : str
+            The federation ID.
         target_account_name : str | None
             The name of the account to remove. If `None`, the caller removes
             themselves from the federation. The owner cannot remove themselves.
@@ -232,7 +232,7 @@ class FederationManager(ABC):
 
     @abstractmethod
     def create_invitation(
-        self, flwr_aid: str, federation: str, invitee_account_name: str
+        self, flwr_aid: str, federation_id: str, invitee_account_name: str
     ) -> None:
         """Create an invitation for an account to join a federation.
 
@@ -240,8 +240,8 @@ class FederationManager(ABC):
         ----------
         flwr_aid : str
             The ID of the account creating the invitation (inviter).
-        federation : str
-            The name of the federation.
+        federation_id : str
+            The federation ID.
         invitee_account_name : str
             The name of the account being invited.
 
@@ -276,15 +276,15 @@ class FederationManager(ABC):
         """
 
     @abstractmethod
-    def accept_invitation(self, flwr_aid: str, federation: str) -> None:
+    def accept_invitation(self, flwr_aid: str, federation_id: str) -> None:
         """Accept a pending invitation and become a member of the federation.
 
         Parameters
         ----------
         flwr_aid : str
             The ID of the account accepting the invitation (invitee).
-        federation : str
-            The name of the federation.
+        federation_id : str
+            The federation ID.
 
         Raises
         ------
@@ -294,15 +294,15 @@ class FederationManager(ABC):
         """
 
     @abstractmethod
-    def reject_invitation(self, flwr_aid: str, federation: str) -> None:
+    def reject_invitation(self, flwr_aid: str, federation_id: str) -> None:
         """Reject a pending invitation.
 
         Parameters
         ----------
         flwr_aid : str
             The ID of the account rejecting the invitation (invitee).
-        federation : str
-            The name of the federation.
+        federation_id : str
+            The federation ID.
 
         Raises
         ------
@@ -313,7 +313,7 @@ class FederationManager(ABC):
 
     @abstractmethod
     def revoke_invitation(
-        self, flwr_aid: str, federation: str, invitee_account_name: str
+        self, flwr_aid: str, federation_id: str, invitee_account_name: str
     ) -> None:
         """Revoke a pending invitation.
 
@@ -321,8 +321,8 @@ class FederationManager(ABC):
         ----------
         flwr_aid : str
             The ID of the account revoking the invitation.
-        federation : str
-            The name of the federation.
+        federation_id : str
+            The federation ID.
         invitee_account_name : str
             The name of the account whose invitation is being revoked.
 

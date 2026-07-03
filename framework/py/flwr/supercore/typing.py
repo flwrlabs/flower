@@ -43,13 +43,13 @@ class StartRunContext(ActionContext):
 
     Attributes
     ----------
-    federation_name : str
-        Target federation name.
+    federation_id : str
+        Target federation ID.
     runtime : RunTime
         The runtime relevant to the action.
     """
 
-    federation_name: str
+    federation_id: str
     runtime: RunTime
 
 
@@ -59,15 +59,15 @@ class CreateFederationContext(ActionContext):
 
     Attributes
     ----------
-    federation_name : str
-        Target federation name.
+    federation_id : str
+        Target federation ID.
     runtime : RunTime
         The runtime relevant to the action.
     visibility: str
         The visibility level of the federation to be created.
     """
 
-    federation_name: str
+    federation_id: str
     runtime: RunTime
     visibility: str
 
@@ -78,15 +78,15 @@ class CreateInvitationContext(ActionContext):
 
     Attributes
     ----------
-    federation_name : str
-        Target federation name.
+    federation_id : str
+        Target federation ID.
     invitee_account_name : str
         Account name of the invitee.
     runtime : RunTime
         The runtime relevant to the action.
     """
 
-    federation_name: str
+    federation_id: str
     invitee_account_name: str
     runtime: RunTime
 
@@ -97,11 +97,11 @@ class AcceptInvitationContext(ActionContext):
 
     Attributes
     ----------
-    federation_name : str
-        Target federation name.
+    federation_id : str
+        Target federation ID.
     runtime : RunTime
         The runtime relevant to the action.
     """
 
-    federation_name: str
+    federation_id: str
     runtime: RunTime

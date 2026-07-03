@@ -27,7 +27,7 @@ from flwr.supercore.run import Run
 class Federation:  # pylint: disable=R0902
     """Federation details."""
 
-    name: str
+    id: str
     description: str
     members: list[Member]
     nodes: list[NodeInfo]

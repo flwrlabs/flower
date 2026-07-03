@@ -67,7 +67,7 @@ def ls(  # pylint: disable=R0914, R0913, R0917, R0912
         typer.Option(
             "--federation",
             case_sensitive=False,
-            help="Name of the federation to display",
+            help="Federation ID to display",
         ),
     ] = None,
     verbose: Annotated[
@@ -201,7 +201,7 @@ def _to_json(  # pylint: disable=R0913,R0917
         return {
             "federations": [
                 {
-                    "name": federation.name,
+                    "id": federation.name,
                     "description": federation.description,
                     "archived": federation.archived,
                     "simulation": federation.simulation,
@@ -261,7 +261,7 @@ def _show_federation(
     stub : ControlStub
         The gRPC stub for Control API communication.
     federation : str
-        Name of the federation to show.
+        Federation ID to show.
 
     Returns
     -------

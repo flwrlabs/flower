@@ -26,8 +26,8 @@ from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
-    NOOP_FEDERATION,
     NOOP_FEDERATION_DESCRIPTION,
+    NOOP_FEDERATION_ID,
     ActionType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -60,7 +60,7 @@ def test_get_details_with_valid_federation() -> None:
         init_args_logging_level=DEFAULT_SIMULATION_CONFIG.init_args_logging_level,
         init_args_log_to_driver=DEFAULT_SIMULATION_CONFIG.init_args_log_to_driver,
     )
-    manager.set_simulation_config(NOOP_FLWR_AID, NOOP_FEDERATION, config)
+    manager.set_simulation_config(NOOP_FLWR_AID, NOOP_FEDERATION_ID, config)
 
     # Mock data
     run_id_1 = 123
@@ -77,7 +77,7 @@ def test_get_details_with_valid_federation() -> None:
         finished_at="",
         status=RunStatus(status="running", sub_status="", details=""),
         flwr_aid=NOOP_FLWR_AID,
-        federation=NOOP_FEDERATION,
+        federation_id=NOOP_FEDERATION_ID,
         primary_task_id=None,
         bytes_sent=1024,
         bytes_recv=512,
@@ -95,7 +95,7 @@ def test_get_details_with_valid_federation() -> None:
         finished_at="2025-01-02T00:10:00",
         status=RunStatus(status="finished", sub_status="", details=""),
         flwr_aid=NOOP_FLWR_AID,
-        federation=NOOP_FEDERATION,
+        federation_id=NOOP_FEDERATION_ID,
         primary_task_id=None,
         bytes_sent=2048,
         bytes_recv=1024,
@@ -125,11 +125,11 @@ def test_get_details_with_valid_federation() -> None:
     mock_linkstate.get_node_info.return_value = [mock_node_1, mock_node_2]
 
     # Execute
-    result = manager.get_details(NOOP_FEDERATION)
+    result = manager.get_details(NOOP_FEDERATION_ID)
 
     # Assert
     assert isinstance(result, Federation)
-    assert result.name == NOOP_FEDERATION
+    assert result.id == NOOP_FEDERATION_ID
     assert result.description == NOOP_FEDERATION_DESCRIPTION
     assert len(result.members) == 1
     assert result.members[0] == Member(
@@ -151,11 +151,11 @@ def test_get_details_with_invalid_federation() -> None:
     manager = NoOpFederationManager()
     mock_linkstate = Mock()
     manager.linkstate = mock_linkstate
-    invalid_federation = "invalid_federation"
+    invalid_federation_id = "@me/invalid"
 
     # Execute & Assert
     with pytest.raises(ValueError):
-        manager.get_details(invalid_federation)
+        manager.get_details(invalid_federation_id)
 
 
 def test_get_details_with_no_runs() -> None:
@@ -170,10 +170,10 @@ def test_get_details_with_no_runs() -> None:
     mock_linkstate.get_node_info.return_value = []
 
     # Execute
-    result = manager.get_details(NOOP_FEDERATION)
+    result = manager.get_details(NOOP_FEDERATION_ID)
 
     # Assert
-    assert result.name == NOOP_FEDERATION
+    assert result.id == NOOP_FEDERATION_ID
     assert len(result.members) == 1
     assert result.members[0] == Member(
         account=Account(id=NOOP_FLWR_AID, name=NOOP_ACCOUNT_NAME),
@@ -186,12 +186,12 @@ def test_get_details_with_no_runs() -> None:
 
 
 def test_exists() -> None:
-    """Test exists method returns True only for NOOP_FEDERATION."""
+    """Test exists method returns True only for NOOP_FEDERATION_ID."""
     # Prepare
     manager = NoOpFederationManager()
 
     # Execute & Assert
-    assert manager.exists(NOOP_FEDERATION)
+    assert manager.exists(NOOP_FEDERATION_ID)
     assert not manager.exists("other_federation")
 
 
@@ -201,8 +201,8 @@ def test_has_member() -> None:
     manager = NoOpFederationManager()
 
     # Execute & Assert
-    assert manager.has_member(NOOP_FLWR_AID, NOOP_FEDERATION) is True
-    assert manager.has_member("any_aid", NOOP_FEDERATION) is False
+    assert manager.has_member(NOOP_FLWR_AID, NOOP_FEDERATION_ID) is True
+    assert manager.has_member("any_aid", NOOP_FEDERATION_ID) is False
 
     # Test that it raises ValueError for non-existent federation
     with pytest.raises(ValueError):
@@ -216,7 +216,7 @@ def test_filter_nodes() -> None:
     node_ids = {1, 2, 3, 4, 5}
 
     # Execute
-    result = manager.filter_nodes(node_ids, NOOP_FEDERATION)
+    result = manager.filter_nodes(node_ids, NOOP_FEDERATION_ID)
 
     # Assert
     assert result == node_ids
@@ -227,13 +227,13 @@ def test_filter_nodes() -> None:
 
 
 def test_has_node() -> None:
-    """Test has_node method returns True for NOOP_FEDERATION."""
+    """Test has_node method returns True for NOOP_FEDERATION_ID."""
     # Prepare
     manager = NoOpFederationManager()
 
     # Execute & Assert
-    assert manager.has_node(1, NOOP_FEDERATION) is True
-    assert manager.has_node(999, NOOP_FEDERATION) is True
+    assert manager.has_node(1, NOOP_FEDERATION_ID) is True
+    assert manager.has_node(999, NOOP_FEDERATION_ID) is True
 
     # Test that it raises ValueError for non-existent federation
     with pytest.raises(ValueError):
@@ -257,7 +257,7 @@ def test_can_execute(action: ActionType) -> None:
 
 
 def test_get_federations() -> None:
-    """Test get_federations method returns NOOP_FEDERATION."""
+    """Test get_federations method returns NOOP_FEDERATION_ID."""
     # Prepare
     manager = NoOpFederationManager()
 
@@ -268,7 +268,7 @@ def test_get_federations() -> None:
     # Assert
     assert len(result) == 0
     assert len(result2) == 1
-    assert result2[0].name == NOOP_FEDERATION
+    assert result2[0].id == NOOP_FEDERATION_ID
     assert result2[0].description == NOOP_FEDERATION_DESCRIPTION
     assert result2[0].archived is False
     assert result2[0].simulation is False
@@ -283,7 +283,7 @@ def test_simulation_runtime_flag_is_reflected() -> None:
     manager.linkstate = mock_linkstate
 
     federations = manager.get_federations(NOOP_FLWR_AID)
-    details = manager.get_details(NOOP_FEDERATION)
+    details = manager.get_details(NOOP_FEDERATION_ID)
 
     assert federations[0].simulation is True
     assert details.simulation is True
@@ -295,7 +295,7 @@ def test_get_simulation_config_returns_defaults_when_unset() -> None:
     """Test get_simulation_config returns shared defaults when unset."""
     manager = NoOpFederationManager(simulation=True)
 
-    stored = manager.get_simulation_config(NOOP_FEDERATION)
+    stored = manager.get_simulation_config(NOOP_FEDERATION_ID)
 
     assert stored == DEFAULT_SIMULATION_CONFIG
     assert stored.num_supernodes == DEFAULT_SIMULATION_CONFIG.num_supernodes
@@ -321,21 +321,21 @@ def test_simulation_config_returns_none_when_simulation_is_disabled() -> None:
 
     assert manager._simulation_config is None  # pylint: disable=protected-access
 
-    assert manager.get_simulation_config(NOOP_FEDERATION) is None
+    assert manager.get_simulation_config(NOOP_FEDERATION_ID) is None
 
     with pytest.raises(FlowerError) as set_err:
         manager.set_simulation_config(
-            NOOP_FLWR_AID, NOOP_FEDERATION, SimulationConfig()
+            NOOP_FLWR_AID, NOOP_FEDERATION_ID, SimulationConfig()
         )
     assert set_err.value.code == ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION
 
 
 def test_get_simulation_config_fails_for_invalid_federation() -> None:
-    """Test get_simulation_config fails for invalid federation names."""
+    """Test get_simulation_config fails for invalid federation IDs."""
     manager = NoOpFederationManager(simulation=True)
 
     with pytest.raises(FlowerError) as err:
-        manager.get_simulation_config("invalid_federation")
+        manager.get_simulation_config("@me/invalid")
 
     assert err.value.code == ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION
 
@@ -360,7 +360,7 @@ def test_get_federations_returns_stored_simulation_config() -> None:
         init_args_log_to_driver=DEFAULT_SIMULATION_CONFIG.init_args_log_to_driver,
     )
 
-    manager.set_simulation_config(NOOP_FLWR_AID, NOOP_FEDERATION, config)
+    manager.set_simulation_config(NOOP_FLWR_AID, NOOP_FEDERATION_ID, config)
 
     federations = manager.get_federations(NOOP_FLWR_AID)
 
@@ -383,13 +383,13 @@ def test_set_simulation_config_does_not_override_unset_fields() -> None:
         backend="ray",
         verbose=True,
     )
-    manager.set_simulation_config(NOOP_FLWR_AID, NOOP_FEDERATION, full_config)
+    manager.set_simulation_config(NOOP_FLWR_AID, NOOP_FEDERATION_ID, full_config)
 
     # Apply a partial update that only changes num_supernodes
     partial_config = SimulationConfig(num_supernodes=99)
-    manager.set_simulation_config(NOOP_FLWR_AID, NOOP_FEDERATION, partial_config)
+    manager.set_simulation_config(NOOP_FLWR_AID, NOOP_FEDERATION_ID, partial_config)
 
-    result = manager.get_simulation_config(NOOP_FEDERATION)
+    result = manager.get_simulation_config(NOOP_FEDERATION_ID)
     assert result is not None
 
     # The updated field should reflect the new value
