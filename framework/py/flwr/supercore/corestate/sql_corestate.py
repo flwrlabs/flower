@@ -1052,10 +1052,10 @@ def _task_usage_to_row(
 def _task_usage_from_row(row: dict[str, Any]) -> TaskUsage:
     """Convert a task_usage row to a TaskUsage proto."""
     return TaskUsage(
-        usage_type = row["usage_type"]
-        input_tokens = row["input_tokens"]
-        output_tokens = row["output_tokens"]
-        total_tokens = row["total_tokens"]
+        usage_type=row["usage_type"],
+        input_tokens=row["input_tokens"],
+        output_tokens=row["output_tokens"],
+        total_tokens=row["total_tokens"],
     )
 
 
