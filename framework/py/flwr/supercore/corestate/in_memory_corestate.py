@@ -408,9 +408,8 @@ class InMemoryCoreState(
             return []
 
         def matches(record: TaskUsageRecord) -> bool:
-            return (
-                (run_ids is None or record.run_id in run_ids)
-                and (task_ids is None or record.task_id in task_ids)
+            return (run_ids is None or record.run_id in run_ids) and (
+                task_ids is None or record.task_id in task_ids
             )
 
         with self.lock_task_usage_store:
