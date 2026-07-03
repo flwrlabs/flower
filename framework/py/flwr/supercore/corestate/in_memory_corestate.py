@@ -395,24 +395,15 @@ class InMemoryCoreState(
             )
             self._next_task_usage_id += 1
 
-    def get_task_usage(  # pylint: disable=too-many-arguments,too-many-boolean-expressions
+    def get_task_usage(
         self,
         *,
         run_ids: Sequence[int] | None = None,
         task_ids: Sequence[int] | None = None,
-        usage_types: Sequence[str] | None = None,
-        reported: bool | None = None,
-        created_before: str | None = None,
-        limit: int | None = None,
     ) -> Sequence[TaskUsage]:
         """Retrieve task usage records based on the specified filters."""
-        if limit is not None and limit < 0:
-            raise AssertionError("`limit` must be >= 0")
-        if (
-            limit == 0
-            or (run_ids is not None and not run_ids)
-            or (task_ids is not None and not task_ids)
-            or (usage_types is not None and not usage_types)
+        if (run_ids is not None and not run_ids) or (
+            task_ids is not None and not task_ids
         ):
             return []
 
@@ -420,9 +411,6 @@ class InMemoryCoreState(
             return (
                 (run_ids is None or record.run_id in run_ids)
                 and (task_ids is None or record.task_id in task_ids)
-                and (usage_types is None or record.usage.usage_type in usage_types)
-                and (reported is None or (record.reported_at is not None) is reported)
-                and (created_before is None or record.created_at < created_before)
             )
 
         with self.lock_task_usage_store:
@@ -430,8 +418,6 @@ class InMemoryCoreState(
                 record for record in self.task_usage_store.values() if matches(record)
             ]
             records.sort(key=lambda record: record.id)
-            if limit is not None:
-                records = records[:limit]
             return [record.usage for record in records]
 
     def claim_task(self, task_id: int) -> str | None:

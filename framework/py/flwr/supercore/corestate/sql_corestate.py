@@ -534,22 +534,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 },
             )
 
-    def get_task_usage(  # pylint: disable=too-many-arguments,too-many-locals
+    def get_task_usage(
         self,
         *,
         run_ids: Sequence[int] | None = None,
         task_ids: Sequence[int] | None = None,
-        usage_types: Sequence[str] | None = None,
-        reported: bool | None = None,
-        created_before: str | None = None,
-        limit: int | None = None,
     ) -> Sequence[TaskUsage]:
         """Retrieve task usage records based on the specified filters."""
-        if limit is not None and limit < 0:
-            raise AssertionError("`limit` must be >= 0")
-        if limit == 0:
-            return []
-
         conditions = []
         params: dict[str, Any] = {}
 
@@ -573,36 +564,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 {f"tid_{i}": task_id for i, task_id in enumerate(sint64_task_ids)}
             )
 
-        if usage_types is not None:
-            if not usage_types:
-                return []
-            placeholders = ",".join([f":ut_{i}" for i in range(len(usage_types))])
-            conditions.append(f"usage_type IN ({placeholders})")
-            params.update(
-                {f"ut_{i}": usage_type for i, usage_type in enumerate(usage_types)}
-            )
-
-        if reported is True:
-            conditions.append("reported_at IS NOT NULL")
-        elif reported is False:
-            conditions.append("reported_at IS NULL")
-
-        if created_before is not None:
-            conditions.append("created_at < :created_before")
-            params["created_before"] = created_before
-
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        limit_clause = ""
-        if limit is not None:
-            limit_clause = "LIMIT :limit"
-            params["limit"] = limit
 
         query = f"""
             SELECT input_tokens, output_tokens, total_tokens, usage_type
             FROM task_usage
             {where_clause}
             ORDER BY id ASC
-            {limit_clause}
         """
 
         rows = self.query(query, params)

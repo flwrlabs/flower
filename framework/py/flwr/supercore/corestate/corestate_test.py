@@ -290,7 +290,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(reloaded.fab_hash, "fab-hash")
 
     def test_add_and_get_task_usage(self) -> None:
-        """Task usage should round-trip and filter by usage type."""
+        """Task usage should round-trip and filter by task ID."""
         state = self.state_factory()
         task_id = state.create_task(
             task_type=TaskType.MODEL,
@@ -309,11 +309,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         state.add_task_usage(task_id, TaskUsage(input_tokens=999, usage_type="token"))
 
-        usages = state.get_task_usage(
-            task_ids=[task_id],
-            usage_types=["token"],
-            reported=False,
-        )
+        usages = state.get_task_usage(task_ids=[task_id])
 
         self.assertEqual(len(usages), 2)
         usage = usages[0]
