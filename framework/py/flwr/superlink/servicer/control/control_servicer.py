@@ -36,7 +36,6 @@ from flwr.common.config import (
 )
 from flwr.common.constant import (
     FAB_MAX_SIZE,
-    FEDERATION_NOT_FOUND_MESSAGE,
     HEARTBEAT_DEFAULT_INTERVAL,
     LOG_STREAM_INTERVAL,
     NO_ACCOUNT_AUTH_MESSAGE,
@@ -1113,11 +1112,10 @@ def _validate_federation_and_node_in_request(
     _validate_federation_membership_in_request(state, flwr_aid, federation_id)
     nodes_info = state.get_node_info(node_ids=[node_id])
     if not nodes_info or nodes_info[0].owner_aid != flwr_aid:
-        details = f"Node {node_id} not found or you are not its owner."
         raise FlowerError(
             ApiErrorCode.NODE_NOT_FOUND_OR_NOT_OWNER,
-            details,
-            public_details=details,
+            f"Node {node_id} not found or {flwr_aid} is not its owner.",
+            public_details=f"(node: {node_id})",
         )
 
 
@@ -1132,20 +1130,16 @@ def _validate_federation_membership_in_request(
 
     # Check that the federation exists
     if not state.federation_manager.exists(federation_id):
-        details = FEDERATION_NOT_FOUND_MESSAGE % federation_id
         raise FlowerError(
             ApiErrorCode.FEDERATION_NOT_FOUND,
-            details,
-            public_details=details,
+            public_details=f"(federation: {federation_id})",
         )
 
     # Check that the requester is a member of the federation
     if not state.federation_manager.has_member(flwr_aid, federation_id):
-        details = FEDERATION_NOT_FOUND_MESSAGE % federation_id
         raise FlowerError(
             ApiErrorCode.FEDERATION_NOT_FOUND,
-            details,
-            public_details=details,
+            public_details=f"(federation: {federation_id})",
         )
 
 
@@ -1232,8 +1226,7 @@ def _get_remote_fab(
     except ValueError as e:
         raise FlowerError(
             ApiErrorCode.INVALID_APP_SPEC,
-            "Invalid app specification.",
-            public_details=str(e),
+            f"Invalid app specification: {app_spec}",
         ) from e
 
     # Request download link and verification information
@@ -1245,8 +1238,8 @@ def _get_remote_fab(
     except ValueError as e:
         raise FlowerError(
             ApiErrorCode.FAB_DOWNLOAD_LINK_FAILURE,
-            "Failed to request FAB download link.",
-            public_details=str(e),
+            f"Failed to request FAB download link. app-id:{app_id}, ",
+            f"app_version: {app_version}, url: {url}",
         ) from e
 
     # Format verification information
@@ -1261,11 +1254,9 @@ def _get_remote_fab(
         r = requests.get(presigned_url, timeout=60)
         r.raise_for_status()
     except requests.RequestException as e:
-        details = f"FAB download failed: {str(e)}"
         raise FlowerError(
             ApiErrorCode.FAB_DOWNLOAD_FAILURE,
-            details,
-            public_details=details,
+            f"FAB download failed: {str(e)}",
         ) from e
     fab_file = r.content
     return fab_file, verification_dict, note
