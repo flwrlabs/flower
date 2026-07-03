@@ -458,7 +458,7 @@ def flwr_cli_grpc_exc_handler(
         if custom_handler is not None:
             custom_handler(e)
 
-        # Control API serialize FlowerError into gRPC details. If the payload is
+        # Control API serializes FlowerError into gRPC details. If the payload is
         # not a valid FlowerError, the raw gRPC fallback below handles it.
         if flower_error := _flower_error_from_grpc_error(e):
             raise click.ClickException(_format_flower_error(flower_error)) from None
