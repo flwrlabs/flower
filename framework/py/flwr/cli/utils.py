@@ -457,9 +457,14 @@ def flwr_cli_grpc_exc_handler(
     except grpc.RpcError as e:
         if custom_handler is not None:
             custom_handler(e)
+
+        # Control API serialize FlowerError into gRPC details. If the payload is
+        # not a valid FlowerError, the raw gRPC fallback below handles it.
         if flower_error := _flower_error_from_grpc_error(e):
             raise click.ClickException(_format_flower_error(flower_error)) from None
 
+        # Keep special handling only for transport-level errors that are not part
+        # of the FlowerError catalog.
         # pylint: disable-next=E1101
         if e.code() == grpc.StatusCode.UNAUTHENTICATED:
             raise click.ClickException(
