@@ -1115,7 +1115,6 @@ def _validate_federation_and_node_in_request(
         raise FlowerError(
             ApiErrorCode.NODE_NOT_FOUND_OR_NOT_OWNER,
             f"Node {node_id} not found or {flwr_aid} is not its owner.",
-            public_details=f"(node: {node_id})",
         )
 
 
@@ -1132,14 +1131,14 @@ def _validate_federation_membership_in_request(
     if not state.federation_manager.exists(federation_id):
         raise FlowerError(
             ApiErrorCode.FEDERATION_NOT_FOUND,
-            public_details=f"(federation: {federation_id})",
+            message=f"Federation `{federation_id}` not found.",
         )
 
     # Check that the requester is a member of the federation
     if not state.federation_manager.has_member(flwr_aid, federation_id):
         raise FlowerError(
             ApiErrorCode.FEDERATION_NOT_FOUND,
-            public_details=f"(federation: {federation_id})",
+            message=f"Federation `{federation_id}` not found for member `{flwr_aid}`.",
         )
 
 
