@@ -35,6 +35,8 @@ from flwr.cli.constant import (
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
 from flwr.common.constant import FLWR_DIR
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
+from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 
@@ -55,20 +57,36 @@ from .utils import (
 )
 
 
-class _GrpcErrorWithDetails:
+class _GrpcErrorWithDetails(grpc.RpcError):  # type: ignore[misc]
     """Test helper object carrying a gRPC-like details string."""
 
-    def __init__(self, details: str) -> None:
+    def __init__(
+        self,
+        details: str,
+        status_code: grpc.StatusCode = grpc.StatusCode.UNKNOWN,
+    ) -> None:
         self._details = details
+        self._status_code = status_code
 
     def details(self) -> str:
         """Return the stored gRPC details string."""
         return self._details
 
+    def code(self) -> grpc.StatusCode:
+        """Return the stored gRPC status code."""
+        return self._status_code
+
 
 def _grpc_error_with_details(details: str) -> grpc.RpcError:
     """Return a grpc.RpcError-compatible test helper with a details method."""
-    return cast(grpc.RpcError, _GrpcErrorWithDetails(details))
+    return _GrpcErrorWithDetails(details)
+
+
+def _flower_error_details(code: ApiErrorCode, public_details: str | None = None) -> str:
+    """Return serialized FlowerError details as sent through gRPC."""
+    return FlowerError(code, "internal details", public_details).to_json(
+        API_ERROR_MAP[code].public_message
+    )
 
 
 class TestGetSHA256Hash(unittest.TestCase):
@@ -290,21 +308,58 @@ def test_custom_grpc_err_handler() -> None:
     mock_handler.assert_called_once_with(grpc_error)
 
 
-def test_format_grpc_error_uses_json_message_field() -> None:
-    """Structured Flower errors combine public message and details."""
-    err = _grpc_error_with_details(
-        '{"public_message": "request failed", '
-        '"public_details": "missing entitlement", "code": 400}'
-    )
-
-    assert _format_grpc_error(err) == "request failed\nmissing entitlement"
-
-
 def test_format_grpc_error_falls_back_to_plain_string() -> None:
     """Non-JSON errors fall back to their normal string form."""
     err = _grpc_error_with_details("plain failure")
 
     assert _format_grpc_error(err) == "plain failure"
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        ApiErrorCode.NO_ACCOUNT_AUTH,
+        ApiErrorCode.NO_ARTIFACT_PROVIDER,
+        ApiErrorCode.NODE_NOT_FOUND,
+        ApiErrorCode.PULL_UNFINISHED_RUN,
+        ApiErrorCode.PUBLIC_KEY_ALREADY_IN_USE,
+        ApiErrorCode.PUBLIC_KEY_NOT_VALID,
+    ],
+)
+def test_flwr_cli_grpc_exc_handler_uses_flower_error_public_message(
+    code: ApiErrorCode,
+) -> None:
+    """CLI messages come from the serialized FlowerError public message."""
+    err = _GrpcErrorWithDetails(
+        _flower_error_details(code),
+        API_ERROR_MAP[code].status_code,
+    )
+
+    with pytest.raises(click.ClickException) as exc_info:
+        with flwr_cli_grpc_exc_handler():
+            raise err
+
+    assert exc_info.value.message == API_ERROR_MAP[code].public_message
+
+
+def test_flwr_cli_grpc_exc_handler_preserves_public_details() -> None:
+    """Structured FlowerError public details are shown to the CLI user."""
+    err = _GrpcErrorWithDetails(
+        _flower_error_details(
+            ApiErrorCode.INVALID_RUN_CONFIG,
+            "Unknown override key: tool.invalid-key",
+        ),
+        API_ERROR_MAP[ApiErrorCode.INVALID_RUN_CONFIG].status_code,
+    )
+
+    with pytest.raises(click.ClickException) as exc_info:
+        with flwr_cli_grpc_exc_handler():
+            raise err
+
+    assert (
+        exc_info.value.message
+        == "Invalid run configuration.\nUnknown override key: tool.invalid-key"
+    )
 
 
 def test_cli_output_handler_raises_click_exception_for_json_error() -> None:
