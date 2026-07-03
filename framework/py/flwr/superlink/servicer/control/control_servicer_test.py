@@ -94,7 +94,6 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, EntitlementError, FlowerError
-from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.typing import (
@@ -553,19 +552,16 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                     entitlement_code=101,
                 ),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(EntitlementError) as cm,
         ):
             mock_get_fab_config.return_value = {
                 "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
             }
             self.servicer.StartRun(request, context)
 
-        _assert_abort_with_flwr_err(
-            context,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Start run not permitted.",
-            entitlement_code=101,
-        )
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(cm.exception.public_details, "Start run not permitted.")
+        self.assertEqual(cm.exception.entitlement_code, 101)
 
     @parameterized.expand(
         [
@@ -793,16 +789,13 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                     entitlement_code=102,
                 ),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(EntitlementError) as cm,
         ):
             self.servicer.RegisterNode(req, ctx)
 
-        _assert_abort_with_flwr_err(
-            ctx,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Register node not permitted.",
-            entitlement_code=102,
-        )
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(cm.exception.public_details, "Register node not permitted.")
+        self.assertEqual(cm.exception.entitlement_code, 102)
         mock_create_node.assert_not_called()
 
     def test_register_node_calls_can_execute_with_expected_args(self) -> None:
@@ -1020,7 +1013,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         mock_context.abort.side_effect = grpc.RpcError()
 
         # Execute & Assert
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(FlowerError):
             self.servicer.CreateFederation(request, mock_context)
 
     def test_create_federation_denied_when_not_entitled(self) -> None:
@@ -1043,16 +1036,15 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                     entitlement_code=103,
                 ),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(EntitlementError) as cm,
         ):
             self.servicer.CreateFederation(request, context)
 
-        _assert_abort_with_flwr_err(
-            context,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Create federation not permitted.",
-            entitlement_code=103,
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(
+            cm.exception.public_details, "Create federation not permitted."
         )
+        self.assertEqual(cm.exception.entitlement_code, 103)
 
     def test_create_federation_raises_on_invalid_name(self) -> None:
         """Test CreateFederation aborts when federation name is invalid."""
@@ -1102,7 +1094,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         mock_context.abort.side_effect = grpc.RpcError()
 
         # Execute & Assert
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(FlowerError):
             self.servicer.ArchiveFederation(request, mock_context)
 
     def test_archive_federation_stops_active_runs(self) -> None:
@@ -1257,15 +1249,14 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             entitlement_code=104,
         )
 
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(EntitlementError) as cm:
             self.servicer.CreateInvitation(request, context)
 
-        _assert_abort_with_flwr_err(
-            context,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Create invitation not permitted.",
-            entitlement_code=104,
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(
+            cm.exception.public_details, "Create invitation not permitted."
         )
+        self.assertEqual(cm.exception.entitlement_code, 104)
         self.state.federation_manager.create_invitation.assert_not_called()
 
     def test_list_invitations_success(self) -> None:
@@ -1317,15 +1308,14 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             entitlement_code=105,
         )
 
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(EntitlementError) as cm:
             self.servicer.AcceptInvitation(request, context)
 
-        _assert_abort_with_flwr_err(
-            context,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Accept invitation not permitted.",
-            entitlement_code=105,
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(
+            cm.exception.public_details, "Accept invitation not permitted."
         )
+        self.assertEqual(cm.exception.entitlement_code, 105)
         self.state.federation_manager.accept_invitation.assert_not_called()
 
     def test_reject_invitation_success(self) -> None:
@@ -1411,9 +1401,9 @@ class TestControlServicerAuth(unittest.TestCase):
             ),
         ):
             gen = self.servicer.StreamLogs(request, ctx)
-            with self.assertRaises(RuntimeError) as cm:
+            with self.assertRaises(FlowerError) as cm:
                 next(gen)
-            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
+            self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
     def test_streamlogs_auth_successful(self) -> None:
         """Test StreamLogs succeeds for a federation member."""
@@ -1520,9 +1510,9 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state.federation_manager, "has_member", return_value=False
             ),
         ):
-            with self.assertRaises(RuntimeError) as cm:
+            with self.assertRaises(FlowerError) as cm:
                 self.servicer.StopRun(request, ctx)
-            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
+            self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
     def test_stoprun_auth_successful(self) -> None:
         """Test StopRun succeeds for a federation member."""
@@ -1563,9 +1553,9 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state.federation_manager, "has_member", return_value=False
             ),
         ):
-            with self.assertRaises(RuntimeError) as cm:
+            with self.assertRaises(FlowerError) as cm:
                 self.servicer.ListRuns(request, ctx)
-            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
+            self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
     def test_listruns_auth_run_success(self) -> None:
         """Test ListRuns succeeds for a federation member."""
@@ -1614,12 +1604,8 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         self.state = self.servicer.linkstate_factory.state()
 
     def _make_context(self) -> MagicMock:
-        """Create a mock gRPC context that raises on abort."""
-        ctx = MagicMock(spec=grpc.ServicerContext)
-        ctx.abort.side_effect = lambda code, msg: (_ for _ in ()).throw(
-            RuntimeError(f"{code}:{msg}")
-        )
-        return ctx
+        """Create a mock gRPC context."""
+        return MagicMock(spec=grpc.ServicerContext)
 
     def _create_owned_node(self, owner_aid: str) -> int:
         """Create a node owned by the given flwr_aid."""
@@ -1635,61 +1621,51 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
 
     def test_validate_membership_raises_when_federation_not_specified(self) -> None:
         """Test raises FlowerError when federation name is empty."""
-        ctx = self._make_context()
         with self.assertRaises(FlowerError) as cm:
-            _validate_federation_membership_in_request(self.state, self.aid, "", ctx)
+            _validate_federation_membership_in_request(self.state, self.aid, "")
         self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
 
-    def test_validate_membership_aborts_when_federation_not_found(self) -> None:
-        """Test abort when federation does not exist."""
-        ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
+    def test_validate_membership_raises_when_federation_not_found(self) -> None:
+        """Test raises when federation does not exist."""
+        with self.assertRaises(FlowerError) as cm:
             _validate_federation_membership_in_request(
-                self.state, self.aid, "@me/missing", ctx
+                self.state, self.aid, "@me/missing"
             )
-        ctx.abort.assert_called_once()
-        self.assertIn("@me/missing", str(cm.exception))
+        self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
-    def test_validate_membership_aborts_when_not_a_member(self) -> None:
-        """Test abort when flwr_aid is not a member of the federation."""
-        ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
+    def test_validate_membership_raises_when_not_a_member(self) -> None:
+        """Test raises when flwr_aid is not a member of the federation."""
+        with self.assertRaises(FlowerError) as cm:
             _validate_federation_membership_in_request(
-                self.state, "wrong-aid", NOOP_FEDERATION_ID, ctx
+                self.state, "wrong-aid", NOOP_FEDERATION_ID
             )
-        ctx.abort.assert_called_once()
-        self.assertIn("does not exist", str(cm.exception))
+        self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
     # --- _validate_federation_and_node_in_request tests ---
 
     def test_validate_raises_when_federation_not_specified(self) -> None:
         """Test raises FlowerError when federation name is empty."""
-        ctx = self._make_context()
         with self.assertRaises(FlowerError) as cm:
-            _validate_federation_and_node_in_request(self.state, self.aid, "", 1, ctx)
+            _validate_federation_and_node_in_request(self.state, self.aid, "", 1)
         self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
 
-    def test_validate_aborts_when_node_not_owned(self) -> None:
-        """Test abort when a node is not owned by the requester."""
+    def test_validate_raises_when_node_not_owned(self) -> None:
+        """Test raises when a node is not owned by the requester."""
         # Create a node owned by someone else
         node_id = self._create_owned_node("other-aid")
-        ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(FlowerError) as cm:
             _validate_federation_and_node_in_request(
-                self.state, self.aid, NOOP_FEDERATION_ID, node_id, ctx
+                self.state, self.aid, NOOP_FEDERATION_ID, node_id
             )
-        ctx.abort.assert_called_once()
-        self.assertIn("not found or you are not its owner", str(cm.exception))
+        self.assertEqual(cm.exception.code, ApiErrorCode.NODE_NOT_FOUND_OR_NOT_OWNER)
 
-    def test_validate_aborts_when_node_does_not_exist(self) -> None:
-        """Test abort when a node ID does not exist."""
-        ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
+    def test_validate_raises_when_node_does_not_exist(self) -> None:
+        """Test raises when a node ID does not exist."""
+        with self.assertRaises(FlowerError) as cm:
             _validate_federation_and_node_in_request(
-                self.state, self.aid, NOOP_FEDERATION_ID, 999999, ctx
+                self.state, self.aid, NOOP_FEDERATION_ID, 999999
             )
-        ctx.abort.assert_called_once()
-        self.assertIn("not found or you are not its owner", str(cm.exception))
+        self.assertEqual(cm.exception.code, ApiErrorCode.NODE_NOT_FOUND_OR_NOT_OWNER)
 
     # --- AddNodeToFederation / RemoveNodeFromFederation integration tests ---
 
@@ -1716,13 +1692,13 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         self.assertIsInstance(response, AddNodeToFederationResponse)
         ctx.abort.assert_not_called()
 
-    def test_add_node_to_federation_aborts_no_federation(self) -> None:
-        """Test AddNodeToFederation aborts when no federation is specified."""
+    def test_add_node_to_federation_raises_no_federation(self) -> None:
+        """Test AddNodeToFederation raises when no federation is specified."""
         request = AddNodeToFederationRequest(federation_name="", node_id=1)
         ctx = self._make_context()
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(FlowerError) as cm:
             self.servicer.AddNodeToFederation(request, ctx)
-        _assert_abort_with_flwr_err(ctx, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
+        self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
 
     def test_remove_node_from_federation_success(self) -> None:
         """Test RemoveNodeFromFederation succeeds with valid inputs."""
@@ -1747,13 +1723,13 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         self.assertIsInstance(response, RemoveNodeFromFederationResponse)
         ctx.abort.assert_not_called()
 
-    def test_remove_node_from_federation_aborts_no_federation(self) -> None:
-        """Test RemoveNodeFromFederation aborts when no federation is specified."""
+    def test_remove_node_from_federation_raises_no_federation(self) -> None:
+        """Test RemoveNodeFromFederation raises when no federation is specified."""
         request = RemoveNodeFromFederationRequest(federation_name="", node_id=1)
         ctx = self._make_context()
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(FlowerError) as cm:
             self.servicer.RemoveNodeFromFederation(request, ctx)
-        _assert_abort_with_flwr_err(ctx, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
+        self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
 
 
 def test_format_verification_compact() -> None:
@@ -1772,25 +1748,3 @@ def test_format_verification_compact() -> None:
     v2: dict[str, str] = json.loads(out["key2"])
     assert v1 == {"sig": "abc", "algo": "ed25519"}
     assert v2 == {"sig": "def", "algo": "ed25519"}
-
-
-def _assert_abort_with_flwr_err(
-    ctx: MagicMock,
-    code: int,
-    public_details: str | None = None,
-    entitlement_code: int | None = None,
-) -> None:
-    """Assert that ctx.abort was called with a translated FlowerError."""
-    spec = API_ERROR_MAP[code]
-    payload: dict[str, int | str | None] = {
-        "code": code,
-        "public_message": spec.public_message,
-        "public_details": public_details,
-    }
-    if entitlement_code is not None:
-        payload["entitlement_code"] = entitlement_code
-
-    ctx.abort.assert_called_once()
-    status_code, raw_payload = ctx.abort.call_args.args
-    assert status_code == spec.status_code
-    assert json.loads(raw_payload) == payload
