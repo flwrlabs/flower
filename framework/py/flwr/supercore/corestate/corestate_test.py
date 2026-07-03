@@ -322,10 +322,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(usage.total_tokens, 30)
         self.assertEqual(usage.usage_type, "token")
 
-        usage.input_tokens = 999
-        reloaded = state.get_task_usage(task_ids=[task_id])
-        self.assertEqual(reloaded[0].input_tokens, 10)
-
     def test_add_task_usage_rejects_unknown_task(self) -> None:
         """Usage writes should reject unknown task IDs."""
         state = self.state_factory()

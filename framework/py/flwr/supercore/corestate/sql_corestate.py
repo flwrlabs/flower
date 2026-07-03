@@ -515,18 +515,35 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         try:
             with self.session():
-                task_rows = self.query(
+                rows = self.query(
                     """
-                    SELECT run_id
+                    INSERT INTO task_usage (
+                        run_id, task_id, input_tokens, output_tokens, total_tokens,
+                        usage_type, created_at, reported_at
+                    )
+                    SELECT
+                        run_id, task_id, :input_tokens, :output_tokens,
+                        :total_tokens, :usage_type, :created_at, :reported_at
                     FROM task
                     WHERE task_id = :task_id
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM task_usage
+                            WHERE task_usage.task_id = :task_id
+                        )
+                    RETURNING id
                     """,
-                    {"task_id": sint64_task_id},
+                    {
+                        **_task_usage_to_row(usage),
+                        "task_id": sint64_task_id,
+                        "created_at": now().isoformat(),
+                        "reported_at": None,
+                    },
                 )
-                if not task_rows:
-                    raise ValueError(f"Task {task_id} not found")
+                if rows:
+                    return
 
-                existing_rows = self.query(
+                rows = self.query(
                     """
                     SELECT id
                     FROM task_usage
@@ -534,28 +551,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     """,
                     {"task_id": sint64_task_id},
                 )
-                if existing_rows:
+                if rows:
                     return
 
-                self.query(
-                    """
-                    INSERT INTO task_usage (
-                        run_id, task_id, input_tokens, output_tokens, total_tokens,
-                        usage_type, created_at, reported_at
-                    )
-                    VALUES (
-                        :run_id, :task_id, :input_tokens, :output_tokens,
-                        :total_tokens, :usage_type, :created_at, :reported_at
-                    )
-                    """,
-                    {
-                        **_task_usage_to_row(usage),
-                        "run_id": task_rows[0]["run_id"],
-                        "task_id": sint64_task_id,
-                        "created_at": now(),
-                        "reported_at": None,
-                    },
-                )
+                raise ValueError(f"Task {task_id} not found")
         except IntegrityError:
             rows = self.query(
                 """
@@ -582,18 +581,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Retrieve task usage records based on the specified filters."""
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
-        if (
-            limit == 0
-            or (run_ids is not None and not run_ids)
-            or (task_ids is not None and not task_ids)
-            or (usage_types is not None and not usage_types)
-        ):
+        if limit == 0:
             return []
 
         conditions = []
         params: dict[str, Any] = {}
 
         if run_ids is not None:
+            if not run_ids:
+                return []
             sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
             placeholders = ",".join([f":rid_{i}" for i in range(len(sint64_run_ids))])
             conditions.append(f"run_id IN ({placeholders})")
@@ -602,6 +598,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
 
         if task_ids is not None:
+            if not task_ids:
+                return []
             sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
             placeholders = ",".join([f":tid_{i}" for i in range(len(sint64_task_ids))])
             conditions.append(f"task_id IN ({placeholders})")
@@ -610,13 +608,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
 
         if usage_types is not None:
+            if not usage_types:
+                return []
             placeholders = ",".join([f":ut_{i}" for i in range(len(usage_types))])
             conditions.append(f"usage_type IN ({placeholders})")
             params.update(
-                {
-                    f"ut_{i}": usage_type
-                    for i, usage_type in enumerate(usage_types)
-                }
+                {f"ut_{i}": usage_type for i, usage_type in enumerate(usage_types)}
             )
 
         if reported is True:
@@ -626,18 +623,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         if created_before is not None:
             conditions.append("created_at < :created_before")
-            params["created_before"] = datetime.fromisoformat(created_before)
+            params["created_before"] = created_before
 
-        query = """
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        limit_clause = ""
+        if limit is not None:
+            limit_clause = "LIMIT :limit"
+            params["limit"] = limit
+
+        query = f"""
             SELECT input_tokens, output_tokens, total_tokens, usage_type
             FROM task_usage
+            {where_clause}
+            ORDER BY id ASC
+            {limit_clause}
         """
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-        query += " ORDER BY id ASC"
-        if limit is not None:
-            query += " LIMIT :limit"
-            params["limit"] = limit
 
         rows = self.query(query, params)
         return [_task_usage_from_row(row) for row in rows]
