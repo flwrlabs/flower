@@ -72,7 +72,7 @@ def create_linkstate_metadata() -> MetaData:
         Column("fab_hash", String),
         Column("override_config", String),
         Column("usage_reported_at", String, nullable=False, server_default=text("''")),
-        Column("federation", String),
+        Column("federation_id", String),
         Column("primary_task_id", BigInteger, nullable=False),
         Column("federation_config", String),
         Column("series_id", BigInteger, nullable=True),

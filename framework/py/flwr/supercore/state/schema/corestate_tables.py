@@ -65,7 +65,7 @@ def create_corestate_metadata() -> MetaData:
         "run_series",
         metadata,
         Column("series_id", BigInteger, primary_key=True, nullable=False),
-        Column("federation", String, nullable=False),
+        Column("federation_id", String, nullable=False),
         Column("description", String, nullable=True),
         Column("created_at", TIMESTAMP(timezone=True), nullable=False),
         Column("updated_at", TIMESTAMP(timezone=True), nullable=False),

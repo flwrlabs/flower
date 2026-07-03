@@ -1120,11 +1120,9 @@ def _validate_federation_and_node_in_request(
     _validate_federation_membership_in_request(state, flwr_aid, federation_id)
     nodes_info = state.get_node_info(node_ids=[node_id])
     if not nodes_info or nodes_info[0].owner_aid != flwr_aid:
-        details = f"Node {node_id} not found or you are not its owner."
         raise FlowerError(
             ApiErrorCode.NODE_NOT_FOUND_OR_NOT_OWNER,
-            details,
-            public_details=details,
+            f"Node {node_id} not found or {flwr_aid} is not its owner.",
         )
 
 
@@ -1139,20 +1137,16 @@ def _validate_federation_membership_in_request(
 
     # Check that the federation exists
     if not state.federation_manager.exists(federation_id):
-        details = f"Federation '{federation_id}' does not exist"
         raise FlowerError(
             ApiErrorCode.FEDERATION_NOT_FOUND,
-            details,
-            public_details=details,
+            message=f"Federation `{federation_id}` not found.",
         )
 
     # Check that the requester is a member of the federation
     if not state.federation_manager.has_member(flwr_aid, federation_id):
-        details = f"Federation '{federation_id}' does not exist"
         raise FlowerError(
             ApiErrorCode.FEDERATION_NOT_FOUND,
-            details,
-            public_details=details,
+            message=f"`{flwr_aid}` is not a member of federation `{federation_id}`.",
         )
 
 
@@ -1179,7 +1173,7 @@ def _get_account() -> AccountInfo:
     if account.flwr_aid is None:
         raise FlowerError(
             ApiErrorCode.ACCOUNT_INFO_NOT_FOUND,
-            "️⛔️ Failed to fetch the account information.",
+            "Failed to fetch the account information.",
         )
     return account
 
@@ -1196,14 +1190,14 @@ def _check_flwr_aid_in_run(flwr_aid: str | None, run: Run) -> None:
     if not run_flwr_aid:
         raise FlowerError(
             ApiErrorCode.RUN_NOT_ASSOCIATED_WITH_ACCOUNT,
-            "⛔️ Run is not associated with a `flwr_aid`.",
+            f"Run {run.run_id} is not associated with a `flwr_aid`.",
         )
 
     # Exit if `flwr_aid` does not match the run's `flwr_aid`
     if run_flwr_aid != flwr_aid:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_BELONG_TO_ACCOUNT,
-            "⛔️ Run ID does not belong to the account",
+            f"Run {run.run_id} does not belong to the account {flwr_aid}",
         )
 
 
@@ -1239,8 +1233,7 @@ def _get_remote_fab(
     except ValueError as e:
         raise FlowerError(
             ApiErrorCode.INVALID_APP_SPEC,
-            "Invalid app specification.",
-            public_details=str(e),
+            f"Invalid app specification: {app_spec}",
         ) from e
 
     # Request download link and verification information
@@ -1252,8 +1245,8 @@ def _get_remote_fab(
     except ValueError as e:
         raise FlowerError(
             ApiErrorCode.FAB_DOWNLOAD_LINK_FAILURE,
-            "Failed to request FAB download link.",
-            public_details=str(e),
+            f"Failed to request FAB download link. app-id:{app_id}, ",
+            f"app_version: {app_version}, url: {url}",
         ) from e
 
     # Format verification information
@@ -1268,11 +1261,9 @@ def _get_remote_fab(
         r = requests.get(presigned_url, timeout=60)
         r.raise_for_status()
     except requests.RequestException as e:
-        details = f"FAB download failed: {str(e)}"
         raise FlowerError(
             ApiErrorCode.FAB_DOWNLOAD_FAILURE,
-            details,
-            public_details=details,
+            f"FAB download failed: {str(e)}",
         ) from e
     fab_file = r.content
     return fab_file, verification_dict, note

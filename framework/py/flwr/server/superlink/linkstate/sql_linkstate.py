@@ -132,7 +132,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             UPDATE run
             SET run_id = run_id
             WHERE run_id = :run_id {condition}
-            RETURNING run_id, federation, primary_task_id
+            RETURNING run_id, federation_id, primary_task_id
             """,
             {"run_id": uint64_to_int64(run_id)},
         )
@@ -176,7 +176,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         message.metadata.run_id,
                     )
                     return None
-                federation_id: str = run_row["federation"]
+                federation_id: str = run_row["federation_id"]
 
                 # Validate destination node ID
                 query = """SELECT node_id FROM node WHERE node_id = :node_id
@@ -245,7 +245,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             run_ids = {row["run_id"] for row in message_rows}
             placeholders = ",".join([f":rid_{i}" for i in range(len(run_ids))])
             query = f"""
-                SELECT run_id, federation FROM run
+                SELECT run_id, federation_id FROM run
                 WHERE run_id IN ({placeholders})
             """
             params = {f"rid_{i}": rid for i, rid in enumerate(run_ids)}
@@ -253,7 +253,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
             # Build run_id to federation ID mapping
             run_id_to_federation_id: dict[int, str] = {
-                row["run_id"]: row["federation"] for row in run_rows
+                row["run_id"]: row["federation_id"] for row in run_rows
             }
 
             invalid_msg_ids: set[str] = set()
@@ -792,11 +792,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             sint64_run_id = uint64_to_int64(run_id)
 
             # Validate run ID
-            query = "SELECT federation FROM run WHERE run_id = :run_id"
+            query = "SELECT federation_id FROM run WHERE run_id = :run_id"
             rows = self.query(query, {"run_id": sint64_run_id})
             if not rows:
                 return set()
-            federation_id: str = rows[0]["federation"]
+            federation_id: str = rows[0]["federation_id"]
 
             # Retrieve all online nodes
             node_ids = {
@@ -949,11 +949,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         run_insert_query = """
             INSERT INTO run
-            (run_id, fab_id, fab_version, fab_hash, override_config, federation,
+            (run_id, fab_id, fab_version, fab_hash, override_config, federation_id,
             primary_task_id, federation_config, usage_reported_at,
             series_id, flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
             VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
-            :federation, :primary_task_id, :federation_config,
+            :federation_id, :primary_task_id, :federation_config,
             :usage_reported_at, :series_id, :flwr_aid,
             :bytes_sent, :bytes_recv, :clientapp_runtime)
         """
@@ -996,7 +996,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "fab_version": fab_version or "",
                         "fab_hash": fab_hash or "",
                         "override_config": override_config_json,
-                        "federation": federation_id,
+                        "federation_id": federation_id,
                         "primary_task_id": uint64_to_int64(task_id),
                         "federation_config": fed_config_json,
                         "usage_reported_at": "",
@@ -1089,14 +1089,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not federation_ids:
                 return []
             placeholders = ",".join([f":fed_{i}" for i in range(len(federation_ids))])
-            conditions.append(f"r.federation IN ({placeholders})")
+            conditions.append(f"r.federation_id IN ({placeholders})")
             params.update({f"fed_{i}": _id for i, _id in enumerate(federation_ids)})
 
         # Construct the final query
         query = """
             SELECT
                 r.run_id, r.fab_id, r.fab_version, r.fab_hash, r.override_config,
-                r.federation, r.primary_task_id, r.federation_config,
+                r.federation_id, r.primary_task_id, r.federation_config,
                 r.series_id, r.flwr_aid, r.bytes_sent, r.bytes_recv,
                 r.clientapp_runtime,
                 t.type AS primary_task_type,
@@ -1402,7 +1402,7 @@ def _run_from_row(row: dict[str, Any]) -> Run:
         finished_at=timestamp_to_iso(row["finished_at"]),
         status=_run_status_from_row(row),
         flwr_aid=row["flwr_aid"],
-        federation_id=row["federation"],
+        federation_id=row["federation_id"],
         primary_task_id=int64_to_uint64(row["primary_task_id"]),
         bytes_sent=row["bytes_sent"],
         bytes_recv=row["bytes_recv"],
