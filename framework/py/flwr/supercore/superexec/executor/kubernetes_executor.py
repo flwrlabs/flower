@@ -14,7 +14,6 @@
 # ==============================================================================
 """Kubernetes executor for SuperExec TaskExecutor processes."""
 
-
 import importlib
 import re
 import time
@@ -204,6 +203,10 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         """Validate config values used to build TaskExecutor Pods."""
         if self.env is not None:
             self.env = _taskexecutor_env(self.env)
+        if self.volumes is not None:
+            self.volumes = _taskexecutor_volumes(self.volumes)
+        if self.volume_mounts is not None:
+            self.volume_mounts = _taskexecutor_volume_mounts(self.volume_mounts)
 
 
 class KubernetesExecutor:
@@ -564,6 +567,65 @@ def _taskexecutor_env(env: list[JSONObject]) -> list[JSONObject]:
         # Copy only the validated Kubernetes env shape into the generated Pod spec.
         entries.append({"name": name, "value": value})
     return entries
+
+
+def _taskexecutor_volumes(volumes: list[JSONObject]) -> list[JSONObject]:
+    """Build validated TaskExecutor Pod volumes."""
+    if not isinstance(volumes, list):
+        raise ValueError("TaskExecutor volumes must be a list of mappings.")
+    entries: list[JSONObject] = []
+    for entry in volumes:
+        if not isinstance(entry, dict):
+            raise ValueError("TaskExecutor volume entries must be mappings.")
+        if entry.get("name") == "appio-credentials":
+            raise ValueError(
+                "TaskExecutor volume name 'appio-credentials' is reserved."
+            )
+        if "secret" in entry:
+            raise ValueError("TaskExecutor secret volumes are not supported.")
+        if _has_rejected_projected_source(entry):
+            raise ValueError(
+                "TaskExecutor projected secret and serviceAccountToken volumes "
+                "are not supported."
+            )
+        entries.append(entry)
+    return entries
+
+
+def _taskexecutor_volume_mounts(volume_mounts: list[JSONObject]) -> list[JSONObject]:
+    """Build validated TaskExecutor container volume mounts."""
+    if not isinstance(volume_mounts, list):
+        raise ValueError("TaskExecutor volume mounts must be a list of mappings.")
+    entries: list[JSONObject] = []
+    for entry in volume_mounts:
+        if not isinstance(entry, dict):
+            raise ValueError("TaskExecutor volume mount entries must be mappings.")
+        if entry.get("name") == "appio-credentials":
+            raise ValueError(
+                "TaskExecutor volume mount name 'appio-credentials' is reserved."
+            )
+        if entry.get("mountPath") == APPIO_CREDENTIALS_MOUNT_PATH:
+            raise ValueError(
+                f"TaskExecutor volume mount path {APPIO_CREDENTIALS_MOUNT_PATH!r} "
+                "is reserved."
+            )
+        entries.append(entry)
+    return entries
+
+
+def _has_rejected_projected_source(volume: JSONObject) -> bool:
+    """Return true if a projected volume source exposes credentials."""
+    projected = volume.get("projected")
+    if not isinstance(projected, dict):
+        return False
+    sources = projected.get("sources")
+    if not isinstance(sources, list):
+        return False
+    return any(
+        isinstance(source, dict)
+        and ("secret" in source or "serviceAccountToken" in source)
+        for source in sources
+    )
 
 
 def _get_appio_root_certificates(
