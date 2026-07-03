@@ -35,7 +35,9 @@ class ConnectorInvocationResult:
 class _TaskUsageStub(Protocol):
     """AppIo stub surface needed to record task usage."""
 
-    def RecordTaskUsage(self, request: RecordTaskUsageRequest) -> object:
+    def RecordTaskUsage(  # pylint: disable=invalid-name
+        self, request: RecordTaskUsageRequest
+    ) -> object:
         """Record task usage through AppIo."""
 
 
@@ -47,7 +49,19 @@ class TaskUsageRecorder:
 
     def record(self, usage: TaskUsage) -> None:
         """Record one task usage payload."""
-        self._stub.RecordTaskUsage(RecordTaskUsageRequest(task_usage=usage))
+        self._stub.RecordTaskUsage(
+            RecordTaskUsageRequest(task_usage=_with_default_token_counts(usage))
+        )
+
+
+def _with_default_token_counts(usage: TaskUsage) -> TaskUsage:
+    """Return usage with unset token fields normalized to zero."""
+    return TaskUsage(
+        usage_type=usage.usage_type,
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        total_tokens=usage.total_tokens,
+    )
 
 
 def task_usage_from_open_response(
