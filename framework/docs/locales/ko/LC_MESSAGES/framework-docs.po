@@ -17521,7 +17521,7 @@ msgstr ""
 #: ../../source/how-to-use-cli-json-output.rst:160
 #, fuzzy
 msgid "``federation-id``: the federation ID"
-msgstr "Flower 기본 이미지의 태그."
+msgstr ""
 
 #: ../../source/how-to-use-cli-json-output.rst:161
 msgid ""
@@ -18156,7 +18156,7 @@ msgstr ""
 #: ../../flwr app:1
 #, fuzzy
 msgid "Manage Apps"
-msgstr "시뮬레이션 실행"
+msgstr ""
 
 #: ../../flwr app publish:1
 #, fuzzy
@@ -18272,12 +18272,12 @@ msgstr "설명"
 #: ../../flwr federation:1
 #, fuzzy
 msgid "Manage Federations"
-msgstr "시뮬레이션 실행"
+msgstr ""
 
 #: ../../flwr add-supernode:1 federation
 #, fuzzy
 msgid "Add a SuperNode to a federation."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr add-supernode:1 federation
 #, fuzzy
@@ -18288,7 +18288,7 @@ msgstr "서버(SuperLink)"
 #: remove-supernode:1 revoke:1
 #, fuzzy
 msgid "Federation ID."
-msgstr "시뮬레이션 실행"
+msgstr ""
 
 #: ../../flwr accept:1 add-supernode:1 archive:1 create:1 federation invite
 #: list:1 log:1 login:1 pull:1 register:1 reject:1 remove-account:1
@@ -18296,7 +18296,7 @@ msgstr "시뮬레이션 실행"
 #: unregister:1
 #, fuzzy
 msgid "Name of the SuperLink connection."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr archive:1 federation
 #, fuzzy
@@ -18306,7 +18306,7 @@ msgstr "기존 전략 사용"
 #: ../../flwr archive:1 federation
 #, fuzzy
 msgid "Federation ID to archive."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr create:1 federation
 #, fuzzy
@@ -18316,7 +18316,7 @@ msgstr "새 페이지 만들기"
 #: ../../flwr create:1 federation
 #, fuzzy
 msgid "Description of the federation."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr create:1 federation
 #, fuzzy
@@ -18331,12 +18331,12 @@ msgstr "``flwr/base``"
 #: ../../flwr create:1 federation
 #, fuzzy
 msgid "Name of the federation to create."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr federation invite:1
 #, fuzzy
 msgid "Manage Federation Invitations"
-msgstr "시뮬레이션 실행"
+msgstr ""
 
 #: ../../flwr accept:1 federation invite
 #, fuzzy
@@ -18351,7 +18351,7 @@ msgstr "새 페이지 만들기"
 #: ../../flwr create:1 federation invite
 #, fuzzy
 msgid "Name of the Flower account to invite."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr federation invite list:1
 msgid ""
@@ -18366,7 +18366,7 @@ msgstr ""
 #: ../../flwr federation invite reject:1
 #, fuzzy
 msgid "Reject an invitation to join a federation."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr federation invite revoke:1
 msgid "Revoke a pending invitation."
@@ -18375,7 +18375,7 @@ msgstr ""
 #: ../../flwr federation invite revoke:1
 #, fuzzy
 msgid "Name of the Flower account whose invitation should be revoked."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr federation list:1
 msgid ""
@@ -18386,7 +18386,7 @@ msgstr ""
 #: ../../flwr federation list:1
 #, fuzzy
 msgid "Federation ID to display"
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr federation list:1
 msgid "Show additional details, including archived federations."
@@ -18395,22 +18395,22 @@ msgstr ""
 #: ../../flwr federation remove-account:1
 #, fuzzy
 msgid "Remove an account from an existing federation."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr federation remove-account:1
 #, fuzzy
 msgid "Federation ID to remove an account from."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr federation remove-account:1
 #, fuzzy
 msgid "Name of the account to remove from the federation."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr federation remove-supernode:1
 #, fuzzy
 msgid "Remove a SuperNode from a federation."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr federation remove-supernode:1 supernode unregister:1
 #, fuzzy
@@ -18472,7 +18472,7 @@ msgstr ""
 #: ../../flwr federation simulation-config:1
 #, fuzzy
 msgid "Federation ID; must be in the format `@<account>/<federation-name>`."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr install:1
 #, fuzzy
@@ -18552,7 +18552,7 @@ msgstr ""
 #: ../../flwr list:1
 #, fuzzy
 msgid "Maximum number of runs to display"
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr log:1
 msgid "Get logs from a run."
@@ -18581,7 +18581,7 @@ msgstr "Flower 커뮤니티 가입하기"
 #: ../../flwr login:1
 #, fuzzy
 msgid "Login to Flower SuperLink."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr new:1
 #, fuzzy
@@ -18620,14 +18620,14 @@ msgstr ""
 #: ../../flwr run:1
 #, fuzzy
 msgid "Run Flower App."
-msgstr "Flower 서버."
+msgstr ""
 
 #: ../../flwr run:1
 #, fuzzy
 msgid ""
 "The federation ID to submit the run to; must be in the format `@<account"
 ">/<federation-name>`."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr run:1
 #, fuzzy
@@ -18683,7 +18683,7 @@ msgstr ""
 #: ../../flwr stop:1
 #, fuzzy
 msgid "Stop a Flower run."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr stop:1
 msgid ""
@@ -18704,7 +18704,7 @@ msgstr "SuperNodes 인증하기"
 #: ../../flwr list:1 supernode
 #, fuzzy
 msgid "List SuperNodes in the federation (alias: ls)."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr list:1 supernode
 #, fuzzy
@@ -18714,7 +18714,7 @@ msgstr "예시"
 #: ../../flwr register:1 supernode
 #, fuzzy
 msgid "Add a SuperNode to the federation."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../flwr register:1 supernode
 msgid "Path to a P-384 (or any other NIST EC curve) public key file."
@@ -18723,12 +18723,12 @@ msgstr ""
 #: ../../flwr supernode unregister:1
 #, fuzzy
 msgid "Unregister a SuperNode from the federation."
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../source/ref-api-cli.rst:21
 #, fuzzy
 msgid "``flower-superlink``"
-msgstr "flower 초연결"
+msgstr ""
 
 #: ../../source/ref-api-cli.rst:31
 #, fuzzy

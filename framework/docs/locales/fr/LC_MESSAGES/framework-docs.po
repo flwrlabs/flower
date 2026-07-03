@@ -12954,7 +12954,7 @@ msgid ""
 msgstr ""
 "L'utilisateur invité verra l'invitation lorsqu'il se connectera à "
 "`flower.ai <https://flower.ai/>`__ et ouvrira sa page de profil. "
-"L'invitation affichera le nom de la fédération et le nom d'utilisateur du"
+"L'invitation affichera l'ID de la fédération et le nom d'utilisateur du"
 " utilisateur qui l'a envoyée."
 
 #: ../../source/how-to-create-and-manage-federations.rst:122
@@ -14307,10 +14307,9 @@ msgid ""
 " the name of the federation."
 msgstr ""
 "Les fédérations peuvent être adressées par leur identifiant unique, qui a"
-" la forme ``@<account-name>/<federation-name>`` étant donné que "
-"``<account-name>`` est le nom de l'account qui a créé la fédération et "
-"``<federation-name>`` est le nom donné à la fédération au moment du "
-"création."
+" la forme ``@<account-name>/<federation-name>``. "
+"L'``<account-name>`` est le nom du compte qui a créé la fédération, et "
+"``<federation-name>`` est le nom de la fédération."
 
 #: ../../source/how-to-manage-flower-federations.rst:29
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:13
@@ -14357,8 +14356,9 @@ msgid ""
 "account:"
 msgstr ""
 "Le commande ci-dessus affichera une table avec une ligne pour chaque "
-"fédération dont vous faites partie. Dans ce cas, il n'y a qu'une seule "
-"fédération nommée ``default`` sous le compte ``none`` :"
+"fédération dont vous faites partie. Dans ce cas, il y a une "
+"fédération: ``@none/default``. Son nom est ``default``, et "
+"elle appartient au compte ``none`` :"
 
 #: ../../source/how-to-manage-flower-federations.rst:66
 msgid "Inspect a Federation"
@@ -14372,7 +14372,7 @@ msgid ""
 "following information about a federation:"
 msgstr ""
 "Vous pouvez inspecter une fédération spécifique en fournissant "
-"l'identifiant de la fédération à la commande ``flwr federation list``. "
+"le federation ID à la commande ``flwr federation list``. "
 "Avec cette commande, vous pourrez voir les informations suivantes sur une"
 " fédération :"
 
@@ -14394,7 +14394,7 @@ msgid ""
 "The ``flwr federation list --federation <federation-id>`` command expects"
 " the federation ID as an argument:"
 msgstr ""
-"La commande ``flwr federation list --federation <federation>`` nécessite "
+"La commande ``flwr federation list --federation <federation-id>`` nécessite "
 "l'identifiant de la fédération à inspecter comme argument :"
 
 #: ../../source/how-to-manage-flower-federations.rst:83
@@ -14956,7 +14956,7 @@ msgstr ""
 "Connectez-vous ensuite à SuperGrid avec ``flwr login``. Cela ouvre une "
 "fenêtre de navigateur où vous pouvez vous authentifier avec votre compte "
 "SuperGrid. Finalement, exécutez l'application avec ``flwr run`` et "
-"utilisez ``--federation`` pour choisir la fédération :"
+"utilisez ``--federation`` pour choisir la fédération cible :"
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:94
 #, fuzzy
@@ -14964,8 +14964,8 @@ msgid ""
 "Replace ``@<username>/<federation-name>`` with your federation ID, for "
 "example ``@peter123/my-federation``."
 msgstr ""
-"Remplacez ``@<username>/<federation-name>`` par le nom unique de votre "
-"fédération, par exemple ``@peter123/my-federation``."
+"Remplacez ``@<username>/<federation-name>`` par votre federation ID, par "
+"exemple ``@peter123/my-federation``."
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:105
 msgid "The run appears in the same SuperGrid federation dashboard."
@@ -21156,7 +21156,7 @@ msgstr "``run-id``: l'ID de run"
 #: ../../source/how-to-use-cli-json-output.rst:160
 #, fuzzy
 msgid "``federation-id``: the federation ID"
-msgstr "``federation``: l'identifiant de fédération"
+msgstr "``federation-id``: l'identifiant de fédération (ou federation ID)"
 
 #: ../../source/how-to-use-cli-json-output.rst:161
 msgid ""
@@ -22070,7 +22070,7 @@ msgstr "ID du SuperNode à ajouter."
 #: remove-supernode:1 revoke:1
 #, fuzzy
 msgid "Federation ID."
-msgstr "Lister les Fédérations"
+msgstr "Identifiant de la fédération (federation ID)."
 
 #: ../../flwr accept:1 add-supernode:1 archive:1 create:1 federation invite
 #: list:1 log:1 login:1 pull:1 register:1 reject:1 remove-account:1
@@ -22086,7 +22086,7 @@ msgstr "Archiviez une fédération existante."
 #: ../../flwr archive:1 federation
 #, fuzzy
 msgid "Federation ID to archive."
-msgstr "Nom de la fédération à archiver."
+msgstr "ID de la fédération à archiver."
 
 #: ../../flwr create:1 federation
 msgid "Create a new federation."
@@ -22159,7 +22159,7 @@ msgstr ""
 #: ../../flwr federation list:1
 #, fuzzy
 msgid "Federation ID to display"
-msgstr "Nom de la fédération à afficher"
+msgstr "ID de la fédération à afficher"
 
 #: ../../flwr federation list:1
 msgid "Show additional details, including archived federations."
@@ -22174,7 +22174,7 @@ msgstr "Supprimer un compte d'une fédération existante."
 #: ../../flwr federation remove-account:1
 #, fuzzy
 msgid "Federation ID to remove an account from."
-msgstr "Nom de la fédération dont supprimer un compte."
+msgstr "ID de la fédération dont supprimer un compte."
 
 #: ../../flwr federation remove-account:1
 msgid "Name of the account to remove from the federation."
@@ -22239,7 +22239,7 @@ msgstr "true | false"
 #: ../../flwr federation simulation-config:1
 #, fuzzy
 msgid "Federation ID; must be in the format `@<account>/<federation-name>`."
-msgstr "Nom de la fédération ; doit être sous la forme `@<compte>/<fédération>`."
+msgstr "ID de la fédération ; doit être sous la forme `@<compte>/<fédération>`."
 
 #: ../../flwr install:1
 msgid "Install a Flower App Bundle."
@@ -22407,8 +22407,8 @@ msgid ""
 "The federation ID to submit the run to; must be in the format `@<account"
 ">/<federation-name>`."
 msgstr ""
-"La fédération à soumettre le run; doit être dans la forme "
-"`@<account>/<federation>`."
+"L'ID de la fédération où soumettre le run; doit être dans la forme "
+"`@<account>/<federation-name>`."
 
 #: ../../flwr run:1
 msgid "Override run configuration values using one of the following formats:"
@@ -53834,4 +53834,3 @@ msgstr ""
 #~ "Federations on SuperGrid <how-to-"
 #~ "create-and-manage-federations>`."
 #~ msgstr ""
-
