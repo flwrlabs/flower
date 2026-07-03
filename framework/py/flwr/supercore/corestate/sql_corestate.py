@@ -511,8 +511,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
         """Record usage for the specified task."""
-        sint64_task_id = uint64_to_int64(task_id)
-
         with self.session():
             self.query(
                 """
@@ -526,12 +524,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 FROM task
                 WHERE task_id = :task_id
                 """,
-                {
-                    **_task_usage_to_row(usage),
-                    "task_id": sint64_task_id,
-                    "created_at": now().isoformat(),
-                    "reported_at": None,
-                },
+                _task_usage_to_row(task_id, usage),
             )
 
     def get_task_usage(
@@ -1041,25 +1034,27 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     )
 
 
-def _task_usage_to_row(usage: TaskUsage) -> dict[str, int | str]:
+def _task_usage_to_row(
+    task_id: int, usage: TaskUsage
+) -> dict[str, datetime | int | str | None]:
     """Convert a TaskUsage proto to database row values."""
     return {
+        "task_id": uint64_to_int64(task_id),
         "input_tokens": usage.input_tokens,
         "output_tokens": usage.output_tokens,
         "total_tokens": usage.total_tokens,
         "usage_type": usage.usage_type,
+        "created_at": now(),
+        "reported_at": None,
     }
 
 
 def _task_usage_from_row(row: dict[str, Any]) -> TaskUsage:
     """Convert a task_usage row to a TaskUsage proto."""
     usage = TaskUsage()
-    if row["input_tokens"] is not None:
-        usage.input_tokens = int64_to_uint64(row["input_tokens"])
-    if row["output_tokens"] is not None:
-        usage.output_tokens = int64_to_uint64(row["output_tokens"])
-    if row["total_tokens"] is not None:
-        usage.total_tokens = int64_to_uint64(row["total_tokens"])
+    usage.input_tokens = row["input_tokens"]
+    usage.output_tokens = row["output_tokens"]
+    usage.total_tokens = row["total_tokens"]
     usage.usage_type = row["usage_type"]
     return usage
 

@@ -71,8 +71,8 @@ class TaskUsageRecord:
     task_id: int
     run_id: int
     usage: TaskUsage
-    created_at: str
-    reported_at: str | None
+    created_at: datetime
+    reported_at: datetime | None
 
 
 class InMemoryCoreState(
@@ -390,7 +390,7 @@ class InMemoryCoreState(
                 task_id=task_id,
                 run_id=run_id,
                 usage=usage,
-                created_at=now().isoformat(),
+                created_at=now(),
                 reported_at=None,
             )
             self._next_task_usage_id += 1
@@ -407,16 +407,14 @@ class InMemoryCoreState(
         ):
             return []
 
-        def matches(record: TaskUsageRecord) -> bool:
-            return (run_ids is None or record.run_id in run_ids) and (
-                task_ids is None or record.task_id in task_ids
-            )
-
         with self.lock_task_usage_store:
-            records = [
-                record for record in self.task_usage_store.values() if matches(record)
-            ]
-            records.sort(key=lambda record: record.id)
+            records = sorted(
+                self.task_usage_store.values(), key=lambda record: record.id
+            )
+            if run_ids is not None:
+                records = [record for record in records if record.run_id in run_ids]
+            if task_ids is not None:
+                records = [record for record in records if record.task_id in task_ids]
             return [record.usage for record in records]
 
     def claim_task(self, task_id: int) -> str | None:
