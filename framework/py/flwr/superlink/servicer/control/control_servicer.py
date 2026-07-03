@@ -288,7 +288,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 ApiErrorCode.INVALID_RUN_CONFIG,
                 "Could not start run for "
                 f"flwr_aid={flwr_aid}, federation_id={federation_id}: {e}",
-                public_details=str(e),
             ) from e
 
         log_msg = f"Created run {run_id} in federation {run.federation_id}"
@@ -492,12 +491,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
 
         if run.status.status == Status.FINISHED:
-            details = f"Run ID {run_id} is already finished"
             raise FlowerError(
                 ApiErrorCode.RUN_ALREADY_FINISHED,
                 f"Cannot stop run {run_id} for flwr_aid={flwr_aid}; "
                 f"run is already finished with status={run.status}.",
-                public_details=details,
             )
 
         return StopRunResponse(success=state.stop_run(run_id))
@@ -726,15 +723,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         flwr_aid = _get_flwr_aid()
         state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
         if not state.federation_manager.has_member(flwr_aid, federation_id):
-            public_details = (
-                f"Federation '{federation_id}' does not exist or you are "
-                "not a member of it."
-            )
             raise FlowerError(
                 ApiErrorCode.FEDERATION_NOT_FOUND_OR_NOT_MEMBER,
                 f"Federation '{federation_id}' not found or flwr_aid={flwr_aid} "
                 "is not a member.",
-                public_details=public_details,
             )
 
         # Fetch federation details
