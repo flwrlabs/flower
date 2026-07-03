@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-07-02 00:30+0000\n"
+"POT-Creation-Date: 2026-07-03 00:26+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -12946,14 +12946,15 @@ msgid "Pending invitation in the federation members list"
 msgstr "Invitation en attente dans la liste des membres de la fédération"
 
 #: ../../source/how-to-create-and-manage-federations.rst:118
+#, fuzzy
 msgid ""
 "The invited user will see the invitation when they sign in to `flower.ai "
 "<https://flower.ai/>`__ and open their profile page. The invitation shows"
-" the federation name and the username of the user who sent it."
+" the federation ID and the username of the user who sent it."
 msgstr ""
 "L'utilisateur invité verra l'invitation lorsqu'il se connectera à "
 "`flower.ai <https://flower.ai/>`__ et ouvrira sa page de profil. "
-"L'invitation affichera le nom de la fédération et le nom d'utilisateur du"
+"L'invitation affichera l'ID de la fédération et le nom d'utilisateur du"
 " utilisateur qui l'a envoyée."
 
 #: ../../source/how-to-create-and-manage-federations.rst:122
@@ -14298,32 +14299,32 @@ msgstr ""
 "AI) sur tous les SuperNodes qui en font partie."
 
 #: ../../source/how-to-manage-flower-federations.rst:25
+#, fuzzy
 msgid ""
-"Federations can be addressed by their unique identifier, which has the "
-"form ``@<account-name>/<federation-name>`` being ``<account-name>`` the "
-"name of the account that created the federation and ``<federation-name>``"
-" the name given to the federation at creation time."
+"Federations can be addressed by their federation ID, which has the form "
+"``@<account-name>/<federation-name>``. The ``<account-name>`` is the name"
+" of the account that created the federation, and ``<federation-name>`` is"
+" the name of the federation."
 msgstr ""
-"Les fédérations peuvent être adressées par leur identifiant unique, qui a"
-" la forme ``@<account-name>/<federation-name>`` étant donné que "
-"``<account-name>`` est le nom de l'account qui a créé la fédération et "
-"``<federation-name>`` est le nom donné à la fédération au moment du "
-"création."
+"Les fédérations peuvent être adressées par leur identifiant unique "
+"(federation ID), qui a la forme ``@<account-name>/<federation-name>``. "
+"L'``<account-name>`` est le nom du compte qui a créé la fédération, et "
+"``<federation-name>`` est le nom de la fédération."
 
-#: ../../source/how-to-manage-flower-federations.rst:30
+#: ../../source/how-to-manage-flower-federations.rst:29
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:13
 msgid "In this how-to guide, you will:"
 msgstr "Dans ce guide pratique, vous allez:"
 
-#: ../../source/how-to-manage-flower-federations.rst:32
+#: ../../source/how-to-manage-flower-federations.rst:31
 msgid "Learn how to see the federations you are part of."
 msgstr "Apprendre à voir les fédérations dont vous faites partie."
 
-#: ../../source/how-to-manage-flower-federations.rst:33
+#: ../../source/how-to-manage-flower-federations.rst:32
 msgid "Learn how to display information about a specific federation."
 msgstr "Apprendre à afficher des informations sur une fédération spécifique."
 
-#: ../../source/how-to-manage-flower-federations.rst:37
+#: ../../source/how-to-manage-flower-federations.rst:36
 msgid ""
 "This guide covers inspecting federations through the Flower CLI when "
 "using a self-hosted SuperLink. To create and manage federations in the "
@@ -14334,11 +14335,11 @@ msgstr ""
 "les fédérations dans le tableau de bord SuperGrid, voir :doc:`how-to-"
 "create-and-manage-federations`."
 
-#: ../../source/how-to-manage-flower-federations.rst:43
+#: ../../source/how-to-manage-flower-federations.rst:42
 msgid "List Federations"
 msgstr "Lister les Fédérations"
 
-#: ../../source/how-to-manage-flower-federations.rst:45
+#: ../../source/how-to-manage-flower-federations.rst:44
 msgid ""
 "With the |flower_cli_federation_link|_, you can easily inspect the "
 "federations your Flower account is part of:"
@@ -14346,28 +14347,32 @@ msgstr ""
 "Avec le |flower_cli_federation_link|_, vous pouvez facilement inspecter "
 "les fédérations dont votre compte Flower fait partie:"
 
-#: ../../source/how-to-manage-flower-federations.rst:52
+#: ../../source/how-to-manage-flower-federations.rst:51
+#, fuzzy
 msgid ""
 "The above command will display a table with a row for each federation you"
-" are part of. In this case there is only one federation named ``default``"
-" under the account ``none``:"
+" are part of. In this case there is one federation: ``@none/default``. "
+"Its federation name is ``default``, and it belongs to the ``none`` "
+"account:"
 msgstr ""
 "Le commande ci-dessus affichera une table avec une ligne pour chaque "
-"fédération dont vous faites partie. Dans ce cas, il n'y a qu'une seule "
-"fédération nommée ``default`` sous le compte ``none`` :"
+"fédération dont vous faites partie. Dans ce cas, il y a une "
+"fédération: ``@none/default``. Son nom est ``default``, et "
+"elle appartient au compte ``none`` :"
 
 #: ../../source/how-to-manage-flower-federations.rst:66
 msgid "Inspect a Federation"
 msgstr "Inspecter une Fédération"
 
 #: ../../source/how-to-manage-flower-federations.rst:68
+#, fuzzy
 msgid ""
-"You can inspect a specific federation by providing the identifier of the "
-"federation to the ``flwr federation list`` command. With this command, "
-"you will be able to see the following information about a federation:"
+"You can inspect a specific federation by passing its federation ID to "
+"``flwr federation list``. With this command, you will be able to see the "
+"following information about a federation:"
 msgstr ""
 "Vous pouvez inspecter une fédération spécifique en fournissant "
-"l'identifiant de la fédération à la commande ``flwr federation list``. "
+"le federation ID à la commande ``flwr federation list``. "
 "Avec cette commande, vous pourrez voir les informations suivantes sur une"
 " fédération :"
 
@@ -14384,11 +14389,12 @@ msgid "The runs executed via the federation."
 msgstr "Les runs exécutés via la fédération."
 
 #: ../../source/how-to-manage-flower-federations.rst:76
+#, fuzzy
 msgid ""
-"The ``flwr federation list --federation <federation>`` command requires "
-"the identifier of the federation to inspect as an argument:"
+"The ``flwr federation list --federation <federation-id>`` command expects"
+" the federation ID as an argument:"
 msgstr ""
-"La commande ``flwr federation list --federation <federation>`` nécessite "
+"La commande ``flwr federation list --federation <federation-id>`` nécessite "
 "l'identifiant de la fédération à inspecter comme argument :"
 
 #: ../../source/how-to-manage-flower-federations.rst:83
@@ -14940,24 +14946,26 @@ msgid "Pull the app locally with ``flwr new``:"
 msgstr "Tirez l'application localement avec ``flwr new`` :"
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:88
+#, fuzzy
 msgid ""
 "Then, log in to SuperGrid with ``flwr login``. This opens a browser "
 "window where you can authenticate with your SuperGrid account. Finally, "
 "run the app with ``flwr run`` and use ``--federation`` to choose the "
-"federation:"
+"target federation:"
 msgstr ""
 "Connectez-vous ensuite à SuperGrid avec ``flwr login``. Cela ouvre une "
 "fenêtre de navigateur où vous pouvez vous authentifier avec votre compte "
 "SuperGrid. Finalement, exécutez l'application avec ``flwr run`` et "
-"utilisez ``--federation`` pour choisir la fédération :"
+"utilisez ``--federation`` pour choisir la fédération cible :"
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:94
+#, fuzzy
 msgid ""
-"Replace ``@<username>/<federation-name>`` with the unique name of your "
-"federation, for example ``@peter123/my-federation``."
+"Replace ``@<username>/<federation-name>`` with your federation ID, for "
+"example ``@peter123/my-federation``."
 msgstr ""
-"Remplacez ``@<username>/<federation-name>`` par le nom unique de votre "
-"fédération, par exemple ``@peter123/my-federation``."
+"Remplacez ``@<username>/<federation-name>`` par votre federation ID, par "
+"exemple ``@peter123/my-federation``."
 
 #: ../../source/how-to-run-flower-apps-on-supergrid.rst:105
 msgid "The run appears in the same SuperGrid federation dashboard."
@@ -21146,8 +21154,9 @@ msgid "``run-id``: the run ID"
 msgstr "``run-id``: l'ID de run"
 
 #: ../../source/how-to-use-cli-json-output.rst:160
-msgid "``federation``: the federation identifier"
-msgstr "``federation``: l'identifiant de fédération"
+#, fuzzy
+msgid "``federation-id``: the federation ID"
+msgstr "``federation-id``: l'identifiant de fédération (ou federation ID)"
 
 #: ../../source/how-to-use-cli-json-output.rst:161
 msgid ""
@@ -22059,8 +22068,9 @@ msgstr "ID du SuperNode à ajouter."
 
 #: ../../flwr accept:1 add-supernode:1 create:1 federation invite reject:1
 #: remove-supernode:1 revoke:1
-msgid "Name of the federation."
-msgstr ""
+#, fuzzy
+msgid "Federation ID."
+msgstr "Identifiant de la fédération (federation ID)."
 
 #: ../../flwr accept:1 add-supernode:1 archive:1 create:1 federation invite
 #: list:1 log:1 login:1 pull:1 register:1 reject:1 remove-account:1
@@ -22074,8 +22084,9 @@ msgid "Archive an existing federation."
 msgstr "Archiviez une fédération existante."
 
 #: ../../flwr archive:1 federation
-msgid "Name of the federation to archive."
-msgstr "Nom de la fédération à archiver."
+#, fuzzy
+msgid "Federation ID to archive."
+msgstr "ID de la fédération à archiver."
 
 #: ../../flwr create:1 federation
 msgid "Create a new federation."
@@ -22146,8 +22157,9 @@ msgstr ""
 "spécifique (alias : ls)."
 
 #: ../../flwr federation list:1
-msgid "Name of the federation to display"
-msgstr "Nom de la fédération à afficher"
+#, fuzzy
+msgid "Federation ID to display"
+msgstr "ID de la fédération à afficher"
 
 #: ../../flwr federation list:1
 msgid "Show additional details, including archived federations."
@@ -22160,8 +22172,9 @@ msgid "Remove an account from an existing federation."
 msgstr "Supprimer un compte d'une fédération existante."
 
 #: ../../flwr federation remove-account:1
-msgid "Name of the federation to remove an account from."
-msgstr "Nom de la fédération dont supprimer un compte."
+#, fuzzy
+msgid "Federation ID to remove an account from."
+msgstr "ID de la fédération dont supprimer un compte."
 
 #: ../../flwr federation remove-account:1
 msgid "Name of the account to remove from the federation."
@@ -22224,8 +22237,9 @@ msgid "true | false"
 msgstr "true | false"
 
 #: ../../flwr federation simulation-config:1
-msgid "Name of the federation; must be in the format `@<account>/<federation>`."
-msgstr "Nom de la fédération ; doit être sous la forme `@<compte>/<fédération>`."
+#, fuzzy
+msgid "Federation ID; must be in the format `@<account>/<federation-name>`."
+msgstr "ID de la fédération ; doit être sous la forme `@<compte>/<fédération>`."
 
 #: ../../flwr install:1
 msgid "Install a Flower App Bundle."
@@ -22388,12 +22402,13 @@ msgid "Run Flower App."
 msgstr ""
 
 #: ../../flwr run:1
+#, fuzzy
 msgid ""
-"The federation to submit the run to; must be in the format "
-"`@<account>/<federation>`."
+"The federation ID to submit the run to; must be in the format `@<account"
+">/<federation-name>`."
 msgstr ""
-"La fédération à soumettre le run; doit être dans la forme "
-"`@<account>/<federation>`."
+"L'ID de la fédération où soumettre le run; doit être dans la forme "
+"`@<account>/<federation-name>`."
 
 #: ../../flwr run:1
 msgid "Override run configuration values using one of the following formats:"
@@ -25469,7 +25484,9 @@ msgstr ""
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:1
 #: of
 msgid "Strategy wrapper for central DP with server-side fixed clipping."
-msgstr "Wrapper de stratégie pour le DP centralisé avec clipping fixe côté serveur."
+msgstr ""
+"Wrapper de stratégie pour le DP centralisé avec clipping fixe côté "
+"serveur."
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 msgid ""
@@ -46043,10 +46060,6 @@ msgstr ""
 msgid "Reinstall or upgrade ``flwr``, then retry:"
 msgstr "Réinstallez ou mettez à niveau ``flwr``, puis réessayez :"
 
-#: ../../source/ref-exit-codes/601.rst:19
-msgid "python -m pip install -U flwr"
-msgstr "python -m pip install -U flwr"
-
 #: ../../source/ref-exit-codes/602.rst:3
 msgid "[602] COMMON_TLS_NOT_SUPPORTED"
 msgstr "[602] COMMON_TLS_NOT_SUPPORTED"
@@ -46993,7 +47006,9 @@ msgstr ""
 
 #: ../../source/ref-flower-configuration.rst:208
 msgid "Only set ``insecure = true`` for local testing environments."
-msgstr "Ne définissez ``insecure = true`` que pour les environnements de test locaux."
+msgstr ""
+"Ne définissez ``insecure = true`` que pour les environnements de test "
+"locaux."
 
 #: ../../source/ref-flower-configuration.rst:210
 msgid ""
@@ -49175,12 +49190,12 @@ msgid ""
 "is set to ``true``, save the global model NumPy arrays using "
 "``np.savez()`` as shown above."
 msgstr ""
-"Notez que la méthode ``start`` de la stratégie retourne un objet résultat. "
-"Cet objet contient toutes les informations pertinentes sur le processus "
-"FL, y compris les poids de modèle final sous forme de ``ArrayRecord``, et"
-" les métriques de formation et d'évaluation fédérées comme des "
-"``MetricRecords``. Vous pouvez facilement logger les métriques en "
-"utilisant Python's `pprint "
+"Notez que la méthode ``start`` de la stratégie retourne un objet "
+"résultat. Cet objet contient toutes les informations pertinentes sur le "
+"processus FL, y compris les poids de modèle final sous forme de "
+"``ArrayRecord``, et les métriques de formation et d'évaluation fédérées "
+"comme des ``MetricRecords``. Vous pouvez facilement logger les métriques "
+"en utilisant Python's `pprint "
 "<https://docs.python.org/3/library/pprint.html>`_ et, si ``save-model`` "
 "est défini sur ``true``, sauvegarder les tableaux NumPy globaux du modèle"
 " à l'aide de ``np.savez()`` comme montré ci-dessus."
@@ -51028,9 +51043,9 @@ msgstr ""
 "n'aurez pas besoin d'écrire de code pour terminer le tutoriel, mais vous "
 "obtiendrez toujours une introduction pratique aux concepts clés de "
 "l'intelligence artificielle collaborative avec Flower. Vous obtiendrez "
-"également un aperçu des coulisses pour comprendre comment Flower "
-"exécute votre application et comment les différents composants "
-"interagissent entre eux."
+"également un aperçu des coulisses pour comprendre comment Flower exécute "
+"votre application et comment les différents composants interagissent "
+"entre eux."
 
 #: ../../source/tutorial-series-get-started-with-flower.rst:21
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:64
@@ -52915,9 +52930,9 @@ msgstr ""
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:182
 msgid ""
-"In SuperGrid, use the ``--federation`` flag to choose which federation "
-"runs your app. If you omit it, Flower uses ``@<your-account>/workspace``."
-" Learn more in :doc:`Create and Manage Federations on SuperGrid <how-to-"
+"In SuperGrid, use the ``--federation`` flag with the federation ID to run"
+" your app. If you omit it, Flower uses ``@<your-account>/workspace``. "
+"Learn more in :doc:`Create and Manage Federations on SuperGrid <how-to-"
 "create-and-manage-federations>`."
 msgstr ""
 
@@ -53802,4 +53817,20 @@ msgstr ""
 #~ msgstr "``FedAvg`` randomly selects 5 clients (50% of 10)."
 
 #~ msgid "Unreleased"
+#~ msgstr ""
+
+#~ msgid "Name of the federation."
+#~ msgstr ""
+
+#~ msgid "python -m pip install -U flwr"
+#~ msgstr "python -m pip install -U flwr"
+
+#~ msgid ""
+#~ "In SuperGrid, use the ``--federation`` "
+#~ "flag to choose which federation runs "
+#~ "your app. If you omit it, Flower"
+#~ " uses ``@<your-account>/workspace``. Learn "
+#~ "more in :doc:`Create and Manage "
+#~ "Federations on SuperGrid <how-to-"
+#~ "create-and-manage-federations>`."
 #~ msgstr ""
