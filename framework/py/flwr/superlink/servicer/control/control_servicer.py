@@ -1138,7 +1138,7 @@ def _validate_federation_membership_in_request(
     if not state.federation_manager.has_member(flwr_aid, federation_id):
         raise FlowerError(
             ApiErrorCode.FEDERATION_NOT_FOUND,
-            message=f"Federation `{federation_id}` not found for member `{flwr_aid}`.",
+            message=f"`{flwr_aid}` is not a member of federation `{federation_id}`.",
         )
 
 
@@ -1165,7 +1165,7 @@ def _get_account() -> AccountInfo:
     if account.flwr_aid is None:
         raise FlowerError(
             ApiErrorCode.ACCOUNT_INFO_NOT_FOUND,
-            "⛔️ Failed to fetch the account information.",
+            "Failed to fetch the account information.",
         )
     return account
 
@@ -1182,14 +1182,14 @@ def _check_flwr_aid_in_run(flwr_aid: str | None, run: Run) -> None:
     if not run_flwr_aid:
         raise FlowerError(
             ApiErrorCode.RUN_NOT_ASSOCIATED_WITH_ACCOUNT,
-            "⛔️ Run is not associated with a `flwr_aid`.",
+            f"Run {run.run_id} is not associated with a `flwr_aid`.",
         )
 
     # Exit if `flwr_aid` does not match the run's `flwr_aid`
     if run_flwr_aid != flwr_aid:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_BELONG_TO_ACCOUNT,
-            "⛔️ Run ID does not belong to the account",
+            f"Run {run.run_id} does not belong to the account {flwr_aid}",
         )
 
 
