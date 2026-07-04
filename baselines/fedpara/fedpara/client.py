@@ -40,7 +40,7 @@ class FlowerClient(fl.client.NumPyClient):
     def set_parameters(self, parameters: NDArrays) -> None:
         """Apply parameters to model state dict."""
         params_dict = zip(self.net.state_dict().keys(), parameters)
-        state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+        state_dict = OrderedDict({k: torch.from_numpy(v) for k, v in params_dict})
         self.net.load_state_dict(state_dict, strict=True)
 
     def fit(
@@ -101,7 +101,7 @@ class PFlowerClient(fl.client.NumPyClient):
     def set_parameters(self, parameters: NDArrays, evaluate: bool) -> None:
         """Apply parameters to model state dict."""
         params_dict = zip(self.net.state_dict().keys(), parameters)
-        server_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+        server_dict = OrderedDict({k: torch.from_numpy(v) for k, v in params_dict})
         self.private_server_param = {
             k: server_dict[k]
             for k in get_keys_state_dict(

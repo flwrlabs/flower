@@ -26,7 +26,7 @@ def set_parameters(net: Module, parameters: List[np.ndarray]) -> None:
     :param parameters: List of numpy arrays
     """
     params_dict = zip(net.state_dict().keys(), parameters)
-    state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+    state_dict = OrderedDict({k: torch.from_numpy(v) for k, v in params_dict})
     net.load_state_dict(state_dict, strict=True)
 
 

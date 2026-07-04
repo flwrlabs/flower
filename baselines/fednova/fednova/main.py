@@ -62,7 +62,7 @@ def main(cfg: DictConfig) -> None:  # pylint: disable=too-many-locals
         )
         model = instantiate(cfg.model)
         params_dict = zip(model.state_dict().keys(), checkpoint["arr_0"])
-        state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+        state_dict = OrderedDict({k: torch.from_numpy(v) for k, v in params_dict})
         model.load_state_dict(state_dict)
         loss, metrics = test(model.to(device), testloader, device)
         print(f"----Loss: {loss}, Accuracy: {metrics['accuracy']} on Test set ------")
