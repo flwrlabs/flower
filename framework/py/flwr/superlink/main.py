@@ -17,8 +17,8 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Mapping
+from contextlib import AsyncExitStack, asynccontextmanager
 from logging import INFO
 from typing import TYPE_CHECKING
 
@@ -27,10 +27,27 @@ from fastapi import FastAPI
 from flwr import __version__
 from flwr.common import log
 from flwr.supercore.routers import health
+from flwr.superlink import extensions
 from flwr.superlink.routers import control, runtime
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
+
+
+def _merge_lifespan_state(
+    lifespan_state: dict[str, object],
+    extension_state: Mapping[str, object] | None,
+) -> None:
+    """Merge extension lifespan state into the app lifespan state."""
+    if extension_state is None:
+        return
+    for key, value in extension_state.items():
+        if key in lifespan_state:
+            raise ValueError(
+                f"Duplicate lifespan state key detected: {key}. "
+                "Please ensure each SuperLink extension provides unique state keys."
+            )
+        lifespan_state[key] = value
 
 
 def create_app(
@@ -46,22 +63,29 @@ def create_app(
     """
 
     @asynccontextmanager
-    async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[dict[str, object]]:
         """Own process-lifetime resources for the combined SuperLink service."""
         log(INFO, "FastAPI lifespan: startup")
 
-        if superlink_lifespan is not None:
-            # Store the SuperLinkLifespan where future REST routers can access shared
-            # state through FastAPI dependencies
-            fastapi_app.state.superlink_lifespan = superlink_lifespan
-
-        if superlink_lifespan is not None and start_legacy_grpc:
-            # Temporary compatibility path: start the existing gRPC APIs from
-            # FastAPI lifespan
-            superlink_lifespan.startup()
-
         try:
-            yield
+            if superlink_lifespan is not None:
+                # Store the SuperLinkLifespan where future REST routers can access
+                # shared state through FastAPI dependencies
+                fastapi_app.state.superlink_lifespan = superlink_lifespan
+
+            if superlink_lifespan is not None and start_legacy_grpc:
+                # Temporary compatibility path: start the existing gRPC APIs from
+                # FastAPI lifespan
+                superlink_lifespan.startup()
+
+            lifespan_state: dict[str, object] = {}
+            async with AsyncExitStack() as stack:
+                for lifespan_context in extensions.get_lifespan_contexts():
+                    extension_state = await stack.enter_async_context(
+                        lifespan_context(fastapi_app)
+                    )
+                    _merge_lifespan_state(lifespan_state, extension_state)
+                yield lifespan_state
         finally:
             if superlink_lifespan is not None and start_legacy_grpc:
                 superlink_lifespan.shutdown()
@@ -82,6 +106,9 @@ def create_app(
     # SuperLink APIs
     fastapi_app.include_router(control.router)
     fastapi_app.include_router(runtime.router)
+
+    # Extension hooks
+    extensions.configure_app(fastapi_app)
 
     return fastapi_app
 
