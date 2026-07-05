@@ -23,6 +23,7 @@ from logging import INFO
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
+from fastapi.routing import APIRoute, iter_route_contexts
 
 from flwr import __version__
 from flwr.common import log
@@ -32,6 +33,11 @@ from flwr.superlink.routers import control, runtime
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
+
+
+def generate_route_name_operation_id(route: APIRoute) -> str:
+    """Generate OpenAPI operation IDs from route handler names."""
+    return route.name
 
 
 def _merge_lifespan_state(
@@ -98,6 +104,7 @@ def create_app(
         docs_url="/docs",
         redoc_url=None,
         lifespan=lifespan,
+        generate_unique_id_function=generate_route_name_operation_id,
     )
 
     # Core APIs
@@ -110,7 +117,32 @@ def create_app(
     # Extension hooks
     extensions.configure_app(fastapi_app)
 
+    use_route_names_as_operation_ids(fastapi_app)
+
     return fastapi_app
+
+
+def use_route_names_as_operation_ids(app: FastAPI) -> None:
+    """Use route handler names as OpenAPI operation IDs.
+
+    Call this only after all routers have been registered. Route handler names
+    must be unique across the composed application.
+
+    Example:
+
+    - A handler named `create_api_key` produces operation ID `create_api_key`.
+    - Two handlers with the same name produce an operation ID collision.
+    """
+    operation_ids = set()
+    for route_context in iter_route_contexts(app.routes):
+        if isinstance(route_context.route, APIRoute):
+            route_name = route_context.name
+            if route_name in operation_ids:
+                raise ValueError(
+                    f"Operation ID collision detected: {route_name}. "
+                    "Please ensure all route handler function names are unique."
+                )
+            operation_ids.add(route_name)
 
 
 app = create_app()
