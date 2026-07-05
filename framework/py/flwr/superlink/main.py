@@ -108,11 +108,11 @@ def create_app(
     )
 
     # Core APIs
-    fastapi_app.include_router(health.router)
+    # fastapi_app.include_router(health.router)
 
     # SuperLink APIs
-    fastapi_app.include_router(control.router)
-    fastapi_app.include_router(runtime.router)
+    # fastapi_app.include_router(control.router)
+    # fastapi_app.include_router(runtime.router)
 
     # Extension hooks
     extensions.configure_app(fastapi_app)
