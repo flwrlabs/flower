@@ -116,3 +116,14 @@ def test_get_lifespan_contexts_delegates_to_ee_extensions(
     _mock_ee_extensions(monkeypatch, module)
 
     assert extensions.get_lifespan_contexts() == (lifespan_context,)
+
+
+def test_configure_app_raises_for_incomplete_ee_extensions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that incomplete EE extension modules fail clearly."""
+    module = ModuleType(extensions.EE_EXTENSIONS_MODULE)
+    _mock_ee_extensions(monkeypatch, module)
+
+    with pytest.raises(RuntimeError, match="configure_app, get_lifespan_contexts"):
+        extensions.configure_app(FastAPI())

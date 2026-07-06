@@ -45,6 +45,17 @@ def _get_ee_extensions() -> _SuperLinkExtensions | None:
             return None
         raise
 
+    missing = [
+        name
+        for name in ("configure_app", "get_lifespan_contexts")
+        if not hasattr(module, name)
+    ]
+    if missing:
+        raise RuntimeError(
+            f"EE extensions module {EE_EXTENSIONS_MODULE!r} is missing required "
+            f"attribute(s): {', '.join(missing)}"
+        )
+
     return cast(_SuperLinkExtensions, module)
 
 
