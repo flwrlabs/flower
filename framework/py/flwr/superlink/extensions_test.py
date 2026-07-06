@@ -61,7 +61,7 @@ def test_configure_app_delegates_to_ee_extensions(
     def configure_ee_app(fastapi_app: FastAPI) -> None:
         configured_apps.append(fastapi_app)
 
-    setattr(module, "configure_app", configure_ee_app)
+    module.configure_app = configure_ee_app
     _mock_ee_extensions(monkeypatch, module)
 
     extensions.configure_app(app)
@@ -84,7 +84,7 @@ def test_get_lifespan_contexts_delegates_to_ee_extensions(
     def get_ee_lifespan_contexts() -> tuple[extensions.SuperLinkLifespanContext, ...]:
         return (lifespan_context,)
 
-    setattr(module, "get_lifespan_contexts", get_ee_lifespan_contexts)
+    module.get_lifespan_contexts = get_ee_lifespan_contexts
     _mock_ee_extensions(monkeypatch, module)
 
     assert extensions.get_lifespan_contexts() == (lifespan_context,)
