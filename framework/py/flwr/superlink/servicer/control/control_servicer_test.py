@@ -101,12 +101,12 @@ from flwr.superlink.servicer.control.control_account_auth_interceptor import (
     shared_account_info,
 )
 
-from .control_servicer import (
-    ControlServicer,
+from .control_handlers import (
     _format_verification,
     _validate_federation_and_node_in_request,
     _validate_federation_membership_in_request,
 )
+from .control_servicer import ControlServicer
 
 
 class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
@@ -175,10 +175,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config"
             ) as _,
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
         ):
             mock_get_metadata_from_config.return_value = (fab_id, fab_version)
@@ -236,10 +236,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config"
             ) as mock_get_fab_config,
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
         ):
             mock_get_fab_config.return_value = {"tool": {"flwr": {"app": {}}}}
@@ -282,10 +282,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config"
             ) as mock_get_fab_config,
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
             patch.object(
                 self.state.federation_manager,
@@ -320,10 +320,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config"
             ) as mock_get_fab_config,
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
             patch.object(
                 self.state.federation_manager,
@@ -397,10 +397,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config"
             ) as mock_get_fab_config,
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
             patch.object(self.state, "create_run", return_value=0),
             self.assertRaises(FlowerError) as cm,
@@ -422,7 +422,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer._get_remote_fab",
+                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
                 return_value=(
                     b"test FAB content 123456",
                     {"valid_license": ""},
@@ -431,10 +431,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 ),
             ),
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config"
             ) as mock_get_fab_config,
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
         ):
             mock_get_fab_config.return_value = {"tool": {"flwr": {"app": {}}}}
@@ -461,10 +461,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config"
             ) as mock_get_fab_config,
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
         ):
             mock_get_fab_config.return_value = {
@@ -498,10 +498,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute/Assert
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config"
             ) as mock_get_fab_config,
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
             self.assertRaises(FlowerError) as cm,
         ):
@@ -524,7 +524,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config"
             ) as mock_get_fab_config,
             patch.object(
                 self.state.federation_manager,
@@ -566,10 +566,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config"
             ) as mock_get_fab_config,
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
             patch.object(
                 self.state.federation_manager,
@@ -861,7 +861,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         with patch(
-            "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+            "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
             return_value=SimpleNamespace(flwr_aid=flwr_aid_retrieving),
         ):
             res: ListNodesResponse = self.servicer.ListNodes(ListNodesRequest(), Mock())
@@ -1171,7 +1171,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             authn_plugin=Mock(),
         )
         self.get_current_account_info_patcher = patch(
-            "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+            "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
             return_value=SimpleNamespace(
                 flwr_aid=self.flwr_aid, account_name=self.account_name
             ),
@@ -1362,7 +1362,7 @@ class TestControlServicerAuth(unittest.TestCase):
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
             patch.object(
@@ -1397,7 +1397,7 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state.federation_manager, "has_member", return_value=True
             ),
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
         ):
@@ -1445,7 +1445,7 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state.federation_manager, "has_member", return_value=True
             ),
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
         ):
@@ -1472,7 +1472,7 @@ class TestControlServicerAuth(unittest.TestCase):
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
             patch.object(
@@ -1491,7 +1491,7 @@ class TestControlServicerAuth(unittest.TestCase):
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
             patch.object(
@@ -1513,7 +1513,7 @@ class TestControlServicerAuth(unittest.TestCase):
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
                 return_value=SimpleNamespace(
                     flwr_aid="user-123", account_name="test-account"
                 ),
@@ -1534,7 +1534,7 @@ class TestControlServicerAuth(unittest.TestCase):
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
                 return_value=SimpleNamespace(
                     flwr_aid="user-123", account_name="test-account"
                 ),
@@ -1543,7 +1543,7 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state.federation_manager, "has_member", return_value=True
             ),
             patch(
-                "flwr.superlink.servicer.control.control_servicer.resolve_account_ids",
+                "flwr.superlink.servicer.control.control_handlers.resolve_account_ids",
                 return_value={"run-owner": "owner-account"},
             ),
         ):
