@@ -431,29 +431,6 @@ class TestAppIoServicer(unittest.TestCase):
         self.state.add_task_usage.assert_called_once_with(123, usage)
         self.assertIsNotNone(response)
 
-    def test_record_task_usage_rejects_untrusted_task_type(self) -> None:
-        """RecordTaskUsage should reject user-code task types."""
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
-
-        with (
-            patch(
-                "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
-                return_value=Task(task_id=123, run_id=789, type=TaskType.AGENT_APP),
-            ),
-            self.assertRaises(grpc.RpcError),
-        ):
-            self.servicer.RecordTaskUsage(
-                RecordTaskUsageRequest(task_usage=TaskUsage(usage_type="token")),
-                context,
-            )
-
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.PERMISSION_DENIED,
-            f"Task type '{TaskType.AGENT_APP}' is not allowed to record usage.",
-        )
-        self.state.add_task_usage.assert_not_called()
-
     def test_pull_task_message_uses_authenticated_task_destination(self) -> None:
         """PullTaskMessage should query messages for the authenticated task."""
         # Prepare

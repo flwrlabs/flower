@@ -16,20 +16,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Protocol
 
 from flwr.proto.appio_pb2 import RecordTaskUsageRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
-from flwr.supercore.typing import JSONObject, JSONValue
-
-
-@dataclass(frozen=True)
-class ConnectorInvocationResult:
-    """Connector output with optional internal usage metadata."""
-
-    output: JSONValue
-    usage: TaskUsage | None
+from flwr.supercore.typing import JSONObject
 
 
 class _TaskUsageStub(Protocol):
@@ -49,19 +40,7 @@ class TaskUsageRecorder:
 
     def record(self, usage: TaskUsage) -> None:
         """Record one task usage payload."""
-        self._stub.RecordTaskUsage(
-            RecordTaskUsageRequest(task_usage=_with_default_token_counts(usage))
-        )
-
-
-def _with_default_token_counts(usage: TaskUsage) -> TaskUsage:
-    """Return usage with unset token fields normalized to zero."""
-    return TaskUsage(
-        usage_type=usage.usage_type,
-        input_tokens=usage.input_tokens,
-        output_tokens=usage.output_tokens,
-        total_tokens=usage.total_tokens,
-    )
+        self._stub.RecordTaskUsage(RecordTaskUsageRequest(task_usage=usage))
 
 
 def task_usage_from_open_response(

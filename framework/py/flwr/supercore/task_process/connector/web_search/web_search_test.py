@@ -95,11 +95,10 @@ def test_search_uses_direct_providers_when_proxy_endpoint_is_absent(
     monkeypatch.setattr(requests, "get", get_mock)
     monkeypatch.setattr(requests, "post", post_mock)
 
-    result = search_with_usage("Flower")
+    output, usage = search_with_usage("Flower")
 
-    assert result.output == {"results": []}
-    assert result.usage is not None
-    assert result.usage.usage_type == "brave_web_search"
+    assert output == {"results": []}
+    assert usage.usage_type == "brave_web_search"
     get_mock.assert_called_once()
     assert get_mock.call_args.args == (BRAVE_WEB_SEARCH_URL,)
     post_mock.assert_not_called()
@@ -117,10 +116,9 @@ def test_search_with_usage_records_exa_provider_usage_type(
     post_mock = Mock(return_value=response)
     monkeypatch.setattr(requests, "post", post_mock)
 
-    result = search_with_usage("Flower")
+    output, usage = search_with_usage("Flower")
 
-    assert result.output == {"results": []}
-    assert result.usage is not None
-    assert result.usage.usage_type == "exa_web_search"
+    assert output == {"results": []}
+    assert usage.usage_type == "exa_web_search"
     post_mock.assert_called_once()
     assert post_mock.call_args.args == (EXA_SEARCH_URL,)

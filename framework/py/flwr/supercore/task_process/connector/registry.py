@@ -15,16 +15,15 @@
 """Connector registry."""
 
 from collections.abc import Callable
+from typing import TypeGuard, cast
 
-from flwr.supercore.task_process.usage import (
-    ConnectorInvocationResult,
-    TaskUsageRecorder,
-)
+from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
+from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
 from . import browser_use, web_fetch, web_search
 
-ConnectorHandler = Callable[..., JSONValue | ConnectorInvocationResult]
+ConnectorHandler = Callable[..., JSONValue | tuple[JSONValue, TaskUsage]]
 ConnectorToolFactory = Callable[[], JSONObject]
 
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
@@ -49,11 +48,12 @@ def invoke_connector(
     if handler is None:
         raise ValueError(f"Unsupported connector '{name}'.")
     result = handler(**arguments)
-    if isinstance(result, ConnectorInvocationResult):
-        if usage_recorder is not None and result.usage is not None:
-            usage_recorder.record(result.usage)
-        return result.output
-    return result
+    if _has_usage_metadata(result):
+        output, usage = result
+        if usage_recorder is not None:
+            usage_recorder.record(usage)
+        return output
+    return cast(JSONValue, result)
 
 
 def get_builtin_connector_tools() -> list[JSONObject]:
@@ -72,3 +72,14 @@ def get_builtin_connector_tool(name: str) -> JSONObject:
 def has_builtin_connector(name: str) -> bool:
     """Return whether a built-in connector is registered."""
     return name in _CONNECTOR_HANDLERS
+
+
+def _has_usage_metadata(
+    result: JSONValue | tuple[JSONValue, TaskUsage],
+) -> TypeGuard[tuple[JSONValue, TaskUsage]]:
+    """Return whether the connector result includes usage metadata."""
+    return (
+        isinstance(result, tuple)
+        and len(result) == 2
+        and isinstance(result[1], TaskUsage)
+    )

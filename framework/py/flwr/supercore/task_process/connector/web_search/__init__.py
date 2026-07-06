@@ -16,10 +16,8 @@
 
 
 import os
-from typing import cast
 
 from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
-from flwr.supercore.task_process.usage import ConnectorInvocationResult
 from flwr.supercore.typing import JSONObject
 
 from .brave import (
@@ -66,10 +64,11 @@ def make_web_search_tool() -> JSONObject:
 
 def search(query: str) -> JSONObject:
     """Execute one web search request."""
-    return cast(JSONObject, search_with_usage(query).output)
+    output, _usage = search_with_usage(query)
+    return output
 
 
-def search_with_usage(query: str) -> ConnectorInvocationResult:
+def search_with_usage(query: str) -> tuple[JSONObject, TaskUsage]:
     """Execute one web search request and return provider-specific usage."""
     if proxy_endpoint := os.getenv(WEB_SEARCH_ENDPOINT_ENV, "").strip():
         return _result(
@@ -95,11 +94,8 @@ def search_with_usage(query: str) -> ConnectorInvocationResult:
     )
 
 
-def _result(output: JSONObject, provider: str) -> ConnectorInvocationResult:
-    return ConnectorInvocationResult(
-        output=output,
-        usage=TaskUsage(usage_type=f"{provider}_web_search"),
-    )
+def _result(output: JSONObject, provider: str) -> tuple[JSONObject, TaskUsage]:
+    return output, TaskUsage(usage_type=f"{provider}_web_search")
 
 
 __all__ = [
