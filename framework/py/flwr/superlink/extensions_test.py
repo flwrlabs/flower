@@ -57,8 +57,16 @@ def _mock_ee_extensions(monkeypatch: pytest.MonkeyPatch, module: ModuleType) -> 
     monkeypatch.setattr(extensions, "import_module", import_module_mock)
 
 
-def test_configure_app_is_noop() -> None:
+def _mock_missing_ee_extensions(monkeypatch: pytest.MonkeyPatch) -> None:
+    def import_module_mock(_: str) -> ModuleType:
+        raise ModuleNotFoundError(extensions.EE_EXTENSIONS_MODULE)
+
+    monkeypatch.setattr(extensions, "import_module", import_module_mock)
+
+
+def test_configure_app_is_noop(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that extensions hook does not configure the app."""
+    _mock_missing_ee_extensions(monkeypatch)
     app = FastAPI()
     routes_before = list(app.routes)
     middleware_before = list(app.user_middleware)
@@ -69,8 +77,12 @@ def test_configure_app_is_noop() -> None:
     assert app.user_middleware == middleware_before
 
 
-def test_get_lifespan_contexts_returns_empty_tuple() -> None:
+def test_get_lifespan_contexts_returns_empty_tuple(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Test that the extensions hook has no lifespan contexts."""
+    _mock_missing_ee_extensions(monkeypatch)
+
     assert not extensions.get_lifespan_contexts()
 
 
