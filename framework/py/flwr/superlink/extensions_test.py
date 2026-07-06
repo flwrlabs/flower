@@ -36,6 +36,10 @@ class _ConfigureAppExtensions(ModuleType):
         """Configure the FastAPI app."""
         self.configured_apps.append(fastapi_app)
 
+    def get_lifespan_contexts(self) -> tuple[extensions.SuperLinkLifespanContext, ...]:
+        """Return lifespan contexts."""
+        return ()
+
 
 class _LifespanExtensions(ModuleType):
     """Test EE extensions module for lifespan contexts."""
@@ -43,6 +47,10 @@ class _LifespanExtensions(ModuleType):
     def __init__(self, lifespan_context: extensions.SuperLinkLifespanContext) -> None:
         super().__init__(extensions.EE_EXTENSIONS_MODULE)
         self.lifespan_context = lifespan_context
+
+    def configure_app(self, _: FastAPI) -> None:
+        """Configure the FastAPI app."""
+        return None
 
     def get_lifespan_contexts(self) -> tuple[extensions.SuperLinkLifespanContext, ...]:
         """Return lifespan contexts."""
@@ -59,7 +67,9 @@ def _mock_ee_extensions(monkeypatch: pytest.MonkeyPatch, module: ModuleType) -> 
 
 def _mock_missing_ee_extensions(monkeypatch: pytest.MonkeyPatch) -> None:
     def import_module_mock(_: str) -> ModuleType:
-        raise ModuleNotFoundError(extensions.EE_EXTENSIONS_MODULE)
+        exc = ModuleNotFoundError(extensions.EE_EXTENSIONS_MODULE)
+        exc.name = extensions.EE_EXTENSIONS_MODULE
+        raise exc
 
     monkeypatch.setattr(extensions, "import_module", import_module_mock)
 
