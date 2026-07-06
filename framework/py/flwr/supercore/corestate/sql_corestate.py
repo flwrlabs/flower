@@ -1034,9 +1034,7 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     )
 
 
-def _task_usage_to_row(
-    task_id: int, usage: TaskUsage
-) -> dict[str, datetime | int | str | None]:
+def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:
     """Convert a TaskUsage proto to database row values."""
     return {
         "task_id": uint64_to_int64(task_id),
@@ -1051,12 +1049,12 @@ def _task_usage_to_row(
 
 def _task_usage_from_row(row: dict[str, Any]) -> TaskUsage:
     """Convert a task_usage row to a TaskUsage proto."""
-    usage = TaskUsage()
-    usage.input_tokens = row["input_tokens"]
-    usage.output_tokens = row["output_tokens"]
-    usage.total_tokens = row["total_tokens"]
-    usage.usage_type = row["usage_type"]
-    return usage
+    return TaskUsage(
+        usage_type=row["usage_type"],
+        input_tokens=row["input_tokens"],
+        output_tokens=row["output_tokens"],
+        total_tokens=row["total_tokens"],
+    )
 
 
 def _task_message_to_row(message: Message) -> dict[str, Any]:
