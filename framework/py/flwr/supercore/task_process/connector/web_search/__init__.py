@@ -21,11 +21,7 @@ from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 
-from .brave import (
-    BRAVE_API_KEY_ENV,
-    BRAVE_WEB_SEARCH_PROVIDER,
-    BraveWebSearchProvider,
-)
+from .brave import BRAVE_API_KEY_ENV, BRAVE_WEB_SEARCH_PROVIDER, BraveWebSearchProvider
 from .exa import EXA_API_KEY_ENV, EXA_WEB_SEARCH_PROVIDER, ExaWebSearchProvider
 from .proxy import PROXY_WEB_SEARCH_PROVIDER, ProxyWebSearchProvider
 from .tavily import (

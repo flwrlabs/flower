@@ -24,8 +24,6 @@ import requests
 
 from . import WEB_SEARCH_ENDPOINT_ENV, search
 from .brave import BRAVE_API_KEY_ENV, BRAVE_WEB_SEARCH_URL
-from .exa import EXA_API_KEY_ENV, EXA_SEARCH_URL
-from .tavily import TAVILY_API_KEY_ENV
 
 _PROXY_ENDPOINT = "http://proxy/v1/web-search"
 
