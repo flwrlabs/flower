@@ -188,7 +188,6 @@ def create_corestate_metadata() -> MetaData:
             BigInteger,
             ForeignKey("task.task_id"),
             nullable=False,
-            unique=True,
         ),
         Column("input_tokens", BigInteger, nullable=True),
         Column("output_tokens", BigInteger, nullable=True),
@@ -198,6 +197,7 @@ def create_corestate_metadata() -> MetaData:
         Column("reported_at", TIMESTAMP(timezone=True), nullable=True),
     )
     Index("idx_task_usage_run_id", task_usage.c.run_id)
+    Index("idx_task_usage_task_id", task_usage.c.task_id)
     Index("idx_task_usage_reported_at", task_usage.c.reported_at)
 
     return metadata

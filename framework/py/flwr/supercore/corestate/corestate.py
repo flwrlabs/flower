@@ -21,7 +21,7 @@ from typing import Literal
 
 from flwr.app import Context, Message
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
 
 from ..object_store import ObjectStore
@@ -246,6 +246,48 @@ class CoreState(ABC):  # pylint: disable=R0904
         Sequence[Task]
             A sequence of Task objects representing tasks matching the specified
             filters.
+        """
+
+    @abstractmethod
+    def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
+        """Record usage for the specified task.
+
+        Parameters
+        ----------
+        task_id : int
+            The identifier of the task that incurred the usage.
+        usage : TaskUsage
+            Usage payload to persist.
+
+        Notes
+        -----
+        Each successful call appends a new usage record for the task.
+        """
+
+    @abstractmethod
+    def get_task_usage(
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        task_ids: Sequence[int] | None = None,
+    ) -> Sequence[TaskUsage]:
+        """Retrieve task usage records based on the specified filters.
+
+        - If a filter is set to None, it is ignored.
+        - If multiple filters are provided, they are combined using AND logic.
+        - Within each filter, provided values are combined using OR logic.
+
+        Parameters
+        ----------
+        run_ids : Optional[Sequence[int]] (default: None)
+            Sequence of run IDs to filter by.
+        task_ids : Optional[Sequence[int]] (default: None)
+            Sequence of task IDs to filter by.
+
+        Returns
+        -------
+        Sequence[TaskUsage]
+            Usage records ordered by insertion order.
         """
 
     @abstractmethod
