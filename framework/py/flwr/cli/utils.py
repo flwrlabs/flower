@@ -448,9 +448,8 @@ def flwr_cli_grpc_exc_handler(
 
         # Control API serializes FlowerError into gRPC details. If the payload is
         # not a valid FlowerError, the raw gRPC fallback below handles it.
-        if flower_error := FlowerError.from_json(
-            cast(str | None, e.details())  # pylint: disable=E1101
-        ):
+        details = cast(str, e.details())  # pylint: disable=E1101
+        if flower_error := FlowerError.from_json(details):
             raise click.ClickException(_format_flower_error(flower_error)) from None
 
         # Keep special handling only for transport-level errors that are not part
@@ -465,9 +464,7 @@ def flwr_cli_grpc_exc_handler(
             raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE) from None
 
         # Log details from grpc error directly
-        raise click.ClickException(
-            cast(str, e.details())  # pylint: disable=E1101
-        ) from None
+        raise click.ClickException(details) from None
 
 
 def build_pathspec(patterns: Iterable[str]) -> pathspec.PathSpec:
