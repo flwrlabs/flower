@@ -120,7 +120,7 @@ def create_app(
     return fastapi_app
 
 
-def use_route_names_as_operation_ids(fastapi_app: FastAPI) -> None:
+def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
     """Use route handler names as OpenAPI operation IDs.
 
     Call this only after all routers have been registered. Route handler names
