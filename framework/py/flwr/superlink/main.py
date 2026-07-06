@@ -17,20 +17,41 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Mapping
+from contextlib import AsyncExitStack, asynccontextmanager
 from logging import INFO
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
+from fastapi.routing import APIRoute, iter_route_contexts
 
 from flwr import __version__
 from flwr.common import log
-from flwr.supercore.routers import health
-from flwr.superlink.routers import control, runtime
+from flwr.superlink import extensions
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
+
+
+def generate_unique_route_id(route: APIRoute) -> str:
+    """Generate stable route IDs from route handler names."""
+    return route.name
+
+
+def _merge_lifespan_state(
+    lifespan_state: dict[str, object],
+    extension_state: Mapping[str, object] | None,
+) -> None:
+    """Merge extension lifespan state into the app lifespan state."""
+    if extension_state is None:
+        return
+    for key, value in extension_state.items():
+        if key in lifespan_state:
+            raise ValueError(
+                f"Duplicate lifespan state key detected: {key}. "
+                "Please ensure each SuperLink extension provides unique state keys."
+            )
+        lifespan_state[key] = value
 
 
 def create_app(
@@ -46,22 +67,29 @@ def create_app(
     """
 
     @asynccontextmanager
-    async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[dict[str, object]]:
         """Own process-lifetime resources for the combined SuperLink service."""
         log(INFO, "FastAPI lifespan: startup")
 
-        if superlink_lifespan is not None:
-            # Store the SuperLinkLifespan where future REST routers can access shared
-            # state through FastAPI dependencies
-            fastapi_app.state.superlink_lifespan = superlink_lifespan
-
-        if superlink_lifespan is not None and start_legacy_grpc:
-            # Temporary compatibility path: start the existing gRPC APIs from
-            # FastAPI lifespan
-            superlink_lifespan.startup()
-
         try:
-            yield
+            if superlink_lifespan is not None:
+                # Store the SuperLinkLifespan where future REST routers can access
+                # shared state through FastAPI dependencies
+                fastapi_app.state.superlink_lifespan = superlink_lifespan
+
+            if superlink_lifespan is not None and start_legacy_grpc:
+                # Temporary compatibility path: start the existing gRPC APIs from
+                # FastAPI lifespan
+                superlink_lifespan.startup()
+
+            lifespan_state: dict[str, object] = {}
+            async with AsyncExitStack() as stack:
+                for lifespan_context in extensions.get_lifespan_contexts():
+                    extension_state = await stack.enter_async_context(
+                        lifespan_context(fastapi_app)
+                    )
+                    _merge_lifespan_state(lifespan_state, extension_state)
+                yield lifespan_state
         finally:
             if superlink_lifespan is not None and start_legacy_grpc:
                 superlink_lifespan.shutdown()
@@ -74,16 +102,45 @@ def create_app(
         docs_url="/docs",
         redoc_url=None,
         lifespan=lifespan,
+        generate_unique_id_function=generate_unique_route_id,
     )
 
     # Core APIs
-    fastapi_app.include_router(health.router)
+    # fastapi_app.include_router(health.router)
 
     # SuperLink APIs
-    fastapi_app.include_router(control.router)
-    fastapi_app.include_router(runtime.router)
+    # fastapi_app.include_router(control.router)
+    # fastapi_app.include_router(runtime.router)
+
+    # Extension hooks
+    extensions.configure_app(fastapi_app)
+
+    validate_unique_route_operation_ids(fastapi_app)
 
     return fastapi_app
+
+
+def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
+    """Use route handler names as OpenAPI operation IDs.
+
+    Call this only after all routers have been registered. Route handler names
+    must be unique across the composed application.
+
+    Example:
+
+    - A handler named `create_api_key` produces operation ID `create_api_key`.
+    - Two handlers with the same name produce an operation ID collision.
+    """
+    operation_ids = set()
+    for route_context in iter_route_contexts(fastapi_app.routes):
+        if isinstance(route_context.route, APIRoute):
+            op_id = generate_unique_route_id(route_context.route)
+            if op_id in operation_ids:
+                raise ValueError(
+                    f"Operation ID collision detected: {op_id}. "
+                    "Please ensure all route handler function names are unique."
+                )
+            operation_ids.add(op_id)
 
 
 app = create_app()

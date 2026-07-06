@@ -101,7 +101,6 @@ from flwr.superlink.auth_plugin import (
     NoOpControlAuthzPlugin,
 )
 from flwr.superlink.federation import FederationManager, NoOpFederationManager
-from flwr.superlink.main import create_app
 from flwr.superlink.servicer.control import run_control_api_grpc
 from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
 
@@ -801,6 +800,10 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
     superlink_lifespan = None
     if start_legacy_grpc:
         superlink_lifespan = SuperLinkLifespan(lifespan_config)
+    from flwr.superlink.main import (  # pylint: disable=import-outside-toplevel
+        create_app,
+    )
+
     fastapi_app = create_app(
         superlink_lifespan=superlink_lifespan,
         start_legacy_grpc=start_legacy_grpc,
