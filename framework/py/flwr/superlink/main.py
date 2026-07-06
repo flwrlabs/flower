@@ -33,8 +33,8 @@ if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
 
 
-def generate_route_name_operation_id(route: APIRoute) -> str:
-    """Generate OpenAPI operation IDs from route handler names."""
+def generate_unique_route_id(route: APIRoute) -> str:
+    """Generate stable route IDs from route handler names."""
     return route.name
 
 
