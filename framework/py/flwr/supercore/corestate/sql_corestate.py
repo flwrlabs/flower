@@ -174,7 +174,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         if federation_ids is not None:
             placeholders = ",".join([f":fed_{i}" for i in range(len(federation_ids))])
-            conditions.append(f"federation IN ({placeholders})")
+            conditions.append(f"federation_id IN ({placeholders})")
             params.update({f"fed_{i}": _id for i, _id in enumerate(federation_ids)})
         if updated_before is not None:
             conditions.append("updated_at < :updated_before")
@@ -189,7 +189,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         # Select the requested page before joining run IDs so limit applies to series.
         run_series_cte = f"""
             run_series_cte AS (
-                SELECT series_id, federation, description, created_at, updated_at
+                SELECT series_id, federation_id, description, created_at, updated_at
                 FROM run_series
                 {where_clause}
                 ORDER BY updated_at DESC
@@ -255,9 +255,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Store a run in a run series and return the series ID."""
         insert_query = """
             INSERT INTO run_series
-            (series_id, federation, description, created_at, updated_at)
+            (series_id, federation_id, description, created_at, updated_at)
             VALUES
-            (:series_id, :federation, :description, :created_at, :updated_at)
+            (:series_id, :federation_id, :description, :created_at, :updated_at)
             ON CONFLICT(series_id) DO NOTHING
             RETURNING series_id
         """
@@ -272,7 +272,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         insert_query,
                         {
                             "series_id": uint64_to_int64(candidate),
-                            "federation": federation_id,
+                            "federation_id": federation_id,
                             "description": None,
                             "created_at": timestamp,
                             "updated_at": timestamp,
@@ -288,12 +288,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         """
                         UPDATE run_series
                         SET updated_at = :updated_at
-                        WHERE series_id = :series_id AND federation = :federation
+                        WHERE series_id = :series_id AND federation_id = :federation_id
                         RETURNING series_id
                         """,
                         {
                             "series_id": uint64_to_int64(series_id),
-                            "federation": federation_id,
+                            "federation_id": federation_id,
                             "updated_at": now(),
                         },
                     )
@@ -511,79 +511,29 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
         """Record usage for the specified task."""
-        sint64_task_id = uint64_to_int64(task_id)
-
-        try:
-            with self.session():
-                rows = self.query(
-                    """
-                    INSERT INTO task_usage (
-                        run_id, task_id, input_tokens, output_tokens, total_tokens,
-                        usage_type, created_at, reported_at
-                    )
-                    SELECT
-                        run_id, task_id, :input_tokens, :output_tokens,
-                        :total_tokens, :usage_type, :created_at, :reported_at
-                    FROM task
-                    WHERE task_id = :task_id
-                        AND NOT EXISTS (
-                            SELECT 1
-                            FROM task_usage
-                            WHERE task_usage.task_id = :task_id
-                        )
-                    RETURNING id
-                    """,
-                    {
-                        **_task_usage_to_row(usage),
-                        "task_id": sint64_task_id,
-                        "created_at": now().isoformat(),
-                        "reported_at": None,
-                    },
-                )
-                if rows:
-                    return
-
-                rows = self.query(
-                    """
-                    SELECT id
-                    FROM task_usage
-                    WHERE task_id = :task_id
-                    """,
-                    {"task_id": sint64_task_id},
-                )
-                if rows:
-                    return
-
-                raise ValueError(f"Task {task_id} not found")
-        except IntegrityError:
-            rows = self.query(
+        with self.session():
+            self.query(
                 """
-                SELECT id
-                FROM task_usage
+                INSERT INTO task_usage (
+                    run_id, task_id, input_tokens, output_tokens, total_tokens,
+                    usage_type, created_at, reported_at
+                )
+                SELECT
+                    run_id, task_id, :input_tokens, :output_tokens,
+                    :total_tokens, :usage_type, :created_at, :reported_at
+                FROM task
                 WHERE task_id = :task_id
                 """,
-                {"task_id": sint64_task_id},
+                _task_usage_to_row(task_id, usage),
             )
-            if rows:
-                return
-            raise
 
     def get_task_usage(
         self,
         *,
         run_ids: Sequence[int] | None = None,
         task_ids: Sequence[int] | None = None,
-        usage_types: Sequence[str] | None = None,
-        reported: bool | None = None,
-        created_before: str | None = None,
-        limit: int | None = None,
     ) -> Sequence[TaskUsage]:
         """Retrieve task usage records based on the specified filters."""
-        if limit is not None and limit < 0:
-            raise AssertionError("`limit` must be >= 0")
-        if limit == 0:
-            return []
-
         conditions = []
         params: dict[str, Any] = {}
 
@@ -607,36 +557,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 {f"tid_{i}": task_id for i, task_id in enumerate(sint64_task_ids)}
             )
 
-        if usage_types is not None:
-            if not usage_types:
-                return []
-            placeholders = ",".join([f":ut_{i}" for i in range(len(usage_types))])
-            conditions.append(f"usage_type IN ({placeholders})")
-            params.update(
-                {f"ut_{i}": usage_type for i, usage_type in enumerate(usage_types)}
-            )
-
-        if reported is True:
-            conditions.append("reported_at IS NOT NULL")
-        elif reported is False:
-            conditions.append("reported_at IS NULL")
-
-        if created_before is not None:
-            conditions.append("created_at < :created_before")
-            params["created_before"] = created_before
-
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        limit_clause = ""
-        if limit is not None:
-            limit_clause = "LIMIT :limit"
-            params["limit"] = limit
 
         query = f"""
             SELECT input_tokens, output_tokens, total_tokens, usage_type
             FROM task_usage
             {where_clause}
             ORDER BY id ASC
-            {limit_clause}
         """
 
         rows = self.query(query, params)
@@ -1100,46 +1027,34 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     """Convert a database row to a RunSeries object."""
     return RunSeries(
         series_id=int64_to_uint64(row["series_id"]),
-        federation=row["federation"],
+        federation=row["federation_id"],
         description=row["description"] or "",
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
     )
 
 
-def _task_usage_to_row(usage: TaskUsage) -> dict[str, int | str | None]:
+def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:
     """Convert a TaskUsage proto to database row values."""
     return {
-        "input_tokens": (
-            uint64_to_int64(usage.input_tokens)
-            if usage.HasField("input_tokens")
-            else None
-        ),
-        "output_tokens": (
-            uint64_to_int64(usage.output_tokens)
-            if usage.HasField("output_tokens")
-            else None
-        ),
-        "total_tokens": (
-            uint64_to_int64(usage.total_tokens)
-            if usage.HasField("total_tokens")
-            else None
-        ),
+        "task_id": uint64_to_int64(task_id),
+        "input_tokens": usage.input_tokens,
+        "output_tokens": usage.output_tokens,
+        "total_tokens": usage.total_tokens,
         "usage_type": usage.usage_type,
+        "created_at": now(),
+        "reported_at": None,
     }
 
 
 def _task_usage_from_row(row: dict[str, Any]) -> TaskUsage:
     """Convert a task_usage row to a TaskUsage proto."""
-    usage = TaskUsage()
-    if row["input_tokens"] is not None:
-        usage.input_tokens = int64_to_uint64(row["input_tokens"])
-    if row["output_tokens"] is not None:
-        usage.output_tokens = int64_to_uint64(row["output_tokens"])
-    if row["total_tokens"] is not None:
-        usage.total_tokens = int64_to_uint64(row["total_tokens"])
-    usage.usage_type = row["usage_type"]
-    return usage
+    return TaskUsage(
+        usage_type=row["usage_type"],
+        input_tokens=row["input_tokens"],
+        output_tokens=row["output_tokens"],
+        total_tokens=row["total_tokens"],
+    )
 
 
 def _task_message_to_row(message: Message) -> dict[str, Any]:

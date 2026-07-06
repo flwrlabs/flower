@@ -290,7 +290,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(reloaded.fab_hash, "fab-hash")
 
     def test_add_and_get_task_usage(self) -> None:
-        """Task usage should round-trip and filter by usage type."""
+        """Task usage should round-trip and filter by task ID."""
         state = self.state_factory()
         task_id = state.create_task(
             task_type=TaskType.MODEL,
@@ -309,28 +309,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         state.add_task_usage(task_id, TaskUsage(input_tokens=999, usage_type="token"))
 
-        usages = state.get_task_usage(
-            task_ids=[task_id],
-            usage_types=["token"],
-            reported=False,
-        )
+        usages = state.get_task_usage(task_ids=[task_id])
 
-        self.assertEqual(len(usages), 1)
+        self.assertEqual(len(usages), 2)
         usage = usages[0]
         self.assertEqual(usage.input_tokens, 10)
         self.assertEqual(usage.output_tokens, 20)
         self.assertEqual(usage.total_tokens, 30)
         self.assertEqual(usage.usage_type, "token")
-
-    def test_add_task_usage_rejects_unknown_task(self) -> None:
-        """Usage writes should reject unknown task IDs."""
-        state = self.state_factory()
-        missing_task_id = 61016
-        while state.get_tasks(task_ids=[missing_task_id]):
-            missing_task_id += 1
-
-        with self.assertRaises(ValueError):
-            state.add_task_usage(missing_task_id, TaskUsage())
+        self.assertEqual(usages[1].input_tokens, 999)
 
     def test_add_and_get_task_log(self) -> None:
         """Adding and retrieving task logs should preserve concatenation order."""

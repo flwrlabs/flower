@@ -24,6 +24,7 @@ from .appio_token_interceptor import (
     create_serverappio_token_auth_server_interceptor,
     get_authenticated_task,
 )
+from .rpc_error_translation_interceptor import RpcErrorTranslationServerInterceptor
 from .runtime_version_interceptor import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
@@ -43,6 +44,7 @@ __all__ = [
     "AUTHENTICATION_FAILED_MESSAGE",
     "AppIoTokenClientInterceptor",
     "AppIoTokenServerInterceptor",
+    "RpcErrorTranslationServerInterceptor",
     "RuntimeVersionClientInterceptor",
     "RuntimeVersionServerInterceptor",
     "SuperExecAuthClientInterceptor",
