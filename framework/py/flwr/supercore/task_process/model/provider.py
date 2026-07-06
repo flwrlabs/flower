@@ -32,6 +32,7 @@ from flwr.supercore.typing import JSONObject, JSONValue
 
 DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1/responses"
 DEFAULT_MODEL_API_TIMEOUT = 180.0
+_DEFAULT_USAGE_TYPE = "token"
 _STREAM_CONTENT_TYPE = "text/event-stream"
 _TERMINAL_SUCCESS_EVENTS = frozenset({"response.completed", "response.incomplete"})
 _TERMINAL_FAILURE_EVENTS = frozenset({"error", "response.failed"})
@@ -63,8 +64,8 @@ class ModelProviderError(RuntimeError):
 def invoke_model_provider(
     request: JSONObject,
     *,
+    usage_recorder: TaskUsageRecorder,
     on_stream_event: Callable[[JSONObject], None] | None = None,
-    usage_recorder: TaskUsageRecorder | None = None,
 ) -> JSONObject:
     """Invoke the configured Open Responses-compatible model provider.
 
@@ -105,8 +106,6 @@ def invoke_model_provider(
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     payload = dict(request)
-    model = payload.get("model")
-    usage_type = model if isinstance(model, str) and model else "token"
     return _invoke_provider_response(
         responses_url=responses_url,
         headers=headers,
@@ -114,7 +113,7 @@ def invoke_model_provider(
         request=payload,
         on_stream_event=on_stream_event,
         usage_recorder=usage_recorder,
-        usage_type=usage_type,
+        usage_type=_usage_type_from_request(payload),
     )
 
 
@@ -125,7 +124,7 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
     timeout: float,
     request: JSONObject,
     on_stream_event: Callable[[JSONObject], None] | None,
-    usage_recorder: TaskUsageRecorder | None,
+    usage_recorder: TaskUsageRecorder,
     usage_type: str,
 ) -> JSONObject:
     """Run a normal or streaming provider request.
@@ -254,14 +253,19 @@ def _ensure_json_object(payload: object) -> JSONObject:
 
 
 def _record_model_usage(
-    response: JSONObject, usage_recorder: TaskUsageRecorder | None, usage_type: str
+    response: JSONObject, usage_recorder: TaskUsageRecorder, usage_type: str
 ) -> None:
-    if usage_recorder is None:
-        return
-
     usage = task_usage_from_open_response(response, usage_type=usage_type)
     if usage is not None:
         usage_recorder.record(usage)
+
+
+def _usage_type_from_request(request: JSONObject) -> str:
+    """Return the task usage type for a model provider request."""
+    model = request.get("model")
+    if isinstance(model, str) and model:
+        return model
+    return _DEFAULT_USAGE_TYPE
 
 
 def _iter_sse_events(response: requests.Response) -> Iterator[tuple[str | None, str]]:
