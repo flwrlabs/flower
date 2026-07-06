@@ -115,7 +115,7 @@ def create_app(
     # Extension hooks
     extensions.configure_app(fastapi_app)
 
-    use_route_names_as_operation_ids(fastapi_app)
+    validate_unique_route_operation_ids(fastapi_app)
 
     return fastapi_app
 
