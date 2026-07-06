@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from unittest.mock import Mock
 
 import pytest
+import requests
 
 from .web_fetch import (
     WEB_FETCH_ENDPOINT_ENV,
@@ -57,6 +58,20 @@ class _Response:  # pylint: disable=too-many-instance-attributes
     def close(self) -> None:
         """Record that the response was closed."""
         self.closed = True
+
+
+@dataclass
+class _ProxyResponse:
+    status_code: int = 200
+    payload: object | None = None
+    text: str = ""
+    json_error: ValueError | None = None
+
+    def json(self) -> object:
+        """Return the mocked JSON response body."""
+        if self.json_error is not None:
+            raise self.json_error
+        return self.payload
 
 
 def _patch_dns(monkeypatch: pytest.MonkeyPatch, ip_address: str) -> None:
@@ -158,6 +173,91 @@ def test_invoke_web_fetch_provider_calls_proxy_endpoint_when_configured(
         json={"url": "https://example.com:443"},
         timeout=60.0,
     )
+    get_mock.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("post_result", "expected_code", "expected_status_code", "expected_message"),
+    [
+        (
+            requests.RequestException("connection failed"),
+            "fetch_failed",
+            None,
+            "proxy web fetch request failed",
+        ),
+        (
+            _ProxyResponse(
+                status_code=403,
+                payload={"code": "blocked_url", "detail": "URL host is not allowed."},
+            ),
+            "http_error",
+            403,
+            "blocked_url",
+        ),
+        (
+            _ProxyResponse(
+                status_code=502,
+                text="bad gateway",
+                json_error=ValueError("not json"),
+            ),
+            "http_error",
+            502,
+            "bad gateway",
+        ),
+        (
+            _ProxyResponse(json_error=ValueError("not json")),
+            "invalid_response",
+            None,
+            "invalid JSON",
+        ),
+        (
+            _ProxyResponse(payload=["not an object"]),
+            "invalid_response",
+            None,
+            "invalid JSON",
+        ),
+        (
+            _ProxyResponse(payload={}),
+            "invalid_response",
+            None,
+            "must contain content",
+        ),
+        (
+            _ProxyResponse(payload={"content": ["not a string"]}),
+            "invalid_response",
+            None,
+            "must contain content",
+        ),
+    ],
+)
+def test_invoke_web_fetch_provider_reports_proxy_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    post_result: requests.RequestException | _ProxyResponse,
+    expected_code: str,
+    expected_status_code: int | None,
+    expected_message: str,
+) -> None:
+    """Proxy mode should report request, HTTP, and payload errors."""
+    monkeypatch.setenv(WEB_FETCH_ENDPOINT_ENV, _PROXY_ENDPOINT)
+    get_mock = Mock()
+    if isinstance(post_result, requests.RequestException):
+        post_mock = Mock(side_effect=post_result)
+    else:
+        post_mock = Mock(return_value=post_result)
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.connector.web_fetch.requests.get",
+        get_mock,
+    )
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.connector.web_fetch.requests.post",
+        post_mock,
+    )
+
+    with pytest.raises(WebFetchProviderError, match=expected_message) as exc_info:
+        invoke_web_fetch_provider("https://example.com")
+
+    assert exc_info.value.code == expected_code
+    assert exc_info.value.status_code == expected_status_code
     get_mock.assert_not_called()
 
 

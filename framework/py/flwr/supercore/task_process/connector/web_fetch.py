@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Trafilatura-backed web fetch provider."""
+"""Built-in web fetch connector."""
 
 from __future__ import annotations
 
@@ -83,7 +83,6 @@ class WebFetchProviderError(RuntimeError):
 
 def invoke_web_fetch_provider(url: str) -> JSONObject:
     """Execute one web fetch request."""
-    url = _validate_url_syntax(url)
     if proxy_endpoint := os.getenv(WEB_FETCH_ENDPOINT_ENV, "").strip():
         return ProxyWebFetchProvider(proxy_endpoint).fetch(url)
     return _invoke_direct_web_fetch_provider(url)
@@ -97,6 +96,9 @@ class ProxyWebFetchProvider:
 
     def fetch(self, url: str) -> JSONObject:
         """Execute one proxy web fetch request."""
+        # This framework-side validation is best-effort. The proxy remains the
+        # SSRF enforcement point because it validates DNS/IPs and redirects
+        # immediately before fetching.
         url = _validate_url_syntax(url)
         try:
             response = requests.post(
@@ -148,8 +150,8 @@ class ProxyWebFetchProvider:
 def _invoke_direct_web_fetch_provider(url: str) -> JSONObject:
     """Fetch a URL and extract web page content with trafilatura.
 
-    The provider validates every redirect target before requesting it and rejects
-    local/private hosts before DNS-resolved requests are made.
+    The direct provider validates every redirect target before requesting it and
+    rejects local/private hosts before DNS-resolved requests are made.
     """
     url = _validate_url(url)
     response = _fetch_url(url)
@@ -240,11 +242,11 @@ def _fetch_url(url: str) -> requests.Response:
 
 
 def _validate_url(url: str) -> str:
-    """Return a URL allowed by the web-fetch safety policy.
+    """Return a URL allowed by the direct web-fetch guardrails.
 
     Only HTTP(S) URLs with a resolvable, globally routable host are accepted.
     Localhost names, private/reserved IP literals, and hostnames that resolve to
-    non-public addresses are rejected before any request is made.
+    non-public addresses are rejected before any direct request is made.
     """
     url, hostname = _validate_url_syntax_with_hostname(url)
 
