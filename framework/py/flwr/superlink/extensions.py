@@ -17,61 +17,34 @@
 
 from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
-from importlib import import_module
-from typing import Any, Protocol, cast
+from typing import Any
 
 from fastapi import FastAPI
-
-EE_EXTENSIONS_MODULE = "flwr.ee.superlink.extensions"
 
 SuperLinkLifespanContext = Callable[
     [FastAPI], AbstractAsyncContextManager[Mapping[str, Any] | None]
 ]
 
 
-class _SuperLinkExtensions(Protocol):
-    def configure_app(self, app: FastAPI) -> None:
-        """Configure the FastAPI app."""
-
-    def get_lifespan_contexts(self) -> tuple[SuperLinkLifespanContext, ...]:
-        """Return lifespan contexts."""
-
-
-def _get_ee_extensions() -> _SuperLinkExtensions | None:
-    try:
-        module = import_module(EE_EXTENSIONS_MODULE)
-    except ModuleNotFoundError as exc:
-        if exc.name in {"flwr.ee", "flwr.ee.superlink", EE_EXTENSIONS_MODULE}:
-            return None
-        raise
-
-    missing = [
-        name
-        for name in ("configure_app", "get_lifespan_contexts")
-        if not hasattr(module, name)
-    ]
-    if missing:
-        raise RuntimeError(
-            f"EE extensions module {EE_EXTENSIONS_MODULE!r} is missing required "
-            f"attribute(s): {', '.join(missing)}"
-        )
-
-    return cast(_SuperLinkExtensions, module)
-
-
 def configure_app(app: FastAPI) -> None:
     """Configure SuperLink FastAPI extensions."""
-    ee_extensions = _get_ee_extensions()
-    if ee_extensions is None:
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from flwr.ee.superlink.extensions import configure_app as configure_ee_app
+    except ModuleNotFoundError:
         return
 
-    ee_extensions.configure_app(app)
+    configure_ee_app(app)
 
 
 def get_lifespan_contexts() -> tuple[SuperLinkLifespanContext, ...]:
     """Return SuperLink FastAPI lifespan contexts."""
-    ee_extensions = _get_ee_extensions()
-    if ee_extensions is None:
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from flwr.ee.superlink.extensions import (
+            get_lifespan_contexts as get_ee_lifespan_contexts,
+        )
+    except ModuleNotFoundError:
         return ()
 
-    return ee_extensions.get_lifespan_contexts()
+    return get_ee_lifespan_contexts()
