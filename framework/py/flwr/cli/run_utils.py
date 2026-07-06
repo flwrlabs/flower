@@ -30,8 +30,8 @@ class RunRow:  # pylint: disable=too-many-instance-attributes
     ----------
     run_id : int
         The unique identifier for the run.
-    federation : str
-        The federation name.
+    federation_id : str
+        The federation ID.
     fab_id : str
         The Flower App Bundle identifier.
     fab_version : str
@@ -65,7 +65,7 @@ class RunRow:  # pylint: disable=too-many-instance-attributes
     """
 
     run_id: int
-    federation: str
+    federation_id: str
     fab_id: str
     fab_version: str
     fab_hash: str
@@ -132,7 +132,7 @@ def format_runs(runs: list[Run], now_isoformat: str) -> list[RunRow]:
 
         row = RunRow(
             run_id=run.run_id,
-            federation=run.federation,
+            federation_id=run.federation_id,
             fab_id=run.fab_id,
             fab_version=run.fab_version,
             fab_hash=run.fab_hash,

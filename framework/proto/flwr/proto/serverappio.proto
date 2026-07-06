@@ -81,6 +81,10 @@ service ServerAppIo {
   rpc PullTaskMessage(PullTaskMessageRequest)
       returns (PullTaskMessageResponse) {}
 
+  // Record task usage
+  rpc RecordTaskUsage(RecordTaskUsageRequest)
+      returns (RecordTaskUsageResponse) {}
+
   // Push task logs
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
 

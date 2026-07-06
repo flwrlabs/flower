@@ -647,7 +647,7 @@ def run_to_proto(run: Run) -> ProtoRun:
         finished_at=run.finished_at,
         status=run_status_to_proto(run.status),
         flwr_aid=run.flwr_aid,
-        federation=run.federation,
+        federation=run.federation_id,
         bytes_sent=run.bytes_sent,
         bytes_recv=run.bytes_recv,
         clientapp_runtime=run.clientapp_runtime,
@@ -674,7 +674,7 @@ def run_from_proto(run_proto: ProtoRun) -> Run:
         finished_at=run_proto.finished_at,
         status=run_status_from_proto(run_proto.status),
         flwr_aid=run_proto.flwr_aid,
-        federation=run_proto.federation,
+        federation_id=run_proto.federation,
         primary_task_id=(
             run_proto.primary_task_id if run_proto.HasField("primary_task_id") else None
         ),

@@ -37,7 +37,12 @@ from flwr.common.constant import (
 )
 from flwr.common.logger import log
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    Task,
+    TaskEvent,
+    TaskStatus,
+    TaskUsage,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 
@@ -56,6 +61,18 @@ class TokenRecord:
 
     token: str
     active_until: datetime
+
+
+@dataclass
+class TaskUsageRecord:
+    """Record containing task usage and reporting metadata."""
+
+    id: int
+    task_id: int
+    run_id: int
+    usage: TaskUsage
+    created_at: datetime
+    reported_at: datetime | None
 
 
 class InMemoryCoreState(
@@ -80,6 +97,9 @@ class InMemoryCoreState(
         self.task_token_to_task_id: dict[str, int] = {}
         self.task_logs: dict[int, list[tuple[float, str]]] = {}
         self.log_lock = Lock()
+        self.task_usage_store: dict[int, TaskUsageRecord] = {}
+        self.lock_task_usage_store = Lock()
+        self._next_task_usage_id = 1
         self.lock_task_store = Lock()
         self.task_message_store: dict[str, Message] = {}
         self.lock_task_message_store = Lock()
@@ -126,7 +146,7 @@ class InMemoryCoreState(
         self,
         *,
         series_ids: Sequence[int] | None = None,
-        federations: Sequence[str] | None = None,
+        federation_ids: Sequence[str] | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -136,12 +156,12 @@ class InMemoryCoreState(
         if (
             limit == 0
             or (series_ids is not None and not series_ids)
-            or (federations is not None and not federations)
+            or (federation_ids is not None and not federation_ids)
         ):
             return []
 
         series_id_set = set(series_ids) if series_ids is not None else None
-        federation_set = set(federations) if federations is not None else None
+        federation_id_set = set(federation_ids) if federation_ids is not None else None
 
         with self.lock_run_series_store:
             run_series = []
@@ -149,8 +169,8 @@ class InMemoryCoreState(
                 if series_id_set is not None and record.series_id not in series_id_set:
                     continue
                 if (
-                    federation_set is not None
-                    and record.federation not in federation_set
+                    federation_id_set is not None
+                    and record.federation not in federation_id_set
                 ):
                     continue
                 if updated_before is not None and record.updated_at >= updated_before:
@@ -174,7 +194,7 @@ class InMemoryCoreState(
     def store_run_in_series(
         self,
         run_id: int,
-        federation: str,
+        federation_id: str,
         series_id: int | None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
@@ -185,13 +205,13 @@ class InMemoryCoreState(
                 if existing is None:
                     log(ERROR, "Run series %d not found", series_id)
                     return None
-                if existing.federation != federation:
+                if existing.federation != federation_id:
                     log(
                         ERROR,
                         "Run series %d belongs to federation %r, not %r",
                         series_id,
                         existing.federation,
-                        federation,
+                        federation_id,
                     )
                     return None
                 run_series = existing
@@ -206,7 +226,7 @@ class InMemoryCoreState(
                 timestamp = now().isoformat()
                 run_series = RunSeries(
                     series_id=new_series_id,
-                    federation=federation,
+                    federation=federation_id,
                     description="",
                     created_at=timestamp,
                     updated_at=timestamp,
@@ -354,6 +374,48 @@ class InMemoryCoreState(
                 task_copy.CopyFrom(task)
                 result.append(task_copy)
             return result
+
+    def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
+        """Record usage for the specified task."""
+        with self.lock_task_store:
+            task = self.task_store.get(task_id)
+            if task is None:
+                return
+            run_id = task.run_id
+
+        with self.lock_task_usage_store:
+            usage_id = self._next_task_usage_id
+            self.task_usage_store[usage_id] = TaskUsageRecord(
+                id=usage_id,
+                task_id=task_id,
+                run_id=run_id,
+                usage=usage,
+                created_at=now(),
+                reported_at=None,
+            )
+            self._next_task_usage_id += 1
+
+    def get_task_usage(
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        task_ids: Sequence[int] | None = None,
+    ) -> Sequence[TaskUsage]:
+        """Retrieve task usage records based on the specified filters."""
+        if (run_ids is not None and not run_ids) or (
+            task_ids is not None and not task_ids
+        ):
+            return []
+
+        with self.lock_task_usage_store:
+            records = sorted(
+                self.task_usage_store.values(), key=lambda record: record.id
+            )
+            if run_ids is not None:
+                records = [record for record in records if record.run_id in run_ids]
+            if task_ids is not None:
+                records = [record for record in records if record.task_id in task_ids]
+            return [record.usage for record in records]
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
