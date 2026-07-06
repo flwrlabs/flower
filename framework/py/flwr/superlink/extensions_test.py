@@ -33,4 +33,4 @@ def test_configure_app_is_noop() -> None:
 
 def test_get_lifespan_contexts_returns_empty_tuple() -> None:
     """Test that the extensions hook has no lifespan contexts."""
-    assert extensions.get_lifespan_contexts() == ()
+    assert not extensions.get_lifespan_contexts()

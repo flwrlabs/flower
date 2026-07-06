@@ -120,7 +120,7 @@ def create_app(
     return fastapi_app
 
 
-def use_route_names_as_operation_ids(app: FastAPI) -> None:
+def use_route_names_as_operation_ids(fastapi_app: FastAPI) -> None:
     """Use route handler names as OpenAPI operation IDs.
 
     Call this only after all routers have been registered. Route handler names
@@ -132,7 +132,7 @@ def use_route_names_as_operation_ids(app: FastAPI) -> None:
     - Two handlers with the same name produce an operation ID collision.
     """
     operation_ids = set()
-    for route_context in iter_route_contexts(app.routes):
+    for route_context in iter_route_contexts(fastapi_app.routes):
         if isinstance(route_context.route, APIRoute):
             route_name = route_context.name
             if route_name in operation_ids:
