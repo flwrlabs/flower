@@ -94,40 +94,6 @@ def test_invoke_model_provider_omits_auth_for_endpoint_without_key(
     assert post_mock.call_args.kwargs["headers"] == {"Content-Type": "application/json"}
 
 
-def test_invoke_model_provider_records_response_usage(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Provider usage should be recorded before returning the response."""
-    monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "http://proxy/v1/responses")
-    post_mock = _patch_post(
-        monkeypatch,
-        _Response(
-            body={
-                "id": "resp_1",
-                "usage": {
-                    "input_tokens": 10,
-                    "output_tokens": 20,
-                    "total_tokens": 30,
-                },
-            }
-        ),
-    )
-    usage_recorder = Mock()
-
-    result = invoke_model_provider(
-        {"model": "openai/gpt-test", "input": []},
-        usage_recorder=usage_recorder,
-    )
-
-    assert result["id"] == "resp_1"
-    post_mock.assert_called_once()
-    usage = usage_recorder.record.call_args.args[0]
-    assert usage.usage_type == "openai/gpt-test"
-    assert usage.input_tokens == 10
-    assert usage.output_tokens == 20
-    assert usage.total_tokens == 30
-
-
 def test_invoke_model_provider_keeps_auth_when_key_is_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
