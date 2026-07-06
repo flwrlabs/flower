@@ -179,6 +179,7 @@ def test_invoke_model_provider_collects_stream_events(
         "incomplete_details": {"reason": "max_output_tokens"},
     }
 
+
 @pytest.mark.parametrize(
     ("lines", "expected_detail", "expected_message"),
     [
