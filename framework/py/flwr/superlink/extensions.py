@@ -17,19 +17,52 @@
 
 from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
-from typing import Any
+from importlib import import_module
+from typing import Any, Protocol, cast
 
 from fastapi import FastAPI
+
+EE_EXTENSIONS_MODULE = "flwr.ee.superlink.extensions"
 
 SuperLinkLifespanContext = Callable[
     [FastAPI], AbstractAsyncContextManager[Mapping[str, Any] | None]
 ]
 
 
-def configure_app(_: FastAPI) -> None:
+class _SuperLinkExtensions(Protocol):
+    def configure_app(self, app: FastAPI) -> None:
+        """Configure the FastAPI app."""
+        ...
+
+    def get_lifespan_contexts(self) -> tuple[SuperLinkLifespanContext, ...]:
+        """Return lifespan contexts."""
+        ...
+
+
+def _get_ee_extensions() -> _SuperLinkExtensions | None:
+    try:
+        module = import_module(EE_EXTENSIONS_MODULE)
+    except ModuleNotFoundError as exc:
+        if exc.name in {"flwr.ee", "flwr.ee.superlink", EE_EXTENSIONS_MODULE}:
+            return None
+        raise
+
+    return cast(_SuperLinkExtensions, module)
+
+
+def configure_app(app: FastAPI) -> None:
     """Configure SuperLink FastAPI extensions."""
+    ee_extensions = _get_ee_extensions()
+    if ee_extensions is None:
+        return
+
+    ee_extensions.configure_app(app)
 
 
 def get_lifespan_contexts() -> tuple[SuperLinkLifespanContext, ...]:
     """Return SuperLink FastAPI lifespan contexts."""
-    return ()
+    ee_extensions = _get_ee_extensions()
+    if ee_extensions is None:
+        return ()
+
+    return ee_extensions.get_lifespan_contexts()
