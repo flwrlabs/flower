@@ -19,6 +19,7 @@ import ctypes
 import json
 import os
 import re
+import subprocess
 import sys
 from collections.abc import Callable, Iterable, Sequence
 from logging import WARN
@@ -521,3 +522,14 @@ def resolve_account_ids(ids: Iterable[str]) -> dict[str, str]:
         return resolve_account_ids_ee(ids)
     except ModuleNotFoundError:
         return {id_: NOOP_ACCOUNT_NAME for id_ in ids if id_ == NOOP_FLWR_AID}
+
+
+def get_popen_detach_kwargs() -> dict[str, Any]:
+    """Return platform-specific Popen kwargs to detach the process."""
+    if os.name == "nt":
+        return {
+            # The Windows-only constant is absent from non-Windows type stubs.
+            "creationflags": subprocess.CREATE_NEW_PROCESS_GROUP,  # type: ignore[attr-defined]
+        }
+
+    return {"start_new_session": True}

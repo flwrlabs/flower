@@ -17,7 +17,7 @@
 
 import signal
 from collections.abc import Callable
-from threading import Thread
+from threading import Lock, Thread
 from types import FrameType
 
 from grpc import Server
@@ -64,6 +64,8 @@ def register_signal_handlers(
         Additional exit handlers can be added using `add_exit_handler`.
     """
     default_handlers: dict[int, Callable[[int, FrameType], None]] = {}
+    is_exiting = False
+    lock = Lock()
 
     def _wait_to_stop() -> None:
         if grpc_servers is not None:
@@ -86,8 +88,16 @@ def register_signal_handlers(
         When called will reset signal handler to original signal handler from
         default_handlers.
         """
-        # Reset to default handler
-        signal.signal(signalnum, default_handlers[signalnum])  # type: ignore
+        # Ensure that the exit handler is only called once
+        nonlocal is_exiting
+        with lock:
+            if is_exiting:
+                return
+            is_exiting = True
+
+        # Reset to default handlers
+        for sig in SIGNAL_TO_EXIT_CODE:
+            signal.signal(sig, default_handlers[sig])  # type: ignore
 
         # Setup things for graceful exit
         flwr_exit(
