@@ -91,6 +91,7 @@ from flwr.supercore.tls import (
     try_obtain_optional_appio_server_certificates,
 )
 from flwr.supercore.update_check import warn_if_flwr_update_available
+from flwr.supercore.utils import get_popen_detach_kwargs
 from flwr.supercore.version import package_version
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import (
@@ -502,7 +503,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             runtime_dependency_install=config.runtime_dependency_install,
         )
         # pylint: disable-next=consider-using-with
-        self.superexec_process = subprocess.Popen(command)
+        self.superexec_process = subprocess.Popen(command, **get_popen_detach_kwargs())
 
     def _start_health_server_if_needed(self) -> None:
         if self.config.health_server_address is None:
