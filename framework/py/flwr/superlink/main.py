@@ -102,7 +102,7 @@ def create_app(
         docs_url="/docs",
         redoc_url=None,
         lifespan=lifespan,
-        generate_unique_id_function=generate_route_name_operation_id,
+        generate_unique_id_function=generate_unique_route_id,
     )
 
     # Core APIs
