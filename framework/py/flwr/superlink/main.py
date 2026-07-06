@@ -134,8 +134,8 @@ def use_route_names_as_operation_ids(fastapi_app: FastAPI) -> None:
     operation_ids = set()
     for route_context in iter_route_contexts(fastapi_app.routes):
         if isinstance(route_context.route, APIRoute):
-            route_name = route_context.name
-            if route_name in operation_ids:
+            op_id = generate_unique_route_id(route_context.route)
+            if op_id in operation_ids:
                 raise ValueError(
                     f"Operation ID collision detected: {route_name}. "
                     "Please ensure all route handler function names are unique."
