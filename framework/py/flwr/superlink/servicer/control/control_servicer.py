@@ -91,18 +91,6 @@ from .control_fns import (
     _validate_federation_membership_in_request,
 )
 
-# pylint: disable=protected-access
-FederationNotSpecified = control_fns.FederationNotSpecified
-_check_flwr_aid_in_run = control_fns._check_flwr_aid_in_run
-_format_verification = control_fns._format_verification
-_get_account = control_fns._get_account
-_get_remote_fab = control_fns._get_remote_fab
-_validate_federation_and_node_in_request = (
-    control_fns._validate_federation_and_node_in_request
-)
-_with_last_run_statuses = control_fns._with_last_run_statuses
-# pylint: enable=protected-access
-
 
 # pylint: disable=too-many-public-methods
 class ControlServicer(control_pb2_grpc.ControlServicer):

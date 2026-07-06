@@ -101,12 +101,12 @@ from flwr.superlink.servicer.control.control_account_auth_interceptor import (
     shared_account_info,
 )
 
-from .control_servicer import (
-    ControlServicer,
+from .control_fns import (
     _format_verification,
     _validate_federation_and_node_in_request,
     _validate_federation_membership_in_request,
 )
+from .control_servicer import ControlServicer
 
 
 class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
