@@ -31,7 +31,11 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto.task_pb2 import TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    TaskEvent,
+    TaskStatus,
+    TaskUsage,
+)
 from flwr.supercore.constant import TaskType
 from flwr.supercore.date import now
 
@@ -284,6 +288,36 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(reloaded_tasks), 1)
         reloaded = reloaded_tasks[0]
         self.assertEqual(reloaded.fab_hash, "fab-hash")
+
+    def test_add_and_get_task_usage(self) -> None:
+        """Task usage should round-trip and filter by task ID."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+
+        state.add_task_usage(
+            task_id,
+            TaskUsage(
+                input_tokens=10,
+                output_tokens=20,
+                total_tokens=30,
+                usage_type="token",
+            ),
+        )
+        state.add_task_usage(task_id, TaskUsage(input_tokens=999, usage_type="token"))
+
+        usages = state.get_task_usage(task_ids=[task_id])
+
+        self.assertEqual(len(usages), 2)
+        usage = usages[0]
+        self.assertEqual(usage.input_tokens, 10)
+        self.assertEqual(usage.output_tokens, 20)
+        self.assertEqual(usage.total_tokens, 30)
+        self.assertEqual(usage.usage_type, "token")
+        self.assertEqual(usages[1].input_tokens, 999)
 
     def test_add_and_get_task_log(self) -> None:
         """Adding and retrieving task logs should preserve concatenation order."""

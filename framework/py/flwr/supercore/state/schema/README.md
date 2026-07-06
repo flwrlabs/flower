@@ -199,7 +199,7 @@ erDiagram
   task ||--o{ task_logs : task_id
   task ||--o{ task_message : src_task_id
   task ||--o{ task_message : dst_task_id
-  task ||--o| task_usage : task_id
+  task ||--o{ task_usage : task_id
 
 ```
 <!-- END_SQLALCHEMY_DOCS -->
