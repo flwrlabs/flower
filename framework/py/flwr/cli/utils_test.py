@@ -41,9 +41,7 @@ from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 
 from .utils import (
-    _flower_error_from_grpc_error,
     _format_flower_error,
-    _format_grpc_error,
     build_pathspec,
     cli_output_handler,
     collect_files,
@@ -301,23 +299,6 @@ def test_custom_grpc_err_handler() -> None:
     mock_handler.assert_called_once_with(grpc_error)
 
 
-def test_flower_error_from_grpc_error() -> None:
-    """Deserialize FlowerError from gRPC error details."""
-    err = _grpc_error_with_details(
-        _flower_error_details(
-            ApiErrorCode.INVALID_RUN_CONFIG,
-            "Unknown override key: tool.invalid-key",
-        )
-    )
-
-    flower_error = _flower_error_from_grpc_error(err)
-
-    assert flower_error is not None
-    assert flower_error.code == ApiErrorCode.INVALID_RUN_CONFIG
-    assert flower_error.message == "Invalid run configuration."
-    assert flower_error.public_details == "Unknown override key: tool.invalid-key"
-
-
 def test_format_flower_error() -> None:
     """Format FlowerError message and public details."""
     err = FlowerError(
@@ -330,13 +311,6 @@ def test_format_flower_error() -> None:
         _format_flower_error(err)
         == "Invalid run configuration.\nUnknown override key: tool.invalid-key"
     )
-
-
-def test_format_grpc_error() -> None:
-    """Format gRPC error details."""
-    err = _grpc_error_with_details("plain failure")
-
-    assert _format_grpc_error(err) == "plain failure"
 
 
 def test_cli_output_handler_raises_click_exception_for_json_error() -> None:

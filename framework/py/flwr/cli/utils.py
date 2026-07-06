@@ -87,24 +87,12 @@ def log_superlink_connection(superlink_connection: SuperLinkConnection) -> None:
     )
 
 
-def _flower_error_from_grpc_error(err: grpc.RpcError) -> FlowerError | None:
-    """Return the FlowerError serialized in a gRPC error, if present."""
-    return FlowerError.from_json(
-        cast(str | None, err.details())
-    )  # pylint: disable=E1101
-
-
 def _format_flower_error(err: FlowerError) -> str:
     """Return the CLI-facing message for a FlowerError."""
     msg = err.message
     if err.public_details:
         msg += f"\n{err.public_details}"
     return msg
-
-
-def _format_grpc_error(err: grpc.RpcError) -> str:
-    """Return a user-facing message from a gRPC error."""
-    return cast(str, err.details())  # pylint: disable=E1101
 
 
 @contextmanager  # docsig: ignore=SIG503
@@ -460,7 +448,9 @@ def flwr_cli_grpc_exc_handler(
 
         # Control API serializes FlowerError into gRPC details. If the payload is
         # not a valid FlowerError, the raw gRPC fallback below handles it.
-        if flower_error := _flower_error_from_grpc_error(e):
+        if flower_error := FlowerError.from_json(
+            cast(str | None, e.details())  # pylint: disable=E1101
+        ):
             raise click.ClickException(_format_flower_error(flower_error)) from None
 
         # Keep special handling only for transport-level errors that are not part
@@ -475,7 +465,9 @@ def flwr_cli_grpc_exc_handler(
             raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE) from None
 
         # Log details from grpc error directly
-        raise click.ClickException(_format_grpc_error(e)) from None
+        raise click.ClickException(
+            cast(str, e.details())  # pylint: disable=E1101
+        ) from None
 
 
 def build_pathspec(patterns: Iterable[str]) -> pathspec.PathSpec:
