@@ -84,8 +84,8 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
-from . import control_fns
-from .control_fns import (
+from . import control_handlers
+from .control_handlers import (
     _get_flwr_aid,
     _resolve_federation_id,
     _validate_federation_membership_in_request,
@@ -114,7 +114,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: StartRunRequest, context: grpc.ServicerContext
     ) -> StartRunResponse:
         """Create run ID."""
-        return control_fns.start_run(
+        return control_handlers.start_run(
             request, self.linkstate_factory.state(), self.fleet_api_type
         )
 
@@ -172,7 +172,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: ListRunsRequest, context: grpc.ServicerContext
     ) -> ListRunsResponse:
         """Handle `flwr ls` command."""
-        return control_fns.list_runs(
+        return control_handlers.list_runs(
             request, self.linkstate_factory.state(), self.objectstore_factory.store()
         )
 
@@ -180,37 +180,37 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: ListRunSeriesRequest, context: grpc.ServicerContext
     ) -> ListRunSeriesResponse:
         """List run series."""
-        return control_fns.list_run_series(request, self.linkstate_factory.state())
+        return control_handlers.list_run_series(request, self.linkstate_factory.state())
 
     def GetRunSeries(
         self, request: GetRunSeriesRequest, context: grpc.ServicerContext
     ) -> GetRunSeriesResponse:
         """Get run series."""
-        return control_fns.get_run_series(request, self.linkstate_factory.state())
+        return control_handlers.get_run_series(request, self.linkstate_factory.state())
 
     def StopRun(
         self, request: StopRunRequest, context: grpc.ServicerContext
     ) -> StopRunResponse:
         """Stop a given run ID."""
-        return control_fns.stop_run(request, self.linkstate_factory.state())
+        return control_handlers.stop_run(request, self.linkstate_factory.state())
 
     def GetLoginDetails(
         self, request: GetLoginDetailsRequest, context: grpc.ServicerContext
     ) -> GetLoginDetailsResponse:
         """Start login."""
-        return control_fns.get_login_details(request, self.authn_plugin)
+        return control_handlers.get_login_details(request, self.authn_plugin)
 
     def GetAuthTokens(
         self, request: GetAuthTokensRequest, context: grpc.ServicerContext
     ) -> GetAuthTokensResponse:
         """Get auth token."""
-        return control_fns.get_auth_tokens(request, self.authn_plugin)
+        return control_handlers.get_auth_tokens(request, self.authn_plugin)
 
     def PullArtifacts(
         self, request: PullArtifactsRequest, context: grpc.ServicerContext
     ) -> PullArtifactsResponse:
         """Pull artifacts for a given run ID."""
-        return control_fns.pull_artifacts(
+        return control_handlers.pull_artifacts(
             request, self.linkstate_factory.state(), self.artifact_provider
         )
 
@@ -218,49 +218,55 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: RegisterNodeRequest, context: grpc.ServicerContext
     ) -> RegisterNodeResponse:
         """Add a SuperNode."""
-        return control_fns.register_node(request, self.linkstate_factory.state())
+        return control_handlers.register_node(request, self.linkstate_factory.state())
 
     def UnregisterNode(
         self, request: UnregisterNodeRequest, context: grpc.ServicerContext
     ) -> UnregisterNodeResponse:
         """Remove a SuperNode."""
-        return control_fns.unregister_node(request, self.linkstate_factory.state())
+        return control_handlers.unregister_node(request, self.linkstate_factory.state())
 
     def ListNodes(
         self, request: ListNodesRequest, context: grpc.ServicerContext
     ) -> ListNodesResponse:
         """List all SuperNodes."""
-        return control_fns.list_nodes(request, self.linkstate_factory.state())
+        return control_handlers.list_nodes(request, self.linkstate_factory.state())
 
     def ListFederations(
         self, request: ListFederationsRequest, context: grpc.ServicerContext
     ) -> ListFederationsResponse:
         """List all SuperNodes."""
-        return control_fns.list_federations(request, self.linkstate_factory.state())
+        return control_handlers.list_federations(
+            request, self.linkstate_factory.state()
+        )
 
     def ShowFederation(
         self, request: ShowFederationRequest, context: grpc.ServicerContext
     ) -> ShowFederationResponse:
         """Show details of a specific Federation."""
-        return control_fns.show_federation(request, self.linkstate_factory.state())
+        return control_handlers.show_federation(request, self.linkstate_factory.state())
 
     def CreateFederation(
         self, request: CreateFederationRequest, context: grpc.ServicerContext
     ) -> CreateFederationResponse:
         """Create a new Federation."""
-        return control_fns.create_federation(request, self.linkstate_factory.state())
+        return control_handlers.create_federation(
+            request, self.linkstate_factory.state()
+        )
 
     def ArchiveFederation(
         self, request: ArchiveFederationRequest, context: grpc.ServicerContext
     ) -> ArchiveFederationResponse:
         """Archive a Federation."""
-        return control_fns.archive_federation(request, self.linkstate_factory.state())
+        return control_handlers.archive_federation(
+            request, self.linkstate_factory.state()
+        )
 
     def AddNodeToFederation(
         self, request: AddNodeToFederationRequest, context: grpc.ServicerContext
     ) -> AddNodeToFederationResponse:
         """Add a node to a Federation."""
-        return control_fns.add_node_to_federation(
+        return control_handlers.add_node_to_federation(
             request, self.linkstate_factory.state()
         )
 
@@ -268,7 +274,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: RemoveNodeFromFederationRequest, context: grpc.ServicerContext
     ) -> RemoveNodeFromFederationResponse:
         """Remove a node from a Federation."""
-        return control_fns.remove_node_from_federation(
+        return control_handlers.remove_node_from_federation(
             request, self.linkstate_factory.state()
         )
 
@@ -276,7 +282,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: RemoveAccountFromFederationRequest, context: grpc.ServicerContext
     ) -> RemoveAccountFromFederationResponse:
         """Remove an account from a Federation."""
-        return control_fns.remove_account_from_federation(
+        return control_handlers.remove_account_from_federation(
             request, self.linkstate_factory.state()
         )
 
@@ -284,31 +290,41 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: CreateInvitationRequest, context: grpc.ServicerContext
     ) -> CreateInvitationResponse:
         """Create an invitation."""
-        return control_fns.create_invitation(request, self.linkstate_factory.state())
+        return control_handlers.create_invitation(
+            request, self.linkstate_factory.state()
+        )
 
     def ListInvitations(
         self, request: ListInvitationsRequest, context: grpc.ServicerContext
     ) -> ListInvitationsResponse:
         """List invitations."""
-        return control_fns.list_invitations(request, self.linkstate_factory.state())
+        return control_handlers.list_invitations(
+            request, self.linkstate_factory.state()
+        )
 
     def AcceptInvitation(
         self, request: AcceptInvitationRequest, context: grpc.ServicerContext
     ) -> AcceptInvitationResponse:
         """Accept an invitation."""
-        return control_fns.accept_invitation(request, self.linkstate_factory.state())
+        return control_handlers.accept_invitation(
+            request, self.linkstate_factory.state()
+        )
 
     def RejectInvitation(
         self, request: RejectInvitationRequest, context: grpc.ServicerContext
     ) -> RejectInvitationResponse:
         """Reject an invitation."""
-        return control_fns.reject_invitation(request, self.linkstate_factory.state())
+        return control_handlers.reject_invitation(
+            request, self.linkstate_factory.state()
+        )
 
     def RevokeInvitation(
         self, request: RevokeInvitationRequest, context: grpc.ServicerContext
     ) -> RevokeInvitationResponse:
         """Revoke an invitation."""
-        return control_fns.revoke_invitation(request, self.linkstate_factory.state())
+        return control_handlers.revoke_invitation(
+            request, self.linkstate_factory.state()
+        )
 
     def ConfigureSimulationFederation(
         self,
@@ -316,7 +332,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         context: grpc.ServicerContext,
     ) -> ConfigureSimulationFederationResponse:
         """Configure a federation for simulation."""
-        return control_fns.configure_simulation_federation(
+        return control_handlers.configure_simulation_federation(
             request, self.linkstate_factory.state()
         )
 
