@@ -799,9 +799,9 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
     superlink_lifespan = None
     if start_legacy_grpc:
         superlink_lifespan = SuperLinkLifespan(lifespan_config)
-    from flwr.superlink.main import (
+    from flwr.superlink.main import (  # pylint: disable=import-outside-toplevel
         create_app,
-    )  # pylint: disable=import-outside-toplevel
+    )
 
     fastapi_app = create_app(
         superlink_lifespan=superlink_lifespan,

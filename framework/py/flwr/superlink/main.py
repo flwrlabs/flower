@@ -27,9 +27,7 @@ from fastapi.routing import APIRoute, iter_route_contexts
 
 from flwr import __version__
 from flwr.common import log
-from flwr.supercore.routers import health
 from flwr.superlink import extensions
-from flwr.superlink.routers import control, runtime
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
