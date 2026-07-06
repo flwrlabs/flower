@@ -23,9 +23,13 @@ from unittest.mock import Mock
 
 import pytest
 
-from .web_fetch import WebFetchProviderError, invoke_web_fetch_provider
+from .web_fetch import (
+    WEB_FETCH_ENDPOINT_ENV,
+    WebFetchProviderError,
+    invoke_web_fetch_provider,
+)
 
-trafilatura = pytest.importorskip("trafilatura")
+_PROXY_ENDPOINT = "http://proxy/v1/web-fetch"
 
 
 @dataclass
@@ -77,6 +81,7 @@ def _patch_dns(monkeypatch: pytest.MonkeyPatch, ip_address: str) -> None:
 @pytest.fixture(autouse=True)
 def _resolve_hosts_to_public_ip(monkeypatch: pytest.MonkeyPatch) -> None:
     """Avoid real DNS lookups in provider tests."""
+    monkeypatch.delenv(WEB_FETCH_ENDPOINT_ENV, raising=False)
     _patch_dns(monkeypatch, "93.184.216.34")
 
 
@@ -99,6 +104,7 @@ def test_invoke_web_fetch_provider_extracts_markdown(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Requests should return trafilatura-extracted markdown."""
+    trafilatura = pytest.importorskip("trafilatura")
     response = _Response()
     get_mock = _patch_get(monkeypatch, response)
     extract_mock = Mock(return_value="# Hello")
@@ -123,6 +129,72 @@ def test_invoke_web_fetch_provider_extracts_markdown(
     )
     extract_mock.assert_called_once()
     assert response.closed
+
+
+def test_invoke_web_fetch_provider_calls_proxy_endpoint_when_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Proxy mode should post the URL to the configured endpoint."""
+    monkeypatch.setenv(WEB_FETCH_ENDPOINT_ENV, _PROXY_ENDPOINT)
+    response = Mock(status_code=200)
+    response.json.return_value = {"content": "Hello"}
+    get_mock = Mock()
+    post_mock = Mock(return_value=response)
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.connector.web_fetch.requests.post",
+        post_mock,
+    )
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.connector.web_fetch.requests.get",
+        get_mock,
+    )
+
+    assert invoke_web_fetch_provider(" https://example.com:443 ") == {
+        "content": "Hello"
+    }
+
+    post_mock.assert_called_once_with(
+        _PROXY_ENDPOINT,
+        json={"url": "https://example.com:443"},
+        timeout=60.0,
+    )
+    get_mock.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "blocked_url",
+    [
+        "https://user@example.com",
+        "https://user:pass@example.com",
+        "http://example.com:443",
+        "https://example.com:80",
+        "https://example.com:bad",
+        "https://example.com:",
+    ],
+)
+def test_invoke_web_fetch_provider_rejects_invalid_url_syntax(
+    monkeypatch: pytest.MonkeyPatch,
+    blocked_url: str,
+) -> None:
+    """Provider should reject unsafe URL syntax before any request."""
+    monkeypatch.setenv(WEB_FETCH_ENDPOINT_ENV, _PROXY_ENDPOINT)
+    get_mock = Mock()
+    post_mock = Mock()
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.connector.web_fetch.requests.get",
+        get_mock,
+    )
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.connector.web_fetch.requests.post",
+        post_mock,
+    )
+
+    with pytest.raises(WebFetchProviderError) as exc_info:
+        invoke_web_fetch_provider(blocked_url)
+
+    assert exc_info.value.code == "invalid_request"
+    get_mock.assert_not_called()
+    post_mock.assert_not_called()
 
 
 def test_invoke_web_fetch_provider_enforces_fetch_guardrails(
