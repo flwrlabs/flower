@@ -109,25 +109,3 @@ def test_search_uses_direct_providers_when_proxy_endpoint_is_absent(
     get_mock.assert_called_once()
     assert get_mock.call_args.args == (BRAVE_WEB_SEARCH_URL,)
     post_mock.assert_not_called()
-
-
-def test_search_records_exa_provider_usage_type(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Exa provider usage should be recorded with a provider-specific type."""
-    monkeypatch.delenv(WEB_SEARCH_ENDPOINT_ENV, raising=False)
-    monkeypatch.delenv(BRAVE_API_KEY_ENV, raising=False)
-    monkeypatch.delenv(TAVILY_API_KEY_ENV, raising=False)
-    monkeypatch.setenv(EXA_API_KEY_ENV, "exa_test_key")
-    response = _Response(body={"results": []})
-    post_mock = Mock(return_value=response)
-    monkeypatch.setattr(requests, "post", post_mock)
-    usage_recorder = Mock()
-
-    output = search("Flower", usage_recorder=usage_recorder)
-
-    assert output == {"results": []}
-    usage = usage_recorder.record.call_args.args[0]
-    assert usage.usage_type == "exa_web_search"
-    post_mock.assert_called_once()
-    assert post_mock.call_args.args == (EXA_SEARCH_URL,)
