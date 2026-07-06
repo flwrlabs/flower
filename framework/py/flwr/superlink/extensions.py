@@ -32,11 +32,11 @@ SuperLinkLifespanContext = Callable[
 class _SuperLinkExtensions(Protocol):
     def configure_app(self, app: FastAPI) -> None:
         """Configure the FastAPI app."""
-        ...
+        pass
 
     def get_lifespan_contexts(self) -> tuple[SuperLinkLifespanContext, ...]:
         """Return lifespan contexts."""
-        ...
+        pass
 
 
 def _get_ee_extensions() -> _SuperLinkExtensions | None:
