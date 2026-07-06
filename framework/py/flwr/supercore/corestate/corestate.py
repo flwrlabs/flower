@@ -21,7 +21,7 @@ from typing import Literal
 
 from flwr.app import Context, Message
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
 
 from ..object_store import ObjectStore
@@ -48,7 +48,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         series_ids: Sequence[int] | None = None,
-        federations: Sequence[str] | None = None,
+        federation_ids: Sequence[str] | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -62,8 +62,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         series_ids : Optional[Sequence[int]] (default: None)
             Sequence of RunSeries IDs to filter by.
-        federations : Optional[Sequence[str]] (default: None)
-            Sequence of federation names to filter by.
+        federation_ids : Optional[Sequence[str]] (default: None)
+            Sequence of federation IDs to filter by.
         updated_before : str | None (default: None)
             If set, return only RunSeries updated before this ISO timestamp.
         limit : int | None (default: None)
@@ -107,7 +107,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def store_run_in_series(
         self,
         run_id: int,
-        federation: str,
+        federation_id: str,
         series_id: int | None,
     ) -> int | None:
         """Store a run in a run series and return the series ID.
@@ -116,12 +116,12 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         run_id : int
             Run ID to associate with the run series.
-        federation : str
-            Federation the run series belongs to.
+        federation_id : str
+            Federation ID the run series belongs to.
         series_id : int | None
             Caller-provided series ID. If `None`, a new series ID is generated
             and creation is attempted. If set, the matching series must already
-            exist and belong to `federation`.
+            exist and belong to `federation_id`.
 
         Returns
         -------
@@ -246,6 +246,48 @@ class CoreState(ABC):  # pylint: disable=R0904
         Sequence[Task]
             A sequence of Task objects representing tasks matching the specified
             filters.
+        """
+
+    @abstractmethod
+    def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
+        """Record usage for the specified task.
+
+        Parameters
+        ----------
+        task_id : int
+            The identifier of the task that incurred the usage.
+        usage : TaskUsage
+            Usage payload to persist.
+
+        Notes
+        -----
+        Each successful call appends a new usage record for the task.
+        """
+
+    @abstractmethod
+    def get_task_usage(
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        task_ids: Sequence[int] | None = None,
+    ) -> Sequence[TaskUsage]:
+        """Retrieve task usage records based on the specified filters.
+
+        - If a filter is set to None, it is ignored.
+        - If multiple filters are provided, they are combined using AND logic.
+        - Within each filter, provided values are combined using OR logic.
+
+        Parameters
+        ----------
+        run_ids : Optional[Sequence[int]] (default: None)
+            Sequence of run IDs to filter by.
+        task_ids : Optional[Sequence[int]] (default: None)
+            Sequence of task IDs to filter by.
+
+        Returns
+        -------
+        Sequence[TaskUsage]
+            Usage records ordered by insertion order.
         """
 
     @abstractmethod

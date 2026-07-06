@@ -31,15 +31,7 @@ from parameterized import parameterized
 
 from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
 from flwr.app import ConfigRecord, Context, RecordDict
-from flwr.common.constant import (
-    NODE_NOT_FOUND_MESSAGE,
-    NOOP_ACCOUNT_NAME,
-    PUBLIC_KEY_ALREADY_IN_USE_MESSAGE,
-    PUBLIC_KEY_NOT_VALID,
-    SUPERLINK_NODE_ID,
-    Status,
-    SubStatus,
-)
+from flwr.common.constant import NOOP_ACCOUNT_NAME, SUPERLINK_NODE_ID, Status, SubStatus
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -87,14 +79,13 @@ from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
     FLWR_IN_MEMORY_DB_NAME,
-    NOOP_FEDERATION,
+    NOOP_FEDERATION_ID,
     ActionType,
     RunTime,
     TaskType,
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, EntitlementError, FlowerError
-from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.typing import (
@@ -146,7 +137,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             "v0.0.1",
             "hash123",
             {},
-            NOOP_FEDERATION,
+            NOOP_FEDERATION_ID,
             None,
             flwr_aid,
             TaskType.SERVER_APP,
@@ -156,13 +147,13 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self,
         series_id: int,
         *,
-        federation: str = NOOP_FEDERATION,
+        federation_id: str = NOOP_FEDERATION_ID,
         updated_at: str = "2026-05-30T00:00:00+00:00",
         run_ids: list[int] | None = None,
     ) -> None:
         cast(Any, self.state).run_series_store[series_id] = RunSeries(
             series_id=series_id,
-            federation=federation,
+            federation=federation_id,
             description=f"series {series_id}",
             created_at="2026-05-29T00:00:00+00:00",
             updated_at=updated_at,
@@ -179,7 +170,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request = StartRunRequest()
         request.fab.hash_str = fab_hash
         request.fab.content = fab_content
-        request.federation = NOOP_FEDERATION
+        request.federation = NOOP_FEDERATION_ID
 
         # Execute
         with (
@@ -205,7 +196,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(response.HasField("series_id"))
         self.assertGreater(response.series_id, 0)
         self.assertEqual(run_info.series_id, response.series_id)
-        self.assertEqual(response.federation, NOOP_FEDERATION)
+        self.assertEqual(response.federation, NOOP_FEDERATION_ID)
         run_context = self.state.get_run_series_context(response.series_id)
         assert run_context is not None
         self.assertEqual(run_context.run_id, response.run_id)
@@ -214,7 +205,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_start_run_defaults_to_account_simulation_federation(self) -> None:
         """Test StartRun uses the account default simulation federation."""
         self.account_info.account_name = "test_account"
-        expected_federation = f"@test_account/{DEFAULT_FEDERATION_SIMULATION}"
+        expected_federation_id = f"@test_account/{DEFAULT_FEDERATION_SIMULATION}"
         federation_manager = Mock(exists=Mock(side_effect=RuntimeError))
         self.servicer.linkstate_factory.federation_manager = federation_manager
         self.servicer.linkstate_factory.state_instance = None
@@ -222,7 +213,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         with self.assertRaises(RuntimeError):
             self.servicer.StartRun(StartRunRequest(), Mock())
 
-        federation_manager.exists.assert_called_once_with(expected_federation)
+        federation_manager.exists.assert_called_once_with(expected_federation_id)
 
     def test_start_run_uses_existing_series_id(self) -> None:
         """Test StartRun links the run to an existing run series."""
@@ -239,7 +230,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             series_id=series_id,
         )
         self.state.set_run_series_context(series_id, initial_context)
-        request = StartRunRequest(series_id=series_id, federation=NOOP_FEDERATION)
+        request = StartRunRequest(series_id=series_id, federation=NOOP_FEDERATION_ID)
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.fab.content = fab_content
 
@@ -287,7 +278,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request = StartRunRequest()
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.fab.content = fab_content
-        request.federation = NOOP_FEDERATION
+        request.federation = NOOP_FEDERATION_ID
 
         with (
             patch(
@@ -323,7 +314,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request = StartRunRequest()
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.fab.content = fab_content
-        request.federation = NOOP_FEDERATION
+        request.federation = NOOP_FEDERATION_ID
         for key, value in user_config_to_proto({"agent.input": "Hello"}).items():
             request.override_config[key].CopyFrom(value)
 
@@ -370,7 +361,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         """Test StartRun creates an AgentApp run for the built-in flwr agent."""
         request = StartRunRequest(
             app_spec="@flwragent/flwr-agent",
-            federation=NOOP_FEDERATION,
+            federation=NOOP_FEDERATION_ID,
         )
         for key, value in user_config_to_proto({"agent.input": "Hello"}).items():
             request.override_config[key].CopyFrom(value)
@@ -395,15 +386,14 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
         self.assertEqual(tasks[0].fab_hash, runs[0].fab_hash)
 
-    def test_start_run_aborts_if_create_run_fails(self) -> None:
-        """Test StartRun aborts with INTERNAL if the initial task cannot be created."""
+    def test_start_run_raises_if_create_run_fails(self) -> None:
+        """Test StartRun raises if the initial task cannot be created."""
         fab_content = b"test FAB content task failure"
         request = StartRunRequest()
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.fab.content = fab_content
-        request.federation = NOOP_FEDERATION
+        request.federation = NOOP_FEDERATION_ID
         context = Mock()
-        context.abort.side_effect = grpc.RpcError()
 
         with (
             patch(
@@ -413,7 +403,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
             patch.object(self.state, "create_run", return_value=0),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(FlowerError) as cm,
         ):
             mock_get_fab_config.return_value = {
                 "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
@@ -421,16 +411,13 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
             self.servicer.StartRun(request, context)
 
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.INTERNAL,
-            "Failed to create or initialize the run.",
-        )
+        self.assertEqual(cm.exception.code, ApiErrorCode.FAILED_TO_CREATE_RUN)
 
     def test_start_run_returns_note_for_remote_app(self) -> None:
         """Test StartRun includes the Hub compatibility note for remote apps."""
         request = StartRunRequest(
             app_spec="@anne-dev/simple-legacy-127",
-            federation=NOOP_FEDERATION,
+            federation=NOOP_FEDERATION_ID,
         )
 
         with (
@@ -465,7 +452,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request = StartRunRequest()
         request.fab.hash_str = fab_hash
         request.fab.content = fab_content
-        request.federation = NOOP_FEDERATION
+        request.federation = NOOP_FEDERATION_ID
         for key, value in user_config_to_proto(
             {"train.lr": 0.01, "train.epochs": 3}
         ).items():
@@ -503,11 +490,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request = StartRunRequest()
         request.fab.hash_str = fab_hash
         request.fab.content = fab_content
-        request.federation = NOOP_FEDERATION
+        request.federation = NOOP_FEDERATION_ID
         for key, value in user_config_to_proto({"unknown.key": 10}).items():
             request.override_config[key].CopyFrom(value)
         context = Mock()
-        context.abort.side_effect = grpc.RpcError()
 
         # Execute/Assert
         with (
@@ -517,7 +503,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch(
                 "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(FlowerError) as cm,
         ):
             mock_get_fab_config.return_value = {
                 "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
@@ -525,20 +511,16 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
             self.servicer.StartRun(request, context)
 
-        context.abort.assert_called_once()
-        status_code, details = context.abort.call_args.args
-        self.assertEqual(status_code, grpc.StatusCode.FAILED_PRECONDITION)
-        self.assertIn("unknown.key", details)
+        self.assertEqual(cm.exception.code, ApiErrorCode.INVALID_RUN_CONFIG)
 
     def test_start_run_denied_when_not_entitled(self) -> None:
-        """Test StartRun aborts when federation manager denies execution."""
+        """Test StartRun raises when federation manager denies execution."""
         request = StartRunRequest()
         request.fab.hash_str = hashlib.sha256(b"test FAB content").hexdigest()
         request.fab.content = b"test FAB content"
-        request.federation = NOOP_FEDERATION
+        request.federation = NOOP_FEDERATION_ID
 
         context = Mock()
-        context.abort.side_effect = grpc.RpcError()
 
         with (
             patch(
@@ -553,19 +535,16 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                     entitlement_code=101,
                 ),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(EntitlementError) as cm,
         ):
             mock_get_fab_config.return_value = {
                 "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
             }
             self.servicer.StartRun(request, context)
 
-        _assert_abort_with_flwr_err(
-            context,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Start run not permitted.",
-            entitlement_code=101,
-        )
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(cm.exception.public_details, "Start run not permitted.")
+        self.assertEqual(cm.exception.entitlement_code, 101)
 
     @parameterized.expand(
         [
@@ -581,7 +560,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request = StartRunRequest()
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.fab.content = fab_content
-        request.federation = NOOP_FEDERATION
+        request.federation = NOOP_FEDERATION_ID
 
         sim_cfg = SimulationConfig() if simulation else None
 
@@ -612,7 +591,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         mock_can_execute.assert_called_once_with(
             self.aid,
             ActionType.START_RUN,
-            StartRunContext(federation_name=NOOP_FEDERATION, runtime=expected_runtime),
+            StartRunContext(federation_id=NOOP_FEDERATION_ID, runtime=expected_runtime),
         )
 
     @parameterized.expand([(None,), (1,), (2,), (3,), (9,)])  # type: ignore
@@ -660,12 +639,12 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_list_run_series_filters_by_federation(self) -> None:
         """Test ListRunSeries filters by an explicit federation."""
         # Prepare
-        self._create_dummy_run_series(1, federation=NOOP_FEDERATION)
-        self._create_dummy_run_series(2, federation="other-federation")
+        self._create_dummy_run_series(1, federation_id=NOOP_FEDERATION_ID)
+        self._create_dummy_run_series(2, federation_id="@me/other")
 
         # Execute
         response = self.servicer.ListRunSeries(
-            ListRunSeriesRequest(federation_id=NOOP_FEDERATION), Mock()
+            ListRunSeriesRequest(federation_id=NOOP_FEDERATION_ID), Mock()
         )
 
         # Assert
@@ -698,20 +677,16 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(response.HasField("context"))
         self.assertEqual(response.context.series_id, series_id)
 
-    def test_get_run_series_aborts_for_unknown_series(self) -> None:
-        """Test GetRunSeries returns NOT_FOUND for unknown RunSeries IDs."""
+    def test_get_run_series_raises_for_unknown_series(self) -> None:
+        """Test GetRunSeries raises for unknown RunSeries IDs."""
         # Prepare
         context = Mock()
-        context.abort.side_effect = grpc.RpcError()
 
         # Execute/Assert
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(FlowerError) as cm:
             self.servicer.GetRunSeries(GetRunSeriesRequest(series_id=999), context)
 
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.NOT_FOUND,
-            "Run series ID not found.",
-        )
+        self.assertEqual(cm.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
 
     def test_stop_run(self) -> None:
         """Test StopRun method of ControlServicer."""
@@ -734,24 +709,24 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     @parameterized.expand(
         [
             (
-                "",
+                None,
                 False,
                 public_key_to_bytes(generate_key_pairs()[1]),
             ),  # PASSES, true EC keys used once
             (
-                PUBLIC_KEY_ALREADY_IN_USE_MESSAGE,
+                ApiErrorCode.PUBLIC_KEY_ALREADY_IN_USE,
                 True,
                 public_key_to_bytes(generate_key_pairs()[1]),
             ),  # FAILS, true EC keys but already in use
             (
-                PUBLIC_KEY_NOT_VALID,
+                ApiErrorCode.PUBLIC_KEY_NOT_VALID,
                 False,
                 os.urandom(32),
             ),  # FAILS, fake EC keys
         ]
     )  # type: ignore
     def test_create_node_cli(
-        self, error_msg: str, pre_register_key: bool, pub_key: bytes
+        self, expected_code: ApiErrorCode | None, pre_register_key: bool, pub_key: bytes
     ) -> None:
         """Test CreateNodeCli method of ControlServicer."""
         # Prepare
@@ -766,21 +741,20 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         req = RegisterNodeRequest(public_key=pub_key)
         ctx = Mock()
-        node_id = self.servicer.RegisterNode(req, ctx)
-        if error_msg:
-            ctx.abort.assert_called_once_with(
-                grpc.StatusCode.FAILED_PRECONDITION, error_msg
-            )
+        if expected_code is not None:
+            with self.assertRaises(FlowerError) as cm:
+                self.servicer.RegisterNode(req, ctx)
+            self.assertEqual(cm.exception.code, expected_code)
         else:
-            assert node_id
+            response = self.servicer.RegisterNode(req, ctx)
+            assert response.node_id
 
     def test_register_node_denied_when_not_entitled(self) -> None:
-        """Test RegisterNode aborts when federation manager denies execution."""
+        """Test RegisterNode raises when federation manager denies execution."""
         req = RegisterNodeRequest(
             public_key=public_key_to_bytes(generate_key_pairs()[1])
         )
         ctx = Mock()
-        ctx.abort.side_effect = grpc.RpcError()
 
         with (
             patch.object(self.state, "create_node") as mock_create_node,
@@ -793,16 +767,13 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                     entitlement_code=102,
                 ),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(EntitlementError) as cm,
         ):
             self.servicer.RegisterNode(req, ctx)
 
-        _assert_abort_with_flwr_err(
-            ctx,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Register node not permitted.",
-            entitlement_code=102,
-        )
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(cm.exception.public_details, "Register node not permitted.")
+        self.assertEqual(cm.exception.entitlement_code, 102)
         mock_create_node.assert_not_called()
 
     def test_register_node_calls_can_execute_with_expected_args(self) -> None:
@@ -835,7 +806,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Prepare
         pub_key = public_key_to_bytes(generate_key_pairs()[1])
         node_id = self.state.create_node(
-            owner_aid="fake_aid",
+            owner_aid=self.aid,
             owner_name="fake_name",
             public_key=pub_key,
             heartbeat_interval=10,
@@ -844,18 +815,19 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         req = UnregisterNodeRequest(node_id=node_id if real_node_id else node_id + 1)
         ctx = Mock()
-        self.servicer.UnregisterNode(req, ctx)
         if not real_node_id:
-            ctx.abort.assert_called_once_with(
-                grpc.StatusCode.NOT_FOUND, NODE_NOT_FOUND_MESSAGE
-            )
+            with self.assertRaises(FlowerError) as cm:
+                self.servicer.UnregisterNode(req, ctx)
+            self.assertEqual(cm.exception.code, ApiErrorCode.NODE_NOT_FOUND)
+        else:
+            self.servicer.UnregisterNode(req, ctx)
 
     def test_create_delete_create_node_cli(self) -> None:
         """Test CreateNodeCli and DeleteNodeCli method of ControlServicer."""
         # Prepare
         pub_key = public_key_to_bytes(generate_key_pairs()[1])
         node_id = self.state.create_node(
-            owner_aid="fake_aid",
+            owner_aid=self.aid,
             owner_name="fake_name",
             public_key=pub_key,
             heartbeat_interval=10,
@@ -866,7 +838,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.servicer.UnregisterNode(UnregisterNodeRequest(node_id=node_id), Mock())
 
         # Try to add node with same public key again
-        self.servicer.RegisterNode(RegisterNodeRequest(public_key=pub_key), Mock())
+        with self.assertRaises(FlowerError) as cm:
+            self.servicer.RegisterNode(RegisterNodeRequest(public_key=pub_key), Mock())
+        self.assertEqual(cm.exception.code, ApiErrorCode.PUBLIC_KEY_ALREADY_IN_USE)
 
     @parameterized.expand(
         [
@@ -904,7 +878,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_show_federation(self) -> None:
         """Test ShowFederation method of ControlServicer."""
         # Prepare
-        request = ShowFederationRequest(federation_name=NOOP_FEDERATION)
+        request = ShowFederationRequest(federation_name=NOOP_FEDERATION_ID)
 
         # Execute
         response: ShowFederationResponse = self.servicer.ShowFederation(request, Mock())
@@ -912,7 +886,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Assert
         self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
-        self.assertEqual(response.federation.name, NOOP_FEDERATION)
+        self.assertEqual(response.federation.name, NOOP_FEDERATION_ID)
         self.assertFalse(response.federation.simulation)
 
     def test_list_federations_includes_simulation_flag(self) -> None:
@@ -941,7 +915,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Prepare
         name = "test-federation"
         description = "A test federation"
-        expected_name = f"@{NOOP_ACCOUNT_NAME}/{name}"
+        expected_fed_id = f"@{NOOP_ACCOUNT_NAME}/{name}"
         request = CreateFederationRequest(
             federation_name=name,
             description=description,
@@ -951,7 +925,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             Member(account=Account(id=self.aid), role="owner"),
         ]
         mock_federation = SimpleNamespace(
-            name=expected_name,
+            id=expected_fed_id,
             description=description,
             members=mock_members,
             simulation=True,
@@ -985,7 +959,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             self.aid,
             ActionType.CREATE_FEDERATION,
             CreateFederationContext(
-                federation_name=expected_name,
+                federation_id=expected_fed_id,
                 runtime=RunTime.SIMULATION,
                 visibility="private",
             ),
@@ -994,12 +968,12 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             flwr_aid=self.aid,
         )
         mock_create.assert_called_once_with(
-            name=expected_name,
+            federation_id=expected_fed_id,
             description=description,
             flwr_aid=self.aid,
             simulation=True,
         )
-        self.assertEqual(response.federation.name, expected_name)
+        self.assertEqual(response.federation.name, expected_fed_id)
         self.assertEqual(response.federation.description, description)
         self.assertEqual(len(response.federation.members), 1)
         self.assertEqual(response.federation.members[0].account.id, self.aid)
@@ -1007,7 +981,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(response.federation.simulation)
 
     def test_create_federation_fails_on_manager_error(self) -> None:
-        """Test CreateFederation aborts when federation_manager.create_federation
+        """Test CreateFederation raises when federation_manager.create_federation
         raises."""
         # Prepare
         name = "test-federation"
@@ -1017,21 +991,19 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             description=description,
         )
         mock_context = Mock()
-        mock_context.abort.side_effect = grpc.RpcError()
 
         # Execute & Assert
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(FlowerError):
             self.servicer.CreateFederation(request, mock_context)
 
     def test_create_federation_denied_when_not_entitled(self) -> None:
-        """Test CreateFederation aborts when federation manager denies execution."""
+        """Test CreateFederation raises when federation manager denies execution."""
         request = CreateFederationRequest(
             federation_name="test-federation",
             description="A test federation",
             simulation=False,
         )
         context = Mock()
-        context.abort.side_effect = grpc.RpcError()
 
         with (
             patch.object(
@@ -1043,39 +1015,35 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                     entitlement_code=103,
                 ),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(EntitlementError) as cm,
         ):
             self.servicer.CreateFederation(request, context)
 
-        _assert_abort_with_flwr_err(
-            context,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Create federation not permitted.",
-            entitlement_code=103,
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(
+            cm.exception.public_details, "Create federation not permitted."
         )
+        self.assertEqual(cm.exception.entitlement_code, 103)
 
     def test_create_federation_raises_on_invalid_name(self) -> None:
-        """Test CreateFederation aborts when federation name is invalid."""
+        """Test CreateFederation raises when federation name is invalid."""
         request = CreateFederationRequest(
             federation_name="Invalid Federation Name!",
             description="A test federation with invalid name",
             simulation=False,
         )
         context = Mock()
-        context.abort.side_effect = grpc.RpcError()
 
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(FlowerError) as cm:
             self.servicer.CreateFederation(request, context)
 
-        context.abort.assert_called_once()
-        status_code, _ = context.abort.call_args.args
-        self.assertEqual(status_code, grpc.StatusCode.FAILED_PRECONDITION)
+        self.assertEqual(cm.exception.code, ApiErrorCode.INVALID_FEDERATION_NAME)
 
     def test_archive_federation_success(self) -> None:
         """Test ArchiveFederation succeeds when federation_manager.archive_federation
         works."""
         # Prepare
-        request = ArchiveFederationRequest(federation_name="test-federation")
+        request = ArchiveFederationRequest(federation_name="@me/fed")
 
         # Execute
         with patch.object(
@@ -1088,26 +1056,25 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         mock_archive.assert_called_once_with(
             flwr_aid=self.aid,
-            name="test-federation",
+            federation_id="@me/fed",
         )
         self.assertIsNotNone(response)
 
     def test_archive_federation_fails_on_manager_error(self) -> None:
-        """Test ArchiveFederation aborts when federation_manager.archive_federation
+        """Test ArchiveFederation raises when federation_manager.archive_federation
         raises."""
         # Prepare
-        name = "test-federation"
-        request = ArchiveFederationRequest(federation_name=name)
+        federation_id = "@me/fed"
+        request = ArchiveFederationRequest(federation_name=federation_id)
         mock_context = Mock()
-        mock_context.abort.side_effect = grpc.RpcError()
 
         # Execute & Assert
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(FlowerError):
             self.servicer.ArchiveFederation(request, mock_context)
 
     def test_archive_federation_stops_active_runs(self) -> None:
         """Test ArchiveFederation stops unfinished runs in the federation."""
-        request = ArchiveFederationRequest(federation_name="test-federation")
+        request = ArchiveFederationRequest(federation_name="@me/fed")
         # Create an unfinished run in the federation and give it a live token,
         # matching the state that StopRun would normally have to clean up.
         run_id = self.state.create_run(
@@ -1115,7 +1082,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             "v0.0.1",
             "hash123",
             {},
-            "test-federation",
+            "@me/fed",
             None,
             self.aid,
             TaskType.SERVER_APP,
@@ -1137,7 +1104,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_remove_account_from_federation_success(self) -> None:
         """Test RemoveAccountFromFederation succeeds when manager call works."""
         request = RemoveAccountFromFederationRequest(
-            federation_name="test-federation",
+            federation_name="@me/fed",
             account_name="target-account",
         )
         target_flwr_aid = "target-aid"
@@ -1151,7 +1118,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         mock_remove_account.assert_called_once_with(
             flwr_aid=self.aid,
-            federation="test-federation",
+            federation_id="@me/fed",
             target_account_name="target-account",
         )
         self.assertIsInstance(response, RemoveAccountFromFederationResponse)
@@ -1159,7 +1126,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_remove_account_from_federation_stops_removed_account_runs(self) -> None:
         """Test removing an account stops that account's unfinished federation runs."""
         request = RemoveAccountFromFederationRequest(
-            federation_name="test-federation",
+            federation_name="@me/fed",
             account_name="target-account",
         )
         target_flwr_aid = "target-aid"
@@ -1168,7 +1135,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             "v0.0.1",
             "hash123",
             {},
-            "test-federation",
+            "@me/fed",
             None,
             target_flwr_aid,
             TaskType.SERVER_APP,
@@ -1216,7 +1183,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         """Test CreateInvitation success path."""
         request = CreateInvitationRequest(
             invitee_account_name="invitee-aid",
-            federation_name="test-federation",
+            federation_name="@me/fed",
         )
         context = Mock()
         self.state.federation_manager.can_execute.return_value = None
@@ -1231,41 +1198,39 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             flwr_aid=self.flwr_aid,
             action=ActionType.CREATE_INVITATION,
             context=CreateInvitationContext(
-                federation_name="test-federation",
+                federation_id="@me/fed",
                 invitee_account_name="invitee-aid",
                 runtime=RunTime.DEPLOYMENT,
             ),
         )
         self.state.federation_manager.create_invitation.assert_called_once_with(
             flwr_aid=self.flwr_aid,
-            federation="test-federation",
+            federation_id="@me/fed",
             invitee_account_name="invitee-aid",
         )
         self.assertIsInstance(response, CreateInvitationResponse)
 
     def test_create_invitation_denied_when_not_permitted(self) -> None:
-        """Test CreateInvitation aborts when can_execute returns False."""
+        """Test CreateInvitation raises when can_execute returns False."""
         request = CreateInvitationRequest(
             invitee_account_name="invitee-aid",
-            federation_name="test-federation",
+            federation_name="@me/fed",
         )
         context = Mock()
-        context.abort.side_effect = grpc.RpcError()
         self.state.federation_manager.can_execute.side_effect = EntitlementError(
             "Create invitation denied for this account.",
             public_details="Create invitation not permitted.",
             entitlement_code=104,
         )
 
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(EntitlementError) as cm:
             self.servicer.CreateInvitation(request, context)
 
-        _assert_abort_with_flwr_err(
-            context,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Create invitation not permitted.",
-            entitlement_code=104,
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(
+            cm.exception.public_details, "Create invitation not permitted."
         )
+        self.assertEqual(cm.exception.entitlement_code, 104)
         self.state.federation_manager.create_invitation.assert_not_called()
 
     def test_list_invitations_success(self) -> None:
@@ -1285,7 +1250,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
 
     def test_accept_invitation_success(self) -> None:
         """Test AcceptInvitation success path."""
-        request = AcceptInvitationRequest(federation_name="test-federation")
+        request = AcceptInvitationRequest(federation_name="@me/fed")
         context = Mock()
         self.state.federation_manager.can_execute.return_value = None
         self.state.federation_manager.get_simulation_config.return_value = None
@@ -1296,48 +1261,46 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             flwr_aid=self.flwr_aid,
             action=ActionType.ACCEPT_INVITATION,
             context=AcceptInvitationContext(
-                federation_name="test-federation",
+                federation_id="@me/fed",
                 runtime=RunTime.DEPLOYMENT,
             ),
         )
         self.state.federation_manager.accept_invitation.assert_called_once_with(
             flwr_aid=self.flwr_aid,
-            federation="test-federation",
+            federation_id="@me/fed",
         )
         self.assertIsInstance(response, AcceptInvitationResponse)
 
     def test_accept_invitation_denied_when_not_permitted(self) -> None:
-        """Test AcceptInvitation aborts when can_execute returns False."""
-        request = AcceptInvitationRequest(federation_name="test-federation")
+        """Test AcceptInvitation raises when can_execute returns False."""
+        request = AcceptInvitationRequest(federation_name="@me/fed")
         context = Mock()
-        context.abort.side_effect = grpc.RpcError()
         self.state.federation_manager.can_execute.side_effect = EntitlementError(
             "Accept invitation denied for this account.",
             public_details="Accept invitation not permitted.",
             entitlement_code=105,
         )
 
-        with self.assertRaises(grpc.RpcError):
+        with self.assertRaises(EntitlementError) as cm:
             self.servicer.AcceptInvitation(request, context)
 
-        _assert_abort_with_flwr_err(
-            context,
-            ApiErrorCode.ENTITLEMENT_ERROR,
-            public_details="Accept invitation not permitted.",
-            entitlement_code=105,
+        self.assertEqual(cm.exception.code, ApiErrorCode.ENTITLEMENT_ERROR)
+        self.assertEqual(
+            cm.exception.public_details, "Accept invitation not permitted."
         )
+        self.assertEqual(cm.exception.entitlement_code, 105)
         self.state.federation_manager.accept_invitation.assert_not_called()
 
     def test_reject_invitation_success(self) -> None:
         """Test RejectInvitation success path."""
-        request = RejectInvitationRequest(federation_name="test-federation")
+        request = RejectInvitationRequest(federation_name="@me/fed")
         context = Mock()
 
         response = self.servicer.RejectInvitation(request, context)
 
         self.state.federation_manager.reject_invitation.assert_called_once_with(
             flwr_aid=self.flwr_aid,
-            federation="test-federation",
+            federation_id="@me/fed",
         )
         self.assertIsInstance(response, RejectInvitationResponse)
 
@@ -1345,7 +1308,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         """Test RevokeInvitation success path."""
         request = RevokeInvitationRequest(
             invitee_account_name="invitee-aid",
-            federation_name="test-federation",
+            federation_name="@me/fed",
         )
         context = Mock()
 
@@ -1353,7 +1316,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
 
         self.state.federation_manager.revoke_invitation.assert_called_once_with(
             flwr_aid=self.flwr_aid,
-            federation="test-federation",
+            federation_id="@me/fed",
             invitee_account_name="invitee-aid",
         )
         self.assertIsInstance(response, RevokeInvitationResponse)
@@ -1379,7 +1342,7 @@ class TestControlServicerAuth(unittest.TestCase):
             "v0.0.1",
             "hash123",
             {},
-            NOOP_FEDERATION,
+            NOOP_FEDERATION_ID,
             None,
             flwr_aid,
             TaskType.SERVER_APP,
@@ -1388,15 +1351,11 @@ class TestControlServicerAuth(unittest.TestCase):
     def make_context(self) -> MagicMock:
         """Create a mock context."""
         ctx = MagicMock(spec=grpc.ServicerContext)
-        # abort should raise for testing error paths
-        ctx.abort.side_effect = lambda code, msg: (_ for _ in ()).throw(
-            RuntimeError(f"{code}:{msg}")
-        )
         ctx.is_active.return_value = False
         return ctx
 
     def test_streamlogs_auth_unsuccessful_when_not_federation_member(self) -> None:
-        """Test StreamLogs aborts when requester is not a federation member."""
+        """Test StreamLogs raises when requester is not a federation member."""
         run_id = self._create_dummy_run("run-owner")
         request = StreamLogsRequest(run_id=run_id, after_timestamp=0)
         ctx = self.make_context()
@@ -1411,9 +1370,9 @@ class TestControlServicerAuth(unittest.TestCase):
             ),
         ):
             gen = self.servicer.StreamLogs(request, ctx)
-            with self.assertRaises(RuntimeError) as cm:
+            with self.assertRaises(FlowerError) as cm:
                 next(gen)
-            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
+            self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
     def test_streamlogs_auth_successful(self) -> None:
         """Test StreamLogs succeeds for a federation member."""
@@ -1423,7 +1382,7 @@ class TestControlServicerAuth(unittest.TestCase):
         ctx.is_active.return_value = True
         mock_get_run_info = Mock()
         mock_run = Mock(
-            federation=NOOP_FEDERATION,
+            federation_id=NOOP_FEDERATION_ID,
             primary_task_id=456,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
         )
@@ -1459,7 +1418,7 @@ class TestControlServicerAuth(unittest.TestCase):
         ctx = self.make_context()
         ctx.is_active.return_value = True
         mock_run = Mock(
-            federation=NOOP_FEDERATION,
+            federation_id=NOOP_FEDERATION_ID,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
         )
         event_1 = TaskEvent(
@@ -1506,7 +1465,7 @@ class TestControlServicerAuth(unittest.TestCase):
         self.assertEqual(msgs[1].task_event.event, "response.completed")
 
     def test_stoprun_auth_unsuccessful_when_not_federation_member(self) -> None:
-        """Test StopRun aborts when requester is not a federation member."""
+        """Test StopRun raises when requester is not a federation member."""
         run_id = self._create_dummy_run("run-owner")
         request = StopRunRequest(run_id=run_id)
         ctx = self.make_context()
@@ -1520,9 +1479,9 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state.federation_manager, "has_member", return_value=False
             ),
         ):
-            with self.assertRaises(RuntimeError) as cm:
+            with self.assertRaises(FlowerError) as cm:
                 self.servicer.StopRun(request, ctx)
-            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
+            self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
     def test_stoprun_auth_successful(self) -> None:
         """Test StopRun succeeds for a federation member."""
@@ -1547,7 +1506,7 @@ class TestControlServicerAuth(unittest.TestCase):
             self.assertEqual(cast(Run, run).status.sub_status, SubStatus.STOPPED)
 
     def test_listruns_auth_unsuccessful_when_not_federation_member(self) -> None:
-        """Test ListRuns aborts when requester is not a federation member."""
+        """Test ListRuns raises when requester is not a federation member."""
         run_id = self._create_dummy_run("run-owner")
         request = ListRunsRequest(run_id=run_id)
         ctx = self.make_context()
@@ -1563,9 +1522,9 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state.federation_manager, "has_member", return_value=False
             ),
         ):
-            with self.assertRaises(RuntimeError) as cm:
+            with self.assertRaises(FlowerError) as cm:
                 self.servicer.ListRuns(request, ctx)
-            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
+            self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
     def test_listruns_auth_run_success(self) -> None:
         """Test ListRuns succeeds for a federation member."""
@@ -1614,12 +1573,8 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         self.state = self.servicer.linkstate_factory.state()
 
     def _make_context(self) -> MagicMock:
-        """Create a mock gRPC context that raises on abort."""
-        ctx = MagicMock(spec=grpc.ServicerContext)
-        ctx.abort.side_effect = lambda code, msg: (_ for _ in ()).throw(
-            RuntimeError(f"{code}:{msg}")
-        )
-        return ctx
+        """Create a mock gRPC context."""
+        return MagicMock(spec=grpc.ServicerContext)
 
     def _create_owned_node(self, owner_aid: str) -> int:
         """Create a node owned by the given flwr_aid."""
@@ -1635,61 +1590,51 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
 
     def test_validate_membership_raises_when_federation_not_specified(self) -> None:
         """Test raises FlowerError when federation name is empty."""
-        ctx = self._make_context()
         with self.assertRaises(FlowerError) as cm:
-            _validate_federation_membership_in_request(self.state, self.aid, "", ctx)
+            _validate_federation_membership_in_request(self.state, self.aid, "")
         self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
 
-    def test_validate_membership_aborts_when_federation_not_found(self) -> None:
-        """Test abort when federation does not exist."""
-        ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
+    def test_validate_membership_raises_when_federation_not_found(self) -> None:
+        """Test raises when federation does not exist."""
+        with self.assertRaises(FlowerError) as cm:
             _validate_federation_membership_in_request(
-                self.state, self.aid, "nonexistent-fed", ctx
+                self.state, self.aid, "@me/missing"
             )
-        ctx.abort.assert_called_once()
-        self.assertIn("nonexistent-fed", str(cm.exception))
+        self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
-    def test_validate_membership_aborts_when_not_a_member(self) -> None:
-        """Test abort when flwr_aid is not a member of the federation."""
-        ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
+    def test_validate_membership_raises_when_not_a_member(self) -> None:
+        """Test raises when flwr_aid is not a member of the federation."""
+        with self.assertRaises(FlowerError) as cm:
             _validate_federation_membership_in_request(
-                self.state, "wrong-aid", NOOP_FEDERATION, ctx
+                self.state, "wrong-aid", NOOP_FEDERATION_ID
             )
-        ctx.abort.assert_called_once()
-        self.assertIn("does not exist", str(cm.exception))
+        self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
 
     # --- _validate_federation_and_node_in_request tests ---
 
     def test_validate_raises_when_federation_not_specified(self) -> None:
         """Test raises FlowerError when federation name is empty."""
-        ctx = self._make_context()
         with self.assertRaises(FlowerError) as cm:
-            _validate_federation_and_node_in_request(self.state, self.aid, "", 1, ctx)
+            _validate_federation_and_node_in_request(self.state, self.aid, "", 1)
         self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
 
-    def test_validate_aborts_when_node_not_owned(self) -> None:
-        """Test abort when a node is not owned by the requester."""
+    def test_validate_raises_when_node_not_owned(self) -> None:
+        """Test raises when a node is not owned by the requester."""
         # Create a node owned by someone else
         node_id = self._create_owned_node("other-aid")
-        ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(FlowerError) as cm:
             _validate_federation_and_node_in_request(
-                self.state, self.aid, NOOP_FEDERATION, node_id, ctx
+                self.state, self.aid, NOOP_FEDERATION_ID, node_id
             )
-        ctx.abort.assert_called_once()
-        self.assertIn("not found or you are not its owner", str(cm.exception))
+        self.assertEqual(cm.exception.code, ApiErrorCode.NODE_NOT_FOUND_OR_NOT_OWNER)
 
-    def test_validate_aborts_when_node_does_not_exist(self) -> None:
-        """Test abort when a node ID does not exist."""
-        ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
+    def test_validate_raises_when_node_does_not_exist(self) -> None:
+        """Test raises when a node ID does not exist."""
+        with self.assertRaises(FlowerError) as cm:
             _validate_federation_and_node_in_request(
-                self.state, self.aid, NOOP_FEDERATION, 999999, ctx
+                self.state, self.aid, NOOP_FEDERATION_ID, 999999
             )
-        ctx.abort.assert_called_once()
-        self.assertIn("not found or you are not its owner", str(cm.exception))
+        self.assertEqual(cm.exception.code, ApiErrorCode.NODE_NOT_FOUND_OR_NOT_OWNER)
 
     # --- AddNodeToFederation / RemoveNodeFromFederation integration tests ---
 
@@ -1697,7 +1642,7 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         """Test AddNodeToFederation succeeds with valid inputs."""
         node_id = self._create_owned_node(self.aid)
         request = AddNodeToFederationRequest(
-            federation_name=NOOP_FEDERATION, node_id=node_id
+            federation_name=NOOP_FEDERATION_ID, node_id=node_id
         )
         ctx = self._make_context()
 
@@ -1710,25 +1655,25 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
 
         mock_add.assert_called_once_with(
             flwr_aid=self.aid,
-            federation=NOOP_FEDERATION,
+            federation_id=NOOP_FEDERATION_ID,
             node_id=node_id,
         )
         self.assertIsInstance(response, AddNodeToFederationResponse)
         ctx.abort.assert_not_called()
 
-    def test_add_node_to_federation_aborts_no_federation(self) -> None:
-        """Test AddNodeToFederation aborts when no federation is specified."""
+    def test_add_node_to_federation_raises_no_federation(self) -> None:
+        """Test AddNodeToFederation raises when no federation is specified."""
         request = AddNodeToFederationRequest(federation_name="", node_id=1)
         ctx = self._make_context()
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(FlowerError) as cm:
             self.servicer.AddNodeToFederation(request, ctx)
-        _assert_abort_with_flwr_err(ctx, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
+        self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
 
     def test_remove_node_from_federation_success(self) -> None:
         """Test RemoveNodeFromFederation succeeds with valid inputs."""
         node_id = self._create_owned_node(self.aid)
         request = RemoveNodeFromFederationRequest(
-            federation_name=NOOP_FEDERATION, node_id=node_id
+            federation_name=NOOP_FEDERATION_ID, node_id=node_id
         )
         ctx = self._make_context()
 
@@ -1741,19 +1686,19 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
 
         mock_remove.assert_called_once_with(
             flwr_aid=self.aid,
-            federation=NOOP_FEDERATION,
+            federation_id=NOOP_FEDERATION_ID,
             node_id=node_id,
         )
         self.assertIsInstance(response, RemoveNodeFromFederationResponse)
         ctx.abort.assert_not_called()
 
-    def test_remove_node_from_federation_aborts_no_federation(self) -> None:
-        """Test RemoveNodeFromFederation aborts when no federation is specified."""
+    def test_remove_node_from_federation_raises_no_federation(self) -> None:
+        """Test RemoveNodeFromFederation raises when no federation is specified."""
         request = RemoveNodeFromFederationRequest(federation_name="", node_id=1)
         ctx = self._make_context()
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(FlowerError) as cm:
             self.servicer.RemoveNodeFromFederation(request, ctx)
-        _assert_abort_with_flwr_err(ctx, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
+        self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
 
 
 def test_format_verification_compact() -> None:
@@ -1772,25 +1717,3 @@ def test_format_verification_compact() -> None:
     v2: dict[str, str] = json.loads(out["key2"])
     assert v1 == {"sig": "abc", "algo": "ed25519"}
     assert v2 == {"sig": "def", "algo": "ed25519"}
-
-
-def _assert_abort_with_flwr_err(
-    ctx: MagicMock,
-    code: int,
-    public_details: str | None = None,
-    entitlement_code: int | None = None,
-) -> None:
-    """Assert that ctx.abort was called with a translated FlowerError."""
-    spec = API_ERROR_MAP[code]
-    payload: dict[str, int | str | None] = {
-        "code": code,
-        "public_message": spec.public_message,
-        "public_details": public_details,
-    }
-    if entitlement_code is not None:
-        payload["entitlement_code"] = entitlement_code
-
-    ctx.abort.assert_called_once()
-    status_code, raw_payload = ctx.abort.call_args.args
-    assert status_code == spec.status_code
-    assert json.loads(raw_payload) == payload

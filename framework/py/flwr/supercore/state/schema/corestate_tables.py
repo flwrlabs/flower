@@ -65,7 +65,7 @@ def create_corestate_metadata() -> MetaData:
         "run_series",
         metadata,
         Column("series_id", BigInteger, primary_key=True, nullable=False),
-        Column("federation", String, nullable=False),
+        Column("federation_id", String, nullable=False),
         Column("description", String, nullable=True),
         Column("created_at", TIMESTAMP(timezone=True), nullable=False),
         Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
@@ -188,15 +188,16 @@ def create_corestate_metadata() -> MetaData:
             BigInteger,
             ForeignKey("task.task_id"),
             nullable=False,
-            unique=True,
         ),
         Column("input_tokens", BigInteger, nullable=True),
         Column("output_tokens", BigInteger, nullable=True),
         Column("total_tokens", BigInteger, nullable=True),
+        Column("usage_type", String, nullable=False),
         Column("created_at", TIMESTAMP(timezone=True), nullable=False),
         Column("reported_at", TIMESTAMP(timezone=True), nullable=True),
     )
     Index("idx_task_usage_run_id", task_usage.c.run_id)
+    Index("idx_task_usage_task_id", task_usage.c.task_id)
     Index("idx_task_usage_reported_at", task_usage.c.reported_at)
 
     return metadata

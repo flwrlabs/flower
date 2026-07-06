@@ -130,3 +130,34 @@ class TaskEvent(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event", "id", b"id", "run_id", b"run_id", "task_id", b"task_id", "timestamp", b"timestamp"]) -> None: ...
 
 global___TaskEvent = TaskEvent
+
+@typing.final
+class TaskUsage(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    USAGE_TYPE_FIELD_NUMBER: builtins.int
+    INPUT_TOKENS_FIELD_NUMBER: builtins.int
+    OUTPUT_TOKENS_FIELD_NUMBER: builtins.int
+    TOTAL_TOKENS_FIELD_NUMBER: builtins.int
+    usage_type: builtins.str
+    input_tokens: builtins.int
+    output_tokens: builtins.int
+    total_tokens: builtins.int
+    def __init__(
+        self,
+        *,
+        usage_type: builtins.str = ...,
+        input_tokens: builtins.int | None = ...,
+        output_tokens: builtins.int | None = ...,
+        total_tokens: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_input_tokens", b"_input_tokens", "_output_tokens", b"_output_tokens", "_total_tokens", b"_total_tokens", "input_tokens", b"input_tokens", "output_tokens", b"output_tokens", "total_tokens", b"total_tokens"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_input_tokens", b"_input_tokens", "_output_tokens", b"_output_tokens", "_total_tokens", b"_total_tokens", "input_tokens", b"input_tokens", "output_tokens", b"output_tokens", "total_tokens", b"total_tokens", "usage_type", b"usage_type"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_input_tokens", b"_input_tokens"]) -> typing.Literal["input_tokens"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_output_tokens", b"_output_tokens"]) -> typing.Literal["output_tokens"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_total_tokens", b"_total_tokens"]) -> typing.Literal["total_tokens"] | None: ...
+
+global___TaskUsage = TaskUsage

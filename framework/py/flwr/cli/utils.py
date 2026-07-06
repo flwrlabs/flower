@@ -517,7 +517,7 @@ def flwr_cli_grpc_exc_handler(  # pylint: disable=too-many-branches
             if m := patten.match(details):
                 raise click.ClickException(
                     f"Federation '{m.group(1)}' does not exist. "
-                    "Please verify the federation name and try again."
+                    "Please verify the federation ID and try again."
                 ) from None
 
         # Log details from grpc error directly
