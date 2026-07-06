@@ -17,6 +17,7 @@
 
 import os
 
+from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 
 # Prevent browser-use from configuring logging and duplicating Flower logs
@@ -30,8 +31,11 @@ except ImportError:
         task: str,
         allowed_domains: list[str] | None = None,
         model: str | None = None,
+        *,
+        usage_recorder: TaskUsageRecorder,
     ) -> JSONObject:
         """."""
+        del task, allowed_domains, model, usage_recorder
         raise ImportError(
             "Flower's built-in Browser Use connector requires the optional "
             "'browser-use' dependency. To use this feature, add `flwr[agent]` "

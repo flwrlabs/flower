@@ -86,6 +86,7 @@ def test_invoke_browser_use_provider_uses_flower_headless(
         " Find Flower docs ",
         allowed_domains=["*.flower.ai", "docs.python.org"],
         model=" gpt-5 ",
+        usage_recorder=Mock(),
     )
 
     assert result == {
@@ -174,9 +175,16 @@ def test_flower_responses_chat_model_invokes_model_provider(
         SimpleNamespace(role="user", text="Open example.com."),
     ]
 
+    usage_recorder = Mock()
+
     result = cast(
         Any,
-        asyncio.run(FlowerResponsesChatModel(model="gpt-5").ainvoke(messages)),
+        asyncio.run(
+            FlowerResponsesChatModel(
+                model="gpt-5",
+                usage_recorder=usage_recorder,
+            ).ainvoke(messages)
+        ),
     )
 
     assert result.completion == "Click the first link."
@@ -188,5 +196,48 @@ def test_flower_responses_chat_model_invokes_model_provider(
                 {"role": "user", "content": "Open example.com."},
             ],
             "stream": False,
+        },
+        usage_recorder=usage_recorder,
+    )
+
+
+def test_flower_responses_chat_model_passes_usage_recorder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """FlowerResponsesChatModel should pass usage recorder to Responses calls."""
+    invoke_model_provider = Mock(
+        return_value={
+            "object": "response",
+            "output_text": "Click the first link.",
         }
+    )
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.connector.browser_use.browser_use.invoke_model_provider",
+        invoke_model_provider,
+    )
+    usage_recorder = Mock()
+    messages: list[Any] = [
+        SimpleNamespace(role="user", text="Open example.com."),
+    ]
+
+    result = cast(
+        Any,
+        asyncio.run(
+            FlowerResponsesChatModel(
+                model="gpt-5",
+                usage_recorder=usage_recorder,
+            ).ainvoke(messages)
+        ),
+    )
+
+    assert result.completion == "Click the first link."
+    invoke_model_provider.assert_called_once_with(
+        {
+            "model": "gpt-5",
+            "input": [
+                {"role": "user", "content": "Open example.com."},
+            ],
+            "stream": False,
+        },
+        usage_recorder=usage_recorder,
     )

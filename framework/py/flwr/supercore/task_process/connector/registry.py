@@ -15,19 +15,18 @@
 """Connector registry."""
 
 from collections.abc import Callable
-from typing import TypeGuard, cast
 
-from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
 from . import browser_use, web_fetch, web_search
 
-ConnectorHandler = Callable[..., JSONValue | tuple[JSONValue, TaskUsage]]
+ConnectorHandler = Callable[..., JSONValue]
 ConnectorToolFactory = Callable[[], JSONObject]
 
+
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
-    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search_with_usage,
+    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
 }
@@ -41,19 +40,13 @@ _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
 def invoke_connector(
     name: str,
     arguments: JSONObject,
-    usage_recorder: TaskUsageRecorder | None = None,
+    usage_recorder: TaskUsageRecorder,
 ) -> JSONValue:
     """Invoke one connector by name."""
     handler = _CONNECTOR_HANDLERS.get(name)
     if handler is None:
         raise ValueError(f"Unsupported connector '{name}'.")
-    result = handler(**arguments)
-    if _has_usage_metadata(result):
-        output, usage = result
-        if usage_recorder is not None:
-            usage_recorder.record(usage)
-        return output
-    return cast(JSONValue, result)
+    return handler(**arguments, usage_recorder=usage_recorder)
 
 
 def get_builtin_connector_tools() -> list[JSONObject]:
@@ -72,14 +65,3 @@ def get_builtin_connector_tool(name: str) -> JSONObject:
 def has_builtin_connector(name: str) -> bool:
     """Return whether a built-in connector is registered."""
     return name in _CONNECTOR_HANDLERS
-
-
-def _has_usage_metadata(
-    result: JSONValue | tuple[JSONValue, TaskUsage],
-) -> TypeGuard[tuple[JSONValue, TaskUsage]]:
-    """Return whether the connector result includes usage metadata."""
-    return (
-        isinstance(result, tuple)
-        and len(result) == 2
-        and isinstance(result[1], TaskUsage)
-    )

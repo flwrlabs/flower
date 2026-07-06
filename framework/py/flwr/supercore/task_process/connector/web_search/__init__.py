@@ -18,6 +18,7 @@
 import os
 
 from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
+from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 
 from .brave import (
@@ -62,31 +63,32 @@ def make_web_search_tool() -> JSONObject:
     }
 
 
-def search(query: str) -> JSONObject:
+def search(query: str, *, usage_recorder: TaskUsageRecorder) -> JSONObject:
     """Execute one web search request."""
-    output, _usage = search_with_usage(query)
-    return output
-
-
-def search_with_usage(query: str) -> tuple[JSONObject, TaskUsage]:
-    """Execute one web search request and return provider-specific usage."""
     if proxy_endpoint := os.getenv(WEB_SEARCH_ENDPOINT_ENV, "").strip():
         return _result(
             ProxyWebSearchProvider(proxy_endpoint).search(query),
             PROXY_WEB_SEARCH_PROVIDER,
+            usage_recorder,
         )
     if os.getenv(BRAVE_API_KEY_ENV, "").strip():
         return _result(
             BraveWebSearchProvider().search(query),
             BRAVE_WEB_SEARCH_PROVIDER,
+            usage_recorder,
         )
     if os.getenv(TAVILY_API_KEY_ENV, "").strip():
         return _result(
             TavilyWebSearchProvider().search(query),
             TAVILY_WEB_SEARCH_PROVIDER,
+            usage_recorder,
         )
     if os.getenv(EXA_API_KEY_ENV, "").strip():
-        return _result(ExaWebSearchProvider().search(query), EXA_WEB_SEARCH_PROVIDER)
+        return _result(
+            ExaWebSearchProvider().search(query),
+            EXA_WEB_SEARCH_PROVIDER,
+            usage_recorder,
+        )
 
     raise RuntimeError(
         "At least one web search API key environment variable is required: "
@@ -94,8 +96,11 @@ def search_with_usage(query: str) -> tuple[JSONObject, TaskUsage]:
     )
 
 
-def _result(output: JSONObject, provider: str) -> tuple[JSONObject, TaskUsage]:
-    return output, TaskUsage(usage_type=f"{provider}_web_search")
+def _result(
+    output: JSONObject, provider: str, usage_recorder: TaskUsageRecorder
+) -> JSONObject:
+    usage_recorder.record(TaskUsage(usage_type=f"{provider}_web_search"))
+    return output
 
 
 __all__ = [
@@ -103,5 +108,4 @@ __all__ = [
     "WEB_SEARCH_ENDPOINT_ENV",
     "make_web_search_tool",
     "search",
-    "search_with_usage",
 ]

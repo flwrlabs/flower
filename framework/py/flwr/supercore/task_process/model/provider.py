@@ -214,7 +214,13 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
         )
 
         if is_failure_event:
-            _record_model_usage(event, usage_recorder, usage_type)
+            raw_response = event.get("response")
+            if isinstance(raw_response, dict):
+                _record_model_usage(
+                    cast(JSONObject, raw_response), usage_recorder, usage_type
+                )
+            else:
+                _record_model_usage(event, usage_recorder, usage_type)
             raise ModelProviderError(
                 status_code=response.status_code,
                 detail=event,

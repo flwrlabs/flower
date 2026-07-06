@@ -40,7 +40,16 @@ class TaskUsageRecorder:
 
     def record(self, usage: TaskUsage) -> None:
         """Record one task usage payload."""
-        self._stub.RecordTaskUsage(RecordTaskUsageRequest(task_usage=usage))
+        self._stub.RecordTaskUsage(
+            RecordTaskUsageRequest(
+                task_usage=TaskUsage(
+                    usage_type=usage.usage_type,
+                    input_tokens=usage.input_tokens,
+                    output_tokens=usage.output_tokens,
+                    total_tokens=usage.total_tokens,
+                )
+            )
+        )
 
 
 def task_usage_from_open_response(

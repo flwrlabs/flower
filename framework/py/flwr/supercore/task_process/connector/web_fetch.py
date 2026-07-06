@@ -23,6 +23,7 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 
+from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 
 WEB_FETCH_CONNECTOR_NAME = "web_fetch"
@@ -76,12 +77,15 @@ class WebFetchProviderError(RuntimeError):
         super().__init__(f"Web fetch provider request failed: {formatted_detail}")
 
 
-def invoke_web_fetch_provider(url: str) -> JSONObject:
+def invoke_web_fetch_provider(
+    url: str, *, usage_recorder: TaskUsageRecorder
+) -> JSONObject:
     """Fetch a URL and extract web page content with trafilatura.
 
     The provider validates every redirect target before requesting it and rejects
     local/private hosts before DNS-resolved requests are made.
     """
+    del usage_recorder
     url = _validate_url(url)
     response = _fetch_url(url)
     final_url = url

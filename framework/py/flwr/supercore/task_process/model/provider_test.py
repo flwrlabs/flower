@@ -214,6 +214,39 @@ def test_invoke_model_provider_collects_stream_events(
     }
 
 
+def test_invoke_model_provider_records_nested_stream_failure_usage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Failed stream terminal events should record nested response usage."""
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    _patch_post(
+        monkeypatch,
+        _Response(
+            headers={"Content-Type": "text/event-stream"},
+            lines=[
+                b"event: response.failed",
+                b'data: {"type":"response.failed","response":{"id":"resp_1",'
+                b'"error":{"message":"quota exceeded"},"usage":{'
+                b'"input_tokens":10,"output_tokens":20,"total_tokens":30}}}',
+                b"",
+            ],
+        ),
+    )
+    usage_recorder = Mock()
+
+    with pytest.raises(ModelProviderError):
+        invoke_model_provider(
+            {"model": "openai/gpt-test", "input": [], "stream": True},
+            usage_recorder=usage_recorder,
+        )
+
+    usage = usage_recorder.record.call_args.args[0]
+    assert usage.usage_type == "openai/gpt-test"
+    assert usage.input_tokens == 10
+    assert usage.output_tokens == 20
+    assert usage.total_tokens == 30
+
+
 @pytest.mark.parametrize(
     ("lines", "expected_detail", "expected_message"),
     [
