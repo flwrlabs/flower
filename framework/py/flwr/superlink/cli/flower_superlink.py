@@ -83,7 +83,10 @@ from flwr.supercore.constant import (
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
-from flwr.supercore.interceptors import create_fleet_runtime_version_server_interceptor
+from flwr.supercore.interceptors import (
+    RpcErrorTranslationServerInterceptor,
+    create_fleet_runtime_version_server_interceptor,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import (
@@ -91,6 +94,7 @@ from flwr.supercore.tls import (
     try_obtain_optional_appio_server_certificates,
 )
 from flwr.supercore.update_check import warn_if_flwr_update_available
+from flwr.supercore.utils import get_popen_detach_kwargs
 from flwr.supercore.version import package_version
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import (
@@ -100,7 +104,6 @@ from flwr.superlink.auth_plugin import (
     NoOpControlAuthzPlugin,
 )
 from flwr.superlink.federation import FederationManager, NoOpFederationManager
-from flwr.superlink.main import create_app
 from flwr.superlink.servicer.control import run_control_api_grpc
 from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
 
@@ -502,7 +505,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             runtime_dependency_install=config.runtime_dependency_install,
         )
         # pylint: disable-next=consider-using-with
-        self.superexec_process = subprocess.Popen(command)
+        self.superexec_process = subprocess.Popen(command, **get_popen_detach_kwargs())
 
     def _start_health_server_if_needed(self) -> None:
         if self.config.health_server_address is None:
@@ -800,6 +803,10 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
     superlink_lifespan = None
     if start_legacy_grpc:
         superlink_lifespan = SuperLinkLifespan(lifespan_config)
+    from flwr.superlink.main import (  # pylint: disable=import-outside-toplevel
+        create_app,
+    )
+
     fastapi_app = create_app(
         superlink_lifespan=superlink_lifespan,
         start_legacy_grpc=start_legacy_grpc,
@@ -988,7 +995,10 @@ def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
     interceptors: Sequence[grpc.ServerInterceptor] | None = None,
 ) -> grpc.Server:
     """Run Fleet API (gRPC, request-response)."""
-    interceptors = list(interceptors or [])
+    interceptors = [
+        RpcErrorTranslationServerInterceptor(),
+        *list(interceptors or []),
+    ]
     interceptors.append(create_fleet_runtime_version_server_interceptor())
 
     # Create Fleet API gRPC server

@@ -48,7 +48,12 @@ from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    Task,
+    TaskEvent,
+    TaskStatus,
+    TaskUsage,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
@@ -503,6 +508,66 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def get_metadata(self) -> MetaData:
         """Return SQLAlchemy MetaData needed for CoreState tables."""
         return create_corestate_metadata()
+
+    def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
+        """Record usage for the specified task."""
+        with self.session():
+            self.query(
+                """
+                INSERT INTO task_usage (
+                    run_id, task_id, input_tokens, output_tokens, total_tokens,
+                    usage_type, created_at, reported_at
+                )
+                SELECT
+                    run_id, task_id, :input_tokens, :output_tokens,
+                    :total_tokens, :usage_type, :created_at, :reported_at
+                FROM task
+                WHERE task_id = :task_id
+                """,
+                _task_usage_to_row(task_id, usage),
+            )
+
+    def get_task_usage(
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        task_ids: Sequence[int] | None = None,
+    ) -> Sequence[TaskUsage]:
+        """Retrieve task usage records based on the specified filters."""
+        conditions = []
+        params: dict[str, Any] = {}
+
+        if run_ids is not None:
+            if not run_ids:
+                return []
+            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
+            placeholders = ",".join([f":rid_{i}" for i in range(len(sint64_run_ids))])
+            conditions.append(f"run_id IN ({placeholders})")
+            params.update(
+                {f"rid_{i}": run_id for i, run_id in enumerate(sint64_run_ids)}
+            )
+
+        if task_ids is not None:
+            if not task_ids:
+                return []
+            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
+            placeholders = ",".join([f":tid_{i}" for i in range(len(sint64_task_ids))])
+            conditions.append(f"task_id IN ({placeholders})")
+            params.update(
+                {f"tid_{i}": task_id for i, task_id in enumerate(sint64_task_ids)}
+            )
+
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+        query = f"""
+            SELECT input_tokens, output_tokens, total_tokens, usage_type
+            FROM task_usage
+            {where_clause}
+            ORDER BY id ASC
+        """
+
+        rows = self.query(query, params)
+        return [_task_usage_from_row(row) for row in rows]
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
@@ -966,6 +1031,29 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
         description=row["description"] or "",
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
+    )
+
+
+def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:
+    """Convert a TaskUsage proto to database row values."""
+    return {
+        "task_id": uint64_to_int64(task_id),
+        "input_tokens": usage.input_tokens,
+        "output_tokens": usage.output_tokens,
+        "total_tokens": usage.total_tokens,
+        "usage_type": usage.usage_type,
+        "created_at": now(),
+        "reported_at": None,
+    }
+
+
+def _task_usage_from_row(row: dict[str, Any]) -> TaskUsage:
+    """Convert a task_usage row to a TaskUsage proto."""
+    return TaskUsage(
+        usage_type=row["usage_type"],
+        input_tokens=row["input_tokens"],
+        output_tokens=row["output_tokens"],
+        total_tokens=row["total_tokens"],
     )
 
 

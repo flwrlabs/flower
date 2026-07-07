@@ -219,4 +219,57 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
         public_message="Runtime version compatibility check failed.",
     ),
+    ApiErrorCode.FLEET_SUPERNODE_REGISTRATION_DISABLED: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="SuperNode authentication is enabled. "
+        "All SuperNodes must be registered via the CLI.",
+    ),
+    ApiErrorCode.FLEET_SUPERNODE_UNREGISTRATION_DISABLED: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="SuperNode authentication is enabled. "
+        "All SuperNodes must be unregistered via the CLI.",
+    ),
+    ApiErrorCode.FLEET_INVALID_HEARTBEAT_INTERVAL: ApiErrorSpec(
+        status_code=StatusCode.INVALID_ARGUMENT,
+        http_status_code=status.HTTP_400_BAD_REQUEST,
+        public_message="Invalid heartbeat interval.",
+    ),
+    ApiErrorCode.FLEET_NODE_ACTIVATION_FAILED: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="Failed to activate SuperNode.",
+    ),
+    ApiErrorCode.FLEET_NODE_DEACTIVATION_FAILED: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="Failed to deactivate SuperNode.",
+    ),
+    ApiErrorCode.FLEET_NODE_UNREGISTRATION_FAILED: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="Failed to unregister SuperNode.",
+    ),
+    ApiErrorCode.FLEET_RUN_STATUS_NOT_ALLOWED: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="The current run status does not allow this Fleet API "
+        "operation.",
+    ),
+    ApiErrorCode.FLEET_GET_RUN_FAILED: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Failed to get run.",
+    ),
+    ApiErrorCode.FLEET_GET_FAB_FAILED: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Failed to get FAB.",
+    ),
+    ApiErrorCode.FLEET_OBJECT_CONTENT_INVALID: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="Object content is invalid.",
+    ),
 }
