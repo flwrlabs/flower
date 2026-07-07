@@ -15,7 +15,7 @@
 """Tests for FlowerError client-side gRPC formatting."""
 
 
-from collections import namedtuple
+from typing import cast
 from unittest.mock import Mock
 
 import grpc
@@ -28,22 +28,6 @@ from .rpc_error_translation_client_interceptor import (
     RpcErrorTranslationClientInterceptor,
 )
 
-_ClientCallDetails = namedtuple(
-    "_ClientCallDetails",
-    ["method", "timeout", "metadata", "credentials", "wait_for_ready", "compression"],
-)
-
-
-def _make_call_details() -> grpc.ClientCallDetails:
-    return _ClientCallDetails(
-        method="/flwr.proto.Fleet/GetRun",
-        timeout=None,
-        metadata=(),
-        credentials=None,
-        wait_for_ready=None,
-        compression=None,
-    )
-
 
 def _make_rpc_error(details: str) -> grpc.RpcError:
     error = grpc.RpcError()
@@ -51,9 +35,22 @@ def _make_rpc_error(details: str) -> grpc.RpcError:
     return error
 
 
+def _intercept_with_error(rpc_error: grpc.RpcError) -> None:
+    def continuation(
+        _client_call_details: grpc.ClientCallDetails,
+        _request: GetRunRequest,
+    ) -> grpc.Call:
+        raise rpc_error
+
+    RpcErrorTranslationClientInterceptor().intercept_unary_unary(
+        continuation,
+        cast(grpc.ClientCallDetails, Mock()),
+        GetRunRequest(run_id=1),
+    )
+
+
 def test_translate_serialized_flower_error() -> None:
     """Serialized FlowerError details should become a readable exception."""
-    interceptor = RpcErrorTranslationClientInterceptor()
     rpc_error = _make_rpc_error(
         FlowerError(
             ApiErrorCode.FLEET_GET_RUN_FAILED,
@@ -62,36 +59,15 @@ def test_translate_serialized_flower_error() -> None:
         ).to_json("Failed to get run.")
     )
 
-    def continuation(
-        _client_call_details: grpc.ClientCallDetails,
-        _request: GetRunRequest,
-    ) -> grpc.Call:
-        raise rpc_error
-
     with pytest.raises(RuntimeError, match="Failed to get run.\nRun ID not found: 1"):
-        interceptor.intercept_unary_unary(
-            continuation,
-            _make_call_details(),
-            GetRunRequest(run_id=1),
-        )
+        _intercept_with_error(rpc_error)
 
 
 def test_pass_through_non_flower_rpc_error() -> None:
     """Non-Flower gRPC failures should keep their original RpcError type."""
-    interceptor = RpcErrorTranslationClientInterceptor()
     rpc_error = _make_rpc_error("transport failed")
 
-    def continuation(
-        _client_call_details: grpc.ClientCallDetails,
-        _request: GetRunRequest,
-    ) -> grpc.Call:
-        raise rpc_error
-
     with pytest.raises(grpc.RpcError) as err:
-        interceptor.intercept_unary_unary(
-            continuation,
-            _make_call_details(),
-            GetRunRequest(run_id=1),
-        )
+        _intercept_with_error(rpc_error)
 
     assert err.value is rpc_error
