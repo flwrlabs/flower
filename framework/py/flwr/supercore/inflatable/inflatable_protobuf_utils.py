@@ -89,7 +89,7 @@ def make_push_object_fn_protobuf(
     run_id : int
         The run ID for the current operation.
     session_id : str
-        The object push session ID for the current operation.
+        The session ID for the current operation.
 
     Returns
     -------
