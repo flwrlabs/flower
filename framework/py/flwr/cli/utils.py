@@ -62,7 +62,7 @@ SUPERLINK_UNAVAILABLE_MESSAGE = (
     "Connection to the SuperLink is unavailable. Please check your network "
     "connection and 'address' in the SuperLink connection configuration."
 )
-CONTROL_API_READY_TIMEOUT_SECONDS = 30
+CONTROL_API_READY_TIMEOUT_SECONDS = 5
 CONTROL_API_READY_CHECK_INTERVAL_SECONDS = 1
 
 
