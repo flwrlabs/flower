@@ -46,11 +46,11 @@ def grpc_adapter(  # pylint: disable=R0913,too-many-positional-arguments
     tuple[
         int,
         Callable[[], tuple[Message, ObjectTree] | None],
-        Callable[[Message, ObjectTree, float], set[str]],
+        Callable[[Message, ObjectTree, float], tuple[set[str], str]],
         Callable[[int], Run],
         Callable[[str, int], Fab],
         Callable[[int, str], bytes],
-        Callable[[int, str, bytes], None],
+        Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
     ]
 ]:
@@ -82,11 +82,11 @@ def grpc_adapter(  # pylint: disable=R0913,too-many-positional-arguments
     -------
     node_id : int
     receive : Callable[[], Optional[tuple[Message, ObjectTree]]]
-    send : Callable[[Message, ObjectTree, float], set[str]]
+    send : Callable[[Message, ObjectTree, float], tuple[set[str], str]]
     get_run : Callable[[int], Run]
     get_fab : Callable[[str, int], Fab]
     pull_object : Callable[[str], bytes]
-    push_object : Callable[[str, bytes], None]
+    push_object : Callable[[int, str, str, bytes], None]
     confirm_message_received : Callable[[str], None]
     """
     if authentication_keys is not None:
