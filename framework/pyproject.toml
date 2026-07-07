@@ -110,7 +110,7 @@ dev = [
     "pytest==9.0.3",
     "pytest-cov==4.1.0",
     "pytest-watcher==0.4.3",
-    "jupyterlab==4.5.7",
+    "jupyterlab==4.5.9",
     "rope==1.13.0",
     "semver==3.0.2",
     "sphinx==7.4.7",
