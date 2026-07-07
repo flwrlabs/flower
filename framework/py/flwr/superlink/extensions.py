@@ -26,10 +26,29 @@ SuperLinkLifespanContext = Callable[
 ]
 
 
-def configure_app(_: FastAPI) -> None:
+def configure_app(app: FastAPI) -> None:
     """Configure SuperLink FastAPI extensions."""
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from flwr.ee.superlink.extensions import configure_app as _configure_ee_app
+    except ModuleNotFoundError:
+        return
+
+    configure_ee_app: Callable[[FastAPI], None]
+    configure_ee_app = _configure_ee_app
+    configure_ee_app(app)
 
 
 def get_lifespan_contexts() -> tuple[SuperLinkLifespanContext, ...]:
     """Return SuperLink FastAPI lifespan contexts."""
-    return ()
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from flwr.ee.superlink.extensions import (
+            get_lifespan_contexts as _get_ee_lifespan_contexts,
+        )
+    except ModuleNotFoundError:
+        return ()
+
+    get_ee_lifespan_contexts: Callable[[], tuple[SuperLinkLifespanContext, ...]]
+    get_ee_lifespan_contexts = _get_ee_lifespan_contexts
+    return get_ee_lifespan_contexts()
