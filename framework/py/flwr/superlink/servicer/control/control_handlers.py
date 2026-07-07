@@ -669,12 +669,11 @@ def create_federation(
     # Ensure valid federation name is provided
     success, err_msg = validate_federation_name(request.federation_name)
     if not success:
-        details = f"Invalid federation name: '{request.federation_name}'. {err_msg}"
         raise FlowerError(
             ApiErrorCode.INVALID_FEDERATION_NAME,
             f"Invalid federation name in CreateFederation request: "
             f"federation_name={request.federation_name}. {err_msg}",
-            public_details=details,
+            public_details=err_msg,
         )
 
     # Construct federation ID

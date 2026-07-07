@@ -29,6 +29,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
+from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 
@@ -80,6 +81,7 @@ def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
         response = invoke_model_provider(
             request_message.payload,
             on_stream_event=_buffer_event,
+            usage_recorder=TaskUsageRecorder(stub),
         )
     except Exception as ex:
         response = _make_error_response(ex)
