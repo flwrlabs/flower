@@ -136,9 +136,9 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     send : Callable[[Message, ObjectTree, float], tuple[set[str], str]]
     get_run : Callable[[int], Run]
     get_fab : Callable[[str, int], Fab]
-    pull_object : Callable[[str], bytes]
+    pull_object : Callable[[int, str], bytes]
     push_object : Callable[[int, str, str, bytes], None]
-    confirm_message_received : Callable[[str], None]
+    confirm_message_received : Callable[[int, str], None]
     """
     if isinstance(root_certificates, str):
         root_certificates = Path(root_certificates).expanduser().read_bytes()
