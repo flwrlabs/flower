@@ -15,6 +15,7 @@
 """Tests for the gRPC request-response connection."""
 
 
+from typing import cast
 from unittest.mock import Mock, patch
 
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
@@ -23,6 +24,7 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     RegisterNodeFleetResponse,
     UnregisterNodeFleetResponse,
 )
+from flwr.proto.fleet_pb2_grpc import FleetStub  # pylint: disable=E0611
 from flwr.proto.heartbeat_pb2 import SendNodeHeartbeatResponse  # pylint: disable=E0611
 from flwr.supercore.interceptors import (
     RpcErrorTranslationClientInterceptor,
@@ -73,7 +75,7 @@ def test_grpc_request_response_installs_error_translation() -> None:
             insecure=True,
             retry_invoker=retry_invoker,
             authentication_keys=authentication_keys,
-            adapter_cls=_Stub,
+            adapter_cls=cast(type[FleetStub], _Stub),
         ),
     ):
         pass

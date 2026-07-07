@@ -47,7 +47,7 @@ def _make_call_details() -> grpc.ClientCallDetails:
 
 def _make_rpc_error(details: str) -> grpc.RpcError:
     error = grpc.RpcError()
-    error.details = Mock(return_value=details)  # type: ignore[attr-defined]
+    error.details = Mock(return_value=details)
     return error
 
 
