@@ -28,6 +28,7 @@ from browser_use.llm.views import ChatInvokeCompletion
 from pydantic import BaseModel
 
 from flwr.supercore.task_process.model.provider import invoke_model_provider
+from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
 _DEFAULT_BROWSER_USE_MODEL = "openai/gpt-5.5"
@@ -41,6 +42,7 @@ class BrowserUseProvider:
     def __init__(
         self,
         *,
+        usage_recorder: TaskUsageRecorder,
         model: str | None = None,
     ) -> None:
         """Initialize the Browser Use provider."""
@@ -49,6 +51,7 @@ class BrowserUseProvider:
             self._model = model.strip()
             if not self._model:
                 raise ValueError("Browser Use model must not be empty.")
+        self._usage_recorder = usage_recorder
 
     def invoke(
         self,
@@ -85,7 +88,10 @@ class BrowserUseProvider:
         )
         agent: Agent[Any, Any] = Agent(
             task=task,
-            llm=FlowerResponsesChatModel(model=self._model),
+            llm=FlowerResponsesChatModel(
+                model=self._model,
+                usage_recorder=self._usage_recorder,
+            ),
             browser_profile=browser_profile,
             enable_signal_handler=False,
         )
@@ -113,9 +119,10 @@ class BrowserUseProvider:
 class FlowerResponsesChatModel(BaseChatModel):
     """Browser Use LLM adapter backed by Flower's Responses API."""
 
-    def __init__(self, *, model: str) -> None:
+    def __init__(self, *, model: str, usage_recorder: TaskUsageRecorder) -> None:
         """Initialize the Flower Responses chat model."""
         self.model: str = model
+        self._usage_recorder = usage_recorder
 
     @property
     def provider(self) -> str:
@@ -163,7 +170,11 @@ class FlowerResponsesChatModel(BaseChatModel):
                 }
             }
 
-        response = await asyncio.to_thread(invoke_model_provider, request)
+        response = await asyncio.to_thread(
+            invoke_model_provider,
+            request,
+            usage_recorder=self._usage_recorder,
+        )
         # Some Responses-compatible providers include the SDK-style convenience
         # field directly on the response object.
         raw_output_text = response.get("output_text")
@@ -210,6 +221,10 @@ def invoke_browser_use_provider(
     task: str,
     allowed_domains: list[str] | None = None,
     model: str | None = None,
+    *,
+    usage_recorder: TaskUsageRecorder,
 ) -> JSONObject:
     """Execute one Browser Use connector request."""
-    return BrowserUseProvider(model=model).invoke(task, allowed_domains=allowed_domains)
+    return BrowserUseProvider(model=model, usage_recorder=usage_recorder).invoke(
+        task, allowed_domains=allowed_domains
+    )

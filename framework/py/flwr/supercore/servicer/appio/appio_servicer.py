@@ -180,6 +180,8 @@ class AppIoServicer(ABC):
         """Record task usage."""
         log(DEBUG, "AppIoServicer.RecordTaskUsage")
 
+        task = get_authenticated_task()
+        self.state().add_task_usage(task.task_id, request.task_usage)
         return RecordTaskUsageResponse()
 
     def PullTaskMessage(
