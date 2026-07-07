@@ -12,20 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Trafilatura-backed web fetch provider."""
+"""Built-in web fetch connector."""
 
 from __future__ import annotations
 
 import codecs
 import ipaddress
+import os
 import socket
+from typing import cast
 from urllib.parse import urljoin, urlparse
 
 import requests
 
-from flwr.supercore.typing import JSONObject
+from flwr.supercore.typing import JSONObject, JSONValue
 
 WEB_FETCH_CONNECTOR_NAME = "web_fetch"
+WEB_FETCH_ENDPOINT_ENV = "FLWR_WEB_FETCH_ENDPOINT"
 
 
 def make_web_fetch_tool() -> JSONObject:
@@ -53,6 +56,8 @@ _TIMEOUT = 30.0
 _MAX_REDIRECTS = 10
 _READ_CHUNK_SIZE = 64 * 1024
 _REDIRECT_STATUS_CODES = frozenset({301, 302, 303, 307, 308})
+_PROXY_REQUEST_TIMEOUT = 60.0
+_PROXY_WEB_FETCH_PROVIDER = "proxy"
 
 
 class WebFetchProviderError(RuntimeError):
@@ -77,10 +82,76 @@ class WebFetchProviderError(RuntimeError):
 
 
 def invoke_web_fetch_provider(url: str) -> JSONObject:
+    """Execute one web fetch request."""
+    if proxy_endpoint := os.getenv(WEB_FETCH_ENDPOINT_ENV, "").strip():
+        return ProxyWebFetchProvider(proxy_endpoint).fetch(url)
+    return _invoke_direct_web_fetch_provider(url)
+
+
+class ProxyWebFetchProvider:
+    """Proxy web fetch adapter."""
+
+    def __init__(self, endpoint: str) -> None:
+        self._endpoint = endpoint
+
+    def fetch(self, url: str) -> JSONObject:
+        """Execute one proxy web fetch request."""
+        # This framework-side validation is best-effort. The proxy remains the
+        # SSRF enforcement point because it validates DNS/IPs and redirects
+        # immediately before fetching.
+        url = _validate_url_syntax(url)
+        try:
+            response = requests.post(
+                self._endpoint,
+                json={"url": url},
+                timeout=_PROXY_REQUEST_TIMEOUT,
+            )
+        except requests.RequestException as exc:
+            raise WebFetchProviderError(
+                code="fetch_failed",
+                detail=f"{_PROXY_WEB_FETCH_PROVIDER} web fetch request failed: {exc}",
+            ) from exc
+        if response.status_code >= 400:
+            try:
+                detail = str(cast(JSONValue, response.json()))
+            except ValueError:
+                detail = response.text
+            raise WebFetchProviderError(
+                code="http_error",
+                status_code=response.status_code,
+                detail=(
+                    f"{_PROXY_WEB_FETCH_PROVIDER} web fetch request failed: {detail}"
+                ),
+            )
+
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise WebFetchProviderError(
+                code="invalid_response",
+                detail=f"{_PROXY_WEB_FETCH_PROVIDER} web fetch returned invalid JSON.",
+            ) from exc
+        if not isinstance(payload, dict):
+            raise WebFetchProviderError(
+                code="invalid_response",
+                detail=f"{_PROXY_WEB_FETCH_PROVIDER} web fetch returned invalid JSON.",
+            )
+        if not isinstance(payload.get("content"), str):
+            raise WebFetchProviderError(
+                code="invalid_response",
+                detail=(
+                    f"{_PROXY_WEB_FETCH_PROVIDER} web fetch response must contain "
+                    "content."
+                ),
+            )
+        return cast(JSONObject, payload)
+
+
+def _invoke_direct_web_fetch_provider(url: str) -> JSONObject:
     """Fetch a URL and extract web page content with trafilatura.
 
-    The provider validates every redirect target before requesting it and rejects
-    local/private hosts before DNS-resolved requests are made.
+    The direct provider validates every redirect target before requesting it and
+    rejects local/private hosts before DNS-resolved requests are made.
     """
     url = _validate_url(url)
     response = _fetch_url(url)
@@ -171,33 +242,13 @@ def _fetch_url(url: str) -> requests.Response:
 
 
 def _validate_url(url: str) -> str:
-    """Return a URL allowed by the web-fetch safety policy.
+    """Return a URL allowed by the direct web-fetch guardrails.
 
     Only HTTP(S) URLs with a resolvable, globally routable host are accepted.
     Localhost names, private/reserved IP literals, and hostnames that resolve to
-    non-public addresses are rejected before any request is made.
+    non-public addresses are rejected before any direct request is made.
     """
-    url = url.strip()
-    if not url:
-        raise WebFetchProviderError(
-            code="invalid_request",
-            detail="URL must not be empty.",
-        )
-
-    try:
-        # Parse once up front so malformed hosts are rejected before any network I/O.
-        parsed = urlparse(url)
-        hostname = parsed.hostname.rstrip(".").lower() if parsed.hostname else None
-    except ValueError as exc:
-        raise WebFetchProviderError(
-            code="invalid_request",
-            detail="URL must use the http or https scheme.",
-        ) from exc
-    if parsed.scheme not in {"http", "https"} or hostname is None:
-        raise WebFetchProviderError(
-            code="invalid_request",
-            detail="URL must use the http or https scheme.",
-        )
+    url, hostname = _validate_url_syntax_with_hostname(url)
 
     # Block localhost aliases explicitly; they should never reach DNS resolution.
     if hostname == "localhost" or hostname.endswith(".localhost"):
@@ -232,6 +283,60 @@ def _validate_url(url: str) -> str:
             detail="URL host is not allowed.",
         )
     return url
+
+
+def _validate_url_syntax(url: str) -> str:
+    """Return a URL with a supported scheme and default port."""
+    return _validate_url_syntax_with_hostname(url)[0]
+
+
+def _validate_url_syntax_with_hostname(url: str) -> tuple[str, str]:
+    """Return a URL and hostname with a supported scheme and default port."""
+    url = url.strip()
+    if not url:
+        raise WebFetchProviderError(
+            code="invalid_request",
+            detail="URL must not be empty.",
+        )
+
+    try:
+        # Parse once up front so malformed hosts are rejected before any network I/O.
+        parsed = urlparse(url)
+        hostname = parsed.hostname.rstrip(".").lower() if parsed.hostname else None
+    except ValueError as exc:
+        raise WebFetchProviderError(
+            code="invalid_request",
+            detail="URL must use the http or https scheme with a valid port.",
+        ) from exc
+    if parsed.scheme not in {"http", "https"} or hostname is None:
+        raise WebFetchProviderError(
+            code="invalid_request",
+            detail="URL must use the http or https scheme.",
+        )
+    if parsed.username is not None or parsed.password is not None:
+        raise WebFetchProviderError(
+            code="invalid_request",
+            detail="URL userinfo is not allowed.",
+        )
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise WebFetchProviderError(
+            code="invalid_request",
+            detail="URL must use the http or https scheme with a valid port.",
+        ) from exc
+    if port is None and parsed.netloc.endswith(":"):
+        raise WebFetchProviderError(
+            code="invalid_request",
+            detail="URL must use the http or https scheme with a valid port.",
+        )
+    default_port = 80 if parsed.scheme == "http" else 443
+    if port is not None and port != default_port:
+        raise WebFetchProviderError(
+            code="invalid_request",
+            detail="URL must use the default port for its scheme.",
+        )
+    return url, hostname
 
 
 def _read_response_body(response: requests.Response) -> bytes:
