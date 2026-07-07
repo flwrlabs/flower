@@ -59,6 +59,13 @@ def test_get_executor_builds_kubernetes_executor_from_config(
                     "value": "http://proxy/v1/responses",
                 }
             ],
+            "volumes": [
+                {
+                    "name": "shmem",
+                    "emptyDir": {"medium": "Memory", "sizeLimit": "10Gi"},
+                }
+            ],
+            "volume-mounts": [{"name": "shmem", "mountPath": "/dev/shm"}],
             "resources": {"requests": {"cpu": "1"}},
             "node-selector": {"kubernetes.io/os": "linux"},
             "unknown-field": "ignored",
@@ -76,6 +83,10 @@ def test_get_executor_builds_kubernetes_executor_from_config(
     assert config.env == [
         {"name": "FLWR_MODEL_API_ENDPOINT", "value": "http://proxy/v1/responses"}
     ]
+    assert config.volumes == [
+        {"name": "shmem", "emptyDir": {"medium": "Memory", "sizeLimit": "10Gi"}}
+    ]
+    assert config.volume_mounts == [{"name": "shmem", "mountPath": "/dev/shm"}]
     assert config.resources == {"requests": {"cpu": "1"}}
     assert config.node_selector == {"kubernetes.io/os": "linux"}
     assert not hasattr(config, "unknown_field")

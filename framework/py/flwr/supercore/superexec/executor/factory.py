@@ -37,6 +37,8 @@ _KUBERNETES_CONFIG_FIELD_MAP = {
     "labels": "labels",
     "annotations": "annotations",
     "env": "env",
+    "volumes": "volumes",
+    "volume-mounts": "volume_mounts",
     "resources": "resources",
     "node-selector": "node_selector",
     "tolerations": "tolerations",
