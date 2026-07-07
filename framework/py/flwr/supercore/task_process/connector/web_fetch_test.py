@@ -125,7 +125,7 @@ def test_invoke_web_fetch_provider_extracts_markdown(
     extract_mock = Mock(return_value="# Hello")
     monkeypatch.setattr(trafilatura, "extract", extract_mock)
 
-    result = invoke_web_fetch_provider("https://example.com")
+    result = invoke_web_fetch_provider("https://example.com", usage_recorder=Mock())
 
     assert result == {
         "object": "web_fetch.response",
@@ -164,9 +164,9 @@ def test_invoke_web_fetch_provider_calls_proxy_endpoint_when_configured(
         get_mock,
     )
 
-    assert invoke_web_fetch_provider(" https://example.com:443 ") == {
-        "content": "Hello"
-    }
+    assert invoke_web_fetch_provider(
+        " https://example.com:443 ", usage_recorder=Mock()
+    ) == {"content": "Hello"}
 
     post_mock.assert_called_once_with(
         _PROXY_ENDPOINT,
@@ -254,7 +254,7 @@ def test_invoke_web_fetch_provider_reports_proxy_errors(
     )
 
     with pytest.raises(WebFetchProviderError, match=expected_message) as exc_info:
-        invoke_web_fetch_provider("https://example.com")
+        invoke_web_fetch_provider("https://example.com", usage_recorder=Mock())
 
     assert exc_info.value.code == expected_code
     assert exc_info.value.status_code == expected_status_code
@@ -290,7 +290,7 @@ def test_invoke_web_fetch_provider_rejects_invalid_url_syntax(
     )
 
     with pytest.raises(WebFetchProviderError) as exc_info:
-        invoke_web_fetch_provider(blocked_url)
+        invoke_web_fetch_provider(blocked_url, usage_recorder=Mock())
 
     assert exc_info.value.code == "invalid_request"
     get_mock.assert_not_called()
@@ -309,7 +309,7 @@ def test_invoke_web_fetch_provider_enforces_fetch_guardrails(
     get_mock = _patch_get(monkeypatch, redirect_response)
 
     with pytest.raises(WebFetchProviderError) as exc_info:
-        invoke_web_fetch_provider("https://example.com")
+        invoke_web_fetch_provider("https://example.com", usage_recorder=Mock())
 
     assert exc_info.value.code == "blocked_url"
     assert get_mock.call_count == 1
@@ -323,7 +323,7 @@ def test_invoke_web_fetch_provider_enforces_fetch_guardrails(
     )
 
     with pytest.raises(WebFetchProviderError) as exc_info:
-        invoke_web_fetch_provider("https://private.example")
+        invoke_web_fetch_provider("https://private.example", usage_recorder=Mock())
 
     assert exc_info.value.code == "blocked_url"
     get_mock.assert_not_called()
@@ -333,7 +333,7 @@ def test_invoke_web_fetch_provider_enforces_fetch_guardrails(
     _patch_get(monkeypatch, response)
 
     with pytest.raises(WebFetchProviderError) as exc_info:
-        invoke_web_fetch_provider("https://example.com")
+        invoke_web_fetch_provider("https://example.com", usage_recorder=Mock())
 
     assert exc_info.value.code == "response_too_large"
     assert exc_info.value.status_code == 200
@@ -353,7 +353,7 @@ def test_invoke_web_fetch_provider_blocks_non_public_ip_literals(
     )
 
     with pytest.raises(WebFetchProviderError) as exc_info:
-        invoke_web_fetch_provider(blocked_url)
+        invoke_web_fetch_provider(blocked_url, usage_recorder=Mock())
 
     assert exc_info.value.code == "blocked_url"
     get_mock.assert_not_called()

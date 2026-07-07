@@ -16,12 +16,14 @@
 
 from collections.abc import Callable
 
+from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
 from . import browser_use, web_fetch, web_search
 
 ConnectorHandler = Callable[..., JSONValue]
 ConnectorToolFactory = Callable[[], JSONObject]
+
 
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
@@ -35,12 +37,16 @@ _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
 }
 
 
-def invoke_connector(name: str, arguments: JSONObject) -> JSONValue:
+def invoke_connector(
+    name: str,
+    arguments: JSONObject,
+    usage_recorder: TaskUsageRecorder,
+) -> JSONValue:
     """Invoke one connector by name."""
     handler = _CONNECTOR_HANDLERS.get(name)
     if handler is None:
         raise ValueError(f"Unsupported connector '{name}'.")
-    return handler(**arguments)
+    return handler(**arguments, usage_recorder=usage_recorder)
 
 
 def get_builtin_connector_tools() -> list[JSONObject]:

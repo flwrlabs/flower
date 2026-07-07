@@ -51,8 +51,13 @@ def test_search_calls_proxy_endpoint_when_configured(
         "flwr.supercore.task_process.connector.web_search.ProxyWebSearchProvider",
         provider_cls,
     )
+    usage_recorder = Mock()
 
-    assert search("Flower") == {"results": []}
+    output = search("Flower", usage_recorder=usage_recorder)
+
+    assert output == {"results": []}
+    usage = usage_recorder.record.call_args.args[0]
+    assert usage.usage_type == "proxy_web_search"
 
     provider_cls.assert_called_once_with(_PROXY_ENDPOINT)
     provider.search.assert_called_once_with("Flower")
@@ -75,7 +80,7 @@ def test_search_proxy_takes_precedence_over_direct_provider_env(
     monkeypatch.setattr(requests, "get", get_mock)
 
     with pytest.raises(RuntimeError, match="proxy unavailable"):
-        search("Flower")
+        search("Flower", usage_recorder=Mock())
 
     provider_cls.assert_called_once_with(_PROXY_ENDPOINT)
     provider.search.assert_called_once_with("Flower")
@@ -92,8 +97,13 @@ def test_search_uses_direct_providers_when_proxy_endpoint_is_absent(
     post_mock = Mock()
     monkeypatch.setattr(requests, "get", get_mock)
     monkeypatch.setattr(requests, "post", post_mock)
+    usage_recorder = Mock()
 
-    assert search("Flower") == {"results": []}
+    output = search("Flower", usage_recorder=usage_recorder)
+
+    assert output == {"results": []}
+    usage = usage_recorder.record.call_args.args[0]
+    assert usage.usage_type == "brave_web_search"
     get_mock.assert_called_once()
     assert get_mock.call_args.args == (BRAVE_WEB_SEARCH_URL,)
     post_mock.assert_not_called()
