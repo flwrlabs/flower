@@ -83,7 +83,10 @@ from flwr.supercore.constant import (
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
-from flwr.supercore.interceptors import create_fleet_runtime_version_server_interceptor
+from flwr.supercore.interceptors import (
+    RpcErrorTranslationServerInterceptor,
+    create_fleet_runtime_version_server_interceptor,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import (
@@ -992,7 +995,10 @@ def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
     interceptors: Sequence[grpc.ServerInterceptor] | None = None,
 ) -> grpc.Server:
     """Run Fleet API (gRPC, request-response)."""
-    interceptors = list(interceptors or [])
+    interceptors = [
+        RpcErrorTranslationServerInterceptor(),
+        *list(interceptors or []),
+    ]
     interceptors.append(create_fleet_runtime_version_server_interceptor())
 
     # Create Fleet API gRPC server
