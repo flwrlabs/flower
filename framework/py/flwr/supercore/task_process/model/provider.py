@@ -24,10 +24,15 @@ from typing import cast
 
 import requests
 
+from flwr.supercore.task_process.usage import (
+    TaskUsageRecorder,
+    task_usage_from_open_response,
+)
 from flwr.supercore.typing import JSONObject, JSONValue
 
 DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1/responses"
 DEFAULT_MODEL_API_TIMEOUT = 180.0
+_DEFAULT_USAGE_TYPE = "token"
 _STREAM_CONTENT_TYPE = "text/event-stream"
 _TERMINAL_SUCCESS_EVENTS = frozenset({"response.completed", "response.incomplete"})
 _TERMINAL_FAILURE_EVENTS = frozenset({"error", "response.failed"})
@@ -59,6 +64,7 @@ class ModelProviderError(RuntimeError):
 def invoke_model_provider(
     request: JSONObject,
     *,
+    usage_recorder: TaskUsageRecorder,
     on_stream_event: Callable[[JSONObject], None] | None = None,
 ) -> JSONObject:
     """Invoke the configured Open Responses-compatible model provider.
@@ -106,16 +112,20 @@ def invoke_model_provider(
         timeout=timeout,
         request=payload,
         on_stream_event=on_stream_event,
+        usage_recorder=usage_recorder,
+        usage_type=_usage_type_from_request(payload),
     )
 
 
-def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branches
+def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branches,too-many-arguments,too-many-statements
     *,
     responses_url: str,
     headers: dict[str, str],
     timeout: float,
     request: JSONObject,
     on_stream_event: Callable[[JSONObject], None] | None,
+    usage_recorder: TaskUsageRecorder,
+    usage_type: str,
 ) -> JSONObject:
     """Run a normal or streaming provider request.
 
@@ -159,7 +169,9 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
                 detail=response.text or "no response body",
                 message="Model provider returned invalid JSON",
             ) from exc
-        return _ensure_json_object(payload)
+        response_payload = _ensure_json_object(payload)
+        _record_model_usage(response_payload, usage_recorder, usage_type)
+        return response_payload
 
     # Streaming parsing only works for Server-Sent Event responses.
     content_type = response.headers.get("Content-Type", "").lower()
@@ -201,6 +213,13 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
         )
 
         if is_failure_event:
+            raw_response = event.get("response")
+            if isinstance(raw_response, dict):
+                _record_model_usage(
+                    cast(JSONObject, raw_response), usage_recorder, usage_type
+                )
+            else:
+                _record_model_usage(event, usage_recorder, usage_type)
             raise ModelProviderError(
                 status_code=response.status_code,
                 detail=event,
@@ -208,9 +227,12 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
 
         # Terminal success events carry the final response object.
         if isinstance(event_type, str) and event_type in _TERMINAL_SUCCESS_EVENTS:
-            response_payload = event.get("response")
-            if isinstance(response_payload, dict):
-                return cast(JSONObject, response_payload)
+            raw_response = event.get("response")
+            if isinstance(raw_response, dict):
+                final_response = cast(JSONObject, raw_response)
+                _record_model_usage(final_response, usage_recorder, usage_type)
+                return final_response
+            _record_model_usage(event, usage_recorder, usage_type)
             return event
 
     raise ModelProviderError(
@@ -228,6 +250,22 @@ def _ensure_json_object(payload: object) -> JSONObject:
             message="Model provider returned a non-object JSON payload",
         )
     return cast(JSONObject, payload)
+
+
+def _record_model_usage(
+    response: JSONObject, usage_recorder: TaskUsageRecorder, usage_type: str
+) -> None:
+    usage = task_usage_from_open_response(response, usage_type=usage_type)
+    if usage is not None:
+        usage_recorder.record(usage)
+
+
+def _usage_type_from_request(request: JSONObject) -> str:
+    """Return the task usage type for a model provider request."""
+    model = request.get("model")
+    if isinstance(model, str) and model:
+        return model
+    return _DEFAULT_USAGE_TYPE
 
 
 def _iter_sse_events(response: requests.Response) -> Iterator[tuple[str | None, str]]:

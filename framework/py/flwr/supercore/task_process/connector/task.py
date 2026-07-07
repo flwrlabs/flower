@@ -29,6 +29,7 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
+from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 
 from .registry import invoke_connector
@@ -65,6 +66,7 @@ def handle_task(
             "output": invoke_connector(
                 name=cast(str, request_message.payload["name"]),
                 arguments=cast(JSONObject, request_message.payload["arguments"]),
+                usage_recorder=TaskUsageRecorder(stub),
             ),
             "error": None,
         }
