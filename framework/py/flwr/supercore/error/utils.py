@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared exception and error translation utilities."""
+"""Shared FlowerError formatting utilities."""
 
 
-from .base import ApiErrorCode, FlowerError
-from .exceptions import EntitlementError
-from .grpc import rpc_error_translator
-from .http import http_error_translator
-from .utils import format_flower_error
+from .base import FlowerError
 
-__all__ = [
-    "ApiErrorCode",
-    "EntitlementError",
-    "FlowerError",
-    "format_flower_error",
-    "http_error_translator",
-    "rpc_error_translator",
-]
+
+def format_flower_error(err: FlowerError) -> str:
+    """Return a user-facing message for a FlowerError."""
+    msg = err.message
+    if err.public_details:
+        msg += f"\n{err.public_details}"
+    return msg

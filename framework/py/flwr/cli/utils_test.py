@@ -35,13 +35,12 @@ from flwr.cli.constant import (
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
 from flwr.common.constant import FLWR_DIR
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
-from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.error import ApiErrorCode, FlowerError, format_flower_error
 from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 
 from .utils import (
-    _format_flower_error,
     build_pathspec,
     cli_output_handler,
     collect_files,
@@ -308,7 +307,7 @@ def test_format_flower_error() -> None:
     )
 
     assert (
-        _format_flower_error(err)
+        format_flower_error(err)
         == "Invalid run configuration.\nUnknown override key: tool.invalid-key"
     )
 

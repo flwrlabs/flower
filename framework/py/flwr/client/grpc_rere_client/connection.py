@@ -64,7 +64,10 @@ from flwr.supercore.inflatable.inflatable_protobuf_utils import (
     make_pull_object_fn_protobuf,
     make_push_object_fn_protobuf,
 )
-from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
+from flwr.supercore.interceptors import (
+    RpcErrorTranslationClientInterceptor,
+    RuntimeVersionClientInterceptor,
+)
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.retry import RetryInvoker, wrap_stub
 from flwr.supercore.run import Run
@@ -151,6 +154,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
 
     # Always configure auth interceptor, with either user-provided or generated keys
     interceptors: Sequence[grpc.UnaryUnaryClientInterceptor] = [
+        RpcErrorTranslationClientInterceptor(),
         RuntimeVersionClientInterceptor(component_name="SuperNode"),
         NodeAuthClientInterceptor(*authentication_keys),
     ]
