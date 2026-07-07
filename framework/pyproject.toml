@@ -98,7 +98,7 @@ dev = [
     "types-dataclasses==0.6.6",
     "types-protobuf==5.29.1.20250403",
     "types-requests==2.33.0.20260518",
-    "types-setuptools==82.0.0.20260210",
+    "types-setuptools==83.0.0.20260706",
     "setuptools==82.0.0",
     "clang-format==17.0.6",
     "isort==5.13.2",
