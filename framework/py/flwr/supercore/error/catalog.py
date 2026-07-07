@@ -151,7 +151,7 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
     ApiErrorCode.PUBLIC_KEY_ALREADY_IN_USE: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
-        public_message="Public key already in use",
+        public_message="Public key already in use.",
     ),
     ApiErrorCode.NODE_NOT_FOUND: ApiErrorSpec(
         status_code=StatusCode.NOT_FOUND,
@@ -234,7 +234,7 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
     ApiErrorCode.FLEET_INVALID_HEARTBEAT_INTERVAL: ApiErrorSpec(
         status_code=StatusCode.INVALID_ARGUMENT,
         http_status_code=status.HTTP_400_BAD_REQUEST,
-        public_message="Invalid heartbeat interval",
+        public_message="Invalid heartbeat interval.",
     ),
     ApiErrorCode.FLEET_NODE_ACTIVATION_FAILED: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
