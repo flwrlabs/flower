@@ -25,6 +25,7 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 
+from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
 WEB_FETCH_CONNECTOR_NAME = "web_fetch"
@@ -81,8 +82,11 @@ class WebFetchProviderError(RuntimeError):
         super().__init__(f"Web fetch provider request failed: {formatted_detail}")
 
 
-def invoke_web_fetch_provider(url: str) -> JSONObject:
+def invoke_web_fetch_provider(
+    url: str, *, usage_recorder: TaskUsageRecorder
+) -> JSONObject:
     """Execute one web fetch request."""
+    del usage_recorder
     if proxy_endpoint := os.getenv(WEB_FETCH_ENDPOINT_ENV, "").strip():
         return ProxyWebFetchProvider(proxy_endpoint).fetch(url)
     return _invoke_direct_web_fetch_provider(url)

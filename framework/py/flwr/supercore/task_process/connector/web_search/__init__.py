@@ -17,12 +17,18 @@
 
 import os
 
+from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
+from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 
-from .brave import BRAVE_API_KEY_ENV, BraveWebSearchProvider
-from .exa import EXA_API_KEY_ENV, ExaWebSearchProvider
-from .proxy import ProxyWebSearchProvider
-from .tavily import TAVILY_API_KEY_ENV, TavilyWebSearchProvider
+from .brave import BRAVE_API_KEY_ENV, BRAVE_WEB_SEARCH_PROVIDER, BraveWebSearchProvider
+from .exa import EXA_API_KEY_ENV, EXA_WEB_SEARCH_PROVIDER, ExaWebSearchProvider
+from .proxy import PROXY_WEB_SEARCH_PROVIDER, ProxyWebSearchProvider
+from .tavily import (
+    TAVILY_API_KEY_ENV,
+    TAVILY_WEB_SEARCH_PROVIDER,
+    TavilyWebSearchProvider,
+)
 
 WEB_SEARCH_CONNECTOR_NAME = "web_search"
 WEB_SEARCH_ENDPOINT_ENV = "FLWR_WEB_SEARCH_ENDPOINT"
@@ -53,21 +59,44 @@ def make_web_search_tool() -> JSONObject:
     }
 
 
-def search(query: str) -> JSONObject:
+def search(query: str, *, usage_recorder: TaskUsageRecorder) -> JSONObject:
     """Execute one web search request."""
     if proxy_endpoint := os.getenv(WEB_SEARCH_ENDPOINT_ENV, "").strip():
-        return ProxyWebSearchProvider(proxy_endpoint).search(query)
+        return _result(
+            ProxyWebSearchProvider(proxy_endpoint).search(query),
+            PROXY_WEB_SEARCH_PROVIDER,
+            usage_recorder,
+        )
     if os.getenv(BRAVE_API_KEY_ENV, "").strip():
-        return BraveWebSearchProvider().search(query)
+        return _result(
+            BraveWebSearchProvider().search(query),
+            BRAVE_WEB_SEARCH_PROVIDER,
+            usage_recorder,
+        )
     if os.getenv(TAVILY_API_KEY_ENV, "").strip():
-        return TavilyWebSearchProvider().search(query)
+        return _result(
+            TavilyWebSearchProvider().search(query),
+            TAVILY_WEB_SEARCH_PROVIDER,
+            usage_recorder,
+        )
     if os.getenv(EXA_API_KEY_ENV, "").strip():
-        return ExaWebSearchProvider().search(query)
+        return _result(
+            ExaWebSearchProvider().search(query),
+            EXA_WEB_SEARCH_PROVIDER,
+            usage_recorder,
+        )
 
     raise RuntimeError(
         "At least one web search API key environment variable is required: "
         f"{', '.join(_WEB_SEARCH_API_KEY_ENV_VARS)}."
     )
+
+
+def _result(
+    output: JSONObject, provider: str, usage_recorder: TaskUsageRecorder
+) -> JSONObject:
+    usage_recorder.record(TaskUsage(usage_type=f"{provider}_web_search"))
+    return output
 
 
 __all__ = [
