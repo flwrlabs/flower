@@ -183,15 +183,8 @@ INT64_MAX_VALUE = 9223372036854775807  # (1 << 63) - 1
 # Constants for task-token generation
 FLWR_TASK_TOKEN_LENGTH = 128  # Number of bytes used to generate task tokens
 
-# ControlServicer constants
-RUN_ID_NOT_FOUND_MESSAGE = "Run ID not found"
-NO_ACCOUNT_AUTH_MESSAGE = "ControlServicer initialized without account authentication"
-NO_ARTIFACT_PROVIDER_MESSAGE = "ControlServicer initialized without artifact provider"
-PULL_UNFINISHED_RUN_MESSAGE = "Cannot pull artifacts for an unfinished run"
+# SuperLink Fleet API constants
 PUBLIC_KEY_ALREADY_IN_USE_MESSAGE = "Public key already in use"
-PUBLIC_KEY_NOT_VALID = "The provided public key is not valid"
-NODE_NOT_FOUND_MESSAGE = "Node ID not found for account"
-FEDERATION_NOT_FOUND_MESSAGE = "Federation '%s' does not exist"
 
 
 class MessageTypeLegacy:

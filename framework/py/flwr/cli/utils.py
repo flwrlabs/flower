@@ -16,9 +16,7 @@
 
 
 import hashlib
-import json
 import os
-import re
 import sys
 import time
 from collections.abc import Callable, Iterable, Iterator, Mapping
@@ -34,18 +32,7 @@ import typer
 from rich.console import Console
 
 from flwr.cli.typing import SuperLinkConnection
-from flwr.common.constant import (
-    FEDERATION_NOT_FOUND_MESSAGE,
-    NO_ACCOUNT_AUTH_MESSAGE,
-    NO_ARTIFACT_PROVIDER_MESSAGE,
-    NODE_NOT_FOUND_MESSAGE,
-    PUBLIC_KEY_ALREADY_IN_USE_MESSAGE,
-    PUBLIC_KEY_NOT_VALID,
-    PULL_UNFINISHED_RUN_MESSAGE,
-    RUN_ID_NOT_FOUND_MESSAGE,
-    AuthnType,
-    CliOutputFormat,
-)
+from flwr.common.constant import AuthnType, CliOutputFormat
 from flwr.common.logger import print_json_error, redirect_output, restore_output
 from flwr.proto.control_pb2_grpc import ControlStub  # pylint: disable=E0611
 from flwr.supercore.constant import (
@@ -55,6 +42,7 @@ from flwr.supercore.constant import (
     MAX_NAME_LENGTH,
 )
 from flwr.supercore.credential_store import get_credential_store
+from flwr.supercore.error import FlowerError
 from flwr.supercore.grpc import (
     GRPC_MAX_MESSAGE_LENGTH,
     create_channel,
@@ -99,23 +87,12 @@ def log_superlink_connection(superlink_connection: SuperLinkConnection) -> None:
     )
 
 
-def _format_grpc_error(err: grpc.RpcError) -> str:
-    """Return a user-facing message from a gRPC error.
-
-    This function parses FlowerError JSON in `err.details()` when present, otherwise
-    falls back to the raw gRPC details string.
-    """
-    err_message = cast(str, err.details())  # pylint: disable=E1101
-    try:
-        parsed = json.loads(err_message)
-        if isinstance(parsed, dict) and "public_message" in parsed:
-            msg = str(parsed["public_message"])
-            if details := parsed.get("public_details"):
-                msg += f"\n{details}"
-            return msg
-    except (json.JSONDecodeError, TypeError):
-        pass
-    return err_message
+def _format_flower_error(err: FlowerError) -> str:
+    """Return the CLI-facing message for a FlowerError."""
+    msg = err.message
+    if err.public_details:
+        msg += f"\n{err.public_details}"
+    return msg
 
 
 @contextmanager  # docsig: ignore=SIG503
@@ -437,13 +414,14 @@ def wait_for_control_api_channel(
 
 
 @contextmanager  # docsig: disable=SIG503
-def flwr_cli_grpc_exc_handler(  # pylint: disable=too-many-branches
+def flwr_cli_grpc_exc_handler(
     custom_handler: Callable[[grpc.RpcError], None] | None = None,
 ) -> Iterator[None]:
-    """Context manager to handle specific gRPC errors.
+    """Context manager to handle Flower and gRPC CLI errors.
 
-    Catches grpc.RpcError exceptions and translates them into user-friendly messages
-    based on the error code and details.
+    Catches gRPC errors, translates serialized FlowerError details into click
+    exceptions with user-facing messages, and falls back to transport-specific
+    messages or raw gRPC details.
 
     Parameters
     ----------
@@ -467,58 +445,23 @@ def flwr_cli_grpc_exc_handler(  # pylint: disable=too-many-branches
     except grpc.RpcError as e:
         if custom_handler is not None:
             custom_handler(e)
+
+        # Control API serializes FlowerError into gRPC details. If the payload is
+        # not a valid FlowerError, the raw gRPC fallback below handles it.
+        details = cast(str, e.details())  # pylint: disable=E1101
+        if flower_error := FlowerError.from_json(details):
+            raise click.ClickException(_format_flower_error(flower_error)) from None
+
+        # Keep special handling only for transport-level errors that are not part
+        # of the FlowerError catalog.
         # pylint: disable-next=E1101
-        details = _format_grpc_error(e)
         if e.code() == grpc.StatusCode.UNAUTHENTICATED:
             raise click.ClickException(
                 "Authentication failed. Please run `flwr login`"
                 " to authenticate and try again."
             ) from None
-        if e.code() == grpc.StatusCode.UNIMPLEMENTED:
-            if details == NO_ACCOUNT_AUTH_MESSAGE:
-                raise click.ClickException(
-                    "Account authentication is not enabled on this SuperLink."
-                ) from None
-            if details == NO_ARTIFACT_PROVIDER_MESSAGE:
-                raise click.ClickException(
-                    "The SuperLink does not support `flwr pull` command."
-                ) from None
-            raise click.ClickException(details) from None
-        if e.code() == grpc.StatusCode.PERMISSION_DENIED:
-            # Skip showing "Permission denied." when details already contain
-            # a user-friendly message.
-            msg = "Permission denied." if details == "" else f"{details}"
-            raise click.ClickException(msg) from None
         if e.code() == grpc.StatusCode.UNAVAILABLE:
             raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE) from None
-        if e.code() == grpc.StatusCode.NOT_FOUND:
-            if details == RUN_ID_NOT_FOUND_MESSAGE:
-                raise click.ClickException("Run ID not found.") from None
-            if details == NODE_NOT_FOUND_MESSAGE:
-                raise click.ClickException(
-                    "Node ID not found for this account."
-                ) from None
-        if e.code() == grpc.StatusCode.FAILED_PRECONDITION:
-            if details == PULL_UNFINISHED_RUN_MESSAGE:
-                raise click.ClickException(
-                    "Run is not finished yet. Artifacts can only be pulled after "
-                    "the run is finished. You can check the run status with `flwr ls`."
-                ) from None
-            if details == PUBLIC_KEY_ALREADY_IN_USE_MESSAGE:
-                raise click.ClickException(
-                    "The provided public key is already in use by another SuperNode."
-                ) from None
-            if details == PUBLIC_KEY_NOT_VALID:
-                raise click.ClickException(
-                    "The provided public key is invalid. Please provide a valid "
-                    "NIST EC public key."
-                ) from None
-            patten = re.compile(FEDERATION_NOT_FOUND_MESSAGE.replace("%s", "(.+)"))
-            if m := patten.match(details):
-                raise click.ClickException(
-                    f"Federation '{m.group(1)}' does not exist. "
-                    "Please verify the federation ID and try again."
-                ) from None
 
         # Log details from grpc error directly
         raise click.ClickException(details) from None

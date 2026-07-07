@@ -37,7 +37,12 @@ from flwr.common.constant import (
 )
 from flwr.common.logger import log
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    Task,
+    TaskEvent,
+    TaskStatus,
+    TaskUsage,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 
@@ -56,6 +61,18 @@ class TokenRecord:
 
     token: str
     active_until: datetime
+
+
+@dataclass
+class TaskUsageRecord:
+    """Record containing task usage and reporting metadata."""
+
+    id: int
+    task_id: int
+    run_id: int
+    usage: TaskUsage
+    created_at: datetime
+    reported_at: datetime | None
 
 
 class InMemoryCoreState(
@@ -80,6 +97,9 @@ class InMemoryCoreState(
         self.task_token_to_task_id: dict[str, int] = {}
         self.task_logs: dict[int, list[tuple[float, str]]] = {}
         self.log_lock = Lock()
+        self.task_usage_store: dict[int, TaskUsageRecord] = {}
+        self.lock_task_usage_store = Lock()
+        self._next_task_usage_id = 1
         self.lock_task_store = Lock()
         self.task_message_store: dict[str, Message] = {}
         self.lock_task_message_store = Lock()
@@ -354,6 +374,48 @@ class InMemoryCoreState(
                 task_copy.CopyFrom(task)
                 result.append(task_copy)
             return result
+
+    def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
+        """Record usage for the specified task."""
+        with self.lock_task_store:
+            task = self.task_store.get(task_id)
+            if task is None:
+                return
+            run_id = task.run_id
+
+        with self.lock_task_usage_store:
+            usage_id = self._next_task_usage_id
+            self.task_usage_store[usage_id] = TaskUsageRecord(
+                id=usage_id,
+                task_id=task_id,
+                run_id=run_id,
+                usage=usage,
+                created_at=now(),
+                reported_at=None,
+            )
+            self._next_task_usage_id += 1
+
+    def get_task_usage(
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        task_ids: Sequence[int] | None = None,
+    ) -> Sequence[TaskUsage]:
+        """Retrieve task usage records based on the specified filters."""
+        if (run_ids is not None and not run_ids) or (
+            task_ids is not None and not task_ids
+        ):
+            return []
+
+        with self.lock_task_usage_store:
+            records = sorted(
+                self.task_usage_store.values(), key=lambda record: record.id
+            )
+            if run_ids is not None:
+                records = [record for record in records if record.run_id in run_ids]
+            if task_ids is not None:
+                records = [record for record in records if record.task_id in task_ids]
+            return [record.usage for record in records]
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
