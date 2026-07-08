@@ -97,7 +97,9 @@ def test_invoke_connector_dispatches_to_registered_tool_provider(
             oauth_enabled=False,
         )
     )
-    monkeypatch.setitem(registry_module._CONNECTOR_TOOL_PROVIDERS, "fake", provider)
+    monkeypatch.setitem(
+        registry_module.__dict__["_CONNECTOR_TOOL_PROVIDERS"], "fake", provider
+    )
 
     assert not has_builtin_connector("fake")
     with pytest.raises(ValueError, match="Unsupported connector 'fake'"):

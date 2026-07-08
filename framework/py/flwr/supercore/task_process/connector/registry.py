@@ -46,11 +46,11 @@ class ConnectorToolProvider(Protocol):
     @property
     def definition(self) -> ConnectorDefinition:
         """Return provider-level connector metadata."""
-        ...
+        raise NotImplementedError
 
     def tool_definitions(self) -> list[JSONObject]:
         """Return model-compatible tool definitions for this connector."""
-        ...
+        raise NotImplementedError
 
     def execute_tool(
         self,
@@ -59,7 +59,7 @@ class ConnectorToolProvider(Protocol):
         usage_recorder: TaskUsageRecorder,
     ) -> JSONValue:
         """Execute one connector tool call."""
-        ...
+        raise NotImplementedError
 
 
 @dataclass(frozen=True)
