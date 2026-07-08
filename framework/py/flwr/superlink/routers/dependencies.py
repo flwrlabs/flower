@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
 from typing import Protocol, cast
 
 from fastapi import HTTPException, Request, status
@@ -32,8 +31,8 @@ class _SuperLinkLifespanState(Protocol):
     state_factory: LinkStateFactory | None
 
 
-async def get_linkstate(request: Request[State]) -> AsyncGenerator[LinkState, None]:
-    """Yield the SuperLink LinkState for the current request."""
+def get_linkstate(request: Request[State]) -> LinkState:
+    """Return the SuperLink LinkState for the current request."""
     superlink_lifespan = cast(
         _SuperLinkLifespanState | None,
         getattr(request.app.state, "superlink_lifespan", None),
@@ -44,4 +43,4 @@ async def get_linkstate(request: Request[State]) -> AsyncGenerator[LinkState, No
             detail="SuperLink lifespan state is not initialized.",
         )
 
-    yield superlink_lifespan.state_factory.state()
+    return superlink_lifespan.state_factory.state()

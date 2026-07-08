@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from types import SimpleNamespace
 from typing import cast
 from unittest.mock import Mock
@@ -48,16 +47,8 @@ def _make_request(app: FastAPI) -> Request[State]:
     )
 
 
-async def _consume_get_linkstate(request: Request[State]) -> LinkState:
-    dependency = get_linkstate(request)
-    linkstate = await anext(dependency)
-    with pytest.raises(StopAsyncIteration):
-        await anext(dependency)
-    return linkstate
-
-
 def test_get_linkstate_yields_linkstate_from_lifespan() -> None:
-    """get_linkstate should yield the LinkState from the app lifespan."""
+    """get_linkstate should return the LinkState from the app lifespan."""
     app = FastAPI()
     expected_linkstate = cast(LinkState, Mock(spec=LinkState))
     state_factory_mock = Mock(spec=LinkStateFactory)
@@ -66,7 +57,7 @@ def test_get_linkstate_yields_linkstate_from_lifespan() -> None:
         state_factory=cast(LinkStateFactory, state_factory_mock)
     )
 
-    linkstate = asyncio.run(_consume_get_linkstate(_make_request(app)))
+    linkstate = get_linkstate(_make_request(app))
 
     assert linkstate is expected_linkstate
     state_factory_mock.state.assert_called_once_with()
@@ -85,7 +76,7 @@ def test_get_linkstate_raises_when_lifespan_state_is_missing(
         app.state.superlink_lifespan = superlink_lifespan
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(_consume_get_linkstate(_make_request(app)))
+        get_linkstate(_make_request(app))
 
     assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
     assert exc_info.value.detail == "SuperLink lifespan state is not initialized."
