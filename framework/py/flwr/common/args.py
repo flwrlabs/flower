@@ -22,7 +22,7 @@ from os.path import isfile
 from pathlib import Path
 from typing import cast
 
-from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, TRANSPORT_TYPE_REST
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.logger import log
 
 
@@ -167,8 +167,6 @@ def try_obtain_root_certificates(
             grpc_server_address,
             root_cert_path,
         )
-    if args.transport == TRANSPORT_TYPE_REST:
-        return root_cert_path
     return root_certificates
 
 

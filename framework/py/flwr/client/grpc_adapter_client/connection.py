@@ -74,7 +74,7 @@ def grpc_adapter(  # pylint: disable=R0913,too-many-positional-arguments
     root_certificates : Optional[Union[bytes, str]] (default: None)
         Path of the root certificate. If provided, a secure
         connection using the certificates will be established to an SSL-enabled
-        Flower server. Bytes won't work for the REST API.
+        Flower server.
     authentication_keys : Optional[Tuple[PrivateKey, PublicKey]] (default: None)
         SuperNode authentication is not supported for this transport type.
 

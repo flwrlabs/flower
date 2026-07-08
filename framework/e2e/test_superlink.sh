@@ -16,19 +16,7 @@ case "$1" in
 esac
 
 case "$2" in
-  rest)
-    rest_arg_superlink="--fleet-api-type rest"
-    rest_arg_supernode="--rest"
-    server_address="http://localhost:9095"
-    server_app_address="127.0.0.1:9091"
-    db_arg="--database :flwr-in-memory:"
-    server_auth=""
-    client_auth_1=""
-    client_auth_2=""
-    ;;
   sqlite)
-    rest_arg_superlink=""
-    rest_arg_supernode=""
     server_address="127.0.0.1:9092"
     server_app_address="127.0.0.1:9091"
     db_arg="--database $(date +%s).db"
@@ -37,8 +25,6 @@ case "$2" in
     client_auth_2=""
     ;;
   client-auth)
-    rest_arg_superlink=""
-    rest_arg_supernode=""
     server_address="127.0.0.1:9092"
     server_app_address="127.0.0.1:9091"
     db_arg="--database :flwr-in-memory:"
@@ -47,8 +33,6 @@ case "$2" in
     client_auth_2="--auth-supernode-private-key keys/client_credentials_2 --auth-supernode-public-key keys/client_credentials_2.pub"
     ;;
   *)
-    rest_arg_superlink=""
-    rest_arg_supernode=""
     server_address="127.0.0.1:9092"
     server_app_address="127.0.0.1:9091"
     db_arg="--database :flwr-in-memory:"
@@ -86,7 +70,7 @@ else
 fi
 
 timeout 5m flower-superlink \
-  $server_arg $db_arg $rest_arg_superlink $server_auth \
+  $server_arg $db_arg $server_auth \
   $runtime_dependency_install_arg &
 sl_pid=$(pgrep -f "flower-superlink")
 sleep 3
@@ -100,14 +84,14 @@ if [ "$2" = "client-auth" ]; then
   flwr supernode register keys/client_credentials_2.pub e2e
 fi
 
-timeout 5m flower-supernode $client_arg $rest_arg_supernode \
+timeout 5m flower-supernode $client_arg \
   --superlink $server_address $client_auth_1 \
   --clientappio-api-address "localhost:9094" \
   --max-retries 0 &
 cl1_pid=$!
 sleep 3
 
-timeout 5m flower-supernode $client_arg $rest_arg_supernode \
+timeout 5m flower-supernode $client_arg \
   --superlink $server_address $client_auth_2 \
   --clientappio-api-address "localhost:9096" \
   --max-retries 0 &
