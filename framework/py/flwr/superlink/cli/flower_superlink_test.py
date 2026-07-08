@@ -26,7 +26,10 @@ import pytest
 from flwr.common.constant import FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
-from flwr.supercore.interceptors import RuntimeVersionServerInterceptor
+from flwr.supercore.interceptors import (
+    RpcErrorTranslationServerInterceptor,
+    RuntimeVersionServerInterceptor,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.version import package_version
 from flwr.superlink.federation import NoOpFederationManager
@@ -302,10 +305,10 @@ def test_obtain_superlink_certificates_skips_cert_loading_when_insecure(
     obtain_appio_certificates_mock.assert_not_called()
 
 
-def test_run_fleet_api_grpc_rere_adds_runtime_version_interceptor(
+def test_run_fleet_api_grpc_rere_orders_default_interceptors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Fleet gRPC-rere server should observe runtime-version metadata."""
+    """Fleet gRPC-rere server should translate errors before auth interceptors."""
     grpc_server = Mock()
     grpc_server.bound_address = "127.0.0.1:9092"
     create_grpc_server = Mock(return_value=grpc_server)
@@ -322,8 +325,9 @@ def test_run_fleet_api_grpc_rere_adds_runtime_version_interceptor(
     )
 
     interceptors = create_grpc_server.call_args.kwargs["interceptors"]
-    assert interceptors[0] is existing_interceptor
-    assert isinstance(interceptors[1], RuntimeVersionServerInterceptor)
+    assert isinstance(interceptors[0], RpcErrorTranslationServerInterceptor)
+    assert interceptors[1] is existing_interceptor
+    assert isinstance(interceptors[2], RuntimeVersionServerInterceptor)
 
 
 @pytest.mark.parametrize(

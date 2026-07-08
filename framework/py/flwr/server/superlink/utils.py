@@ -14,9 +14,6 @@
 # ==============================================================================
 """SuperLink utilities."""
 
-
-import grpc
-
 from flwr.common.constant import Status, SubStatus
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.object_store import ObjectStore
@@ -50,9 +47,3 @@ def check_abort(
         store.delete_objects_in_run(run_id)
 
     return None
-
-
-def abort_grpc_context(msg: str | None, context: grpc.ServicerContext) -> None:
-    """Abort context with statuscode PERMISSION_DENIED if `msg` is not None."""
-    if msg is not None:
-        context.abort(grpc.StatusCode.PERMISSION_DENIED, msg)

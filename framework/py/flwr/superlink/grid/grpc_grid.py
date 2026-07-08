@@ -263,6 +263,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
                 push_object_protobuf=self._stub.PushObject,
                 node=self.node,
                 run_id=run_id,
+                session_id=res.session_id,
             ),
             object_ids_to_push=set(res.objects_to_push),
         )

@@ -70,6 +70,7 @@ from flwr.supercore.constant import (
     NodeStatus,
     TaskType,
 )
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -80,6 +81,13 @@ from flwr.supercore.inflatable.inflatable_object import (
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.cli.flower_superlink import _run_fleet_api_grpc_rere
 from flwr.superlink.federation import NoOpFederationManager
+
+
+def _flower_error_from_rpc_error(error: grpc.RpcError) -> FlowerError:
+    """Return the FlowerError serialized in gRPC error details."""
+    flower_error = FlowerError.from_json(error.details())
+    assert flower_error is not None
+    return flower_error
 
 
 def create_fab(
@@ -365,8 +373,6 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
 
     def _assert_push_messages_not_allowed(self, node_id: int, run_id: int) -> None:
         """Assert `PushMessages` not allowed."""
-        run_status = self.state.get_run_status({run_id})[run_id]
-
         msg_proto = create_res_message(
             src_node_id=node_id, dst_node_id=SUPERLINK_NODE_ID, run_id=run_id
         )
@@ -377,7 +383,8 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         with self.assertRaises(grpc.RpcError) as e:
             self._push_messages.with_call(request=request)
         assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-        assert e.exception.details() == self.status_to_msg[run_status.status]
+        flower_error = _flower_error_from_rpc_error(e.exception)
+        assert flower_error.code == ApiErrorCode.FLEET_RUN_STATUS_NOT_ALLOWED
 
     @parameterized.expand(
         [
@@ -469,13 +476,13 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
 
     def _assert_get_run_not_allowed(self, run_id: int) -> None:
         """Assert `GetRun` not allowed."""
-        run_status = self.state.get_run_status({run_id})[run_id]
         request = GetRunRequest(run_id=run_id)
 
         with self.assertRaises(grpc.RpcError) as e:
             self._get_run.with_call(request=request)
         assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-        assert e.exception.details() == self.status_to_msg[run_status.status]
+        flower_error = _flower_error_from_rpc_error(e.exception)
+        assert flower_error.code == ApiErrorCode.FLEET_RUN_STATUS_NOT_ALLOWED
 
     @parameterized.expand(
         [
@@ -534,7 +541,6 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         self, node_id: int, hash_str: str, run_id: int
     ) -> None:
         """Assert `GetFab` not allowed."""
-        run_status = self.state.get_run_status({run_id})[run_id]
         request = GetFabRequest(
             node=Node(node_id=node_id), hash_str=hash_str, run_id=run_id
         )
@@ -542,7 +548,8 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         with self.assertRaises(grpc.RpcError) as e:
             self._get_fab.with_call(request=request)
         assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-        assert e.exception.details() == self.status_to_msg[run_status.status]
+        flower_error = _flower_error_from_rpc_error(e.exception)
+        assert flower_error.code == ApiErrorCode.FLEET_RUN_STATUS_NOT_ALLOWED
 
     @parameterized.expand(
         [
@@ -602,7 +609,8 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
             self._get_fab.with_call(request=request)
 
         assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-        assert "does not match run FAB hash" in e.exception.details()
+        flower_error = _flower_error_from_rpc_error(e.exception)
+        assert flower_error.code == ApiErrorCode.FLEET_GET_FAB_FAILED
 
     def test_push_object_succesful(self) -> None:
         """Test `PushObject`."""

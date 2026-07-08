@@ -1471,7 +1471,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=46.0.7,<47.0.0" },
     { name = "fastapi", specifier = ">=0.138.0,<0.139.0" },
     { name = "grpcio", specifier = ">=1.70.0,<2.0.0" },
-    { name = "grpcio-health-checking", specifier = ">=1.70.0,<1.82.0" },
+    { name = "grpcio-health-checking", specifier = ">=1.70.0,<2.0.0" },
     { name = "iterators", specifier = ">=0.0.2,<0.0.3" },
     { name = "numpy", specifier = ">=1.26.0,<3.0.0" },
     { name = "packaging", specifier = ">=24.0,<26.0" },
