@@ -116,6 +116,7 @@ _CONNECTOR_TOOL_PROVIDERS: dict[str, ConnectorToolProvider] = {
         _handler=browser_use.invoke_browser_use_provider,
     ),
 }
+_BUILTIN_CONNECTOR_REFS = tuple(_CONNECTOR_TOOL_PROVIDERS)
 
 
 def invoke_connector(
@@ -131,14 +132,15 @@ def invoke_connector(
 def get_builtin_connector_tools() -> list[JSONObject]:
     """Return function tools for built-in connectors."""
     tools: list[JSONObject] = []
-    for provider in _CONNECTOR_TOOL_PROVIDERS.values():
-        tools.extend(provider.tool_definitions())
+    for connector_ref in _BUILTIN_CONNECTOR_REFS:
+        tools.extend(_get_connector_tool_provider(connector_ref).tool_definitions())
     return tools
 
 
 def get_builtin_connector_tool(name: str) -> JSONObject:
     """Return the function tool for one built-in connector."""
-    tool_definitions = _get_connector_tool_provider(name).tool_definitions()
+    provider = _get_builtin_connector_tool_provider(name)
+    tool_definitions = provider.tool_definitions()
     if len(tool_definitions) != 1:
         raise ValueError(f"Connector '{name}' must expose exactly one built-in tool.")
     return tool_definitions[0]
@@ -146,7 +148,14 @@ def get_builtin_connector_tool(name: str) -> JSONObject:
 
 def has_builtin_connector(name: str) -> bool:
     """Return whether a built-in connector is registered."""
-    return name in _CONNECTOR_TOOL_PROVIDERS
+    return name in _BUILTIN_CONNECTOR_REFS
+
+
+def _get_builtin_connector_tool_provider(name: str) -> ConnectorToolProvider:
+    """Return the built-in tool provider for one connector ref."""
+    if name not in _BUILTIN_CONNECTOR_REFS:
+        raise ValueError(f"Unsupported connector '{name}'.")
+    return _get_connector_tool_provider(name)
 
 
 def _get_connector_tool_provider(connector_ref: str) -> ConnectorToolProvider:
