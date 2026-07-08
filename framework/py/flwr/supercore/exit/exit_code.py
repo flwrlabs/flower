@@ -50,7 +50,6 @@ class ExitCode:
     SUPERNODE_NODE_AUTH_KEY_INVALID = 302
     SUPERNODE_STARTED_WITHOUT_TLS_BUT_NODE_AUTH_ENABLED = 303
     SUPERNODE_INVALID_TRUSTED_ENTITIES = 304
-    SUPERNODE_REST_TRANSPORT_REMOVED = 305
 
     # SuperExec-specific exit codes (400-499)
     SUPEREXEC_INVALID_PLUGIN_CONFIG = 400
@@ -151,10 +150,6 @@ EXIT_CODE_HELP = {
         "Failed to read the trusted entities YAML file. "
         "Please ensure that a valid file is provided using "
         "the `--trusted-entities` option."
-    ),
-    ExitCode.SUPERNODE_REST_TRANSPORT_REMOVED: (
-        "The SuperNode REST transport has been removed. "
-        "Use the default transport instead."
     ),
     # SuperExec-specific exit codes (400-499)
     ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG: (

@@ -39,7 +39,6 @@ from flwr.common.constant import (
     ISOLATION_MODE_SUBPROCESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_REST,
 )
 from flwr.common.logger import log
 from flwr.supercore.auth import (
@@ -82,8 +81,6 @@ class SuperNodeLifespanConfig:  # pylint: disable=too-many-instance-attributes
 def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
     """Parse SuperNode CLI args and return the startup configuration."""
     args = _parse_args_run_supernode().parse_args()
-    if args.transport == TRANSPORT_TYPE_REST:
-        flwr_exit(ExitCode.SUPERNODE_REST_TRANSPORT_REMOVED)
 
     trusted_entities = _try_obtain_trusted_entities(args.trusted_entities)
     if trusted_entities:
@@ -268,13 +265,6 @@ def _parse_args_common(parser: argparse.ArgumentParser) -> None:
         dest="transport",
         const=TRANSPORT_TYPE_GRPC_ADAPTER,
         help="Use grpc-adapter as a transport layer for the client.",
-    )
-    ex_group.add_argument(
-        "--rest",
-        action="store_const",
-        dest="transport",
-        const=TRANSPORT_TYPE_REST,
-        help="REST transport has been removed. Use grpc-rere instead.",
     )
     parser.add_argument(
         "--root-certificates",
