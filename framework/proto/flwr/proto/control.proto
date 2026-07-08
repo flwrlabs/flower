@@ -177,11 +177,8 @@ message Automation {
 }
 message ListAutomationsRequest { string federation = 1; }
 message ListAutomationsResponse { repeated Automation automations = 1; }
-message StopAutomationRequest {
-  string federation = 1;
-  uint64 automation_id = 2;
-}
-message StopAutomationResponse { bool success = 1; }
+message StopAutomationRequest { uint64 automation_id = 1; }
+message StopAutomationResponse {}
 
 message StreamLogsRequest {
   uint64 run_id = 1;

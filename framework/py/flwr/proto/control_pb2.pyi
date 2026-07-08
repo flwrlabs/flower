@@ -261,17 +261,14 @@ global___ListAutomationsResponse = ListAutomationsResponse
 class StopAutomationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    FEDERATION_FIELD_NUMBER: builtins.int
     AUTOMATION_ID_FIELD_NUMBER: builtins.int
-    federation: builtins.str
     automation_id: builtins.int
     def __init__(
         self,
         *,
-        federation: builtins.str = ...,
         automation_id: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["automation_id", b"automation_id", "federation", b"federation"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["automation_id", b"automation_id"]) -> None: ...
 
 global___StopAutomationRequest = StopAutomationRequest
 
@@ -279,14 +276,9 @@ global___StopAutomationRequest = StopAutomationRequest
 class StopAutomationResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    SUCCESS_FIELD_NUMBER: builtins.int
-    success: builtins.bool
     def __init__(
         self,
-        *,
-        success: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["success", b"success"]) -> None: ...
 
 global___StopAutomationResponse = StopAutomationResponse
 
