@@ -45,11 +45,12 @@ class ExitCode:
     CLIENTAPP_COMMUNICATION_ERROR = 250
 
     # SuperNode-specific exit codes (300-399)
-    SUPERNODE_REST_ADDRESS_INVALID = 300
+    # SUPERNODE_REST_ADDRESS_INVALID = 300 --- DELETED ---
     # SUPERNODE_NODE_AUTH_KEYS_REQUIRED = 301 --- DELETED ---
     SUPERNODE_NODE_AUTH_KEY_INVALID = 302
     SUPERNODE_STARTED_WITHOUT_TLS_BUT_NODE_AUTH_ENABLED = 303
     SUPERNODE_INVALID_TRUSTED_ENTITIES = 304
+    SUPERNODE_REST_TRANSPORT_REMOVED = 305
 
     # SuperExec-specific exit codes (400-499)
     SUPEREXEC_INVALID_PLUGIN_CONFIG = 400
@@ -137,9 +138,9 @@ EXIT_CODE_HELP = {
         "The ClientApp could not communicate with the ClientAppIo API."
     ),
     # SuperNode-specific exit codes (300-399)
-    ExitCode.SUPERNODE_REST_ADDRESS_INVALID: (
-        "When using the REST API, please provide `https://` or "
-        "`http://` before the server address (e.g. `http://127.0.0.1:8080`)"
+    ExitCode.SUPERNODE_REST_TRANSPORT_REMOVED: (
+        "The SuperNode REST transport has been removed. "
+        "Use the default gRPC-rere transport instead."
     ),
     ExitCode.SUPERNODE_NODE_AUTH_KEY_INVALID: (
         "Node authentication requires elliptic curve private key. "

@@ -1,0 +1,15 @@
+########################################
+ [305] SUPERNODE_REST_TRANSPORT_REMOVED
+########################################
+
+*************
+ Description
+*************
+
+The SuperNode REST transport has been removed.
+
+****************
+ How to Resolve
+****************
+
+Use the default transport instead. Remove ``--rest`` from ``flower-supernode`` commands.

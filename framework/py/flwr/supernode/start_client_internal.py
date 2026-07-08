@@ -42,7 +42,6 @@ from flwr.common.constant import (
     RUNTIME_DEPENDENCY_INSTALL,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_REST,
     TRANSPORT_TYPES,
     ErrorCode,
     ExecPluginType,
@@ -136,7 +135,6 @@ def start_client_internal(
         Configure the transport layer. Allowed values:
         - 'grpc-rere': gRPC, request-response
         - 'grpc-adapter': gRPC via 3rd party adapter (experimental)
-        - 'rest': HTTP (experimental)
     authentication_keys : Optional[Tuple[PrivateKey, PublicKey]] (default: None)
         Tuple containing the elliptic curve private key and public key for
         authentication from the cryptography library.
@@ -619,21 +617,11 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
     host, port, is_v6 = parsed_address
     address = f"[{host}]:{port}" if is_v6 else f"{host}:{port}"
 
-    # Use either gRPC bidirectional streaming or REST request/response
-    if transport == TRANSPORT_TYPE_REST:
-        try:
-            from requests.exceptions import ConnectionError as RequestsConnectionError
-
-            from flwr.client.rest_client.connection import http_request_response
-        except ModuleNotFoundError:
-            flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
-        if server_address[:4] != "http":
-            flwr_exit(ExitCode.SUPERNODE_REST_ADDRESS_INVALID)
-        connection, error_type = http_request_response, RequestsConnectionError
-    elif transport == TRANSPORT_TYPE_GRPC_RERE:
+    # Use one of the supported gRPC transports
+    if transport == TRANSPORT_TYPE_GRPC_RERE:
         connection, error_type = grpc_request_response, RpcError
     elif transport == TRANSPORT_TYPE_GRPC_ADAPTER:
-        connection, error_type = grpc_adapter, RpcError
+        connection, error_type = grpc_adapter, RpcError  # type: ignore[assignment]
     else:
         raise ValueError(
             f"Unknown transport type: {transport} (possible: {TRANSPORT_TYPES})"

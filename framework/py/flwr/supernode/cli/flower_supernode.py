@@ -82,6 +82,8 @@ class SuperNodeLifespanConfig:  # pylint: disable=too-many-instance-attributes
 def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
     """Parse SuperNode CLI args and return the startup configuration."""
     args = _parse_args_run_supernode().parse_args()
+    if args.transport == TRANSPORT_TYPE_REST:
+        flwr_exit(ExitCode.SUPERNODE_REST_TRANSPORT_REMOVED)
 
     trusted_entities = _try_obtain_trusted_entities(args.trusted_entities)
     if trusted_entities:
@@ -272,7 +274,7 @@ def _parse_args_common(parser: argparse.ArgumentParser) -> None:
         action="store_const",
         dest="transport",
         const=TRANSPORT_TYPE_REST,
-        help="Use REST as a transport layer for the client.",
+        help="REST transport has been removed. Use grpc-rere instead.",
     )
     parser.add_argument(
         "--root-certificates",
@@ -284,9 +286,7 @@ def _parse_args_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--superlink",
         default=FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
-        help="SuperLink Fleet API address (IPv4, IPv6, or a domain name). If using the "
-        "REST (experimental) transport, ensure your address is in the form "
-        "`http://...` or `https://...` when TLS is enabled.",
+        help="SuperLink Fleet API address (IPv4, IPv6, or a domain name).",
     )
     parser.add_argument(
         "--max-retries",
