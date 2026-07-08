@@ -21,6 +21,7 @@ from typing import Any
 
 import grpc
 
+from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetAuthTokensRequest,
     GetAuthTokensResponse,
@@ -55,7 +56,7 @@ def get_current_account_info() -> AccountInfo:
     """Get the current account info from context, or return a default if not set."""
     account_info = shared_account_info.get()
     if account_info is None:
-        return AccountInfo(flwr_aid=None, account_name=None)
+        return AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name=NOOP_ACCOUNT_NAME)
     return account_info
 
 
