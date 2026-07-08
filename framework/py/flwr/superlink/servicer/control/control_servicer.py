@@ -39,8 +39,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateInvitationResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
-    GetAutomationRequest,
-    GetAutomationResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
@@ -221,12 +219,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: ListAutomationsRequest, context: grpc.ServicerContext
     ) -> ListAutomationsResponse:
         """List automations."""
-        _abort_automations_unimplemented(context)
-
-    def GetAutomation(
-        self, request: GetAutomationRequest, context: grpc.ServicerContext
-    ) -> GetAutomationResponse:
-        """Get an automation."""
         _abort_automations_unimplemented(context)
 
     def StopAutomation(

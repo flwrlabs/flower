@@ -42,9 +42,6 @@ service Control {
   rpc ListAutomations(ListAutomationsRequest)
       returns (ListAutomationsResponse) {}
 
-  // Get automation
-  rpc GetAutomation(GetAutomationRequest) returns (GetAutomationResponse) {}
-
   // Stop automation
   rpc StopAutomation(StopAutomationRequest) returns (StopAutomationResponse) {}
 
@@ -178,21 +175,8 @@ message Automation {
   optional uint32 remaining_runs = 10;
   optional uint64 stopped_at = 11;
 }
-message ListAutomationsRequest {
-  string federation = 1;
-  repeated string statuses = 2;
-  optional uint64 limit = 3;
-  optional string cursor = 4;
-}
-message ListAutomationsResponse {
-  repeated Automation automations = 1;
-  optional string next_cursor = 2;
-}
-message GetAutomationRequest {
-  string federation = 1;
-  uint64 automation_id = 2;
-}
-message GetAutomationResponse { Automation automation = 1; }
+message ListAutomationsRequest { string federation = 1; }
+message ListAutomationsResponse { repeated Automation automations = 1; }
 message StopAutomationRequest {
   string federation = 1;
   uint64 automation_id = 2;

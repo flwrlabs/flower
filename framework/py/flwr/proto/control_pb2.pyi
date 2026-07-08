@@ -231,28 +231,13 @@ class ListAutomationsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FEDERATION_FIELD_NUMBER: builtins.int
-    STATUSES_FIELD_NUMBER: builtins.int
-    LIMIT_FIELD_NUMBER: builtins.int
-    CURSOR_FIELD_NUMBER: builtins.int
     federation: builtins.str
-    limit: builtins.int
-    cursor: builtins.str
-    @property
-    def statuses(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
         federation: builtins.str = ...,
-        statuses: collections.abc.Iterable[builtins.str] | None = ...,
-        limit: builtins.int | None = ...,
-        cursor: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_cursor", b"_cursor", "_limit", b"_limit", "cursor", b"cursor", "limit", b"limit"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_cursor", b"_cursor", "_limit", b"_limit", "cursor", b"cursor", "federation", b"federation", "limit", b"limit", "statuses", b"statuses"]) -> None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_cursor", b"_cursor"]) -> typing.Literal["cursor"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+    def ClearField(self, field_name: typing.Literal["federation", b"federation"]) -> None: ...
 
 global___ListAutomationsRequest = ListAutomationsRequest
 
@@ -261,56 +246,16 @@ class ListAutomationsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     AUTOMATIONS_FIELD_NUMBER: builtins.int
-    NEXT_CURSOR_FIELD_NUMBER: builtins.int
-    next_cursor: builtins.str
     @property
     def automations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Automation]: ...
     def __init__(
         self,
         *,
         automations: collections.abc.Iterable[global___Automation] | None = ...,
-        next_cursor: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_next_cursor", b"_next_cursor", "next_cursor", b"next_cursor"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_next_cursor", b"_next_cursor", "automations", b"automations", "next_cursor", b"next_cursor"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["_next_cursor", b"_next_cursor"]) -> typing.Literal["next_cursor"] | None: ...
+    def ClearField(self, field_name: typing.Literal["automations", b"automations"]) -> None: ...
 
 global___ListAutomationsResponse = ListAutomationsResponse
-
-@typing.final
-class GetAutomationRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    FEDERATION_FIELD_NUMBER: builtins.int
-    AUTOMATION_ID_FIELD_NUMBER: builtins.int
-    federation: builtins.str
-    automation_id: builtins.int
-    def __init__(
-        self,
-        *,
-        federation: builtins.str = ...,
-        automation_id: builtins.int = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["automation_id", b"automation_id", "federation", b"federation"]) -> None: ...
-
-global___GetAutomationRequest = GetAutomationRequest
-
-@typing.final
-class GetAutomationResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    AUTOMATION_FIELD_NUMBER: builtins.int
-    @property
-    def automation(self) -> global___Automation: ...
-    def __init__(
-        self,
-        *,
-        automation: global___Automation | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["automation", b"automation"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["automation", b"automation"]) -> None: ...
-
-global___GetAutomationResponse = GetAutomationResponse
 
 @typing.final
 class StopAutomationRequest(google.protobuf.message.Message):

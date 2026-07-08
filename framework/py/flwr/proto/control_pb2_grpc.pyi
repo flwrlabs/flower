@@ -57,12 +57,6 @@ class ControlStub:
     ]
     """List automations"""
 
-    GetAutomation: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.control_pb2.GetAutomationRequest,
-        flwr.proto.control_pb2.GetAutomationResponse,
-    ]
-    """Get automation"""
-
     StopAutomation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.StopAutomationRequest,
         flwr.proto.control_pb2.StopAutomationResponse,
@@ -242,12 +236,6 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.ListAutomationsResponse,
     ]
     """List automations"""
-
-    GetAutomation: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.control_pb2.GetAutomationRequest,
-        flwr.proto.control_pb2.GetAutomationResponse,
-    ]
-    """Get automation"""
 
     StopAutomation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.StopAutomationRequest,
@@ -436,14 +424,6 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ListAutomationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAutomationsResponse]]:
         """List automations"""
-
-    @abc.abstractmethod
-    def GetAutomation(
-        self,
-        request: flwr.proto.control_pb2.GetAutomationRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.control_pb2.GetAutomationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.GetAutomationResponse]]:
-        """Get automation"""
 
     @abc.abstractmethod
     def StopAutomation(

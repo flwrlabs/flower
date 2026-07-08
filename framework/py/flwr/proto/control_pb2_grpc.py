@@ -54,11 +54,6 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.ListAutomationsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.ListAutomationsResponse.FromString,
                 _registered_method=True)
-        self.GetAutomation = channel.unary_unary(
-                '/flwr.proto.Control/GetAutomation',
-                request_serializer=flwr_dot_proto_dot_control__pb2.GetAutomationRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_control__pb2.GetAutomationResponse.FromString,
-                _registered_method=True)
         self.StopAutomation = channel.unary_unary(
                 '/flwr.proto.Control/StopAutomation',
                 request_serializer=flwr_dot_proto_dot_control__pb2.StopAutomationRequest.SerializeToString,
@@ -212,13 +207,6 @@ class ControlServicer(object):
 
     def ListAutomations(self, request, context):
         """List automations
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetAutomation(self, request, context):
-        """Get automation
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -425,11 +413,6 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.ListAutomations,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ListAutomationsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.ListAutomationsResponse.SerializeToString,
-            ),
-            'GetAutomation': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetAutomation,
-                    request_deserializer=flwr_dot_proto_dot_control__pb2.GetAutomationRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_control__pb2.GetAutomationResponse.SerializeToString,
             ),
             'StopAutomation': grpc.unary_unary_rpc_method_handler(
                     servicer.StopAutomation,
@@ -665,33 +648,6 @@ class Control(object):
             '/flwr.proto.Control/ListAutomations',
             flwr_dot_proto_dot_control__pb2.ListAutomationsRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.ListAutomationsResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def GetAutomation(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.Control/GetAutomation',
-            flwr_dot_proto_dot_control__pb2.GetAutomationRequest.SerializeToString,
-            flwr_dot_proto_dot_control__pb2.GetAutomationResponse.FromString,
             options,
             channel_credentials,
             insecure,
