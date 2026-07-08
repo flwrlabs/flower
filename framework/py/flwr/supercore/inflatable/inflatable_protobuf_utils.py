@@ -75,6 +75,7 @@ def make_push_object_fn_protobuf(
     push_object_protobuf: Callable[[PushObjectRequest], PushObjectResponse],
     node: Node,
     run_id: int,
+    session_id: str,
 ) -> Callable[[str, bytes], None]:
     """Create a push object function that uses gRPC to push objects.
 
@@ -87,6 +88,8 @@ def make_push_object_fn_protobuf(
         The node making the request.
     run_id : int
         The run ID for the current operation.
+    session_id : str
+        The session ID for the current operation.
 
     Returns
     -------
@@ -98,7 +101,11 @@ def make_push_object_fn_protobuf(
 
     def push_object_fn(object_id: str, object_content: bytes) -> None:
         request = PushObjectRequest(
-            node=node, run_id=run_id, object_id=object_id, object_content=object_content
+            node=node,
+            run_id=run_id,
+            object_id=object_id,
+            object_content=object_content,
+            session_id=session_id,
         )
         response: PushObjectResponse = push_object_protobuf(request)
         if not response.stored:

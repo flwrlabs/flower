@@ -24,6 +24,7 @@ import grpc
 from google.protobuf.message import Message as GrpcMessage
 from parameterized import parameterized
 
+from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.common.dummy_grpc_handlers_test import (
     NoOpUnaryStreamHandler,
     NoOpUnaryUnaryHandler,
@@ -53,7 +54,9 @@ class TestControlAccountAuthInterceptor(unittest.TestCase):
     def setUp(self) -> None:
         """Set up test fixtures."""
         # Set a known default for shared_account_info and store the token.
-        self.default_account_info = AccountInfo(flwr_aid=None, account_name=None)
+        self.default_account_info = AccountInfo(
+            flwr_aid=NOOP_FLWR_AID, account_name=NOOP_ACCOUNT_NAME
+        )
         self.token = shared_account_info.set(self.default_account_info)
         self.expected_account_info = AccountInfo(
             flwr_aid="flwr_aid", account_name="account_name"
@@ -101,8 +104,8 @@ class TestControlAccountAuthInterceptor(unittest.TestCase):
         self.assertEqual(response, "dummy_response")
         # Assert `shared_account_info` is not set
         account_info_from_context = get_current_account_info()
-        self.assertIsNone(account_info_from_context.flwr_aid)
-        self.assertIsNone(account_info_from_context.account_name)
+        self.assertEqual(account_info_from_context.flwr_aid, NOOP_FLWR_AID)
+        self.assertEqual(account_info_from_context.account_name, NOOP_ACCOUNT_NAME)
 
     @parameterized.expand(
         [
@@ -288,7 +291,7 @@ class TestExecUserAuthInterceptorAuthorization(unittest.TestCase):
         """Set up test fixtures."""
         # Reset the shared AccountInfo before each test
         self.default_token = shared_account_info.set(
-            AccountInfo(flwr_aid=None, account_name=None)
+            AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name=NOOP_ACCOUNT_NAME)
         )
         self.expected_account_info = AccountInfo(
             flwr_aid="flwr_aid", account_name="account_name"
