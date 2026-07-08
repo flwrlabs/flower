@@ -488,8 +488,8 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
 def _push_messages(
     state: NodeState,
     object_store: ObjectStore,
-    send: Callable[[Message, ObjectTree, float], set[str]],
-    push_object: Callable[[int, str, bytes], None],
+    send: Callable[[Message, ObjectTree, float], tuple[set[str], str]],
+    push_object: Callable[[int, str, str, bytes], None],
 ) -> None:
     """Push reply messages to the SuperLink."""
     # This is to ensure that only one message is processed at a time
@@ -541,7 +541,7 @@ def _push_messages(
             )
             # Send the reply message with its ObjectTree and ClientApp runtime
             # Get the IDs of objects to send
-            ids_obj_to_send = send(message, object_tree, clientapp_runtime)
+            ids_obj_to_send, session_id = send(message, object_tree, clientapp_runtime)
 
             # Push object contents from the ObjectStore
             run_id = message.metadata.run_id
@@ -550,8 +550,10 @@ def _push_messages(
                 # Use functools.partial to bind run_id explicitly,
                 # avoiding late binding issues and satisfying flake8 (B023)
                 # Equivalent to:
-                # lambda object_id, content: push_object(run_id, object_id, content)
-                push_object_fn=partial(push_object, run_id),
+                # lambda object_id, content: push_object(
+                #     run_id, session_id, object_id, content
+                # )
+                push_object_fn=partial(push_object, run_id, session_id),
             )
             log(INFO, "Sent successfully")
         except RunNotRunningException:
@@ -598,11 +600,11 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
     tuple[
         int,
         Callable[[], tuple[Message, ObjectTree] | None],
-        Callable[[Message, ObjectTree, float], set[str]],
+        Callable[[Message, ObjectTree, float], tuple[set[str], str]],
         Callable[[int], Run],
         Callable[[str, int], Fab],
         Callable[[int, str], bytes],
-        Callable[[int, str, bytes], None],
+        Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
     ]
 ]:

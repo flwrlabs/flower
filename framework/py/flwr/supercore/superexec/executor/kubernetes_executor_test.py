@@ -212,6 +212,104 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
     assert pod["spec"]["restartPolicy"] == "Never"
 
 
+def test_build_taskexecutor_pod_includes_configured_volumes() -> None:
+    """Test configured Pod volumes and container volume mounts are included."""
+    spec = _execution_spec()
+    config = _executor_config(
+        volumes=[
+            {
+                "name": "shmem",
+                "emptyDir": {"medium": "Memory", "sizeLimit": "10Gi"},
+            }
+        ],
+        volume_mounts=[{"name": "shmem", "mountPath": "/dev/shm"}],
+    )
+
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            spec, config, _appio_root_certificates(spec, config), _LAUNCH_ATTEMPT_ID
+        )
+    )
+    container = pod["spec"]["containers"][0]
+
+    assert {
+        "name": "shmem",
+        "emptyDir": {"medium": "Memory", "sizeLimit": "10Gi"},
+    } in pod["spec"]["volumes"]
+    assert {"name": "shmem", "mountPath": "/dev/shm"} in container["volumeMounts"]
+
+
+@pytest.mark.parametrize(
+    ("config_overrides", "expected_message"),
+    [
+        ({"volumes": {"name": "shmem"}}, "volumes must be a list"),
+        ({"volumes": ["shmem"]}, "volume entries must be mappings"),
+        (
+            {"volumes": [{"name": "appio-credentials", "emptyDir": {}}]},
+            "appio-credentials",
+        ),
+        (
+            {"volumes": [{"name": "secret", "secret": {"secretName": "api-key"}}]},
+            "secret volumes",
+        ),
+        (
+            {
+                "volumes": [
+                    {
+                        "name": "projected-secret",
+                        "projected": {
+                            "sources": [
+                                {"secret": {"name": "api-key"}},
+                            ]
+                        },
+                    }
+                ]
+            },
+            "projected secret",
+        ),
+        (
+            {
+                "volumes": [
+                    {
+                        "name": "service-account-token",
+                        "projected": {
+                            "sources": [
+                                {"serviceAccountToken": {"path": "token"}},
+                            ]
+                        },
+                    }
+                ]
+            },
+            "serviceAccountToken",
+        ),
+        ({"volume_mounts": {"name": "shmem"}}, "volume mounts must be a list"),
+        ({"volume_mounts": ["shmem"]}, "volume mount entries must be mappings"),
+        (
+            {
+                "volume_mounts": [
+                    {"name": "appio-credentials", "mountPath": "/credentials"}
+                ]
+            },
+            "appio-credentials",
+        ),
+        (
+            {
+                "volume_mounts": [
+                    {"name": "credentials", "mountPath": APPIO_CREDENTIALS_MOUNT_PATH}
+                ]
+            },
+            "mount path",
+        ),
+    ],
+)
+def test_kubernetes_executor_config_rejects_invalid_volumes(
+    config_overrides: dict[str, object], expected_message: str
+) -> None:
+    """Test TaskExecutor volumes reject invalid entries."""
+    with pytest.raises(ValueError, match=expected_message):
+        _executor_config(**config_overrides)
+
+
 def test_build_taskexecutor_pod_supports_explicit_env() -> None:
     """Test Pod construction includes validated explicit container env."""
     pod = _as_dict(

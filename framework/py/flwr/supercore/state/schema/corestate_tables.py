@@ -99,6 +99,48 @@ def create_corestate_metadata() -> MetaData:
     Index("idx_series_runs_series_id", series_runs.c.series_id)
 
     # --------------------------------------------------------------------------
+    #  Table: automation
+    # --------------------------------------------------------------------------
+    automation = Table(
+        "automation",
+        metadata,
+        Column(
+            "automation_id",
+            Integer,
+            primary_key=True,
+            autoincrement=True,
+            nullable=False,
+        ),
+        Column("federation_id", String, nullable=False),
+        Column("flwr_aid", String, nullable=False),
+        Column("series_id", BigInteger, nullable=False),
+        Column("status", String, nullable=False),
+        Column("fab_id", String, nullable=True),
+        Column("fab_version", String, nullable=True),
+        Column("fab_hash", String, nullable=True),
+        Column("override_config", String, nullable=False),
+        Column("federation_config", String, nullable=True),
+        Column("primary_task_type", String, nullable=False),
+        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("next_run_at", TIMESTAMP(timezone=True), nullable=True),
+        Column("fixed_interval", BigInteger, nullable=True),
+        Column("remaining_runs", Integer, nullable=True),
+        Column("stopped_at", TIMESTAMP(timezone=True), nullable=True),
+    )
+    Index(
+        "idx_automation_status_next_run_at",
+        automation.c.status,
+        automation.c.next_run_at,
+    )
+    Index(
+        "idx_automation_federation_id_status_updated_at",
+        automation.c.federation_id,
+        automation.c.status,
+        automation.c.updated_at,
+    )
+
+    # --------------------------------------------------------------------------
     #  Table: task
     # --------------------------------------------------------------------------
     task = Table(
