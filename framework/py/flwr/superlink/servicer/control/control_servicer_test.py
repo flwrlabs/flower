@@ -860,7 +860,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         with patch(
-            "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
+            "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
             return_value=SimpleNamespace(flwr_aid=flwr_aid_retrieving),
         ):
             res: ListNodesResponse = self.servicer.ListNodes(ListNodesRequest(), Mock())
@@ -1170,7 +1170,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             authn_plugin=Mock(),
         )
         self.get_current_account_info_patcher = patch(
-            "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
+            "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
             return_value=SimpleNamespace(
                 flwr_aid=self.flwr_aid, account_name=self.account_name
             ),
@@ -1361,7 +1361,7 @@ class TestControlServicerAuth(unittest.TestCase):
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
             patch.object(
@@ -1396,7 +1396,7 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state.federation_manager, "has_member", return_value=True
             ),
             patch(
-                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
         ):
@@ -1444,7 +1444,7 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state.federation_manager, "has_member", return_value=True
             ),
             patch(
-                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
         ):
@@ -1471,7 +1471,7 @@ class TestControlServicerAuth(unittest.TestCase):
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
             patch.object(
@@ -1490,7 +1490,7 @@ class TestControlServicerAuth(unittest.TestCase):
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
             patch.object(
@@ -1512,7 +1512,7 @@ class TestControlServicerAuth(unittest.TestCase):
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(
                     flwr_aid="user-123", account_name="test-account"
                 ),
@@ -1533,7 +1533,7 @@ class TestControlServicerAuth(unittest.TestCase):
 
         with (
             patch(
-                "flwr.superlink.servicer.control.control_handlers.get_current_account_info",
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(
                     flwr_aid="user-123", account_name="test-account"
                 ),
