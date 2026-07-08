@@ -154,7 +154,7 @@ EXIT_CODE_HELP = {
     ),
     ExitCode.SUPERNODE_REST_TRANSPORT_REMOVED: (
         "The SuperNode REST transport has been removed. "
-        "Use the default gRPC-rere transport instead."
+        "Use the default transport instead."
     ),
     # SuperExec-specific exit codes (400-499)
     ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG: (
