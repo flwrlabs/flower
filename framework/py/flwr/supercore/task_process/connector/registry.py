@@ -14,7 +14,11 @@
 # ==============================================================================
 """Connector registry."""
 
+from __future__ import annotations
+
 from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Protocol
 
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
@@ -25,15 +29,92 @@ ConnectorHandler = Callable[..., JSONValue]
 ConnectorToolFactory = Callable[[], JSONObject]
 
 
-_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
-    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
-    web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
-    browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
-}
-_BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
-    web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.make_web_search_tool,
-    web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.make_web_fetch_tool,
-    browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.make_browser_use_tool,
+@dataclass(frozen=True)
+class ConnectorDefinition:
+    """Provider-level connector metadata."""
+
+    connector_ref: str
+    display_name: str
+    description: str
+    oauth_enabled: bool
+    default_scopes: tuple[str, ...] = ()
+
+
+class ConnectorToolProvider(Protocol):
+    """Tool execution interface for one connector provider."""
+
+    @property
+    def definition(self) -> ConnectorDefinition:
+        """Return provider-level connector metadata."""
+        ...
+
+    def tool_definitions(self) -> list[JSONObject]:
+        """Return model-compatible tool definitions for this connector."""
+        ...
+
+    def execute_tool(
+        self,
+        *,
+        arguments: JSONObject,
+        usage_recorder: TaskUsageRecorder,
+    ) -> JSONValue:
+        """Execute one connector tool call."""
+        ...
+
+
+@dataclass(frozen=True)
+class _BuiltInConnectorToolProvider:
+    """Adapter from current built-in connector functions to tool providers."""
+
+    definition: ConnectorDefinition
+    _make_tool: ConnectorToolFactory
+    _handler: ConnectorHandler
+
+    def tool_definitions(self) -> list[JSONObject]:
+        """Return the built-in connector's function tool definition."""
+        return [self._make_tool()]
+
+    def execute_tool(
+        self,
+        *,
+        arguments: JSONObject,
+        usage_recorder: TaskUsageRecorder,
+    ) -> JSONValue:
+        """Execute the built-in connector handler."""
+        return self._handler(**arguments, usage_recorder=usage_recorder)
+
+
+_CONNECTOR_TOOL_PROVIDERS: dict[str, ConnectorToolProvider] = {
+    web_search.WEB_SEARCH_CONNECTOR_NAME: _BuiltInConnectorToolProvider(
+        definition=ConnectorDefinition(
+            connector_ref=web_search.WEB_SEARCH_CONNECTOR_NAME,
+            display_name="Web Search",
+            description="Search the web for current information.",
+            oauth_enabled=False,
+        ),
+        _make_tool=web_search.make_web_search_tool,
+        _handler=web_search.search,
+    ),
+    web_fetch.WEB_FETCH_CONNECTOR_NAME: _BuiltInConnectorToolProvider(
+        definition=ConnectorDefinition(
+            connector_ref=web_fetch.WEB_FETCH_CONNECTOR_NAME,
+            display_name="Web Fetch",
+            description="Fetch a web page and extract readable content.",
+            oauth_enabled=False,
+        ),
+        _make_tool=web_fetch.make_web_fetch_tool,
+        _handler=web_fetch.invoke_web_fetch_provider,
+    ),
+    browser_use.BROWSER_USE_CONNECTOR_NAME: _BuiltInConnectorToolProvider(
+        definition=ConnectorDefinition(
+            connector_ref=browser_use.BROWSER_USE_CONNECTOR_NAME,
+            display_name="Browser Use",
+            description="Use a headless browser to complete a web task.",
+            oauth_enabled=False,
+        ),
+        _make_tool=browser_use.make_browser_use_tool,
+        _handler=browser_use.invoke_browser_use_provider,
+    ),
 }
 
 
@@ -43,25 +124,34 @@ def invoke_connector(
     usage_recorder: TaskUsageRecorder,
 ) -> JSONValue:
     """Invoke one connector by name."""
-    handler = _CONNECTOR_HANDLERS.get(name)
-    if handler is None:
-        raise ValueError(f"Unsupported connector '{name}'.")
-    return handler(**arguments, usage_recorder=usage_recorder)
+    provider = _get_connector_tool_provider(name)
+    return provider.execute_tool(arguments=arguments, usage_recorder=usage_recorder)
 
 
 def get_builtin_connector_tools() -> list[JSONObject]:
     """Return function tools for built-in connectors."""
-    return [make_tool() for make_tool in _BUILTIN_CONNECTOR_TOOL_FACTORIES.values()]
+    tools: list[JSONObject] = []
+    for provider in _CONNECTOR_TOOL_PROVIDERS.values():
+        tools.extend(provider.tool_definitions())
+    return tools
 
 
 def get_builtin_connector_tool(name: str) -> JSONObject:
     """Return the function tool for one built-in connector."""
-    make_tool = _BUILTIN_CONNECTOR_TOOL_FACTORIES.get(name)
-    if make_tool is None:
-        raise ValueError(f"Unsupported connector '{name}'.")
-    return make_tool()
+    tool_definitions = _get_connector_tool_provider(name).tool_definitions()
+    if len(tool_definitions) != 1:
+        raise ValueError(f"Connector '{name}' must expose exactly one built-in tool.")
+    return tool_definitions[0]
 
 
 def has_builtin_connector(name: str) -> bool:
     """Return whether a built-in connector is registered."""
-    return name in _CONNECTOR_HANDLERS
+    return name in _CONNECTOR_TOOL_PROVIDERS
+
+
+def _get_connector_tool_provider(connector_ref: str) -> ConnectorToolProvider:
+    """Return the tool provider for one connector ref."""
+    provider = _CONNECTOR_TOOL_PROVIDERS.get(connector_ref)
+    if provider is None:
+        raise ValueError(f"Unsupported connector '{connector_ref}'.")
+    return provider
