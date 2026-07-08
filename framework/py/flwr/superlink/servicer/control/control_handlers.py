@@ -20,7 +20,6 @@ import hashlib
 import json
 from collections.abc import Sequence
 from logging import ERROR, INFO
-from typing import cast
 
 import requests
 
@@ -164,8 +163,8 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
         return StartRunResponse()
 
     account = _get_account()
-    flwr_aid = cast(str, account.flwr_aid)
-    account_name = cast(str, account.account_name)
+    flwr_aid = account.flwr_aid
+    account_name = account.account_name
     override_config = user_config_from_proto(request.override_config)
 
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
@@ -278,8 +277,8 @@ def list_runs(
     log(INFO, "ControlServicer.ListRuns")
 
     account = _get_account()
-    flwr_aid = cast(str, account.flwr_aid)
-    account_name = cast(str, account.account_name)
+    flwr_aid = account.flwr_aid
+    account_name = account.account_name
     # Build a set of run IDs for `flwr ls --runs`
     if not request.HasField("run_id"):
         # If no `run_id` is specified and account auth is enabled,
@@ -543,7 +542,7 @@ def register_node(
     )
 
     # Account name exists if `flwr_aid` exists
-    account_name = cast(str, get_current_account_info().account_name)
+    account_name = get_current_account_info().account_name
     try:
         node_id = state.create_node(
             owner_aid=flwr_aid,
@@ -678,7 +677,7 @@ def create_federation(
 
     # Construct federation ID
     account = _get_account()
-    flwr_aid = cast(str, account.flwr_aid)
+    flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     federation_id = f"@{account.account_name}/{request.federation_name}"
 
@@ -919,8 +918,8 @@ def configure_simulation_federation(
 
     # Get caller's account info
     account = _get_account()
-    flwr_aid = cast(str, account.flwr_aid)
-    account_name = cast(str, account.account_name)
+    flwr_aid = account.flwr_aid
+    account_name = account.account_name
 
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     federation_id = _resolve_federation_id(state, account_name, request.federation_name)
@@ -1025,7 +1024,7 @@ def _with_last_run_statuses(
 def _get_account() -> AccountInfo:
     """Guard clause to check if account information exists."""
     account = get_current_account_info()
-    if account.flwr_aid is None:
+    if not account.flwr_aid:
         raise FlowerError(
             ApiErrorCode.ACCOUNT_INFO_NOT_FOUND,
             "Failed to fetch the account information.",
@@ -1035,10 +1034,10 @@ def _get_account() -> AccountInfo:
 
 def _get_flwr_aid() -> str:
     """Guard clause to check if `flwr_aid` exists."""
-    return cast(str, _get_account().flwr_aid)
+    return _get_account().flwr_aid
 
 
-def _check_flwr_aid_in_run(flwr_aid: str | None, run: Run) -> None:
+def _check_flwr_aid_in_run(flwr_aid: str, run: Run) -> None:
     """Guard clause to check if `flwr_aid` matches the run's `flwr_aid`."""
     # `run.flwr_aid` must not be an empty string. Abort if it is empty.
     run_flwr_aid = run.flwr_aid

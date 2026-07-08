@@ -125,7 +125,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         )
         account_info = authn_plugin.validate_tokens_in_metadata([])[1]
         assert account_info is not None
-        assert account_info.flwr_aid is not None
         self.account_info = account_info
         self.aid: str = account_info.flwr_aid
         shared_account_info.set(account_info)
@@ -1567,7 +1566,6 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         )
         account_info = authn_plugin.validate_tokens_in_metadata([])[1]
         assert account_info is not None
-        assert account_info.flwr_aid is not None
         self.aid: str = account_info.flwr_aid
         shared_account_info.set(account_info)
         self.state = self.servicer.linkstate_factory.state()
