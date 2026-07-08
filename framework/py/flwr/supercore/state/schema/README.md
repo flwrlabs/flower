@@ -11,7 +11,7 @@
 ---
 erDiagram
   automation {
-    BIGINT automation_id PK
+    INTEGER automation_id PK
     TIMESTAMP created_at
     VARCHAR fab_hash "nullable"
     VARCHAR fab_id "nullable"

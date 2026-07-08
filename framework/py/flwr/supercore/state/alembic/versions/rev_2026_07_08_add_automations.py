@@ -39,7 +39,7 @@ def upgrade() -> None:
         "automation",
         sa.Column(
             "automation_id",
-            sa.BigInteger().with_variant(sa.Integer(), "sqlite"),
+            sa.Integer(),
             autoincrement=True,
             nullable=False,
         ),

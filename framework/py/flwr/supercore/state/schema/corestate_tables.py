@@ -106,7 +106,7 @@ def create_corestate_metadata() -> MetaData:
         metadata,
         Column(
             "automation_id",
-            BigInteger().with_variant(Integer(), "sqlite"),
+            Integer,
             primary_key=True,
             autoincrement=True,
             nullable=False,
