@@ -130,11 +130,10 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 
-from .control_account_auth_interceptor import get_current_account_info
-
 
 def start_run(  # pylint: disable=too-many-locals, too-many-statements
     request: StartRunRequest,
+    account: AccountInfo,
     state: LinkState,
     fleet_api_type: str | None,
 ) -> StartRunResponse:
@@ -162,7 +161,6 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
         )
         return StartRunResponse()
 
-    account = _get_account()
     flwr_aid = account.flwr_aid
     account_name = account.account_name
     override_config = user_config_from_proto(request.override_config)
@@ -271,12 +269,14 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
 
 
 def list_runs(
-    request: ListRunsRequest, state: LinkState, store: ObjectStore
+    request: ListRunsRequest,
+    account: AccountInfo,
+    state: LinkState,
+    store: ObjectStore,
 ) -> ListRunsResponse:
     """Handle `flwr ls` command."""
     log(INFO, "ControlServicer.ListRuns")
 
-    account = _get_account()
     flwr_aid = account.flwr_aid
     account_name = account.account_name
     # Build a set of run IDs for `flwr ls --runs`
@@ -328,12 +328,12 @@ def list_runs(
 
 
 def list_run_series(
-    request: ListRunSeriesRequest, state: LinkState
+    request: ListRunSeriesRequest, account: AccountInfo, state: LinkState
 ) -> ListRunSeriesResponse:
     """List run series."""
     log(INFO, "ControlServicer.ListRunSeries")
 
-    flwr_aid = _get_flwr_aid()
+    flwr_aid = account.flwr_aid
     updated_before = (
         request.updated_before if request.HasField("updated_before") else None
     )
@@ -356,12 +356,12 @@ def list_run_series(
 
 
 def get_run_series(
-    request: GetRunSeriesRequest, state: LinkState
+    request: GetRunSeriesRequest, account: AccountInfo, state: LinkState
 ) -> GetRunSeriesResponse:
     """Get run series."""
     log(INFO, "ControlServicer.GetRunSeries")
 
-    flwr_aid = _get_flwr_aid()
+    flwr_aid = account.flwr_aid
     series_id = request.series_id
     series_matches = state.get_run_series(series_ids=[series_id])
 
@@ -385,7 +385,9 @@ def get_run_series(
     return response
 
 
-def stop_run(request: StopRunRequest, state: LinkState) -> StopRunResponse:
+def stop_run(
+    request: StopRunRequest, account: AccountInfo, state: LinkState
+) -> StopRunResponse:
     """Stop a given run ID."""
     log(INFO, "ControlServicer.StopRun")
 
@@ -401,7 +403,7 @@ def stop_run(request: StopRunRequest, state: LinkState) -> StopRunResponse:
         )
     run = runs[0]
 
-    flwr_aid = _get_flwr_aid()
+    flwr_aid = account.flwr_aid
     _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
 
     if run.status.status == Status.FINISHED:
@@ -468,6 +470,7 @@ def get_auth_tokens(
 
 def pull_artifacts(
     request: PullArtifactsRequest,
+    account: AccountInfo,
     state: LinkState,
     artifact_provider: ArtifactProvider | None,
 ) -> PullArtifactsResponse:
@@ -502,7 +505,7 @@ def pull_artifacts(
         )
 
     # Check if `flwr_aid` matches the run's `flwr_aid`
-    flwr_aid = get_current_account_info().flwr_aid
+    flwr_aid = account.flwr_aid
     _check_flwr_aid_in_run(flwr_aid=flwr_aid, run=run)
 
     # Call artifact provider
@@ -511,7 +514,7 @@ def pull_artifacts(
 
 
 def register_node(
-    request: RegisterNodeRequest, state: LinkState
+    request: RegisterNodeRequest, account: AccountInfo, state: LinkState
 ) -> RegisterNodeResponse:
     """Add a SuperNode."""
     log(INFO, "ControlServicer.RegisterNode")
@@ -534,7 +537,7 @@ def register_node(
 
     node_id = 0
 
-    flwr_aid = _get_flwr_aid()
+    flwr_aid = account.flwr_aid
     state.federation_manager.can_execute(
         flwr_aid,
         ActionType.REGISTER_SUPERNODE,
@@ -542,7 +545,7 @@ def register_node(
     )
 
     # Account name exists if `flwr_aid` exists
-    account_name = get_current_account_info().account_name
+    account_name = account.account_name
     try:
         node_id = state.create_node(
             owner_aid=flwr_aid,
@@ -565,12 +568,12 @@ def register_node(
 
 
 def unregister_node(
-    request: UnregisterNodeRequest, state: LinkState
+    request: UnregisterNodeRequest, account: AccountInfo, state: LinkState
 ) -> UnregisterNodeResponse:
     """Remove a SuperNode."""
     log(INFO, "ControlServicer.UnregisterNode")
 
-    flwr_aid = _get_flwr_aid()
+    flwr_aid = account.flwr_aid
     try:
         state.delete_node(owner_aid=flwr_aid, node_id=request.node_id)
     except ValueError as err:
@@ -583,26 +586,28 @@ def unregister_node(
     return UnregisterNodeResponse()
 
 
-def list_nodes(request: ListNodesRequest, state: LinkState) -> ListNodesResponse:
+def list_nodes(
+    request: ListNodesRequest, account: AccountInfo, state: LinkState
+) -> ListNodesResponse:
     """List all SuperNodes."""
     _ = request
     log(INFO, "ControlServicer.ListNodes")
 
     nodes_info: Sequence[NodeInfo] = []
     # Retrieve all nodes for the account
-    nodes_info = state.get_node_info(owner_aids=[_get_flwr_aid()])
+    nodes_info = state.get_node_info(owner_aids=[account.flwr_aid])
 
     return ListNodesResponse(nodes_info=nodes_info, now=now().isoformat())
 
 
 def list_federations(
-    request: ListFederationsRequest, state: LinkState
+    request: ListFederationsRequest, account: AccountInfo, state: LinkState
 ) -> ListFederationsResponse:
     """List all SuperNodes."""
     _ = request
     log(INFO, "ControlServicer.ListFederations")
 
-    flwr_aid = _get_flwr_aid()
+    flwr_aid = account.flwr_aid
 
     # Get federations the account is a member of
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
@@ -622,14 +627,14 @@ def list_federations(
 
 
 def show_federation(
-    request: ShowFederationRequest, state: LinkState
+    request: ShowFederationRequest, account: AccountInfo, state: LinkState
 ) -> ShowFederationResponse:
     """Show details of a specific Federation."""
     log(INFO, "ControlServicer.ShowFederation")
 
     # Ensure flwr_aid is a member of the requested federation
     federation_id = request.federation_name
-    flwr_aid = _get_flwr_aid()
+    flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     if not state.federation_manager.has_member(flwr_aid, federation_id):
         raise FlowerError(
@@ -656,7 +661,7 @@ def show_federation(
 
 
 def create_federation(
-    request: CreateFederationRequest, state: LinkState
+    request: CreateFederationRequest, account: AccountInfo, state: LinkState
 ) -> CreateFederationResponse:
     """Create a new Federation."""
     log(INFO, "ControlServicer.CreateFederation")
@@ -676,7 +681,6 @@ def create_federation(
         )
 
     # Construct federation ID
-    account = _get_account()
     flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     federation_id = f"@{account.account_name}/{request.federation_name}"
@@ -711,7 +715,7 @@ def create_federation(
 
 
 def archive_federation(
-    request: ArchiveFederationRequest, state: LinkState
+    request: ArchiveFederationRequest, account: AccountInfo, state: LinkState
 ) -> ArchiveFederationResponse:
     """Archive a Federation."""
     log(INFO, "ControlServicer.ArchiveFederation")
@@ -722,7 +726,7 @@ def archive_federation(
 
     # Archive federation
     state.federation_manager.archive_federation(
-        flwr_aid=_get_flwr_aid(),
+        flwr_aid=account.flwr_aid,
         federation_id=request.federation_name,
     )
     for run in state.get_run_info(federation_ids=[request.federation_name]):
@@ -733,13 +737,13 @@ def archive_federation(
 
 
 def add_node_to_federation(
-    request: AddNodeToFederationRequest, state: LinkState
+    request: AddNodeToFederationRequest, account: AccountInfo, state: LinkState
 ) -> AddNodeToFederationResponse:
     """Add a node to a Federation."""
     log(INFO, "ControlServicer.AddNodeToFederation")
 
     # Validate federation, node ID, and ownership
-    flwr_aid = _get_flwr_aid()
+    flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     _validate_federation_and_node_in_request(
         state, flwr_aid, request.federation_name, request.node_id
@@ -756,13 +760,13 @@ def add_node_to_federation(
 
 
 def remove_node_from_federation(
-    request: RemoveNodeFromFederationRequest, state: LinkState
+    request: RemoveNodeFromFederationRequest, account: AccountInfo, state: LinkState
 ) -> RemoveNodeFromFederationResponse:
     """Remove a node from a Federation."""
     log(INFO, "ControlServicer.RemoveNodeFromFederation")
 
     # Validate federation, node ID, and ownership
-    flwr_aid = _get_flwr_aid()
+    flwr_aid = account.flwr_aid
     _validate_federation_and_node_in_request(
         state, flwr_aid, request.federation_name, request.node_id
     )
@@ -778,7 +782,7 @@ def remove_node_from_federation(
 
 
 def remove_account_from_federation(
-    request: RemoveAccountFromFederationRequest, state: LinkState
+    request: RemoveAccountFromFederationRequest, account: AccountInfo, state: LinkState
 ) -> RemoveAccountFromFederationResponse:
     """Remove an account from a Federation."""
     log(INFO, "ControlServicer.RemoveAccountFromFederation")
@@ -786,7 +790,7 @@ def remove_account_from_federation(
     target_account = None if not request.account_name else request.account_name
 
     removed_flwr_aid = state.federation_manager.remove_account(
-        flwr_aid=_get_flwr_aid(),
+        flwr_aid=account.flwr_aid,
         federation_id=request.federation_name,
         target_account_name=target_account,
     )
@@ -802,12 +806,12 @@ def remove_account_from_federation(
 
 
 def create_invitation(
-    request: CreateInvitationRequest, state: LinkState
+    request: CreateInvitationRequest, account: AccountInfo, state: LinkState
 ) -> CreateInvitationResponse:
     """Create an invitation."""
     log(INFO, "ControlServicer.CreateInvitation")
 
-    flwr_aid = _get_flwr_aid()
+    flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     federation_id = request.federation_name
     invitee_account_name = request.invitee_account_name
@@ -837,14 +841,14 @@ def create_invitation(
 
 
 def list_invitations(
-    request: ListInvitationsRequest, state: LinkState
+    request: ListInvitationsRequest, account: AccountInfo, state: LinkState
 ) -> ListInvitationsResponse:
     """List invitations."""
     _ = request
     log(INFO, "ControlServicer.ListInvitations")
 
     created_invitations, received_invitations = (
-        state.federation_manager.list_invitations(_get_flwr_aid())
+        state.federation_manager.list_invitations(account.flwr_aid)
     )
     return ListInvitationsResponse(
         created_invitations=created_invitations,
@@ -853,12 +857,12 @@ def list_invitations(
 
 
 def accept_invitation(
-    request: AcceptInvitationRequest, state: LinkState
+    request: AcceptInvitationRequest, account: AccountInfo, state: LinkState
 ) -> AcceptInvitationResponse:
     """Accept an invitation."""
     log(INFO, "ControlServicer.AcceptInvitation")
 
-    flwr_aid = _get_flwr_aid()
+    flwr_aid = account.flwr_aid
     federation_id = request.federation_name
 
     runtime = (
@@ -877,33 +881,33 @@ def accept_invitation(
     )
 
     state.federation_manager.accept_invitation(
-        flwr_aid=_get_flwr_aid(),
+        flwr_aid=flwr_aid,
         federation_id=request.federation_name,
     )
     return AcceptInvitationResponse()
 
 
 def reject_invitation(
-    request: RejectInvitationRequest, state: LinkState
+    request: RejectInvitationRequest, account: AccountInfo, state: LinkState
 ) -> RejectInvitationResponse:
     """Reject an invitation."""
     log(INFO, "ControlServicer.RejectInvitation")
 
     state.federation_manager.reject_invitation(
-        flwr_aid=_get_flwr_aid(),
+        flwr_aid=account.flwr_aid,
         federation_id=request.federation_name,
     )
     return RejectInvitationResponse()
 
 
 def revoke_invitation(
-    request: RevokeInvitationRequest, state: LinkState
+    request: RevokeInvitationRequest, account: AccountInfo, state: LinkState
 ) -> RevokeInvitationResponse:
     """Revoke an invitation."""
     log(INFO, "ControlServicer.RevokeInvitation")
 
     state.federation_manager.revoke_invitation(
-        flwr_aid=_get_flwr_aid(),
+        flwr_aid=account.flwr_aid,
         federation_id=request.federation_name,
         invitee_account_name=request.invitee_account_name,
     )
@@ -911,13 +915,13 @@ def revoke_invitation(
 
 
 def configure_simulation_federation(
-    request: ConfigureSimulationFederationRequest, state: LinkState
+    request: ConfigureSimulationFederationRequest,
+    account: AccountInfo,
+    state: LinkState,
 ) -> ConfigureSimulationFederationResponse:
     """Configure a federation for simulation."""
     log(INFO, "ControlServicer.ConfigureSimulationFederation")
 
-    # Get caller's account info
-    account = _get_account()
     flwr_aid = account.flwr_aid
     account_name = account.account_name
 
@@ -1019,22 +1023,6 @@ def _with_last_run_statuses(
                 entry.last_run_status.CopyFrom(run_status_to_proto(run_status))
         result.append(entry)
     return result
-
-
-def _get_account() -> AccountInfo:
-    """Guard clause to check if account information exists."""
-    account = get_current_account_info()
-    if not account.flwr_aid:
-        raise FlowerError(
-            ApiErrorCode.ACCOUNT_INFO_NOT_FOUND,
-            "Failed to fetch the account information.",
-        )
-    return account
-
-
-def _get_flwr_aid() -> str:
-    """Guard clause to check if `flwr_aid` exists."""
-    return _get_account().flwr_aid
 
 
 def _check_flwr_aid_in_run(flwr_aid: str, run: Run) -> None:
