@@ -138,10 +138,6 @@ EXIT_CODE_HELP = {
         "The ClientApp could not communicate with the ClientAppIo API."
     ),
     # SuperNode-specific exit codes (300-399)
-    ExitCode.SUPERNODE_REST_TRANSPORT_REMOVED: (
-        "The SuperNode REST transport has been removed. "
-        "Use the default gRPC-rere transport instead."
-    ),
     ExitCode.SUPERNODE_NODE_AUTH_KEY_INVALID: (
         "Node authentication requires elliptic curve private key. "
         "Please ensure that the file path points to a valid private key "
@@ -155,6 +151,10 @@ EXIT_CODE_HELP = {
         "Failed to read the trusted entities YAML file. "
         "Please ensure that a valid file is provided using "
         "the `--trusted-entities` option."
+    ),
+    ExitCode.SUPERNODE_REST_TRANSPORT_REMOVED: (
+        "The SuperNode REST transport has been removed. "
+        "Use the default gRPC-rere transport instead."
     ),
     # SuperExec-specific exit codes (400-499)
     ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG: (
