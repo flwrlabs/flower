@@ -2,10 +2,6 @@
 set -e
 
 case "$1" in
-  rest)
-    echo "The SuperNode REST transport has been removed. Use the default gRPC-rere transport instead." >&2
-    exit 1
-    ;;
   sqlite)
     server_address="127.0.0.1:9092"
     server_app_address="127.0.0.1:9091"
