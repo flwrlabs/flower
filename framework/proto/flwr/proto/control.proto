@@ -34,6 +34,20 @@ service Control {
   // Stop run upon request
   rpc StopRun(StopRunRequest) returns (StopRunResponse) {}
 
+  // Start automation upon request
+  rpc StartAutomation(StartAutomationRequest)
+      returns (StartAutomationResponse) {}
+
+  // List automations
+  rpc ListAutomations(ListAutomationsRequest)
+      returns (ListAutomationsResponse) {}
+
+  // Get automation
+  rpc GetAutomation(GetAutomationRequest) returns (GetAutomationResponse) {}
+
+  // Stop automation
+  rpc StopAutomation(StopAutomationRequest) returns (StopAutomationResponse) {}
+
   // Start log stream upon request
   rpc StreamLogs(StreamLogsRequest) returns (stream StreamLogsResponse) {}
 
@@ -139,6 +153,52 @@ message StartRunResponse {
   optional uint64 series_id = 3;
   string federation = 4;
 }
+
+message StartAutomationRequest {
+  StartRunRequest start_run_request = 1;
+  optional uint64 start_at = 2;
+  optional uint64 fixed_interval = 3;
+  optional uint32 max_runs = 4;
+}
+message StartAutomationResponse {
+  uint64 automation_id = 1;
+  uint64 series_id = 2;
+  uint64 next_run_at = 3;
+}
+message Automation {
+  uint64 automation_id = 1;
+  string status = 2;
+  string federation = 3;
+  uint64 series_id = 4;
+  string flwr_aid = 5;
+  uint64 created_at = 6;
+  uint64 updated_at = 7;
+  optional uint64 next_run_at = 8;
+  optional uint64 fixed_interval = 9;
+  optional uint32 remaining_runs = 10;
+  optional uint64 stopped_at = 11;
+}
+message ListAutomationsRequest {
+  string federation = 1;
+  repeated string statuses = 2;
+  optional uint64 limit = 3;
+  optional string cursor = 4;
+}
+message ListAutomationsResponse {
+  repeated Automation automations = 1;
+  optional string next_cursor = 2;
+}
+message GetAutomationRequest {
+  string federation = 1;
+  uint64 automation_id = 2;
+}
+message GetAutomationResponse { Automation automation = 1; }
+message StopAutomationRequest {
+  string federation = 1;
+  uint64 automation_id = 2;
+}
+message StopAutomationResponse { bool success = 1; }
+
 message StreamLogsRequest {
   uint64 run_id = 1;
   double after_timestamp = 2;

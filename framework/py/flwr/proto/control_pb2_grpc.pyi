@@ -45,6 +45,30 @@ class ControlStub:
     ]
     """Stop run upon request"""
 
+    StartAutomation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StartAutomationRequest,
+        flwr.proto.control_pb2.StartAutomationResponse,
+    ]
+    """Start automation upon request"""
+
+    ListAutomations: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAutomationsRequest,
+        flwr.proto.control_pb2.ListAutomationsResponse,
+    ]
+    """List automations"""
+
+    GetAutomation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.GetAutomationRequest,
+        flwr.proto.control_pb2.GetAutomationResponse,
+    ]
+    """Get automation"""
+
+    StopAutomation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StopAutomationRequest,
+        flwr.proto.control_pb2.StopAutomationResponse,
+    ]
+    """Stop automation"""
+
     StreamLogs: grpc.UnaryStreamMultiCallable[
         flwr.proto.control_pb2.StreamLogsRequest,
         flwr.proto.control_pb2.StreamLogsResponse,
@@ -206,6 +230,30 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.StopRunResponse,
     ]
     """Stop run upon request"""
+
+    StartAutomation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StartAutomationRequest,
+        flwr.proto.control_pb2.StartAutomationResponse,
+    ]
+    """Start automation upon request"""
+
+    ListAutomations: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAutomationsRequest,
+        flwr.proto.control_pb2.ListAutomationsResponse,
+    ]
+    """List automations"""
+
+    GetAutomation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.GetAutomationRequest,
+        flwr.proto.control_pb2.GetAutomationResponse,
+    ]
+    """Get automation"""
+
+    StopAutomation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StopAutomationRequest,
+        flwr.proto.control_pb2.StopAutomationResponse,
+    ]
+    """Stop automation"""
 
     StreamLogs: grpc.aio.UnaryStreamMultiCallable[
         flwr.proto.control_pb2.StreamLogsRequest,
@@ -372,6 +420,38 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.StopRunResponse, collections.abc.Awaitable[flwr.proto.control_pb2.StopRunResponse]]:
         """Stop run upon request"""
+
+    @abc.abstractmethod
+    def StartAutomation(
+        self,
+        request: flwr.proto.control_pb2.StartAutomationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.StartAutomationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.StartAutomationResponse]]:
+        """Start automation upon request"""
+
+    @abc.abstractmethod
+    def ListAutomations(
+        self,
+        request: flwr.proto.control_pb2.ListAutomationsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListAutomationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAutomationsResponse]]:
+        """List automations"""
+
+    @abc.abstractmethod
+    def GetAutomation(
+        self,
+        request: flwr.proto.control_pb2.GetAutomationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.GetAutomationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.GetAutomationResponse]]:
+        """Get automation"""
+
+    @abc.abstractmethod
+    def StopAutomation(
+        self,
+        request: flwr.proto.control_pb2.StopAutomationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.StopAutomationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.StopAutomationResponse]]:
+        """Stop automation"""
 
     @abc.abstractmethod
     def StreamLogs(
