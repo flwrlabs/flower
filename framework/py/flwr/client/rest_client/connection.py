@@ -112,11 +112,11 @@ def http_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     tuple[
         int,
         Callable[[], tuple[Message, ObjectTree] | None],
-        Callable[[Message, ObjectTree, float], set[str]],
+        Callable[[Message, ObjectTree, float], tuple[set[str], str]],
         Callable[[int], Run],
         Callable[[str, int], Fab],
         Callable[[int, str], bytes],
-        Callable[[int, str, bytes], None],
+        Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
     ]
 ]:
@@ -150,12 +150,12 @@ def http_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     -------
     node_id : int
     receive : Callable[[], Optional[tuple[Message, ObjectTree]]]
-    send : Callable[[Message, ObjectTree, float], set[str]]
+    send : Callable[[Message, ObjectTree, float], tuple[set[str], str]]
     get_run : Callable[[int], Run]
     get_fab : Callable[[str, int], Fab]
-    pull_object : Callable[[str], bytes]
-    push_object : Callable[[str, bytes], None]
-    confirm_message_received : Callable[[str], None]
+    pull_object : Callable[[int, str], bytes]
+    push_object : Callable[[int, str, str, bytes], None]
+    confirm_message_received : Callable[[int, str], None]
     """
     log(
         WARN,
@@ -396,7 +396,7 @@ def http_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
 
     def send(
         message: Message, object_tree: ObjectTree, clientapp_runtime: float
-    ) -> set[str]:
+    ) -> tuple[set[str], str]:
         """Send the message with its ObjectTree to SuperLink."""
         # Get Node
         if node is None:
@@ -416,8 +416,8 @@ def http_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         if res is None:
             raise ValueError("PushMessagesResponse is None.")
 
-        # Get and return the object IDs to push
-        return set(res.objects_to_push)
+        # Get and return the object IDs to push and the session ID
+        return set(res.objects_to_push), res.session_id
 
     def get_run(run_id: int) -> Run:
         # Construct the request
@@ -454,7 +454,9 @@ def http_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         )
         return fn(object_id)
 
-    def push_object(run_id: int, object_id: str, contents: bytes) -> None:
+    def push_object(
+        run_id: int, session_id: str, object_id: str, contents: bytes
+    ) -> None:
         """Push the object to the SuperLink."""
         # Check Node
         if node is None:
@@ -464,6 +466,7 @@ def http_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             push_object_protobuf=_push_object_protobuf,
             node=node,
             run_id=run_id,
+            session_id=session_id,
         )
         fn(object_id, contents)
 

@@ -41,5 +41,5 @@ class AccountAuthCredentials:
 class AccountInfo:
     """User information for event log."""
 
-    flwr_aid: str | None
-    account_name: str | None
+    flwr_aid: str
+    account_name: str

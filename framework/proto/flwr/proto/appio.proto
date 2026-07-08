@@ -46,6 +46,7 @@ message PushAppMessagesRequest {
 message PushAppMessagesResponse {
   repeated string message_ids = 1;
   repeated string objects_to_push = 2;
+  string session_id = 3;
 }
 
 // PullAppMessages messages
