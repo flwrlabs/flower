@@ -34,6 +34,17 @@ service Control {
   // Stop run upon request
   rpc StopRun(StopRunRequest) returns (StopRunResponse) {}
 
+  // Start automation upon request
+  rpc StartAutomation(StartAutomationRequest)
+      returns (StartAutomationResponse) {}
+
+  // List automations
+  rpc ListAutomations(ListAutomationsRequest)
+      returns (ListAutomationsResponse) {}
+
+  // Stop automation
+  rpc StopAutomation(StopAutomationRequest) returns (StopAutomationResponse) {}
+
   // Start log stream upon request
   rpc StreamLogs(StreamLogsRequest) returns (stream StreamLogsResponse) {}
 
@@ -139,6 +150,36 @@ message StartRunResponse {
   optional uint64 series_id = 3;
   string federation = 4;
 }
+
+message StartAutomationRequest {
+  StartRunRequest start_run_request = 1;
+  optional string start_at = 2;
+  optional uint64 fixed_interval = 3;
+  optional uint32 max_runs = 4;
+}
+message StartAutomationResponse {
+  uint64 automation_id = 1;
+  uint64 series_id = 2;
+  string next_run_at = 3;
+}
+message Automation {
+  uint64 automation_id = 1;
+  string status = 2;
+  string federation = 3;
+  uint64 series_id = 4;
+  string flwr_aid = 5;
+  string created_at = 6;
+  string updated_at = 7;
+  optional string next_run_at = 8;
+  optional uint64 fixed_interval = 9;
+  optional uint32 remaining_runs = 10;
+  optional string stopped_at = 11;
+}
+message ListAutomationsRequest { string federation = 1; }
+message ListAutomationsResponse { repeated Automation automations = 1; }
+message StopAutomationRequest { uint64 automation_id = 1; }
+message StopAutomationResponse {}
+
 message StreamLogsRequest {
   uint64 run_id = 1;
   double after_timestamp = 2;
