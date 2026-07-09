@@ -5627,7 +5627,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:31
 #, fuzzy
 msgid "Enable the SuperExec component"
-msgstr "Construindo a imagem base"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:38
 msgid "Run simulations in Kubernetes using the Simulation Plugin"
@@ -6108,7 +6108,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:505
 #, fuzzy
 msgid "Generate a Certificate via Ingress Annotations"
-msgstr "Contribua com traduções"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:507
 msgid ""
@@ -6297,9 +6297,8 @@ msgid "Override Replaces the name of the chart in the Chart.yaml"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`flower-server`"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -6365,9 +6364,8 @@ msgid "Default Domain"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`example.com`"
-msgstr "Exemplo"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.ingressClassName`"
@@ -6459,9 +6457,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`false`"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.accountAuth.enabled`"
@@ -6488,9 +6485,8 @@ msgid "Existing secret with user authentication configuration."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`global.federationsConfig.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enables or disables the federations configuration plugin."
@@ -6503,7 +6499,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Set the federations configuration."
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.federationsConfig.existingSecret`"
@@ -6631,9 +6627,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`RuntimeDefault`"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -6682,9 +6677,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`tls.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -6692,23 +6686,21 @@ msgid "Enable TLS configuration for the Flower Framework."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`tls.issuer.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable automatic creation of a cert-manager Issuer."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`tls.issuer.name`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Name of the Issuer resource to use."
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.issuer.spec`"
@@ -6719,23 +6711,21 @@ msgid "The contents of the `.spec` block for the cert-manager Issuer."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`tls.certificate.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable automatic creation of a cert-manager Certificate."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`tls.certificate.annotations`"
-msgstr "Contribua com traduções"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Certificate CRD annotations."
-msgstr "Contribua com traduções"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.certificate.secretName`"
@@ -6774,9 +6764,8 @@ msgid "Kind of the existing issuer (`Issuer` or `ClusterIssuer`)."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`tls.certificate.duration`"
-msgstr "Contribua com traduções"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "The requested ‘duration’ (i.e. lifetime) of the Certificate."
@@ -6829,36 +6818,32 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:748
 #, fuzzy
 msgid "Component SuperLink"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.name`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Name of the SuperLink"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable or Disable SuperLink"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.resources`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -6868,9 +6853,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.volumes`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Specify a list of volumes for the SuperLink pod(s)"
@@ -6892,7 +6876,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "The isolation mode of the SuperLink"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -6944,9 +6928,8 @@ msgid "Automount SA-Token"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.service.type`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -6959,9 +6942,8 @@ msgid "`ClusterIP`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.service.servicePortControlName`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Prefix of the SuperLink Control API port"
@@ -6972,66 +6954,60 @@ msgid "`control`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.service.servicePortControl`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Port to expose for the SuperLink Control API"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`9093`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.service.nodePortControl`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Node port for SuperLink Control API"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.service.servicePortServerAppIoName`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Prefix of the SuperLink ServerAppIo API port"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`serverappio`"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.service.servicePortServerAppIo`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Port to expose for the SuperLink ServerAppIo API"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`9091`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.service.nodePortServerAppIo`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Node port for SuperLink ServerAppIo API"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.servicePortFleetName`"
@@ -7042,9 +7018,8 @@ msgid "Prefix of the SuperLink Fleet API port"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`fleet`"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.servicePortFleet`"
@@ -7068,43 +7043,39 @@ msgid "Node port for SuperLink Fleet API"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.containerPorts.control`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Container port for SuperLink Control API"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.containerPorts.serverAppIo`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Container port for SuperLink ServerAppIo API"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.containerPorts.fleet`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Container port for SuperLink Fleet API"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.containerPorts.health`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Container port for SuperLink Health API"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -7125,47 +7096,42 @@ msgid "`1`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.labels`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Extra labels for SuperLink pods"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.extraArgs`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Add extra arguments to the default arguments for the SuperLink"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Enable TLS on the SuperLink ServerAppIo API."
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.existingSecret`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Existing Kubernetes Secret for ServerAppIo TLS."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.mountPath`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Mount path used when AppIO uses a separate TLS Secret."
@@ -7176,9 +7142,8 @@ msgid "`/app/appio-cert`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.caCertfile`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Path to the CA certificate used by SuperExec to verify ServerAppIo."
@@ -7190,9 +7155,8 @@ msgid "`/app/cert/ca.crt`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.certfile`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Path to the ServerAppIo server certificate."
@@ -7204,9 +7168,8 @@ msgid "`/app/cert/tls.crt`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.keyfile`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Path to the ServerAppIo server private key."
@@ -7218,23 +7181,20 @@ msgid "`/app/cert/tls.key`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.certificate.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable automatic creation of a cert-manager Certificate for ServerAppIo."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.certificate.annotations`"
-msgstr "Contribua com traduções"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.certificate.secretName`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid ""
@@ -7243,68 +7203,60 @@ msgid ""
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.certificate.issuerGroup`"
-msgstr "Contribua com traduções"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "API group for the issuer."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.certificate.existingIssuer`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.appioTls.certificate.existingIssuerKind`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.certificate.dnsNames`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "DNS names for the ServerAppIo certificate."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.certificate.duration`"
-msgstr "Contribua com traduções"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "The requested certificate lifetime."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.certificate.renewBefore`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "How long before expiry cert-manager should renew the certificate."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.certificate.privateKey`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Private key options."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.appioTls.certificate.usages`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.superexecAuthSecretFile`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -7312,18 +7264,16 @@ msgid "Path to a file containing the SuperExec shared secret."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.nodeSelector`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Node labels for SuperLink pods which merges with global.nodeSelector"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.tolerations`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Node tolerations for SuperLink pods which merges with global.tolerations"
@@ -7351,18 +7301,16 @@ msgid "SuperLink deployment rolling update configuration parameters"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.affinity`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Node affinity for SuperLink pods which merges with global.affinity"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.env`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid ""
@@ -7385,21 +7333,19 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Security settings that for the SuperLink"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.livenessProbe.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable livenessProbe on SuperLink containers"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.livenessProbe.initialDelaySeconds`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -7412,9 +7358,8 @@ msgid "`0`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.livenessProbe.periodSeconds`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -7427,9 +7372,8 @@ msgid "`10`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.livenessProbe.timeoutSeconds`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -7437,9 +7381,8 @@ msgid "Timeout seconds for livenessProbe"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.livenessProbe.failureThreshold`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -7461,18 +7404,16 @@ msgid "Success threshold for livenessProbe"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.readinessProbe.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable readinessProbe on SuperLink containers"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.readinessProbe.initialDelaySeconds`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -7480,9 +7421,8 @@ msgid "Initial delay seconds for readinessProbe"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.readinessProbe.periodSeconds`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -7490,9 +7430,8 @@ msgid "Period seconds for readinessProbe"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.readinessProbe.timeoutSeconds`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -7500,9 +7439,8 @@ msgid "Timeout seconds for readinessProbe"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.readinessProbe.failureThreshold`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -7510,9 +7448,8 @@ msgid "Failure threshold for readinessProbe"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.readinessProbe.successThreshold`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -7544,50 +7481,44 @@ msgid "Defines which ingress controller which implement the resource"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.ingress.tls.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable TLS termination at the Ingress level."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.ingress.tls.secretName`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Name of the Kubernetes Secret that will contain the"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.ingress.control.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable an ingress resource for SuperLink API"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.ingress.control.hostname`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Ingress hostname for the SuperLink API ingress"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`control.example.com`"
-msgstr "Exemplo"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.ingress.control.path`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink API ingress path"
@@ -7598,9 +7529,8 @@ msgid "`/`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.ingress.control.pathType`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Ingress path type. One of Exact, Prefix or ImplementationSpecific"
@@ -7643,42 +7573,37 @@ msgid "`superlink.ingress.fleet.pathType`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.ingress.serverAppIo.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Enable an ingress resource for SuperLink ServerAppIo API"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.ingress.serverAppIo.hostname`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Ingress hostname for the SuperLink ServerAppIo API ingress"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`serverappio.example.com`"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.ingress.serverAppIo.path`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink ServerAppIo API ingress path"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.ingress.serverAppIo.pathType`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.extraHosts`"
@@ -7707,9 +7632,8 @@ msgid "Additional rules to be covered with this ingress record"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.lifecycle`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink container(s) to automate configuration before or after startup"
@@ -7738,12 +7662,11 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Annotations for SuperLink pods"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.podLabels`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Extra podLabels for SuperLink pods"
@@ -7779,25 +7702,22 @@ msgid "SuperLink image repository"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`flwr/superlink-ee`"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.image.tag`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "SuperLink image tag"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`1.32.1-ubuntu`"
-msgstr "``UBUNTU_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.image.digest`"
@@ -7920,30 +7840,27 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:352
 #, fuzzy
 msgid "Component SuperExec"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.name`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Name of the SuperExec"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superexec-serverapp`"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable or disable SuperExec"
@@ -7951,9 +7868,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.pluginType`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -7961,14 +7877,12 @@ msgid "The type of plugin to use."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`serverapp`"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superexec.superlink`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Address of the SuperLink the SuperExec should connect to"
@@ -7976,15 +7890,13 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.superexecAuthSecretFile`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.rootCertificates`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -7993,9 +7905,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.allowRuntimeDependencyInstallation`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Allow SuperExec to install runtime dependencies for ServerApps."
@@ -8003,9 +7914,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.executor.type`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8016,9 +7926,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.executor.configPath`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8034,9 +7943,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.executor.configMap.create`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8045,9 +7953,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.executor.configMap.name`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8059,9 +7966,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.executor.configMap.key`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8075,9 +7981,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.executor.kubernetes.namespace`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8103,27 +8008,25 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.executor.kubernetes.taskExecutor.image.registry`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "TaskExecutor image registry."
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.executor.kubernetes.taskExecutor.image.repository`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "TaskExecutor image repository."
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8134,7 +8037,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "TaskExecutor image tag."
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8145,19 +8048,18 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "TaskExecutor image digest."
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.executor.kubernetes.taskExecutor.image.pullPolicy`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "TaskExecutor image pull policy."
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8215,9 +8117,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.executor.kubernetes.taskExecutor.labels`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8233,7 +8134,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Additional annotations for generated TaskExecutor Pods and Secrets."
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8264,7 +8165,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Node selector for generated TaskExecutor Pods."
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8275,7 +8176,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Tolerations for generated TaskExecutor Pods."
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8306,7 +8207,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Pod security context for generated TaskExecutor Pods."
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8334,15 +8235,13 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.resources`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.volumes`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Optionally specify list of volumes for the SuperExec pod(s)"
@@ -8350,9 +8249,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.volumeMounts`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8361,9 +8259,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.serviceAccount.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8377,9 +8274,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.serviceAccount.labels`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8388,9 +8284,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.rbac.create`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8401,9 +8296,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.rbac.includeGet`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8414,15 +8308,14 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.containerPorts.health`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Container port for SuperExec Health API"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8432,13 +8325,12 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "Security settings for the SuperExec Pods"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.livenessProbe.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8472,9 +8364,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.readinessProbe.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8508,9 +8399,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.replicas`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "The number of SuperExec pods to run"
@@ -8518,21 +8408,19 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.labels`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Extra labels for SuperExec pods"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.extraArgs`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8541,9 +8429,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.nodeSelector`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8552,9 +8439,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.tolerations`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8583,9 +8469,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.affinity`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8594,9 +8479,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.env`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8607,9 +8491,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.lifecycle`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8618,57 +8501,52 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.annotations`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Additional custom annotations for SuperExec"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.selectorLabels`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Extra selectorLabels for SuperExec pods"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.podAnnotations`"
-msgstr "Contribua com traduções"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Annotations for SuperExec pods"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.podLabels`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Extra podLabels for SuperExec pods"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.imagePullSecrets`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8677,63 +8555,57 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.image.registry`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "SuperExec image registry"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.image.repository`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "SuperExec image repository"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`flwr/superexec-ee`"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.image.tag`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Image tag of SuperExec"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.image.digest`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Image digest of SuperExec"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.image.pullPolicy`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8742,9 +8614,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.networkPolicy.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8758,9 +8629,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.taskExecutorNetworkPolicy.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8771,9 +8641,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.taskExecutorNetworkPolicy.allowExternalEgress`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8782,9 +8651,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.taskExecutorNetworkPolicy.labels`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8795,9 +8663,8 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.taskExecutorNetworkPolicy.extraEgress`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8987,9 +8854,8 @@ msgid "Replaces the name of the chart in the Chart.yaml"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`flower-client`"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Completely replaces the generated name."
@@ -9006,41 +8872,36 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:277
 #, fuzzy
 msgid "Component SuperNode"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.name`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Name of the SuperNode"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Enable or disable SuperNode"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.resources`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.node.config`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.isolationMode`"
@@ -9083,9 +8944,8 @@ msgid "`supernode.superlink.certificate.copyFromExistingSecret.secretName`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.volumes`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Specify a list of volumes for the SuperNode pod(s)"
@@ -9116,14 +8976,12 @@ msgid "`supernode.serviceAccount.automountServiceAccountToken`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.service.type`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.service.servicePortClientAppIoName`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Prefix of the SuperNode ClientAppIo API port"
@@ -9134,135 +8992,121 @@ msgid "`clientappio`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.service.servicePortClientAppIo`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Port to expose for the SuperNode ClientAppIo API"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`9094`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.service.nodePortClientAppIo`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Node port for SuperNode ClientAppIo API"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.containerPorts.clientAppIo`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Container port for SuperNode ClientAppIo API"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.containerPorts.health`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Container port for SuperNode Health API"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.podSecurityContext`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.replicas`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "The number of SuperNode pods to run"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.labels`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Extra labels for SuperNode pods"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.extraArgs`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Add extra arguments to the default arguments for the SuperNode"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.appioTls.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Enable TLS on the SuperNode ClientAppIo API."
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.appioTls.caCertfile`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Path to the CA certificate used by SuperExec to verify ClientAppIo."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.appioTls.certfile`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Path to the ClientAppIo server certificate."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.appioTls.keyfile`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Path to the ClientAppIo server private key."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.superexecAuthSecretFile`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.nodeSelector`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Node labels for SuperNode pods which merges with global.nodeSelector"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.tolerations`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Node tolerations for SuperNode pods which merges with global.tolerations"
@@ -9285,18 +9129,16 @@ msgid "SuperNode deployment rolling update configuration parameters"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.affinity`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Node affinity for SuperNode pods which merges with global.affinity"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.env`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid ""
@@ -9305,9 +9147,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.livenessProbe.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Enable livenessProbe on SuperNode containers"
@@ -9318,28 +9159,24 @@ msgid "`supernode.livenessProbe.initialDelaySeconds`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.livenessProbe.periodSeconds`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.livenessProbe.timeoutSeconds`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.livenessProbe.failureThreshold`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.livenessProbe.successThreshold`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.readinessProbe.enabled`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Enable readinessProbe on SuperNode containers"
@@ -9350,29 +9187,24 @@ msgid "`supernode.readinessProbe.initialDelaySeconds`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.readinessProbe.periodSeconds`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.readinessProbe.timeoutSeconds`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.readinessProbe.failureThreshold`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.readinessProbe.successThreshold`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.lifecycle`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "SuperNode container(s) to automate configuration before or after startup"
@@ -9401,12 +9233,11 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Annotations for SuperNode pods"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.podLabels`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Extra podLabels for SuperNode pods"
@@ -9437,19 +9268,17 @@ msgid "SuperNode image repository"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`flwr/supernode-ee`"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`supernode.image.tag`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Image tag of SuperNode"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.image.digest`"
@@ -9458,7 +9287,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Image digest of SuperNode"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.image.pullPolicy`"
@@ -9515,23 +9344,20 @@ msgid ""
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec-clientapp`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Enable or disable SuperExec component"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`clientapp`"
-msgstr "O nome do repositório da imagem base."
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-#, fuzzy
 msgid "`superexec.supernode`"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Address of the supernode the SuperExec should connect to"
@@ -9548,7 +9374,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "Security settings for the SuperExec Pod"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "The number of SuperExec containers to run"
@@ -9557,12 +9383,12 @@ msgstr ""
 #: ../../source/helm/index.rst:41
 #, fuzzy
 msgid "Deploy SuperLink"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/index.rst:41
 #, fuzzy
 msgid "Deploy SuperNode"
-msgstr "Construindo a imagem do servidor"
+msgstr ""
 
 #: ../../source/helm/index.rst:-1
 msgid "Learn how to run Flower for federated learning using Helm charts."
@@ -9571,7 +9397,7 @@ msgstr ""
 #: ../../source/helm/index.rst:7
 #, fuzzy
 msgid "Run Flower using Helm"
-msgstr "O nome do repositório da imagem base."
+msgstr ""
 
 #: ../../source/helm/index.rst:11
 msgid ""
