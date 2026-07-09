@@ -805,13 +805,13 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
     if start_legacy_grpc:
         superlink_lifespan = SuperLinkLifespan(lifespan_config)
     else:
-        # Initialize LinkState
         federation_manager = get_federation_manager(
             is_simulation=lifespan_config.simulation
         )
         _, linkstate_factory = _get_objectstore_linkstate_factories(
             lifespan_config.database, federation_manager
         )
+        # Force initialization before exposing LinkState through FastAPI dependencies
         linkstate_factory.state()
     from flwr.superlink.main import (  # pylint: disable=import-outside-toplevel
         create_app,
