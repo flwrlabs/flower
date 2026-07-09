@@ -20,12 +20,13 @@ import secrets
 from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from threading import Lock
 from typing import Literal, cast
 
 from flwr.app import Context, Message
+from flwr.app.user_config import UserConfig
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -36,6 +37,8 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.logger import log
+from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     Task,
@@ -43,6 +46,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
+from flwr.supercore.constant import AUTOMATION_STATUS_ACTIVE, AUTOMATION_STATUS_STOPPED
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 
@@ -50,6 +54,7 @@ from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import (
     generate_rand_int_from_bytes,
+    timestamp_to_iso,
     validate_task_event_data,
     validate_task_message,
 )
@@ -75,6 +80,19 @@ class TaskUsageRecord:
     reported_at: datetime | None
 
 
+@dataclass
+class AutomationRecord:
+    """Record containing automation metadata and run template."""
+
+    automation: Automation
+    fab_id: str | None
+    fab_version: str | None
+    fab_hash: str | None
+    override_config: UserConfig
+    federation_config: SimulationConfig | None
+    primary_task_type: str
+
+
 class InMemoryCoreState(
     CoreState
 ):  # pylint: disable=R0904,too-many-instance-attributes
@@ -90,6 +108,9 @@ class InMemoryCoreState(
         self.lock_run_series_store = Lock()
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
+        self.automation_store: dict[int, AutomationRecord] = {}
+        self.lock_automation_store = Lock()
+        self._next_automation_id = 1
         self.task_store: dict[int, Task] = {}
         # Store task ID to token mapping
         self.task_token_store: dict[int, TokenRecord] = {}
@@ -241,6 +262,161 @@ class InMemoryCoreState(
             if series_id is not None:
                 run_series.updated_at = now().isoformat()
             return resolved_series_id
+
+    def store_automation(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        federation_id: str,
+        flwr_aid: str,
+        fab_id: str | None,
+        fab_version: str | None,
+        fab_hash: str | None,
+        override_config: UserConfig,
+        federation_config: SimulationConfig | None,
+        primary_task_type: str,
+        next_run_at: datetime,
+        fixed_interval: int | None = None,
+        remaining_runs: int | None = None,
+        series_id: int | None = None,
+    ) -> Automation:
+        """Store an automation and return its metadata."""
+        _validate_store_automation_args(
+            federation_id=federation_id,
+            flwr_aid=flwr_aid,
+            primary_task_type=primary_task_type,
+            fixed_interval=fixed_interval,
+            remaining_runs=remaining_runs,
+        )
+        with self.lock_run_series_store, self.lock_automation_store:
+            series_id = self._resolve_automation_series_locked(federation_id, series_id)
+            if series_id is None:
+                raise ValueError("Could not create or validate automation run series")
+
+            current = now()
+            automation_id = self._next_automation_id
+            self._next_automation_id += 1
+            automation = Automation(
+                automation_id=automation_id,
+                status=AUTOMATION_STATUS_ACTIVE,
+                federation=federation_id,
+                series_id=series_id,
+                flwr_aid=flwr_aid,
+                created_at=_datetime_to_string(current),
+                updated_at=_datetime_to_string(current),
+                next_run_at=_datetime_to_string(next_run_at),
+            )
+            if fixed_interval is not None:
+                automation.fixed_interval = fixed_interval
+            if remaining_runs is not None:
+                automation.remaining_runs = remaining_runs
+
+            self.automation_store[automation_id] = AutomationRecord(
+                automation=automation,
+                fab_id=fab_id,
+                fab_version=fab_version,
+                fab_hash=fab_hash,
+                override_config=dict(override_config),
+                federation_config=_copy_federation_config(federation_config),
+                primary_task_type=primary_task_type,
+            )
+            return _copy_automation(automation)
+
+    def list_automations(
+        self,
+        *,
+        federation: str | None = None,
+        statuses: Sequence[str] | None = None,
+        due_before: datetime | None = None,
+        limit: int | None = None,
+    ) -> Sequence[Automation]:
+        """Return automations matching the given filters."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if limit == 0 or (statuses is not None and not statuses):
+            return []
+
+        status_set = set(statuses) if statuses is not None else None
+        cutoff = _normalize_datetime(due_before) if due_before is not None else None
+        with self.lock_automation_store:
+            automations = [
+                record.automation
+                for record in self.automation_store.values()
+                if (federation is None or record.automation.federation == federation)
+                and (status_set is None or record.automation.status in status_set)
+                and (
+                    cutoff is None
+                    or (
+                        record.automation.HasField("next_run_at")
+                        and _timestamp_string_to_datetime(record.automation.next_run_at)
+                        <= cutoff
+                    )
+                )
+            ]
+            if due_before is None:
+                automations.sort(
+                    key=lambda automation: _timestamp_string_to_datetime(
+                        automation.updated_at
+                    ),
+                    reverse=True,
+                )
+            else:
+                automations.sort(
+                    key=lambda automation: _timestamp_string_to_datetime(
+                        automation.next_run_at
+                    )
+                )
+            if limit is not None:
+                automations = automations[:limit]
+            return [_copy_automation(automation) for automation in automations]
+
+    def stop_automation(self, automation_id: int) -> bool:
+        """Stop an active automation."""
+        with self.lock_automation_store:
+            record = self.automation_store.get(automation_id)
+            if record is None or record.automation.status != AUTOMATION_STATUS_ACTIVE:
+                return False
+
+            stopped_at = _datetime_to_string(now())
+            record.automation.status = AUTOMATION_STATUS_STOPPED
+            record.automation.updated_at = stopped_at
+            record.automation.stopped_at = stopped_at
+            record.automation.ClearField("next_run_at")
+            return True
+
+    def _resolve_automation_series_locked(
+        self, federation_id: str, series_id: int | None
+    ) -> int | None:
+        """Create or validate the run series for a new automation."""
+        if series_id is not None:
+            existing = self.run_series_store.get(series_id)
+            if existing is None:
+                log(ERROR, "Run series %d not found", series_id)
+                return None
+            if existing.federation != federation_id:
+                log(
+                    ERROR,
+                    "Run series %d belongs to federation %r, not %r",
+                    series_id,
+                    existing.federation,
+                    federation_id,
+                )
+                return None
+            existing.updated_at = now().isoformat()
+            return series_id
+
+        new_series_id = generate_rand_int_from_bytes(
+            SERIES_ID_NUM_BYTES,
+            exclude=set(self.run_series_store),
+        )
+        timestamp = now().isoformat()
+        self.run_series_store[new_series_id] = RunSeries(
+            series_id=new_series_id,
+            federation=federation_id,
+            description="",
+            created_at=timestamp,
+            updated_at=timestamp,
+        )
+        return new_series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""
@@ -740,3 +916,59 @@ class InMemoryCoreState(
         for key, expires_at in list(self.nonce_store.items()):
             if expires_at < current:
                 del self.nonce_store[key]
+
+
+def _validate_store_automation_args(
+    *,
+    federation_id: str,
+    flwr_aid: str,
+    primary_task_type: str,
+    fixed_interval: int | None,
+    remaining_runs: int | None,
+) -> None:
+    """Validate store_automation arguments."""
+    if not federation_id:
+        raise ValueError("`federation_id` must be set")
+    if not flwr_aid:
+        raise ValueError("`flwr_aid` must be set")
+    if not primary_task_type:
+        raise ValueError("`primary_task_type` must be set")
+    if fixed_interval is not None and fixed_interval <= 0:
+        raise ValueError("`fixed_interval` must be greater than 0")
+    if remaining_runs is not None and remaining_runs <= 0:
+        raise ValueError("`remaining_runs` must be greater than 0")
+
+
+def _normalize_datetime(timestamp: datetime) -> datetime:
+    """Return a timezone-aware UTC datetime."""
+    if timestamp.tzinfo is None:
+        return timestamp.replace(tzinfo=UTC)
+    return timestamp.astimezone(UTC)
+
+
+def _datetime_to_string(timestamp: datetime) -> str:
+    """Convert a datetime to an ISO-formatted UTC string."""
+    return timestamp_to_iso(_normalize_datetime(timestamp))
+
+
+def _timestamp_string_to_datetime(timestamp: str) -> datetime:
+    """Convert an ISO-formatted timestamp string to a UTC datetime."""
+    return _normalize_datetime(datetime.fromisoformat(timestamp))
+
+
+def _copy_automation(automation: Automation) -> Automation:
+    """Return a copy of an Automation protobuf."""
+    copied = Automation()
+    copied.CopyFrom(automation)
+    return copied
+
+
+def _copy_federation_config(
+    federation_config: SimulationConfig | None,
+) -> SimulationConfig | None:
+    """Return a copy of a SimulationConfig protobuf."""
+    if federation_config is None:
+        return None
+    copied = SimulationConfig()
+    copied.CopyFrom(federation_config)
+    return copied

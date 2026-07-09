@@ -30,6 +30,7 @@ from sqlalchemy.exc import IntegrityError
 from flwr.app import Context, Message
 from flwr.app.message import make_message
 from flwr.app.metadata import Metadata
+from flwr.app.user_config import UserConfig
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -43,7 +44,9 @@ from flwr.common.constant import (
 from flwr.common.logger import log
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
+from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
@@ -54,11 +57,16 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
+from flwr.supercore.constant import AUTOMATION_STATUS_ACTIVE, AUTOMATION_STATUS_STOPPED
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
-from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
+from flwr.supercore.utils import (
+    int64_to_uint64,
+    simulation_config_to_json,
+    uint64_to_int64,
+)
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -321,6 +329,208 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 return resolved_series_id
         except IntegrityError:
             return None
+
+    def store_automation(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        federation_id: str,
+        flwr_aid: str,
+        fab_id: str | None,
+        fab_version: str | None,
+        fab_hash: str | None,
+        override_config: UserConfig,
+        federation_config: SimulationConfig | None,
+        primary_task_type: str,
+        next_run_at: datetime,
+        fixed_interval: int | None = None,
+        remaining_runs: int | None = None,
+        series_id: int | None = None,
+    ) -> Automation:
+        """Store an automation and return its metadata."""
+        _validate_store_automation_args(
+            federation_id=federation_id,
+            flwr_aid=flwr_aid,
+            primary_task_type=primary_task_type,
+            fixed_interval=fixed_interval,
+            remaining_runs=remaining_runs,
+        )
+
+        try:
+            with self.session():
+                series_id = self._resolve_automation_series(federation_id, series_id)
+                if series_id is None:
+                    raise ValueError(
+                        "Could not create or validate automation run series"
+                    )
+
+                current = now()
+                rows = self.query(
+                    """
+                    INSERT INTO automation (
+                        federation_id, status, series_id, flwr_aid,
+                        fab_id, fab_version, fab_hash, override_config,
+                        federation_config, primary_task_type,
+                        created_at, updated_at, next_run_at, fixed_interval,
+                        remaining_runs, stopped_at
+                    )
+                    VALUES (
+                        :federation_id, :status, :series_id, :flwr_aid,
+                        :fab_id, :fab_version, :fab_hash, :override_config,
+                        :federation_config, :primary_task_type,
+                        :created_at, :updated_at, :next_run_at, :fixed_interval,
+                        :remaining_runs, :stopped_at
+                    )
+                    RETURNING *
+                    """,
+                    {
+                        **_run_template_to_row(
+                            fab_id=fab_id,
+                            fab_version=fab_version,
+                            fab_hash=fab_hash,
+                            override_config=override_config,
+                            federation_config=federation_config,
+                            primary_task_type=primary_task_type,
+                        ),
+                        "federation_id": federation_id,
+                        "status": AUTOMATION_STATUS_ACTIVE,
+                        "series_id": uint64_to_int64(series_id),
+                        "flwr_aid": flwr_aid,
+                        "created_at": current,
+                        "updated_at": current,
+                        "next_run_at": next_run_at,
+                        "fixed_interval": fixed_interval,
+                        "remaining_runs": remaining_runs,
+                        "stopped_at": None,
+                    },
+                )
+        except IntegrityError as exc:
+            raise ValueError("Could not store automation") from exc
+
+        return _automation_from_row(rows[0])
+
+    def list_automations(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        federation: str | None = None,
+        statuses: Sequence[str] | None = None,
+        due_before: datetime | None = None,
+        limit: int | None = None,
+    ) -> Sequence[Automation]:
+        """Return automations matching the given filters."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if limit == 0 or (statuses is not None and not statuses):
+            return []
+
+        conditions: list[str] = []
+        params: dict[str, Any] = {}
+        if federation is not None:
+            conditions.append("federation_id = :federation_id")
+            params["federation_id"] = federation
+        if statuses is not None:
+            placeholders = ",".join(f":status_{i}" for i in range(len(statuses)))
+            conditions.append(f"status IN ({placeholders})")
+            params.update({f"status_{i}": status for i, status in enumerate(statuses)})
+        if due_before is not None:
+            conditions.append("next_run_at IS NOT NULL")
+            conditions.append("next_run_at <= :due_before")
+            params["due_before"] = due_before
+
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        order_clause = "ORDER BY updated_at DESC, automation_id DESC"
+        if due_before is not None:
+            order_clause = "ORDER BY next_run_at ASC, automation_id ASC"
+
+        limit_clause = ""
+        if limit is not None:
+            limit_clause = "LIMIT :limit"
+            params["limit"] = limit
+
+        rows = self.query(
+            f"""
+            SELECT *
+            FROM automation
+            {where_clause}
+            {order_clause}
+            {limit_clause}
+            """,
+            params,
+        )
+        return [_automation_from_row(row) for row in rows]
+
+    def stop_automation(self, automation_id: int) -> bool:
+        """Stop an active automation."""
+        stopped_at = now()
+        rows = self.query(
+            """
+            UPDATE automation
+            SET status = :status,
+                updated_at = :updated_at,
+                stopped_at = :stopped_at,
+                next_run_at = NULL
+            WHERE automation_id = :automation_id
+            AND status = :active_status
+            RETURNING automation_id
+            """,
+            {
+                "automation_id": automation_id,
+                "status": AUTOMATION_STATUS_STOPPED,
+                "updated_at": stopped_at,
+                "stopped_at": stopped_at,
+                "active_status": AUTOMATION_STATUS_ACTIVE,
+            },
+        )
+        return bool(rows)
+
+    def _resolve_automation_series(
+        self, federation_id: str, series_id: int | None
+    ) -> int | None:
+        """Create or validate the run series for a new automation."""
+        if series_id is None:
+            candidate = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
+            timestamp = now()
+            rows = self.query(
+                """
+                INSERT INTO run_series
+                    (series_id, federation_id, description, created_at, updated_at)
+                VALUES
+                    (:series_id, :federation_id, :description, :created_at,
+                     :updated_at)
+                ON CONFLICT(series_id) DO NOTHING
+                RETURNING series_id
+                """,
+                {
+                    "series_id": uint64_to_int64(candidate),
+                    "federation_id": federation_id,
+                    "description": None,
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                },
+            )
+            return candidate if rows else None
+
+        rows = self.query(
+            """
+            UPDATE run_series
+            SET updated_at = :updated_at
+            WHERE series_id = :series_id AND federation_id = :federation_id
+            RETURNING series_id
+            """,
+            {
+                "series_id": uint64_to_int64(series_id),
+                "federation_id": federation_id,
+                "updated_at": now(),
+            },
+        )
+        if not rows:
+            log(
+                ERROR,
+                "Run series %d not found in federation %r",
+                series_id,
+                federation_id,
+            )
+            return None
+        return series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""
@@ -1032,6 +1242,74 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
     )
+
+
+def _automation_from_row(row: dict[str, Any]) -> Automation:
+    """Convert a database row to an Automation object."""
+    automation = Automation(
+        automation_id=row["automation_id"],
+        status=row["status"],
+        federation=row["federation_id"],
+        series_id=int64_to_uint64(row["series_id"]),
+        flwr_aid=row["flwr_aid"],
+        created_at=timestamp_to_iso(row["created_at"]),
+        updated_at=timestamp_to_iso(row["updated_at"]),
+    )
+    if row["next_run_at"] is not None:
+        automation.next_run_at = timestamp_to_iso(row["next_run_at"])
+    if row["fixed_interval"] is not None:
+        automation.fixed_interval = row["fixed_interval"]
+    if row["remaining_runs"] is not None:
+        automation.remaining_runs = row["remaining_runs"]
+    if row["stopped_at"] is not None:
+        automation.stopped_at = timestamp_to_iso(row["stopped_at"])
+    return automation
+
+
+def _run_template_to_row(
+    *,
+    fab_id: str | None,
+    fab_version: str | None,
+    fab_hash: str | None,
+    override_config: UserConfig,
+    federation_config: SimulationConfig | None,
+    primary_task_type: str,
+) -> dict[str, Any]:
+    """Convert run template values to database row values."""
+    federation_config_json = None
+    if federation_config is not None:
+        federation_config_json = json.dumps(
+            simulation_config_to_json(federation_config)
+        )
+    return {
+        "fab_id": fab_id or "",
+        "fab_version": fab_version or "",
+        "fab_hash": fab_hash or "",
+        "override_config": json.dumps(override_config),
+        "federation_config": federation_config_json,
+        "primary_task_type": primary_task_type,
+    }
+
+
+def _validate_store_automation_args(
+    *,
+    federation_id: str,
+    flwr_aid: str,
+    primary_task_type: str,
+    fixed_interval: int | None,
+    remaining_runs: int | None,
+) -> None:
+    """Validate store_automation arguments."""
+    if not federation_id:
+        raise ValueError("`federation_id` must be set")
+    if not flwr_aid:
+        raise ValueError("`flwr_aid` must be set")
+    if not primary_task_type:
+        raise ValueError("`primary_task_type` must be set")
+    if fixed_interval is not None and fixed_interval <= 0:
+        raise ValueError("`fixed_interval` must be greater than 0")
+    if remaining_runs is not None and remaining_runs <= 0:
+        raise ValueError("`remaining_runs` must be greater than 0")
 
 
 def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:

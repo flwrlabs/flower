@@ -124,6 +124,10 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
 # Default federation names for every Flower account
 DEFAULT_FEDERATION_SIMULATION = "workspace"
 
+# Constants for automations
+AUTOMATION_STATUS_ACTIVE = "active"
+AUTOMATION_STATUS_STOPPED = "stopped"
+
 
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
