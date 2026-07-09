@@ -262,13 +262,18 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
     compatibility adapters.
     """
 
-    def __init__(self, config: SuperLinkLifespanConfig) -> None:
+    def __init__(
+        self,
+        config: SuperLinkLifespanConfig,
+        objectstore_factory: ObjectStoreFactory | None = None,
+        state_factory: LinkStateFactory | None = None,
+    ) -> None:
         self.config = config
         self.grpc_servers: list[grpc.Server] = []
         self.bckg_threads: list[threading.Thread] = []
         self.superexec_process: subprocess.Popen[bytes] | None = None
-        self.objectstore_factory: ObjectStoreFactory | None = None
-        self.state_factory: LinkStateFactory | None = None
+        self.objectstore_factory = objectstore_factory
+        self.state_factory = state_factory
         self._serverappio_server: grpc.Server | None = None
         self._started = False
 
@@ -278,15 +283,18 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         if self._started:
             return
 
-        federation_manager = get_federation_manager(
-            is_simulation=self.config.simulation
-        )
-        objectstore_factory, state_factory = _get_objectstore_linkstate_factories(
-            self.config.database, federation_manager
-        )
-        state_factory.state()  # Force initialization before starting network servers
-        self.objectstore_factory = objectstore_factory
-        self.state_factory = state_factory
+        if self.objectstore_factory is None or self.state_factory is None:
+            federation_manager = get_federation_manager(
+                is_simulation=self.config.simulation
+            )
+            objectstore_factory, state_factory = _get_objectstore_linkstate_factories(
+                self.config.database, federation_manager
+            )
+            self.objectstore_factory = objectstore_factory
+            self.state_factory = state_factory
+
+        # Force initialization before starting network servers
+        self.state_factory.state()
 
         self._start_control_api()
         self._start_serverappio_api()
@@ -801,18 +809,20 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
             "`--enable-http-api` cannot be combined with `--fleet-api-type rest`",
         )
     superlink_lifespan = None
-    linkstate_factory = None
+    federation_manager = get_federation_manager(
+        is_simulation=lifespan_config.simulation
+    )
+    objectstore_factory, linkstate_factory = _get_objectstore_linkstate_factories(
+        lifespan_config.database, federation_manager
+    )
+    # Force initialization before exposing LinkState through FastAPI dependencies
+    linkstate_factory.state()
     if start_legacy_grpc:
-        superlink_lifespan = SuperLinkLifespan(lifespan_config)
-    else:
-        federation_manager = get_federation_manager(
-            is_simulation=lifespan_config.simulation
+        superlink_lifespan = SuperLinkLifespan(
+            lifespan_config,
+            objectstore_factory=objectstore_factory,
+            state_factory=linkstate_factory,
         )
-        _, linkstate_factory = _get_objectstore_linkstate_factories(
-            lifespan_config.database, federation_manager
-        )
-        # Force initialization before exposing LinkState through FastAPI dependencies
-        linkstate_factory.state()
     from flwr.superlink.main import (  # pylint: disable=import-outside-toplevel
         create_app,
     )

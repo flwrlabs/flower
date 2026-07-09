@@ -63,13 +63,13 @@ def create_app(
 ) -> FastAPI:
     """Create the SuperLink FastAPI app.
 
-    The `flower-superlink` CLI can pass a `linkstate_factory` for FastAPI-only
-    mode, or a `superlink_lifespan` when FastAPI starts the legacy gRPC APIs for
-    compatibility. In both cases, lifespan startup publishes the LinkStateFactory
-    to app state so REST routers can use FastAPI dependencies.
-
-    Running `uvicorn flwr.superlink.main:app` starts an app without SuperLink
-    state configured.
+    This FastAPI app can be started in two ways:
+    1. Via `flower-superlink`: the CLI passes either a `linkstate_factory` for
+       FastAPI-only mode, or a `superlink_lifespan` when FastAPI also starts the
+       legacy gRPC APIs for compatibility. In both cases, lifespan startup
+       publishes the LinkStateFactory to app state for REST dependencies.
+    2. Via `uvicorn flwr.superlink.main:app`: no SuperLink state is configured
+       unless the caller provides it explicitly.
     """
 
     @asynccontextmanager
