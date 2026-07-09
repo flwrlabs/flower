@@ -203,27 +203,15 @@ def push_messages(
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
-    # Store Message object to descendants mapping and preregister objects
-    objects_to_push: set[str] = set()
-    for object_tree in request.message_object_trees:
-        objects_to_push |= set(store.preregister(run_id, object_tree))
-    # Store Message in State
-    message_id: str | None = state.store_message_res(message=msg)
-    # This is temporary. We should consider a more robust cleanup
-    # mechanism that protects duplicate messages from premature deletion.
-    # Once that is in place, we can remove the run status check below.
-    if (
-        message_id is None
-        and state.get_run_status({run_id})[run_id].status == Status.FINISHED
-    ):
-        # The request currently contains only one message and its object tree.
-        store.delete(request.message_object_trees[0].object_id)
-        objects_to_push.clear()
+    # Store Message in State and preregister its objects.
+    _, objects_to_push = state.store_message_and_object_tree(
+        msg, request.message_object_trees[0]
+    )
 
     # Build response
     response = PushMessagesResponse(
         reconnect=Reconnect(reconnect=5),
-        results={str(message_id): 0},
+        results={msg.metadata.message_id: 0},
         objects_to_push=objects_to_push,
     )
 
