@@ -86,10 +86,6 @@ def create_app(
                 # Temporary compatibility path: start the existing gRPC APIs from
                 # FastAPI lifespan
                 superlink_lifespan.startup()
-                if superlink_lifespan.state_factory is None:
-                    raise RuntimeError(
-                        "SuperLink lifespan state has not been initialized."
-                    )
 
             fastapi_app.state.linkstate_factory = linkstate_factory
 
