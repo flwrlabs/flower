@@ -127,7 +127,7 @@ class StartAutomationRequest(google.protobuf.message.Message):
     START_AT_FIELD_NUMBER: builtins.int
     FIXED_INTERVAL_FIELD_NUMBER: builtins.int
     MAX_RUNS_FIELD_NUMBER: builtins.int
-    start_at: builtins.int
+    start_at: builtins.str
     fixed_interval: builtins.int
     max_runs: builtins.int
     @property
@@ -136,7 +136,7 @@ class StartAutomationRequest(google.protobuf.message.Message):
         self,
         *,
         start_run_request: global___StartRunRequest | None = ...,
-        start_at: builtins.int | None = ...,
+        start_at: builtins.str | None = ...,
         fixed_interval: builtins.int | None = ...,
         max_runs: builtins.int | None = ...,
     ) -> None: ...
@@ -160,13 +160,13 @@ class StartAutomationResponse(google.protobuf.message.Message):
     NEXT_RUN_AT_FIELD_NUMBER: builtins.int
     automation_id: builtins.int
     series_id: builtins.int
-    next_run_at: builtins.int
+    next_run_at: builtins.str
     def __init__(
         self,
         *,
         automation_id: builtins.int = ...,
         series_id: builtins.int = ...,
-        next_run_at: builtins.int = ...,
+        next_run_at: builtins.str = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["automation_id", b"automation_id", "next_run_at", b"next_run_at", "series_id", b"series_id"]) -> None: ...
 
@@ -192,12 +192,12 @@ class Automation(google.protobuf.message.Message):
     federation: builtins.str
     series_id: builtins.int
     flwr_aid: builtins.str
-    created_at: builtins.int
-    updated_at: builtins.int
-    next_run_at: builtins.int
+    created_at: builtins.str
+    updated_at: builtins.str
+    next_run_at: builtins.str
     fixed_interval: builtins.int
     remaining_runs: builtins.int
-    stopped_at: builtins.int
+    stopped_at: builtins.str
     def __init__(
         self,
         *,
@@ -206,12 +206,12 @@ class Automation(google.protobuf.message.Message):
         federation: builtins.str = ...,
         series_id: builtins.int = ...,
         flwr_aid: builtins.str = ...,
-        created_at: builtins.int = ...,
-        updated_at: builtins.int = ...,
-        next_run_at: builtins.int | None = ...,
+        created_at: builtins.str = ...,
+        updated_at: builtins.str = ...,
+        next_run_at: builtins.str | None = ...,
         fixed_interval: builtins.int | None = ...,
         remaining_runs: builtins.int | None = ...,
-        stopped_at: builtins.int | None = ...,
+        stopped_at: builtins.str | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_next_run_at", b"_next_run_at", "_remaining_runs", b"_remaining_runs", "_stopped_at", b"_stopped_at", "fixed_interval", b"fixed_interval", "next_run_at", b"next_run_at", "remaining_runs", b"remaining_runs", "stopped_at", b"stopped_at"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_next_run_at", b"_next_run_at", "_remaining_runs", b"_remaining_runs", "_stopped_at", b"_stopped_at", "automation_id", b"automation_id", "created_at", b"created_at", "federation", b"federation", "fixed_interval", b"fixed_interval", "flwr_aid", b"flwr_aid", "next_run_at", b"next_run_at", "remaining_runs", b"remaining_runs", "series_id", b"series_id", "status", b"status", "stopped_at", b"stopped_at", "updated_at", b"updated_at"]) -> None: ...

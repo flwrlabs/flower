@@ -153,14 +153,14 @@ message StartRunResponse {
 
 message StartAutomationRequest {
   StartRunRequest start_run_request = 1;
-  optional uint64 start_at = 2;
+  optional string start_at = 2;
   optional uint64 fixed_interval = 3;
   optional uint32 max_runs = 4;
 }
 message StartAutomationResponse {
   uint64 automation_id = 1;
   uint64 series_id = 2;
-  uint64 next_run_at = 3;
+  string next_run_at = 3;
 }
 message Automation {
   uint64 automation_id = 1;
@@ -168,12 +168,12 @@ message Automation {
   string federation = 3;
   uint64 series_id = 4;
   string flwr_aid = 5;
-  uint64 created_at = 6;
-  uint64 updated_at = 7;
-  optional uint64 next_run_at = 8;
+  string created_at = 6;
+  string updated_at = 7;
+  optional string next_run_at = 8;
   optional uint64 fixed_interval = 9;
   optional uint32 remaining_runs = 10;
-  optional uint64 stopped_at = 11;
+  optional string stopped_at = 11;
 }
 message ListAutomationsRequest { string federation = 1; }
 message ListAutomationsResponse { repeated Automation automations = 1; }
