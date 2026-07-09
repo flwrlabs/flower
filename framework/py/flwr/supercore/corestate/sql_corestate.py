@@ -347,14 +347,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         series_id: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
-        _validate_store_automation_args(
-            federation_id=federation_id,
-            flwr_aid=flwr_aid,
-            primary_task_type=primary_task_type,
-            fixed_interval=fixed_interval,
-            remaining_runs=remaining_runs,
-        )
-
         try:
             with self.session():
                 series_id = self._resolve_automation_series(federation_id, series_id)
@@ -1289,27 +1281,6 @@ def _run_template_to_row(
         "federation_config": federation_config_json,
         "primary_task_type": primary_task_type,
     }
-
-
-def _validate_store_automation_args(
-    *,
-    federation_id: str,
-    flwr_aid: str,
-    primary_task_type: str,
-    fixed_interval: int | None,
-    remaining_runs: int | None,
-) -> None:
-    """Validate store_automation arguments."""
-    if not federation_id:
-        raise ValueError("`federation_id` must be set")
-    if not flwr_aid:
-        raise ValueError("`flwr_aid` must be set")
-    if not primary_task_type:
-        raise ValueError("`primary_task_type` must be set")
-    if fixed_interval is not None and fixed_interval <= 0:
-        raise ValueError("`fixed_interval` must be greater than 0")
-    if remaining_runs is not None and remaining_runs <= 0:
-        raise ValueError("`remaining_runs` must be greater than 0")
 
 
 def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:
