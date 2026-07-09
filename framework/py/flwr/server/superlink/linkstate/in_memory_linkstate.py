@@ -249,6 +249,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         res_metadata = message.metadata
         with self.lock:
+            message_id = res_metadata.message_id
+            if message_id in self.message_res_store:
+                return message_id
+
             # Check if the Message it is replying to exists and is valid
             msg_ins_id = res_metadata.reply_to_message_id
             self._check_stored_messages({msg_ins_id})
@@ -310,7 +314,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
                 return None
 
-            message_id = message.metadata.message_id
             self.message_res_store[message_id] = message
             self.message_ins_id_to_message_res_id[msg_ins_id] = message_id
 

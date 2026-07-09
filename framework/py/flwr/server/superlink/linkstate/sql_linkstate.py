@@ -396,6 +396,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session():
             res_metadata = message.metadata
+            message_id = res_metadata.message_id
             if not self._lock_run(res_metadata.run_id, require_unfinished=True):
                 log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
                 return None
@@ -449,6 +450,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             try:
                 self.query(query, msg_dict)
             except IntegrityError:
+                # Return the message_id if the reply already exists in the database
+                if self.query(
+                    "SELECT 1 FROM message_res WHERE message_id = :message_id",
+                    {"message_id": message_id},
+                ):
+                    return message_id
+
                 log(
                     ERROR,
                     "Failed to store Message reply: duplicate reply for "
@@ -457,7 +465,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 )
                 return None
 
-        return message.metadata.message_id
+        return message_id
 
     def get_message_res(self, message_ids: set[str]) -> list[Message]:
         """Get reply Messages for the given Message IDs."""
