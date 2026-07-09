@@ -56,6 +56,7 @@ from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
     SendNodeHeartbeatResponse,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ObjectTree,
     PullObjectRequest,
     PullObjectResponse,
     PushObjectRequest,
@@ -272,7 +273,11 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
         msg_proto = create_res_message(
             src_node_id=node_id, dst_node_id=SUPERLINK_NODE_ID, run_id=run_id
         )
-        req = PushMessagesRequest(node=Node(node_id=node_id), messages_list=[msg_proto])
+        req = PushMessagesRequest(
+            node=Node(node_id=node_id),
+            messages_list=[msg_proto],
+            message_object_trees=[ObjectTree(object_id="object-id")],
+        )
         return self._push_messages.with_call(request=req, metadata=metadata)
 
     def _test_pull_object(self, metadata: list[Any]) -> Any:

@@ -22,7 +22,7 @@ from unittest.mock import Mock, patch
 import grpc
 from parameterized import parameterized
 
-from flwr.app import ConfigRecord
+from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.app.message import get_message_to_descendant_id_mapping
 from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
@@ -31,7 +31,7 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     SubStatus,
 )
-from flwr.common.serde import message_from_proto
+from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -339,12 +339,19 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         # Prepare
         node_id = self._create_dummy_node()
         run_id = self._create_dummy_run()
-        msg_proto = create_res_message(
-            src_node_id=node_id, dst_node_id=SUPERLINK_NODE_ID, run_id=run_id
+        message_ins = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
         )
+        self.state.store_message_ins(message_ins)
+        pulled_ins = self.state.get_message_ins(node_id=node_id, limit=1)[0]
+        message = Message(RecordDict(), reply_to=pulled_ins)
+        # pylint: disable-next=W0212
+        message.metadata._message_id = message.object_id  # type: ignore
+        msg_proto = message_to_proto(message)
 
         # Construct message to descendant mapping
-        message = message_from_proto(msg_proto)
         descendant_mapping = get_message_to_descendant_id_mapping(message)
 
         request = PushMessagesRequest(

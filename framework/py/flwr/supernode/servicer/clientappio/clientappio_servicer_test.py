@@ -312,7 +312,36 @@ class TestClientAppIoServicer(unittest.TestCase):
             "ClientAppIo.PushMessages expects exactly one message and one object tree.",
         )
         self.mock_state.record_message_processing_end.assert_not_called()
-        self.mock_state.store_message.assert_not_called()
+        self.mock_state.store_message_and_object_tree.assert_not_called()
+
+    def test_servicer_push_messages_stores_message_and_object_tree(self) -> None:
+        """PushMessages should store the message and preregister its object tree."""
+        message = make_message(
+            metadata=self.maker.metadata(),
+            content=self.maker.recorddict(1, 1, 1),
+        )
+        object_tree = get_object_tree(message)
+        request = PushAppMessagesRequest(
+            messages_list=[message_to_proto(message)],
+            message_object_trees=[object_tree],
+        )
+        self.mock_state.store_message_and_object_tree.return_value = (
+            True,
+            ["object-id"],
+        )
+
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(run_id=message.metadata.run_id),
+        ):
+            response = self.servicer.PushMessages(request, Mock())
+
+        self.mock_state.record_message_processing_end.assert_called_once_with(
+            message_id=message.metadata.reply_to_message_id
+        )
+        self.mock_state.store_message_and_object_tree.assert_called_once()
+        self.assertEqual(list(response.objects_to_push), ["object-id"])
 
     def test_get_nodes_unimplemented(self) -> None:
         """GetNodes should be unavailable on ClientAppIo."""
