@@ -253,7 +253,6 @@ def start_client_internal(
         Configure the transport layer. Allowed values:
         - 'grpc-bidi': gRPC, bidirectional streaming
         - 'grpc-rere': gRPC, request-response (experimental)
-        - 'rest': HTTP (experimental)
     authentication_keys : Optional[Tuple[PrivateKey, PublicKey]] (default: None)
         Tuple containing the elliptic curve private key and public key for
         authentication from the cryptography library.
