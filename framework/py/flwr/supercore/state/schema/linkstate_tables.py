@@ -21,6 +21,7 @@ from sqlalchemy import (
     Column,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     LargeBinary,
@@ -112,7 +113,7 @@ def create_linkstate_metadata() -> MetaData:
     # --------------------------------------------------------------------------
     #  Table: connector
     # --------------------------------------------------------------------------
-    connector = Table(
+    Table(
         "connector",
         metadata,
         Column("id", Integer, primary_key=True, autoincrement=True),
@@ -128,11 +129,6 @@ def create_linkstate_metadata() -> MetaData:
             "connector_ref",
             name="uq_connector_flwr_aid_connector_ref",
         ),
-    )
-    Index(
-        "idx_connector_flwr_aid_connector_ref",
-        connector.c.flwr_aid,
-        connector.c.connector_ref,
     )
 
     # --------------------------------------------------------------------------
@@ -168,12 +164,18 @@ def create_linkstate_metadata() -> MetaData:
         metadata,
         Column("id", Integer, primary_key=True, autoincrement=True),
         Column("run_id", BigInteger, ForeignKey("run.run_id"), nullable=False),
+        Column("flwr_aid", String, nullable=False),
         Column("connector_ref", String, nullable=False),
         Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+        ForeignKeyConstraint(
+            ["flwr_aid", "connector_ref"],
+            ["connector.flwr_aid", "connector.connector_ref"],
+        ),
         UniqueConstraint(
             "run_id",
+            "flwr_aid",
             "connector_ref",
-            name="uq_run_connector_run_id_connector_ref",
+            name="uq_run_connector_run_id_flwr_aid_connector_ref",
         ),
     )
     Index("idx_run_connector_run_id", run_connector.c.run_id)

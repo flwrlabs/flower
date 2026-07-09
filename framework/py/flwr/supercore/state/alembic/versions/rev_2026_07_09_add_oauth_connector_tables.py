@@ -50,12 +50,6 @@ def upgrade() -> None:
             "flwr_aid", "connector_ref", name="uq_connector_flwr_aid_connector_ref"
         ),
     )
-    with op.batch_alter_table("connector", schema=None) as batch_op:
-        batch_op.create_index(
-            "idx_connector_flwr_aid_connector_ref",
-            ["flwr_aid", "connector_ref"],
-            unique=False,
-        )
 
     op.create_table(
         "connector_oauth_session",
@@ -84,15 +78,23 @@ def upgrade() -> None:
         "run_connector",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("run_id", sa.BigInteger(), nullable=False),
+        sa.Column("flwr_aid", sa.String(), nullable=False),
         sa.Column("connector_ref", sa.String(), nullable=False),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["flwr_aid", "connector_ref"],
+            ["connector.flwr_aid", "connector.connector_ref"],
+        ),
         sa.ForeignKeyConstraint(
             ["run_id"],
             ["run.run_id"],
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
-            "run_id", "connector_ref", name="uq_run_connector_run_id_connector_ref"
+            "run_id",
+            "flwr_aid",
+            "connector_ref",
+            name="uq_run_connector_run_id_flwr_aid_connector_ref",
         ),
     )
     with op.batch_alter_table("run_connector", schema=None) as batch_op:
@@ -112,8 +114,5 @@ def downgrade() -> None:
         batch_op.drop_index("idx_connector_oauth_session_flwr_aid_status_expires_at")
 
     op.drop_table("connector_oauth_session")
-    with op.batch_alter_table("connector", schema=None) as batch_op:
-        batch_op.drop_index("idx_connector_flwr_aid_connector_ref")
-
     op.drop_table("connector")
     # ### end Alembic commands ###

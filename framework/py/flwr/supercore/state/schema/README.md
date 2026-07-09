@@ -154,8 +154,9 @@ erDiagram
 
   run_connector {
     INTEGER id PK
+    VARCHAR connector_ref FK
+    VARCHAR flwr_aid FK
     BIGINT run_id FK
-    VARCHAR connector_ref
     TIMESTAMP created_at
   }
 
@@ -247,6 +248,8 @@ erDiagram
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   run ||--o{ run_connector : run_id
+  connector }o--o{ run_connector : flwr_aid
+  connector }o--o{ run_connector : connector_ref
   objects ||--o| run_objects : object_id
   task ||--o{ task_event : task_id
   task ||--o{ task_logs : task_id
