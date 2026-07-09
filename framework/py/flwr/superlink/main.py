@@ -30,6 +30,7 @@ from flwr.common import log
 from flwr.superlink import extensions
 
 if TYPE_CHECKING:
+    from flwr.server.superlink.linkstate import LinkStateFactory
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
 
 
@@ -57,6 +58,7 @@ def _merge_lifespan_state(
 def create_app(
     *,
     superlink_lifespan: SuperLinkLifespan | None = None,
+    linkstate_factory: LinkStateFactory | None = None,
     start_legacy_grpc: bool = False,
 ) -> FastAPI:
     """Create the SuperLink FastAPI app.
@@ -104,6 +106,8 @@ def create_app(
         lifespan=lifespan,
         generate_unique_id_function=generate_unique_route_id,
     )
+    if linkstate_factory is not None:
+        fastapi_app.state.linkstate_factory = linkstate_factory
 
     # Core APIs
     # fastapi_app.include_router(health.router)

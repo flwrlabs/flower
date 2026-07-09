@@ -801,14 +801,24 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
             "`--enable-http-api` cannot be combined with `--fleet-api-type rest`",
         )
     superlink_lifespan = None
+    linkstate_factory = None
     if start_legacy_grpc:
         superlink_lifespan = SuperLinkLifespan(lifespan_config)
+    else:
+        federation_manager = get_federation_manager(
+            is_simulation=lifespan_config.simulation
+        )
+        _, linkstate_factory = _get_objectstore_linkstate_factories(
+            lifespan_config.database, federation_manager
+        )
+        linkstate_factory.state()
     from flwr.superlink.main import (  # pylint: disable=import-outside-toplevel
         create_app,
     )
 
     fastapi_app = create_app(
         superlink_lifespan=superlink_lifespan,
+        linkstate_factory=linkstate_factory,
         start_legacy_grpc=start_legacy_grpc,
     )
 

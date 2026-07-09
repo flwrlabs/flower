@@ -17,7 +17,7 @@
 
 from __future__ import annotations
 
-from typing import Protocol, cast
+from typing import cast
 
 from fastapi import HTTPException, Request, status
 from starlette.datastructures import State
@@ -25,22 +25,16 @@ from starlette.datastructures import State
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 
 
-class _SuperLinkLifespanState(Protocol):
-    """Subset of SuperLinkLifespan state needed by FastAPI dependencies."""
-
-    state_factory: LinkStateFactory | None
-
-
 def get_linkstate(request: Request[State]) -> LinkState:
     """Return the SuperLink LinkState for the current request."""
-    superlink_lifespan = cast(
-        _SuperLinkLifespanState | None,
-        getattr(request.app.state, "superlink_lifespan", None),
+    linkstate_factory = cast(
+        LinkStateFactory | None,
+        getattr(request.app.state, "linkstate_factory", None),
     )
-    if superlink_lifespan is None or superlink_lifespan.state_factory is None:
+    if linkstate_factory is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="SuperLink lifespan state is not initialized.",
+            detail="SuperLink LinkStateFactory is not initialized.",
         )
 
-    return superlink_lifespan.state_factory.state()
+    return linkstate_factory.state()

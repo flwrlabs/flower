@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import cast
 from unittest.mock import Mock
 
@@ -27,6 +26,7 @@ from starlette.datastructures import State
 
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 
+from ..main import create_app
 from .dependencies import get_linkstate
 
 
@@ -48,35 +48,33 @@ def _make_request(app: FastAPI) -> Request[State]:
 
 
 def test_get_linkstate_yields_linkstate_from_lifespan() -> None:
-    """get_linkstate should return the LinkState from the app lifespan."""
-    app = FastAPI()
+    """get_linkstate should return the LinkState from the FastAPI app state."""
     expected_linkstate = cast(LinkState, Mock(spec=LinkState))
     state_factory_mock = Mock(spec=LinkStateFactory)
     state_factory_mock.state.return_value = expected_linkstate
-    app.state.superlink_lifespan = SimpleNamespace(
-        state_factory=cast(LinkStateFactory, state_factory_mock)
-    )
+    app = create_app(linkstate_factory=cast(LinkStateFactory, state_factory_mock))
 
     linkstate = get_linkstate(_make_request(app))
 
+    assert app.state.linkstate_factory is state_factory_mock
     assert linkstate is expected_linkstate
     state_factory_mock.state.assert_called_once_with()
 
 
 @pytest.mark.parametrize(
-    "superlink_lifespan",
-    [None, SimpleNamespace(state_factory=None)],
+    "set_linkstate_factory",
+    [False, True],
 )
-def test_get_linkstate_raises_when_lifespan_state_is_missing(
-    superlink_lifespan: object | None,
+def test_get_linkstate_raises_when_linkstate_factory_is_missing(
+    set_linkstate_factory: bool,
 ) -> None:
-    """get_linkstate should fail clearly before SuperLink state is initialized."""
+    """get_linkstate should fail clearly before LinkStateFactory is initialized."""
     app = FastAPI()
-    if superlink_lifespan is not None:
-        app.state.superlink_lifespan = superlink_lifespan
+    if set_linkstate_factory:
+        app.state.linkstate_factory = None
 
     with pytest.raises(HTTPException) as exc_info:
         get_linkstate(_make_request(app))
 
     assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    assert exc_info.value.detail == "SuperLink lifespan state is not initialized."
+    assert exc_info.value.detail == "SuperLink LinkStateFactory is not initialized."
