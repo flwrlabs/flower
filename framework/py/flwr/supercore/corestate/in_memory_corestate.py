@@ -350,7 +350,7 @@ class InMemoryCoreState(
                 automations.sort(key=lambda automation: automation.next_run_at)
             if limit is not None:
                 automations = automations[:limit]
-            return list(automations)
+            return automations
 
     def stop_automation(self, automation_id: int) -> bool:
         """Stop an active automation."""
