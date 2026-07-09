@@ -23,6 +23,7 @@ from threading import Lock, RLock
 from flwr.app import Error, Message
 from flwr.common.constant import ErrorCode
 from flwr.common.logger import log
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
@@ -97,6 +98,20 @@ class InMemoryNodeState(
                 return None
             self.msg_store[msg_id] = MessageEntry(message=message)
             return msg_id
+
+    def store_message_and_object_tree(
+        self, message: Message, object_tree: ObjectTree
+    ) -> tuple[bool, list[str]]:
+        """Store a Message and preregister its ObjectTree."""
+        with self.lock_msg_store:
+            stored = self.store_message(message) is not None
+            if not stored:
+                return False, []
+
+            missing_objects = self.object_store.preregister(
+                message.metadata.run_id, object_tree
+            )
+            return True, missing_objects
 
     def get_messages(
         self,
