@@ -10,6 +10,26 @@
         layout: elk
 ---
 erDiagram
+  automation {
+    INTEGER automation_id PK
+    TIMESTAMP created_at
+    VARCHAR fab_hash "nullable"
+    VARCHAR fab_id "nullable"
+    VARCHAR fab_version "nullable"
+    VARCHAR federation_config "nullable"
+    VARCHAR federation_id
+    BIGINT fixed_interval "nullable"
+    VARCHAR flwr_aid
+    TIMESTAMP next_run_at "nullable"
+    VARCHAR override_config
+    VARCHAR primary_task_type
+    INTEGER remaining_runs "nullable"
+    BIGINT series_id
+    VARCHAR status
+    TIMESTAMP stopped_at "nullable"
+    TIMESTAMP updated_at
+  }
+
   context {
     BIGINT run_id FK "nullable"
     BLOB context "nullable"

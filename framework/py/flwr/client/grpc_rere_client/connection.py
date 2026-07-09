@@ -119,7 +119,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     root_certificates : Optional[Union[bytes, str]] (default: None)
         Path of the root certificate. If provided, a secure
         connection using the certificates will be established to an SSL-enabled
-        Flower server. Bytes won't work for the REST API.
+        Flower server.
     authentication_keys : Optional[Tuple[PrivateKey, PublicKey]] (default: None)
         Tuple containing the elliptic curve private key and public key for
         authentication from the cryptography library.

@@ -2,7 +2,7 @@
 
 ## Install
 
-To reproduce a development env with Python 3.11.14, all extras (`simulation`, `rest`) and all dependency groups (`dev`):
+To reproduce a development env with Python 3.11.14, all extras (`simulation`) and all dependency groups (`dev`):
 
 ```
 uv sync --python=3.11.14 --locked --all-extras --all-groups

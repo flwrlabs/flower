@@ -39,7 +39,6 @@ from flwr.common.constant import (
     ISOLATION_MODE_SUBPROCESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_REST,
 )
 from flwr.common.logger import log
 from flwr.supercore.auth import (
@@ -267,13 +266,6 @@ def _parse_args_common(parser: argparse.ArgumentParser) -> None:
         const=TRANSPORT_TYPE_GRPC_ADAPTER,
         help="Use grpc-adapter as a transport layer for the client.",
     )
-    ex_group.add_argument(
-        "--rest",
-        action="store_const",
-        dest="transport",
-        const=TRANSPORT_TYPE_REST,
-        help="Use REST as a transport layer for the client.",
-    )
     parser.add_argument(
         "--root-certificates",
         metavar="ROOT_CERT",
@@ -284,9 +276,7 @@ def _parse_args_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--superlink",
         default=FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
-        help="SuperLink Fleet API address (IPv4, IPv6, or a domain name). If using the "
-        "REST (experimental) transport, ensure your address is in the form "
-        "`http://...` or `https://...` when TLS is enabled.",
+        help="SuperLink Fleet API address (IPv4, IPv6, or a domain name).",
     )
     parser.add_argument(
         "--max-retries",

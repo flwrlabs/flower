@@ -2,7 +2,7 @@
 
 ## Install
 
-To run FastAPI, install `flwr` with all extras to ensure the `rest` extra is included:
+To run FastAPI, install `flwr` with all extras:
 
 ```bash
 uv sync --locked --all-extras

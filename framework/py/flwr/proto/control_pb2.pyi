@@ -120,6 +120,169 @@ class StartRunResponse(google.protobuf.message.Message):
 global___StartRunResponse = StartRunResponse
 
 @typing.final
+class StartAutomationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    START_RUN_REQUEST_FIELD_NUMBER: builtins.int
+    START_AT_FIELD_NUMBER: builtins.int
+    FIXED_INTERVAL_FIELD_NUMBER: builtins.int
+    MAX_RUNS_FIELD_NUMBER: builtins.int
+    start_at: builtins.str
+    fixed_interval: builtins.int
+    max_runs: builtins.int
+    @property
+    def start_run_request(self) -> global___StartRunRequest: ...
+    def __init__(
+        self,
+        *,
+        start_run_request: global___StartRunRequest | None = ...,
+        start_at: builtins.str | None = ...,
+        fixed_interval: builtins.int | None = ...,
+        max_runs: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_max_runs", b"_max_runs", "_start_at", b"_start_at", "fixed_interval", b"fixed_interval", "max_runs", b"max_runs", "start_at", b"start_at", "start_run_request", b"start_run_request"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_max_runs", b"_max_runs", "_start_at", b"_start_at", "fixed_interval", b"fixed_interval", "max_runs", b"max_runs", "start_at", b"start_at", "start_run_request", b"start_run_request"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_fixed_interval", b"_fixed_interval"]) -> typing.Literal["fixed_interval"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_max_runs", b"_max_runs"]) -> typing.Literal["max_runs"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_start_at", b"_start_at"]) -> typing.Literal["start_at"] | None: ...
+
+global___StartAutomationRequest = StartAutomationRequest
+
+@typing.final
+class StartAutomationResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AUTOMATION_ID_FIELD_NUMBER: builtins.int
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    NEXT_RUN_AT_FIELD_NUMBER: builtins.int
+    automation_id: builtins.int
+    series_id: builtins.int
+    next_run_at: builtins.str
+    def __init__(
+        self,
+        *,
+        automation_id: builtins.int = ...,
+        series_id: builtins.int = ...,
+        next_run_at: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["automation_id", b"automation_id", "next_run_at", b"next_run_at", "series_id", b"series_id"]) -> None: ...
+
+global___StartAutomationResponse = StartAutomationResponse
+
+@typing.final
+class Automation(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AUTOMATION_ID_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
+    FEDERATION_FIELD_NUMBER: builtins.int
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    FLWR_AID_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    UPDATED_AT_FIELD_NUMBER: builtins.int
+    NEXT_RUN_AT_FIELD_NUMBER: builtins.int
+    FIXED_INTERVAL_FIELD_NUMBER: builtins.int
+    REMAINING_RUNS_FIELD_NUMBER: builtins.int
+    STOPPED_AT_FIELD_NUMBER: builtins.int
+    automation_id: builtins.int
+    status: builtins.str
+    federation: builtins.str
+    series_id: builtins.int
+    flwr_aid: builtins.str
+    created_at: builtins.str
+    updated_at: builtins.str
+    next_run_at: builtins.str
+    fixed_interval: builtins.int
+    remaining_runs: builtins.int
+    stopped_at: builtins.str
+    def __init__(
+        self,
+        *,
+        automation_id: builtins.int = ...,
+        status: builtins.str = ...,
+        federation: builtins.str = ...,
+        series_id: builtins.int = ...,
+        flwr_aid: builtins.str = ...,
+        created_at: builtins.str = ...,
+        updated_at: builtins.str = ...,
+        next_run_at: builtins.str | None = ...,
+        fixed_interval: builtins.int | None = ...,
+        remaining_runs: builtins.int | None = ...,
+        stopped_at: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_next_run_at", b"_next_run_at", "_remaining_runs", b"_remaining_runs", "_stopped_at", b"_stopped_at", "fixed_interval", b"fixed_interval", "next_run_at", b"next_run_at", "remaining_runs", b"remaining_runs", "stopped_at", b"stopped_at"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_next_run_at", b"_next_run_at", "_remaining_runs", b"_remaining_runs", "_stopped_at", b"_stopped_at", "automation_id", b"automation_id", "created_at", b"created_at", "federation", b"federation", "fixed_interval", b"fixed_interval", "flwr_aid", b"flwr_aid", "next_run_at", b"next_run_at", "remaining_runs", b"remaining_runs", "series_id", b"series_id", "status", b"status", "stopped_at", b"stopped_at", "updated_at", b"updated_at"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_fixed_interval", b"_fixed_interval"]) -> typing.Literal["fixed_interval"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_next_run_at", b"_next_run_at"]) -> typing.Literal["next_run_at"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_remaining_runs", b"_remaining_runs"]) -> typing.Literal["remaining_runs"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_stopped_at", b"_stopped_at"]) -> typing.Literal["stopped_at"] | None: ...
+
+global___Automation = Automation
+
+@typing.final
+class ListAutomationsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_FIELD_NUMBER: builtins.int
+    federation: builtins.str
+    def __init__(
+        self,
+        *,
+        federation: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation", b"federation"]) -> None: ...
+
+global___ListAutomationsRequest = ListAutomationsRequest
+
+@typing.final
+class ListAutomationsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AUTOMATIONS_FIELD_NUMBER: builtins.int
+    @property
+    def automations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Automation]: ...
+    def __init__(
+        self,
+        *,
+        automations: collections.abc.Iterable[global___Automation] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["automations", b"automations"]) -> None: ...
+
+global___ListAutomationsResponse = ListAutomationsResponse
+
+@typing.final
+class StopAutomationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AUTOMATION_ID_FIELD_NUMBER: builtins.int
+    automation_id: builtins.int
+    def __init__(
+        self,
+        *,
+        automation_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["automation_id", b"automation_id"]) -> None: ...
+
+global___StopAutomationRequest = StopAutomationRequest
+
+@typing.final
+class StopAutomationResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___StopAutomationResponse = StopAutomationResponse
+
+@typing.final
 class StreamLogsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
