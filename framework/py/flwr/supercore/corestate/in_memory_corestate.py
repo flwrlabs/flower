@@ -20,7 +20,7 @@ import secrets
 from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from logging import ERROR
 from threading import Lock
 from typing import Literal, cast
@@ -54,7 +54,6 @@ from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import (
     generate_rand_int_from_bytes,
-    timestamp_to_iso,
     validate_task_event_data,
     validate_task_message,
 )
@@ -294,9 +293,9 @@ class InMemoryCoreState(
                 federation=federation_id,
                 series_id=series_id,
                 flwr_aid=flwr_aid,
-                created_at=_datetime_to_string(current),
-                updated_at=_datetime_to_string(current),
-                next_run_at=_datetime_to_string(next_run_at),
+                created_at=current.isoformat(),
+                updated_at=current.isoformat(),
+                next_run_at=next_run_at.isoformat(),
             )
             if fixed_interval is not None:
                 automation.fixed_interval = fixed_interval
@@ -309,10 +308,10 @@ class InMemoryCoreState(
                 fab_version=fab_version,
                 fab_hash=fab_hash,
                 override_config=dict(override_config),
-                federation_config=_copy_federation_config(federation_config),
+                federation_config=federation_config,
                 primary_task_type=primary_task_type,
             )
-            return _copy_automation(automation)
+            return automation
 
     def list_automations(
         self,
@@ -329,7 +328,7 @@ class InMemoryCoreState(
             return []
 
         status_set = set(statuses) if statuses is not None else None
-        cutoff = _normalize_datetime(due_before) if due_before is not None else None
+        cutoff = due_before.isoformat() if due_before is not None else None
         with self.lock_automation_store:
             automations = [
                 record.automation
@@ -340,27 +339,20 @@ class InMemoryCoreState(
                     cutoff is None
                     or (
                         record.automation.HasField("next_run_at")
-                        and _timestamp_string_to_datetime(record.automation.next_run_at)
-                        <= cutoff
+                        and record.automation.next_run_at <= cutoff
                     )
                 )
             ]
             if due_before is None:
                 automations.sort(
-                    key=lambda automation: _timestamp_string_to_datetime(
-                        automation.updated_at
-                    ),
+                    key=lambda automation: automation.updated_at,
                     reverse=True,
                 )
             else:
-                automations.sort(
-                    key=lambda automation: _timestamp_string_to_datetime(
-                        automation.next_run_at
-                    )
-                )
+                automations.sort(key=lambda automation: automation.next_run_at)
             if limit is not None:
                 automations = automations[:limit]
-            return [_copy_automation(automation) for automation in automations]
+            return list(automations)
 
     def stop_automation(self, automation_id: int) -> bool:
         """Stop an active automation."""
@@ -369,7 +361,7 @@ class InMemoryCoreState(
             if record is None or record.automation.status != AUTOMATION_STATUS_ACTIVE:
                 return False
 
-            stopped_at = _datetime_to_string(now())
+            stopped_at = now().isoformat()
             record.automation.status = AUTOMATION_STATUS_STOPPED
             record.automation.updated_at = stopped_at
             record.automation.stopped_at = stopped_at
@@ -909,38 +901,3 @@ class InMemoryCoreState(
         for key, expires_at in list(self.nonce_store.items()):
             if expires_at < current:
                 del self.nonce_store[key]
-
-
-def _normalize_datetime(timestamp: datetime) -> datetime:
-    """Return a timezone-aware UTC datetime."""
-    if timestamp.tzinfo is None:
-        return timestamp.replace(tzinfo=UTC)
-    return timestamp.astimezone(UTC)
-
-
-def _datetime_to_string(timestamp: datetime) -> str:
-    """Convert a datetime to an ISO-formatted UTC string."""
-    return timestamp_to_iso(_normalize_datetime(timestamp))
-
-
-def _timestamp_string_to_datetime(timestamp: str) -> datetime:
-    """Convert an ISO-formatted timestamp string to a UTC datetime."""
-    return _normalize_datetime(datetime.fromisoformat(timestamp))
-
-
-def _copy_automation(automation: Automation) -> Automation:
-    """Return a copy of an Automation protobuf."""
-    copied = Automation()
-    copied.CopyFrom(automation)
-    return copied
-
-
-def _copy_federation_config(
-    federation_config: SimulationConfig | None,
-) -> SimulationConfig | None:
-    """Return a copy of a SimulationConfig protobuf."""
-    if federation_config is None:
-        return None
-    copied = SimulationConfig()
-    copied.CopyFrom(federation_config)
-    return copied
