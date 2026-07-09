@@ -57,19 +57,18 @@ def _merge_lifespan_state(
 
 def create_app(
     *,
+    linkstate_factory: LinkStateFactory,
     superlink_lifespan: SuperLinkLifespan | None = None,
-    linkstate_factory: LinkStateFactory | None = None,
     start_legacy_grpc: bool = False,
 ) -> FastAPI:
     """Create the SuperLink FastAPI app.
 
     This FastAPI app can be started in two ways:
-    1. Via `flower-superlink`: the CLI passes either a `linkstate_factory` for
-       FastAPI-only mode, or a `superlink_lifespan` when FastAPI also starts the
-       legacy gRPC APIs for compatibility. In both cases, lifespan startup
-       publishes the LinkStateFactory to app state for REST dependencies.
-    2. Via `uvicorn flwr.superlink.main:app`: no SuperLink state is configured
-       unless the caller provides it explicitly.
+    1. Via `flower-superlink`: the CLI always passes a `linkstate_factory`.
+       When FastAPI also starts the legacy gRPC APIs for compatibility, the CLI
+       also passes a `superlink_lifespan` initialized with the same factory.
+    2. Via direct callers: they must provide a `linkstate_factory` explicitly.
+       Lifespan startup publishes it to app state for REST dependencies.
     """
 
     @asynccontextmanager
@@ -78,7 +77,6 @@ def create_app(
         log(INFO, "FastAPI lifespan: startup")
 
         try:
-            active_linkstate_factory = linkstate_factory
             if superlink_lifespan is not None:
                 # Store the SuperLinkLifespan where future REST routers can access
                 # shared state through FastAPI dependencies
@@ -92,10 +90,8 @@ def create_app(
                     raise RuntimeError(
                         "SuperLink lifespan state has not been initialized."
                     )
-                active_linkstate_factory = superlink_lifespan.state_factory
 
-            if active_linkstate_factory is not None:
-                fastapi_app.state.linkstate_factory = active_linkstate_factory
+            fastapi_app.state.linkstate_factory = linkstate_factory
 
             lifespan_state: dict[str, object] = {}
             async with AsyncExitStack() as stack:
@@ -156,6 +152,3 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
                     "Please ensure all route handler function names are unique."
                 )
             operation_ids.add(op_id)
-
-
-app = create_app()

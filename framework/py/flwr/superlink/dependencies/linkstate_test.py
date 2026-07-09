@@ -69,6 +69,7 @@ def _create_app_with_linkstate_factory(
         superlink_lifespan, "state_factory", linkstate_factory
     )
     return create_app(
+        linkstate_factory=linkstate_factory,
         superlink_lifespan=cast(Any, superlink_lifespan),
         start_legacy_grpc=True,
     )
