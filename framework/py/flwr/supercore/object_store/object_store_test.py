@@ -383,24 +383,12 @@ class InMemoryObjectStoreTest(ObjectStoreTest):
         return InMemoryObjectStore()
 
 
-class SqlInMemoryObjectStoreTest(ObjectStoreTest):
-    """Test SqlObjectStore implementation with in-memory database."""
-
-    __test__ = True
+class SqlObjectStoreTestMixin:
+    """Test SQL-specific ObjectStore behavior."""
 
     def object_store_factory(self) -> SqlObjectStore:
-        """Return SqlObjectStore."""
-        store = SqlObjectStore(":memory:")
-        store.initialize()
-        return store
-
-    def test_in_memory_does_not_create_alembic_version(self) -> None:
-        """Ensure in-memory DB uses create_all without Alembic versioning."""
-        store = self.object_store_factory()
-        table_names = inspect(
-            cast(Engine, store._engine)  # pylint: disable=W0212
-        ).get_table_names()
-        self.assertNotIn("alembic_version", table_names)
+        """Provide SQL ObjectStore implementation to test."""
+        raise NotImplementedError()
 
     def test_preregister_rejects_new_children_for_existing_object_id(self) -> None:
         """Ensure existing SQL objects cannot get new children."""
@@ -449,7 +437,27 @@ class SqlInMemoryObjectStoreTest(ObjectStoreTest):
         self.assertEqual(store.query.call_count, 1)
 
 
-class SqlFileBasedObjectStoreTest(ObjectStoreTest):
+class SqlInMemoryObjectStoreTest(SqlObjectStoreTestMixin, ObjectStoreTest):
+    """Test SqlObjectStore implementation with in-memory database."""
+
+    __test__ = True
+
+    def object_store_factory(self) -> SqlObjectStore:
+        """Return SqlObjectStore."""
+        store = SqlObjectStore(":memory:")
+        store.initialize()
+        return store
+
+    def test_in_memory_does_not_create_alembic_version(self) -> None:
+        """Ensure in-memory DB uses create_all without Alembic versioning."""
+        store = self.object_store_factory()
+        table_names = inspect(
+            cast(Engine, store._engine)  # pylint: disable=W0212
+        ).get_table_names()
+        self.assertNotIn("alembic_version", table_names)
+
+
+class SqlFileBasedObjectStoreTest(SqlObjectStoreTestMixin, ObjectStoreTest):
     """Test SqlObjectStore implementation with file-based database."""
 
     __test__ = True

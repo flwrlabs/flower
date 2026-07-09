@@ -15,8 +15,8 @@
 """Add ObjectStore lock table.
 
 Revision ID: c17f3d9b8a42
-Revises: b2f7c9e5a4d1
-Create Date: 2026-06-12 00:00:00.000000
+Revises: 1289dca56546
+Create Date: 2026-07-09 00:00:00.000000
 """
 
 from collections.abc import Sequence
@@ -28,7 +28,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "c17f3d9b8a42"
-down_revision: str | Sequence[str] | None = "f3bd92e61ee6"
+down_revision: str | Sequence[str] | None = "1289dca56546"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
