@@ -805,6 +805,7 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
     if start_legacy_grpc:
         superlink_lifespan = SuperLinkLifespan(lifespan_config)
     else:
+        # Initialize LinkState
         federation_manager = get_federation_manager(
             is_simulation=lifespan_config.simulation
         )
