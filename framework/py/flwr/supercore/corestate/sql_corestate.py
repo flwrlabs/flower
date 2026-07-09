@@ -396,7 +396,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     },
                 )
         except IntegrityError as exc:
-            raise ValueError("Could not store automation") from exc
+            raise ValueError(f"Could not store automation: {exc}") from exc
 
         return _automation_from_row(rows[0])
 
