@@ -44,6 +44,21 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.StopRunRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.StopRunResponse.FromString,
                 _registered_method=True)
+        self.StartAutomation = channel.unary_unary(
+                '/flwr.proto.Control/StartAutomation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.StartAutomationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.StartAutomationResponse.FromString,
+                _registered_method=True)
+        self.ListAutomations = channel.unary_unary(
+                '/flwr.proto.Control/ListAutomations',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListAutomationsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListAutomationsResponse.FromString,
+                _registered_method=True)
+        self.StopAutomation = channel.unary_unary(
+                '/flwr.proto.Control/StopAutomation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.StopAutomationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.StopAutomationResponse.FromString,
+                _registered_method=True)
         self.StreamLogs = channel.unary_stream(
                 '/flwr.proto.Control/StreamLogs',
                 request_serializer=flwr_dot_proto_dot_control__pb2.StreamLogsRequest.SerializeToString,
@@ -178,6 +193,27 @@ class ControlServicer(object):
 
     def StopRun(self, request, context):
         """Stop run upon request
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StartAutomation(self, request, context):
+        """Start automation upon request
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListAutomations(self, request, context):
+        """List automations
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StopAutomation(self, request, context):
+        """Stop automation
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -368,6 +404,21 @@ def add_ControlServicer_to_server(servicer, server):
                     request_deserializer=flwr_dot_proto_dot_control__pb2.StopRunRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.StopRunResponse.SerializeToString,
             ),
+            'StartAutomation': grpc.unary_unary_rpc_method_handler(
+                    servicer.StartAutomation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.StartAutomationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.StartAutomationResponse.SerializeToString,
+            ),
+            'ListAutomations': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListAutomations,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListAutomationsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListAutomationsResponse.SerializeToString,
+            ),
+            'StopAutomation': grpc.unary_unary_rpc_method_handler(
+                    servicer.StopAutomation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.StopAutomationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.StopAutomationResponse.SerializeToString,
+            ),
             'StreamLogs': grpc.unary_stream_rpc_method_handler(
                     servicer.StreamLogs,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.StreamLogsRequest.FromString,
@@ -543,6 +594,87 @@ class Control(object):
             '/flwr.proto.Control/StopRun',
             flwr_dot_proto_dot_control__pb2.StopRunRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.StopRunResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StartAutomation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/StartAutomation',
+            flwr_dot_proto_dot_control__pb2.StartAutomationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.StartAutomationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListAutomations(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListAutomations',
+            flwr_dot_proto_dot_control__pb2.ListAutomationsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListAutomationsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StopAutomation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/StopAutomation',
+            flwr_dot_proto_dot_control__pb2.StopAutomationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.StopAutomationResponse.FromString,
             options,
             channel_credentials,
             insecure,

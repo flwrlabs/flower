@@ -17,7 +17,7 @@
 import time
 from collections.abc import Generator
 from logging import INFO
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 import grpc
 
@@ -43,6 +43,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAutomationsRequest,
+    ListAutomationsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -67,8 +69,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RevokeInvitationResponse,
     ShowFederationRequest,
     ShowFederationResponse,
+    StartAutomationRequest,
+    StartAutomationResponse,
     StartRunRequest,
     StartRunResponse,
+    StopAutomationRequest,
+    StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
     StreamLogsRequest,
@@ -91,6 +97,15 @@ from .control_handlers import (
     _resolve_federation_id,
     _validate_federation_membership_in_request,
 )
+
+
+def _abort_automations_unimplemented(context: grpc.ServicerContext) -> NoReturn:
+    """Abort an automation RPC that has no implementation yet."""
+    context.abort(
+        grpc.StatusCode.UNIMPLEMENTED,
+        "Automations are not implemented.",
+    )
+    raise NotImplementedError("Automations are not implemented.")
 
 
 # pylint: disable=too-many-public-methods
@@ -204,6 +219,24 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         return control_handlers.stop_run(
             request, _get_account(), self.linkstate_factory.state()
         )
+
+    def StartAutomation(
+        self, request: StartAutomationRequest, context: grpc.ServicerContext
+    ) -> StartAutomationResponse:
+        """Start an automation."""
+        _abort_automations_unimplemented(context)
+
+    def ListAutomations(
+        self, request: ListAutomationsRequest, context: grpc.ServicerContext
+    ) -> ListAutomationsResponse:
+        """List automations."""
+        _abort_automations_unimplemented(context)
+
+    def StopAutomation(
+        self, request: StopAutomationRequest, context: grpc.ServicerContext
+    ) -> StopAutomationResponse:
+        """Stop an automation."""
+        _abort_automations_unimplemented(context)
 
     def GetLoginDetails(
         self, request: GetLoginDetailsRequest, context: grpc.ServicerContext

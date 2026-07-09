@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-07-03 00:26+0000\n"
+"POT-Creation-Date: 2026-07-09 00:26+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -473,17 +473,16 @@ msgstr "Argument de construction"
 #: ../../source/ref-exit-codes/2.rst:7 ../../source/ref-exit-codes/200.rst:23
 #: ../../source/ref-exit-codes/201.rst:7 ../../source/ref-exit-codes/202.rst:7
 #: ../../source/ref-exit-codes/203.rst:7 ../../source/ref-exit-codes/250.rst:7
-#: ../../source/ref-exit-codes/3.rst:7 ../../source/ref-exit-codes/300.rst:7
-#: ../../source/ref-exit-codes/302.rst:7 ../../source/ref-exit-codes/303.rst:7
-#: ../../source/ref-exit-codes/304.rst:7 ../../source/ref-exit-codes/400.rst:7
-#: ../../source/ref-exit-codes/401.rst:7 ../../source/ref-exit-codes/402.rst:7
-#: ../../source/ref-exit-codes/500.rst:7 ../../source/ref-exit-codes/600.rst:7
-#: ../../source/ref-exit-codes/601.rst:7 ../../source/ref-exit-codes/602.rst:7
-#: ../../source/ref-exit-codes/603.rst:7 ../../source/ref-exit-codes/604.rst:7
-#: ../../source/ref-exit-codes/605.rst:7 ../../source/ref-exit-codes/606.rst:7
-#: ../../source/ref-exit-codes/607.rst:7 ../../source/ref-exit-codes/608.rst:7
-#: ../../source/ref-exit-codes/700.rst:7 ../../source/ref-exit-codes/701.rst:7
-#: ../../source/ref-exit-codes/800.rst:7
+#: ../../source/ref-exit-codes/3.rst:7 ../../source/ref-exit-codes/302.rst:7
+#: ../../source/ref-exit-codes/303.rst:7 ../../source/ref-exit-codes/304.rst:7
+#: ../../source/ref-exit-codes/400.rst:7 ../../source/ref-exit-codes/401.rst:7
+#: ../../source/ref-exit-codes/402.rst:7 ../../source/ref-exit-codes/500.rst:7
+#: ../../source/ref-exit-codes/600.rst:7 ../../source/ref-exit-codes/601.rst:7
+#: ../../source/ref-exit-codes/602.rst:7 ../../source/ref-exit-codes/603.rst:7
+#: ../../source/ref-exit-codes/604.rst:7 ../../source/ref-exit-codes/605.rst:7
+#: ../../source/ref-exit-codes/606.rst:7 ../../source/ref-exit-codes/607.rst:7
+#: ../../source/ref-exit-codes/608.rst:7 ../../source/ref-exit-codes/700.rst:7
+#: ../../source/ref-exit-codes/701.rst:7 ../../source/ref-exit-codes/800.rst:7
 msgid "Description"
 msgstr "Description"
 
@@ -7970,7 +7969,7 @@ msgstr "Value"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`nameOverride`"
-msgstr "`nameOverride`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Override Replaces the name of the chart in the Chart.yaml"
@@ -7978,12 +7977,12 @@ msgstr "Remplacement des noms de l'application dans le fichier Chart.yaml"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`flower-server`"
-msgstr "`flower-server`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`fullnameOverride`"
-msgstr "`fullnameOverride`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Override Completely replaces the generated name."
@@ -7992,7 +7991,7 @@ msgstr "Remplacement complet du nom généré."
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`\"\"`"
-msgstr "`\"\"`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:690
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:245
@@ -8002,7 +8001,7 @@ msgstr "Paramètres globaux"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.annotations`"
-msgstr "`global.annotations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8013,12 +8012,12 @@ msgstr "Annotations par défaut"
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, python-brace-format
 msgid "`{}`"
-msgstr "`{}`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.labels`"
-msgstr "`global.labels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8028,7 +8027,7 @@ msgstr "Étiquettes par défaut"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.podLabels`"
-msgstr "`global.podLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8037,7 +8036,7 @@ msgstr "PodLabels par défaut"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.domain`"
-msgstr "`global.domain`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Default Domain"
@@ -8045,11 +8044,11 @@ msgstr "Domaine par défaut"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`example.com`"
-msgstr "`example.com`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.ingressClassName`"
-msgstr "`global.ingressClassName`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Default IngressClass"
@@ -8058,7 +8057,7 @@ msgstr "IngressClass par défaut"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.nodeSelector`"
-msgstr "`global.nodeSelector`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8068,7 +8067,7 @@ msgstr "Sélecteur de nœud par défaut pour tous les composants"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.tolerations`"
-msgstr "`global.tolerations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8078,12 +8077,12 @@ msgstr "Tolérations par défaut pour tous les composants"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`[]`"
-msgstr "`[]`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.affinity.podAntiAffinity`"
-msgstr "`global.affinity.podAntiAffinity`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8093,7 +8092,7 @@ msgstr "Présentation d'affinité par défaut pour tous les composants"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`soft`"
-msgstr "`soft`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8103,7 +8102,7 @@ msgstr "Règles d'anti-affinité du pod par défaut. Soit : `rien`, `mou` ou `du
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.affinity.nodeAffinity.type`"
-msgstr "`global.affinity.nodeAffinity.type`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8113,12 +8112,12 @@ msgstr "Règles d'affinité de nœud par défaut. Soit : `rien`, `mou` ou `dur`"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`hard`"
-msgstr "`hard`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.affinity.nodeAffinity.matchExpressions`"
-msgstr "`global.affinity.nodeAffinity.matchExpressions`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8128,7 +8127,7 @@ msgstr "Expressions de match pour l'affinité de nœud par défaut"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.nodeAuth.enabled`"
-msgstr "`global.nodeAuth.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8138,11 +8137,11 @@ msgstr "Activer ou désactiver la liaison SuperLink <-> SuperNode"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`false`"
-msgstr "`false`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.accountAuth.enabled`"
-msgstr "`global.accountAuth.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enables or disables the user authentication plugin."
@@ -8150,7 +8149,7 @@ msgstr "Activer ou désactiver le plugin d'authentification utilisateur."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.accountAuth.config`"
-msgstr "`global.accountAuth.config`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Set the user authentication configuration."
@@ -8158,7 +8157,7 @@ msgstr "Configurer l'authentification utilisateur."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.accountAuth.existingSecret`"
-msgstr "`global.accountAuth.existingSecret`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Existing secret with user authentication configuration."
@@ -8166,7 +8165,7 @@ msgstr "Secret existant avec configuration d'authentification utilisateur."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.federationsConfig.enabled`"
-msgstr "`global.federationsConfig.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enables or disables the federations configuration plugin."
@@ -8174,7 +8173,7 @@ msgstr "Activer ou désactiver le plugin de configuration des fédérations."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.federationsConfig.config`"
-msgstr "`global.federationsConfig.config`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Set the federations configuration."
@@ -8182,7 +8181,7 @@ msgstr "Configurer les fédérations."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.federationsConfig.existingSecret`"
-msgstr "`global.federationsConfig.existingSecret`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Existing secret with federations configuration."
@@ -8190,7 +8189,7 @@ msgstr "Secret existant avec configuration des fédérations."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.license.enabled`"
-msgstr "`global.license.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enables or disables the configuration of the EE license."
@@ -8199,11 +8198,11 @@ msgstr "Activer ou désactiver la configuration du licence EE."
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`true`"
-msgstr "`true`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.license.key`"
-msgstr "`global.license.key`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "The EE license key."
@@ -8211,7 +8210,7 @@ msgstr "Clé de licence EE."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.license.secretKey`"
-msgstr "`global.license.secretKey`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "The name of the key inside the Kubernetes Secret"
@@ -8219,11 +8218,11 @@ msgstr "Nom de la clé à l'intérieur du Secret Kubernetes"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`FLWR_LICENSE_KEY`"
-msgstr "`FLWR_LICENSE_KEY`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`global.license.existingSecret`"
-msgstr "`global.license.existingSecret`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Name of an existing Kubernetes Secret"
@@ -8232,7 +8231,7 @@ msgstr "Nom d'un Secret Kubernetes existant"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.securityContext.runAsUser`"
-msgstr "`global.securityContext.runAsUser`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8242,12 +8241,12 @@ msgstr "Définir le contexte de sécurité runAsUser"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`49999`"
-msgstr "`49999`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.securityContext.runAsGroup`"
-msgstr "`global.securityContext.runAsGroup`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8257,7 +8256,7 @@ msgstr "Définir le contexte de sécurité runAsGroup"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.securityContext.fsGroup`"
-msgstr "`global.securityContext.fsGroup`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8267,7 +8266,7 @@ msgstr "Définir le contexte de sécurité fsGroup"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.podSecurityContext.runAsNonRoot`"
-msgstr "`global.podSecurityContext.runAsNonRoot`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8277,7 +8276,7 @@ msgstr "Définir le contexte de sécurité runAsNonRoot"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.podSecurityContext.readOnlyRootFilesystem`"
-msgstr "`global.podSecurityContext.readOnlyRootFilesystem`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8287,7 +8286,7 @@ msgstr "Définir le contexte de sécurité readOnlyRootFilesystem"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.podSecurityContext.allowPrivilegeEscalation`"
-msgstr "`global.podSecurityContext.allowPrivilegeEscalation`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8297,7 +8296,7 @@ msgstr "Définir le contexte de sécurité allowPrivilegeEscalation"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.podSecurityContext.seccompProfile.type`"
-msgstr "`global.podSecurityContext.seccompProfile.type`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8307,12 +8306,12 @@ msgstr "Définir le contexte de sécurité seccompProfile"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`RuntimeDefault`"
-msgstr "`RuntimeDefault`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.podSecurityContext.capabilities.drop`"
-msgstr "`global.podSecurityContext.capabilities.drop`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8322,12 +8321,12 @@ msgstr "Définir le contexte de sécurité capabilities"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`[\"ALL\"]`"
-msgstr "`[\"TOUT\"]`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.env`"
-msgstr "`global.env`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8337,7 +8336,7 @@ msgstr "Variables d'environnement par défaut"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.image.pullPolicy`"
-msgstr "`global.image.pullPolicy`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8347,7 +8346,7 @@ msgstr "Politique de tirage d'image par défaut"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`IfNotPresent`"
-msgstr "`IfNotPresent`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:727
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:271
@@ -8357,7 +8356,7 @@ msgstr "Configuration TLS"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`tls.enabled`"
-msgstr "`tls.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8366,7 +8365,7 @@ msgstr "Activer la configuration TLS pour le Framework Flower."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.issuer.enabled`"
-msgstr "`tls.issuer.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable automatic creation of a cert-manager Issuer."
@@ -8374,7 +8373,7 @@ msgstr "Activer la création automatique d'un Issuer cert-manager."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.issuer.name`"
-msgstr "`tls.issuer.name`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Name of the Issuer resource to use."
@@ -8382,7 +8381,7 @@ msgstr "Nom du ressource Issuer à utiliser."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.issuer.spec`"
-msgstr "`tls.issuer.spec`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "The contents of the `.spec` block for the cert-manager Issuer."
@@ -8390,7 +8389,7 @@ msgstr "Contenu du bloc `.spec` pour l'Issuer cert-manager."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.certificate.enabled`"
-msgstr "`tls.certificate.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable automatic creation of a cert-manager Certificate."
@@ -8398,7 +8397,7 @@ msgstr "Activer la création automatique d'un Certificate cert-manager."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.certificate.annotations`"
-msgstr "`tls.certificate.annotations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Certificate CRD annotations."
@@ -8406,7 +8405,7 @@ msgstr "Annotations CRD du Certificate."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.certificate.secretName`"
-msgstr "`tls.certificate.secretName`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Name of the Kubernetes Secret to store the TLS key and certificate."
@@ -8414,7 +8413,7 @@ msgstr "Nom de la Secret Kubernetes pour stocker la clé et le certificat TLS."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.certificate.issuerGroup`"
-msgstr "`tls.certificate.issuerGroup`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "API group for the issuer. Defaults to `cert-manager.io`."
@@ -8422,11 +8421,11 @@ msgstr "Groupe API pour l'émetteur. Par défaut, `cert-manager.io`."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`cert-manager.io`"
-msgstr "`cert-manager.io`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.certificate.existingIssuer`"
-msgstr "`tls.certificate.existingIssuer`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Name of an existing Issuer or ClusterIssuer to use."
@@ -8434,7 +8433,7 @@ msgstr "Nom d'un émetteur existant ou ClusterIssuer à utiliser."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.certificate.existingIssuerKind`"
-msgstr "`tls.certificate.existingIssuerKind`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Kind of the existing issuer (`Issuer` or `ClusterIssuer`)."
@@ -8442,7 +8441,7 @@ msgstr "Type de l'émetteur existant (`Issuer` ou `ClusterIssuer`)."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.certificate.duration`"
-msgstr "`tls.certificate.duration`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "The requested ‘duration’ (i.e. lifetime) of the Certificate."
@@ -8450,11 +8449,11 @@ msgstr "Durée requise (c'est-à-dire la durée de vie) du Certificate."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`43800h`"
-msgstr "`43800h`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.certificate.renewBefore`"
-msgstr "`tls.certificate.renewBefore`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "How long before the currently issued certificate’s expiry"
@@ -8462,11 +8461,11 @@ msgstr "Durée avant l'expiration actuelle du certificat"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`360h`"
-msgstr "`360h`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.certificate.privateKey`"
-msgstr "`tls.certificate.privateKey`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Private key options. These include the key algorithm and"
@@ -8474,7 +8473,7 @@ msgstr "Options de clés privées. Il s'agit de l'algorithme de la clé et"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.certificate.usages`"
-msgstr "`tls.certificate.usages`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Requested key usages and extended key usages."
@@ -8482,7 +8481,7 @@ msgstr "Utilisations requises de clés et utilisations étendues de clés."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.certificate.additionalHosts`"
-msgstr "`tls.certificate.additionalHosts`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Additional hosts you want to put into the SAN's"
@@ -8490,7 +8489,7 @@ msgstr "Hôtes supplémentaires que vous souhaitez ajouter dans le SAN's"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`tls.existingSecret`"
-msgstr "`tls.existingSecret`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:748
 msgid "Component SuperLink"
@@ -8498,7 +8497,7 @@ msgstr "Composant SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.name`"
-msgstr "`superlink.name`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Name of the SuperLink"
@@ -8506,11 +8505,11 @@ msgstr "Nom du SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink`"
-msgstr "`superlink`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.enabled`"
-msgstr "`superlink.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable or Disable SuperLink"
@@ -8518,7 +8517,7 @@ msgstr "Activer ou désactiver SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.resources`"
-msgstr "`superlink.resources`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8532,7 +8531,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.volumes`"
-msgstr "`superlink.volumes`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Specify a list of volumes for the SuperLink pod(s)"
@@ -8540,7 +8539,7 @@ msgstr "Spécifiez une liste de volumes pour le(s) pod(s) du SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.volumeMounts`"
-msgstr "`superlink.volumeMounts`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8549,7 +8548,7 @@ msgstr "Permet de spécifier des VolumeMounts supplémentaires"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.isolationMode`"
-msgstr "`superlink.isolationMode`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "The isolation mode of the SuperLink"
@@ -8558,11 +8557,11 @@ msgstr "Mode d'isolement du SuperLink"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`subprocess`"
-msgstr "`subprocess`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.automountServiceAccountToken`"
-msgstr "`superlink.automountServiceAccountToken`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8571,7 +8570,7 @@ msgstr "Automount SA-TOKEN dans le pod."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.serviceAccount.enabled`"
-msgstr "`superlink.serviceAccount.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enabled a service account for the application controller"
@@ -8579,7 +8578,7 @@ msgstr "Activer un compte de service pour le contrôleur d'application"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.serviceAccount.annotations`"
-msgstr "`superlink.serviceAccount.annotations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8588,7 +8587,7 @@ msgstr "Annotations appliquées au compte de service activé"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.serviceAccount.labels`"
-msgstr "`superlink.serviceAccount.labels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8597,7 +8596,7 @@ msgstr "Étiquettes appliquées au compte de service activé"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.serviceAccount.automountServiceAccountToken`"
-msgstr "`superlink.serviceAccount.automountServiceAccountToken`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8606,7 +8605,7 @@ msgstr "Automount SA-TOKEN"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.type`"
-msgstr "`superlink.service.type`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8616,11 +8615,11 @@ msgstr "Sont valides ClusterIP, NodePort ou Loadbalancer"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`ClusterIP`"
-msgstr "`ClusterIP`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.servicePortControlName`"
-msgstr "`superlink.service.servicePortControlName`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Prefix of the SuperLink Control API port"
@@ -8628,11 +8627,11 @@ msgstr "Préfixe du port API de contrôle SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`control`"
-msgstr "`control`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.servicePortControl`"
-msgstr "`superlink.service.servicePortControl`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Port to expose for the SuperLink Control API"
@@ -8640,11 +8639,11 @@ msgstr "Port à exposer pour l'API de contrôle SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`9093`"
-msgstr "`9093`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.nodePortControl`"
-msgstr "`superlink.service.nodePortControl`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Node port for SuperLink Control API"
@@ -8652,7 +8651,7 @@ msgstr "Port node pour l'API de contrôle SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.servicePortServerAppIoName`"
-msgstr "`superlink.service.servicePortServerAppIoName`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Prefix of the SuperLink ServerAppIo API port"
@@ -8660,11 +8659,11 @@ msgstr "Préfixe du port API ServerAppIo SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`serverappio`"
-msgstr "`serverappio`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.servicePortServerAppIo`"
-msgstr "`superlink.service.servicePortServerAppIo`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Port to expose for the SuperLink ServerAppIo API"
@@ -8672,11 +8671,11 @@ msgstr "Port à exposer pour l'API ServerAppIo SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`9091`"
-msgstr "`9091`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.nodePortServerAppIo`"
-msgstr "`superlink.service.nodePortServerAppIo`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Node port for SuperLink ServerAppIo API"
@@ -8684,7 +8683,7 @@ msgstr "Port node pour l'API ServerAppIo SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.servicePortFleetName`"
-msgstr "`superlink.service.servicePortFleetName`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Prefix of the SuperLink Fleet API port"
@@ -8692,11 +8691,11 @@ msgstr "Préfixe du port API Fleet SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`fleet`"
-msgstr "`fleet`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.servicePortFleet`"
-msgstr "`superlink.service.servicePortFleet`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Port to expose for the SuperLink Fleet API"
@@ -8705,11 +8704,11 @@ msgstr "Port à exposer pour l'API Fleet SuperLink"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`9092`"
-msgstr "`9092`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.nodePortFleet`"
-msgstr "`superlink.service.nodePortFleet`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Node port for SuperLink Fleet API"
@@ -8717,7 +8716,7 @@ msgstr "Port du nœud pour l'API SuperLink Fleet"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.containerPorts.control`"
-msgstr "`superlink.containerPorts.control`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Container port for SuperLink Control API"
@@ -8725,7 +8724,7 @@ msgstr "Port du conteneur pour l'API de contrôle SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.containerPorts.serverAppIo`"
-msgstr "`superlink.containerPorts.serverAppIo`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Container port for SuperLink ServerAppIo API"
@@ -8733,7 +8732,7 @@ msgstr "Port du conteneur pour l'API ServerAppIo SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.containerPorts.fleet`"
-msgstr "`superlink.containerPorts.fleet`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Container port for SuperLink Fleet API"
@@ -8741,7 +8740,7 @@ msgstr "Port du conteneur pour l'API SuperLink Fleet"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.containerPorts.health`"
-msgstr "`superlink.containerPorts.health`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Container port for SuperLink Health API"
@@ -8750,11 +8749,11 @@ msgstr "Port du conteneur pour l'API Health SuperLink"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`8081`"
-msgstr "`8081`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.replicaCount`"
-msgstr "`superlink.replicaCount`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "The number of SuperLink pods to run"
@@ -8763,11 +8762,11 @@ msgstr "Nombre de pods SuperLink à exécuter"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`1`"
-msgstr "`1`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.labels`"
-msgstr "`superlink.labels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Extra labels for SuperLink pods"
@@ -8775,7 +8774,7 @@ msgstr "Étiquettes supplémentaires pour les pods SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.extraArgs`"
-msgstr "`superlink.extraArgs`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Add extra arguments to the default arguments for the SuperLink"
@@ -8784,8 +8783,149 @@ msgstr ""
 "SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.enabled`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Enable TLS on the SuperLink ServerAppIo API."
+msgstr "Activer TLS sur l'API ServerAppIo du SuperLink."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.existingSecret`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Existing Kubernetes Secret for ServerAppIo TLS."
+msgstr "Secret Kubernetes existant pour le TLS ServerAppIo."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.mountPath`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Mount path used when AppIO uses a separate TLS Secret."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`/app/appio-cert`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.caCertfile`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Path to the CA certificate used by SuperExec to verify ServerAppIo."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`/app/cert/ca.crt`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.certfile`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Path to the ServerAppIo server certificate."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`/app/cert/tls.crt`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.keyfile`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Path to the ServerAppIo server private key."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`/app/cert/tls.key`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.certificate.enabled`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Enable automatic creation of a cert-manager Certificate for ServerAppIo."
+msgstr "Activer la création automatique d'un certificat cert-manager pour ServerAppIo."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.certificate.annotations`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.certificate.secretName`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid ""
+"Name of the Kubernetes Secret storing the ServerAppIo TLS key and "
+"certificate."
+msgstr "Nom du Secret Kubernetes stockant la clé TLS ServerAppIo et le certificat."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.certificate.issuerGroup`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "API group for the issuer."
+msgstr "Groupe API de l'émetteur."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.certificate.existingIssuer`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.certificate.existingIssuerKind`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.certificate.dnsNames`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "DNS names for the ServerAppIo certificate."
+msgstr "Noms DNS du certificat ServerAppIo."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.certificate.duration`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "The requested certificate lifetime."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.certificate.renewBefore`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "How long before expiry cert-manager should renew the certificate."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.certificate.privateKey`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Private key options."
+msgstr "Options de clé privée."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`superlink.appioTls.certificate.usages`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.superexecAuthSecretFile`"
-msgstr "`superlink.superexecAuthSecretFile`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8794,7 +8934,7 @@ msgstr "Chemin vers un fichier contenant le secret partagé SuperExec."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.nodeSelector`"
-msgstr "`superlink.nodeSelector`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Node labels for SuperLink pods which merges with global.nodeSelector"
@@ -8804,7 +8944,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.tolerations`"
-msgstr "`superlink.tolerations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Node tolerations for SuperLink pods which merges with global.tolerations"
@@ -8814,7 +8954,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.updateStrategy.type`"
-msgstr "`superlink.updateStrategy.type`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink deployment strategy type"
@@ -8823,11 +8963,11 @@ msgstr "Type de stratégie de déploiement SuperLink"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`RollingUpdate`"
-msgstr "`RollingUpdate`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.updateStrategy.rollingUpdate`"
-msgstr "`superlink.updateStrategy.rollingUpdate`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink deployment rolling update configuration parameters"
@@ -8835,7 +8975,7 @@ msgstr "Paramètres de configuration d'actualisation roulante SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.affinity`"
-msgstr "`superlink.affinity`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Node affinity for SuperLink pods which merges with global.affinity"
@@ -8845,7 +8985,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.env`"
-msgstr "`superlink.env`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid ""
@@ -8857,7 +8997,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.podSecurityContext`"
-msgstr "`superlink.podSecurityContext`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Security settings that for the SuperLink Pods"
@@ -8865,7 +9005,7 @@ msgstr "Paramètres de sécurité pour les pods SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.securityContext`"
-msgstr "`superlink.securityContext`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Security settings that for the SuperLink"
@@ -8873,7 +9013,7 @@ msgstr "Paramètres de sécurité pour le SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.livenessProbe.enabled`"
-msgstr "`superlink.livenessProbe.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable livenessProbe on SuperLink containers"
@@ -8881,7 +9021,7 @@ msgstr "Activer livenessProbe sur les conteneurs SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.livenessProbe.initialDelaySeconds`"
-msgstr "`superlink.livenessProbe.initialDelaySeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8891,11 +9031,11 @@ msgstr "Délai initial en secondes pour livenessProbe"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`0`"
-msgstr "`0`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.livenessProbe.periodSeconds`"
-msgstr "`superlink.livenessProbe.periodSeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8905,11 +9045,11 @@ msgstr "Période en secondes pour livenessProbe"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`10`"
-msgstr "`10`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.livenessProbe.timeoutSeconds`"
-msgstr "`superlink.livenessProbe.timeoutSeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8918,7 +9058,7 @@ msgstr "Temps d'attente en secondes pour livenessProbe"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.livenessProbe.failureThreshold`"
-msgstr "`superlink.livenessProbe.failureThreshold`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8928,11 +9068,11 @@ msgstr "Seuil de défaillance pour livenessProbe"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`3`"
-msgstr "`3`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.livenessProbe.successThreshold`"
-msgstr "`superlink.livenessProbe.successThreshold`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8941,7 +9081,7 @@ msgstr "Seuil de réussite pour livenessProbe"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.readinessProbe.enabled`"
-msgstr "`superlink.readinessProbe.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable readinessProbe on SuperLink containers"
@@ -8949,7 +9089,7 @@ msgstr "Activer readinessProbe sur les conteneurs SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.readinessProbe.initialDelaySeconds`"
-msgstr "`superlink.readinessProbe.initialDelaySeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8958,7 +9098,7 @@ msgstr "Délai initial en secondes pour readinessProbe"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.readinessProbe.periodSeconds`"
-msgstr "`superlink.readinessProbe.periodSeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8967,7 +9107,7 @@ msgstr "Période en secondes pour readinessProbe"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.readinessProbe.timeoutSeconds`"
-msgstr "`superlink.readinessProbe.timeoutSeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8976,7 +9116,7 @@ msgstr "Temps d'attente en secondes pour readinessProbe"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.readinessProbe.failureThreshold`"
-msgstr "`superlink.readinessProbe.failureThreshold`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8985,7 +9125,7 @@ msgstr "Seuil de défaillance pour readinessProbe"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.readinessProbe.successThreshold`"
-msgstr "`superlink.readinessProbe.successThreshold`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -8994,7 +9134,7 @@ msgstr "Seuil de réussite pour readinessProbe"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.enabled`"
-msgstr "`superlink.ingress.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable the ingress resource"
@@ -9002,7 +9142,7 @@ msgstr "Activer la ressource Ingress"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.annotations`"
-msgstr "`superlink.ingress.annotations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Additional annotations for the ingress"
@@ -9010,7 +9150,7 @@ msgstr "Annotations supplémentaires pour l'Ingress"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.ingressClassName`"
-msgstr "`superlink.ingress.ingressClassName`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Defines which ingress controller which implement the resource"
@@ -9018,7 +9158,7 @@ msgstr "Définit quel contrôleur d'Ingress implémente la ressource"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.tls.enabled`"
-msgstr "`superlink.ingress.tls.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable TLS termination at the Ingress level."
@@ -9026,7 +9166,7 @@ msgstr "Activer la terminaison TLS au niveau de l'Ingress."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.tls.secretName`"
-msgstr "`superlink.ingress.tls.secretName`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Name of the Kubernetes Secret that will contain the"
@@ -9034,7 +9174,7 @@ msgstr "Nom du Secret Kubernetes qui contiendra le"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.control.enabled`"
-msgstr "`superlink.ingress.control.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable an ingress resource for SuperLink API"
@@ -9042,7 +9182,7 @@ msgstr "Activer une ressource Ingress pour l'API SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.control.hostname`"
-msgstr "`superlink.ingress.control.hostname`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Ingress hostname for the SuperLink API ingress"
@@ -9050,11 +9190,11 @@ msgstr "Hôte Ingress pour l'ingress API SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`control.example.com`"
-msgstr "`control.example.com`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.control.path`"
-msgstr "`superlink.ingress.control.path`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink API ingress path"
@@ -9062,11 +9202,11 @@ msgstr "Chemin d'accès de l'ingress API SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`/`"
-msgstr "`/`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.control.pathType`"
-msgstr "`superlink.ingress.control.pathType`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Ingress path type. One of Exact, Prefix or ImplementationSpecific"
@@ -9074,11 +9214,11 @@ msgstr "Type de chemin d'accès. L'un des Exact, Préfixe ou ImplementationSpeci
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`ImplementationSpecific`"
-msgstr "`ImplementationSpecific`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.fleet.enabled`"
-msgstr "`superlink.ingress.fleet.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable an ingress resource for SuperLink Fleet API"
@@ -9086,7 +9226,7 @@ msgstr "Activer une ressource Ingress pour l'API Fleet SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.fleet.hostname`"
-msgstr "`superlink.ingress.fleet.hostname`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Ingress hostname for the SuperLink Fleet API ingress"
@@ -9094,11 +9234,11 @@ msgstr "Hôte Ingress pour l'ingress API Fleet SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`fleet.example.com`"
-msgstr "`fleet.example.com`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.fleet.path`"
-msgstr "`superlink.ingress.fleet.path`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink Fleet API ingress path"
@@ -9106,11 +9246,11 @@ msgstr "Chemin d'accès de l'ingress API Fleet SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.fleet.pathType`"
-msgstr "`superlink.ingress.fleet.pathType`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.serverAppIo.enabled`"
-msgstr "`superlink.ingress.serverAppIo.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable an ingress resource for SuperLink ServerAppIo API"
@@ -9118,7 +9258,7 @@ msgstr "Activer une ressource Ingress pour l'API ServerAppIo SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.serverAppIo.hostname`"
-msgstr "`superlink.ingress.serverAppIo.hostname`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Ingress hostname for the SuperLink ServerAppIo API ingress"
@@ -9126,11 +9266,11 @@ msgstr "Hôte Ingress pour l'ingress API ServerAppIo SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`serverappio.example.com`"
-msgstr "`serverappio.example.com`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.serverAppIo.path`"
-msgstr "`superlink.ingress.serverAppIo.path`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink ServerAppIo API ingress path"
@@ -9138,11 +9278,11 @@ msgstr "Chemin d'accès de l'ingress API ServerAppIo SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.serverAppIo.pathType`"
-msgstr "`superlink.ingress.serverAppIo.pathType`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.extraHosts`"
-msgstr "`superlink.ingress.extraHosts`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "An array with additional hostname(s) to be covered with the ingress record"
@@ -9152,7 +9292,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.extraTls`"
-msgstr "`superlink.ingress.extraTls`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid ""
@@ -9164,7 +9304,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.extraRules`"
-msgstr "`superlink.ingress.extraRules`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Additional rules to be covered with this ingress record"
@@ -9172,7 +9312,7 @@ msgstr "Règles supplémentaires à couvrir avec ce registre d'Ingress"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.lifecycle`"
-msgstr "`superlink.lifecycle`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink container(s) to automate configuration before or after startup"
@@ -9182,7 +9322,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.annotations`"
-msgstr "`superlink.annotations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Additional custom annotations for SuperLink"
@@ -9190,7 +9330,7 @@ msgstr "Annotations personnalisées supplémentaires pour SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.selectorLabels`"
-msgstr "`superlink.selectorLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Extra selectorLabels for SuperLink pods"
@@ -9198,7 +9338,7 @@ msgstr "Étiquettes de sélection supplémentaires pour les pods SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.podAnnotations`"
-msgstr "`superlink.podAnnotations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Annotations for SuperLink pods"
@@ -9206,7 +9346,7 @@ msgstr "Annotations pour les pods SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.podLabels`"
-msgstr "`superlink.podLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Extra podLabels for SuperLink pods"
@@ -9214,7 +9354,7 @@ msgstr "Étiquettes de pod supplémentaires pour les pods SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.imagePullSecrets`"
-msgstr "`superlink.imagePullSecrets`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink image pull secrets which overrides global.imagePullSecrets"
@@ -9224,7 +9364,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.image.registry`"
-msgstr "`superlink.image.registry`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink image registry"
@@ -9233,11 +9373,11 @@ msgstr "Registre d'image SuperLink"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`registry.hub.docker.com`"
-msgstr "`registry.hub.docker.com`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.image.repository`"
-msgstr "`superlink.image.repository`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink image repository"
@@ -9245,11 +9385,11 @@ msgstr "Répertoire d'image SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`flwr/superlink-ee`"
-msgstr "`flwr/superlink-ee`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.image.tag`"
-msgstr "`superlink.image.tag`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink image tag"
@@ -9257,12 +9397,12 @@ msgstr "Tag d'image SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-msgid "`1.29.0-ubuntu`"
-msgstr "`1.29.0-ubuntu`"
+msgid "`1.32.1-ubuntu`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.image.digest`"
-msgstr "`superlink.image.digest`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink image digest"
@@ -9270,7 +9410,7 @@ msgstr "Digest d'image SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.image.pullPolicy`"
-msgstr "`superlink.image.pullPolicy`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "SuperLink image pullPolicy which Components image pullPolicy"
@@ -9280,7 +9420,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.enabled`"
-msgstr "`superlink.networkPolicy.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9289,7 +9429,7 @@ msgstr "Spécifiez si une NetworkPolicy doit être créée"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.allowExternal`"
-msgstr "`superlink.networkPolicy.allowExternal`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9298,7 +9438,7 @@ msgstr "Autoriser le trafic d'ingress externe"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.allowExternalEgress`"
-msgstr "`superlink.networkPolicy.allowExternalEgress`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9307,7 +9447,7 @@ msgstr "Autoriser un trafic egress non restreint"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.extraIngress`"
-msgstr "`superlink.networkPolicy.extraIngress`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9316,20 +9456,18 @@ msgstr "Ajouter des règles d'ingress supplémentaires à la NetworkPolicy"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.extraEgress`"
-msgstr "`superlink.networkPolicy.extraEgress`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid ""
-"Add extra ingress rules to the NetworkPolicy (ignored if "
+"Add extra egress rules to the NetworkPolicy (ignored if "
 "allowExternalEgress=true)"
-msgstr ""
-"Ajouter des règles d'ingress supplémentaires à la NetworkPolicy (ignorées"
-" si allowExternalEgress=true)"
+msgstr "Ajouter des règles egress supplémentaires à la NetworkPolicy (ignorées si allowExternalEgress=true)"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.serverAppIo.ingressPodMatchLabels`"
-msgstr "`superlink.networkPolicy.serverAppIo.ingressPodMatchLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid ""
@@ -9342,7 +9480,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.serverAppIo.ingressNSMatchLabels`"
-msgstr "`superlink.networkPolicy.serverAppIo.ingressNSMatchLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid ""
@@ -9355,7 +9493,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.serverAppIo.ingressNSPodMatchLabels`"
-msgstr "`superlink.networkPolicy.serverAppIo.ingressNSPodMatchLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid ""
@@ -9368,37 +9506,37 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.fleet.ingressPodMatchLabels`"
-msgstr "`superlink.networkPolicy.fleet.ingressPodMatchLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.fleet.ingressNSMatchLabels`"
-msgstr "`superlink.networkPolicy.fleet.ingressNSMatchLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.fleet.ingressNSPodMatchLabels`"
-msgstr "`superlink.networkPolicy.fleet.ingressNSPodMatchLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.control.ingressPodMatchLabels`"
-msgstr "`superlink.networkPolicy.control.ingressPodMatchLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.control.ingressNSMatchLabels`"
-msgstr "`superlink.networkPolicy.control.ingressNSMatchLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.networkPolicy.control.ingressNSPodMatchLabels`"
-msgstr "`superlink.networkPolicy.control.ingressNSPodMatchLabels`"
+msgstr ""
 
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:847
-#: ../../source/helm/how-to-deploy-supernode-using-helm.md:348
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:864
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:352
 msgid "Component SuperExec"
 msgstr "Composant SuperExec"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.name`"
-msgstr "`superexec.name`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9407,12 +9545,12 @@ msgstr "Nom du SuperExec"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superexec-serverapp`"
-msgstr "`superexec-serverapp`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.enabled`"
-msgstr "`superexec.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable or disable SuperExec"
@@ -9421,7 +9559,7 @@ msgstr "Activer ou désactiver SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.pluginType`"
-msgstr "`superexec.pluginType`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9430,11 +9568,11 @@ msgstr "Type de plugin à utiliser."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`serverapp`"
-msgstr "`serverapp`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superexec.superlink`"
-msgstr "`superexec.superlink`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Address of the SuperLink the SuperExec should connect to"
@@ -9443,11 +9581,22 @@ msgstr "Adresse du SuperLink auquel le SuperExec doit se connecter"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.superexecAuthSecretFile`"
-msgstr "`superexec.superexecAuthSecretFile`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.rootCertificates`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Path to a PEM-encoded root CA certificate used to verify AppIO."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.allowRuntimeDependencyInstallation`"
-msgstr "`superexec.allowRuntimeDependencyInstallation`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Allow SuperExec to install runtime dependencies for ServerApps."
@@ -9457,13 +9606,325 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.type`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Executor backend for SuperExec task launches. Valid values are "
+"`subprocess` or `kubernetes`."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.configPath`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Absolute file path inside the SuperExec container for the executor config"
+" file. Must not end with `/` or point directly under `/`."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`/etc/flwr/executor/executor-config.yaml`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.configMap.create`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Create a ConfigMap containing the generated executor config."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.configMap.name`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"ConfigMap name to create or mount. Required when `create` is false. "
+"Defaults to `<superexec-fullname>-executor-config` when `create` is true."
+" Explicit names must be 63 characters or fewer."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.configMap.key`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "ConfigMap data key for the generated executor config file."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`executor-config.yaml`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.namespace`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Namespace where SuperExec creates TaskExecutor Pods and credential "
+"Secrets. The chart renders this Namespace in Kubernetes executor mode, so"
+" installation requires permission to create or adopt it. Required when "
+"`superexec.executor.type=kubernetes` and must differ from the release "
+"namespace."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.appioRootCertificatesPath`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Path to a PEM-encoded AppIO root CA file to copy into TaskExecutor "
+"credential Secrets."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.image.registry`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "TaskExecutor image registry."
+msgstr "Registre d'image TaskExecutor."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.image.repository`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "TaskExecutor image repository."
+msgstr "Répertoire d'image TaskExecutor."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.image.tag`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "TaskExecutor image tag."
+msgstr "Tag d'image TaskExecutor."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.image.digest`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "TaskExecutor image digest."
+msgstr "Digest d'image TaskExecutor."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.image.pullPolicy`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "TaskExecutor image pull policy."
+msgstr "Politique de pull d'image TaskExecutor."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`Always`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.resourcePool`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Resource pool label value for the TaskExecutor Namespace and generated "
+"TaskExecutor Pods and Secrets."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.activePodBudget`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Maximum active TaskExecutor Pods allowed for this SuperExec before it "
+"waits for capacity."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`nil`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.capacityPollInterval`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Capacity wait polling interval in seconds."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.capacityLogInterval`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Capacity wait log interval in seconds."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.labels`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Additional labels for generated TaskExecutor Pods and Secrets."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.annotations`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Additional annotations for generated TaskExecutor Pods and Secrets."
+msgstr "Annotations supplémentaires pour les pods et secrets TaskExecutor générés."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.env`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Literal environment variables for the generated TaskExecutor container."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.resources`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "TaskExecutor container requests and limits."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.nodeSelector`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Node selector for generated TaskExecutor Pods."
+msgstr "Sélecteur de nœuds pour les pods TaskExecutor générés."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.tolerations`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Tolerations for generated TaskExecutor Pods."
+msgstr "Tolérances pour les pods TaskExecutor générés."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.affinity`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Affinity for generated TaskExecutor Pods."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.priorityClassName`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "PriorityClass name for generated TaskExecutor Pods."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.podSecurityContext`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Pod security context for generated TaskExecutor Pods."
+msgstr "Contexte de sécurité des pods TaskExecutor générés."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.containerSecurityContext`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Container security context for generated TaskExecutor Pods."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.serviceAccountName`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Optional service account name for generated TaskExecutor Pods. Flower's "
+"Kubernetes executor runtime sets `automountServiceAccountToken: false`; "
+"leaving this empty avoids assigning a non-default identity, but "
+"tokenlessness comes from that runtime setting."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.resources`"
-msgstr "`superexec.resources`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.volumes`"
-msgstr "`superexec.volumes`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Optionally specify list of volumes for the SuperExec pod(s)"
@@ -9472,17 +9933,17 @@ msgstr "Spécifiez facultativement la liste des volumes pour les pods SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.volumeMounts`"
-msgstr "`superexec.volumeMounts`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.automountServiceAccountToken`"
-msgstr "`superexec.automountServiceAccountToken`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.serviceAccount.enabled`"
-msgstr "`superexec.serviceAccount.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9492,22 +9953,46 @@ msgstr "Activer un compte de service pour ce composant"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.serviceAccount.annotations`"
-msgstr "`superexec.serviceAccount.annotations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.serviceAccount.labels`"
-msgstr "`superexec.serviceAccount.labels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.serviceAccount.automountServiceAccountToken`"
-msgstr "`superexec.serviceAccount.automountServiceAccountToken`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.rbac.create`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Create Role and RoleBinding permissions in the TaskExecutor namespace for"
+" the Kubernetes executor launcher ServiceAccount."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.rbac.includeGet`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Include diagnostic `get` permissions on Pods and Secrets in addition to "
+"create/list/delete."
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.containerPorts.health`"
-msgstr "`superexec.containerPorts.health`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9517,7 +10002,7 @@ msgstr "Port conteneur pour l'API de santé SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.podSecurityContext`"
-msgstr "`superexec.podSecurityContext`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Security settings for the SuperExec Pods"
@@ -9526,7 +10011,7 @@ msgstr "Paramètres de sécurité pour les pods SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.livenessProbe.enabled`"
-msgstr "`superexec.livenessProbe.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9536,32 +10021,32 @@ msgstr "Activer livenessProbe sur les conteneurs SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.livenessProbe.initialDelaySeconds`"
-msgstr "`superexec.livenessProbe.initialDelaySeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.livenessProbe.periodSeconds`"
-msgstr "`superexec.livenessProbe.periodSeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.livenessProbe.timeoutSeconds`"
-msgstr "`superexec.livenessProbe.timeoutSeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.livenessProbe.failureThreshold`"
-msgstr "`superexec.livenessProbe.failureThreshold`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.livenessProbe.successThreshold`"
-msgstr "`superexec.livenessProbe.successThreshold`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.readinessProbe.enabled`"
-msgstr "`superexec.readinessProbe.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9571,32 +10056,32 @@ msgstr "Activer readinessProbe sur les conteneurs SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.readinessProbe.initialDelaySeconds`"
-msgstr "`superexec.readinessProbe.initialDelaySeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.readinessProbe.periodSeconds`"
-msgstr "`superexec.readinessProbe.periodSeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.readinessProbe.timeoutSeconds`"
-msgstr "`superexec.readinessProbe.timeoutSeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.readinessProbe.failureThreshold`"
-msgstr "`superexec.readinessProbe.failureThreshold`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.readinessProbe.successThreshold`"
-msgstr "`superexec.readinessProbe.successThreshold`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.replicas`"
-msgstr "`superexec.replicas`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "The number of SuperExec pods to run"
@@ -9605,7 +10090,7 @@ msgstr "Nombre de pods SuperExec à exécuter"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.labels`"
-msgstr "`superexec.labels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9615,7 +10100,7 @@ msgstr "Étiquettes supplémentaires pour les pods SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.extraArgs`"
-msgstr "`superexec.extraArgs`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9627,7 +10112,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.nodeSelector`"
-msgstr "`superexec.nodeSelector`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9639,7 +10124,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.tolerations`"
-msgstr "`superexec.tolerations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9651,7 +10136,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.updateStrategy.type`"
-msgstr "`superexec.updateStrategy.type`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9661,7 +10146,7 @@ msgstr "Type de stratégie de déploiement SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.updateStrategy.rollingUpdate`"
-msgstr "`superexec.updateStrategy.rollingUpdate`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9673,7 +10158,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.affinity`"
-msgstr "`superexec.affinity`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9685,7 +10170,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.env`"
-msgstr "`superexec.env`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9699,7 +10184,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.lifecycle`"
-msgstr "`superexec.lifecycle`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9711,7 +10196,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.annotations`"
-msgstr "`superexec.annotations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9721,7 +10206,7 @@ msgstr "Annotations personnalisées supplémentaires pour les pods SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.selectorLabels`"
-msgstr "`superexec.selectorLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9731,7 +10216,7 @@ msgstr "Étiquettes de sélection supplémentaires pour les pods SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.podAnnotations`"
-msgstr "`superexec.podAnnotations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9741,7 +10226,7 @@ msgstr "Annotations pour les pods SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.podLabels`"
-msgstr "`superexec.podLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9751,7 +10236,7 @@ msgstr "Étiquettes de pod supplémentaires pour les pods SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.imagePullSecrets`"
-msgstr "`superexec.imagePullSecrets`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9761,7 +10246,7 @@ msgstr "Secrets d'image pull SuperExec qui surchargent global.imagePullSecrets"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.image.registry`"
-msgstr "`superexec.image.registry`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9771,7 +10256,7 @@ msgstr "Registre d'image SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.image.repository`"
-msgstr "`superexec.image.repository`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9781,12 +10266,12 @@ msgstr "Répertoire d'image SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`flwr/superexec-ee`"
-msgstr "`flwr/superexec-ee`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.image.tag`"
-msgstr "`superexec.image.tag`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9796,7 +10281,7 @@ msgstr "Tag d'image du SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.image.digest`"
-msgstr "`superexec.image.digest`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9806,7 +10291,7 @@ msgstr "Digest d'image de SuperExec"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.image.pullPolicy`"
-msgstr "`superexec.image.pullPolicy`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -9814,31 +10299,73 @@ msgid "Components image pullPolicy"
 msgstr "Politique de tirage d'image des composants"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`Always`"
-msgstr "`Always`"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.networkPolicy.enabled`"
-msgstr "`superexec.networkPolicy.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.networkPolicy.allowExternalEgress`"
-msgstr "`superexec.networkPolicy.allowExternalEgress`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.networkPolicy.extraEgress`"
-msgstr "`superexec.networkPolicy.extraEgress`"
+msgstr ""
 
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:903
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.taskExecutorNetworkPolicy.enabled`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Create a NetworkPolicy in the TaskExecutor namespace for Flower-created "
+"TaskExecutor Pods."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.taskExecutorNetworkPolicy.allowExternalEgress`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Allow unrestricted egress from TaskExecutor Pods."
+msgstr "Autoriser un egress non restreint depuis les pods TaskExecutor."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.taskExecutorNetworkPolicy.labels`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Additional labels for the TaskExecutor NetworkPolicy pod selector. These "
+"labels are also added to generated TaskExecutor Pod labels."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.taskExecutorNetworkPolicy.extraEgress`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Add egress rules from TaskExecutor Pods to AppIO, proxies, registries, or"
+" other required services (ignored if allowExternalEgress=true)."
+msgstr "Ajouter des règles egress depuis les pods TaskExecutor vers AppIO, les proxies, les registres ou d'autres services requis (ignorées si allowExternalEgress=true)."
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:954
 msgid "Component OpenFGA"
 msgstr "Composant OpenFGA"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`openfga.enabled`"
-msgstr "`openfga.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Enable the openfga subchart and deploy OpenFGA"
@@ -10073,7 +10600,7 @@ msgstr "Remplace le nom du chart dans le Chart.yaml"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`flower-client`"
-msgstr "`flower-client`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Completely replaces the generated name."
@@ -10081,7 +10608,7 @@ msgstr "Remplace complètement le nom généré."
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`global.nodeAuth.authSupernodePrivateKey`"
-msgstr "`global.nodeAuth.authSupernodePrivateKey`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Specifies the ecdsa-sha2-nistp384 private key"
@@ -10093,7 +10620,7 @@ msgstr "Composant SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.name`"
-msgstr "`supernode.name`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Name of the SuperNode"
@@ -10101,11 +10628,11 @@ msgstr "Nom du SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode`"
-msgstr "`supernode`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.enabled`"
-msgstr "`supernode.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Enable or disable SuperNode"
@@ -10113,15 +10640,15 @@ msgstr "Activer ou désactiver SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.resources`"
-msgstr "`supernode.resources`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.node.config`"
-msgstr "`supernode.node.config`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.isolationMode`"
-msgstr "`supernode.isolationMode`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "The isolation mode of the SuperNode"
@@ -10129,7 +10656,7 @@ msgstr "Mode d'isolement du SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.superlink.address`"
-msgstr "`supernode.superlink.address`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Address of the SuperLink the SuperNodes should connect to"
@@ -10137,11 +10664,11 @@ msgstr "Adresse de SuperLink que les SuperNodes doivent se connecter à"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`my-superlink.example.com`"
-msgstr "`my-superlink.example.com`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.superlink.port`"
-msgstr "`supernode.superlink.port`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Port of the SuperLink the SuperNodes should connect to"
@@ -10149,19 +10676,19 @@ msgstr "Port de SuperLink que les SuperNodes doivent se connecter à"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.superlink.certificate.existingSecret`"
-msgstr "`supernode.superlink.certificate.existingSecret`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.superlink.certificate.copyFromExistingSecret.enabled`"
-msgstr "`supernode.superlink.certificate.copyFromExistingSecret.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.superlink.certificate.copyFromExistingSecret.secretName`"
-msgstr "`supernode.superlink.certificate.copyFromExistingSecret.secretName`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.volumes`"
-msgstr "`supernode.volumes`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Specify a list of volumes for the SuperNode pod(s)"
@@ -10169,35 +10696,35 @@ msgstr "Spécifiez une liste de volumes pour le pod(s) SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.volumeMounts`"
-msgstr "`supernode.volumeMounts`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.automountServiceAccountToken`"
-msgstr "`supernode.automountServiceAccountToken`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.serviceAccount.enabled`"
-msgstr "`supernode.serviceAccount.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.serviceAccount.annotations`"
-msgstr "`supernode.serviceAccount.annotations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.serviceAccount.labels`"
-msgstr "`supernode.serviceAccount.labels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.serviceAccount.automountServiceAccountToken`"
-msgstr "`supernode.serviceAccount.automountServiceAccountToken`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.service.type`"
-msgstr "`supernode.service.type`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.service.servicePortClientAppIoName`"
-msgstr "`supernode.service.servicePortClientAppIoName`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Prefix of the SuperNode ClientAppIo API port"
@@ -10205,11 +10732,11 @@ msgstr "Préfixe du port API ClientAppIo de SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`clientappio`"
-msgstr "`clientappio`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.service.servicePortClientAppIo`"
-msgstr "`supernode.service.servicePortClientAppIo`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Port to expose for the SuperNode ClientAppIo API"
@@ -10217,11 +10744,11 @@ msgstr "Port à exposer pour l'API ClientAppIo de SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`9094`"
-msgstr "`9094`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.service.nodePortClientAppIo`"
-msgstr "`supernode.service.nodePortClientAppIo`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Node port for SuperNode ClientAppIo API"
@@ -10229,7 +10756,7 @@ msgstr "Port du nœud pour l'API ClientAppIo de SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.containerPorts.clientAppIo`"
-msgstr "`supernode.containerPorts.clientAppIo`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Container port for SuperNode ClientAppIo API"
@@ -10237,7 +10764,7 @@ msgstr "Port du conteneur pour l'API ClientAppIo de SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.containerPorts.health`"
-msgstr "`supernode.containerPorts.health`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Container port for SuperNode Health API"
@@ -10245,11 +10772,11 @@ msgstr "Port du conteneur pour l'API Health de SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.podSecurityContext`"
-msgstr "`supernode.podSecurityContext`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.replicas`"
-msgstr "`supernode.replicas`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "The number of SuperNode pods to run"
@@ -10257,7 +10784,7 @@ msgstr "Nombre de pods SuperNode à exécuter"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.labels`"
-msgstr "`supernode.labels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Extra labels for SuperNode pods"
@@ -10265,7 +10792,7 @@ msgstr "Étiquettes supplémentaires pour les pods SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.extraArgs`"
-msgstr "`supernode.extraArgs`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Add extra arguments to the default arguments for the SuperNode"
@@ -10274,12 +10801,44 @@ msgstr ""
 "SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`supernode.appioTls.enabled`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Enable TLS on the SuperNode ClientAppIo API."
+msgstr "Activer TLS sur l'API ClientAppIo du SuperNode."
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`supernode.appioTls.caCertfile`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Path to the CA certificate used by SuperExec to verify ClientAppIo."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`supernode.appioTls.certfile`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Path to the ClientAppIo server certificate."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`supernode.appioTls.keyfile`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Path to the ClientAppIo server private key."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.superexecAuthSecretFile`"
-msgstr "`supernode.superexecAuthSecretFile`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.nodeSelector`"
-msgstr "`supernode.nodeSelector`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Node labels for SuperNode pods which merges with global.nodeSelector"
@@ -10289,7 +10848,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.tolerations`"
-msgstr "`supernode.tolerations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Node tolerations for SuperNode pods which merges with global.tolerations"
@@ -10299,7 +10858,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.updateStrategy.type`"
-msgstr "`supernode.updateStrategy.type`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "SuperNode deployment strategy type"
@@ -10307,7 +10866,7 @@ msgstr "Type de stratégie de déploiement SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.updateStrategy.rollingUpdate`"
-msgstr "`supernode.updateStrategy.rollingUpdate`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "SuperNode deployment rolling update configuration parameters"
@@ -10317,7 +10876,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.affinity`"
-msgstr "`supernode.affinity`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Node affinity for SuperNode pods which merges with global.affinity"
@@ -10327,7 +10886,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.env`"
-msgstr "`supernode.env`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid ""
@@ -10339,7 +10898,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.livenessProbe.enabled`"
-msgstr "`supernode.livenessProbe.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Enable livenessProbe on SuperNode containers"
@@ -10347,27 +10906,27 @@ msgstr "Activer livenessProbe sur les conteneurs SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.livenessProbe.initialDelaySeconds`"
-msgstr "`supernode.livenessProbe.initialDelaySeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.livenessProbe.periodSeconds`"
-msgstr "`supernode.livenessProbe.periodSeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.livenessProbe.timeoutSeconds`"
-msgstr "`supernode.livenessProbe.timeoutSeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.livenessProbe.failureThreshold`"
-msgstr "`supernode.livenessProbe.failureThreshold`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.livenessProbe.successThreshold`"
-msgstr "`supernode.livenessProbe.successThreshold`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.readinessProbe.enabled`"
-msgstr "`supernode.readinessProbe.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Enable readinessProbe on SuperNode containers"
@@ -10375,27 +10934,27 @@ msgstr "Activer readinessProbe sur les conteneurs SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.readinessProbe.initialDelaySeconds`"
-msgstr "`supernode.readinessProbe.initialDelaySeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.readinessProbe.periodSeconds`"
-msgstr "`supernode.readinessProbe.periodSeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.readinessProbe.timeoutSeconds`"
-msgstr "`supernode.readinessProbe.timeoutSeconds`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.readinessProbe.failureThreshold`"
-msgstr "`supernode.readinessProbe.failureThreshold`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.readinessProbe.successThreshold`"
-msgstr "`supernode.readinessProbe.successThreshold`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.lifecycle`"
-msgstr "`supernode.lifecycle`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "SuperNode container(s) to automate configuration before or after startup"
@@ -10405,7 +10964,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.annotations`"
-msgstr "`supernode.annotations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Additional custom annotations for SuperNode"
@@ -10413,7 +10972,7 @@ msgstr "Annotations personnalisées supplémentaires pour SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.selectorLabels`"
-msgstr "`supernode.selectorLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Extra selectorLabels for SuperNode pods"
@@ -10421,7 +10980,7 @@ msgstr "Étiquettes de sélection supplémentaires pour les pods SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.podAnnotations`"
-msgstr "`supernode.podAnnotations`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Annotations for SuperNode pods"
@@ -10429,7 +10988,7 @@ msgstr "Annotations pour les pods SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.podLabels`"
-msgstr "`supernode.podLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Extra podLabels for SuperNode pods"
@@ -10437,7 +10996,7 @@ msgstr "Étiquettes de pod supplémentaires pour les pods SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.imagePullSecrets`"
-msgstr "`supernode.imagePullSecrets`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "SuperNode image pull secrets which overrides global.imagePullSecrets"
@@ -10445,7 +11004,7 @@ msgstr "Secrets d'image pull SuperNode qui dépassent global.imagePullSecrets"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.image.registry`"
-msgstr "`supernode.image.registry`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "SuperNode image registry"
@@ -10453,7 +11012,7 @@ msgstr "Registre d'image SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.image.repository`"
-msgstr "`supernode.image.repository`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "SuperNode image repository"
@@ -10461,11 +11020,11 @@ msgstr "Répertoire d'image SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`flwr/supernode-ee`"
-msgstr "`flwr/supernode-ee`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.image.tag`"
-msgstr "`supernode.image.tag`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Image tag of SuperNode"
@@ -10473,7 +11032,7 @@ msgstr "Tag d'image SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.image.digest`"
-msgstr "`supernode.image.digest`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Image digest of SuperNode"
@@ -10481,31 +11040,31 @@ msgstr "Digest d'image SuperNode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.image.pullPolicy`"
-msgstr "`supernode.image.pullPolicy`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.networkPolicy.enabled`"
-msgstr "`supernode.networkPolicy.enabled`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.networkPolicy.allowExternal`"
-msgstr "`supernode.networkPolicy.allowExternal`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.networkPolicy.allowExternalEgress`"
-msgstr "`supernode.networkPolicy.allowExternalEgress`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.networkPolicy.extraIngress`"
-msgstr "`supernode.networkPolicy.extraIngress`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.networkPolicy.extraEgress`"
-msgstr "`supernode.networkPolicy.extraEgress`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.networkPolicy.ingressPodMatchLabels`"
-msgstr "`supernode.networkPolicy.ingressPodMatchLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid ""
@@ -10517,7 +11076,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.networkPolicy.ingressNSMatchLabels`"
-msgstr "`supernode.networkPolicy.ingressNSMatchLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid ""
@@ -10529,7 +11088,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`supernode.networkPolicy.ingressNSPodMatchLabels`"
-msgstr "`supernode.networkPolicy.ingressNSPodMatchLabels`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid ""
@@ -10541,7 +11100,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec-clientapp`"
-msgstr "`superexec-clientapp`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Enable or disable SuperExec component"
@@ -10549,15 +11108,19 @@ msgstr "Activer ou désactiver le composant SuperExec"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`clientapp`"
-msgstr "`clientapp`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.supernode`"
-msgstr "`superexec.supernode`"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Address of the supernode the SuperExec should connect to"
 msgstr "Adresse du supernode auquel SuperExec doit se connecter"
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Allow SuperExec to install runtime dependencies for ClientApps."
+msgstr "Autoriser SuperExec à installer les dépendances runtime pour les applications Client."
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Specify a list of volumes for the SuperExec pod(s)"
@@ -12954,8 +13517,8 @@ msgid ""
 msgstr ""
 "L'utilisateur invité verra l'invitation lorsqu'il se connectera à "
 "`flower.ai <https://flower.ai/>`__ et ouvrira sa page de profil. "
-"L'invitation affichera l'ID de la fédération et le nom d'utilisateur du"
-" utilisateur qui l'a envoyée."
+"L'invitation affichera l'ID de la fédération et le nom d'utilisateur du "
+"utilisateur qui l'a envoyée."
 
 #: ../../source/how-to-create-and-manage-federations.rst:122
 msgid "Pending federation invitation on the invited user's profile page"
@@ -14307,8 +14870,8 @@ msgid ""
 " the name of the federation."
 msgstr ""
 "Les fédérations peuvent être adressées par leur identifiant unique "
-"(federation ID), qui a la forme ``@<account-name>/<federation-name>``. "
-"L'``<account-name>`` est le nom du compte qui a créé la fédération, et "
+"(federation ID), qui a la forme ``@<account-name>/<federation-name>``. L"
+"'``<account-name>`` est le nom du compte qui a créé la fédération, et "
 "``<federation-name>`` est le nom de la fédération."
 
 #: ../../source/how-to-manage-flower-federations.rst:29
@@ -14356,9 +14919,9 @@ msgid ""
 "account:"
 msgstr ""
 "Le commande ci-dessus affichera une table avec une ligne pour chaque "
-"fédération dont vous faites partie. Dans ce cas, il y a une "
-"fédération: ``@none/default``. Son nom est ``default``, et "
-"elle appartient au compte ``none`` :"
+"fédération dont vous faites partie. Dans ce cas, il y a une fédération: "
+"``@none/default``. Son nom est ``default``, et elle appartient au compte "
+"``none`` :"
 
 #: ../../source/how-to-manage-flower-federations.rst:66
 msgid "Inspect a Federation"
@@ -14371,10 +14934,10 @@ msgid ""
 "``flwr federation list``. With this command, you will be able to see the "
 "following information about a federation:"
 msgstr ""
-"Vous pouvez inspecter une fédération spécifique en fournissant "
-"le federation ID à la commande ``flwr federation list``. "
-"Avec cette commande, vous pourrez voir les informations suivantes sur une"
-" fédération :"
+"Vous pouvez inspecter une fédération spécifique en fournissant le "
+"federation ID à la commande ``flwr federation list``. Avec cette "
+"commande, vous pourrez voir les informations suivantes sur une fédération"
+" :"
 
 #: ../../source/how-to-manage-flower-federations.rst:72
 msgid "The members of the federation."
@@ -14394,8 +14957,8 @@ msgid ""
 "The ``flwr federation list --federation <federation-id>`` command expects"
 " the federation ID as an argument:"
 msgstr ""
-"La commande ``flwr federation list --federation <federation-id>`` nécessite "
-"l'identifiant de la fédération à inspecter comme argument :"
+"La commande ``flwr federation list --federation <federation-id>`` "
+"nécessite l'identifiant de la fédération à inspecter comme argument :"
 
 #: ../../source/how-to-manage-flower-federations.rst:83
 msgid ""
@@ -45268,7 +45831,6 @@ msgstr ""
 #: ../../source/ref-exit-codes/202.rst:13
 #: ../../source/ref-exit-codes/203.rst:15
 #: ../../source/ref-exit-codes/250.rst:14
-#: ../../source/ref-exit-codes/300.rst:14
 #: ../../source/ref-exit-codes/302.rst:15
 #: ../../source/ref-exit-codes/303.rst:14
 #: ../../source/ref-exit-codes/304.rst:15
@@ -45665,43 +46227,6 @@ msgstr "[3] GRACEFUL_EXIT_SIGTERM"
 #: ../../source/ref-exit-codes/3.rst:9
 msgid "The process exited gracefully, triggered by ``SIGTERM``."
 msgstr "Le processus a quitté de manière gracieuse, déclenché par ``SIGTERM``."
-
-#: ../../source/ref-exit-codes/300.rst:3
-msgid "[300] SUPERNODE_REST_ADDRESS_INVALID"
-msgstr "[300] SUPERNODE_REST_ADDRESS_INVALID"
-
-#: ../../source/ref-exit-codes/300.rst:9
-msgid ""
-"The provided SuperLink address for the REST API is invalid. The address "
-"must start with ``http://`` or ``https://`` to be recognized correctly."
-msgstr ""
-"L'adresse fournie pour le serveur REST API est invalide. L'adresse doit "
-"commencer par ``http://`` ou ``https://`` pour être reconnue "
-"correctement."
-
-#: ../../source/ref-exit-codes/300.rst:16
-msgid ""
-"When using the REST API, ensure that the server address starts with "
-"either ``https://`` or ``http://``. For example:"
-msgstr ""
-"Lorsque vous utilisez le REST API, assurez-vous que l'adresse du serveur "
-"commence par soit ``https://`` ou ``http://``. Par exemple:"
-
-#: ../../source/ref-exit-codes/300.rst:19
-msgid "``http://127.0.0.1:8080``"
-msgstr "``http://127.0.0.1:8080``"
-
-#: ../../source/ref-exit-codes/300.rst:20
-msgid "``https://example.com:8080``"
-msgstr "``https://example.com:8080``"
-
-#: ../../source/ref-exit-codes/300.rst:22
-msgid ""
-"Verify the address in your configuration or command-line arguments and "
-"correct it as needed."
-msgstr ""
-"Vérifiez l'adresse dans votre configuration ou vos arguments de ligne de "
-"commande et corrigez-la si nécessaire."
 
 #: ../../source/ref-exit-codes/302.rst:3
 msgid "[302] SUPERNODE_NODE_AUTH_KEY_INVALID"
@@ -53834,3 +54359,44 @@ msgstr ""
 #~ "Federations on SuperGrid <how-to-"
 #~ "create-and-manage-federations>`."
 #~ msgstr ""
+
+#~ msgid "[300] SUPERNODE_REST_ADDRESS_INVALID"
+#~ msgstr "[300] SUPERNODE_REST_ADDRESS_INVALID"
+
+#~ msgid ""
+#~ "The provided SuperLink address for the"
+#~ " REST API is invalid. The address "
+#~ "must start with ``http://`` or "
+#~ "``https://`` to be recognized correctly."
+#~ msgstr ""
+#~ "L'adresse fournie pour le serveur REST"
+#~ " API est invalide. L'adresse doit "
+#~ "commencer par ``http://`` ou ``https://`` "
+#~ "pour être reconnue correctement."
+
+#~ msgid ""
+#~ "When using the REST API, ensure "
+#~ "that the server address starts with "
+#~ "either ``https://`` or ``http://``. For "
+#~ "example:"
+#~ msgstr ""
+#~ "Lorsque vous utilisez le REST API, "
+#~ "assurez-vous que l'adresse du serveur"
+#~ " commence par soit ``https://`` ou "
+#~ "``http://``. Par exemple:"
+
+#~ msgid "``http://127.0.0.1:8080``"
+#~ msgstr "``http://127.0.0.1:8080``"
+
+#~ msgid "``https://example.com:8080``"
+#~ msgstr "``https://example.com:8080``"
+
+#~ msgid ""
+#~ "Verify the address in your configuration"
+#~ " or command-line arguments and "
+#~ "correct it as needed."
+#~ msgstr ""
+#~ "Vérifiez l'adresse dans votre configuration"
+#~ " ou vos arguments de ligne de "
+#~ "commande et corrigez-la si nécessaire."
+
