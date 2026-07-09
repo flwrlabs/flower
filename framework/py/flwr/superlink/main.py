@@ -27,10 +27,13 @@ from fastapi.routing import APIRoute, iter_route_contexts
 
 from flwr import __version__
 from flwr.common import log
+from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore.constant import FLWR_IN_MEMORY_SQLITE_DB_URL
+from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink import extensions
+from flwr.superlink.federation import NoOpFederationManager
 
 if TYPE_CHECKING:
-    from flwr.server.superlink.linkstate import LinkStateFactory
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
 
 
@@ -55,6 +58,16 @@ def _merge_lifespan_state(
         lifespan_state[key] = value
 
 
+def _create_default_linkstate_factory() -> LinkStateFactory:
+    """Create the default LinkStateFactory for direct uvicorn startup."""
+    objectstore_factory = ObjectStoreFactory(FLWR_IN_MEMORY_SQLITE_DB_URL)
+    return LinkStateFactory(
+        FLWR_IN_MEMORY_SQLITE_DB_URL,
+        NoOpFederationManager(),
+        objectstore_factory,
+    )
+
+
 def create_app(
     *,
     linkstate_factory: LinkStateFactory,
@@ -67,8 +80,9 @@ def create_app(
     1. Via `flower-superlink`: the CLI always passes a `linkstate_factory`.
        When FastAPI also starts the legacy gRPC APIs for compatibility, the CLI
        also passes a `superlink_lifespan` initialized with the same factory.
-    2. Via direct callers: they must provide a `linkstate_factory` explicitly.
-       Lifespan startup publishes it to app state for REST dependencies.
+    2. Via `uvicorn flwr.superlink.main:app`: the module-level app uses an
+       in-memory SQLite LinkStateFactory. Direct callers of `create_app` must
+       provide their desired `linkstate_factory` explicitly.
     """
 
     @asynccontextmanager
@@ -148,3 +162,6 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
                     "Please ensure all route handler function names are unique."
                 )
             operation_ids.add(op_id)
+
+
+app = create_app(linkstate_factory=_create_default_linkstate_factory())

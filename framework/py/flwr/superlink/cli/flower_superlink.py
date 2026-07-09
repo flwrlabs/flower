@@ -265,14 +265,13 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
     def __init__(
         self,
         config: SuperLinkLifespanConfig,
-        objectstore_factory: ObjectStoreFactory | None = None,
-        state_factory: LinkStateFactory | None = None,
+        state_factory: LinkStateFactory,
     ) -> None:
         self.config = config
         self.grpc_servers: list[grpc.Server] = []
         self.bckg_threads: list[threading.Thread] = []
         self.superexec_process: subprocess.Popen[bytes] | None = None
-        self.objectstore_factory = objectstore_factory
+        self.objectstore_factory = state_factory.objectstore_factory
         self.state_factory = state_factory
         self._serverappio_server: grpc.Server | None = None
         self._started = False
@@ -282,16 +281,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         log(INFO, "SuperLinkLifespan: start")
         if self._started:
             return
-
-        if self.objectstore_factory is None or self.state_factory is None:
-            federation_manager = get_federation_manager(
-                is_simulation=self.config.simulation
-            )
-            objectstore_factory, state_factory = _get_objectstore_linkstate_factories(
-                self.config.database, federation_manager
-            )
-            self.objectstore_factory = objectstore_factory
-            self.state_factory = state_factory
 
         # Force initialization before starting network servers
         self.state_factory.state()
@@ -358,9 +347,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
     def _start_control_api(self) -> None:
         config = self.config
-        if self.state_factory is None or self.objectstore_factory is None:
-            raise RuntimeError("SuperLink lifespan state has not been initialized.")
-
         control_server: grpc.Server = run_control_api_grpc(
             address=config.control_address,
             state_factory=self.state_factory,
@@ -376,9 +362,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
     def _start_serverappio_api(self) -> None:
         config = self.config
-        if self.state_factory is None or self.objectstore_factory is None:
-            raise RuntimeError("SuperLink lifespan state has not been initialized.")
-
         serverappio_server: grpc.Server = run_serverappio_api_grpc(
             address=config.serverappio_address,
             state_factory=self.state_factory,
@@ -393,8 +376,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         config = self.config
         if config.simulation:
             return
-        if self.state_factory is None or self.objectstore_factory is None:
-            raise RuntimeError("SuperLink lifespan state has not been initialized.")
 
         fleet_api_address = config.fleet_api_address
         if not fleet_api_address:
@@ -436,8 +417,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         TODO: Replace this separate uvicorn server with `flwr.superlink.routers.fleet`
         routes mounted in the main FastAPI app.
         """
-        if self.state_factory is None or self.objectstore_factory is None:
-            raise RuntimeError("SuperLink lifespan state has not been initialized.")
         if (
             importlib.util.find_spec("requests")
             and importlib.util.find_spec("starlette")
@@ -463,9 +442,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
     def _start_legacy_fleet_grpc_rere(self, fleet_address: str) -> None:
         """Start the current Fleet gRPC request-response API."""
-        if self.state_factory is None or self.objectstore_factory is None:
-            raise RuntimeError("SuperLink lifespan state has not been initialized.")
-
         interceptors = [NodeAuthServerInterceptor(self.state_factory)]
         if self.config.enable_event_log:
             fleet_log_plugin = _try_obtain_fleet_event_log_writer_plugin()
@@ -485,9 +461,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
     def _start_legacy_fleet_grpc_adapter(self, fleet_address: str) -> None:
         """Start the current Fleet GrpcAdapter compatibility API."""
-        if self.state_factory is None or self.objectstore_factory is None:
-            raise RuntimeError("SuperLink lifespan state has not been initialized.")
-
         fleet_server = _run_fleet_api_grpc_adapter(
             address=fleet_address,
             state_factory=self.state_factory,
@@ -759,7 +732,11 @@ def flower_superlink() -> None:
     # Run SuperLink in Legacy Mode (Only gRPC)
     ###########################################################################
 
-    superlink_lifespan = SuperLinkLifespan(config)
+    federation_manager = get_federation_manager(is_simulation=config.simulation)
+    _, state_factory = _get_objectstore_linkstate_factories(
+        config.database, federation_manager
+    )
+    superlink_lifespan = SuperLinkLifespan(config, state_factory)
     try:
         superlink_lifespan.startup()
     except Exception as err:  # pylint: disable=broad-except
@@ -812,7 +789,7 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
     federation_manager = get_federation_manager(
         is_simulation=lifespan_config.simulation
     )
-    objectstore_factory, linkstate_factory = _get_objectstore_linkstate_factories(
+    _, linkstate_factory = _get_objectstore_linkstate_factories(
         lifespan_config.database, federation_manager
     )
     # Force initialization before exposing LinkState through FastAPI dependencies
@@ -820,7 +797,6 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
     if start_legacy_grpc:
         superlink_lifespan = SuperLinkLifespan(
             lifespan_config,
-            objectstore_factory=objectstore_factory,
             state_factory=linkstate_factory,
         )
     from flwr.superlink.main import (  # pylint: disable=import-outside-toplevel
