@@ -16,9 +16,9 @@ on:
         required: false
         default: main
       docker-image-tag:
-        description: "Docker tag to publish."
+        description: "Docker tag to publish. Defaults to <flower-version>-main.<run-id>.g<short-sha>."
         required: false
-        default: unstable
+        default: ""
       docker-registry:
         description: "Docker registry host. Defaults to vars.DOCKER_IMAGE_REGISTRY."
         required: false
@@ -41,14 +41,34 @@ env:
   DOCKER_IMAGE_REGISTRY_USER: ${{ inputs.docker-registry-user || vars.DOCKER_IMAGE_REGISTRY_USER }}
   DOCKER_IMAGE_NAMESPACE: ${{ inputs.docker-image-namespace || vars.DOCKER_IMAGE_NAMESPACE }}
   FLOWER_REPO_REF: ${{ inputs.flower-repo-ref || 'main' }}
-  DOCKER_IMAGE_TAG: ${{ inputs.docker-image-tag || 'unstable' }}
+  DOCKER_IMAGE_TAG: ${{ inputs.docker-image-tag }}
 
 jobs:
+  resolve-intermediate-version:
+    if: ${{ github.repository_owner == 'flwrlabs' }}
+    name: Resolve intermediate version
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      flwr-version: ${{ steps.version.outputs.flwr-version }}
+      docker-image-tag: ${{ steps.version.outputs.docker-image-tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/bootstrap
+
+      - name: Resolve intermediate version
+        id: version
+        run: ./framework/dev/release/resolve-intermediate-version.sh
+
   prepare-docker-build-matrix:
     if: ${{ github.repository_owner == 'flwrlabs' }}
     name: Collect docker build parameters
     runs-on: ubuntu-22.04
     timeout-minutes: 20
+    needs: resolve-intermediate-version
     outputs:
       pip-version: ${{ steps.versions.outputs.pip-version }}
       setuptools-version: ${{ steps.versions.outputs.setuptools-version }}
@@ -97,13 +117,15 @@ jobs:
             --input matrix.raw.json \
             --output matrix.json \
             --docker-image-namespace "${DOCKER_IMAGE_NAMESPACE}" \
-            --tag "${DOCKER_IMAGE_TAG}"
+            --tag "${{ needs.resolve-intermediate-version.outputs.docker-image-tag }}" \
+            --strip-flwr-version-ref \
+            --build-local-wheel
           echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
 
   build-docker-base-images:
     name: Build base images
     uses: ./.github/workflows/_docker-build.yml
-    needs: prepare-docker-build-matrix
+    needs: [prepare-docker-build-matrix, resolve-intermediate-version]
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.prepare-docker-build-matrix.outputs.matrix).base }}
@@ -116,7 +138,9 @@ jobs:
       dockerfile: ${{ matrix.images.file_dir }}/Dockerfile
       prepare-framework: true
       patch-base-dockerfiles: true
+      build-local-wheel: true
       flower-repo-ref: ${{ inputs.flower-repo-ref || 'main' }}
+      flwr-package-version: ${{ needs.resolve-intermediate-version.outputs.flwr-version }}
       build-args: |
         PIP_VERSION=${{ needs.prepare-docker-build-matrix.outputs.pip-version }}
         SETUPTOOLS_VERSION=${{ needs.prepare-docker-build-matrix.outputs.setuptools-version }}

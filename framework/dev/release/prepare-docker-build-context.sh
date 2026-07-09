@@ -22,9 +22,12 @@ if [[ "${PREPARE_FRAMEWORK:-false}" == "true" ]]; then
 fi
 
 if [[ "${PATCH_BASE_DOCKERFILES:-false}" == "true" ]]; then
-  echo "No repository-specific Dockerfile patches are required in flwrlabs/flower."
+  git apply --unidiff-zero framework/dev/release/dockerfile.base.ubuntu.local-wheel.patch
 fi
 
 if [[ "${BUILD_LOCAL_WHEEL:-false}" == "true" ]]; then
+  if [[ -n "${FLWR_PACKAGE_VERSION:-}" ]]; then
+    (cd framework && uv version --frozen "${FLWR_PACKAGE_VERSION}")
+  fi
   (cd framework && ./dev/build.sh)
 fi

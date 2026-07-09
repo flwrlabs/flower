@@ -55,6 +55,11 @@ on:
         required: false
         type: string
         default: main
+      flwr-package-version:
+        description: "Flower package version to use when build-local-wheel is enabled."
+        required: false
+        type: string
+        default: ""
       docker-registry-user:
         description: "Docker registry username."
         required: false
@@ -114,6 +119,7 @@ jobs:
           PREPARE_FRAMEWORK: ${{ inputs.prepare-framework }}
           PATCH_BASE_DOCKERFILES: ${{ inputs.patch-base-dockerfiles }}
           BUILD_LOCAL_WHEEL: ${{ inputs.build-local-wheel }}
+          FLWR_PACKAGE_VERSION: ${{ inputs.flwr-package-version }}
         run: ./framework/dev/release/prepare-docker-build-context.sh
 
       - name: Resolve build args

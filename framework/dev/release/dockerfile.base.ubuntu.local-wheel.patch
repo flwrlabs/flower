@@ -1,0 +1,18 @@
+diff --git a/framework/docker/base/ubuntu/Dockerfile b/framework/docker/base/ubuntu/Dockerfile
+--- a/framework/docker/base/ubuntu/Dockerfile
++++ b/framework/docker/base/ubuntu/Dockerfile
+@@ -67,3 +67,4 @@
+-ARG FLWR_VERSION
+-ARG FLWR_VERSION_REF
+-ARG FLWR_PACKAGE=flwr
++ARG COPY_PATH
++ARG FLWR_WHEEL
++# hadolint ignore=DL3045
++COPY ${COPY_PATH}/${FLWR_WHEEL} .
+@@ -71,5 +72 @@
+-RUN if [ -z "${FLWR_VERSION_REF}" ]; then \
+-    pip install -U --no-cache-dir ${FLWR_PACKAGE}==${FLWR_VERSION}; \
+-    else \
+-    pip install -U --no-cache-dir ${FLWR_PACKAGE}@${FLWR_VERSION_REF}; \
+-    fi
++RUN pip install -U --no-cache-dir ${FLWR_WHEEL}
