@@ -91,10 +91,11 @@ class SqliteMixin(ABC):
                     SQL_CREATE_TABLE_BAR,
                 )
         """
-        self._conn = sqlite3.connect(self.database_path)
+        self._conn = sqlite3.connect(self.database_path, timeout=600.0)
         # Enable Write-Ahead Logging (WAL) for better concurrency
         self._conn.execute("PRAGMA journal_mode = WAL;")
         self._conn.execute("PRAGMA synchronous = NORMAL;")
+        self._conn.execute("PRAGMA busy_timeout = 600000;")
         self._conn.execute("PRAGMA foreign_keys = ON;")
         self._conn.execute("PRAGMA cache_size = -64000;")  # 64MB cache
         self._conn.execute("PRAGMA temp_store = MEMORY;")  # In-memory temp tables

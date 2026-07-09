@@ -144,6 +144,8 @@ class GrpcGrid(Grid):
         self._grpc_stub: ServerAppIoStub | None = None
         self._channel: grpc.Channel | None = None
         self.node = Node(node_id=SUPERLINK_NODE_ID)
+        self._object_size_bytes: dict[str, int] = {}
+        self._pushed_message_size_bytes: dict[str, int] = {}
         self._retry_invoker = _make_simple_grpc_retry_invoker()
         self.pull_interval = pull_interval
         super().__init__()
@@ -249,14 +251,26 @@ class GrpcGrid(Grid):
         max_concurrent_pushes: int | None = None,
     ) -> list[str]:
         """Push all messages and its associated objects."""
+        track_network_bytes = get_active_profiler() is not None
         # Prepare all Messages to be sent in a single request
         proto_messages = []
         object_trees = []
         all_objects: dict[str, InflatableObject] = {}
+        message_object_ids: dict[str, set[str]] = {}
+        message_overhead_bytes: dict[str, int] = {}
         for msg in messages:
-            proto_messages.append(message_to_proto(remove_content_from_message(msg)))
-            all_objects.update(get_all_nested_objects(msg))
-            object_trees.append(get_object_tree(msg))
+            proto_msg = message_to_proto(remove_content_from_message(msg))
+            object_tree = get_object_tree(msg)
+            proto_messages.append(proto_msg)
+            nested_objects = get_all_nested_objects(msg)
+            all_objects.update(nested_objects)
+            object_trees.append(object_tree)
+            if track_network_bytes:
+                message_id = msg.metadata.message_id
+                message_object_ids[message_id] = set(nested_objects.keys())
+                message_overhead_bytes[message_id] = len(
+                    proto_msg.SerializeToString()
+                ) + len(object_tree.SerializeToString())
             del msg
 
         # Call GrpcServerAppIoStub method
@@ -269,12 +283,20 @@ class GrpcGrid(Grid):
         )
 
         # Push objects
+        push_object_fn = make_push_object_fn_protobuf(
+            push_object_protobuf=self._stub.PushObject,
+            node=self.node,
+            run_id=run_id,
+        )
+
+        def counting_push_object_fn(object_id: str, object_content: bytes) -> None:
+            self._object_size_bytes[object_id] = len(object_content)
+            push_object_fn(object_id, object_content)
+
         push_objects(
             all_objects,
-            push_object_fn=make_push_object_fn_protobuf(
-                push_object_protobuf=self._stub.PushObject,
-                node=self.node,
-                run_id=run_id,
+            push_object_fn=(
+                counting_push_object_fn if track_network_bytes else push_object_fn
             ),
             object_ids_to_push=set(res.objects_to_push),
             max_concurrent_pushes=(
@@ -283,6 +305,20 @@ class GrpcGrid(Grid):
                 else FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES
             ),
         )
+        if track_network_bytes:
+            for message_id, object_ids in message_object_ids.items():
+                size_bytes = message_overhead_bytes[message_id]
+                for object_id in object_ids:
+                    object_size = self._object_size_bytes.get(object_id)
+                    if object_size is None:
+                        obj = all_objects.get(object_id)
+                        if obj is None:
+                            continue
+                        object_content = obj.deflate()
+                        object_size = len(object_content)
+                        self._object_size_bytes[object_id] = object_size
+                    size_bytes += object_size
+                self._pushed_message_size_bytes[message_id] = size_bytes
         return cast(list[str], res.message_ids)
 
     def push_messages(self, messages: Iterable[Message]) -> Iterable[str]:
@@ -293,6 +329,7 @@ class GrpcGrid(Grid):
         """
         # Construct Messages
         run_id = cast(Run, self._run).run_id
+        messages = list(messages)
         message_ids: list[str] = []
         if not messages:
             return message_ids
@@ -351,6 +388,7 @@ class GrpcGrid(Grid):
         set of given message IDs.
         """
         run_id = cast(Run, self._run).run_id
+        track_network_bytes = get_active_profiler() is not None
         try:
             # Pull Messages
             res: PullAppMessagesResponse = self._stub.PullMessages(
@@ -402,6 +440,13 @@ class GrpcGrid(Grid):
                     )
                     continue
 
+                upstream_bytes = None
+                if track_network_bytes:
+                    upstream_bytes = (
+                        len(msg_proto.SerializeToString())
+                        + len(msg_tree.SerializeToString())
+                        + sum(len(content) for content in all_object_contents.values())
+                    )
                 # Confirm that the message has been received
                 self._stub.ConfirmMessageReceived(
                     ConfirmMessageReceivedRequest(
@@ -411,6 +456,10 @@ class GrpcGrid(Grid):
                 message = cast(
                     Message, inflate_object_from_contents(msg_id, all_object_contents)
                 )
+                if upstream_bytes is not None:
+                    message.metadata.__dict__["_network_upstream_bytes"] = (
+                        upstream_bytes
+                    )
                 # Network delivery metrics are attached to the lightweight reply message
                 # held in LinkState (and serialized in `msg_proto`). Preserve only the
                 # downstream timing as internal metadata so strategy reply validation is
@@ -423,8 +472,8 @@ class GrpcGrid(Grid):
                     if net_delivery_record is not None:
                         downstream_ms = net_delivery_record.get("downstream_ms")
                         if isinstance(downstream_ms, (int, float)):
-                            message.metadata.__dict__["_network_downstream_ms"] = (
-                                float(downstream_ms)
+                            message.metadata.__dict__["_network_downstream_ms"] = float(
+                                downstream_ms
                             )
                 message.metadata.__dict__["_message_id"] = msg_id
                 inflated_msgs.append(message)
@@ -452,6 +501,7 @@ class GrpcGrid(Grid):
         profiler = get_active_profiler()
         if profiler is None:
             log(DEBUG, "[profiling] No active profiler in GrpcGrid.send_and_receive")
+        messages = list(messages)
         proc = psutil.Process() if psutil is not None else None
         start = perf_counter() if profiler is not None else None
 
@@ -494,6 +544,13 @@ class GrpcGrid(Grid):
             mem_start_mb = proc.memory_info().rss / (1024**2)
             disk_start = read_disk_io_mb(proc)
         msg_ids = set(self.push_messages(messages))
+        downstream_bytes_by_id = {}
+        if profiler is not None:
+            for msg_id in msg_ids:
+                size_bytes = self._pushed_message_size_bytes.pop(msg_id, None)
+                if size_bytes is not None:
+                    downstream_bytes_by_id[msg_id] = size_bytes
+        downstream_bytes_total = sum(downstream_bytes_by_id.values())
         if profiler is not None and push_start is not None:
             mem_end_mb = None
             mem_delta_mb = None
@@ -523,6 +580,7 @@ class GrpcGrid(Grid):
                     "disk_read_mb": disk_read_mb,
                     "disk_write_mb": disk_write_mb,
                     "disk_source": disk_source,
+                    "network_bytes": downstream_bytes_total,
                 },
             )
         del messages
@@ -534,6 +592,7 @@ class GrpcGrid(Grid):
         disk_start = None
         pull_active_ms = 0.0
         wait_sleep_ms = 0.0
+        upstream_bytes_total = 0
         if proc is not None:
             mem_start_mb = proc.memory_info().rss / (1024**2)
             disk_start = read_disk_io_mb(proc)
@@ -549,6 +608,19 @@ class GrpcGrid(Grid):
                 {msg.metadata.reply_to_message_id for msg in res_msgs}
             )
             if profiler is not None and res_msgs:
+                for msg in res_msgs:
+                    downstream_bytes = downstream_bytes_by_id.get(
+                        msg.metadata.reply_to_message_id
+                    )
+                    if downstream_bytes is not None:
+                        msg.metadata.__dict__["_network_downstream_bytes"] = (
+                            downstream_bytes
+                        )
+                    upstream_bytes = msg.metadata.__dict__.get(
+                        "_network_upstream_bytes"
+                    )
+                    if isinstance(upstream_bytes, (int, float)):
+                        upstream_bytes_total += int(upstream_bytes)
                 record_network_delivery_metrics_from_messages(
                     res_msgs, delivered_at_ms=time.time() * 1000.0
                 )
@@ -591,6 +663,7 @@ class GrpcGrid(Grid):
                     "disk_read_mb": disk_read_mb,
                     "disk_write_mb": disk_write_mb,
                     "disk_source": disk_source,
+                    "network_bytes": upstream_bytes_total,
                 },
             )
         if profiler is not None and start is not None:
@@ -613,9 +686,7 @@ class GrpcGrid(Grid):
                 task="send_and_receive",
                 round=get_current_round(),
                 node_id=None,
-                duration_ms=max(
-                    duration_ms - wait_sleep_ms, 0.0
-                ),
+                duration_ms=max(duration_ms - wait_sleep_ms, 0.0),
                 metadata={
                     "expected_replies": expected_replies,
                     "wait_sleep_ms": wait_sleep_ms,
@@ -626,6 +697,7 @@ class GrpcGrid(Grid):
                     "disk_read_mb": disk_read_mb,
                     "disk_write_mb": disk_write_mb,
                     "disk_source": disk_source,
+                    "network_bytes": downstream_bytes_total + upstream_bytes_total,
                 },
             )
             publish_profile_summary()

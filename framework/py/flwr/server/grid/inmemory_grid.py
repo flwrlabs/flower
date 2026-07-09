@@ -35,13 +35,27 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     psutil = None
 from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.common.inflatable import get_all_nested_objects, get_object_tree
 from flwr.common.logger import warn_deprecated_feature
+from flwr.common.message import remove_content_from_message
+from flwr.common.serde import message_to_proto
 from flwr.common.system_metrics import DiskIoSnapshot, read_disk_io_mb
 from flwr.common.typing import Run
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 
 from .grid import Grid
+
+
+def _message_size_bytes(message: Message) -> int:
+    """Return a logical serialized size for a message and its object tree."""
+    proto_msg = message_to_proto(remove_content_from_message(message))
+    object_tree = get_object_tree(message)
+    return (
+        len(proto_msg.SerializeToString())
+        + len(object_tree.SerializeToString())
+        + sum(len(obj.deflate()) for obj in get_all_nested_objects(message).values())
+    )
 
 
 class InMemoryGrid(Grid):
@@ -66,6 +80,7 @@ class InMemoryGrid(Grid):
         self.state = state_factory.state()
         self.pull_interval = pull_interval
         self.node = Node(node_id=SUPERLINK_NODE_ID)
+        self._pushed_message_size_bytes: dict[str, int] = {}
 
     def _check_message(self, message: Message) -> None:
         # Check if the message is valid
@@ -120,6 +135,8 @@ class InMemoryGrid(Grid):
         This method takes an iterable of messages and sends each message
         to the node specified in `dst_node_id`.
         """
+        messages = list(messages)
+        track_network_bytes = get_active_profiler() is not None
         msg_ids: list[str] = []
         for msg in messages:
             # Populate metadata
@@ -132,6 +149,10 @@ class InMemoryGrid(Grid):
             msg_id = self.state.store_message_ins(msg)
             if msg_id:
                 msg_ids.append(str(msg_id))
+                if track_network_bytes:
+                    self._pushed_message_size_bytes[str(msg_id)] = _message_size_bytes(
+                        msg
+                    )
 
         return msg_ids
 
@@ -142,9 +163,14 @@ class InMemoryGrid(Grid):
         set of given message IDs.
         """
         msg_ids = set(message_ids)
+        track_network_bytes = get_active_profiler() is not None
         # Pull Messages
         message_res_list = self.state.get_message_res(message_ids=msg_ids)
         for msg_res in message_res_list:
+            if track_network_bytes:
+                msg_res.metadata.__dict__["_network_upstream_bytes"] = (
+                    _message_size_bytes(msg_res)
+                )
             if msg_res.has_content():
                 metric_record = msg_res.content.metric_records.get(
                     "_flwr_network_delivery"
@@ -180,6 +206,7 @@ class InMemoryGrid(Grid):
         profiler = get_active_profiler()
         proc = psutil.Process() if psutil is not None else None
         start = perf_counter() if profiler is not None else None
+        messages = list(messages)
 
         def _disk_delta(
             start_snapshot: DiskIoSnapshot | None,
@@ -220,6 +247,13 @@ class InMemoryGrid(Grid):
             mem_start_mb = proc.memory_info().rss / (1024**2)
             disk_start = read_disk_io_mb(proc)
         msg_ids = set(self.push_messages(messages))
+        downstream_bytes_by_id = {}
+        if profiler is not None:
+            for msg_id in msg_ids:
+                size_bytes = self._pushed_message_size_bytes.pop(msg_id, None)
+                if size_bytes is not None:
+                    downstream_bytes_by_id[msg_id] = size_bytes
+        downstream_bytes_total = sum(downstream_bytes_by_id.values())
         if profiler is not None and push_start is not None:
             mem_end_mb = None
             mem_delta_mb = None
@@ -249,6 +283,7 @@ class InMemoryGrid(Grid):
                     "disk_read_mb": disk_read_mb,
                     "disk_write_mb": disk_write_mb,
                     "disk_source": disk_source,
+                    "network_bytes": downstream_bytes_total,
                 },
             )
         del messages
@@ -260,6 +295,7 @@ class InMemoryGrid(Grid):
         disk_start = None
         pull_active_ms = 0.0
         wait_sleep_ms = 0.0
+        upstream_bytes_total = 0
         if proc is not None:
             mem_start_mb = proc.memory_info().rss / (1024**2)
             disk_start = read_disk_io_mb(proc)
@@ -275,6 +311,19 @@ class InMemoryGrid(Grid):
                 {msg.metadata.reply_to_message_id for msg in res_msgs}
             )
             if profiler is not None and res_msgs:
+                for msg in res_msgs:
+                    downstream_bytes = downstream_bytes_by_id.get(
+                        msg.metadata.reply_to_message_id
+                    )
+                    if downstream_bytes is not None:
+                        msg.metadata.__dict__["_network_downstream_bytes"] = (
+                            downstream_bytes
+                        )
+                    upstream_bytes = msg.metadata.__dict__.get(
+                        "_network_upstream_bytes"
+                    )
+                    if isinstance(upstream_bytes, (int, float)):
+                        upstream_bytes_total += int(upstream_bytes)
                 record_network_delivery_metrics_from_messages(
                     res_msgs, delivered_at_ms=time.time() * 1000.0
                 )
@@ -317,6 +366,7 @@ class InMemoryGrid(Grid):
                     "disk_read_mb": disk_read_mb,
                     "disk_write_mb": disk_write_mb,
                     "disk_source": disk_source,
+                    "network_bytes": upstream_bytes_total,
                 },
             )
         if profiler is not None and start is not None:
@@ -339,9 +389,7 @@ class InMemoryGrid(Grid):
                 task="send_and_receive",
                 round=get_current_round(),
                 node_id=None,
-                duration_ms=max(
-                    duration_ms - wait_sleep_ms, 0.0
-                ),
+                duration_ms=max(duration_ms - wait_sleep_ms, 0.0),
                 metadata={
                     "expected_replies": expected_replies,
                     "wait_sleep_ms": wait_sleep_ms,
@@ -352,6 +400,7 @@ class InMemoryGrid(Grid):
                     "disk_read_mb": disk_read_mb,
                     "disk_write_mb": disk_write_mb,
                     "disk_source": disk_source,
+                    "network_bytes": downstream_bytes_total + upstream_bytes_total,
                 },
             )
             publish_profile_summary()

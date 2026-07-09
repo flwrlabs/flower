@@ -16,11 +16,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import time
 import threading
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from .message import Message
 
@@ -36,6 +37,15 @@ class ProfileEvent:
     node_id: int | None
     duration_ms: float
     metadata: dict[str, Any]
+
+
+def _single_or_mixed(values: set[Any]) -> Any:
+    """Return the only value in a set, or 'mixed' when multiple are present."""
+    if len(values) == 1:
+        return next(iter(values))
+    if len(values) > 1:
+        return "mixed"
+    return None
 
 
 class ProfileRecorder:
@@ -60,7 +70,9 @@ class ProfileRecorder:
         if duration_ms is None:
             return
         event = ProfileEvent(
-            timestamp_ms=timestamp_ms if timestamp_ms is not None else time.time() * 1000.0,
+            timestamp_ms=(
+                timestamp_ms if timestamp_ms is not None else time.time() * 1000.0
+            ),
             scope=scope,
             task=task,
             round=round,
@@ -116,6 +128,12 @@ class ProfileRecorder:
                     "disk_read_count": 0,
                     "disk_write_count": 0,
                     "disk_sources": set(),
+                    "sum_network_bytes": 0,
+                    "min_network_bytes": None,
+                    "max_network_bytes": None,
+                    "network_count": 0,
+                    "sender_node_ids": set(),
+                    "receiver_node_ids": set(),
                 }
                 stats[key] = stat
             stat["count"] += 1
@@ -130,7 +148,10 @@ class ProfileRecorder:
                 if stat["max_ms"] is None
                 else max(stat["max_ms"], event.duration_ms)
             )
-            if "memory_mb" in event.metadata and event.metadata["memory_mb"] is not None:
+            if (
+                "memory_mb" in event.metadata
+                and event.metadata["memory_mb"] is not None
+            ):
                 mem_val = float(event.metadata["memory_mb"])
                 stat["sum_mem_mb"] += mem_val
                 stat["mem_count"] += 1
@@ -161,7 +182,10 @@ class ProfileRecorder:
                     if stat["max_mem_delta_mb"] is None
                     else max(stat["max_mem_delta_mb"], mem_delta)
                 )
-            if "disk_read_mb" in event.metadata and event.metadata["disk_read_mb"] is not None:
+            if (
+                "disk_read_mb" in event.metadata
+                and event.metadata["disk_read_mb"] is not None
+            ):
                 disk_read = float(event.metadata["disk_read_mb"])
                 stat["sum_disk_read_mb"] += disk_read
                 stat["disk_read_count"] += 1
@@ -175,7 +199,10 @@ class ProfileRecorder:
                     if stat["max_disk_read_mb"] is None
                     else max(stat["max_disk_read_mb"], disk_read)
                 )
-            if "disk_write_mb" in event.metadata and event.metadata["disk_write_mb"] is not None:
+            if (
+                "disk_write_mb" in event.metadata
+                and event.metadata["disk_write_mb"] is not None
+            ):
                 disk_write = float(event.metadata["disk_write_mb"])
                 stat["sum_disk_write_mb"] += disk_write
                 stat["disk_write_count"] += 1
@@ -191,14 +218,33 @@ class ProfileRecorder:
                 )
             if "disk_source" in event.metadata and event.metadata["disk_source"]:
                 stat["disk_sources"].add(event.metadata["disk_source"])
+            if (
+                "network_bytes" in event.metadata
+                and event.metadata["network_bytes"] is not None
+            ):
+                network_bytes = int(event.metadata["network_bytes"])
+                stat["sum_network_bytes"] += network_bytes
+                stat["network_count"] += 1
+                stat["min_network_bytes"] = (
+                    network_bytes
+                    if stat["min_network_bytes"] is None
+                    else min(stat["min_network_bytes"], network_bytes)
+                )
+                stat["max_network_bytes"] = (
+                    network_bytes
+                    if stat["max_network_bytes"] is None
+                    else max(stat["max_network_bytes"], network_bytes)
+                )
+            if "sender_node_id" in event.metadata:
+                stat["sender_node_ids"].add(event.metadata["sender_node_id"])
+            if "receiver_node_id" in event.metadata:
+                stat["receiver_node_ids"].add(event.metadata["receiver_node_id"])
 
         entries: list[dict[str, Any]] = []
         for stat in stats.values():
             avg_ms = stat["sum_ms"] / stat["count"] if stat["count"] else 0.0
             avg_mem = (
-                stat["sum_mem_mb"] / stat["mem_count"]
-                if stat["mem_count"]
-                else None
+                stat["sum_mem_mb"] / stat["mem_count"] if stat["mem_count"] else None
             )
             avg_mem_delta = (
                 stat["sum_mem_delta_mb"] / stat["mem_delta_count"]
@@ -222,6 +268,24 @@ class ProfileRecorder:
                 disk_source = "mixed"
             else:
                 disk_source = None
+            sender_node_ids = stat["sender_node_ids"]
+            receiver_node_ids = stat["receiver_node_ids"]
+            sender_node_id = _single_or_mixed(sender_node_ids)
+            receiver_node_id = _single_or_mixed(receiver_node_ids)
+            network_count = stat["network_count"]
+            total_network_mb = (
+                stat["sum_network_bytes"] / (1024**2) if network_count else None
+            )
+            avg_network_mb = (
+                total_network_mb / network_count
+                if total_network_mb is not None and network_count
+                else None
+            )
+            max_network_mb = (
+                stat["max_network_bytes"] / (1024**2)
+                if stat["max_network_bytes"] is not None
+                else None
+            )
             entries.append(
                 {
                     "scope": stat["scope"],
@@ -242,6 +306,11 @@ class ProfileRecorder:
                     "avg_disk_write_mb": avg_disk_write,
                     "max_disk_write_mb": stat["max_disk_write_mb"],
                     "disk_source": disk_source,
+                    "avg_network_mb": avg_network_mb,
+                    "total_network_mb": total_network_mb,
+                    "max_network_mb": max_network_mb,
+                    "sender_node_id": sender_node_id,
+                    "receiver_node_id": receiver_node_id,
                     "node_id": stat["node_id"],
                 }
             )
@@ -256,8 +325,16 @@ class ProfileRecorder:
                 by_round[round_id] = {}
             if entry["scope"] == "server" and entry["task"] == "network_upstream":
                 by_round[round_id]["upstream_avg"] = entry["avg_ms"]
+                if isinstance(entry.get("total_network_mb"), (int, float)):
+                    by_round[round_id]["upstream_network_mb"] = entry[
+                        "total_network_mb"
+                    ]
             if entry["scope"] == "server" and entry["task"] == "network_downstream":
                 by_round[round_id]["downstream_avg"] = entry["avg_ms"]
+                if isinstance(entry.get("total_network_mb"), (int, float)):
+                    by_round[round_id]["downstream_network_mb"] = entry[
+                        "total_network_mb"
+                    ]
 
         for round_id, values in by_round.items():
             if "upstream_avg" in values and "downstream_avg" in values:
@@ -271,6 +348,20 @@ class ProfileRecorder:
                         "avg_ms": network_ms,
                         "min_ms": network_ms,
                         "max_ms": network_ms,
+                        "avg_network_mb": (
+                            values.get("upstream_network_mb", 0.0)
+                            + values.get("downstream_network_mb", 0.0)
+                            if "upstream_network_mb" in values
+                            or "downstream_network_mb" in values
+                            else None
+                        ),
+                        "total_network_mb": (
+                            values.get("upstream_network_mb", 0.0)
+                            + values.get("downstream_network_mb", 0.0)
+                            if "upstream_network_mb" in values
+                            or "downstream_network_mb" in values
+                            else None
+                        ),
                     }
                 )
 
@@ -286,6 +377,12 @@ class ProfileRecorder:
         event_entries = []
         for event in events:
             metadata = event.metadata or {}
+            network_bytes = metadata.get("network_bytes")
+            network_mb = (
+                network_bytes / (1024**2)
+                if isinstance(network_bytes, (int, float))
+                else None
+            )
             event_entries.append(
                 {
                     "timestamp_ms": event.timestamp_ms,
@@ -300,6 +397,10 @@ class ProfileRecorder:
                     "disk_read_mb": metadata.get("disk_read_mb"),
                     "disk_write_mb": metadata.get("disk_write_mb"),
                     "disk_source": metadata.get("disk_source"),
+                    "network_bytes": network_bytes,
+                    "network_mb": network_mb,
+                    "sender_node_id": metadata.get("sender_node_id"),
+                    "receiver_node_id": metadata.get("receiver_node_id"),
                 }
             )
 
@@ -473,15 +574,24 @@ def record_network_delivery_metrics_from_messages(
         try:
             if msg.has_error():
                 continue
+            client_node_id = msg.metadata.src_node_id
             # Upstream: SuperNode reply enqueue at SuperLink -> ServerApp delivery.
             created_at_ms = float(msg.metadata.created_at) * 1000.0
             upstream_ms = max(delivered_at_ms - created_at_ms, 0.0)
+            upstream_bytes = msg.metadata.__dict__.get("_network_upstream_bytes")
+            upstream_metadata: dict[str, Any] = {
+                "sender_node_id": client_node_id,
+                "receiver_node_id": "server",
+            }
+            if isinstance(upstream_bytes, (int, float)):
+                upstream_metadata["network_bytes"] = int(upstream_bytes)
             profiler.record(
                 scope="network",
                 task="upstream",
                 round=round_id,
-                node_id=None,
+                node_id=client_node_id,
                 duration_ms=upstream_ms,
+                metadata=upstream_metadata,
             )
 
             # Downstream is injected by SuperLink as part of reply payload when
@@ -498,19 +608,44 @@ def record_network_delivery_metrics_from_messages(
                         downstream_ms = max(float(value), 0.0)
 
             if downstream_ms is not None:
+                downstream_bytes = msg.metadata.__dict__.get(
+                    "_network_downstream_bytes"
+                )
+                downstream_metadata: dict[str, Any] = {
+                    "sender_node_id": "server",
+                    "receiver_node_id": client_node_id,
+                }
+                if isinstance(downstream_bytes, (int, float)):
+                    downstream_metadata["network_bytes"] = int(downstream_bytes)
                 profiler.record(
                     scope="network",
                     task="downstream",
                     round=round_id,
-                    node_id=None,
+                    node_id=client_node_id,
                     duration_ms=downstream_ms,
+                    metadata=downstream_metadata,
                 )
+                combined_metadata: dict[str, Any] = {
+                    "sender_node_id": None,
+                    "receiver_node_id": None,
+                }
+                combined_bytes = 0
+                has_combined_bytes = False
+                if isinstance(downstream_bytes, (int, float)):
+                    combined_bytes += int(downstream_bytes)
+                    has_combined_bytes = True
+                if isinstance(upstream_bytes, (int, float)):
+                    combined_bytes += int(upstream_bytes)
+                    has_combined_bytes = True
+                if has_combined_bytes:
+                    combined_metadata["network_bytes"] = combined_bytes
                 profiler.record(
                     scope="network",
                     task="combined",
                     round=round_id,
-                    node_id=None,
+                    node_id=client_node_id,
                     duration_ms=downstream_ms + upstream_ms,
+                    metadata=combined_metadata,
                 )
         except Exception:
             # Profiling should never break normal control flow

@@ -34,7 +34,10 @@ from flwr.cli.config_utils import (
 from flwr.cli.constant import FEDERATION_CONFIG_HELP_MESSAGE
 from flwr.common.constant import CliOutputFormat
 from flwr.common.logger import print_json_error, redirect_output, restore_output
-from flwr.proto.control_pb2 import GetRunProfileRequest, StreamRunProfileRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (
+    GetRunProfileRequest,
+    StreamRunProfileRequest,
+)  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub  # pylint: disable=E0611
 
 from .utils import flwr_cli_grpc_exc_handler, init_channel, load_cli_auth_plugin
@@ -106,7 +109,13 @@ def profile(
                             Console().print_json(json.dumps(summary))
                         else:
                             entries, network_entries = _split_entries(summary)
-                            Console().print(_render_table(summary, title="Run Profile Summary", entries=entries))
+                            Console().print(
+                                _render_table(
+                                    summary,
+                                    title="Run Profile Summary",
+                                    entries=entries,
+                                )
+                            )
                             if network_entries:
                                 Console().print(
                                     _render_table(
@@ -115,6 +124,7 @@ def profile(
                                         entries=_rename_network_tasks(network_entries),
                                         include_memory=False,
                                         include_disk=False,
+                                        include_network=True,
                                     )
                                 )
                         if suppress_output:
@@ -152,7 +162,9 @@ def profile(
             Console().print_json(json.dumps(summary))
         else:
             entries, network_entries = _split_entries(summary)
-            Console().print(_render_table(summary, title="Run Profile Summary", entries=entries))
+            Console().print(
+                _render_table(summary, title="Run Profile Summary", entries=entries)
+            )
             if network_entries:
                 Console().print(
                     _render_table(
@@ -161,6 +173,7 @@ def profile(
                         entries=_rename_network_tasks(network_entries),
                         include_memory=False,
                         include_disk=False,
+                        include_network=True,
                     )
                 )
     except (typer.Exit, Exception) as err:  # pylint: disable=broad-except
@@ -193,6 +206,7 @@ def _render_table(
     entries: list[dict] | None = None,
     include_memory: bool = True,
     include_disk: bool = True,
+    include_network: bool = False,
 ) -> Table:
     table_title = title
     if title == "Run Profile Summary":
@@ -208,6 +222,11 @@ def _render_table(
     table.add_column("Node", style="magenta")
     table.add_column("Avg (ms)", justify="right")
     table.add_column("Max (ms)", justify="right")
+    if include_network:
+        table.add_column("Sender", style="white")
+        table.add_column("Receiver", style="white")
+        table.add_column("Avg Data (MB)", justify="right")
+        table.add_column("Total Data (MB)", justify="right")
     if include_memory:
         table.add_column("Avg Mem (MB)", justify="right")
         table.add_column("Max Mem (MB)", justify="right")
@@ -229,6 +248,10 @@ def _render_table(
         avg_read = entry.get("avg_disk_read_mb")
         avg_write = entry.get("avg_disk_write_mb")
         disk_source = entry.get("disk_source")
+        sender_node = entry.get("sender_node_id")
+        receiver_node = entry.get("receiver_node_id")
+        avg_network = entry.get("avg_network_mb")
+        total_network = entry.get("total_network_mb")
         table.add_row(
             str(entry.get("task", "")),
             str(entry.get("scope", "")),
@@ -238,11 +261,31 @@ def _render_table(
             f"{entry.get('max_ms', 0.0):.2f}",
             *(
                 [
+                    str(sender_node) if sender_node is not None else "-",
+                    str(receiver_node) if receiver_node is not None else "-",
+                    (
+                        f"{avg_network:.2f}"
+                        if isinstance(avg_network, (int, float))
+                        else "-"
+                    ),
+                    (
+                        f"{total_network:.2f}"
+                        if isinstance(total_network, (int, float))
+                        else "-"
+                    ),
+                ]
+                if include_network
+                else []
+            ),
+            *(
+                [
                     f"{avg_mem:.2f}" if isinstance(avg_mem, (int, float)) else "-",
                     f"{max_mem:.2f}" if isinstance(max_mem, (int, float)) else "-",
-                    f"{avg_mem_delta:.2f}"
-                    if isinstance(avg_mem_delta, (int, float))
-                    else "-",
+                    (
+                        f"{avg_mem_delta:.2f}"
+                        if isinstance(avg_mem_delta, (int, float))
+                        else "-"
+                    ),
                 ]
                 if include_memory
                 else []

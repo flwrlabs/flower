@@ -450,6 +450,10 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
             )
             return None
 
+        enqueued_at_ms = now().timestamp() * 1000.0
+        # Anchor reply enqueue in SuperLink clock for upstream delivery metrics.
+        message.metadata.created_at = enqueued_at_ms / 1000.0
+
         # Store Message
         data = (message_to_dict(message),)
 
