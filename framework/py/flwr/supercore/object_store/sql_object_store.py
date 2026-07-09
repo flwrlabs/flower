@@ -283,12 +283,8 @@ class SqlObjectStore(ObjectStore, SqlMixin):
         self.query(
             "INSERT INTO objectstore_locks (lock_id, lock_value) "
             "VALUES (:lock_id, 0) "
-            "ON CONFLICT (lock_id) DO NOTHING",
-            {"lock_id": self._MUTATION_LOCK_ID},
-        )
-        self.query(
-            "UPDATE objectstore_locks SET lock_value = lock_value "
-            "WHERE lock_id = :lock_id",
+            "ON CONFLICT (lock_id) DO UPDATE "
+            "SET lock_value = objectstore_locks.lock_value",
             {"lock_id": self._MUTATION_LOCK_ID},
         )
 

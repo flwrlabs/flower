@@ -431,15 +431,11 @@ class SqlInMemoryObjectStoreTest(ObjectStoreTest):
         store.query.assert_any_call(
             "INSERT INTO objectstore_locks (lock_id, lock_value) "
             "VALUES (:lock_id, 0) "
-            "ON CONFLICT (lock_id) DO NOTHING",
+            "ON CONFLICT (lock_id) DO UPDATE "
+            "SET lock_value = objectstore_locks.lock_value",
             {"lock_id": store._MUTATION_LOCK_ID},  # pylint: disable=W0212
         )
-        store.query.assert_any_call(
-            "UPDATE objectstore_locks SET lock_value = lock_value "
-            "WHERE lock_id = :lock_id",
-            {"lock_id": store._MUTATION_LOCK_ID},  # pylint: disable=W0212
-        )
-        self.assertEqual(store.query.call_count, 2)
+        self.assertEqual(store.query.call_count, 1)
 
     def test_mutation_session_locks_once(self) -> None:
         """Ensure nested mutation sessions reuse the transaction-scoped lock."""
@@ -450,7 +446,7 @@ class SqlInMemoryObjectStoreTest(ObjectStoreTest):
             with store._mutation_session():  # pylint: disable=protected-access
                 pass
 
-        self.assertEqual(store.query.call_count, 2)
+        self.assertEqual(store.query.call_count, 1)
 
 
 class SqlFileBasedObjectStoreTest(ObjectStoreTest):
