@@ -330,7 +330,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         except IntegrityError:
             return None
 
-    def store_automation(  # pylint: disable=too-many-arguments
+    def store_automation(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         *,
         federation_id: str,
@@ -1258,7 +1258,7 @@ def _automation_from_row(row: dict[str, Any]) -> Automation:
     return automation
 
 
-def _run_template_to_row(
+def _run_template_to_row(  # pylint: disable=too-many-arguments
     *,
     fab_id: str | None,
     fab_version: str | None,

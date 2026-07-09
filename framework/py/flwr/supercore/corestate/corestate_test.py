@@ -79,7 +79,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         mock_datetime.now.side_effect = timestamps
         return stack
 
-    def store_automation(
+    def store_automation(  # pylint: disable=too-many-arguments
         self,
         state: CoreState,
         *,

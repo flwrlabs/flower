@@ -262,7 +262,7 @@ class InMemoryCoreState(
                 run_series.updated_at = now().isoformat()
             return resolved_series_id
 
-    def store_automation(  # pylint: disable=too-many-arguments
+    def store_automation(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         *,
         federation_id: str,
