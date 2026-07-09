@@ -29,6 +29,7 @@ from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
+from flwr.supercore.inflatable.inflatable_object import get_object_tree
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run
 
@@ -129,6 +130,22 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         # Ensure message won't be retrieved again
         result = self.state.get_messages()
         self.assertEqual(len(result), 0)
+
+    def test_store_message_and_object_tree(self) -> None:
+        """Test storing a message and preregistering its object tree."""
+        # Prepare
+        msg = make_dummy_message()
+
+        # Execute
+        stored, missing_objects = self.state.store_message_and_object_tree(
+            msg, get_object_tree(msg)
+        )
+
+        # Assert
+        self.assertTrue(stored)
+        self.assertIn(msg.metadata.message_id, missing_objects)
+        self.assertTrue(msg.metadata.message_id in self.state.object_store)
+        self.assertEqual(self.state.get_messages()[0], msg)
 
     @parameterized.expand(  # type: ignore
         [

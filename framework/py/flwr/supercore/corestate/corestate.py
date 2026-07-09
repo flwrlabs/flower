@@ -20,6 +20,7 @@ from collections.abc import Sequence
 from typing import Literal
 
 from flwr.app import Context, Message
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
@@ -42,6 +43,27 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
+
+    @abstractmethod
+    def store_message_and_object_tree(
+        self, message: Message, object_tree: ObjectTree
+    ) -> tuple[bool, list[str]]:
+        """Store a Message and preregister its ObjectTree.
+
+        Parameters
+        ----------
+        message : Message
+            The Message to store.
+        object_tree : ObjectTree
+            The ObjectTree containing the IDs of objects to preregister.
+
+        Returns
+        -------
+        tuple[bool, list[str]]
+            A tuple containing a boolean indicating whether the Message was
+            stored and a list of object IDs that still need to be pushed. If
+            storing the Message fails, returns `(False, [])`.
+        """
 
     @abstractmethod
     def get_run_series(

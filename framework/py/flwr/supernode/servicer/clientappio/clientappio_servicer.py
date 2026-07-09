@@ -228,9 +228,8 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         task = get_authenticated_task()
         run_id = task.run_id
 
-        # Initialize state and store connection
+        # Initialize state connection
         state = self.state_factory.state()
-        store = self.objectstore_factory.store()
 
         if len(request.messages_list) != 1 or len(request.message_object_trees) != 1:
             context.abort(
@@ -240,19 +239,24 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
             )
             raise RuntimeError("Unreachable code")  # for mypy
 
+        if run_id != request.messages_list[0].metadata.run_id:
+            context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                "Run ID in message does not match authenticated task's run ID.",
+            )
+            raise RuntimeError("Unreachable code")  # for mypy
+
         # Record message processing end time
-        message = request.messages_list[0]
+        message = message_from_proto(request.messages_list[0])
         state.record_message_processing_end(
             message_id=message.metadata.reply_to_message_id
         )
 
-        # Store Message object to descendants mapping and preregister objects
-        objects_to_push = set(
-            store.preregister(run_id, request.message_object_trees[0])
+        # Save the message to the state and preregister its objects
+        _, objects_to_push = state.store_message_and_object_tree(
+            message, request.message_object_trees[0]
         )
 
-        # Save the message to the state
-        state.store_message(message_from_proto(message))
         return PushAppMessagesResponse(objects_to_push=objects_to_push)
 
     def GetNodes(
