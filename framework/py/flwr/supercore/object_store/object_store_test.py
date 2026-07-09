@@ -383,8 +383,10 @@ class InMemoryObjectStoreTest(ObjectStoreTest):
         return InMemoryObjectStore()
 
 
-class SqlObjectStoreTestMixin:
+class SqlObjectStoreTestMixin(unittest.TestCase):
     """Test SQL-specific ObjectStore behavior."""
+
+    __test__ = False
 
     def object_store_factory(self) -> SqlObjectStore:
         """Provide SQL ObjectStore implementation to test."""
