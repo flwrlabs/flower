@@ -276,6 +276,10 @@ class SqlObjectStore(ObjectStore, SqlMixin):
                 self._lock_objectstore_mutation()
                 yield
             finally:
+                _objectstore_mutation_lock_held.reset(token)
+
+    def _lock_objectstore_mutation(self) -> None:
+        """Serialize structural ObjectStore writes within the active transaction."""
         self.query(
             "INSERT INTO objectstore_locks (lock_id, lock_value) "
             "VALUES (:lock_id, 0) "
