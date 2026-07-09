@@ -17,7 +17,7 @@
 import time
 from collections.abc import Generator
 from logging import INFO
-from typing import Any, NoReturn, cast
+from typing import Any, cast
 
 import grpc
 
@@ -97,16 +97,6 @@ from .control_handlers import (
     _resolve_federation_id,
     _validate_federation_membership_in_request,
 )
-
-
-def _abort_automations_unimplemented(context: grpc.ServicerContext) -> NoReturn:
-    """Abort an automation RPC that has no implementation yet."""
-    context.abort(
-        grpc.StatusCode.UNIMPLEMENTED,
-        "Automations are not implemented.",
-    )
-    raise NotImplementedError("Automations are not implemented.")
-
 
 # pylint: disable=too-many-public-methods
 class ControlServicer(control_pb2_grpc.ControlServicer):
@@ -224,19 +214,25 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: StartAutomationRequest, context: grpc.ServicerContext
     ) -> StartAutomationResponse:
         """Start an automation."""
-        _abort_automations_unimplemented(context)
+        return control_handlers.start_automation(
+            request, _get_account(), self.linkstate_factory.state(), self.fleet_api_type
+        )
 
     def ListAutomations(
         self, request: ListAutomationsRequest, context: grpc.ServicerContext
     ) -> ListAutomationsResponse:
         """List automations."""
-        _abort_automations_unimplemented(context)
+        return control_handlers.list_automations(
+            request, _get_account(), self.linkstate_factory.state()
+        )
 
     def StopAutomation(
         self, request: StopAutomationRequest, context: grpc.ServicerContext
     ) -> StopAutomationResponse:
         """Stop an automation."""
-        _abort_automations_unimplemented(context)
+        return control_handlers.stop_automation(
+            request, _get_account(), self.linkstate_factory.state()
+        )
 
     def GetLoginDetails(
         self, request: GetLoginDetailsRequest, context: grpc.ServicerContext
