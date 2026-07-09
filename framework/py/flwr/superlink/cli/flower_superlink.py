@@ -732,15 +732,17 @@ def flower_superlink() -> None:
     # Run SuperLink in Legacy Mode (Only gRPC)
     ###########################################################################
 
-    federation_manager = get_federation_manager(is_simulation=config.simulation)
-    _, state_factory = _get_objectstore_linkstate_factories(
-        config.database, federation_manager
-    )
-    superlink_lifespan = SuperLinkLifespan(config, state_factory)
+    superlink_lifespan: SuperLinkLifespan | None = None
     try:
+        federation_manager = get_federation_manager(is_simulation=config.simulation)
+        _, state_factory = _get_objectstore_linkstate_factories(
+            config.database, federation_manager
+        )
+        superlink_lifespan = SuperLinkLifespan(config, state_factory)
         superlink_lifespan.startup()
     except Exception as err:  # pylint: disable=broad-except
-        superlink_lifespan.shutdown()
+        if superlink_lifespan is not None:
+            superlink_lifespan.shutdown()
         flwr_exit(ExitCode.SUPERLINK_INVALID_ARGS, str(err))
 
     # Graceful shutdown

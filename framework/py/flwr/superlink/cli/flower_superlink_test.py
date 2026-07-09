@@ -240,6 +240,48 @@ def test_flower_superlink_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> 
     assert captured == ["update", "flower-superlink"]
 
 
+def test_flower_superlink_legacy_factory_error_exits_invalid_args(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Legacy mode factory creation errors should use the CLI invalid-args exit."""
+
+    class _SentinelError(Exception):
+        pass
+
+    config = SimpleNamespace(
+        enable_http_api=False,
+        simulation=False,
+        database="dummysql://localhost/flwr",
+    )
+    captured: dict[str, object] = {}
+
+    def _raise_value_error(*_args: object, **_kwargs: object) -> object:
+        raise ValueError("Unsupported value for `--database`.")
+
+    def _capture_exit(code: int, message: str) -> None:
+        captured["code"] = code
+        captured["message"] = message
+        raise _SentinelError()
+
+    monkeypatch.setattr(app_module, "warn_if_flwr_update_available", lambda **_: None)
+    monkeypatch.setattr(app_module, "event", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(app_module, "_parse_superlink_lifespan_config", lambda: config)
+    monkeypatch.setattr(
+        app_module,
+        "_get_objectstore_linkstate_factories",
+        _raise_value_error,
+    )
+    monkeypatch.setattr(app_module, "flwr_exit", _capture_exit)
+
+    with pytest.raises(_SentinelError):
+        app_module.flower_superlink()
+
+    assert captured == {
+        "code": app_module.ExitCode.SUPERLINK_INVALID_ARGS,
+        "message": "Unsupported value for `--database`.",
+    }
+
+
 def test_obtain_superlink_certificates_keeps_appio_separate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
