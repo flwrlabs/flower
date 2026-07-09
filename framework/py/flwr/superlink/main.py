@@ -74,6 +74,7 @@ def create_app(
         log(INFO, "FastAPI lifespan: startup")
 
         try:
+            active_linkstate_factory = linkstate_factory
             if superlink_lifespan is not None:
                 # Store the SuperLinkLifespan where future REST routers can access
                 # shared state through FastAPI dependencies
@@ -83,6 +84,14 @@ def create_app(
                 # Temporary compatibility path: start the existing gRPC APIs from
                 # FastAPI lifespan
                 superlink_lifespan.startup()
+                if superlink_lifespan.state_factory is None:
+                    raise RuntimeError(
+                        "SuperLink lifespan state has not been initialized."
+                    )
+                active_linkstate_factory = superlink_lifespan.state_factory
+
+            if active_linkstate_factory is not None:
+                fastapi_app.state.linkstate_factory = active_linkstate_factory
 
             lifespan_state: dict[str, object] = {}
             async with AsyncExitStack() as stack:
@@ -106,8 +115,6 @@ def create_app(
         lifespan=lifespan,
         generate_unique_id_function=generate_unique_route_id,
     )
-    if linkstate_factory is not None:
-        fastapi_app.state.linkstate_factory = linkstate_factory
 
     # Core APIs
     # fastapi_app.include_router(health.router)
