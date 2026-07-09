@@ -159,7 +159,7 @@ def create_linkstate_metadata() -> MetaData:
     # --------------------------------------------------------------------------
     #  Table: run_connector
     # --------------------------------------------------------------------------
-    run_connector = Table(
+    Table(
         "run_connector",
         metadata,
         Column("id", Integer, primary_key=True, autoincrement=True),
@@ -178,7 +178,6 @@ def create_linkstate_metadata() -> MetaData:
             name="uq_run_connector_run_id_flwr_aid_connector_ref",
         ),
     )
-    Index("idx_run_connector_run_id", run_connector.c.run_id)
 
     # --------------------------------------------------------------------------
     #  Table: message_ins
