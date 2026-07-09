@@ -1274,9 +1274,9 @@ def _run_template_to_row(
             simulation_config_to_json(federation_config)
         )
     return {
-        "fab_id": fab_id or "",
-        "fab_version": fab_version or "",
-        "fab_hash": fab_hash or "",
+        "fab_id": fab_id,
+        "fab_version": fab_version,
+        "fab_hash": fab_hash,
         "override_config": json.dumps(override_config),
         "federation_config": federation_config_json,
         "primary_task_type": primary_task_type,
