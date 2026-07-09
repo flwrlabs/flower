@@ -158,9 +158,8 @@ when the managed local SuperLink is shut down.
 - Use ``address = ":local-in-memory:"`` when the managed local SuperLink runs on a
   filesystem where SQLite performs poorly, such as some network drives or HPC storage
 
-Learn more in the `How to Run Simulations
-<https://flower.ai/docs/framework/how-to-run-simulations.html>`_ guide about other
-optional parameters you can use to configure your local simulation.
+Learn more in the `How to Run Simulations <how-to-run-simulations.html>`_ guide about
+other optional parameters you can use to configure your local simulation.
 
 When you use a local simulation profile with ``address = ":local:"`` or ``address =
 ":local-in-memory:"``, Flower CLI commands that communicate with SuperLink use the
@@ -207,8 +206,8 @@ prevent eavesdropping and tampering. In production, you should always use TLS by
 
 Only set ``insecure = true`` for local testing environments.
 
-Refer to the `deployment documentation <https://flower.ai/docs/framework/deploy.html>`_
-for TLS setup and advanced configurations.
+Refer to the `deployment documentation <deploy.html>`_ for TLS setup and advanced
+configurations.
 
 ********************************************
  Upgrading from previous versions of Flower
