@@ -30,6 +30,31 @@ erDiagram
     TIMESTAMP updated_at
   }
 
+  connector {
+    INTEGER id PK
+    VARCHAR config_json
+    VARCHAR connector_ref
+    TIMESTAMP created_at
+    VARCHAR credentials_json
+    VARCHAR flwr_aid
+    TIMESTAMP last_used_at "nullable"
+    TIMESTAMP updated_at
+  }
+
+  connector_oauth_session {
+    INTEGER id PK
+    TIMESTAMP completed_at "nullable"
+    VARCHAR connector_ref
+    TIMESTAMP created_at
+    TIMESTAMP expires_at
+    VARCHAR flwr_aid
+    VARCHAR oauth_session_id UK
+    VARCHAR pkce_verifier "nullable"
+    VARCHAR redirect_uri
+    VARCHAR state
+    VARCHAR status
+  }
+
   context {
     BIGINT run_id FK "nullable"
     BLOB context "nullable"
@@ -127,6 +152,13 @@ erDiagram
     VARCHAR usage_reported_at
   }
 
+  run_connector {
+    INTEGER id PK
+    BIGINT run_id FK
+    VARCHAR connector_ref
+    TIMESTAMP created_at
+  }
+
   run_objects {
     VARCHAR object_id PK,FK
     BIGINT run_id PK
@@ -214,6 +246,7 @@ erDiagram
   run ||--o{ message_res : run_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
+  run ||--o{ run_connector : run_id
   objects ||--o| run_objects : object_id
   task ||--o{ task_event : task_id
   task ||--o{ task_logs : task_id

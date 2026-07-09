@@ -16,11 +16,13 @@
 
 
 from sqlalchemy import (
+    TIMESTAMP,
     BigInteger,
     Column,
     Float,
     ForeignKey,
     Index,
+    Integer,
     LargeBinary,
     MetaData,
     String,
@@ -106,6 +108,75 @@ def create_linkstate_metadata() -> MetaData:
         Column("run_id", BigInteger, ForeignKey("run.run_id"), unique=True),
         Column("context", LargeBinary),
     )
+
+    # --------------------------------------------------------------------------
+    #  Table: connector
+    # --------------------------------------------------------------------------
+    connector = Table(
+        "connector",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("flwr_aid", String, nullable=False),
+        Column("connector_ref", String, nullable=False),
+        Column("credentials_json", String, nullable=False),
+        Column("config_json", String, nullable=False),
+        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("last_used_at", TIMESTAMP(timezone=True), nullable=True),
+        UniqueConstraint(
+            "flwr_aid",
+            "connector_ref",
+            name="uq_connector_flwr_aid_connector_ref",
+        ),
+    )
+    Index(
+        "idx_connector_flwr_aid_connector_ref",
+        connector.c.flwr_aid,
+        connector.c.connector_ref,
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: connector_oauth_session
+    # --------------------------------------------------------------------------
+    connector_oauth_session = Table(
+        "connector_oauth_session",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("oauth_session_id", String, nullable=False, unique=True),
+        Column("flwr_aid", String, nullable=False),
+        Column("connector_ref", String, nullable=False),
+        Column("state", String, nullable=False),
+        Column("redirect_uri", String, nullable=False),
+        Column("pkce_verifier", String, nullable=True),
+        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("expires_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("completed_at", TIMESTAMP(timezone=True), nullable=True),
+        Column("status", String, nullable=False),
+    )
+    Index(
+        "idx_connector_oauth_session_flwr_aid_status_expires_at",
+        connector_oauth_session.c.flwr_aid,
+        connector_oauth_session.c.status,
+        connector_oauth_session.c.expires_at,
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: run_connector
+    # --------------------------------------------------------------------------
+    run_connector = Table(
+        "run_connector",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("run_id", BigInteger, ForeignKey("run.run_id"), nullable=False),
+        Column("connector_ref", String, nullable=False),
+        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+        UniqueConstraint(
+            "run_id",
+            "connector_ref",
+            name="uq_run_connector_run_id_connector_ref",
+        ),
+    )
+    Index("idx_run_connector_run_id", run_connector.c.run_id)
 
     # --------------------------------------------------------------------------
     #  Table: message_ins
