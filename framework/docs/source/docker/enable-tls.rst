@@ -12,7 +12,7 @@ Transport Layer Security (TLS) for each Flower component to ensure secure commun
 .. note::
 
     For testing purposes, you can generate your own self-signed certificates. The
-    `Enable SSL connections <../how-to-enable-tls-connections.html#certificates>`__ page
+    `Enable TLS connections <../how-to-enable-tls-connections.html#certificates>`__ page
     contains a section that will guide you through the process.
 
 .. note::
