@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-03 00:26+0000\n"
+"POT-Creation-Date: 2026-07-09 00:26+0000\n"
 "PO-Revision-Date: 2026-05-23 06:53+0000\n"
 "Last-Translator: Seulki Yun <icstuckyi@gmail.com>\n"
 "Language: ko\n"
@@ -378,17 +378,16 @@ msgstr "빌드 전달인자"
 #: ../../source/ref-exit-codes/2.rst:7 ../../source/ref-exit-codes/200.rst:23
 #: ../../source/ref-exit-codes/201.rst:7 ../../source/ref-exit-codes/202.rst:7
 #: ../../source/ref-exit-codes/203.rst:7 ../../source/ref-exit-codes/250.rst:7
-#: ../../source/ref-exit-codes/3.rst:7 ../../source/ref-exit-codes/300.rst:7
-#: ../../source/ref-exit-codes/302.rst:7 ../../source/ref-exit-codes/303.rst:7
-#: ../../source/ref-exit-codes/304.rst:7 ../../source/ref-exit-codes/400.rst:7
-#: ../../source/ref-exit-codes/401.rst:7 ../../source/ref-exit-codes/402.rst:7
-#: ../../source/ref-exit-codes/500.rst:7 ../../source/ref-exit-codes/600.rst:7
-#: ../../source/ref-exit-codes/601.rst:7 ../../source/ref-exit-codes/602.rst:7
-#: ../../source/ref-exit-codes/603.rst:7 ../../source/ref-exit-codes/604.rst:7
-#: ../../source/ref-exit-codes/605.rst:7 ../../source/ref-exit-codes/606.rst:7
-#: ../../source/ref-exit-codes/607.rst:7 ../../source/ref-exit-codes/608.rst:7
-#: ../../source/ref-exit-codes/700.rst:7 ../../source/ref-exit-codes/701.rst:7
-#: ../../source/ref-exit-codes/800.rst:7
+#: ../../source/ref-exit-codes/3.rst:7 ../../source/ref-exit-codes/302.rst:7
+#: ../../source/ref-exit-codes/303.rst:7 ../../source/ref-exit-codes/304.rst:7
+#: ../../source/ref-exit-codes/400.rst:7 ../../source/ref-exit-codes/401.rst:7
+#: ../../source/ref-exit-codes/402.rst:7 ../../source/ref-exit-codes/500.rst:7
+#: ../../source/ref-exit-codes/600.rst:7 ../../source/ref-exit-codes/601.rst:7
+#: ../../source/ref-exit-codes/602.rst:7 ../../source/ref-exit-codes/603.rst:7
+#: ../../source/ref-exit-codes/604.rst:7 ../../source/ref-exit-codes/605.rst:7
+#: ../../source/ref-exit-codes/606.rst:7 ../../source/ref-exit-codes/607.rst:7
+#: ../../source/ref-exit-codes/608.rst:7 ../../source/ref-exit-codes/700.rst:7
+#: ../../source/ref-exit-codes/701.rst:7 ../../source/ref-exit-codes/800.rst:7
 msgid "Description"
 msgstr "설명"
 
@@ -7640,6 +7639,167 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
+msgid "`superlink.appioTls.enabled`"
+msgstr "flower 초연결"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "Enable TLS on the SuperLink ServerAppIo API."
+msgstr "서버(SuperLink)"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.existingSecret`"
+msgstr "기존 전략 사용"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "Existing Kubernetes Secret for ServerAppIo TLS."
+msgstr "기존 전략 사용"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.mountPath`"
+msgstr "flower 초연결"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Mount path used when AppIO uses a separate TLS Secret."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "`/app/appio-cert`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.caCertfile`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Path to the CA certificate used by SuperExec to verify ServerAppIo."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`/app/cert/ca.crt`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.certfile`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Path to the ServerAppIo server certificate."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`/app/cert/tls.crt`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.keyfile`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Path to the ServerAppIo server private key."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`/app/cert/tls.key`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.certificate.enabled`"
+msgstr "인증서"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Enable automatic creation of a cert-manager Certificate for ServerAppIo."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.certificate.annotations`"
+msgstr "인증서"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.certificate.secretName`"
+msgstr "인증서"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid ""
+"Name of the Kubernetes Secret storing the ServerAppIo TLS key and "
+"certificate."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.certificate.issuerGroup`"
+msgstr "인증서"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "API group for the issuer."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.certificate.existingIssuer`"
+msgstr "인증서"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.certificate.existingIssuerKind`"
+msgstr "인증서"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.certificate.dnsNames`"
+msgstr "인증서"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "DNS names for the ServerAppIo certificate."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.certificate.duration`"
+msgstr "인증서"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "The requested certificate lifetime."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.certificate.renewBefore`"
+msgstr "인증서"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "How long before expiry cert-manager should renew the certificate."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.certificate.privateKey`"
+msgstr "인증서"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "Private key options."
+msgstr "고급 Docker 옵션"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superlink.appioTls.certificate.usages`"
+msgstr "인증서"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
 msgid "`superlink.superexecAuthSecretFile`"
 msgstr "flower 초연결"
 
@@ -8138,7 +8298,7 @@ msgstr "flower 초연결"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
-msgid "`1.29.0-ubuntu`"
+msgid "`1.32.1-ubuntu`"
 msgstr "``ubuntu``"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
@@ -8200,7 +8360,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid ""
-"Add extra ingress rules to the NetworkPolicy (ignored if "
+"Add extra egress rules to the NetworkPolicy (ignored if "
 "allowExternalEgress=true)"
 msgstr ""
 
@@ -8258,8 +8418,8 @@ msgstr ""
 msgid "`superlink.networkPolicy.control.ingressNSPodMatchLabels`"
 msgstr ""
 
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:847
-#: ../../source/helm/how-to-deploy-supernode-using-helm.md:348
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:864
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:352
 #, fuzzy
 msgid "Component SuperExec"
 msgstr "run\\_supernode"
@@ -8324,12 +8484,355 @@ msgid "`superexec.superexecAuthSecretFile`"
 msgstr "run\\_supernode"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.rootCertificates`"
+msgstr "run\\_supernode"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Path to a PEM-encoded root CA certificate used to verify AppIO."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "`superexec.allowRuntimeDependencyInstallation`"
 msgstr "flower 초연결"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Allow SuperExec to install runtime dependencies for ServerApps."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.executor.type`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Executor backend for SuperExec task launches. Valid values are "
+"`subprocess` or `kubernetes`."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.executor.configPath`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Absolute file path inside the SuperExec container for the executor config"
+" file. Must not end with `/` or point directly under `/`."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`/etc/flwr/executor/executor-config.yaml`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.executor.configMap.create`"
+msgstr "run\\_supernode"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Create a ConfigMap containing the generated executor config."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.executor.configMap.name`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"ConfigMap name to create or mount. Required when `create` is false. "
+"Defaults to `<superexec-fullname>-executor-config` when `create` is true."
+" Explicit names must be 63 characters or fewer."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.executor.configMap.key`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "ConfigMap data key for the generated executor config file."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`executor-config.yaml`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.executor.kubernetes.namespace`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Namespace where SuperExec creates TaskExecutor Pods and credential "
+"Secrets. The chart renders this Namespace in Kubernetes executor mode, so"
+" installation requires permission to create or adopt it. Required when "
+"`superexec.executor.type=kubernetes` and must differ from the release "
+"namespace."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.appioRootCertificatesPath`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Path to a PEM-encoded AppIO root CA file to copy into TaskExecutor "
+"credential Secrets."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.executor.kubernetes.taskExecutor.image.registry`"
+msgstr "레포지토리 설정하기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "TaskExecutor image registry."
+msgstr "Flower 서버앱"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.executor.kubernetes.taskExecutor.image.repository`"
+msgstr "레포지토리 설정하기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "TaskExecutor image repository."
+msgstr "레포지토리 설정하기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.image.tag`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "TaskExecutor image tag."
+msgstr "flower 초연결"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.image.digest`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "TaskExecutor image digest."
+msgstr "Flower 서버앱"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.executor.kubernetes.taskExecutor.image.pullPolicy`"
+msgstr "레포지토리 설정하기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "TaskExecutor image pull policy."
+msgstr "레포지토리 설정하기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`Always`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.resourcePool`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Resource pool label value for the TaskExecutor Namespace and generated "
+"TaskExecutor Pods and Secrets."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.activePodBudget`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Maximum active TaskExecutor Pods allowed for this SuperExec before it "
+"waits for capacity."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`nil`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.capacityPollInterval`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Capacity wait polling interval in seconds."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.capacityLogInterval`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Capacity wait log interval in seconds."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.executor.kubernetes.taskExecutor.labels`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Additional labels for generated TaskExecutor Pods and Secrets."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.annotations`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "Additional annotations for generated TaskExecutor Pods and Secrets."
+msgstr "서버(SuperLink)"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.env`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Literal environment variables for the generated TaskExecutor container."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.resources`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "TaskExecutor container requests and limits."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.nodeSelector`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "Node selector for generated TaskExecutor Pods."
+msgstr "flower 초연결"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.tolerations`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "Tolerations for generated TaskExecutor Pods."
+msgstr "서버(SuperLink)"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.affinity`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Affinity for generated TaskExecutor Pods."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.priorityClassName`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "PriorityClass name for generated TaskExecutor Pods."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.podSecurityContext`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "Pod security context for generated TaskExecutor Pods."
+msgstr "서버(SuperLink)"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.containerSecurityContext`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Container security context for generated TaskExecutor Pods."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "`superexec.executor.kubernetes.taskExecutor.serviceAccountName`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Optional service account name for generated TaskExecutor Pods. Flower's "
+"Kubernetes executor runtime sets `automountServiceAccountToken: false`; "
+"leaving this empty avoids assigning a non-default identity, but "
+"tokenlessness comes from that runtime setting."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
@@ -8386,6 +8889,32 @@ msgstr "SuperNode Dockerfile 만들기"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.serviceAccount.automountServiceAccountToken`"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.rbac.create`"
+msgstr "run\\_supernode"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Create Role and RoleBinding permissions in the TaskExecutor namespace for"
+" the Kubernetes executor launcher ServiceAccount."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.rbac.includeGet`"
+msgstr "run\\_supernode"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Include diagnostic `get` permissions on Pods and Secrets in addition to "
+"create/list/delete."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
@@ -8718,10 +9247,6 @@ msgid "Components image pullPolicy"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`Always`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
 msgid "`superexec.networkPolicy.enabled`"
@@ -8737,7 +9262,57 @@ msgstr ""
 msgid "`superexec.networkPolicy.extraEgress`"
 msgstr ""
 
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:903
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.taskExecutorNetworkPolicy.enabled`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Create a NetworkPolicy in the TaskExecutor namespace for Flower-created "
+"TaskExecutor Pods."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.taskExecutorNetworkPolicy.allowExternalEgress`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Allow unrestricted egress from TaskExecutor Pods."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.taskExecutorNetworkPolicy.labels`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Additional labels for the TaskExecutor NetworkPolicy pod selector. These "
+"labels are also added to generated TaskExecutor Pod labels."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.taskExecutorNetworkPolicy.extraEgress`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid ""
+"Add egress rules from TaskExecutor Pods to AppIO, proxies, registries, or"
+" other required services (ignored if allowExternalEgress=true)."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:954
 #, fuzzy
 msgid "Component OpenFGA"
 msgstr "공통"
@@ -9153,6 +9728,43 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
+msgid "`supernode.appioTls.enabled`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "Enable TLS on the SuperNode ClientAppIo API."
+msgstr "서버(SuperLink)"
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`supernode.appioTls.caCertfile`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Path to the CA certificate used by SuperExec to verify ClientAppIo."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`supernode.appioTls.certfile`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Path to the ClientAppIo server certificate."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`supernode.appioTls.keyfile`"
+msgstr "SuperNode Dockerfile 만들기"
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Path to the ClientAppIo server private key."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
 msgid "`supernode.superexecAuthSecretFile`"
 msgstr "기존 전략 사용"
 
@@ -9446,6 +10058,10 @@ msgstr "run\\_supernode"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Address of the supernode the SuperExec should connect to"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Allow SuperExec to install runtime dependencies for ClientApps."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -35222,7 +35838,6 @@ msgstr ""
 #: ../../source/ref-exit-codes/202.rst:13
 #: ../../source/ref-exit-codes/203.rst:15
 #: ../../source/ref-exit-codes/250.rst:14
-#: ../../source/ref-exit-codes/300.rst:14
 #: ../../source/ref-exit-codes/302.rst:15
 #: ../../source/ref-exit-codes/303.rst:14
 #: ../../source/ref-exit-codes/304.rst:15
@@ -35529,36 +36144,6 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/3.rst:9
 msgid "The process exited gracefully, triggered by ``SIGTERM``."
-msgstr ""
-
-#: ../../source/ref-exit-codes/300.rst:3
-msgid "[300] SUPERNODE_REST_ADDRESS_INVALID"
-msgstr ""
-
-#: ../../source/ref-exit-codes/300.rst:9
-msgid ""
-"The provided SuperLink address for the REST API is invalid. The address "
-"must start with ``http://`` or ``https://`` to be recognized correctly."
-msgstr ""
-
-#: ../../source/ref-exit-codes/300.rst:16
-msgid ""
-"When using the REST API, ensure that the server address starts with "
-"either ``https://`` or ``http://``. For example:"
-msgstr ""
-
-#: ../../source/ref-exit-codes/300.rst:19
-msgid "``http://127.0.0.1:8080``"
-msgstr ""
-
-#: ../../source/ref-exit-codes/300.rst:20
-msgid "``https://example.com:8080``"
-msgstr ""
-
-#: ../../source/ref-exit-codes/300.rst:22
-msgid ""
-"Verify the address in your configuration or command-line arguments and "
-"correct it as needed."
 msgstr ""
 
 #: ../../source/ref-exit-codes/302.rst:3
@@ -75822,5 +76407,39 @@ msgstr ""
 #~ "more in :doc:`Create and Manage "
 #~ "Federations on SuperGrid <how-to-"
 #~ "create-and-manage-federations>`."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Add extra ingress rules to the "
+#~ "NetworkPolicy (ignored if allowExternalEgress=true)"
+#~ msgstr ""
+
+#~ msgid "[300] SUPERNODE_REST_ADDRESS_INVALID"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The provided SuperLink address for the"
+#~ " REST API is invalid. The address "
+#~ "must start with ``http://`` or "
+#~ "``https://`` to be recognized correctly."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "When using the REST API, ensure "
+#~ "that the server address starts with "
+#~ "either ``https://`` or ``http://``. For "
+#~ "example:"
+#~ msgstr ""
+
+#~ msgid "``http://127.0.0.1:8080``"
+#~ msgstr ""
+
+#~ msgid "``https://example.com:8080``"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Verify the address in your configuration"
+#~ " or command-line arguments and "
+#~ "correct it as needed."
 #~ msgstr ""
 
