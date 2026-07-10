@@ -25,14 +25,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.date import now
-from flwr.supercore.routers.protobuf import ProtobufRouter
-from flwr.superlink.dependencies.linkstate import get_linkstate
-
-from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    ListRunsRequest,
-    ListRunsResponse,
-)
 from flwr.supercore.protobuf.routing import ProtobufRouter
+from flwr.superlink.dependencies.linkstate import get_linkstate
 
 router = APIRouter(prefix="/control", tags=["control"])
 protobuf_router = ProtobufRouter(router)

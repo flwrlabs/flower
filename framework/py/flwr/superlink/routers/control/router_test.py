@@ -26,7 +26,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
-from flwr.supercore.routers.protobuf import PROTOBUF_MEDIA_TYPE
+from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.run import Run
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.routers.control.router import router
