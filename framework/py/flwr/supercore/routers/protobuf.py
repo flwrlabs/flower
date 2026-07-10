@@ -249,9 +249,14 @@ class ProtobufRouter:
                     await http_request.body(), request_type
                 )
                 result = await _call_handler(func, proto_request, dependency_values)
-                proto_response = cast(Message, result)
+                # Fail clearly when a handler violates its declared response contract.
+                if not isinstance(result, Message):
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Invalid response returned from unary handler",
+                    )
                 return Response(
-                    content=proto_response.SerializeToString(),
+                    content=result.SerializeToString(),
                     media_type=PROTOBUF_MEDIA_TYPE,
                 )
 
@@ -294,14 +299,20 @@ class ProtobufRouter:
                 result = await _call_handler(func, proto_request, dependency_values)
 
                 content: AsyncIterable[bytes] | Iterable[bytes]
-                if hasattr(result, "__aiter__"):
+                # Select framing based on the stream type and reject invalid results.
+                if isinstance(result, AsyncIterable):
                     content = _async_iter_framed_bytes(
                         cast(AsyncIterable[Message], result)
                     )
-                else:
+                elif isinstance(result, Iterable):
                     content = (
                         _frame_message(message)
                         for message in cast(Iterable[Message], result)
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Invalid response returned from stream handler",
                     )
 
                 return StreamingResponse(

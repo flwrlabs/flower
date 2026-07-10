@@ -16,7 +16,7 @@
 
 from collections.abc import AsyncIterator, Iterator
 from threading import get_ident
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.testclient import TestClient
@@ -106,6 +106,54 @@ def test_sync_stream_handler_runs_in_threadpool() -> None:
 
     assert response.status_code == 200
     assert handler_thread_ids
+
+
+def test_unary_unary_rejects_non_protobuf_response() -> None:
+    """The router reports a clear error for invalid unary response values."""
+    app = FastAPI()
+    fastapi_router = APIRouter()
+    protobuf_router = ProtobufRouter(fastapi_router)
+
+    @protobuf_router.unary_unary("/rpc/ListRuns")
+    def list_runs(_request: ListRunsRequest) -> ListRunsResponse:
+        return cast(ListRunsResponse, object())
+
+    app.include_router(fastapi_router)
+    client = TestClient(app)
+
+    response = client.post(
+        "/rpc/ListRuns",
+        content=ListRunsRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == ("Invalid response returned from unary handler")
+
+
+def test_unary_stream_rejects_non_iterable_response() -> None:
+    """The router reports a clear error for invalid stream response values."""
+    app = FastAPI()
+    fastapi_router = APIRouter()
+    protobuf_router = ProtobufRouter(fastapi_router)
+
+    @protobuf_router.unary_stream("/rpc/StreamLogs")
+    def stream_logs(_request: StreamLogsRequest) -> Iterator[StreamLogsResponse]:
+        return cast(Iterator[StreamLogsResponse], None)
+
+    app.include_router(fastapi_router)
+    client = TestClient(app)
+
+    response = client.post(
+        "/rpc/StreamLogs",
+        content=StreamLogsRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == (
+        "Invalid response returned from stream handler"
+    )
 
 
 def test_unary_stream_returns_framed_protobuf_stream() -> None:
