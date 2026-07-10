@@ -397,7 +397,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError(f"Could not store automation: {exc}") from exc
 
         row = rows[0]
-        next_run_at = row["next_run_at"]
         return Automation(
             automation_id=row["automation_id"],
             status=row["status"],
@@ -406,10 +405,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             flwr_aid=row["flwr_aid"],
             created_at=timestamp_to_iso(row["created_at"]),
             updated_at=timestamp_to_iso(row["updated_at"]),
-            next_run_at=timestamp_to_iso(next_run_at),
+            next_run_at=timestamp_to_iso(row["next_run_at"]),
             fixed_interval=row["fixed_interval"],
             max_runs=row["remaining_runs"],
-            stopped_at=None,
         )
 
     def list_automations(  # pylint: disable=too-many-arguments,too-many-locals
