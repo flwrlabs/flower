@@ -297,11 +297,9 @@ class InMemoryCoreState(
                 created_at=current.isoformat(),
                 updated_at=current.isoformat(),
                 next_run_at=next_run_at.isoformat(),
+                fixed_interval=fixed_interval,
+                remaining_runs=remaining_runs,
             )
-            if fixed_interval is not None:
-                automation.fixed_interval = fixed_interval
-            if remaining_runs is not None:
-                automation.remaining_runs = remaining_runs
 
             self.automation_store[automation_id] = AutomationRecord(
                 automation=automation,
@@ -353,7 +351,7 @@ class InMemoryCoreState(
                 automations.sort(key=lambda automation: automation.next_run_at)
             if limit is not None:
                 automations = automations[:limit]
-            return list(automations)
+            return automations
 
     def stop_automation(self, automation_id: int) -> bool:
         """Stop an active automation."""

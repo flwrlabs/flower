@@ -395,7 +395,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     },
                 )
         except IntegrityError as exc:
-            raise ValueError("Could not store automation") from exc
+            raise ValueError(f"Could not store automation: {exc}") from exc
 
         return _automation_from_row(rows[0])
 
@@ -1263,7 +1263,7 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
 
 def _automation_from_row(row: dict[str, Any]) -> Automation:
     """Convert a database row to an Automation object."""
-    automation = Automation(
+    return Automation(
         automation_id=row["automation_id"],
         status=row["status"],
         federation=row["federation_id"],
@@ -1271,16 +1271,11 @@ def _automation_from_row(row: dict[str, Any]) -> Automation:
         flwr_aid=row["flwr_aid"],
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
+        next_run_at=timestamp_to_iso(row["next_run_at"]),
+        fixed_interval=row["fixed_interval"],
+        remaining_runs=row["remaining_runs"],
+        stopped_at=timestamp_to_iso(row["stopped_at"]),
     )
-    if row["next_run_at"] is not None:
-        automation.next_run_at = timestamp_to_iso(row["next_run_at"])
-    if row["fixed_interval"] is not None:
-        automation.fixed_interval = row["fixed_interval"]
-    if row["remaining_runs"] is not None:
-        automation.remaining_runs = row["remaining_runs"]
-    if row["stopped_at"] is not None:
-        automation.stopped_at = timestamp_to_iso(row["stopped_at"])
-    return automation
 
 
 def _run_template_to_row(  # pylint: disable=too-many-arguments
