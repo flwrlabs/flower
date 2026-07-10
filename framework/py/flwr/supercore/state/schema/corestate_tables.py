@@ -232,13 +232,7 @@ def create_corestate_metadata() -> MetaData:
             ForeignKey("object_push_sessions.session_id", ondelete="CASCADE"),
             nullable=False,
         ),
-        Column("message_object_id", String, nullable=False),
-        PrimaryKeyConstraint("session_id", "message_object_id"),
-    )
-    Index(
-        "idx_object_push_session_roots_message_object_id_unique",
-        object_push_session_roots.c.message_object_id,
-        unique=True,
+        Column("root_object_id", String, primary_key=True, nullable=False),
     )
     Index(
         "idx_object_push_session_roots_session_id",

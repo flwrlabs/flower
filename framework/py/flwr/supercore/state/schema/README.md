@@ -109,8 +109,8 @@ erDiagram
   }
 
   object_push_session_roots {
-    VARCHAR message_object_id PK
-    VARCHAR session_id PK,FK
+    VARCHAR root_object_id PK
+    VARCHAR session_id FK
   }
 
   object_push_sessions {
@@ -232,7 +232,7 @@ erDiagram
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   object_push_sessions ||--o| object_push_session_pending : session_id
-  object_push_sessions ||--o| object_push_session_roots : session_id
+  object_push_sessions ||--o{ object_push_session_roots : session_id
   objects ||--o| run_objects : object_id
   task ||--o{ task_event : task_id
   task ||--o{ task_logs : task_id
