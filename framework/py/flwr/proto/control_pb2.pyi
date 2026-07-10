@@ -185,7 +185,7 @@ class Automation(google.protobuf.message.Message):
     UPDATED_AT_FIELD_NUMBER: builtins.int
     NEXT_RUN_AT_FIELD_NUMBER: builtins.int
     FIXED_INTERVAL_FIELD_NUMBER: builtins.int
-    REMAINING_RUNS_FIELD_NUMBER: builtins.int
+    MAX_RUNS_FIELD_NUMBER: builtins.int
     STOPPED_AT_FIELD_NUMBER: builtins.int
     automation_id: builtins.int
     status: builtins.str
@@ -196,7 +196,7 @@ class Automation(google.protobuf.message.Message):
     updated_at: builtins.str
     next_run_at: builtins.str
     fixed_interval: builtins.int
-    remaining_runs: builtins.int
+    max_runs: builtins.int
     stopped_at: builtins.str
     def __init__(
         self,
@@ -208,19 +208,17 @@ class Automation(google.protobuf.message.Message):
         flwr_aid: builtins.str = ...,
         created_at: builtins.str = ...,
         updated_at: builtins.str = ...,
-        next_run_at: builtins.str | None = ...,
+        next_run_at: builtins.str = ...,
         fixed_interval: builtins.int | None = ...,
-        remaining_runs: builtins.int | None = ...,
+        max_runs: builtins.int | None = ...,
         stopped_at: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_next_run_at", b"_next_run_at", "_remaining_runs", b"_remaining_runs", "_stopped_at", b"_stopped_at", "fixed_interval", b"fixed_interval", "next_run_at", b"next_run_at", "remaining_runs", b"remaining_runs", "stopped_at", b"stopped_at"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_next_run_at", b"_next_run_at", "_remaining_runs", b"_remaining_runs", "_stopped_at", b"_stopped_at", "automation_id", b"automation_id", "created_at", b"created_at", "federation", b"federation", "fixed_interval", b"fixed_interval", "flwr_aid", b"flwr_aid", "next_run_at", b"next_run_at", "remaining_runs", b"remaining_runs", "series_id", b"series_id", "status", b"status", "stopped_at", b"stopped_at", "updated_at", b"updated_at"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_max_runs", b"_max_runs", "_stopped_at", b"_stopped_at", "fixed_interval", b"fixed_interval", "max_runs", b"max_runs", "stopped_at", b"stopped_at"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_max_runs", b"_max_runs", "_stopped_at", b"_stopped_at", "automation_id", b"automation_id", "created_at", b"created_at", "federation", b"federation", "fixed_interval", b"fixed_interval", "flwr_aid", b"flwr_aid", "max_runs", b"max_runs", "next_run_at", b"next_run_at", "series_id", b"series_id", "status", b"status", "stopped_at", b"stopped_at", "updated_at", b"updated_at"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_fixed_interval", b"_fixed_interval"]) -> typing.Literal["fixed_interval"] | None: ...
     @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_next_run_at", b"_next_run_at"]) -> typing.Literal["next_run_at"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_remaining_runs", b"_remaining_runs"]) -> typing.Literal["remaining_runs"] | None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_max_runs", b"_max_runs"]) -> typing.Literal["max_runs"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_stopped_at", b"_stopped_at"]) -> typing.Literal["stopped_at"] | None: ...
 

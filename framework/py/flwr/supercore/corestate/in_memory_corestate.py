@@ -276,7 +276,7 @@ class InMemoryCoreState(
         series_id: int,
         next_run_at: str,
         fixed_interval: int | None = None,
-        remaining_runs: int | None = None,
+        max_runs: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
         with self.lock_automation_store:
@@ -293,7 +293,7 @@ class InMemoryCoreState(
                 updated_at=current.isoformat(),
                 next_run_at=next_run_at,
                 fixed_interval=fixed_interval,
-                remaining_runs=remaining_runs,
+                max_runs=max_runs,
             )
 
             self.automation_store[automation_id] = AutomationRecord(
@@ -338,10 +338,7 @@ class InMemoryCoreState(
                     continue
 
                 # Apply due time filter.
-                if cutoff is not None and (
-                    not automation.HasField("next_run_at")
-                    or automation.next_run_at > cutoff
-                ):
+                if cutoff is not None and automation.next_run_at > cutoff:
                     continue
 
                 automations.append(automation)
@@ -368,53 +365,6 @@ class InMemoryCoreState(
             record.automation.status = AutomationStatus.STOPPED
             record.automation.updated_at = stopped_at
             record.automation.stopped_at = stopped_at
-            record.automation.ClearField("next_run_at")
-            return True
-
-    def update_automation(
-        self,
-        automation_id: int,
-        *,
-        expected_next_run_at: str,
-        next_run_at: str | None,
-        status: AutomationStatus = AutomationStatus.ACTIVE,
-    ) -> bool:
-        """Update an automation after dispatch or mark it failed."""
-        if status not in (AutomationStatus.ACTIVE, AutomationStatus.FAILED):
-            raise AssertionError("`status` must be active or failed")
-
-        with self.lock_automation_store:
-            record = self.automation_store.get(automation_id)
-            if (
-                record is None
-                or record.automation.status != AutomationStatus.ACTIVE
-                or not record.automation.HasField("next_run_at")
-                or record.automation.next_run_at != expected_next_run_at
-            ):
-                return False
-
-            updated_at = now().isoformat()
-            record.automation.updated_at = updated_at
-
-            if status == AutomationStatus.FAILED:
-                record.automation.status = AutomationStatus.FAILED
-                record.automation.ClearField("next_run_at")
-                return True
-
-            if record.automation.HasField("remaining_runs"):
-                record.automation.remaining_runs = max(
-                    record.automation.remaining_runs - 1, 0
-                )
-
-            if (
-                record.automation.HasField("remaining_runs")
-                and record.automation.remaining_runs == 0
-            ) or next_run_at is None:
-                record.automation.status = AutomationStatus.COMPLETED
-                record.automation.ClearField("next_run_at")
-                return True
-
-            record.automation.next_run_at = next_run_at
             return True
 
     def add_task_log(self, task_id: int, log_message: str) -> None:

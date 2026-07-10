@@ -88,7 +88,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         flwr_aid: str = "aid-a",
         next_run_at: str | None = None,
         fixed_interval: int | None = None,
-        remaining_runs: int | None = 1,
+        max_runs: int | None = 1,
     ) -> Automation:
         """Store a minimal automation."""
         return state.store_automation(
@@ -103,7 +103,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             series_id=series_id,
             next_run_at=next_run_at or now().isoformat(),
             fixed_interval=fixed_interval,
-            remaining_runs=remaining_runs,
+            max_runs=max_runs,
         )
 
     def test_store_run_in_series_creates_id(self) -> None:
@@ -239,68 +239,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [automation.automation_id for automation in stopped], [due.automation_id]
         )
-        self.assertFalse(stopped[0].HasField("next_run_at"))
-
-    def test_update_automation(self) -> None:
-        """Automation updates should advance and fail records."""
-        state = self.state_factory()
-        current = now()
-
-        completing = self.store_automation(
-            state,
-            series_id=1,
-            next_run_at=(current - timedelta(seconds=30)).isoformat(),
-            fixed_interval=60,
-            remaining_runs=2,
-        )
-        next_run_at = (current + timedelta(seconds=30)).isoformat()
-        self.assertTrue(
-            state.update_automation(
-                completing.automation_id,
-                expected_next_run_at=(current - timedelta(seconds=30)).isoformat(),
-                next_run_at=next_run_at,
-                status=AutomationStatus.ACTIVE,
-            )
-        )
-        self.assertFalse(
-            state.update_automation(
-                completing.automation_id,
-                expected_next_run_at=(current - timedelta(seconds=30)).isoformat(),
-                next_run_at=next_run_at,
-                status=AutomationStatus.ACTIVE,
-            )
-        )
-        updated = state.list_automations(
-            federation="@me/fed-a",
-            statuses=[AutomationStatus.ACTIVE],
-            order_by="updated_at",
-        )
-        self.assertEqual(updated[0].remaining_runs, 1)
-        self.assertEqual(updated[0].next_run_at, next_run_at)
-
-        failing = self.store_automation(
-            state,
-            series_id=2,
-            next_run_at=(current - timedelta(seconds=15)).isoformat(),
-        )
-        self.assertTrue(
-            state.update_automation(
-                failing.automation_id,
-                expected_next_run_at=(current - timedelta(seconds=15)).isoformat(),
-                next_run_at=None,
-                status=AutomationStatus.FAILED,
-            )
-        )
-        failed = state.list_automations(
-            federation="@me/fed-a",
-            statuses=[AutomationStatus.FAILED],
-            order_by="updated_at",
-        )
-        self.assertEqual(
-            [automation.automation_id for automation in failed],
-            [failing.automation_id],
-        )
-        self.assertFalse(failed[0].HasField("next_run_at"))
+        self.assertEqual(stopped[0].next_run_at, due_at)
 
     def test_store_automation_preserves_series_id_without_validation(self) -> None:
         """Automation storage should preserve caller-provided series IDs."""

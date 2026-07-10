@@ -28,7 +28,6 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
 
-from ..constant import AutomationStatus
 from ..object_store import ObjectStore
 
 
@@ -152,7 +151,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         series_id: int,
         next_run_at: str,
         fixed_interval: int | None = None,
-        remaining_runs: int | None = None,
+        max_runs: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata.
 
@@ -177,12 +176,15 @@ class CoreState(ABC):  # pylint: disable=R0904
         series_id : int
             Run series ID to use when dispatching automation runs.
         next_run_at : str
-            Next due time as a timestamp string. For one-shot automations, this
-            is the requested `start_at`.
+            Initial due time as a timestamp string. This is required when
+            storing an automation. For one-shot automations, this is the
+            requested `start_at`; for recurring automations, this is the first
+            scheduled run time.
         fixed_interval : int | None (default: None)
             Recurring interval in seconds.
-        remaining_runs : int | None (default: None)
-            Remaining number of runs, if finite.
+        max_runs : int | None (default: None)
+            Maximum number of runs, if finite. The value initializes the
+            persisted `remaining_runs` counter.
 
         Returns
         -------
@@ -236,37 +238,6 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         bool
             True if an active automation was stopped, otherwise False.
-        """
-
-    @abstractmethod
-    def update_automation(
-        self,
-        automation_id: int,
-        *,
-        expected_next_run_at: str,
-        next_run_at: str | None,
-        status: AutomationStatus = AutomationStatus.ACTIVE,
-    ) -> bool:
-        """Update an automation after dispatch or mark it failed.
-
-        Parameters
-        ----------
-        automation_id : int
-            Automation ID to update.
-        expected_next_run_at : str
-            Current due time timestamp string expected by the caller. The update
-            only succeeds if the stored `next_run_at` still matches this value.
-        next_run_at : str | None
-            Next due time timestamp string after a successful dispatch. If
-            `None`, the automation is completed.
-        status : AutomationStatus
-            Target status. Use `active` to advance after successful dispatch and
-            `failed` to terminally fail the automation.
-
-        Returns
-        -------
-        bool
-            True if the active automation was updated, otherwise False.
         """
 
     @abstractmethod

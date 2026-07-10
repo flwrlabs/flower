@@ -344,7 +344,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         series_id: int,
         next_run_at: str,
         fixed_interval: int | None = None,
-        remaining_runs: int | None = None,
+        max_runs: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
         federation_config_json = None
@@ -389,7 +389,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         "updated_at": current,
                         "next_run_at": next_run_at,
                         "fixed_interval": fixed_interval,
-                        "remaining_runs": remaining_runs,
+                        "remaining_runs": max_runs,
                         "stopped_at": None,
                     },
                 )
@@ -398,7 +398,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         row = rows[0]
         next_run_at = row["next_run_at"]
-        stopped_at = row["stopped_at"]
         return Automation(
             automation_id=row["automation_id"],
             status=row["status"],
@@ -407,10 +406,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             flwr_aid=row["flwr_aid"],
             created_at=timestamp_to_iso(row["created_at"]),
             updated_at=timestamp_to_iso(row["updated_at"]),
-            next_run_at=timestamp_to_iso(next_run_at) if next_run_at else None,
+            next_run_at=timestamp_to_iso(next_run_at),
             fixed_interval=row["fixed_interval"],
-            remaining_runs=row["remaining_runs"],
-            stopped_at=timestamp_to_iso(stopped_at) if stopped_at else None,
+            max_runs=row["remaining_runs"],
+            stopped_at=None,
         )
 
     def list_automations(  # pylint: disable=too-many-arguments,too-many-locals
@@ -475,9 +474,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     flwr_aid=row["flwr_aid"],
                     created_at=timestamp_to_iso(row["created_at"]),
                     updated_at=timestamp_to_iso(row["updated_at"]),
-                    next_run_at=timestamp_to_iso(next_run_at) if next_run_at else None,
+                    next_run_at=timestamp_to_iso(next_run_at),
                     fixed_interval=row["fixed_interval"],
-                    remaining_runs=row["remaining_runs"],
+                    max_runs=row["remaining_runs"],
                     stopped_at=timestamp_to_iso(stopped_at) if stopped_at else None,
                 )
             )
@@ -491,8 +490,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             UPDATE automation
             SET status = :status,
                 updated_at = :updated_at,
-                stopped_at = :stopped_at,
-                next_run_at = NULL
+                stopped_at = :stopped_at
             WHERE automation_id = :automation_id
             AND status = :active_status
             RETURNING automation_id
@@ -504,89 +502,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 "stopped_at": stopped_at,
                 "active_status": AutomationStatus.ACTIVE,
             },
-        )
-        return bool(rows)
-
-    def update_automation(
-        self,
-        automation_id: int,
-        *,
-        expected_next_run_at: str,
-        next_run_at: str | None,
-        status: AutomationStatus = AutomationStatus.ACTIVE,
-    ) -> bool:
-        """Update an automation after dispatch or mark it failed."""
-        if status not in (AutomationStatus.ACTIVE, AutomationStatus.FAILED):
-            raise AssertionError("`status` must be active or failed")
-
-        timestamp = now()
-        if status == AutomationStatus.FAILED:
-            rows = self.query(
-                """
-                UPDATE automation
-                SET status = :status,
-                    updated_at = :updated_at,
-                    next_run_at = NULL
-                WHERE automation_id = :automation_id
-                AND status = :active_status
-                AND next_run_at = :expected_next_run_at
-                RETURNING automation_id
-                """,
-                {
-                    "automation_id": automation_id,
-                    "status": AutomationStatus.FAILED,
-                    "updated_at": timestamp,
-                    "active_status": AutomationStatus.ACTIVE,
-                    "expected_next_run_at": expected_next_run_at,
-                },
-            )
-            return bool(rows)
-
-        next_run_sql = "NULL"
-        status_sql = ":completed_status"
-        params: dict[str, Any] = {
-            "automation_id": automation_id,
-            "active_status": AutomationStatus.ACTIVE,
-            "completed_status": AutomationStatus.COMPLETED,
-            "updated_at": timestamp,
-            "expected_next_run_at": expected_next_run_at,
-        }
-        if next_run_at is not None:
-            status_sql = """
-                CASE
-                    WHEN remaining_runs IS NOT NULL AND remaining_runs <= 1
-                        THEN :completed_status
-                    ELSE :active_status
-                END
-            """
-            next_run_sql = """
-                CASE
-                    WHEN remaining_runs IS NOT NULL AND remaining_runs <= 1
-                        THEN NULL
-                    ELSE :next_run_at
-                END
-            """
-            params["next_run_at"] = next_run_at
-
-        rows = self.query(
-            f"""
-            UPDATE automation
-            SET status = {status_sql},
-                updated_at = :updated_at,
-                next_run_at = {next_run_sql},
-                remaining_runs = CASE
-                    WHEN remaining_runs IS NULL
-                        THEN NULL
-                    WHEN remaining_runs > 0
-                        THEN remaining_runs - 1
-                    ELSE 0
-                END
-            WHERE automation_id = :automation_id
-            AND status = :active_status
-            AND next_run_at = :expected_next_run_at
-            RETURNING automation_id
-            """,
-            params,
         )
         return bool(rows)
 

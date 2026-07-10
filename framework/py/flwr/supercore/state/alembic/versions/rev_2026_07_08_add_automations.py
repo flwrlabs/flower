@@ -55,7 +55,7 @@ def upgrade() -> None:
         sa.Column("primary_task_type", sa.String(), nullable=False),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("updated_at", sa.TIMESTAMP(timezone=True), nullable=False),
-        sa.Column("next_run_at", sa.TIMESTAMP(timezone=True), nullable=True),
+        sa.Column("next_run_at", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("fixed_interval", sa.BigInteger(), nullable=True),
         sa.Column("remaining_runs", sa.Integer(), nullable=True),
         sa.Column("stopped_at", sa.TIMESTAMP(timezone=True), nullable=True),
