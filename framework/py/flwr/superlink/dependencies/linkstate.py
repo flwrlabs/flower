@@ -17,20 +17,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeAlias, cast
+from typing import cast
 
 from fastapi import HTTPException, Request, status
-from starlette.datastructures import State
 
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 
-if TYPE_CHECKING:
-    RequestWithState: TypeAlias = Request[State]
-else:
-    RequestWithState: TypeAlias = Request
 
-
-def get_linkstate(request: RequestWithState) -> LinkState:
+def get_linkstate(request: Request) -> LinkState:  # type: ignore[type-arg]
     """Return the SuperLink LinkState for the current request."""
     linkstate_factory = cast(
         LinkStateFactory | None,
