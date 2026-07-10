@@ -201,7 +201,7 @@ async def _call_handler(
     return result
 
 
-class ProtobufRpcRouter:
+class ProtobufRouter:
     """Add protobuf RPC request and response handling to a FastAPI router."""
 
     def __init__(self, router: APIRouter) -> None:

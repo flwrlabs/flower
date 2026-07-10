@@ -20,13 +20,13 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsRequest,
     ListRunsResponse,
 )
-from flwr.supercore.protobuf.routing import ProtobufRpcRouter
+from flwr.supercore.protobuf.routing import ProtobufRouter
 
 router = APIRouter(prefix="/control", tags=["control"])
-protobuf_rpc_router = ProtobufRpcRouter(router)
+protobuf_router = ProtobufRouter(router)
 
 
-@protobuf_rpc_router.unary_unary("/rpc/ListRuns")
+@protobuf_router.unary_unary("/rpc/ListRuns")
 def list_runs(_request: ListRunsRequest) -> ListRunsResponse:
     """List runs.
 

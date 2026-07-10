@@ -32,14 +32,14 @@ from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
 )
-from flwr.supercore.protobuf.routing import ProtobufRpcRouter
+from flwr.supercore.protobuf.routing import ProtobufRouter
 
 
 def test_unary_unary_parses_and_returns_protobuf() -> None:
     """The router parses protobuf requests and preserves FastAPI dependencies."""
     app = FastAPI()
     fastapi_router = APIRouter()
-    protobuf_rpc_router = ProtobufRpcRouter(fastapi_router)
+    protobuf_router = ProtobufRouter(fastapi_router)
     seen_run_ids: list[int] = []
     handler_thread_ids: list[int] = []
 
@@ -49,7 +49,7 @@ def test_unary_unary_parses_and_returns_protobuf() -> None:
     async def get_event_loop_thread_id() -> int:
         return get_ident()
 
-    @protobuf_rpc_router.unary_unary("/rpc/ListRuns")
+    @protobuf_router.unary_unary("/rpc/ListRuns")
     def list_runs(
         request: ListRunsRequest,
         limit: Annotated[int, Depends(get_limit)],
@@ -81,13 +81,13 @@ def test_sync_stream_handler_runs_in_threadpool() -> None:
     """The router creates synchronous streams outside the event-loop thread."""
     app = FastAPI()
     fastapi_router = APIRouter()
-    protobuf_rpc_router = ProtobufRpcRouter(fastapi_router)
+    protobuf_router = ProtobufRouter(fastapi_router)
     handler_thread_ids: list[int] = []
 
     async def get_event_loop_thread_id() -> int:
         return get_ident()
 
-    @protobuf_rpc_router.unary_stream("/rpc/StreamLogs")
+    @protobuf_router.unary_stream("/rpc/StreamLogs")
     def stream_logs(
         _request: StreamLogsRequest,
         event_loop_thread_id: Annotated[int, Depends(get_event_loop_thread_id)],
@@ -113,9 +113,9 @@ def test_unary_unary_rejects_non_protobuf_response() -> None:
     """The router reports a clear error for invalid unary response values."""
     app = FastAPI()
     fastapi_router = APIRouter()
-    protobuf_rpc_router = ProtobufRpcRouter(fastapi_router)
+    protobuf_router = ProtobufRouter(fastapi_router)
 
-    @protobuf_rpc_router.unary_unary("/rpc/ListRuns")
+    @protobuf_router.unary_unary("/rpc/ListRuns")
     def list_runs(_request: ListRunsRequest) -> ListRunsResponse:
         return cast(ListRunsResponse, object())
 
@@ -136,9 +136,9 @@ def test_unary_stream_rejects_non_iterable_response() -> None:
     """The router reports a clear error for invalid stream response values."""
     app = FastAPI()
     fastapi_router = APIRouter()
-    protobuf_rpc_router = ProtobufRpcRouter(fastapi_router)
+    protobuf_router = ProtobufRouter(fastapi_router)
 
-    @protobuf_rpc_router.unary_stream("/rpc/StreamLogs")
+    @protobuf_router.unary_stream("/rpc/StreamLogs")
     def stream_logs(_request: StreamLogsRequest) -> Iterator[StreamLogsResponse]:
         return cast(Iterator[StreamLogsResponse], None)
 
@@ -161,9 +161,9 @@ def test_unary_stream_returns_framed_protobuf_stream() -> None:
     """The router frames every protobuf message in a streamed response."""
     app = FastAPI()
     fastapi_router = APIRouter()
-    protobuf_rpc_router = ProtobufRpcRouter(fastapi_router)
+    protobuf_router = ProtobufRouter(fastapi_router)
 
-    @protobuf_rpc_router.unary_stream("/rpc/StreamLogs")
+    @protobuf_router.unary_stream("/rpc/StreamLogs")
     async def stream_logs(
         request: StreamLogsRequest,
     ) -> AsyncIterator[StreamLogsResponse]:
