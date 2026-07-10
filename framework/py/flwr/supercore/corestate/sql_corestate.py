@@ -354,45 +354,44 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
 
         try:
-            with self.session():
-                current = now()
-                rows = self.query(
-                    """
-                    INSERT INTO automation (
-                        federation_id, status, series_id, flwr_aid,
-                        fab_id, fab_version, fab_hash, override_config,
-                        federation_config, primary_task_type,
-                        created_at, updated_at, next_run_at, fixed_interval,
-                        remaining_runs, stopped_at
-                    )
-                    VALUES (
-                        :federation_id, :status, :series_id, :flwr_aid,
-                        :fab_id, :fab_version, :fab_hash, :override_config,
-                        :federation_config, :primary_task_type,
-                        :created_at, :updated_at, :next_run_at, :fixed_interval,
-                        :remaining_runs, :stopped_at
-                    )
-                    RETURNING *
-                    """,
-                    {
-                        "federation_id": federation_id,
-                        "status": AutomationStatus.ACTIVE,
-                        "series_id": uint64_to_int64(series_id),
-                        "flwr_aid": flwr_aid,
-                        "fab_id": fab_id,
-                        "fab_version": fab_version,
-                        "fab_hash": fab_hash,
-                        "override_config": json.dumps(override_config),
-                        "federation_config": federation_config_json,
-                        "primary_task_type": primary_task_type,
-                        "created_at": current,
-                        "updated_at": current,
-                        "next_run_at": next_run_at,
-                        "fixed_interval": fixed_interval,
-                        "remaining_runs": remaining_runs,
-                        "stopped_at": None,
-                    },
+            current = now()
+            rows = self.query(
+                """
+                INSERT INTO automation (
+                    federation_id, status, series_id, flwr_aid,
+                    fab_id, fab_version, fab_hash, override_config,
+                    federation_config, primary_task_type,
+                    created_at, updated_at, next_run_at, fixed_interval,
+                    remaining_runs, stopped_at
                 )
+                VALUES (
+                    :federation_id, :status, :series_id, :flwr_aid,
+                    :fab_id, :fab_version, :fab_hash, :override_config,
+                    :federation_config, :primary_task_type,
+                    :created_at, :updated_at, :next_run_at, :fixed_interval,
+                    :remaining_runs, :stopped_at
+                )
+                RETURNING *
+                """,
+                {
+                    "federation_id": federation_id,
+                    "status": AutomationStatus.ACTIVE,
+                    "series_id": uint64_to_int64(series_id),
+                    "flwr_aid": flwr_aid,
+                    "fab_id": fab_id,
+                    "fab_version": fab_version,
+                    "fab_hash": fab_hash,
+                    "override_config": json.dumps(override_config),
+                    "federation_config": federation_config_json,
+                    "primary_task_type": primary_task_type,
+                    "created_at": current,
+                    "updated_at": current,
+                    "next_run_at": next_run_at,
+                    "fixed_interval": fixed_interval,
+                    "remaining_runs": remaining_runs,
+                    "stopped_at": None,
+                },
+            )
         except IntegrityError as exc:
             raise ValueError(f"Could not store automation: {exc}") from exc
 
