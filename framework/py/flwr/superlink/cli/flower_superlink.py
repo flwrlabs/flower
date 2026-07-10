@@ -20,6 +20,7 @@ import argparse
 import os
 import subprocess
 import sys
+import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from logging import INFO, WARN
@@ -264,6 +265,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.config = config
         self.grpc_servers: list[grpc.Server] = []
+        self.bckg_threads: list[threading.Thread] = []
         self.superexec_process: subprocess.Popen[bytes] | None = None
         self.objectstore_factory = state_factory.objectstore_factory
         self.state_factory = state_factory
@@ -312,6 +314,16 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self.superexec_process = None
         self._serverappio_server = None
         self._started = False
+
+    def wait_until_background_thread_exits(self) -> None:
+        """Block like the historical `flower-superlink` command.
+
+        With only gRPC servers, `self.bckg_threads` is empty and `all([])` is
+        intentionally true, so this loop blocks until a signal handler exits the
+        process. This preserves the current CLI behavior.
+        """
+        while all(thread.is_alive() for thread in self.bckg_threads):
+            sleep(0.1)
 
     def _start_control_api(self) -> None:
         config = self.config
@@ -671,8 +683,12 @@ def flower_superlink() -> None:
         exit_handlers=[superlink_lifespan.shutdown],
     )
 
-    while True:
-        sleep(0.1)
+    # Block until a thread exits prematurely
+    superlink_lifespan.wait_until_background_thread_exits()
+
+    # Exit if any thread has exited prematurely
+    # This code will not be reached if the SuperLink stops gracefully
+    flwr_exit(ExitCode.SUPERLINK_THREAD_CRASH)
 
 
 def _format_address(address: str) -> tuple[str, str, int]:
