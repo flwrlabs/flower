@@ -342,11 +342,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         federation_config: SimulationConfig | None,
         primary_task_type: str,
         series_id: int,
-        next_run_at: datetime,
+        next_run_at: str,
         fixed_interval: int | None = None,
         remaining_runs: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
+        federation_config_json = None
+        if federation_config is not None:
+            federation_config_json = json.dumps(
+                simulation_config_to_json(federation_config)
+            )
+
         try:
             with self.session():
                 current = now()
@@ -369,18 +375,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     RETURNING *
                     """,
                     {
-                        **_run_template_to_row(
-                            fab_id=fab_id,
-                            fab_version=fab_version,
-                            fab_hash=fab_hash,
-                            override_config=override_config,
-                            federation_config=federation_config,
-                            primary_task_type=primary_task_type,
-                        ),
                         "federation_id": federation_id,
                         "status": AutomationStatus.ACTIVE,
                         "series_id": uint64_to_int64(series_id),
                         "flwr_aid": flwr_aid,
+                        "fab_id": fab_id,
+                        "fab_version": fab_version,
+                        "fab_hash": fab_hash,
+                        "override_config": json.dumps(override_config),
+                        "federation_config": federation_config_json,
+                        "primary_task_type": primary_task_type,
                         "created_at": current,
                         "updated_at": current,
                         "next_run_at": next_run_at,
@@ -436,7 +440,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if due_before is not None:
             conditions.append("next_run_at IS NOT NULL")
             conditions.append("next_run_at <= :due_before")
-            params["due_before"] = due_before
+            params["due_before"] = due_before.isoformat()
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         order_clause = "ORDER BY updated_at DESC, automation_id DESC"
@@ -507,8 +511,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         automation_id: int,
         *,
-        expected_next_run_at: datetime,
-        next_run_at: datetime | None,
+        expected_next_run_at: str,
+        next_run_at: str | None,
         status: AutomationStatus = AutomationStatus.ACTIVE,
     ) -> bool:
         """Update an automation after dispatch or mark it failed."""
@@ -1297,30 +1301,6 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
         updated_at=timestamp_to_iso(row["updated_at"]),
     )
 
-
-def _run_template_to_row(  # pylint: disable=too-many-arguments
-    *,
-    fab_id: str | None,
-    fab_version: str | None,
-    fab_hash: str | None,
-    override_config: UserConfig,
-    federation_config: SimulationConfig | None,
-    primary_task_type: str,
-) -> dict[str, Any]:
-    """Convert run template values to database row values."""
-    federation_config_json = None
-    if federation_config is not None:
-        federation_config_json = json.dumps(
-            simulation_config_to_json(federation_config)
-        )
-    return {
-        "fab_id": fab_id,
-        "fab_version": fab_version,
-        "fab_hash": fab_hash,
-        "override_config": json.dumps(override_config),
-        "federation_config": federation_config_json,
-        "primary_task_type": primary_task_type,
-    }
 
 
 def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:

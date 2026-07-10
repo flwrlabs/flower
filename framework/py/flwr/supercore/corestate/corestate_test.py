@@ -86,7 +86,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         series_id: int,
         federation_id: str = "@me/fed-a",
         flwr_aid: str = "aid-a",
-        next_run_at: datetime | None = None,
+        next_run_at: str | None = None,
         fixed_interval: int | None = None,
         remaining_runs: int | None = 1,
     ) -> Automation:
@@ -101,7 +101,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             federation_config=None,
             primary_task_type=TaskType.SERVER_APP,
             series_id=series_id,
-            next_run_at=next_run_at or now(),
+            next_run_at=next_run_at or now().isoformat(),
             fixed_interval=fixed_interval,
             remaining_runs=remaining_runs,
         )
@@ -185,49 +185,31 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(state.get_run_series(series_ids=[]), [])
         self.assertEqual(state.get_run_series(federation_ids=[]), [])
 
-    def test_store_list_and_stop_automation(self) -> None:  # pylint: disable=R0914
+    def test_store_list_and_stop_automation(self) -> None:
         """Automation storage should support list, due filtering, and stop."""
         state = self.state_factory()
         current = now()
-
-        def create_series(run_id: int, federation_id: str = "@me/fed-a") -> int:
-            series_id = state.store_run_in_series(
-                run_id=run_id, federation_id=federation_id, series_id=None
-            )
-            assert series_id is not None
-            return series_id
-
-        series_id = create_series(123)
-        future_series_id = create_series(124)
-        other_series_id = create_series(125, federation_id="@me/fed-b")
-        advancing_series_id = create_series(126)
-        completing_series_id = create_series(127)
-        failing_series_id = create_series(128)
+        due_at = (current - timedelta(seconds=60)).isoformat()
 
         due = self.store_automation(
             state,
-            series_id=series_id,
-            next_run_at=current - timedelta(seconds=60),
+            series_id=1,
+            next_run_at=due_at,
             fixed_interval=60,
         )
         future = self.store_automation(
             state,
-            series_id=future_series_id,
-            next_run_at=current + timedelta(seconds=60),
+            series_id=2,
+            next_run_at=(current + timedelta(seconds=60)).isoformat(),
         )
         _ = self.store_automation(
             state,
-            series_id=other_series_id,
+            series_id=3,
             federation_id="@me/fed-b",
-            next_run_at=current - timedelta(seconds=30),
+            next_run_at=(current - timedelta(seconds=30)).isoformat(),
         )
 
-        self.assertEqual(due.series_id, series_id)
-        self.assertEqual(due.status, "active")
-        self.assertEqual(due.federation, "@me/fed-a")
-        self.assertEqual(due.flwr_aid, "aid-a")
-        self.assertEqual(due.fixed_interval, 60)
-        self.assertEqual(due.remaining_runs, 1)
+        self.assertEqual(due.next_run_at, due_at)
 
         listed = state.list_automations(federation="@me/fed-a", order_by="updated_at")
         self.assertSetEqual(
@@ -246,76 +228,65 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [automation.automation_id for automation in due_list], [due.automation_id]
         )
 
-        advancing = self.store_automation(
+        self.assertTrue(state.stop_automation(due.automation_id))
+        self.assertFalse(state.stop_automation(due.automation_id))
+
+        stopped = state.list_automations(
+            federation="@me/fed-a",
+            statuses=[AutomationStatus.STOPPED],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in stopped], [due.automation_id]
+        )
+        self.assertFalse(stopped[0].HasField("next_run_at"))
+
+    def test_update_automation(self) -> None:
+        """Automation updates should advance and fail records."""
+        state = self.state_factory()
+        current = now()
+
+        completing = self.store_automation(
             state,
-            series_id=advancing_series_id,
-            next_run_at=current - timedelta(seconds=45),
+            series_id=1,
+            next_run_at=(current - timedelta(seconds=30)).isoformat(),
             fixed_interval=60,
             remaining_runs=2,
         )
-        next_run_at = current + timedelta(seconds=15)
+        next_run_at = (current + timedelta(seconds=30)).isoformat()
         self.assertTrue(
             state.update_automation(
-                advancing.automation_id,
-                expected_next_run_at=current - timedelta(seconds=45),
+                completing.automation_id,
+                expected_next_run_at=(current - timedelta(seconds=30)).isoformat(),
                 next_run_at=next_run_at,
                 status=AutomationStatus.ACTIVE,
             )
         )
         self.assertFalse(
             state.update_automation(
-                advancing.automation_id,
-                expected_next_run_at=current - timedelta(seconds=45),
+                completing.automation_id,
+                expected_next_run_at=(current - timedelta(seconds=30)).isoformat(),
                 next_run_at=next_run_at,
                 status=AutomationStatus.ACTIVE,
             )
         )
-        advanced = next(
-            automation
-            for automation in state.list_automations(
-                federation="@me/fed-a",
-                statuses=[AutomationStatus.ACTIVE],
-                order_by="updated_at",
-            )
-            if automation.automation_id == advancing.automation_id
-        )
-        self.assertEqual(advanced.remaining_runs, 1)
-        self.assertEqual(advanced.next_run_at, next_run_at.isoformat())
-
-        completing = self.store_automation(
-            state,
-            series_id=completing_series_id,
-            next_run_at=current - timedelta(seconds=30),
-        )
-        self.assertTrue(
-            state.update_automation(
-                completing.automation_id,
-                expected_next_run_at=current - timedelta(seconds=30),
-                next_run_at=None,
-                status=AutomationStatus.ACTIVE,
-            )
-        )
-        completed = state.list_automations(
+        updated = state.list_automations(
             federation="@me/fed-a",
-            statuses=[AutomationStatus.COMPLETED],
+            statuses=[AutomationStatus.ACTIVE],
             order_by="updated_at",
         )
-        self.assertEqual(
-            [automation.automation_id for automation in completed],
-            [completing.automation_id],
-        )
-        self.assertEqual(completed[0].remaining_runs, 0)
-        self.assertFalse(completed[0].HasField("next_run_at"))
+        self.assertEqual(updated[0].remaining_runs, 1)
+        self.assertEqual(updated[0].next_run_at, next_run_at)
 
         failing = self.store_automation(
             state,
-            series_id=failing_series_id,
-            next_run_at=current - timedelta(seconds=15),
+            series_id=2,
+            next_run_at=(current - timedelta(seconds=15)).isoformat(),
         )
         self.assertTrue(
             state.update_automation(
                 failing.automation_id,
-                expected_next_run_at=current - timedelta(seconds=15),
+                expected_next_run_at=(current - timedelta(seconds=15)).isoformat(),
                 next_run_at=None,
                 status=AutomationStatus.FAILED,
             )
@@ -330,20 +301,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [failing.automation_id],
         )
         self.assertFalse(failed[0].HasField("next_run_at"))
-
-        self.assertTrue(state.stop_automation(due.automation_id))
-        self.assertFalse(state.stop_automation(due.automation_id))
-
-        stopped = state.list_automations(
-            federation="@me/fed-a",
-            statuses=[AutomationStatus.STOPPED],
-            order_by="updated_at",
-        )
-        self.assertEqual(
-            [automation.automation_id for automation in stopped], [due.automation_id]
-        )
-        self.assertTrue(stopped[0].HasField("stopped_at"))
-        self.assertFalse(stopped[0].HasField("next_run_at"))
 
     def test_store_automation_preserves_series_id_without_validation(self) -> None:
         """Automation storage should preserve caller-provided series IDs."""

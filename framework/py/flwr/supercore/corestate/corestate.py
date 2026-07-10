@@ -150,7 +150,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         federation_config: SimulationConfig | None,
         primary_task_type: str,
         series_id: int,
-        next_run_at: datetime,
+        next_run_at: str,
         fixed_interval: int | None = None,
         remaining_runs: int | None = None,
     ) -> Automation:
@@ -176,10 +176,9 @@ class CoreState(ABC):  # pylint: disable=R0904
             Primary task type used by future runs.
         series_id : int
             Run series ID to use when dispatching automation runs.
-        next_run_at : datetime
-            Next due time. For one-shot automations, this is the requested
-            `start_at`. Returned `Automation.next_run_at` values are serialized
-            as timestamp strings.
+        next_run_at : str
+            Next due time as a timestamp string. For one-shot automations, this
+            is the requested `start_at`.
         fixed_interval : int | None (default: None)
             Recurring interval in seconds.
         remaining_runs : int | None (default: None)
@@ -244,8 +243,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         automation_id: int,
         *,
-        expected_next_run_at: datetime,
-        next_run_at: datetime | None,
+        expected_next_run_at: str,
+        next_run_at: str | None,
         status: AutomationStatus = AutomationStatus.ACTIVE,
     ) -> bool:
         """Update an automation after dispatch or mark it failed.
@@ -254,12 +253,12 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         automation_id : int
             Automation ID to update.
-        expected_next_run_at : datetime
-            Current due time expected by the caller. The update only succeeds if
-            the stored `next_run_at` still matches this value.
-        next_run_at : datetime | None
-            Next due time after a successful dispatch. If `None`, the automation
-            is completed.
+        expected_next_run_at : str
+            Current due time timestamp string expected by the caller. The update
+            only succeeds if the stored `next_run_at` still matches this value.
+        next_run_at : str | None
+            Next due time timestamp string after a successful dispatch. If
+            `None`, the automation is completed.
         status : AutomationStatus
             Target status. Use `active` to advance after successful dispatch and
             `failed` to terminally fail the automation.

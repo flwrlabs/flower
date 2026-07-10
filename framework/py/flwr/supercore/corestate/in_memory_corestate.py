@@ -274,7 +274,7 @@ class InMemoryCoreState(
         federation_config: SimulationConfig | None,
         primary_task_type: str,
         series_id: int,
-        next_run_at: datetime,
+        next_run_at: str,
         fixed_interval: int | None = None,
         remaining_runs: int | None = None,
     ) -> Automation:
@@ -291,7 +291,7 @@ class InMemoryCoreState(
                 flwr_aid=flwr_aid,
                 created_at=current.isoformat(),
                 updated_at=current.isoformat(),
-                next_run_at=next_run_at.isoformat(),
+                next_run_at=next_run_at,
                 fixed_interval=fixed_interval,
                 remaining_runs=remaining_runs,
             )
@@ -375,8 +375,8 @@ class InMemoryCoreState(
         self,
         automation_id: int,
         *,
-        expected_next_run_at: datetime,
-        next_run_at: datetime | None,
+        expected_next_run_at: str,
+        next_run_at: str | None,
         status: AutomationStatus = AutomationStatus.ACTIVE,
     ) -> bool:
         """Update an automation after dispatch or mark it failed."""
@@ -389,7 +389,7 @@ class InMemoryCoreState(
                 record is None
                 or record.automation.status != AutomationStatus.ACTIVE
                 or not record.automation.HasField("next_run_at")
-                or record.automation.next_run_at != expected_next_run_at.isoformat()
+                or record.automation.next_run_at != expected_next_run_at
             ):
                 return False
 
@@ -414,7 +414,7 @@ class InMemoryCoreState(
                 record.automation.ClearField("next_run_at")
                 return True
 
-            record.automation.next_run_at = next_run_at.isoformat()
+            record.automation.next_run_at = next_run_at
             return True
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
