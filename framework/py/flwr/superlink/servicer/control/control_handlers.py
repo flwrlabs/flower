@@ -111,7 +111,6 @@ from flwr.supercore.constant import (
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
-from flwr.supercore.object_store import ObjectStore
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.run import Run
 from flwr.supercore.typing import (
@@ -272,7 +271,6 @@ def list_runs(
     request: ListRunsRequest,
     account: AccountInfo,
     state: LinkState,
-    store: ObjectStore,
 ) -> ListRunsResponse:
     """Handle `flwr ls` command."""
     log(INFO, "ControlServicer.ListRuns")
@@ -318,7 +316,7 @@ def list_runs(
     for run in runs:
         run.account_name = account_names[run.flwr_aid]
         if run.status.status == Status.FINISHED:
-            store.delete_objects_in_run(run.run_id)
+            state.object_store.delete_objects_in_run(run.run_id)
 
     # Construct and return response
     return ListRunsResponse(
