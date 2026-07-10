@@ -12,27 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Control API router."""
-
-from fastapi import APIRouter, HTTPException
-
-from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    ListRunsRequest,
-    ListRunsResponse,
-)
-from flwr.supercore.protobuf.routing import ProtobufRpcRouter
-
-router = APIRouter(prefix="/control", tags=["control"])
-protobuf_rpc_router = ProtobufRpcRouter(router)
-
-
-@protobuf_rpc_router.unary_unary("/rpc/ListRuns")
-def list_runs(_request: ListRunsRequest) -> ListRunsResponse:
-    """List runs.
-
-    Returns
-    -------
-    ListRunsResponse
-        Not yet implemented.
-    """
-    raise HTTPException(status_code=501, detail="Not implemented")
+"""Shared protobuf-over-HTTP utilities."""

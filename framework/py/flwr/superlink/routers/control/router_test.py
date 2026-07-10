@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from flwr.proto.control_pb2 import ListRunsRequest  # pylint: disable=E0611
-from flwr.supercore.routers.protobuf import PROTOBUF_MEDIA_TYPE
+from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.superlink.routers.control.router import router
 
 

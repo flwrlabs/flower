@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""FastAPI routing helpers for protobuf APIs."""
+"""FastAPI routing helpers for protobuf RPC APIs."""
+
 
 from __future__ import annotations
 
@@ -33,9 +34,11 @@ from google.protobuf.message import DecodeError, Message
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import State
 
-PROTOBUF_MEDIA_TYPE = "application/x-protobuf"
-PROTOBUF_STREAM_MEDIA_TYPE = "application/x-protobuf-stream"
-_FRAME_HEADER_SIZE = 4
+from flwr.supercore.protobuf.constants import (
+    PROTOBUF_MEDIA_TYPE,
+    PROTOBUF_STREAM_MEDIA_TYPE,
+)
+from flwr.supercore.protobuf.framing import async_iter_framed_bytes, frame_message
 
 RequestT = TypeVar("RequestT", bound=Message)
 ResponseT = TypeVar("ResponseT", bound=Message)
@@ -178,20 +181,6 @@ def _parse_protobuf_body(body: bytes, message_type: type[RequestT]) -> RequestT:
     return message
 
 
-def _frame_message(message: Message) -> bytes:
-    """Prefix a protobuf message with its four-byte payload size."""
-    payload = message.SerializeToString()
-    return len(payload).to_bytes(_FRAME_HEADER_SIZE, "big") + payload
-
-
-async def _async_iter_framed_bytes(
-    messages: AsyncIterable[Message],
-) -> AsyncIterator[bytes]:
-    """Frame every protobuf message from an asynchronous iterator."""
-    async for message in messages:
-        yield _frame_message(message)
-
-
 def _is_async_handler(func: Callable[..., object]) -> bool:
     """Return whether a handler executes on the event loop."""
     return inspect.iscoroutinefunction(func) or inspect.isasyncgenfunction(func)
@@ -212,8 +201,8 @@ async def _call_handler(
     return result
 
 
-class ProtobufRouter:
-    """Add protobuf request and response handling to a FastAPI router."""
+class ProtobufRpcRouter:
+    """Add protobuf RPC request and response handling to a FastAPI router."""
 
     def __init__(self, router: APIRouter) -> None:
         self.router = router
@@ -301,12 +290,12 @@ class ProtobufRouter:
                 content: AsyncIterable[bytes] | Iterable[bytes]
                 # Select framing based on the stream type and reject invalid results.
                 if isinstance(result, AsyncIterable):
-                    content = _async_iter_framed_bytes(
+                    content = async_iter_framed_bytes(
                         cast(AsyncIterable[Message], result)
                     )
                 elif isinstance(result, Iterable):
                     content = (
-                        _frame_message(message)
+                        frame_message(message)
                         for message in cast(Iterable[Message], result)
                     )
                 else:
