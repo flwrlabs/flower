@@ -21,22 +21,33 @@ from unittest.mock import Mock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from flwr.common.constant import NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsRequest,
     ListRunsResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
+from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.run import Run
+from flwr.superlink.dependencies.account import GetAccount
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.routers.control.router import router
 
 
-def test_list_runs_returns_runs_from_linkstate() -> None:
-    """ListRuns serializes the runs returned by LinkState."""
+def test_list_runs_returns_runs_from_control_handler() -> None:
+    """ListRuns delegates to the Control handler with the authenticated account."""
     linkstate = Mock(spec=LinkState)
-    linkstate.get_run_info.return_value = [Run.create_empty(7)]
+    run = Run.create_empty(7)
+    run.flwr_aid = NOOP_FLWR_AID
+    linkstate.get_run_info.return_value = [run]
+    authn_plugin = Mock()
+    authz_plugin = Mock()
+    account = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
+    authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
+    authz_plugin.authorize.return_value = True
     app = FastAPI()
+    app.state.get_account = GetAccount(authn_plugin, authz_plugin)
     app.include_router(router)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     client = TestClient(app)
@@ -52,7 +63,9 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     assert set(proto_response.run_dict) == {7}
     assert datetime.fromisoformat(proto_response.now)
     linkstate.get_run_info.assert_called_once_with(
+        flwr_aids=[NOOP_FLWR_AID],
         order_by="pending_at",
         ascending=False,
         limit=1,
     )
+    authz_plugin.authorize.assert_called_once_with(account)
