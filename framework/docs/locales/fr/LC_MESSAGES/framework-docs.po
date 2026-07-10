@@ -705,7 +705,6 @@ msgid "Contribute translations"
 msgstr "Contribuer aux traductions"
 
 #: ../../source/contributor-how-to-contribute-translations.rst:5
-#, fuzzy
 msgid ""
 "Since `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_ we have "
 "introduced translations to our doc pages, but, as you might have noticed,"
@@ -715,8 +714,7 @@ msgid ""
 "those translations! This might also be a great opportunity for those "
 "wanting to become open source contributors with little prerequisites."
 msgstr ""
-"Depuis `Flower 1.5 <https://flower.ai/docs/framework/ref-"
-"changelog.html#v1-5-0-2023-08-31>`_, nous avons introduit des traductions"
+"Depuis `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_, nous avons introduit des traductions"
 " dans nos pages de documentation, mais, comme vous avez pu le remarquer, "
 "les traductions sont souvent imparfaites. Si vous parlez des langues "
 "autres que l'anglais, vous pourriez être en mesure d'aider notre effort "
@@ -2892,7 +2890,6 @@ msgstr ""
 "chaque composant de Flower afin d'assurer une communication sécurisée."
 
 #: ../../source/docker/enable-tls.rst:14
-#, fuzzy
 msgid ""
 "For testing purposes, you can generate your own self-signed certificates."
 " The `Enable TLS connections <../how-to-enable-tls-"
@@ -2900,8 +2897,8 @@ msgid ""
 " you through the process."
 msgstr ""
 "Pour des fins de test, vous pouvez générer vos propres certificats auto-"
-"signés. La page `Enable SSL connections <https://flower.ai/docs/framework"
-"/how-to-enable-ssl-connections.html#certificates>`__ contient une section"
+"signés. La page `Enable TLS connections <../how-to-enable-tls-"
+"connections.html#certificates>`__ contient une section"
 " qui vous guidera à travers le processus."
 
 #: ../../source/docker/enable-tls.rst:20
@@ -6875,7 +6872,6 @@ msgstr ""
 "et ``secagg_mod`` pour cela."
 
 #: ../../source/explanation-ref-secure-aggregation-protocols.rst:30
-#, fuzzy
 msgid ""
 "You may find a detailed example in the `Secure Aggregation Example "
 "<https://flower.ai/docs/examples/flower-secure-aggregation.html>`_. The "
@@ -6887,7 +6883,7 @@ msgstr ""
 "Example <https://flower.ai/docs/examples/flower-secure-"
 "aggregation.html>`_. La documentation de la configuration du protocole "
 "``SecAgg+`` est disponible à l'adresse `SecAggPlusWorkflow "
-"<https://flower.ai/docs/framework/ref-"
+"<ref-"
 "api/flwr.server.workflow.SecAggPlusWorkflow.html>`_."
 
 #: ../../source/explanation-ref-secure-aggregation-protocols.rst:35
@@ -15386,7 +15382,6 @@ msgid "Further help"
 msgstr "Aide supplémentaire"
 
 #: ../../source/how-to-migrate-from-openfl.rst:555
-#, fuzzy
 msgid ""
 "For a complete PyTorch example that goes into depth on various Flower "
 "components, see the `Get started with Flower <tutorial-series-write-your-"
@@ -15401,7 +15396,7 @@ msgid ""
 msgstr ""
 "Pour un exemple PyTorch complet qui entre dans les détails sur diverses "
 "composantes Flower, voir le tutoriel `Get started with Flower "
-"<https://flower.ai/docs/framework/tutorial-series-write-your-first-"
+"<tutorial-series-write-your-first-"
 "flower-app-pytorch.html>`_. Même si nous attendons que ce guide aidera la"
 " plupart des utilisateurs à se migrer rapidement vers l'écosystème "
 "Flower, certaines charges de travail OpenFL complexes peuvent nécessiter "
@@ -16689,7 +16684,6 @@ msgid "Configure Flower App Docker Images"
 msgstr "Configurer les Images Docker de l'Application Flower"
 
 #: ../../source/how-to-run-flower-on-gcp.rst:213
-#, fuzzy
 msgid ""
 "To proceed with the next step, we first create a local Flower app and "
 "then define a dedicated Dockerfile for the Docker image that will run "
@@ -16706,7 +16700,7 @@ msgstr ""
 "et la poussons dans le registre Google récemment créé. La plupart des "
 "étapes sur la façon de construire les images Docker discutées ci-dessous "
 "sont basées sur le `Flower Quickstart with Docker Tutorial "
-"<https://flower.ai/docs/framework/docker/tutorial-quickstart-"
+"<docker/tutorial-quickstart-"
 "docker.html>`_."
 
 #: ../../source/how-to-run-flower-on-gcp.rst:220
@@ -16936,7 +16930,6 @@ msgid "Then we can execute the example on the GCP cluster by running:"
 msgstr "Nous pouvons ensuite exécuter l'exemple sur le cluster GCP en exécutant :"
 
 #: ../../source/how-to-run-flower-on-gcp.rst:639
-#, fuzzy
 msgid ""
 "Please note that in the current deployment, communication is not "
 "encrypted. To enable TLS for secure connections, check the following "
@@ -16945,7 +16938,7 @@ msgid ""
 msgstr ""
 "Notez que dans la mise en production actuelle, la communication n'est pas"
 " chiffrée. Pour activer TLS pour les connexions sécurisées, consultez les"
-" instructions `guide <https://flower.ai/docs/framework/how-to-enable-tls-"
+" instructions `guide <how-to-enable-tls-"
 "connections.html>`_. Nous mettrons également à jour ce guide bientôt avec"
 " plus de détails sur la configuration de TLS."
 
@@ -55957,14 +55950,13 @@ msgstr ""
 "certains drives réseau ou stockages HPC"
 
 #: ../../source/ref-flower-configuration.rst:161
-#, fuzzy
 msgid ""
 "Learn more in the `How to Run Simulations <how-to-run-simulations.html>`_"
 " guide about other optional parameters you can use to configure your "
 "local simulation."
 msgstr ""
 "En savoir plus dans la guide `How to Run Simulations "
-"<https://flower.ai/docs/framework/how-to-run-simulations.html>`_ sur les "
+"<how-to-run-simulations.html>`_ sur les "
 "autres paramètres facultatifs que vous pouvez utiliser pour configurer "
 "votre simulation locale."
 
@@ -56073,13 +56065,11 @@ msgstr ""
 "locaux."
 
 #: ../../source/ref-flower-configuration.rst:209
-#, fuzzy
 msgid ""
 "Refer to the `deployment documentation <deploy.html>`_ for TLS setup and "
 "advanced configurations."
 msgstr ""
-"Référez-vous au `deployment documentation "
-"<https://flower.ai/docs/framework/deploy.html>`_ pour la configuration de"
+"Référez-vous au `deployment documentation <deploy.html>`_ pour la configuration de"
 " TLS et les configurations avancées."
 
 #: ../../source/ref-flower-configuration.rst:214
@@ -62953,4 +62943,3 @@ msgstr ""
 #~ "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 #~ " Let's run the project:"
 #~ msgstr ""
-

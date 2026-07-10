@@ -623,7 +623,6 @@ msgid "Contribute translations"
 msgstr "Contribua com traduções"
 
 #: ../../source/contributor-how-to-contribute-translations.rst:5
-#, fuzzy
 msgid ""
 "Since `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_ we have "
 "introduced translations to our doc pages, but, as you might have noticed,"
@@ -633,8 +632,7 @@ msgid ""
 "those translations! This might also be a great opportunity for those "
 "wanting to become open source contributors with little prerequisites."
 msgstr ""
-"Desde o `Flower 1.5 <https://flower.ai/docs/framework/ref-"
-"changelog.html#v1-5-0-2023-08-31>`_ nós introduzimos traduções para "
+"Desde o `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_ nós introduzimos traduções para "
 "nossas páginas de documentação, mas, como você pode ter notado, as "
 "traduções são muitas vezes imperfeitas. Se você fala línguas diferentes "
 "do inglês, você pode ser capaz de nos ajudar neste esforço para tornar o "
@@ -88028,4 +88026,3 @@ msgstr ""
 #~ "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 #~ " Let's run the project:"
 #~ msgstr ""
-

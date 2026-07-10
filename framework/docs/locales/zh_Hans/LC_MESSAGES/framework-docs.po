@@ -624,7 +624,6 @@ msgid "Contribute translations"
 msgstr "贡献译文"
 
 #: ../../source/contributor-how-to-contribute-translations.rst:5
-#, fuzzy
 msgid ""
 "Since `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_ we have "
 "introduced translations to our doc pages, but, as you might have noticed,"
@@ -634,8 +633,7 @@ msgid ""
 "those translations! This might also be a great opportunity for those "
 "wanting to become open source contributors with little prerequisites."
 msgstr ""
-"从 `Flower 1.5 <https://flower.ai/docs/framework/ref-"
-"changelog.html#v1-5-0-2023-08-31>`_ "
+"从 `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_ "
 "开始，我们在文档页面中引入了翻译，但正如你可能已经注意到的，这些翻译往往并不完美。如果您会说英语以外的语言，也许您可以帮助我们翻译这些文档，让更多的人了解"
 " Federated Learning！对于那些想成为开源贡献者的人来说，这也是一个很好的机会。"
 
@@ -2545,9 +2543,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/docker/enable-tls.rst:7
-#, fuzzy
 msgid "Enable TLS for Secure Connections"
-msgstr "启用 SSL 连接"
+msgstr "启用 TLS 安全连接"
 
 #: ../../source/docker/enable-tls.rst:9
 msgid ""
@@ -2557,15 +2554,14 @@ msgid ""
 msgstr ""
 
 #: ../../source/docker/enable-tls.rst:14
-#, fuzzy
 msgid ""
 "For testing purposes, you can generate your own self-signed certificates."
 " The `Enable TLS connections <../how-to-enable-tls-"
 "connections.html#certificates>`__ page contains a section that will guide"
 " you through the process."
 msgstr ""
-"出于测试目的，你可以生成自己的自签名证书。启用 SSL 连接 <https://flower.ai/docs/framework/how-to-"
-"enable-ssl-connections.html#certificates>`_ 页面中有一个部分将指导你完成这一过程。"
+"出于测试目的，你可以生成自己的自签名证书。`启用 TLS 连接 <../how-to-enable-tls-"
+"connections.html#certificates>`__ 页面中有一个部分将指导你完成这一过程。"
 
 #: ../../source/docker/enable-tls.rst:20
 msgid ""
@@ -12021,9 +12017,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-enable-tls-connections.rst:7
-#, fuzzy
 msgid "Enable TLS connections"
-msgstr "启用 SSL 连接"
+msgstr "启用 TLS 连接"
 
 #: ../../source/how-to-enable-tls-connections.rst:9
 msgid ""
@@ -14576,7 +14571,7 @@ msgstr ""
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:228
 #, fuzzy
 msgid "Create a Connector"
-msgstr "启用 SSL 连接"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:230
 msgid ""
@@ -25401,7 +25396,7 @@ msgstr ":py:obj:`keys <flwr.common.MetricsRecord.keys>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.common.ReconnectIns.rst:2
 #, fuzzy
 msgid "ReconnectIns"
-msgstr "启用 SSL 连接"
+msgstr ""
 
 #: ../../source/ref-api/flwr.common.ReconnectIns.rst:28:<autosummary>:1
 #, fuzzy
@@ -49058,14 +49053,11 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-flower-configuration.rst:161
-#, fuzzy
 msgid ""
 "Learn more in the `How to Run Simulations <how-to-run-simulations.html>`_"
 " guide about other optional parameters you can use to configure your "
 "local simulation."
 msgstr ""
-"`TensorFlow快速入门 (教程) <https://flower.ai/docs/framework/tutorial-"
-"quickstart-tensorflow.html>`_"
 
 #: ../../source/ref-flower-configuration.rst:164
 msgid ""
@@ -49235,7 +49227,7 @@ msgstr ""
 #: ../../source/ref-flower-network-communication.rst:74
 #, fuzzy
 msgid "Mandatory Network Connections"
-msgstr "启用 SSL 连接"
+msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:76
 msgid "Deployed Flower systems have at least two types of network connections:"
@@ -49271,7 +49263,7 @@ msgstr ""
 #: ../../source/ref-flower-network-communication.rst:97
 #, fuzzy
 msgid "Optional Network Connections"
-msgstr "启用 SSL 连接"
+msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:99
 msgid ""
@@ -84412,4 +84404,3 @@ msgstr ""
 #~ "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 #~ " Let's run the project:"
 #~ msgstr ""
-

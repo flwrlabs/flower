@@ -604,7 +604,6 @@ msgid "Contribute translations"
 msgstr "번역 기여"
 
 #: ../../source/contributor-how-to-contribute-translations.rst:5
-#, fuzzy
 msgid ""
 "Since `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_ we have "
 "introduced translations to our doc pages, but, as you might have noticed,"
@@ -614,8 +613,7 @@ msgid ""
 "those translations! This might also be a great opportunity for those "
 "wanting to become open source contributors with little prerequisites."
 msgstr ""
-"`Flower 1.5 <https://flower.ai/docs/framework/ref "
-"changelog.html#v1-5-0-2023-08-31>`_ 부터 문서 페이지에 번역을 도입했지만, 아시다시피 번역이 불안전한 "
+"`Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_ 부터 문서 페이지에 번역을 도입했지만, 아시다시피 번역이 불안전한 "
 "경우가 많습니다. 만일 영어 이외의 언어를 사용한다면, 많은 사람들이 연합 학습에 접근할 수 있도록 번역 작업에 기여함으로써 저희의"
 " 노력에 도움을 주실 수 있습니다! 이는 전제 조건이 거의 없는 오픈 소스 기여자가 되고자 하는 사람들에게 좋은 기회가 될 수도 "
 "있습니다."
@@ -2540,15 +2538,14 @@ msgid ""
 msgstr ""
 
 #: ../../source/docker/enable-tls.rst:14
-#, fuzzy
 msgid ""
 "For testing purposes, you can generate your own self-signed certificates."
 " The `Enable TLS connections <../how-to-enable-tls-"
 "connections.html#certificates>`__ page contains a section that will guide"
 " you through the process."
 msgstr ""
-"테스트 목적으로 자체 서명된 인증서를 생성할 수 있습니다. 'SSL 연결 사용 "
-"<https://flower.ai/docs/framework/how-to-enable-ssl-"
+"테스트 목적으로 자체 서명된 인증서를 생성할 수 있습니다. `TLS 연결 사용 "
+"<../how-to-enable-tls-"
 "connections.html#certificates>`__ 페이지에 프로세스를 안내하는 섹션이 있습니다."
 
 #: ../../source/docker/enable-tls.rst:20
@@ -12006,9 +12003,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-enable-tls-connections.rst:7
-#, fuzzy
 msgid "Enable TLS connections"
-msgstr "SSL 연결 사용"
+msgstr "TLS 연결 사용"
 
 #: ../../source/how-to-enable-tls-connections.rst:9
 msgid ""
@@ -14564,7 +14560,7 @@ msgstr ""
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:228
 #, fuzzy
 msgid "Create a Connector"
-msgstr "SSL 연결 사용"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:230
 msgid ""
@@ -25371,7 +25367,7 @@ msgstr ":py:obj:`keys <flwr.common.MetricsRecord.keys>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.common.ReconnectIns.rst:2
 #, fuzzy
 msgid "ReconnectIns"
-msgstr "SSL 연결 사용"
+msgstr ""
 
 #: ../../source/ref-api/flwr.common.ReconnectIns.rst:28:<autosummary>:1
 #, fuzzy
@@ -45070,7 +45066,7 @@ msgstr ""
 #: ../../source/ref-flower-network-communication.rst:97
 #, fuzzy
 msgid "Optional Network Connections"
-msgstr "SSL 연결 사용"
+msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:99
 msgid ""
@@ -84293,4 +84289,3 @@ msgstr ""
 #~ "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 #~ " Let's run the project:"
 #~ msgstr ""
-
