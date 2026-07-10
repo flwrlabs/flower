@@ -20,7 +20,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsRequest,
     ListRunsResponse,
 )
-from flwr.superlink.routers.router import ProtobufRouter
+from flwr.supercore.routers.protobuf import ProtobufRouter
 
 router = APIRouter(prefix="/control", tags=["control"])
 protobuf_router = ProtobufRouter(router)

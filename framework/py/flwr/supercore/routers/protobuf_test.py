@@ -26,7 +26,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsRequest,
     StreamLogsResponse,
 )
-from flwr.superlink.routers.router import (
+from flwr.supercore.routers.protobuf import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
     ProtobufRouter,
