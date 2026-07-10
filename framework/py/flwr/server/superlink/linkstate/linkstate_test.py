@@ -58,6 +58,7 @@ from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
+from flwr.supercore.inflatable.inflatable_object import get_object_tree
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.superlink.federation import NoOpFederationManager
@@ -650,6 +651,77 @@ class StateTest(CoreStateTest):
 
         assert datetime.fromisoformat(actual_message_ins.metadata.delivered_at) > dt
         assert actual_message_ins.metadata.ttl > 0
+
+    def test_store_message_and_object_tree_ins(self) -> None:
+        """Test store_message_and_object_tree with instruction Messages."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+
+        # Execute
+        stored, missing_objects = state.store_message_and_object_tree(
+            msg, get_object_tree(msg)
+        )
+
+        # Assert
+        assert stored
+        assert msg.metadata.message_id in missing_objects
+        assert msg.metadata.message_id in state.object_store
+        message_ins_list = state.get_message_ins(node_id=node_id, limit=1)
+        assert len(message_ins_list) == 1
+        assert message_ins_list[0].metadata.message_id == msg.metadata.message_id
+
+        # Invalid messages should not preregister objects.
+        invalid_msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=SUPERLINK_NODE_ID,
+                run_id=run_id,
+            )
+        )
+        stored, missing_objects = state.store_message_and_object_tree(
+            invalid_msg, get_object_tree(invalid_msg)
+        )
+        assert not stored
+        assert missing_objects == []
+        assert invalid_msg.metadata.message_id not in state.object_store
+
+    def test_store_message_and_object_tree_res(self) -> None:
+        """Test store_message_and_object_tree with reply Messages."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+        ins_msg_id = state.store_message_ins(msg)
+        assert ins_msg_id
+        ins_msg = state.get_message_ins(node_id=node_id, limit=1)[0]
+        res_msg = Message(RecordDict(), reply_to=ins_msg)
+        # pylint: disable-next=W0212
+        res_msg.metadata._message_id = res_msg.object_id  # type: ignore
+
+        # Execute
+        stored, missing_objects = state.store_message_and_object_tree(
+            res_msg, get_object_tree(res_msg)
+        )
+
+        # Assert
+        assert stored
+        assert res_msg.metadata.message_id in missing_objects
+        assert res_msg.metadata.message_id in state.object_store
+        replies = state.get_message_res({ins_msg_id})
+        assert len(replies) == 1
+        assert replies[0].metadata.message_id == res_msg.metadata.message_id
 
     @parameterized.expand([(False,), (True,)])  # type: ignore
     def test_store_message_ins_duplicate_same_message_is_idempotent(

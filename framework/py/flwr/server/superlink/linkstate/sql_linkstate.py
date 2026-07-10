@@ -39,6 +39,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.utils.validator import validate_message
@@ -216,6 +217,24 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 raise
 
         return message.metadata.message_id
+
+    def store_message_and_object_tree(
+        self, message: Message, object_tree: ObjectTree
+    ) -> tuple[bool, list[str]]:
+        """Store a Message and preregister its ObjectTree."""
+        with self.session():
+            if message.metadata.reply_to_message_id:
+                stored = self.store_message_res(message) is not None
+            else:
+                stored = self.store_message_ins(message) is not None
+
+            if not stored:
+                return False, []
+
+            missing_objects = self.object_store.preregister(
+                message.metadata.run_id, object_tree
+            )
+            return True, missing_objects
 
     # pylint: disable-next=too-many-locals
     def _check_stored_messages(self, message_ids: set[str]) -> None:
