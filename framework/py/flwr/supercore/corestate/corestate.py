@@ -175,9 +175,11 @@ class CoreState(ABC):  # pylint: disable=R0904
         primary_task_type : str
             Primary task type used by future runs.
         series_id : int
-            Existing run series to reuse.
+            Run series ID to use when dispatching automation runs.
         next_run_at : datetime
-            Next due time.
+            Next due time. For one-shot automations, this is the requested
+            `start_at`. Returned `Automation.next_run_at` values are serialized
+            as timestamp strings.
         fixed_interval : int | None (default: None)
             Recurring interval in seconds.
         remaining_runs : int | None (default: None)
@@ -190,12 +192,13 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def list_automations(
+    def list_automations(  # pylint: disable=too-many-arguments
         self,
         *,
         federation: str | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
+        order_by: Literal["next_run_at", "updated_at"],
         limit: int | None = None,
     ) -> Sequence[Automation]:
         """Return automations matching the given filters.
@@ -209,14 +212,16 @@ class CoreState(ABC):  # pylint: disable=R0904
         due_before : datetime | None (default: None)
             If set, return only automations with `next_run_at` at or before this
             timestamp.
+        order_by : Literal["next_run_at", "updated_at"]
+            Field used to order the result. `next_run_at` orders ascending;
+            `updated_at` orders descending.
         limit : int | None (default: None)
             Maximum number of automation records to return.
 
         Returns
         -------
         Sequence[Automation]
-            Automation metadata. Records are ordered by `next_run_at` ascending
-            when `due_before` is set, otherwise by `updated_at` descending.
+            Automation metadata ordered by `order_by`.
         """
 
     @abstractmethod

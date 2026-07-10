@@ -279,11 +279,6 @@ class InMemoryCoreState(
         remaining_runs: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
-        if not self.get_run_series(
-            series_ids=[series_id], federation_ids=[federation_id]
-        ):
-            raise ValueError("Automation run series not found in federation")
-
         with self.lock_automation_store:
             current = now()
             automation_id = self._next_automation_id
@@ -312,12 +307,13 @@ class InMemoryCoreState(
             )
             return automation
 
-    def list_automations(
+    def list_automations(  # pylint: disable=too-many-arguments
         self,
         *,
         federation: str | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
+        order_by: Literal["next_run_at", "updated_at"],
         limit: int | None = None,
     ) -> Sequence[Automation]:
         """Return automations matching the given filters."""
@@ -329,20 +325,28 @@ class InMemoryCoreState(
         status_set = set(statuses) if statuses is not None else None
         cutoff = due_before.isoformat() if due_before is not None else None
         with self.lock_automation_store:
-            automations = [
-                record.automation
-                for record in self.automation_store.values()
-                if (federation is None or record.automation.federation == federation)
-                and (status_set is None or record.automation.status in status_set)
-                and (
-                    cutoff is None
-                    or (
-                        record.automation.HasField("next_run_at")
-                        and record.automation.next_run_at <= cutoff
-                    )
-                )
-            ]
-            if due_before is None:
+            automations: list[Automation] = []
+            for record in self.automation_store.values():
+                automation = record.automation
+
+                # Apply federation filter.
+                if federation is not None and automation.federation != federation:
+                    continue
+
+                # Apply status filter.
+                if status_set is not None and automation.status not in status_set:
+                    continue
+
+                # Apply due time filter.
+                if cutoff is not None and (
+                    not automation.HasField("next_run_at")
+                    or automation.next_run_at > cutoff
+                ):
+                    continue
+
+                automations.append(automation)
+
+            if order_by == "updated_at":
                 automations.sort(
                     key=lambda automation: automation.updated_at,
                     reverse=True,

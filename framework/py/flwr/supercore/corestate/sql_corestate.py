@@ -349,11 +349,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Store an automation and return its metadata."""
         try:
             with self.session():
-                if not self.get_run_series(
-                    series_ids=[series_id], federation_ids=[federation_id]
-                ):
-                    raise ValueError("Automation run series not found in federation")
-
                 current = now()
                 rows = self.query(
                     """
@@ -397,14 +392,30 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         except IntegrityError as exc:
             raise ValueError(f"Could not store automation: {exc}") from exc
 
-        return _automation_from_row(rows[0])
+        row = rows[0]
+        next_run_at = row["next_run_at"]
+        stopped_at = row["stopped_at"]
+        return Automation(
+            automation_id=row["automation_id"],
+            status=row["status"],
+            federation=row["federation_id"],
+            series_id=int64_to_uint64(row["series_id"]),
+            flwr_aid=row["flwr_aid"],
+            created_at=timestamp_to_iso(row["created_at"]),
+            updated_at=timestamp_to_iso(row["updated_at"]),
+            next_run_at=timestamp_to_iso(next_run_at) if next_run_at else None,
+            fixed_interval=row["fixed_interval"],
+            remaining_runs=row["remaining_runs"],
+            stopped_at=timestamp_to_iso(stopped_at) if stopped_at else None,
+        )
 
-    def list_automations(  # pylint: disable=too-many-arguments
+    def list_automations(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         *,
         federation: str | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
+        order_by: Literal["next_run_at", "updated_at"],
         limit: int | None = None,
     ) -> Sequence[Automation]:
         """Return automations matching the given filters."""
@@ -429,7 +440,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         order_clause = "ORDER BY updated_at DESC, automation_id DESC"
-        if due_before is not None:
+        if order_by == "next_run_at":
             order_clause = "ORDER BY next_run_at ASC, automation_id ASC"
 
         limit_clause = ""
@@ -447,7 +458,26 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             """,
             params,
         )
-        return [_automation_from_row(row) for row in rows]
+        automations = []
+        for row in rows:
+            next_run_at = row["next_run_at"]
+            stopped_at = row["stopped_at"]
+            automations.append(
+                Automation(
+                    automation_id=row["automation_id"],
+                    status=row["status"],
+                    federation=row["federation_id"],
+                    series_id=int64_to_uint64(row["series_id"]),
+                    flwr_aid=row["flwr_aid"],
+                    created_at=timestamp_to_iso(row["created_at"]),
+                    updated_at=timestamp_to_iso(row["updated_at"]),
+                    next_run_at=timestamp_to_iso(next_run_at) if next_run_at else None,
+                    fixed_interval=row["fixed_interval"],
+                    remaining_runs=row["remaining_runs"],
+                    stopped_at=timestamp_to_iso(stopped_at) if stopped_at else None,
+                )
+            )
+        return automations
 
     def stop_automation(self, automation_id: int) -> bool:
         """Stop an active automation."""
@@ -508,24 +538,38 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return bool(rows)
 
-        rows = self.query(
-            """
-            UPDATE automation
-            SET status = CASE
+        next_run_sql = "NULL"
+        status_sql = ":completed_status"
+        params: dict[str, Any] = {
+            "automation_id": automation_id,
+            "active_status": AutomationStatus.ACTIVE,
+            "completed_status": AutomationStatus.COMPLETED,
+            "updated_at": timestamp,
+            "expected_next_run_at": expected_next_run_at,
+        }
+        if next_run_at is not None:
+            status_sql = """
+                CASE
                     WHEN remaining_runs IS NOT NULL AND remaining_runs <= 1
-                        THEN :completed_status
-                    WHEN :next_run_at IS NULL
                         THEN :completed_status
                     ELSE :active_status
-                END,
-                updated_at = :updated_at,
-                next_run_at = CASE
+                END
+            """
+            next_run_sql = """
+                CASE
                     WHEN remaining_runs IS NOT NULL AND remaining_runs <= 1
                         THEN NULL
-                    WHEN :next_run_at IS NULL
-                        THEN NULL
                     ELSE :next_run_at
-                END,
+                END
+            """
+            params["next_run_at"] = next_run_at
+
+        rows = self.query(
+            f"""
+            UPDATE automation
+            SET status = {status_sql},
+                updated_at = :updated_at,
+                next_run_at = {next_run_sql},
                 remaining_runs = CASE
                     WHEN remaining_runs IS NULL
                         THEN NULL
@@ -538,14 +582,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             AND next_run_at = :expected_next_run_at
             RETURNING automation_id
             """,
-            {
-                "automation_id": automation_id,
-                "active_status": AutomationStatus.ACTIVE,
-                "completed_status": AutomationStatus.COMPLETED,
-                "updated_at": timestamp,
-                "next_run_at": next_run_at,
-                "expected_next_run_at": expected_next_run_at,
-            },
+            params,
         )
         return bool(rows)
 
@@ -1258,23 +1295,6 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
         description=row["description"] or "",
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
-    )
-
-
-def _automation_from_row(row: dict[str, Any]) -> Automation:
-    """Convert a database row to an Automation object."""
-    return Automation(
-        automation_id=row["automation_id"],
-        status=row["status"],
-        federation=row["federation_id"],
-        series_id=int64_to_uint64(row["series_id"]),
-        flwr_aid=row["flwr_aid"],
-        created_at=timestamp_to_iso(row["created_at"]),
-        updated_at=timestamp_to_iso(row["updated_at"]),
-        next_run_at=timestamp_to_iso(row["next_run_at"]),
-        fixed_interval=row["fixed_interval"],
-        remaining_runs=row["remaining_runs"],
-        stopped_at=timestamp_to_iso(row["stopped_at"]),
     )
 
 
