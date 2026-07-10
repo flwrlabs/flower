@@ -2,6 +2,11 @@
 
 ## Schema
 
+Note: Mermaid ER diagrams do not support composite foreign key notation. The
+two `connector` to `run_connector` relationship lines below represent one
+composite foreign key on (`flwr_aid`, `connector_ref`), not two standalone
+foreign keys.
+
 <!-- BEGIN_SQLALCHEMY_DOCS -->
 ```mermaid
 
