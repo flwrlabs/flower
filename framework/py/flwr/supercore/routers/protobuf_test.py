@@ -14,7 +14,8 @@
 # ==============================================================================
 """Tests for protobuf FastAPI routing helpers."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
+from threading import get_ident
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI
@@ -39,16 +40,23 @@ def test_unary_unary_parses_and_returns_protobuf() -> None:
     fastapi_router = APIRouter()
     protobuf_router = ProtobufRouter(fastapi_router)
     seen_run_ids: list[int] = []
+    handler_thread_ids: list[int] = []
 
     def get_limit() -> int:
         return 10
+
+    async def get_event_loop_thread_id() -> int:
+        return get_ident()
 
     @protobuf_router.unary_unary("/rpc/ListRuns")
     def list_runs(
         request: ListRunsRequest,
         limit: Annotated[int, Depends(get_limit)],
+        event_loop_thread_id: Annotated[int, Depends(get_event_loop_thread_id)],
     ) -> ListRunsResponse:
         seen_run_ids.append(request.run_id)
+        handler_thread_ids.append(get_ident())
+        assert handler_thread_ids[-1] != event_loop_thread_id
         return ListRunsResponse(now=str(limit))
 
     app.include_router(fastapi_router)
@@ -66,6 +74,38 @@ def test_unary_unary_parses_and_returns_protobuf() -> None:
     assert response.headers["content-type"].startswith(PROTOBUF_MEDIA_TYPE)
     assert seen_run_ids == [7]
     assert proto_response.now == "10"
+
+
+def test_sync_stream_handler_runs_in_threadpool() -> None:
+    """The router creates synchronous streams outside the event-loop thread."""
+    app = FastAPI()
+    fastapi_router = APIRouter()
+    protobuf_router = ProtobufRouter(fastapi_router)
+    handler_thread_ids: list[int] = []
+
+    async def get_event_loop_thread_id() -> int:
+        return get_ident()
+
+    @protobuf_router.unary_stream("/rpc/StreamLogs")
+    def stream_logs(
+        _request: StreamLogsRequest,
+        event_loop_thread_id: Annotated[int, Depends(get_event_loop_thread_id)],
+    ) -> Iterator[StreamLogsResponse]:
+        handler_thread_ids.append(get_ident())
+        assert handler_thread_ids[-1] != event_loop_thread_id
+        return iter([StreamLogsResponse(log_output="done")])
+
+    app.include_router(fastapi_router)
+    client = TestClient(app)
+
+    response = client.post(
+        "/rpc/StreamLogs",
+        content=StreamLogsRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 200
+    assert handler_thread_ids
 
 
 def test_unary_stream_returns_framed_protobuf_stream() -> None:

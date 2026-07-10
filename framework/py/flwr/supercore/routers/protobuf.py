@@ -30,6 +30,7 @@ from typing import TypeVar, cast, get_args, get_origin, get_type_hints
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 from google.protobuf.message import DecodeError, Message
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import State
 
 PROTOBUF_MEDIA_TYPE = "application/x-protobuf"
@@ -191,6 +192,26 @@ async def _async_iter_framed_bytes(
         yield _frame_message(message)
 
 
+def _is_async_handler(func: Callable[..., object]) -> bool:
+    """Return whether a handler executes on the event loop."""
+    return inspect.iscoroutinefunction(func) or inspect.isasyncgenfunction(func)
+
+
+async def _call_handler(
+    func: Callable[..., object],
+    proto_request: Message,
+    dependency_values: dict[str, object],
+) -> object:
+    """Call asynchronous handlers directly and synchronous handlers in a thread."""
+    if _is_async_handler(func):
+        result = func(proto_request, **dependency_values)
+    else:
+        result = await run_in_threadpool(func, proto_request, **dependency_values)
+    if inspect.isawaitable(result):
+        return await result
+    return result
+
+
 class ProtobufRouter:
     """Add protobuf request and response handling to a FastAPI router."""
 
@@ -227,9 +248,7 @@ class ProtobufRouter:
                 proto_request = _parse_protobuf_body(
                     await http_request.body(), request_type
                 )
-                result = func(proto_request, **dependency_values)
-                if inspect.isawaitable(result):
-                    result = await result
+                result = await _call_handler(func, proto_request, dependency_values)
                 proto_response = cast(Message, result)
                 return Response(
                     content=proto_response.SerializeToString(),
@@ -272,9 +291,7 @@ class ProtobufRouter:
                 proto_request = _parse_protobuf_body(
                     await http_request.body(), request_type
                 )
-                result = func(proto_request, **dependency_values)
-                if inspect.isawaitable(result):
-                    result = await result
+                result = await _call_handler(func, proto_request, dependency_values)
 
                 content: AsyncIterable[bytes] | Iterable[bytes]
                 if hasattr(result, "__aiter__"):
