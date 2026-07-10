@@ -14,6 +14,7 @@
 # ==============================================================================
 """Constants for protobuf-over-HTTP APIs."""
 
+
 PROTOBUF_MEDIA_TYPE = "application/protobuf"
 PROTOBUF_STREAM_MEDIA_TYPE = "application/flower-protobuf-stream"
 FRAME_HEADER_SIZE = 4
