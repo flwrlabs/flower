@@ -129,8 +129,8 @@ def _stream_response_type(func: Callable[..., object]) -> type[StreamT]:
         or len(args) != 1
     ):
         raise TypeError(
-            f"{func.__name__} return value must be annotated as AsyncIterable[T] "
-            "or Iterable[T]"
+            f"{func.__name__} return value must be annotated as AsyncIterable[T], "
+            "AsyncIterator[T], Iterable[T], or Iterator[T]"
         )
 
     item_type = args[0]
