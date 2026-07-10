@@ -16,16 +16,23 @@
 
 from fastapi import APIRouter, HTTPException
 
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    ListRunsRequest,
+    ListRunsResponse,
+)
+from flwr.superlink.routers.router import ProtobufRouter
+
 router = APIRouter(prefix="/control", tags=["control"])
+protobuf_router = ProtobufRouter(router)
 
 
-@router.get("/runs")
-def list_runs() -> dict[str, str]:
+@protobuf_router.unary_unary("/rpc/ListRuns")
+def list_runs(_request: ListRunsRequest) -> ListRunsResponse:
     """List runs.
 
     Returns
     -------
-    dict[str, str]
+    ListRunsResponse
         Not yet implemented.
     """
     raise HTTPException(status_code=501, detail="Not implemented")
