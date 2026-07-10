@@ -39,6 +39,13 @@ def list_runs(
 ) -> ListRunsResponse:
     """List runs.
 
+    Parameters
+    ----------
+    request : ListRunsRequest
+        Filters for the requested runs.
+    linkstate : LinkState
+        State used to retrieve runs.
+
     Returns
     -------
     ListRunsResponse
