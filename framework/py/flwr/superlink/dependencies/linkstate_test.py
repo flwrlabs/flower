@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any, cast
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from fastapi import FastAPI, HTTPException, Request, status
@@ -88,7 +88,8 @@ def test_get_linkstate_returns_linkstate_after_startup(
         start_legacy_grpc=start_legacy_grpc,
     )
 
-    linkstate = asyncio.run(_get_linkstate_after_lifespan_startup(app))
+    with patch("flwr.superlink.extensions.get_lifespan_contexts", return_value=()):
+        linkstate = asyncio.run(_get_linkstate_after_lifespan_startup(app))
 
     assert app.state.linkstate_factory is state_factory_mock
     assert linkstate is expected_linkstate
