@@ -14,18 +14,56 @@
 # ==============================================================================
 """Control API router."""
 
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
+
+from flwr.common.serde import run_to_proto
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    ListRunsRequest,
+    ListRunsResponse,
+)
+from flwr.server.superlink.linkstate import LinkState
+from flwr.supercore.date import now
+from flwr.supercore.protobuf.routing import ProtobufRouter
+from flwr.superlink.dependencies.linkstate import get_linkstate
 
 router = APIRouter(prefix="/control", tags=["control"])
+protobuf_router = ProtobufRouter(router)
 
 
-@router.get("/runs")
-def list_runs() -> dict[str, str]:
+@protobuf_router.unary_unary("/rpc/ListRuns")
+def list_runs(
+    request: ListRunsRequest,
+    linkstate: Annotated[LinkState, Depends(get_linkstate)],
+) -> ListRunsResponse:
     """List runs.
+
+    Parameters
+    ----------
+    request : ListRunsRequest
+        Filters for the requested runs.
+    linkstate : LinkState
+        State used to retrieve runs.
 
     Returns
     -------
-    dict[str, str]
-        Not yet implemented.
+    ListRunsResponse
+        Runs that match the requested filters.
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    # This is a temporary implementation of list_runs.
+    # Eventually it will rely on its control_handlers.py counterpart
+    if request.HasField("run_id"):
+        runs = linkstate.get_run_info(run_ids=[request.run_id])
+    else:
+        limit = request.limit if request.HasField("limit") else None
+        runs = linkstate.get_run_info(
+            order_by="pending_at",
+            ascending=False,
+            limit=limit,
+        )
+
+    return ListRunsResponse(
+        run_dict={run.run_id: run_to_proto(run) for run in runs},
+        now=now().isoformat(),
+    )
