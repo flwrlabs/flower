@@ -253,8 +253,8 @@ message DisconnectConnectorRequest { string connector_ref = 1; }
 message DisconnectConnectorResponse { bool success = 1; }
 
 message BeginConnectorOAuthRequest {
-  string connector_ref = 2;
-  string redirect_uri = 3;
+  string connector_ref = 1;
+  string redirect_uri = 2;
 }
 message BeginConnectorOAuthResponse {
   bool success = 1;
@@ -272,7 +272,7 @@ message CompleteConnectorOAuthRequest {
 message CompleteConnectorOAuthResponse {
   bool success = 1;
   string connector_ref = 2;
-  string message = 4;
+  string message = 3;
 }
 
 message StopRunRequest { uint64 run_id = 1; }
