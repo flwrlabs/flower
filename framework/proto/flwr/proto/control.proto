@@ -64,6 +64,21 @@ service Control {
   // Get auth tokens upon request
   rpc GetAuthTokens(GetAuthTokensRequest) returns (GetAuthTokensResponse) {}
 
+  // List OAuth connectors available to the authenticated account
+  rpc ListConnectors(ListConnectorsRequest) returns (ListConnectorsResponse) {}
+
+  // Disconnect connector credentials for the authenticated account
+  rpc DisconnectConnector(DisconnectConnectorRequest)
+      returns (DisconnectConnectorResponse) {}
+
+  // Begin OAuth connector authorization flow
+  rpc BeginConnectorOAuth(BeginConnectorOAuthRequest)
+      returns (BeginConnectorOAuthResponse) {}
+
+  // Complete OAuth connector authorization flow
+  rpc CompleteConnectorOAuth(CompleteConnectorOAuthRequest)
+      returns (CompleteConnectorOAuthResponse) {}
+
   // Pull artifacts generated during a run (flwr pull)
   rpc PullArtifacts(PullArtifactsRequest) returns (PullArtifactsResponse) {}
 
@@ -223,6 +238,41 @@ message GetAuthTokensRequest { string device_code = 1; }
 message GetAuthTokensResponse {
   string access_token = 1;
   string refresh_token = 2;
+}
+
+message ListConnectorsRequest {}
+message ConnectorSummary {
+  string connector_ref = 1;
+  bool connected = 2;
+  string display_name = 3;
+  string description = 4;
+}
+message ListConnectorsResponse { repeated ConnectorSummary connectors = 1; }
+
+message DisconnectConnectorRequest { string connector_ref = 1; }
+message DisconnectConnectorResponse { bool success = 1; }
+
+message BeginConnectorOAuthRequest {
+  string connector_ref = 2;
+  string redirect_uri = 3;
+}
+message BeginConnectorOAuthResponse {
+  bool success = 1;
+  string oauth_session_id = 2;
+  string authorization_url = 3;
+  string connector_ref = 4;
+  string expires_at = 5;
+}
+
+message CompleteConnectorOAuthRequest {
+  string oauth_session_id = 1;
+  string code = 2;
+  string state = 3;
+}
+message CompleteConnectorOAuthResponse {
+  bool success = 1;
+  string connector_ref = 2;
+  string message = 4;
 }
 
 message StopRunRequest { uint64 run_id = 1; }
