@@ -365,7 +365,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             ]:
                 fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
 
-        fleet_address = cast(str, fleet_api_address)
+        fleet_address, _, _ = _format_address(cast(str, fleet_api_address))
         if config.fleet_api_type == TRANSPORT_TYPE_GRPC_RERE:
             self._start_legacy_fleet_grpc_rere(fleet_address)
         elif config.fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
@@ -683,12 +683,7 @@ def flower_superlink() -> None:
         exit_handlers=[superlink_lifespan.shutdown],
     )
 
-    # Block until a thread exits prematurely
     superlink_lifespan.wait_until_background_thread_exits()
-
-    # Exit if any thread has exited prematurely
-    # This code will not be reached if the SuperLink stops gracefully
-    flwr_exit(ExitCode.SUPERLINK_THREAD_CRASH)
 
 
 def _format_address(address: str) -> tuple[str, str, int]:
