@@ -57,7 +57,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
-from flwr.supercore.constant import AUTOMATION_STATUS_ACTIVE, AUTOMATION_STATUS_STOPPED
+from flwr.supercore.constant import AutomationStatus
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
@@ -341,19 +341,18 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         override_config: UserConfig,
         federation_config: SimulationConfig | None,
         primary_task_type: str,
+        series_id: int,
         next_run_at: datetime,
         fixed_interval: int | None = None,
         remaining_runs: int | None = None,
-        series_id: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
         try:
             with self.session():
-                series_id = self._resolve_automation_series(federation_id, series_id)
-                if series_id is None:
-                    raise ValueError(
-                        "Could not create or validate automation run series"
-                    )
+                if not self.get_run_series(
+                    series_ids=[series_id], federation_ids=[federation_id]
+                ):
+                    raise ValueError("Automation run series not found in federation")
 
                 current = now()
                 rows = self.query(
@@ -384,7 +383,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                             primary_task_type=primary_task_type,
                         ),
                         "federation_id": federation_id,
-                        "status": AUTOMATION_STATUS_ACTIVE,
+                        "status": AutomationStatus.ACTIVE,
                         "series_id": uint64_to_int64(series_id),
                         "flwr_aid": flwr_aid,
                         "created_at": current,
@@ -466,63 +465,89 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             """,
             {
                 "automation_id": automation_id,
-                "status": AUTOMATION_STATUS_STOPPED,
+                "status": AutomationStatus.STOPPED,
                 "updated_at": stopped_at,
                 "stopped_at": stopped_at,
-                "active_status": AUTOMATION_STATUS_ACTIVE,
+                "active_status": AutomationStatus.ACTIVE,
             },
         )
         return bool(rows)
 
-    def _resolve_automation_series(
-        self, federation_id: str, series_id: int | None
-    ) -> int | None:
-        """Create or validate the run series for a new automation."""
-        if series_id is None:
-            candidate = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
-            timestamp = now()
+    def update_automation(
+        self,
+        automation_id: int,
+        *,
+        expected_next_run_at: datetime,
+        next_run_at: datetime | None,
+        status: AutomationStatus = AutomationStatus.ACTIVE,
+    ) -> bool:
+        """Update an automation after dispatch or mark it failed."""
+        if status not in (AutomationStatus.ACTIVE, AutomationStatus.FAILED):
+            raise AssertionError("`status` must be active or failed")
+
+        timestamp = now()
+        if status == AutomationStatus.FAILED:
             rows = self.query(
                 """
-                INSERT INTO run_series
-                    (series_id, federation_id, description, created_at, updated_at)
-                VALUES
-                    (:series_id, :federation_id, :description, :created_at,
-                     :updated_at)
-                ON CONFLICT(series_id) DO NOTHING
-                RETURNING series_id
+                UPDATE automation
+                SET status = :status,
+                    updated_at = :updated_at,
+                    next_run_at = NULL
+                WHERE automation_id = :automation_id
+                AND status = :active_status
+                AND next_run_at = :expected_next_run_at
+                RETURNING automation_id
                 """,
                 {
-                    "series_id": uint64_to_int64(candidate),
-                    "federation_id": federation_id,
-                    "description": None,
-                    "created_at": timestamp,
+                    "automation_id": automation_id,
+                    "status": AutomationStatus.FAILED,
                     "updated_at": timestamp,
+                    "active_status": AutomationStatus.ACTIVE,
+                    "expected_next_run_at": expected_next_run_at,
                 },
             )
-            return candidate if rows else None
+            return bool(rows)
 
         rows = self.query(
             """
-            UPDATE run_series
-            SET updated_at = :updated_at
-            WHERE series_id = :series_id AND federation_id = :federation_id
-            RETURNING series_id
+            UPDATE automation
+            SET status = CASE
+                    WHEN remaining_runs IS NOT NULL AND remaining_runs <= 1
+                        THEN :completed_status
+                    WHEN :next_run_at IS NULL
+                        THEN :completed_status
+                    ELSE :active_status
+                END,
+                updated_at = :updated_at,
+                next_run_at = CASE
+                    WHEN remaining_runs IS NOT NULL AND remaining_runs <= 1
+                        THEN NULL
+                    WHEN :next_run_at IS NULL
+                        THEN NULL
+                    ELSE :next_run_at
+                END,
+                remaining_runs = CASE
+                    WHEN remaining_runs IS NULL
+                        THEN NULL
+                    WHEN remaining_runs > 0
+                        THEN remaining_runs - 1
+                    ELSE 0
+                END
+            WHERE automation_id = :automation_id
+            AND status = :active_status
+            AND next_run_at = :expected_next_run_at
+            RETURNING automation_id
             """,
             {
-                "series_id": uint64_to_int64(series_id),
-                "federation_id": federation_id,
-                "updated_at": now(),
+                "automation_id": automation_id,
+                "active_status": AutomationStatus.ACTIVE,
+                "completed_status": AutomationStatus.COMPLETED,
+                "updated_at": timestamp,
+                "next_run_at": next_run_at,
+                "expected_next_run_at": expected_next_run_at,
             },
         )
-        if not rows:
-            log(
-                ERROR,
-                "Run series %d not found in federation %r",
-                series_id,
-                federation_id,
-            )
-            return None
-        return series_id
+        return bool(rows)
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

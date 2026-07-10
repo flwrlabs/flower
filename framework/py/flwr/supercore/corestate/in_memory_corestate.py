@@ -46,7 +46,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
-from flwr.supercore.constant import AUTOMATION_STATUS_ACTIVE, AUTOMATION_STATUS_STOPPED
+from flwr.supercore.constant import AutomationStatus
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 
@@ -273,23 +273,24 @@ class InMemoryCoreState(
         override_config: UserConfig,
         federation_config: SimulationConfig | None,
         primary_task_type: str,
+        series_id: int,
         next_run_at: datetime,
         fixed_interval: int | None = None,
         remaining_runs: int | None = None,
-        series_id: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
-        with self.lock_run_series_store, self.lock_automation_store:
-            series_id = self._resolve_automation_series_locked(federation_id, series_id)
-            if series_id is None:
-                raise ValueError("Could not create or validate automation run series")
+        if not self.get_run_series(
+            series_ids=[series_id], federation_ids=[federation_id]
+        ):
+            raise ValueError("Automation run series not found in federation")
 
+        with self.lock_automation_store:
             current = now()
             automation_id = self._next_automation_id
             self._next_automation_id += 1
             automation = Automation(
                 automation_id=automation_id,
-                status=AUTOMATION_STATUS_ACTIVE,
+                status=AutomationStatus.ACTIVE,
                 federation=federation_id,
                 series_id=series_id,
                 flwr_aid=flwr_aid,
@@ -358,50 +359,61 @@ class InMemoryCoreState(
         """Stop an active automation."""
         with self.lock_automation_store:
             record = self.automation_store.get(automation_id)
-            if record is None or record.automation.status != AUTOMATION_STATUS_ACTIVE:
+            if record is None or record.automation.status != AutomationStatus.ACTIVE:
                 return False
 
             stopped_at = now().isoformat()
-            record.automation.status = AUTOMATION_STATUS_STOPPED
+            record.automation.status = AutomationStatus.STOPPED
             record.automation.updated_at = stopped_at
             record.automation.stopped_at = stopped_at
             record.automation.ClearField("next_run_at")
             return True
 
-    def _resolve_automation_series_locked(
-        self, federation_id: str, series_id: int | None
-    ) -> int | None:
-        """Create or validate the run series for a new automation."""
-        if series_id is not None:
-            existing = self.run_series_store.get(series_id)
-            if existing is None:
-                log(ERROR, "Run series %d not found", series_id)
-                return None
-            if existing.federation != federation_id:
-                log(
-                    ERROR,
-                    "Run series %d belongs to federation %r, not %r",
-                    series_id,
-                    existing.federation,
-                    federation_id,
-                )
-                return None
-            existing.updated_at = now().isoformat()
-            return series_id
+    def update_automation(
+        self,
+        automation_id: int,
+        *,
+        expected_next_run_at: datetime,
+        next_run_at: datetime | None,
+        status: AutomationStatus = AutomationStatus.ACTIVE,
+    ) -> bool:
+        """Update an automation after dispatch or mark it failed."""
+        if status not in (AutomationStatus.ACTIVE, AutomationStatus.FAILED):
+            raise AssertionError("`status` must be active or failed")
 
-        new_series_id = generate_rand_int_from_bytes(
-            SERIES_ID_NUM_BYTES,
-            exclude=set(self.run_series_store),
-        )
-        timestamp = now().isoformat()
-        self.run_series_store[new_series_id] = RunSeries(
-            series_id=new_series_id,
-            federation=federation_id,
-            description="",
-            created_at=timestamp,
-            updated_at=timestamp,
-        )
-        return new_series_id
+        with self.lock_automation_store:
+            record = self.automation_store.get(automation_id)
+            if (
+                record is None
+                or record.automation.status != AutomationStatus.ACTIVE
+                or not record.automation.HasField("next_run_at")
+                or record.automation.next_run_at != expected_next_run_at.isoformat()
+            ):
+                return False
+
+            updated_at = now().isoformat()
+            record.automation.updated_at = updated_at
+
+            if status == AutomationStatus.FAILED:
+                record.automation.status = AutomationStatus.FAILED
+                record.automation.ClearField("next_run_at")
+                return True
+
+            if record.automation.HasField("remaining_runs"):
+                record.automation.remaining_runs = max(
+                    record.automation.remaining_runs - 1, 0
+                )
+
+            if (
+                record.automation.HasField("remaining_runs")
+                and record.automation.remaining_runs == 0
+            ) or next_run_at is None:
+                record.automation.status = AutomationStatus.COMPLETED
+                record.automation.ClearField("next_run_at")
+                return True
+
+            record.automation.next_run_at = next_run_at.isoformat()
+            return True
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

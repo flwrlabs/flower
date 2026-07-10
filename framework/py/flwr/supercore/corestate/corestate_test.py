@@ -37,7 +37,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
-from flwr.supercore.constant import TaskType
+from flwr.supercore.constant import AutomationStatus, TaskType
 from flwr.supercore.date import now
 
 from . import CoreState
@@ -91,6 +91,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         series_id: int | None = None,
     ) -> Automation:
         """Store a minimal automation."""
+        if series_id is None:
+            series_id = state.store_run_in_series(
+                run_id=10_000 + len(state.get_run_series()),
+                federation_id=federation_id,
+                series_id=None,
+            )
+            assert series_id is not None
+
         return state.store_automation(
             federation_id=federation_id,
             flwr_aid=flwr_aid,
@@ -100,10 +108,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             override_config={},
             federation_config=None,
             primary_task_type=TaskType.SERVER_APP,
+            series_id=series_id,
             next_run_at=next_run_at or now(),
             fixed_interval=fixed_interval,
             remaining_runs=remaining_runs,
-            series_id=series_id,
         )
 
     def test_store_run_in_series_creates_id(self) -> None:
@@ -185,7 +193,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(state.get_run_series(series_ids=[]), [])
         self.assertEqual(state.get_run_series(federation_ids=[]), [])
 
-    def test_store_list_and_stop_automation(self) -> None:
+    def test_store_list_and_stop_automation(self) -> None:  # pylint: disable=R0914
         """Automation storage should support list, due filtering, and stop."""
         state = self.state_factory()
         current = now()
@@ -230,10 +238,86 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [automation.automation_id for automation in due_list], [due.automation_id]
         )
 
+        advancing = self.store_automation(
+            state,
+            next_run_at=current - timedelta(seconds=45),
+            fixed_interval=60,
+            remaining_runs=2,
+        )
+        next_run_at = current + timedelta(seconds=15)
+        self.assertTrue(
+            state.update_automation(
+                advancing.automation_id,
+                expected_next_run_at=current - timedelta(seconds=45),
+                next_run_at=next_run_at,
+                status=AutomationStatus.ACTIVE,
+            )
+        )
+        self.assertFalse(
+            state.update_automation(
+                advancing.automation_id,
+                expected_next_run_at=current - timedelta(seconds=45),
+                next_run_at=next_run_at,
+                status=AutomationStatus.ACTIVE,
+            )
+        )
+        advanced = next(
+            automation
+            for automation in state.list_automations(
+                federation="@me/fed-a", statuses=[AutomationStatus.ACTIVE]
+            )
+            if automation.automation_id == advancing.automation_id
+        )
+        self.assertEqual(advanced.remaining_runs, 1)
+        self.assertEqual(advanced.next_run_at, next_run_at.isoformat())
+
+        completing = self.store_automation(
+            state, next_run_at=current - timedelta(seconds=30)
+        )
+        self.assertTrue(
+            state.update_automation(
+                completing.automation_id,
+                expected_next_run_at=current - timedelta(seconds=30),
+                next_run_at=None,
+                status=AutomationStatus.ACTIVE,
+            )
+        )
+        completed = state.list_automations(
+            federation="@me/fed-a", statuses=[AutomationStatus.COMPLETED]
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in completed],
+            [completing.automation_id],
+        )
+        self.assertEqual(completed[0].remaining_runs, 0)
+        self.assertFalse(completed[0].HasField("next_run_at"))
+
+        failing = self.store_automation(
+            state, next_run_at=current - timedelta(seconds=15)
+        )
+        self.assertTrue(
+            state.update_automation(
+                failing.automation_id,
+                expected_next_run_at=current - timedelta(seconds=15),
+                next_run_at=None,
+                status=AutomationStatus.FAILED,
+            )
+        )
+        failed = state.list_automations(
+            federation="@me/fed-a", statuses=[AutomationStatus.FAILED]
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in failed],
+            [failing.automation_id],
+        )
+        self.assertFalse(failed[0].HasField("next_run_at"))
+
         self.assertTrue(state.stop_automation(due.automation_id))
         self.assertFalse(state.stop_automation(due.automation_id))
 
-        stopped = state.list_automations(federation="@me/fed-a", statuses=["stopped"])
+        stopped = state.list_automations(
+            federation="@me/fed-a", statuses=[AutomationStatus.STOPPED]
+        )
         self.assertEqual(
             [automation.automation_id for automation in stopped], [due.automation_id]
         )
