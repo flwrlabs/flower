@@ -14,6 +14,7 @@
 # ==============================================================================
 """Framing utilities for protobuf-over-HTTP streams."""
 
+
 from __future__ import annotations
 
 from collections.abc import AsyncIterable, AsyncIterator
