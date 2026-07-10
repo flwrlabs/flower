@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for protobuf FastAPI routing helpers."""
 
+
 from collections.abc import AsyncIterator, Iterator
 from threading import get_ident
 from typing import Annotated, cast
@@ -27,11 +28,11 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsRequest,
     StreamLogsResponse,
 )
-from flwr.supercore.routers.protobuf import (
+from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
-    ProtobufRouter,
 )
+from flwr.supercore.protobuf.routing import ProtobufRouter
 
 
 def test_unary_unary_parses_and_returns_protobuf() -> None:
