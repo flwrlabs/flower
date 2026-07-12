@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from unittest.mock import Mock
 
-from flwr.agentapp import AgentApp, AgentSession
+from flwr.agentapp import AgentApp, AgentConnectors, AgentSession
 from flwr.app import Context, RecordDict
 
 
@@ -48,3 +48,8 @@ def test_agentapp_registers_and_calls_main() -> None:
     app(session, context)
 
     assert calls == [(session, context)]
+
+
+def test_agent_connectors_is_public() -> None:
+    """AgentConnectors should be importable from flwr.agentapp."""
+    assert AgentConnectors.__name__ == "AgentConnectors"

@@ -21,7 +21,7 @@ import time
 from collections.abc import Sequence
 from typing import cast
 
-from flwr.agentapp import AgentResponses, AgentSession
+from flwr.agentapp import AgentConnectors, AgentResponses, AgentSession
 from flwr.app import Context, Message
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -38,29 +38,55 @@ from flwr.supercore.json_message.connector_message import (
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.task_process.connector.tool_call import (
     ConnectorToolCall,
-    extract_builtin_connector_tool_calls,
     with_builtin_connector_tools,
 )
+from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject, JSONValue
-from flwr.supercore.utils import strict_json_dumps
 
 from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
 _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
-_MAX_BUILTIN_CONNECTOR_ROUNDS = 4
+_DIRECT_CONNECTOR_CALL_ID = "call_direct"
 
 
 class RuntimeAgentSession(AgentSession):
     """AgentSession bound to one AgentApp task."""
 
-    def __init__(self, responses: AgentResponses) -> None:
+    def __init__(self, responses: AgentResponses, connectors: AgentConnectors) -> None:
         self._responses = responses
+        self._connectors = connectors
 
     @property
     def responses(self) -> AgentResponses:
         """Model response creation API."""
         return self._responses
+
+    @property
+    def connectors(self) -> AgentConnectors:
+        """Connector tool schema and execution API."""
+        return self._connectors
+
+
+class RuntimeAgentConnectors(AgentConnectors):
+    """AgentConnectors implementation backed by connector tasks."""
+
+    def __init__(self, responses: RuntimeAgentResponses) -> None:
+        self._responses = responses
+
+    def tools(self, names: Sequence[str]) -> list[JSONObject]:
+        """Return model-facing tool schemas for built-in connectors."""
+        return [get_builtin_connector_tool(name) for name in names]
+
+    def call(self, name: str, arguments: JSONObject) -> JSONValue:
+        """Execute one built-in connector."""
+        return self._responses._create_connector_response(
+            ConnectorToolCall(
+                name=name,
+                call_id=_DIRECT_CONNECTOR_CALL_ID,
+                arguments=arguments,
+            )
+        )
 
 
 class RuntimeAgentResponses(AgentResponses):
@@ -80,66 +106,16 @@ class RuntimeAgentResponses(AgentResponses):
         self._task_id = task_id
 
     def create(self, request: JSONObject) -> JSONObject:
-        """Create a model response through child model and connector tasks."""
-        # Expand requested built-in connector names into function tools while
-        # keeping track of which names this request explicitly enabled.
+        """Create a model response through a child model task."""
+        # Keep string connector shorthand as schema expansion only.
         prepared_tools = with_builtin_connector_tools(request)
         model_request = prepared_tools.request
         response_payload = self._create_model_response(model_request)
-
-        if (
-            prepared_tools.enabled_builtin_connectors
-            and model_request.get("tool_choice") != "none"
-        ):
-            response_payload = self._complete_builtin_connector_loop(
-                model_request,
-                response_payload,
-                prepared_tools.enabled_builtin_connectors,
-            )
 
         output = response_payload.get("output")
         if _is_json_object_list(output):
             append_items(self._context, cast(list[JSONObject], output))
         return response_payload
-
-    def _complete_builtin_connector_loop(
-        self,
-        model_request: JSONObject,
-        response_payload: JSONObject,
-        enabled_builtin_connectors: frozenset[str],
-    ) -> JSONObject:
-        """Execute contiguous built-in connector calls."""
-        current_request = model_request
-        for _ in range(_MAX_BUILTIN_CONNECTOR_ROUNDS):
-            tool_calls = extract_builtin_connector_tool_calls(
-                response_payload, enabled_builtin_connectors
-            )
-            if not tool_calls:
-                return response_payload
-
-            followup_input = self._create_connector_outputs(tool_calls)
-            current_request = _connector_followup_request(
-                current_request, response_payload, followup_input
-            )
-            response_payload = self._create_model_response(current_request)
-
-        return response_payload
-
-    def _create_connector_outputs(
-        self, tool_calls: Sequence[ConnectorToolCall]
-    ) -> list[JSONObject]:
-        """Execute connector calls and return function_call_output items."""
-        followup_input: list[JSONObject] = []
-        for tool_call in tool_calls:
-            output = self._create_connector_response(tool_call)
-            followup_input.append(
-                {
-                    "type": "function_call_output",
-                    "call_id": tool_call.call_id,
-                    "output": strict_json_dumps(output, compact=True),
-                }
-            )
-        return followup_input
 
     def _create_model_response(self, request: JSONObject) -> JSONObject:
         """Create one model response through a child model task."""
@@ -246,34 +222,3 @@ class RuntimeAgentResponses(AgentResponses):
 def _is_json_object_list(obj: JSONValue) -> bool:
     """Check if the given object is a list of JSON objects."""
     return isinstance(obj, list) and all(isinstance(item, dict) for item in obj)
-
-
-def _connector_followup_request(
-    request: JSONObject,
-    response_payload: JSONObject,
-    followup_input: list[JSONObject],
-) -> JSONObject:
-    """Build the next hidden model request after connector execution."""
-    followup_request = dict(request)
-    followup_request["tool_choice"] = "auto"
-    followup_request["stream"] = False
-
-    previous_response_id = response_payload.get("id")
-    if isinstance(previous_response_id, str) and previous_response_id:
-        followup_request["input"] = followup_input
-        followup_request["previous_response_id"] = previous_response_id
-        return followup_request
-
-    prior_input: list[JSONObject] = []
-    current_input = request.get("input")
-    if _is_json_object_list(current_input):
-        prior_input = [*cast(list[JSONObject], current_input)]
-
-    output = response_payload.get("output")
-    prior_output: list[JSONObject] = []
-    if _is_json_object_list(output):
-        prior_output = cast(list[JSONObject], output)
-
-    followup_request.pop("previous_response_id", None)
-    followup_request["input"] = [*prior_input, *prior_output, *followup_input]
-    return followup_request
