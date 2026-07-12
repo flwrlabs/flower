@@ -21,9 +21,7 @@ from sqlalchemy import (
     Column,
     Float,
     ForeignKey,
-    ForeignKeyConstraint,
     Index,
-    Integer,
     LargeBinary,
     MetaData,
     String,
@@ -116,29 +114,19 @@ def create_linkstate_metadata() -> MetaData:
     Table(
         "connector",
         metadata,
-        Column("id", Integer, primary_key=True, autoincrement=True),
-        Column("flwr_aid", String, nullable=False),
-        Column("connector_ref", String, nullable=False),
+        Column("flwr_aid", String, primary_key=True, nullable=False),
+        Column("connector_ref", String, primary_key=True, nullable=False),
         Column("credentials_json", String, nullable=False),
         Column("config_json", String, nullable=False),
-        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
-        Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
-        Column("last_used_at", TIMESTAMP(timezone=True), nullable=True),
-        UniqueConstraint(
-            "flwr_aid",
-            "connector_ref",
-            name="uq_connector_flwr_aid_connector_ref",
-        ),
     )
 
     # --------------------------------------------------------------------------
     #  Table: connector_oauth_session
     # --------------------------------------------------------------------------
-    connector_oauth_session = Table(
+    Table(
         "connector_oauth_session",
         metadata,
-        Column("id", Integer, primary_key=True, autoincrement=True),
-        Column("oauth_session_id", String, nullable=False, unique=True),
+        Column("oauth_session_id", String, primary_key=True, nullable=False),
         Column("flwr_aid", String, nullable=False),
         Column("connector_ref", String, nullable=False),
         Column("state", String, nullable=False),
@@ -147,36 +135,6 @@ def create_linkstate_metadata() -> MetaData:
         Column("created_at", TIMESTAMP(timezone=True), nullable=False),
         Column("expires_at", TIMESTAMP(timezone=True), nullable=False),
         Column("completed_at", TIMESTAMP(timezone=True), nullable=True),
-        Column("status", String, nullable=False),
-    )
-    Index(
-        "idx_connector_oauth_session_flwr_aid_status_expires_at",
-        connector_oauth_session.c.flwr_aid,
-        connector_oauth_session.c.status,
-        connector_oauth_session.c.expires_at,
-    )
-
-    # --------------------------------------------------------------------------
-    #  Table: run_connector
-    # --------------------------------------------------------------------------
-    Table(
-        "run_connector",
-        metadata,
-        Column("id", Integer, primary_key=True, autoincrement=True),
-        Column("run_id", BigInteger, ForeignKey("run.run_id"), nullable=False),
-        Column("flwr_aid", String, nullable=False),
-        Column("connector_ref", String, nullable=False),
-        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
-        ForeignKeyConstraint(
-            ["flwr_aid", "connector_ref"],
-            ["connector.flwr_aid", "connector.connector_ref"],
-        ),
-        UniqueConstraint(
-            "run_id",
-            "flwr_aid",
-            "connector_ref",
-            name="uq_run_connector_run_id_flwr_aid_connector_ref",
-        ),
     )
 
     # --------------------------------------------------------------------------

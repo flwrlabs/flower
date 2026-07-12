@@ -141,6 +141,16 @@ def create_corestate_metadata() -> MetaData:
     )
 
     # --------------------------------------------------------------------------
+    #  Table: run_connector
+    # --------------------------------------------------------------------------
+    Table(
+        "run_connector",
+        metadata,
+        Column("run_id", BigInteger, primary_key=True, nullable=False),
+        Column("connector_ref", String, primary_key=True, nullable=False),
+    )
+
+    # --------------------------------------------------------------------------
     #  Table: task
     # --------------------------------------------------------------------------
     task = Table(
