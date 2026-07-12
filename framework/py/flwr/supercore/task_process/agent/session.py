@@ -48,6 +48,7 @@ from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
 _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
+_MAX_BUILTIN_CONNECTOR_ROUNDS = 4
 
 
 class RuntimeAgentSession(AgentSession):
@@ -86,51 +87,59 @@ class RuntimeAgentResponses(AgentResponses):
         model_request = prepared_tools.request
         response_payload = self._create_model_response(model_request)
 
-        tool_calls = extract_builtin_connector_tool_calls(
-            response_payload, prepared_tools.enabled_builtin_connectors
-        )
-        if tool_calls:
-            # Execute one connector batch; further tool-call loops stay in AgentApp.
-            followup_input: list[JSONObject] = []
-            for tool_call in tool_calls:
-                output = self._create_connector_response(tool_call)
-                followup_input.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": tool_call.call_id,
-                        "output": strict_json_dumps(output, compact=True),
-                    }
-                )
-
-            # Continue with caller-defined tools only; runtime built-ins were only
-            # advertised for the hidden connector-planning turn.
-            followup_request = dict(model_request)
-            followup_request.pop("tool_choice", None)
-            if prepared_tools.followup_tools is None:
-                followup_request.pop("tools", None)
-            else:
-                followup_request["tools"] = prepared_tools.followup_tools
-            if request.get("stream") is True:
-                followup_request["stream"] = True
-
-            previous_response_id = response_payload.get("id")
-            if isinstance(previous_response_id, str) and previous_response_id:
-                followup_request["input"] = followup_input
-                followup_request["previous_response_id"] = previous_response_id
-            else:
-                output = response_payload.get("output")
-                prior_output: list[JSONObject] = []
-                if _is_json_object_list(output):
-                    prior_output = cast(list[JSONObject], output)
-                # Some providers do not return a reusable response id, so replay
-                # the first response output with the connector results appended.
-                followup_request["input"] = [*prior_output, *followup_input]
-            response_payload = self._create_model_response(followup_request)
+        if (
+            prepared_tools.enabled_builtin_connectors
+            and model_request.get("tool_choice") != "none"
+        ):
+            response_payload = self._complete_builtin_connector_loop(
+                model_request,
+                response_payload,
+                prepared_tools.enabled_builtin_connectors,
+            )
 
         output = response_payload.get("output")
         if _is_json_object_list(output):
             append_items(self._context, cast(list[JSONObject], output))
         return response_payload
+
+    def _complete_builtin_connector_loop(
+        self,
+        model_request: JSONObject,
+        response_payload: JSONObject,
+        enabled_builtin_connectors: frozenset[str],
+    ) -> JSONObject:
+        """Execute contiguous built-in connector calls."""
+        current_request = model_request
+        for _ in range(_MAX_BUILTIN_CONNECTOR_ROUNDS):
+            tool_calls = extract_builtin_connector_tool_calls(
+                response_payload, enabled_builtin_connectors
+            )
+            if not tool_calls:
+                return response_payload
+
+            followup_input = self._create_connector_outputs(tool_calls)
+            current_request = _connector_followup_request(
+                current_request, response_payload, followup_input
+            )
+            response_payload = self._create_model_response(current_request)
+
+        return response_payload
+
+    def _create_connector_outputs(
+        self, tool_calls: Sequence[ConnectorToolCall]
+    ) -> list[JSONObject]:
+        """Execute connector calls and return function_call_output items."""
+        followup_input: list[JSONObject] = []
+        for tool_call in tool_calls:
+            output = self._create_connector_response(tool_call)
+            followup_input.append(
+                {
+                    "type": "function_call_output",
+                    "call_id": tool_call.call_id,
+                    "output": strict_json_dumps(output, compact=True),
+                }
+            )
+        return followup_input
 
     def _create_model_response(self, request: JSONObject) -> JSONObject:
         """Create one model response through a child model task."""
@@ -237,3 +246,34 @@ class RuntimeAgentResponses(AgentResponses):
 def _is_json_object_list(obj: JSONValue) -> bool:
     """Check if the given object is a list of JSON objects."""
     return isinstance(obj, list) and all(isinstance(item, dict) for item in obj)
+
+
+def _connector_followup_request(
+    request: JSONObject,
+    response_payload: JSONObject,
+    followup_input: list[JSONObject],
+) -> JSONObject:
+    """Build the next hidden model request after connector execution."""
+    followup_request = dict(request)
+    followup_request["tool_choice"] = "auto"
+    followup_request["stream"] = False
+
+    previous_response_id = response_payload.get("id")
+    if isinstance(previous_response_id, str) and previous_response_id:
+        followup_request["input"] = followup_input
+        followup_request["previous_response_id"] = previous_response_id
+        return followup_request
+
+    prior_input: list[JSONObject] = []
+    current_input = request.get("input")
+    if _is_json_object_list(current_input):
+        prior_input = [*cast(list[JSONObject], current_input)]
+
+    output = response_payload.get("output")
+    prior_output: list[JSONObject] = []
+    if _is_json_object_list(output):
+        prior_output = cast(list[JSONObject], output)
+
+    followup_request.pop("previous_response_id", None)
+    followup_request["input"] = [*prior_input, *prior_output, *followup_input]
+    return followup_request

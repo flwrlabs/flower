@@ -40,13 +40,12 @@ class PreparedConnectorTools:
     """A model request with per-request connector tool state.
 
     `enabled_builtin_connectors` is the built-in connector allowlist for one
-    `responses.create` call. AgentApp-owned loops opt in again on later calls
-    by passing built-in connector names in `tools`.
+    `responses.create` call. Later calls opt in again by passing built-in
+    connector names in `tools`.
     """
 
     request: JSONObject
     enabled_builtin_connectors: frozenset[str]
-    followup_tools: list[JSONObject] | None
 
 
 def with_builtin_connector_tools(request: JSONObject) -> PreparedConnectorTools:
@@ -58,12 +57,10 @@ def with_builtin_connector_tools(request: JSONObject) -> PreparedConnectorTools:
         return PreparedConnectorTools(
             request=updated,
             enabled_builtin_connectors=frozenset(),
-            followup_tools=None,
         )
 
     if isinstance(tools, Sequence) and not isinstance(tools, str):
         enabled_builtin_connectors: set[str] = set()
-        followup_tools: list[JSONObject] = []
         normalized_tools: list[JSONObject] = []
 
         tool_list = list(tools)
@@ -83,15 +80,13 @@ def with_builtin_connector_tools(request: JSONObject) -> PreparedConnectorTools:
             if isinstance(tool, dict):
                 tool_name = tool.get("name")
                 # JSON tool definitions belong to AgentApp/user code. Built-in
-                # connector names are reserved so the follow-up turn can remove
-                # only runtime-injected connector tools.
+                # connector names are reserved for runtime-owned connector calls.
                 if isinstance(tool_name, str) and has_builtin_connector(tool_name):
                     raise ValueError(
                         f"Built-in connector tool name '{tool_name}' is reserved. "
                         f"Use the string form '{tool_name}' to enable it."
                     )
                 json_tool = cast(JSONObject, tool)
-                followup_tools.append(json_tool)
                 normalized_tools.append(json_tool)
                 continue
 
@@ -101,74 +96,64 @@ def with_builtin_connector_tools(request: JSONObject) -> PreparedConnectorTools:
             )
 
         updated["tools"] = normalized_tools
-        if enabled_builtin_connectors and updated.get("stream") is True:
-            # The runtime needs the complete first response to execute connector
-            # calls, then restores the caller's stream setting on the follow-up.
+        if enabled_builtin_connectors and updated.get("tool_choice") in (None, "auto"):
+            updated["tool_choice"] = "required"
+        if (
+            enabled_builtin_connectors
+            and updated.get("tool_choice") != "none"
+            and updated.get("stream") is True
+        ):
             updated["stream"] = False
 
         return PreparedConnectorTools(
             request=updated,
             enabled_builtin_connectors=frozenset(enabled_builtin_connectors),
-            followup_tools=followup_tools if followup_tools else None,
         )
 
     return PreparedConnectorTools(
         request=updated,
         enabled_builtin_connectors=frozenset(),
-        followup_tools=None,
     )
 
 
 def extract_builtin_connector_tool_calls(
     response: JSONObject, enabled_builtin_connectors: Collection[str]
 ) -> list[ConnectorToolCall]:
-    """Extract enabled built-in connector function calls from one model response."""
-    if not enabled_builtin_connectors:
-        return []
-
+    """Return calls only if every function call is an enabled built-in."""
     output = response.get("output")
+    # No output list means there are no tool calls for the runtime to handle.
     if not isinstance(output, Sequence) or isinstance(output, str):
         return []
 
-    tool_calls = []
+    tool_calls: list[ConnectorToolCall] = []
     for item in output:
-        if not isinstance(item, dict):
-            continue
-        if item.get("type") != "function_call":
+        # Responses can contain messages/reasoning alongside tool calls.
+        if not isinstance(item, dict) or item.get("type") != "function_call":
             continue
 
         name = item.get("name")
-        # Use the per-request enabled set instead of the global built-in
-        # registry. A model can emit arbitrary function_call names; the runtime
-        # should only consume connector calls the AgentApp explicitly enabled.
+        # A client or disabled tool call belongs to AgentApp, not the runtime.
         if not isinstance(name, str) or name not in enabled_builtin_connectors:
-            continue
+            return []
 
         call_id = item.get("call_id")
+        # Connector outputs must reference the model's function_call call_id.
         if not isinstance(call_id, str) or not call_id:
             raise ValueError(
                 f"Connector function_call '{name}' requires a non-empty call_id."
             )
 
-        # Providers may return arguments as a JSON string or an already-decoded object.
-        arguments = item.get("arguments")
-        if isinstance(arguments, dict):
-            parsed_arguments = cast(JSONObject, arguments)
-        elif isinstance(arguments, str):
-            try:
-                parsed = json.loads(arguments)
-            except json.JSONDecodeError as err:
-                raise ValueError("Function-call arguments are malformed JSON.") from err
+        arguments = item["arguments"]
+        # Providers may return arguments as either a JSON object or JSON string.
+        if isinstance(arguments, str):
+            arguments = json.loads(arguments)
 
-            if not isinstance(parsed, dict):
-                raise ValueError(
-                    "Function-call arguments must decode to a JSON object."
-                )
-            parsed_arguments = cast(JSONObject, parsed)
-        else:
-            raise ValueError("Function-call arguments must be a JSON object or string.")
         tool_calls.append(
-            ConnectorToolCall(name=name, call_id=call_id, arguments=parsed_arguments)
+            ConnectorToolCall(
+                name=name,
+                call_id=call_id,
+                arguments=cast(JSONObject, arguments),
+            )
         )
 
     return tool_calls
