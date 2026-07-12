@@ -413,70 +413,82 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             log(ERROR, errors)
             return None
 
-        with self.session():
-            res_metadata = message.metadata
-            if not self._lock_run(res_metadata.run_id, require_unfinished=True):
-                log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
-                return None
+        res_metadata = message.metadata
+        message_id = res_metadata.message_id
 
-            msg_ins_id = res_metadata.reply_to_message_id
-            msg_ins = self.get_valid_message_ins(msg_ins_id)
-            if msg_ins is None:
-                log(
-                    ERROR,
-                    "Failed to store Message reply: "
-                    "The message it replies to with message_id %s does not exist or "
-                    "has expired, or was deleted because the target SuperNode was "
-                    "removed from the federation.",
-                    msg_ins_id,
+        try:
+            with self.session():
+                if not self._lock_run(res_metadata.run_id, require_unfinished=True):
+                    log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
+                    return None
+
+                msg_ins_id = res_metadata.reply_to_message_id
+                msg_ins = self.get_valid_message_ins(msg_ins_id)
+                if msg_ins is None:
+                    log(
+                        ERROR,
+                        "Failed to store Message reply: "
+                        "The message it replies to with message_id %s does not exist "
+                        "or has expired, or was deleted because the target SuperNode "
+                        "was removed from the federation.",
+                        msg_ins_id,
+                    )
+                    return None
+
+                # Ensure that the dst_node_id of the original message matches the
+                # src_node_id of reply being processed.
+                if int64_to_uint64(msg_ins["dst_node_id"]) != res_metadata.src_node_id:
+                    return None
+
+                # Fail if the Message TTL exceeds the expiration time of the Message it
+                # replies to, with a small tolerance for floating-point precision.
+                max_allowed_ttl = (
+                    msg_ins["created_at"] + msg_ins["ttl"] - res_metadata.created_at
                 )
-                return None
+                if res_metadata.ttl and (
+                    res_metadata.ttl - max_allowed_ttl > MESSAGE_TTL_TOLERANCE
+                ):
+                    log(
+                        WARNING,
+                        "Received Message with TTL %.2f exceeding the allowed maximum "
+                        "TTL %.2f.",
+                        res_metadata.ttl,
+                        max_allowed_ttl,
+                    )
+                    return None
 
-            # Ensure that the dst_node_id of the original message matches the
-            # src_node_id of reply being processed.
-            if int64_to_uint64(msg_ins["dst_node_id"]) != res_metadata.src_node_id:
-                return None
+                # Check idempotent retries before attempting INSERT. We cannot rely on
+                # IntegrityError details alone because `message_res` also has a unique
+                # constraint on `reply_to_message_id`, so the same retry can violate
+                # either constraint depending on backend/index behavior.
+                if self.query(
+                    "SELECT 1 FROM message_res WHERE message_id = :message_id",
+                    {"message_id": message_id},
+                ):
+                    return message_id
 
-            # Fail if the Message TTL exceeds the expiration time of the Message it
-            # replies to, with a small tolerance for floating-point precision.
-            max_allowed_ttl = (
-                msg_ins["created_at"] + msg_ins["ttl"] - res_metadata.created_at
-            )
-            if res_metadata.ttl and (
-                res_metadata.ttl - max_allowed_ttl > MESSAGE_TTL_TOLERANCE
-            ):
-                log(
-                    WARNING,
-                    "Received Message with TTL %.2f exceeding the allowed maximum "
-                    "TTL %.2f.",
-                    res_metadata.ttl,
-                    max_allowed_ttl,
+                # Store Message
+                msg_dict = message_to_dict(message)
+
+                # Convert values from uint64 to sint64 for SQLite
+                convert_uint64_values_in_dict_to_sint64(
+                    msg_dict, ["run_id", "src_node_id", "dst_node_id"]
                 )
-                return None
 
-            # Store Message
-            msg_dict = message_to_dict(message)
+                columns = ", ".join([f":{key}" for key in msg_dict])
+                query = f"INSERT INTO message_res VALUES({columns})"
 
-            # Convert values from uint64 to sint64 for SQLite
-            convert_uint64_values_in_dict_to_sint64(
-                msg_dict, ["run_id", "src_node_id", "dst_node_id"]
-            )
-
-            columns = ", ".join([f":{key}" for key in msg_dict])
-            query = f"INSERT INTO message_res VALUES({columns})"
-
-            try:
                 self.query(query, msg_dict)
-            except IntegrityError:
-                log(
-                    ERROR,
-                    "Failed to store Message reply: duplicate reply for "
-                    "reply_to_message_id %s or invalid run.",
-                    msg_ins_id,
-                )
-                return None
+        except IntegrityError:
+            log(
+                ERROR,
+                "Failed to store Message reply: duplicate reply for "
+                "reply_to_message_id %s or invalid run.",
+                res_metadata.reply_to_message_id,
+            )
+            return None
 
-        return message.metadata.message_id
+        return message_id
 
     def get_message_res(self, message_ids: set[str]) -> list[Message]:
         """Get reply Messages for the given Message IDs."""

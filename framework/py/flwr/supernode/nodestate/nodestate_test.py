@@ -147,6 +147,22 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.assertTrue(msg.metadata.message_id in self.state.object_store)
         self.assertEqual(self.state.get_messages()[0], msg)
 
+    def test_store_message_duplicate_same_message_is_idempotent(self) -> None:
+        """Test storing a duplicate message returns its message ID."""
+        # Prepare
+        msg = make_dummy_message(msg_id="test_msg")
+
+        # Execute
+        first_msg_id = self.state.store_message(msg)
+        second_msg_id = self.state.store_message(msg)
+        messages = self.state.get_messages()
+
+        # Assert
+        self.assertEqual(first_msg_id, "test_msg")
+        self.assertEqual(second_msg_id, "test_msg")
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0], msg)
+
     @parameterized.expand(  # type: ignore
         [
             ({"run_ids": [1]}, {"msg1", "msg2"}),

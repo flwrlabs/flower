@@ -12,28 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""FastAPI dependencies shared by SuperLink routers."""
+"""Framing utilities for protobuf-over-HTTP streams."""
 
 
 from __future__ import annotations
 
-from typing import cast
+from collections.abc import AsyncIterable, AsyncIterator
 
-from fastapi import HTTPException, Request, status
+from google.protobuf.message import Message
 
-from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
+from flwr.supercore.protobuf.constants import FRAME_HEADER_SIZE
 
 
-def get_linkstate(request: Request) -> LinkState:  # type: ignore[type-arg]
-    """Return the SuperLink LinkState for the current request."""
-    linkstate_factory = cast(
-        LinkStateFactory | None,
-        getattr(request.app.state, "linkstate_factory", None),
-    )
-    if linkstate_factory is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="SuperLink LinkStateFactory is not initialized.",
-        )
+def frame_message(message: Message) -> bytes:
+    """Prefix a protobuf message with its four-byte payload size."""
+    payload = message.SerializeToString()
+    return len(payload).to_bytes(FRAME_HEADER_SIZE, "big") + payload
 
-    return linkstate_factory.state()
+
+async def async_iter_framed_bytes(
+    messages: AsyncIterable[Message],
+) -> AsyncIterator[bytes]:
+    """Frame every protobuf message from an asynchronous iterator."""
+    async for message in messages:
+        yield frame_message(message)
