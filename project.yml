@@ -56,4 +56,4 @@ targets:
       base:
         PRODUCT_NAME: hello-world-ios
         INFOPLIST_FILE: "intelligence/swift/examples/hello-world-ios/Info.plist"
-        TARGETED_DEVICE_FAMILY: "1" 
+        TARGETED_DEVICE_FAMILY: "1"

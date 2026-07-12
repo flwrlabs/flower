@@ -106,8 +106,8 @@ python -m dasha.plot --input_paths multirun/2023-09-16/10-39-30 --output_path pl
 The above commands would generate results that you can plot and would look like:
 
 | *Small-Scale Experiments: Comparison of DASHA and MARINA* |
-|:--:| 
-| ![plot.png](_static/plot.png) | 
+|:--:|
+| ![plot.png](_static/plot.png) |
 
 ### Large-Scale Experiments
 
@@ -124,8 +124,8 @@ python -m dasha.plot --input_paths PATH_DASHA PATH_MARINA --output_path plot_nn.
 ```
 
 | *Large-Scale Experiments: Comparison of DASHA and MARINA* |
-|:--:| 
-| ![plot.png](_static/plot_nn.png) | 
+|:--:|
+| ![plot.png](_static/plot_nn.png) |
 
 ### Running Tests
 
