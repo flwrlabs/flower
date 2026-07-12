@@ -34,20 +34,13 @@ class ConnectorToolCall:
     arguments: JSONObject
 
 
-@dataclass(frozen=True)
-class PreparedConnectorTools:
-    """A model request with connector shorthand tools expanded."""
-
-    request: JSONObject
-
-
-def with_builtin_connector_tools(request: JSONObject) -> PreparedConnectorTools:
+def with_builtin_connector_tools(request: JSONObject) -> JSONObject:
     """Return request with requested built-in connector function tools enabled."""
     updated = dict(request)
     tools = request.get("tools")
 
     if tools is None:
-        return PreparedConnectorTools(request=updated)
+        return updated
 
     if isinstance(tools, Sequence) and not isinstance(tools, str):
         enabled_builtin_connectors: set[str] = set()
@@ -77,6 +70,6 @@ def with_builtin_connector_tools(request: JSONObject) -> PreparedConnectorTools:
             )
 
         updated["tools"] = normalized_tools
-        return PreparedConnectorTools(request=updated)
+        return updated
 
-    return PreparedConnectorTools(request=updated)
+    return updated

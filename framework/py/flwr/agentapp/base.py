@@ -21,7 +21,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 
 from flwr.app import Context
-from flwr.supercore.typing import JSONObject, JSONValue
+from flwr.supercore.typing import JSONObject
 
 
 class AgentResponses(ABC):
@@ -51,8 +51,8 @@ class AgentConnectors(ABC):
         """Return model-facing tool schemas for built-in connectors."""
 
     @abstractmethod
-    def call(self, name: str, arguments: JSONObject) -> JSONValue:
-        """Execute one built-in connector."""
+    def call(self, tool_call: JSONObject) -> JSONObject:
+        """Execute one model function_call and return a function_call_output item."""
 
 
 class AgentSession(ABC):

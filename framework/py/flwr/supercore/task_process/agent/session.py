@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Sequence
 from typing import cast
@@ -42,12 +43,12 @@ from flwr.supercore.task_process.connector.tool_call import (
 )
 from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject, JSONValue
+from flwr.supercore.utils import strict_json_dumps
 
 from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
 _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
-_DIRECT_CONNECTOR_CALL_ID = "call_direct"
 
 
 class RuntimeAgentSession(AgentSession):
@@ -78,15 +79,24 @@ class RuntimeAgentConnectors(AgentConnectors):
         """Return model-facing tool schemas for built-in connectors."""
         return [get_builtin_connector_tool(name) for name in names]
 
-    def call(self, name: str, arguments: JSONObject) -> JSONValue:
-        """Execute one built-in connector."""
-        return self._responses._create_connector_response(
+    def call(self, tool_call: JSONObject) -> JSONObject:
+        """Execute one model function_call and return a function_call_output item."""
+        arguments = tool_call["arguments"]
+        if isinstance(arguments, str):
+            arguments = json.loads(arguments)
+
+        output = self._responses._create_connector_response(
             ConnectorToolCall(
-                name=name,
-                call_id=_DIRECT_CONNECTOR_CALL_ID,
-                arguments=arguments,
+                name=cast(str, tool_call["name"]),
+                call_id=cast(str, tool_call["call_id"]),
+                arguments=cast(JSONObject, arguments),
             )
         )
+        return {
+            "type": "function_call_output",
+            "call_id": tool_call["call_id"],
+            "output": strict_json_dumps(output, compact=True),
+        }
 
 
 class RuntimeAgentResponses(AgentResponses):
@@ -108,8 +118,7 @@ class RuntimeAgentResponses(AgentResponses):
     def create(self, request: JSONObject) -> JSONObject:
         """Create a model response through a child model task."""
         # Keep string connector shorthand as schema expansion only.
-        prepared_tools = with_builtin_connector_tools(request)
-        model_request = prepared_tools.request
+        model_request = with_builtin_connector_tools(request)
         response_payload = self._create_model_response(model_request)
 
         output = response_payload.get("output")
