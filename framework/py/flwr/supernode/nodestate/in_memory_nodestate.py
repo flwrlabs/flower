@@ -94,8 +94,10 @@ class InMemoryNodeState(
         # verifies the authenticated task token before storing messages.
         with self.lock_msg_store:
             msg_id = message.metadata.message_id
-            if msg_id == "" or msg_id in self.msg_store:
+            if msg_id == "":
                 return None
+            if msg_id in self.msg_store:
+                return msg_id
             self.msg_store[msg_id] = MessageEntry(message=message)
             return msg_id
 

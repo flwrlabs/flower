@@ -1820,6 +1820,35 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 1
 
+    def test_store_message_res_duplicate_same_message_is_idempotent(self) -> None:
+        """Test duplicate store_message_res with the same Message is idempotent."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+        ins_msg_id = state.store_message_ins(msg)
+        assert ins_msg_id
+
+        ins_msg = state.get_message_ins(node_id=node_id, limit=1)[0]
+        res_msg = Message(RecordDict(), reply_to=ins_msg)
+        res_msg.metadata._message_id = str(uuid4())  # type: ignore
+        retry_res_msg = message_from_proto(message_to_proto(res_msg))
+
+        # Execute
+        first_res_msg_id = state.store_message_res(res_msg)
+        second_res_msg_id = state.store_message_res(retry_res_msg)
+
+        # Assert
+        assert first_res_msg_id == res_msg.metadata.message_id
+        assert second_res_msg_id == res_msg.metadata.message_id
+        assert state.num_message_res() == 1
+
     def test_store_message_res_rejects_duplicate_reply(self) -> None:
         """Test store_message_res rejects a second reply for one Message."""
         # Prepare

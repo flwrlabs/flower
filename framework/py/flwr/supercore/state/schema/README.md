@@ -2,11 +2,6 @@
 
 ## Schema
 
-Note: Mermaid ER diagrams do not support composite foreign key notation. The
-two `connector` to `run_connector` relationship lines below represent one
-composite foreign key on (`flwr_aid`, `connector_ref`), not two standalone
-foreign keys.
-
 <!-- BEGIN_SQLALCHEMY_DOCS -->
 ```mermaid
 
@@ -36,28 +31,22 @@ erDiagram
   }
 
   connector {
-    INTEGER id PK
+    VARCHAR connector_ref PK
+    VARCHAR flwr_aid PK
     VARCHAR config_json
-    VARCHAR connector_ref
-    TIMESTAMP created_at
     VARCHAR credentials_json
-    VARCHAR flwr_aid
-    TIMESTAMP last_used_at "nullable"
-    TIMESTAMP updated_at
   }
 
   connector_oauth_session {
-    INTEGER id PK
+    VARCHAR oauth_session_id PK
     TIMESTAMP completed_at "nullable"
     VARCHAR connector_ref
     TIMESTAMP created_at
     TIMESTAMP expires_at
     VARCHAR flwr_aid
-    VARCHAR oauth_session_id UK
     VARCHAR pkce_verifier "nullable"
     VARCHAR redirect_uri
     VARCHAR state
-    VARCHAR status
   }
 
   context {
@@ -158,11 +147,8 @@ erDiagram
   }
 
   run_connector {
-    INTEGER id PK
-    VARCHAR connector_ref FK
-    VARCHAR flwr_aid FK
-    BIGINT run_id FK
-    TIMESTAMP created_at
+    VARCHAR connector_ref PK
+    BIGINT run_id PK
   }
 
   run_objects {
@@ -252,9 +238,6 @@ erDiagram
   run ||--o{ message_res : run_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
-  run ||--o{ run_connector : run_id
-  connector }o--o{ run_connector : flwr_aid
-  connector }o--o{ run_connector : connector_ref
   objects ||--o| run_objects : object_id
   task ||--o{ task_event : task_id
   task ||--o{ task_logs : task_id
