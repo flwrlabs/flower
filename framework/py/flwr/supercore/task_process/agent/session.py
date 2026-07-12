@@ -81,7 +81,7 @@ class RuntimeAgentConnectors(AgentConnectors):
         if isinstance(arguments, str):
             arguments = json.loads(arguments)
 
-        output = self._responses._create_connector_response(
+        output = self._responses.create_connector_response(
             name=cast(str, tool_call["name"]),
             call_id=cast(str, tool_call["call_id"]),
             arguments=cast(JSONObject, arguments),
@@ -151,7 +151,7 @@ class RuntimeAgentResponses(AgentResponses):
         response = ModelResponse.from_message(response_message)
         return response.payload
 
-    def _create_connector_response(
+    def create_connector_response(
         self, *, name: str, call_id: str, arguments: JSONObject
     ) -> JSONValue:
         """Create one connector response through a child connector task."""
