@@ -37,10 +37,6 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorResponse,
 )
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
-from flwr.supercore.task_process.connector.tool_call import (
-    ConnectorToolCall,
-    with_builtin_connector_tools,
-)
 from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_dumps
@@ -86,11 +82,9 @@ class RuntimeAgentConnectors(AgentConnectors):
             arguments = json.loads(arguments)
 
         output = self._responses._create_connector_response(
-            ConnectorToolCall(
-                name=cast(str, tool_call["name"]),
-                call_id=cast(str, tool_call["call_id"]),
-                arguments=cast(JSONObject, arguments),
-            )
+            name=cast(str, tool_call["name"]),
+            call_id=cast(str, tool_call["call_id"]),
+            arguments=cast(JSONObject, arguments),
         )
         return {
             "type": "function_call_output",
@@ -117,9 +111,7 @@ class RuntimeAgentResponses(AgentResponses):
 
     def create(self, request: JSONObject) -> JSONObject:
         """Create a model response through a child model task."""
-        # Keep string connector shorthand as schema expansion only.
-        model_request = with_builtin_connector_tools(request)
-        response_payload = self._create_model_response(model_request)
+        response_payload = self._create_model_response(request)
 
         output = response_payload.get("output")
         if _is_json_object_list(output):
@@ -159,9 +151,10 @@ class RuntimeAgentResponses(AgentResponses):
         response = ModelResponse.from_message(response_message)
         return response.payload
 
-    def _create_connector_response(self, tool_call: ConnectorToolCall) -> JSONValue:
+    def _create_connector_response(
+        self, *, name: str, call_id: str, arguments: JSONObject
+    ) -> JSONValue:
         """Create one connector response through a child connector task."""
-        name = tool_call.name
         create_res = self._stub.CreateTask(
             CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=name)
         )
@@ -172,8 +165,8 @@ class RuntimeAgentResponses(AgentResponses):
         message = ConnectorRequest(
             dst_task_id=connector_task_id,
             name=name,
-            call_id=tool_call.call_id,
-            arguments=tool_call.arguments,
+            call_id=call_id,
+            arguments=arguments,
         )
         response_message = self._send_and_receive(message)
         response = ConnectorResponse.from_message(response_message)
