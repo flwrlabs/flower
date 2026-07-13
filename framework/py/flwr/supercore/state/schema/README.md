@@ -103,6 +103,23 @@ erDiagram
     VARCHAR parent_id PK,FK
   }
 
+  object_push_session_pending {
+    VARCHAR object_id PK
+    VARCHAR session_id PK,FK
+  }
+
+  object_push_session_roots {
+    VARCHAR root_object_id PK
+    VARCHAR session_id FK
+  }
+
+  object_push_sessions {
+    VARCHAR session_id PK
+    TIMESTAMP expires_at
+    INTEGER pending_count
+    BIGINT run_id
+  }
+
   objects {
     VARCHAR object_id PK "nullable"
     BLOB content "nullable"
@@ -214,6 +231,8 @@ erDiagram
   run ||--o{ message_res : run_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
+  object_push_sessions ||--o| object_push_session_pending : session_id
+  object_push_sessions ||--o{ object_push_session_roots : session_id
   objects ||--o| run_objects : object_id
   task ||--o{ task_event : task_id
   task ||--o{ task_logs : task_id
