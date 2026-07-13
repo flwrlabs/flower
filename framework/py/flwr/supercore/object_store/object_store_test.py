@@ -15,7 +15,6 @@
 """Tests for ObjectStore."""
 
 
-import sqlite3
 import tempfile
 import threading
 import unittest
@@ -430,29 +429,18 @@ class SqlInMemoryObjectStoreTest(SqlObjectStoreTestMixin, ObjectStoreTest):
         self.assertNotIn("alembic_version", table_names)
 
 
-class SqlFileBasedObjectStoreTest(SqlObjectStoreTestMixin, ObjectStoreTest):
-    """Test SqlObjectStore implementation with file-based database."""
+class SqlPersistentObjectStoreTestMixin(unittest.TestCase):
+    """Test SQL ObjectStore behavior requiring a persistent database."""
 
-    __test__ = True
-
-    def setUp(self) -> None:
-        """Set up the test case."""
-        super().setUp()
-        self.temp_file = tempfile.NamedTemporaryFile()  # pylint: disable=R1732
-
-    def tearDown(self) -> None:
-        """Tear down the test case."""
-        super().tearDown()
-        self.temp_file.close()
+    __test__ = False
+    run_id: int
 
     def object_store_factory(self) -> SqlObjectStore:
-        """Return SqlObjectStore."""
-        store = SqlObjectStore(self.temp_file.name)
-        store.initialize()
-        return store
+        """Return a new store connected to the same persistent database."""
+        raise NotImplementedError()
 
-    def test_file_db_creates_alembic_version(self) -> None:
-        """Ensure file-based DBs run Alembic migrations."""
+    def test_persistent_db_creates_alembic_version(self) -> None:
+        """Ensure persistent SQL databases run Alembic migrations."""
         store = self.object_store_factory()
         table_names = inspect(
             cast(Engine, store._engine)  # pylint: disable=W0212
@@ -490,8 +478,7 @@ class SqlFileBasedObjectStoreTest(SqlObjectStoreTestMixin, ObjectStoreTest):
     def test_concurrent_preregister_and_run_cleanup(self) -> None:
         """Concurrent run cleanup preserves objects registered by another run."""
         store = self.object_store_factory()
-        second_store = SqlObjectStore(self.temp_file.name)
-        second_store.initialize()
+        second_store = self.object_store_factory()
         child = CustomDataClass(b"shared")
         old_parent = CustomDataClass(b"old", children=[child])
         new_parent = CustomDataClass(b"new", children=[child])
@@ -524,6 +511,7 @@ class SqlFileBasedObjectStoreTest(SqlObjectStoreTestMixin, ObjectStoreTest):
     def test_put_raises_if_object_deleted_before_update(self) -> None:
         """A concurrent delete before the write must not report put success."""
         store = self.object_store_factory()
+        second_store = self.object_store_factory()
         obj = CustomDataClass(data=b"test_value")
         object_content = obj.deflate()
         object_id = get_object_id(object_content)
@@ -542,12 +530,17 @@ class SqlFileBasedObjectStoreTest(SqlObjectStoreTestMixin, ObjectStoreTest):
                 "UPDATE objects SET content = :content"
             ):
                 should_delete = False
-                with sqlite3.connect(self.temp_file.name) as conn:
-                    conn.execute("PRAGMA foreign_keys = ON")
-                    conn.execute(
-                        "DELETE FROM objects WHERE object_id = ? AND ref_count = 0",
-                        (object_id,),
-                    )
+
+                def delete_object() -> None:
+                    with second_store.session():
+                        second_store.query(
+                            "DELETE FROM objects "
+                            "WHERE object_id = :object_id AND ref_count = 0",
+                            {"object_id": object_id},
+                        )
+
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    executor.submit(delete_object).result()
             return original_query(query, data)
 
         with patch.object(store, "query", side_effect=delete_before_update):
@@ -555,3 +548,27 @@ class SqlFileBasedObjectStoreTest(SqlObjectStoreTestMixin, ObjectStoreTest):
                 store.put(object_id, object_content)
 
         self.assertIsNone(store.get(object_id))
+
+
+class SqlFileBasedObjectStoreTest(
+    SqlPersistentObjectStoreTestMixin, SqlObjectStoreTestMixin, ObjectStoreTest
+):
+    """Test SqlObjectStore implementation with file-based database."""
+
+    __test__ = True
+
+    def setUp(self) -> None:
+        """Set up the test case."""
+        super().setUp()
+        self.temp_file = tempfile.NamedTemporaryFile()  # pylint: disable=R1732
+
+    def tearDown(self) -> None:
+        """Tear down the test case."""
+        super().tearDown()
+        self.temp_file.close()
+
+    def object_store_factory(self) -> SqlObjectStore:
+        """Return SqlObjectStore."""
+        store = SqlObjectStore(self.temp_file.name)
+        store.initialize()
+        return store
