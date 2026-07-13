@@ -17,6 +17,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Literal
 
 from flwr.app import Context, Message
@@ -24,6 +25,7 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
+from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
 
@@ -43,6 +45,78 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
+
+    @abstractmethod
+    def upsert_connector(
+        self,
+        *,
+        flwr_aid: str,
+        connector_ref: str,
+        credentials_json: str,
+        config_json: str,
+    ) -> bool:
+        """Create or update a connector for an account.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the connector.
+        connector_ref : str
+            Connector reference unique within the account.
+        credentials_json : str
+            Serialized connector credentials.
+        config_json : str
+            Serialized connector configuration.
+
+        Returns
+        -------
+        bool
+            ``True`` if the connector was stored, otherwise ``False``.
+        """
+
+    @abstractmethod
+    def get_connector(
+        self, *, flwr_aid: str, connector_ref: str
+    ) -> ConnectorRecord | None:
+        """Return an account's connector, if present."""
+
+    @abstractmethod
+    def delete_connector(self, *, flwr_aid: str, connector_ref: str) -> bool:
+        """Delete an account's connector if it exists."""
+
+    @abstractmethod
+    def create_connector_oauth_session(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        oauth_session_id: str,
+        flwr_aid: str,
+        connector_ref: str,
+        state: str,
+        redirect_uri: str,
+        pkce_verifier: str | None,
+        expires_at: datetime,
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Create and return a connector OAuth session.
+
+        Returns ``None`` if the session ID already exists or a required identifier
+        is empty. ``expires_at`` must be timezone-aware.
+        """
+
+    @abstractmethod
+    def get_connector_oauth_session(
+        self, *, oauth_session_id: str, flwr_aid: str
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Return an account's connector OAuth session, if present."""
+
+    @abstractmethod
+    def complete_connector_oauth_session(
+        self, *, oauth_session_id: str, flwr_aid: str
+    ) -> bool:
+        """Mark a pending connector OAuth session as completed.
+
+        Returns ``False`` when the session is missing, belongs to another account,
+        is expired, or has already been completed.
+        """
 
     @abstractmethod
     def store_message_and_object_tree(

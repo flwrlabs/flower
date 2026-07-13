@@ -20,7 +20,7 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
 
@@ -58,6 +58,7 @@ from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
+from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
@@ -139,6 +140,223 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             hash_str=row["fab_hash"],
             content=row["content"],
             verifications=json.loads(row["verifications"]),
+        )
+
+    def upsert_connector(
+        self,
+        *,
+        flwr_aid: str,
+        connector_ref: str,
+        credentials_json: str,
+        config_json: str,
+    ) -> bool:
+        """Create or update a connector for an account."""
+        if not flwr_aid or not connector_ref:
+            return False
+        params = {
+            "flwr_aid": flwr_aid,
+            "connector_ref": connector_ref,
+            "credentials_json": credentials_json,
+            "config_json": config_json,
+        }
+        with self.session():
+            self.query(
+                """
+                DELETE FROM connector
+                WHERE flwr_aid = :flwr_aid
+                  AND connector_ref = :connector_ref
+                """,
+                params,
+            )
+            self.query(
+                """
+                INSERT INTO connector (
+                    flwr_aid, connector_ref, credentials_json, config_json
+                )
+                VALUES (
+                    :flwr_aid, :connector_ref, :credentials_json, :config_json
+                )
+                """,
+                params,
+            )
+        return True
+
+    def get_connector(
+        self, *, flwr_aid: str, connector_ref: str
+    ) -> ConnectorRecord | None:
+        """Return an account's connector, if present."""
+        if not flwr_aid or not connector_ref:
+            return None
+        rows = self.query(
+            """
+            SELECT flwr_aid, connector_ref, credentials_json, config_json
+            FROM connector
+            WHERE flwr_aid = :flwr_aid
+              AND connector_ref = :connector_ref
+            """,
+            {"flwr_aid": flwr_aid, "connector_ref": connector_ref},
+        )
+        if not rows:
+            return None
+        row = rows[0]
+        return ConnectorRecord(
+            flwr_aid=row["flwr_aid"],
+            connector_ref=row["connector_ref"],
+            credentials_json=row["credentials_json"],
+            config_json=row["config_json"],
+        )
+
+    def delete_connector(self, *, flwr_aid: str, connector_ref: str) -> bool:
+        """Delete an account's connector if it exists."""
+        if not flwr_aid or not connector_ref:
+            return False
+        params = {"flwr_aid": flwr_aid, "connector_ref": connector_ref}
+        with self.session():
+            rows = self.query(
+                """
+                SELECT connector_ref
+                FROM connector
+                WHERE flwr_aid = :flwr_aid
+                  AND connector_ref = :connector_ref
+                """,
+                params,
+            )
+            if not rows:
+                return False
+            self.query(
+                """
+                DELETE FROM connector
+                WHERE flwr_aid = :flwr_aid
+                  AND connector_ref = :connector_ref
+                """,
+                params,
+            )
+        return True
+
+    def create_connector_oauth_session(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        oauth_session_id: str,
+        flwr_aid: str,
+        connector_ref: str,
+        state: str,
+        redirect_uri: str,
+        pkce_verifier: str | None,
+        expires_at: datetime,
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Create and return a connector OAuth session."""
+        if not oauth_session_id or not flwr_aid or not connector_ref:
+            return None
+        session = ConnectorOAuthSessionRecord(
+            oauth_session_id=oauth_session_id,
+            flwr_aid=flwr_aid,
+            connector_ref=connector_ref,
+            state=state,
+            redirect_uri=redirect_uri,
+            pkce_verifier=pkce_verifier,
+            created_at=now(),
+            expires_at=expires_at,
+            completed_at=None,
+        )
+        try:
+            self.query(
+                """
+                INSERT INTO connector_oauth_session (
+                    oauth_session_id, flwr_aid, connector_ref, state,
+                    redirect_uri, pkce_verifier, created_at, expires_at,
+                    completed_at
+                )
+                VALUES (
+                    :oauth_session_id, :flwr_aid, :connector_ref, :state,
+                    :redirect_uri, :pkce_verifier, :created_at, :expires_at,
+                    :completed_at
+                )
+                """,
+                {
+                    "oauth_session_id": session.oauth_session_id,
+                    "flwr_aid": session.flwr_aid,
+                    "connector_ref": session.connector_ref,
+                    "state": session.state,
+                    "redirect_uri": session.redirect_uri,
+                    "pkce_verifier": session.pkce_verifier,
+                    "created_at": session.created_at,
+                    "expires_at": session.expires_at,
+                    "completed_at": session.completed_at,
+                },
+            )
+        except IntegrityError:
+            return None
+        return session
+
+    def get_connector_oauth_session(
+        self, *, oauth_session_id: str, flwr_aid: str
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Return an account's connector OAuth session, if present."""
+        if not oauth_session_id or not flwr_aid:
+            return None
+        rows = self.query(
+            """
+            SELECT oauth_session_id, flwr_aid, connector_ref, state,
+                   redirect_uri, pkce_verifier, created_at, expires_at,
+                   completed_at
+            FROM connector_oauth_session
+            WHERE oauth_session_id = :oauth_session_id
+              AND flwr_aid = :flwr_aid
+            """,
+            {"oauth_session_id": oauth_session_id, "flwr_aid": flwr_aid},
+        )
+        if not rows:
+            return None
+        return _connector_oauth_session_from_row(rows[0])
+
+    def complete_connector_oauth_session(
+        self, *, oauth_session_id: str, flwr_aid: str
+    ) -> bool:
+        """Mark a pending connector OAuth session as completed."""
+        if not oauth_session_id or not flwr_aid:
+            return False
+        params = {"oauth_session_id": oauth_session_id, "flwr_aid": flwr_aid}
+        completed_at = now()
+        with self.session():
+            rows = self.query(
+                """
+                SELECT oauth_session_id, flwr_aid, connector_ref, state,
+                       redirect_uri, pkce_verifier, created_at, expires_at,
+                       completed_at
+                FROM connector_oauth_session
+                WHERE oauth_session_id = :oauth_session_id
+                  AND flwr_aid = :flwr_aid
+                """,
+                params,
+            )
+            if not rows:
+                return False
+            session = _connector_oauth_session_from_row(rows[0])
+            if session.completed_at is not None or session.expires_at <= completed_at:
+                return False
+            update_params = {**params, "completed_at": completed_at}
+            self.query(
+                """
+                UPDATE connector_oauth_session
+                SET completed_at = :completed_at
+                WHERE oauth_session_id = :oauth_session_id
+                  AND flwr_aid = :flwr_aid
+                  AND completed_at IS NULL
+                  AND expires_at > :completed_at
+                """,
+                update_params,
+            )
+            updated = self.query(
+                """
+                SELECT completed_at
+                FROM connector_oauth_session
+                WHERE oauth_session_id = :oauth_session_id
+                  AND flwr_aid = :flwr_aid
+                """,
+                params,
+            )
+        return bool(updated) and _datetime_from_row(updated[0]["completed_at"]) == (
+            completed_at
         )
 
     def get_run_series(  # pylint: disable=R0914
@@ -986,6 +1204,34 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         # IntegrityError can only arise from (namespace, nonce) uniqueness.
         except IntegrityError:
             return False
+
+
+def _datetime_from_row(value: datetime | str) -> datetime:
+    """Convert a timestamp row value to a timezone-aware UTC datetime."""
+    timestamp = value if isinstance(value, datetime) else datetime.fromisoformat(value)
+    if timestamp.tzinfo is None:
+        return timestamp.replace(tzinfo=UTC)
+    return timestamp.astimezone(UTC)
+
+
+def _connector_oauth_session_from_row(
+    row: dict[str, Any],
+) -> ConnectorOAuthSessionRecord:
+    """Convert a connector OAuth session row to its persistence record."""
+    completed_at = row["completed_at"]
+    return ConnectorOAuthSessionRecord(
+        oauth_session_id=row["oauth_session_id"],
+        flwr_aid=row["flwr_aid"],
+        connector_ref=row["connector_ref"],
+        state=row["state"],
+        redirect_uri=row["redirect_uri"],
+        pkce_verifier=row["pkce_verifier"],
+        created_at=_datetime_from_row(row["created_at"]),
+        expires_at=_datetime_from_row(row["expires_at"]),
+        completed_at=(
+            None if completed_at is None else _datetime_from_row(completed_at)
+        ),
+    )
 
 
 def determine_task_status(row: dict[str, Any]) -> TaskStatus:
