@@ -36057,11 +36057,9 @@ msgstr ""
 #: flwr.serverapp.strategy.fedprox.FedProx:10 of
 #, python-brace-format
 msgid ""
-""
-"\n"
-msgstr ""
 "\\frac{\\mu}{2} || w - w^t ||^2\n"
 "\n"
+msgstr ""
 
 #: flwr.serverapp.strategy.fedprox.FedProx:13 of
 msgid ""
