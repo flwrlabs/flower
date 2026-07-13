@@ -142,6 +142,45 @@ def create_corestate_metadata() -> MetaData:
     )
 
     # --------------------------------------------------------------------------
+    #  Table: connector
+    # --------------------------------------------------------------------------
+    Table(
+        "connector",
+        metadata,
+        Column("flwr_aid", String, primary_key=True, nullable=False),
+        Column("connector_ref", String, primary_key=True, nullable=False),
+        Column("credentials_json", String, nullable=False),
+        Column("config_json", String, nullable=False),
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: connector_oauth_session
+    # --------------------------------------------------------------------------
+    Table(
+        "connector_oauth_session",
+        metadata,
+        Column("oauth_session_id", String, primary_key=True, nullable=False),
+        Column("flwr_aid", String, nullable=False),
+        Column("connector_ref", String, nullable=False),
+        Column("state", String, nullable=False),
+        Column("redirect_uri", String, nullable=False),
+        Column("pkce_verifier", String, nullable=True),
+        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("expires_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("completed_at", TIMESTAMP(timezone=True), nullable=True),
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: run_connector
+    # --------------------------------------------------------------------------
+    Table(
+        "run_connector",
+        metadata,
+        Column("run_id", BigInteger, primary_key=True, nullable=False),
+        Column("connector_ref", String, primary_key=True, nullable=False),
+    )
+
+    # --------------------------------------------------------------------------
     #  Table: task
     # --------------------------------------------------------------------------
     task = Table(
