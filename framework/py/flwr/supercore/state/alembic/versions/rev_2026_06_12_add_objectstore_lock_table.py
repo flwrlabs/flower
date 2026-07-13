@@ -15,7 +15,7 @@
 """Add ObjectStore lock table.
 
 Revision ID: c17f3d9b8a42
-Revises: 1289dca56546
+Revises: cf405f09bb06
 Create Date: 2026-07-09 00:00:00.000000
 """
 
