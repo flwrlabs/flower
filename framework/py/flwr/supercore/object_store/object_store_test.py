@@ -539,6 +539,8 @@ class SqlPersistentObjectStoreTestMixin(unittest.TestCase):
                             {"object_id": object_id},
                         )
 
+                # Use a separate thread so the ContextVar-bound session used by put()
+                # is not reused; the deletion must run in another transaction.
                 with ThreadPoolExecutor(max_workers=1) as executor:
                     executor.submit(delete_object).result()
             return original_query(query, data)
