@@ -35,8 +35,8 @@ from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.routers.control.router import router
 
 
-def test_list_runs_returns_runs_from_control_handler() -> None:
-    """ListRuns delegates to the Control handler with the authenticated account."""
+def test_list_runs_returns_refreshed_tokens_from_control_handler() -> None:
+    """ListRuns returns refreshed tokens while delegating to the Control handler."""
     linkstate = Mock(spec=LinkState)
     run = Run.create_empty(7)
     run.flwr_aid = NOOP_FLWR_AID
@@ -44,7 +44,11 @@ def test_list_runs_returns_runs_from_control_handler() -> None:
     authn_plugin = Mock()
     authz_plugin = Mock()
     account = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
-    authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
+    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
+    authn_plugin.refresh_tokens.return_value = (
+        [("x-access-token", "new-access-token")],
+        account,
+    )
     authz_plugin.authorize.return_value = True
     app = FastAPI()
     app.state.get_account = GetAccount(authn_plugin, authz_plugin)
@@ -60,6 +64,7 @@ def test_list_runs_returns_runs_from_control_handler() -> None:
     proto_response = ListRunsResponse.FromString(response.content)
 
     assert response.status_code == 200
+    assert response.headers["x-access-token"] == "new-access-token"
     assert set(proto_response.run_dict) == {7}
     assert datetime.fromisoformat(proto_response.now)
     linkstate.get_run_info.assert_called_once_with(

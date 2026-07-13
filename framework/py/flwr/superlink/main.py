@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
 from logging import INFO
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
@@ -31,7 +32,15 @@ from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_SQLITE_DB_URL
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink import extensions
+from flwr.superlink.auth_plugin import (
+    ControlAuthnPlugin,
+    ControlAuthzPlugin,
+    NoOpControlAuthnPlugin,
+    NoOpControlAuthzPlugin,
+)
+from flwr.superlink.dependencies.account import GetAccount
 from flwr.superlink.federation import NoOpFederationManager
+from flwr.superlink.routers.control import router as control_router
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
@@ -71,6 +80,8 @@ def _create_default_linkstate_factory() -> LinkStateFactory:
 def create_app(
     *,
     linkstate_factory: LinkStateFactory,
+    authn_plugin: ControlAuthnPlugin,
+    authz_plugin: ControlAuthzPlugin,
     superlink_lifespan: SuperLinkLifespan | None = None,
     start_legacy_grpc: bool = False,
 ) -> FastAPI:
@@ -78,12 +89,14 @@ def create_app(
 
     This FastAPI app can be started in two ways:
     1. Via `flower-superlink`: the CLI always passes a `linkstate_factory`.
-       When FastAPI also starts the legacy gRPC APIs for compatibility, the CLI
-       also passes a `superlink_lifespan` initialized with the same factory.
+       It also passes the Control authentication and authorization plugins. When
+       FastAPI starts the legacy gRPC APIs for compatibility, the CLI passes a
+       `superlink_lifespan` initialized with the same factory.
     2. Via `uvicorn flwr.superlink.main:app`: the module-level app uses an
-       in-memory SQLite LinkStateFactory. Direct callers of `create_app` must
-       provide their desired `linkstate_factory` explicitly.
+       in-memory SQLite LinkStateFactory and NoOp Control authentication
+       plugins. Direct callers of `create_app` must provide all dependencies.
     """
+    account_dependency = GetAccount(authn_plugin, authz_plugin)
 
     @asynccontextmanager
     async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[dict[str, object]]:
@@ -102,6 +115,7 @@ def create_app(
                 superlink_lifespan.startup()
 
             fastapi_app.state.linkstate_factory = linkstate_factory
+            fastapi_app.state.get_account = account_dependency
 
             lifespan_state: dict[str, object] = {}
             async with AsyncExitStack() as stack:
@@ -130,7 +144,7 @@ def create_app(
     # fastapi_app.include_router(health.router)
 
     # SuperLink APIs
-    # fastapi_app.include_router(control.router)
+    fastapi_app.include_router(control_router)
     # fastapi_app.include_router(runtime.router)
 
     # Extension hooks
@@ -165,4 +179,8 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
 
 
 # Temporary: we need a way to provision the FastAPI server
-app = create_app(linkstate_factory=_create_default_linkstate_factory())
+app = create_app(
+    linkstate_factory=_create_default_linkstate_factory(),
+    authn_plugin=NoOpControlAuthnPlugin(Path(), False),
+    authz_plugin=NoOpControlAuthzPlugin(Path(), False),
+)
