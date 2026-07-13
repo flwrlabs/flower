@@ -293,7 +293,7 @@ class InMemoryCoreState(
                 updated_at=current.isoformat(),
                 next_run_at=next_run_at,
                 fixed_interval=fixed_interval,
-                max_runs=max_runs,
+                remaining_runs=max_runs,
             )
 
             self.automation_store[automation_id] = AutomationRecord(

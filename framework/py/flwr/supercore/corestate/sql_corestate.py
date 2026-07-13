@@ -407,7 +407,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             updated_at=timestamp_to_iso(row["updated_at"]),
             next_run_at=timestamp_to_iso(row["next_run_at"]),
             fixed_interval=row["fixed_interval"],
-            max_runs=row["remaining_runs"],
+            remaining_runs=row["remaining_runs"],
         )
 
     def list_automations(  # pylint: disable=too-many-arguments,too-many-locals
@@ -474,7 +474,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     updated_at=timestamp_to_iso(row["updated_at"]),
                     next_run_at=timestamp_to_iso(next_run_at),
                     fixed_interval=row["fixed_interval"],
-                    max_runs=row["remaining_runs"],
+                    remaining_runs=row["remaining_runs"],
                     stopped_at=timestamp_to_iso(stopped_at) if stopped_at else None,
                 )
             )

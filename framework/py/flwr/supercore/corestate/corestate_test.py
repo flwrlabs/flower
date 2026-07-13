@@ -227,6 +227,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [automation.automation_id for automation in due_list], [due.automation_id]
         )
+        self.assertEqual(due_list[0].remaining_runs, 1)
 
         self.assertTrue(state.stop_automation(due.automation_id))
         self.assertFalse(state.stop_automation(due.automation_id))
