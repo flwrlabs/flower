@@ -409,35 +409,6 @@ class SqlObjectStoreTestMixin(unittest.TestCase):
                 ),
             )
 
-    def test_mutation_lock_uses_sql_lock_row(
-        self,
-    ) -> None:
-        """Ensure ObjectStore mutations use a transaction-scoped SQL lock."""
-        store = self.object_store_factory()
-        store.query = Mock()  # type: ignore[method-assign]
-
-        store._lock_objectstore_mutation()  # pylint: disable=protected-access
-
-        store.query.assert_any_call(
-            "INSERT INTO objectstore_locks (lock_id, lock_value) "
-            "VALUES (:lock_id, 0) "
-            "ON CONFLICT (lock_id) DO UPDATE "
-            "SET lock_value = objectstore_locks.lock_value",
-            {"lock_id": store._MUTATION_LOCK_ID},  # pylint: disable=W0212
-        )
-        self.assertEqual(store.query.call_count, 1)
-
-    def test_mutation_session_locks_once(self) -> None:
-        """Ensure nested mutation sessions reuse the transaction-scoped lock."""
-        store = self.object_store_factory()
-        store.query = Mock()  # type: ignore[method-assign]
-
-        with store._mutation_session():  # pylint: disable=protected-access
-            with store._mutation_session():  # pylint: disable=protected-access
-                pass
-
-        self.assertEqual(store.query.call_count, 1)
-
 
 class SqlInMemoryObjectStoreTest(SqlObjectStoreTestMixin, ObjectStoreTest):
     """Test SqlObjectStore implementation with in-memory database."""
@@ -487,6 +458,34 @@ class SqlFileBasedObjectStoreTest(SqlObjectStoreTestMixin, ObjectStoreTest):
             cast(Engine, store._engine)  # pylint: disable=W0212
         ).get_table_names()
         self.assertIn("alembic_version", table_names)
+        self.assertIn("objectstore_locks", table_names)
+
+    def test_mutation_lock_uses_sql_lock_row(self) -> None:
+        """Ensure ObjectStore mutations use a transaction-scoped SQL lock."""
+        store = self.object_store_factory()
+        store.query = Mock()  # type: ignore[method-assign]
+
+        store._lock_objectstore_mutation()  # pylint: disable=protected-access
+
+        store.query.assert_any_call(
+            "INSERT INTO objectstore_locks (lock_id, lock_value) "
+            "VALUES (:lock_id, 0) "
+            "ON CONFLICT (lock_id) DO UPDATE "
+            "SET lock_value = objectstore_locks.lock_value",
+            {"lock_id": store._MUTATION_LOCK_ID},  # pylint: disable=W0212
+        )
+        self.assertEqual(store.query.call_count, 1)
+
+    def test_mutation_session_locks_once(self) -> None:
+        """Ensure nested mutation sessions reuse the transaction-scoped lock."""
+        store = self.object_store_factory()
+        store.query = Mock()  # type: ignore[method-assign]
+
+        with store._mutation_session():  # pylint: disable=protected-access
+            with store._mutation_session():  # pylint: disable=protected-access
+                pass
+
+        self.assertEqual(store.query.call_count, 1)
 
     def test_concurrent_preregister_and_run_cleanup(self) -> None:
         """Concurrent run cleanup preserves objects registered by another run."""
