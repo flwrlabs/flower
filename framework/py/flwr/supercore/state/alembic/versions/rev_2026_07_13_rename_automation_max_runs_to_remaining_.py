@@ -23,7 +23,6 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-
 # pylint: disable=no-member
 
 # revision identifiers, used by Alembic.
@@ -36,8 +35,7 @@ depends_on: str | Sequence[str] | None = None
 def _automation_column_names() -> set[str]:
     """Return the column names currently present on the automation table."""
     return {
-        column["name"]
-        for column in sa.inspect(op.get_bind()).get_columns("automation")
+        column["name"] for column in sa.inspect(op.get_bind()).get_columns("automation")
     }
 
 
