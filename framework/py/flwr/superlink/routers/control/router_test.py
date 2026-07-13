@@ -38,10 +38,12 @@ from flwr.superlink.routers.control.router import router
 def test_list_runs_returns_runs_from_linkstate() -> None:
     """ListRuns serializes the runs returned by LinkState."""
     linkstate = Mock(spec=LinkState)
-    linkstate.get_run_info.return_value = [Run.create_empty(7)]
     authn_plugin = Mock()
     authz_plugin = Mock()
     account = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
+    run = Run.create_empty(7)
+    run.flwr_aid = account.flwr_aid
+    linkstate.get_run_info.return_value = [run]
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
     authz_plugin.authorize.return_value = True
     app = FastAPI()
@@ -59,8 +61,10 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
 
     assert response.status_code == 200
     assert set(proto_response.run_dict) == {7}
+    assert proto_response.run_dict[7].account_name == account.account_name
     assert datetime.fromisoformat(proto_response.now)
     linkstate.get_run_info.assert_called_once_with(
+        flwr_aids=[account.flwr_aid],
         order_by="pending_at",
         ascending=False,
         limit=1,
