@@ -1,6 +1,6 @@
 """Defines the client class and support functions for FedAvg."""
 
-from typing import Callable, Dict, List, OrderedDict
+from typing import Callable, Dict, List
 
 import flwr as fl
 import torch
@@ -44,7 +44,7 @@ class FlowerClientFedAvg(fl.client.NumPyClient):
     def set_parameters(self, parameters):
         """Set the local model parameters using given ones."""
         params_dict = zip(self.net.state_dict().keys(), parameters)
-        state_dict = OrderedDict({k: torch.from_numpy(v) for k, v in params_dict})
+        state_dict = {k: torch.from_numpy(v) for k, v in params_dict}
         self.net.load_state_dict(state_dict, strict=True)
 
     def fit(self, parameters, config: Dict[str, Scalar]):
