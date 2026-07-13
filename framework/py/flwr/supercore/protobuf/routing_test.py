@@ -121,6 +121,7 @@ def test_unary_unary_rejects_http_response_dependency_parameter() -> None:
             _request: ListRunsRequest,
             http_response: Annotated[None, Depends(lambda: None)],
         ) -> ListRunsResponse:
+            del http_response
             return ListRunsResponse()
 
 
