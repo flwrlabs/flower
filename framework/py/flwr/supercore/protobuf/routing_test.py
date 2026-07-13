@@ -29,13 +29,13 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsRequest,
     StreamLogsResponse,
 )
+from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
 )
 from flwr.supercore.protobuf.routing import ProtobufRouter
-from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.error.catalog import API_ERROR_MAP
 
 
 def test_unary_unary_parses_and_returns_protobuf() -> None:
