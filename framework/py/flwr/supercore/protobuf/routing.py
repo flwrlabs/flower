@@ -34,6 +34,7 @@ from google.protobuf.message import DecodeError, Message
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import State
 
+from flwr.supercore.error import http_error_translator
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
@@ -233,21 +234,22 @@ class ProtobufRouter:
                 http_request: Request[State],
                 **dependency_values: object,
             ) -> Response:
-                _check_request_media_type(http_request)
-                proto_request = _parse_protobuf_body(
-                    await http_request.body(), request_type
-                )
-                result = await _call_handler(func, proto_request, dependency_values)
-                # Fail clearly when a handler violates its declared response contract.
-                if not isinstance(result, Message):
-                    raise HTTPException(
-                        status_code=500,
-                        detail="Invalid response returned from unary handler",
+                with http_error_translator(func.__name__):
+                    _check_request_media_type(http_request)
+                    proto_request = _parse_protobuf_body(
+                        await http_request.body(), request_type
                     )
-                return Response(
-                    content=result.SerializeToString(),
-                    media_type=PROTOBUF_MEDIA_TYPE,
-                )
+                    result = await _call_handler(func, proto_request, dependency_values)
+                    # Fail clearly if a handler violates its declared response contract.
+                    if not isinstance(result, Message):
+                        raise HTTPException(
+                            status_code=500,
+                            detail="Invalid response returned from unary handler",
+                        )
+                    return Response(
+                        content=result.SerializeToString(),
+                        media_type=PROTOBUF_MEDIA_TYPE,
+                    )
 
             wrapper.__name__ = func.__name__
             wrapper.__signature__ = (  # type: ignore[attr-defined]
