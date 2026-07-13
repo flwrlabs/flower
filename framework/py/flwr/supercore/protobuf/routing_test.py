@@ -15,6 +15,7 @@
 """Tests for protobuf FastAPI routing helpers."""
 
 
+import json
 from collections.abc import AsyncIterator, Iterator
 from threading import get_ident
 from typing import Annotated, cast
@@ -34,6 +35,8 @@ from flwr.supercore.protobuf.constants import (
     PROTOBUF_STREAM_MEDIA_TYPE,
 )
 from flwr.supercore.protobuf.routing import ProtobufRouter
+from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.error.catalog import API_ERROR_MAP
 
 
 def test_unary_unary_parses_and_returns_protobuf() -> None:
@@ -183,6 +186,36 @@ def test_unary_unary_rejects_non_protobuf_response() -> None:
 
     assert response.status_code == 500
     assert response.json()["detail"] == ("Invalid response returned from unary handler")
+
+
+def test_unary_unary_translates_flower_error() -> None:
+    """The router maps handler FlowerErrors to the HTTP error contract."""
+    app = FastAPI()
+    fastapi_router = APIRouter()
+    protobuf_router = ProtobufRouter(fastapi_router)
+
+    @protobuf_router.unary_unary("/rpc/ListRuns")
+    def list_runs(_request: ListRunsRequest) -> ListRunsResponse:
+        raise FlowerError(ApiErrorCode.RUN_ID_NOT_FOUND, "run 42 does not exist")
+
+    app.include_router(fastapi_router)
+    client = TestClient(app)
+
+    response = client.post(
+        "/rpc/ListRuns",
+        content=ListRunsRequest(run_id=42).SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    error_spec = API_ERROR_MAP[ApiErrorCode.RUN_ID_NOT_FOUND]
+    assert response.status_code == error_spec.http_status_code
+    assert response.json()["detail"] == json.dumps(
+        {
+            "code": ApiErrorCode.RUN_ID_NOT_FOUND,
+            "public_message": error_spec.public_message,
+            "public_details": None,
+        }
+    )
 
 
 def test_unary_stream_rejects_non_iterable_response() -> None:
