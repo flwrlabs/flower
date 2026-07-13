@@ -28,7 +28,7 @@ class ExitCode:
     GRACEFUL_EXIT_SIGTERM = 3  # Graceful exit triggered by SIGTERM
 
     # SuperLink-specific exit codes (100-199)
-    SUPERLINK_THREAD_CRASH = 100
+    # SUPERLINK_THREAD_CRASH = 100 --- DELETED ---
     SUPERLINK_LICENSE_INVALID = 101
     SUPERLINK_LICENSE_MISSING = 102
     SUPERLINK_LICENSE_URL_INVALID = 103
@@ -61,7 +61,7 @@ class ExitCode:
 
     # Common exit codes (600-699)
     COMMON_ADDRESS_INVALID = 600
-    COMMON_MISSING_EXTRA_REST = 601
+    # COMMON_MISSING_EXTRA_REST = 601 --- DELETED ---
     COMMON_TLS_NOT_SUPPORTED = 602
     COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE = 603
     COMMON_PATH_INVALID = 604
@@ -90,7 +90,6 @@ EXIT_CODE_HELP = {
     ExitCode.GRACEFUL_EXIT_SIGQUIT: "",
     ExitCode.GRACEFUL_EXIT_SIGTERM: "",
     # SuperLink-specific exit codes (100-199)
-    ExitCode.SUPERLINK_THREAD_CRASH: "An important background thread has crashed.",
     ExitCode.SUPERLINK_LICENSE_INVALID: (
         "The license is invalid or has expired. "
         "Please contact `hello@flower.ai` for assistance."
@@ -172,11 +171,6 @@ EXIT_CODE_HELP = {
     ExitCode.COMMON_ADDRESS_INVALID: (
         "Please provide a valid URL, IPv4 or IPv6 address."
     ),
-    ExitCode.COMMON_MISSING_EXTRA_REST: """
-Dependencies required for using the REST-based Fleet API are missing.
-
-Please reinstall or upgrade `flwr`.
-""",
     ExitCode.COMMON_TLS_NOT_SUPPORTED: "Please use the '--insecure' flag.",
     ExitCode.COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE: (
         "The '--root-certificates' option cannot be used together with '--insecure'."
