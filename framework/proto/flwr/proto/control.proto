@@ -241,27 +241,26 @@ message GetAuthTokensResponse {
 }
 
 message ListConnectorsRequest {}
-message ConnectorSummary {
+message Connector {
   string connector_ref = 1;
-  bool connected = 2;
-  string display_name = 3;
-  string description = 4;
+  string display_name = 2;
+  string description = 3;
+  bool connected = 4;
 }
-message ListConnectorsResponse { repeated ConnectorSummary connectors = 1; }
+message ListConnectorsResponse { repeated Connector connectors = 1; }
 
 message DisconnectConnectorRequest { string connector_ref = 1; }
-message DisconnectConnectorResponse { bool success = 1; }
+message DisconnectConnectorResponse {}
 
 message BeginConnectorOAuthRequest {
   string connector_ref = 1;
   string redirect_uri = 2;
 }
 message BeginConnectorOAuthResponse {
-  bool success = 1;
-  string oauth_session_id = 2;
-  string authorization_url = 3;
-  string connector_ref = 4;
-  string expires_at = 5;
+  string oauth_session_id = 1;
+  string authorization_url = 2;
+  string connector_ref = 3;
+  string expires_at = 4;
 }
 
 message CompleteConnectorOAuthRequest {
@@ -270,9 +269,7 @@ message CompleteConnectorOAuthRequest {
   string state = 3;
 }
 message CompleteConnectorOAuthResponse {
-  bool success = 1;
-  string connector_ref = 2;
-  string message = 3;
+  string connector_ref = 1;
 }
 
 message StopRunRequest { uint64 run_id = 1; }

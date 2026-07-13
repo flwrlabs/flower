@@ -539,28 +539,28 @@ class ListConnectorsRequest(google.protobuf.message.Message):
 global___ListConnectorsRequest = ListConnectorsRequest
 
 @typing.final
-class ConnectorSummary(google.protobuf.message.Message):
+class Connector(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
-    CONNECTED_FIELD_NUMBER: builtins.int
     DISPLAY_NAME_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
+    CONNECTED_FIELD_NUMBER: builtins.int
     connector_ref: builtins.str
-    connected: builtins.bool
     display_name: builtins.str
     description: builtins.str
+    connected: builtins.bool
     def __init__(
         self,
         *,
         connector_ref: builtins.str = ...,
-        connected: builtins.bool = ...,
         display_name: builtins.str = ...,
         description: builtins.str = ...,
+        connected: builtins.bool = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["connected", b"connected", "connector_ref", b"connector_ref", "description", b"description", "display_name", b"display_name"]) -> None: ...
 
-global___ConnectorSummary = ConnectorSummary
+global___Connector = Connector
 
 @typing.final
 class ListConnectorsResponse(google.protobuf.message.Message):
@@ -568,11 +568,11 @@ class ListConnectorsResponse(google.protobuf.message.Message):
 
     CONNECTORS_FIELD_NUMBER: builtins.int
     @property
-    def connectors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ConnectorSummary]: ...
+    def connectors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Connector]: ...
     def __init__(
         self,
         *,
-        connectors: collections.abc.Iterable[global___ConnectorSummary] | None = ...,
+        connectors: collections.abc.Iterable[global___Connector] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["connectors", b"connectors"]) -> None: ...
 
@@ -597,14 +597,9 @@ global___DisconnectConnectorRequest = DisconnectConnectorRequest
 class DisconnectConnectorResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    SUCCESS_FIELD_NUMBER: builtins.int
-    success: builtins.bool
     def __init__(
         self,
-        *,
-        success: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["success", b"success"]) -> None: ...
 
 global___DisconnectConnectorResponse = DisconnectConnectorResponse
 
@@ -630,12 +625,10 @@ global___BeginConnectorOAuthRequest = BeginConnectorOAuthRequest
 class BeginConnectorOAuthResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    SUCCESS_FIELD_NUMBER: builtins.int
     OAUTH_SESSION_ID_FIELD_NUMBER: builtins.int
     AUTHORIZATION_URL_FIELD_NUMBER: builtins.int
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
     EXPIRES_AT_FIELD_NUMBER: builtins.int
-    success: builtins.bool
     oauth_session_id: builtins.str
     authorization_url: builtins.str
     connector_ref: builtins.str
@@ -643,13 +636,12 @@ class BeginConnectorOAuthResponse(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        success: builtins.bool = ...,
         oauth_session_id: builtins.str = ...,
         authorization_url: builtins.str = ...,
         connector_ref: builtins.str = ...,
         expires_at: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["authorization_url", b"authorization_url", "connector_ref", b"connector_ref", "expires_at", b"expires_at", "oauth_session_id", b"oauth_session_id", "success", b"success"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["authorization_url", b"authorization_url", "connector_ref", b"connector_ref", "expires_at", b"expires_at", "oauth_session_id", b"oauth_session_id"]) -> None: ...
 
 global___BeginConnectorOAuthResponse = BeginConnectorOAuthResponse
 
@@ -678,20 +670,14 @@ global___CompleteConnectorOAuthRequest = CompleteConnectorOAuthRequest
 class CompleteConnectorOAuthResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    SUCCESS_FIELD_NUMBER: builtins.int
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
-    MESSAGE_FIELD_NUMBER: builtins.int
-    success: builtins.bool
     connector_ref: builtins.str
-    message: builtins.str
     def __init__(
         self,
         *,
-        success: builtins.bool = ...,
         connector_ref: builtins.str = ...,
-        message: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["connector_ref", b"connector_ref", "message", b"message", "success", b"success"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["connector_ref", b"connector_ref"]) -> None: ...
 
 global___CompleteConnectorOAuthResponse = CompleteConnectorOAuthResponse
 
