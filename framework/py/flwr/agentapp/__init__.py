@@ -17,11 +17,13 @@
 
 from .agent_app import AgentApp as AgentApp
 from .agent_app import LoadAgentAppError as LoadAgentAppError
+from .base import AgentConnectors as AgentConnectors
 from .base import AgentResponses as AgentResponses
 from .base import AgentSession as AgentSession
 
 __all__ = [
     "AgentApp",
+    "AgentConnectors",
     "AgentResponses",
     "AgentSession",
     "LoadAgentAppError",

@@ -59,7 +59,7 @@ from flwr.supercore.typing import JSONObject
 from flwr.superlink.grid import GrpcGrid
 
 from .context_items import append_items
-from .session import RuntimeAgentResponses, RuntimeAgentSession
+from .session import RuntimeAgentConnectors, RuntimeAgentResponses, RuntimeAgentSession
 
 _AGENT_INPUT_KEY = "agent.input"
 
@@ -218,7 +218,8 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             task_id=task_id,
             context=context,
         )
-        agent = RuntimeAgentSession(responses=responses)
+        connectors = RuntimeAgentConnectors(responses)
+        agent = RuntimeAgentSession(responses=responses, connectors=connectors)
 
         # Load and run the AgentApp
         agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)

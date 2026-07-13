@@ -15,7 +15,7 @@
 """Add OAuth connector tables.
 
 Revision ID: e2dd7937d7fc
-Revises: 1289dca56546
+Revises: cf405f09bb06
 Create Date: 2026-07-09 20:12:34.148401
 """
 from collections.abc import Sequence
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "e2dd7937d7fc"
-down_revision: str | Sequence[str] | None = "1289dca56546"
+down_revision: str | Sequence[str] | None = "cf405f09bb06"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
