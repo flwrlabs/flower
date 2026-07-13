@@ -156,13 +156,11 @@ def test_unary_unary_translates_flower_error() -> None:
 
     error_spec = API_ERROR_MAP[ApiErrorCode.RUN_ID_NOT_FOUND]
     assert response.status_code == error_spec.http_status_code
-    assert response.json()["detail"] == json.dumps(
-        {
-            "code": ApiErrorCode.RUN_ID_NOT_FOUND,
-            "public_message": error_spec.public_message,
-            "public_details": None,
-        }
-    )
+    assert json.loads(response.json()["detail"]) == {
+        "code": ApiErrorCode.RUN_ID_NOT_FOUND,
+        "public_message": error_spec.public_message,
+        "public_details": None,
+    }
 
 
 def test_unary_stream_rejects_non_iterable_response() -> None:
