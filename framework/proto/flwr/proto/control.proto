@@ -268,9 +268,7 @@ message CompleteConnectorOAuthRequest {
   string code = 2;
   string state = 3;
 }
-message CompleteConnectorOAuthResponse {
-  string connector_ref = 1;
-}
+message CompleteConnectorOAuthResponse { string connector_ref = 1; }
 
 message StopRunRequest { uint64 run_id = 1; }
 message StopRunResponse { bool success = 1; }
