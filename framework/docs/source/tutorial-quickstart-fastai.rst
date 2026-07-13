@@ -39,8 +39,8 @@ Then, run the command below:
 This example uses a local simulation profile that ``flwr run`` submits to a managed
 local SuperLink, which then executes the run with the Flower Simulation Runtime,
 creating a federation of two nodes using `FedAvg
-<https://flower.ai/docs/framework/ref-api/flwr.serverapp.strategy.FedAvg.html#flwr.server.strategy.FedAvg>`_
-as the aggregation strategy. The dataset will be partitioned using Flower Dataset's
+<ref-api/flwr.serverapp.strategy.FedAvg.html#flwr.serverapp.strategy.FedAvg>`_ as the
+aggregation strategy. The dataset will be partitioned using Flower Dataset's
 `IidPartitioner
 <https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_.
 Let's run the project:

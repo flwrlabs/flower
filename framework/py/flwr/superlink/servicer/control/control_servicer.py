@@ -193,7 +193,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             request,
             _get_account(),
             self.linkstate_factory.state(),
-            self.objectstore_factory.store(),
         )
 
     def ListRunSeries(

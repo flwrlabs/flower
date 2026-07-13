@@ -52,7 +52,7 @@
    {% endblock %}
 
 {% block modules %}
-{% if modules %}
+{% if modules or fullname == "flwr" %}
 .. rubric:: Modules
 
 .. autosummary::
@@ -62,5 +62,19 @@
 {% for item in modules %}
    {{ item }}
 {%- endfor %}
+{% if fullname == "flwr" %}
+{% if "client" not in modules %}
+   client
+{% endif %}
+{% if "common" not in modules %}
+   common
+{% endif %}
+{% if "server" not in modules %}
+   server
+{% endif %}
+{% if "simulation" not in modules %}
+   simulation
+{% endif %}
+{% endif %}
 {% endif %}
 {% endblock %}
