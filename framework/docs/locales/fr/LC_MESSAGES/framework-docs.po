@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-07-10 00:27+0000\n"
+"POT-Creation-Date: 2026-07-13 00:22+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -467,17 +467,16 @@ msgstr "Argument de construction"
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #: ../../source/how-to-configure-audit-logging.rst:58
 #: ../../source/ref-exit-codes/0.rst:7 ../../source/ref-exit-codes/1.rst:7
-#: ../../source/ref-exit-codes/100.rst:7 ../../source/ref-exit-codes/101.rst:7
-#: ../../source/ref-exit-codes/102.rst:7 ../../source/ref-exit-codes/103.rst:7
-#: ../../source/ref-exit-codes/104.rst:7 ../../source/ref-exit-codes/105.rst:7
-#: ../../source/ref-exit-codes/2.rst:7 ../../source/ref-exit-codes/200.rst:23
-#: ../../source/ref-exit-codes/201.rst:7 ../../source/ref-exit-codes/202.rst:7
-#: ../../source/ref-exit-codes/203.rst:7 ../../source/ref-exit-codes/250.rst:7
-#: ../../source/ref-exit-codes/3.rst:7 ../../source/ref-exit-codes/302.rst:7
-#: ../../source/ref-exit-codes/303.rst:7 ../../source/ref-exit-codes/304.rst:7
-#: ../../source/ref-exit-codes/400.rst:7 ../../source/ref-exit-codes/401.rst:7
-#: ../../source/ref-exit-codes/402.rst:7 ../../source/ref-exit-codes/500.rst:7
-#: ../../source/ref-exit-codes/600.rst:7 ../../source/ref-exit-codes/601.rst:7
+#: ../../source/ref-exit-codes/101.rst:7 ../../source/ref-exit-codes/102.rst:7
+#: ../../source/ref-exit-codes/103.rst:7 ../../source/ref-exit-codes/104.rst:7
+#: ../../source/ref-exit-codes/105.rst:7 ../../source/ref-exit-codes/2.rst:7
+#: ../../source/ref-exit-codes/200.rst:23 ../../source/ref-exit-codes/201.rst:7
+#: ../../source/ref-exit-codes/202.rst:7 ../../source/ref-exit-codes/203.rst:7
+#: ../../source/ref-exit-codes/250.rst:7 ../../source/ref-exit-codes/3.rst:7
+#: ../../source/ref-exit-codes/302.rst:7 ../../source/ref-exit-codes/303.rst:7
+#: ../../source/ref-exit-codes/304.rst:7 ../../source/ref-exit-codes/400.rst:7
+#: ../../source/ref-exit-codes/401.rst:7 ../../source/ref-exit-codes/402.rst:7
+#: ../../source/ref-exit-codes/500.rst:7 ../../source/ref-exit-codes/600.rst:7
 #: ../../source/ref-exit-codes/602.rst:7 ../../source/ref-exit-codes/603.rst:7
 #: ../../source/ref-exit-codes/604.rst:7 ../../source/ref-exit-codes/605.rst:7
 #: ../../source/ref-exit-codes/606.rst:7 ../../source/ref-exit-codes/607.rst:7
@@ -714,14 +713,14 @@ msgid ""
 "those translations! This might also be a great opportunity for those "
 "wanting to become open source contributors with little prerequisites."
 msgstr ""
-"Depuis `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_, nous avons introduit des traductions"
-" dans nos pages de documentation, mais, comme vous avez pu le remarquer, "
-"les traductions sont souvent imparfaites. Si vous parlez des langues "
-"autres que l'anglais, vous pourriez être en mesure d'aider notre effort "
-"pour rendre l'apprentissage fédéré accessible à autant de personnes que "
-"possible en contribuant à ces traductions ! Cela pourrait également être "
-"une excellente opportunité pour ceux qui souhaitent devenir contributeurs"
-" open source avec peu de prérequis."
+"Depuis `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_, nous avons "
+"introduit des traductions dans nos pages de documentation, mais, comme "
+"vous avez pu le remarquer, les traductions sont souvent imparfaites. Si "
+"vous parlez des langues autres que l'anglais, vous pourriez être en "
+"mesure d'aider notre effort pour rendre l'apprentissage fédéré accessible"
+" à autant de personnes que possible en contribuant à ces traductions ! "
+"Cela pourrait également être une excellente opportunité pour ceux qui "
+"souhaitent devenir contributeurs open source avec peu de prérequis."
 
 #: ../../source/contributor-how-to-contribute-translations.rst:12
 msgid ""
@@ -2898,8 +2897,8 @@ msgid ""
 msgstr ""
 "Pour des fins de test, vous pouvez générer vos propres certificats auto-"
 "signés. La page `Enable TLS connections <../how-to-enable-tls-"
-"connections.html#certificates>`__ contient une section"
-" qui vous guidera à travers le processus."
+"connections.html#certificates>`__ contient une section qui vous guidera à"
+" travers le processus."
 
 #: ../../source/docker/enable-tls.rst:20
 msgid ""
@@ -6882,8 +6881,7 @@ msgstr ""
 "Vous pouvez trouver un exemple détaillé dans le `Secure Aggregation "
 "Example <https://flower.ai/docs/examples/flower-secure-"
 "aggregation.html>`_. La documentation de la configuration du protocole "
-"``SecAgg+`` est disponible à l'adresse `SecAggPlusWorkflow "
-"<ref-"
+"``SecAgg+`` est disponible à l'adresse `SecAggPlusWorkflow <ref-"
 "api/flwr.server.workflow.SecAggPlusWorkflow.html>`_."
 
 #: ../../source/explanation-ref-secure-aggregation-protocols.rst:35
@@ -15395,14 +15393,14 @@ msgid ""
 " to get in touch with our team!"
 msgstr ""
 "Pour un exemple PyTorch complet qui entre dans les détails sur diverses "
-"composantes Flower, voir le tutoriel `Get started with Flower "
-"<tutorial-series-write-your-first-"
-"flower-app-pytorch.html>`_. Même si nous attendons que ce guide aidera la"
-" plupart des utilisateurs à se migrer rapidement vers l'écosystème "
-"Flower, certaines charges de travail OpenFL complexes peuvent nécessiter "
-"plus de clarification ou d'aide. Si vous avez d'autres questions, `join "
-"the Flower Slack <https://flower.ai/join-slack/>`_ (et utilisez le canal "
-"``#questions``) ou rejoignez notre `OpenFL Continuity Program "
+"composantes Flower, voir le tutoriel `Get started with Flower <tutorial-"
+"series-write-your-first-flower-app-pytorch.html>`_. Même si nous "
+"attendons que ce guide aidera la plupart des utilisateurs à se migrer "
+"rapidement vers l'écosystème Flower, certaines charges de travail OpenFL "
+"complexes peuvent nécessiter plus de clarification ou d'aide. Si vous "
+"avez d'autres questions, `join the Flower Slack <https://flower.ai/join-"
+"slack/>`_ (et utilisez le canal ``#questions``) ou rejoignez notre "
+"`OpenFL Continuity Program "
 "<https://docs.google.com/forms/d/e/1FAIpQLScprGGX_jFRoEUv4HbJkkhkg6O7e5eCiq7uP95_0xK5Qnt1gA/viewform>`_"
 " pour nous contacter !"
 
@@ -16699,9 +16697,8 @@ msgstr ""
 "ClientApp sera exécuté. Après avoir construit l'image, nous la taggeons "
 "et la poussons dans le registre Google récemment créé. La plupart des "
 "étapes sur la façon de construire les images Docker discutées ci-dessous "
-"sont basées sur le `Flower Quickstart with Docker Tutorial "
-"<docker/tutorial-quickstart-"
-"docker.html>`_."
+"sont basées sur le `Flower Quickstart with Docker Tutorial <docker"
+"/tutorial-quickstart-docker.html>`_."
 
 #: ../../source/how-to-run-flower-on-gcp.rst:220
 msgid "We create the Flower NumPy app as follows:"
@@ -16938,9 +16935,9 @@ msgid ""
 msgstr ""
 "Notez que dans la mise en production actuelle, la communication n'est pas"
 " chiffrée. Pour activer TLS pour les connexions sécurisées, consultez les"
-" instructions `guide <how-to-enable-tls-"
-"connections.html>`_. Nous mettrons également à jour ce guide bientôt avec"
-" plus de détails sur la configuration de TLS."
+" instructions `guide <how-to-enable-tls-connections.html>`_. Nous "
+"mettrons également à jour ce guide bientôt avec plus de détails sur la "
+"configuration de TLS."
 
 #: ../../source/how-to-run-flower-on-gcp.rst:644
 msgid ""
@@ -31574,7 +31571,7 @@ msgstr ""
 #: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1
 #: flwr.server.strategy.qfedavg.QFedAvg.aggregate_evaluate:1:<autosummary>:1
 #: flwr.server.strategy.qfedavg.QFedAvg.num_evaluation_clients:1 of
-#, fuzzy, python-format
+#, fuzzy
 msgid "Use a fraction of available clients for evaluation."
 msgstr ""
 "``fraction-evaluate=1.0`` → sélectionner 100% des clients disponibles "
@@ -54315,92 +54312,6 @@ msgstr "[1] GRACEFUL_EXIT_SIGINT"
 msgid "The process exited gracefully, triggered by ``SIGINT``."
 msgstr "Le processus a quitté de manière gracieuse, déclenché par ``SIGINT``."
 
-#: ../../source/ref-exit-codes/100.rst:3
-msgid "[100] SUPERLINK_THREAD_CRASH"
-msgstr "[100] SUPERLINK_THREAD_CRASH"
-
-#: ../../source/ref-exit-codes/100.rst:9
-msgid ""
-"A critical background thread has crashed in the SuperLink, causing it to "
-"exit prematurely. This indicates a serious issue with the SuperLink that "
-"requires immediate investigation."
-msgstr ""
-"Un thread de fond critique a crashé dans le SuperLink, provoquant son "
-"exit prématuré. Cela indique un problème grave avec le SuperLink qui "
-"nécessite une investigation immédiate."
-
-#: ../../source/ref-exit-codes/100.rst:13
-msgid "Critical background threads include:"
-msgstr "Les threads de fond critiques incluent :"
-
-#: ../../source/ref-exit-codes/100.rst:15
-msgid ""
-"**Scheduler**: Schedules the execution of runs. This thread exists only "
-"when the isolation mode is set to ``subprocess`` (default)."
-msgstr ""
-"**Scheduler** : Planifie l'exécution des runs. Ce thread existe "
-"uniquement lorsque le mode d'isolement est défini sur ``subprocess`` (par"
-" défaut)."
-
-#: ../../source/ref-exit-codes/100.rst:17
-msgid ""
-"**REST API server**: Manages the REST API server. This thread exists only"
-" when the Fleet API type is set to ``rest``."
-msgstr ""
-"**REST API serveur** : Gère le serveur REST API. Ce thread existe "
-"uniquement lorsque le type de Fleet est défini sur API pour ``rest``."
-
-#: ../../source/ref-exit-codes/100.rst:22
-#: ../../source/ref-exit-codes/101.rst:20
-#: ../../source/ref-exit-codes/102.rst:13
-#: ../../source/ref-exit-codes/103.rst:13
-#: ../../source/ref-exit-codes/104.rst:13
-#: ../../source/ref-exit-codes/105.rst:17
-#: ../../source/ref-exit-codes/200.rst:32
-#: ../../source/ref-exit-codes/201.rst:13
-#: ../../source/ref-exit-codes/202.rst:13
-#: ../../source/ref-exit-codes/203.rst:15
-#: ../../source/ref-exit-codes/250.rst:14
-#: ../../source/ref-exit-codes/302.rst:15
-#: ../../source/ref-exit-codes/303.rst:14
-#: ../../source/ref-exit-codes/304.rst:15
-#: ../../source/ref-exit-codes/400.rst:14
-#: ../../source/ref-exit-codes/401.rst:13
-#: ../../source/ref-exit-codes/402.rst:14
-#: ../../source/ref-exit-codes/500.rst:17
-#: ../../source/ref-exit-codes/600.rst:14
-#: ../../source/ref-exit-codes/601.rst:13
-#: ../../source/ref-exit-codes/602.rst:17
-#: ../../source/ref-exit-codes/603.rst:14
-#: ../../source/ref-exit-codes/604.rst:13
-#: ../../source/ref-exit-codes/605.rst:13
-#: ../../source/ref-exit-codes/606.rst:13
-#: ../../source/ref-exit-codes/607.rst:15
-#: ../../source/ref-exit-codes/608.rst:13
-#: ../../source/ref-exit-codes/700.rst:13
-#: ../../source/ref-exit-codes/701.rst:13
-#: ../../source/ref-exit-codes/800.rst:13
-msgid "How to Resolve"
-msgstr "Comment Résoudre"
-
-#: ../../source/ref-exit-codes/100.rst:24
-msgid "Check the logs for any errors that may have caused the thread to crash."
-msgstr ""
-"Vérifiez les journaux pour toute erreur qui aurait pu causer le thread à "
-"crasher."
-
-#: ../../source/ref-exit-codes/100.rst:25
-msgid "Ensure the SuperLink's configuration is correct."
-msgstr "Assurez-vous que la configuration du SuperLink est correcte."
-
-#: ../../source/ref-exit-codes/100.rst:26
-#: ../../source/ref-exit-codes/101.rst:25
-#: ../../source/ref-exit-codes/103.rst:19
-msgid "If the issue persists, please contact support for further assistance."
-msgstr ""
-"Si le problème persiste, veuillez contacter le support pour une "
-"assistance supplémentaire."
-
 #: ../../source/ref-exit-codes/101.rst:3
 msgid "[101] SUPERLINK_LICENSE_INVALID"
 msgstr "[101] SUPERLINK_LICENSE_INVALID"
@@ -54438,6 +54349,37 @@ msgstr ""
 "type de clé) ou sa signature a échoué la vérification contre la clé "
 "d'attribution."
 
+#: ../../source/ref-exit-codes/101.rst:20
+#: ../../source/ref-exit-codes/102.rst:13
+#: ../../source/ref-exit-codes/103.rst:13
+#: ../../source/ref-exit-codes/104.rst:13
+#: ../../source/ref-exit-codes/105.rst:17
+#: ../../source/ref-exit-codes/200.rst:32
+#: ../../source/ref-exit-codes/201.rst:13
+#: ../../source/ref-exit-codes/202.rst:13
+#: ../../source/ref-exit-codes/203.rst:15
+#: ../../source/ref-exit-codes/250.rst:14
+#: ../../source/ref-exit-codes/302.rst:15
+#: ../../source/ref-exit-codes/303.rst:14
+#: ../../source/ref-exit-codes/304.rst:15
+#: ../../source/ref-exit-codes/400.rst:14
+#: ../../source/ref-exit-codes/401.rst:13
+#: ../../source/ref-exit-codes/402.rst:14
+#: ../../source/ref-exit-codes/500.rst:17
+#: ../../source/ref-exit-codes/600.rst:14
+#: ../../source/ref-exit-codes/602.rst:17
+#: ../../source/ref-exit-codes/603.rst:14
+#: ../../source/ref-exit-codes/604.rst:13
+#: ../../source/ref-exit-codes/605.rst:13
+#: ../../source/ref-exit-codes/606.rst:13
+#: ../../source/ref-exit-codes/607.rst:15
+#: ../../source/ref-exit-codes/608.rst:13
+#: ../../source/ref-exit-codes/700.rst:13
+#: ../../source/ref-exit-codes/701.rst:13
+#: ../../source/ref-exit-codes/800.rst:13
+msgid "How to Resolve"
+msgstr "Comment Résoudre"
+
 #: ../../source/ref-exit-codes/101.rst:22
 msgid "Ensure that the ``FLWR_LICENSE_KEY`` is valid."
 msgstr "Assurez-vous que le ``FLWR_LICENSE_KEY`` est valide."
@@ -54449,6 +54391,13 @@ msgid ""
 msgstr ""
 "Assurez-vous d'utiliser la bonne clé publique et qu'elle est accessible "
 "par SuperLink."
+
+#: ../../source/ref-exit-codes/101.rst:25
+#: ../../source/ref-exit-codes/103.rst:19
+msgid "If the issue persists, please contact support for further assistance."
+msgstr ""
+"Si le problème persiste, veuillez contacter le support pour une "
+"assistance supplémentaire."
 
 #: ../../source/ref-exit-codes/102.rst:3
 msgid "[102] SUPERLINK_LICENSE_MISSING"
@@ -55100,20 +55049,6 @@ msgstr "IPv4 (e.g., ``192.168.1.1:9091``)"
 #: ../../source/ref-exit-codes/600.rst:19
 msgid "IPv6 (e.g., ``[2001:0db8::1]:9092``)"
 msgstr "IPv6 (e.g., ``[2001:0db8::1]:9092``)"
-
-#: ../../source/ref-exit-codes/601.rst:3
-msgid "[601] COMMON_MISSING_EXTRA_REST"
-msgstr "[601] COMMON_MISSING_EXTRA_REST"
-
-#: ../../source/ref-exit-codes/601.rst:9
-msgid "Dependencies required for using the REST-based Fleet API are missing."
-msgstr ""
-"Les dépendances requises pour utiliser l'API Fleet basée sur REST sont "
-"manquantes."
-
-#: ../../source/ref-exit-codes/601.rst:15
-msgid "Reinstall or upgrade ``flwr``, then retry:"
-msgstr "Réinstallez ou mettez à niveau ``flwr``, puis réessayez :"
 
 #: ../../source/ref-exit-codes/602.rst:3
 msgid "[602] COMMON_TLS_NOT_SUPPORTED"
@@ -55955,10 +55890,9 @@ msgid ""
 " guide about other optional parameters you can use to configure your "
 "local simulation."
 msgstr ""
-"En savoir plus dans la guide `How to Run Simulations "
-"<how-to-run-simulations.html>`_ sur les "
-"autres paramètres facultatifs que vous pouvez utiliser pour configurer "
-"votre simulation locale."
+"En savoir plus dans la guide `How to Run Simulations <how-to-run-"
+"simulations.html>`_ sur les autres paramètres facultatifs que vous pouvez"
+" utiliser pour configurer votre simulation locale."
 
 #: ../../source/ref-flower-configuration.rst:164
 msgid ""
@@ -56069,8 +56003,8 @@ msgid ""
 "Refer to the `deployment documentation <deploy.html>`_ for TLS setup and "
 "advanced configurations."
 msgstr ""
-"Référez-vous au `deployment documentation <deploy.html>`_ pour la configuration de"
-" TLS et les configurations avancées."
+"Référez-vous au `deployment documentation <deploy.html>`_ pour la "
+"configuration de TLS et les configurations avancées."
 
 #: ../../source/ref-flower-configuration.rst:214
 msgid "Upgrading from previous versions of Flower"
@@ -62943,3 +62877,66 @@ msgstr ""
 #~ "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 #~ " Let's run the project:"
 #~ msgstr ""
+
+#~ msgid "[100] SUPERLINK_THREAD_CRASH"
+#~ msgstr "[100] SUPERLINK_THREAD_CRASH"
+
+#~ msgid ""
+#~ "A critical background thread has crashed"
+#~ " in the SuperLink, causing it to "
+#~ "exit prematurely. This indicates a "
+#~ "serious issue with the SuperLink that"
+#~ " requires immediate investigation."
+#~ msgstr ""
+#~ "Un thread de fond critique a "
+#~ "crashé dans le SuperLink, provoquant son"
+#~ " exit prématuré. Cela indique un "
+#~ "problème grave avec le SuperLink qui "
+#~ "nécessite une investigation immédiate."
+
+#~ msgid "Critical background threads include:"
+#~ msgstr "Les threads de fond critiques incluent :"
+
+#~ msgid ""
+#~ "**Scheduler**: Schedules the execution of "
+#~ "runs. This thread exists only when "
+#~ "the isolation mode is set to "
+#~ "``subprocess`` (default)."
+#~ msgstr ""
+#~ "**Scheduler** : Planifie l'exécution des "
+#~ "runs. Ce thread existe uniquement "
+#~ "lorsque le mode d'isolement est défini"
+#~ " sur ``subprocess`` (par défaut)."
+
+#~ msgid ""
+#~ "**REST API server**: Manages the REST"
+#~ " API server. This thread exists only"
+#~ " when the Fleet API type is set"
+#~ " to ``rest``."
+#~ msgstr ""
+#~ "**REST API serveur** : Gère le "
+#~ "serveur REST API. Ce thread existe "
+#~ "uniquement lorsque le type de Fleet "
+#~ "est défini sur API pour ``rest``."
+
+#~ msgid "Check the logs for any errors that may have caused the thread to crash."
+#~ msgstr ""
+#~ "Vérifiez les journaux pour toute erreur"
+#~ " qui aurait pu causer le thread "
+#~ "à crasher."
+
+#~ msgid "Ensure the SuperLink's configuration is correct."
+#~ msgstr "Assurez-vous que la configuration du SuperLink est correcte."
+
+#~ msgid "[601] COMMON_MISSING_EXTRA_REST"
+#~ msgstr "[601] COMMON_MISSING_EXTRA_REST"
+
+#~ msgid "Dependencies required for using the REST-based Fleet API are missing."
+#~ msgstr ""
+#~ "Les dépendances requises pour utiliser "
+#~ "l'API Fleet basée sur REST sont "
+#~ "manquantes."
+
+#~ msgid "Reinstall or upgrade ``flwr``, then retry:"
+#~ msgstr "Réinstallez ou mettez à niveau ``flwr``, puis réessayez :"
+
