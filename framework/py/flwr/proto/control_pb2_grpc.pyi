@@ -99,6 +99,30 @@ class ControlStub:
     ]
     """Get auth tokens upon request"""
 
+    ListConnectors: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListConnectorsRequest,
+        flwr.proto.control_pb2.ListConnectorsResponse,
+    ]
+    """List OAuth connectors available to the authenticated account"""
+
+    DisconnectConnector: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DisconnectConnectorRequest,
+        flwr.proto.control_pb2.DisconnectConnectorResponse,
+    ]
+    """Disconnect connector credentials for the authenticated account"""
+
+    BeginConnectorOAuth: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.BeginConnectorOAuthRequest,
+        flwr.proto.control_pb2.BeginConnectorOAuthResponse,
+    ]
+    """Begin OAuth connector authorization flow"""
+
+    CompleteConnectorOAuth: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CompleteConnectorOAuthRequest,
+        flwr.proto.control_pb2.CompleteConnectorOAuthResponse,
+    ]
+    """Complete OAuth connector authorization flow"""
+
     PullArtifacts: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.PullArtifactsRequest,
         flwr.proto.control_pb2.PullArtifactsResponse,
@@ -278,6 +302,30 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.GetAuthTokensResponse,
     ]
     """Get auth tokens upon request"""
+
+    ListConnectors: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListConnectorsRequest,
+        flwr.proto.control_pb2.ListConnectorsResponse,
+    ]
+    """List OAuth connectors available to the authenticated account"""
+
+    DisconnectConnector: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DisconnectConnectorRequest,
+        flwr.proto.control_pb2.DisconnectConnectorResponse,
+    ]
+    """Disconnect connector credentials for the authenticated account"""
+
+    BeginConnectorOAuth: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.BeginConnectorOAuthRequest,
+        flwr.proto.control_pb2.BeginConnectorOAuthResponse,
+    ]
+    """Begin OAuth connector authorization flow"""
+
+    CompleteConnectorOAuth: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CompleteConnectorOAuthRequest,
+        flwr.proto.control_pb2.CompleteConnectorOAuthResponse,
+    ]
+    """Complete OAuth connector authorization flow"""
 
     PullArtifacts: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.PullArtifactsRequest,
@@ -480,6 +528,38 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.GetAuthTokensResponse, collections.abc.Awaitable[flwr.proto.control_pb2.GetAuthTokensResponse]]:
         """Get auth tokens upon request"""
+
+    @abc.abstractmethod
+    def ListConnectors(
+        self,
+        request: flwr.proto.control_pb2.ListConnectorsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListConnectorsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListConnectorsResponse]]:
+        """List OAuth connectors available to the authenticated account"""
+
+    @abc.abstractmethod
+    def DisconnectConnector(
+        self,
+        request: flwr.proto.control_pb2.DisconnectConnectorRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.DisconnectConnectorResponse, collections.abc.Awaitable[flwr.proto.control_pb2.DisconnectConnectorResponse]]:
+        """Disconnect connector credentials for the authenticated account"""
+
+    @abc.abstractmethod
+    def BeginConnectorOAuth(
+        self,
+        request: flwr.proto.control_pb2.BeginConnectorOAuthRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.BeginConnectorOAuthResponse, collections.abc.Awaitable[flwr.proto.control_pb2.BeginConnectorOAuthResponse]]:
+        """Begin OAuth connector authorization flow"""
+
+    @abc.abstractmethod
+    def CompleteConnectorOAuth(
+        self,
+        request: flwr.proto.control_pb2.CompleteConnectorOAuthRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.CompleteConnectorOAuthResponse, collections.abc.Awaitable[flwr.proto.control_pb2.CompleteConnectorOAuthResponse]]:
+        """Complete OAuth connector authorization flow"""
 
     @abc.abstractmethod
     def PullArtifacts(
