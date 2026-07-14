@@ -52,6 +52,7 @@ from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
 from flwr.supercore.utils import (
+    build_sql_in_params,
     int64_to_uint64,
     simulation_config_from_json,
     simulation_config_to_json,
@@ -61,7 +62,6 @@ from flwr.superlink.federation import FederationManager
 
 from .linkstate import LinkState
 from .utils import (
-    build_params,
     check_node_availability_for_in_message,
     convert_sint64_values_in_dict_to_uint64,
     convert_uint64_values_in_dict_to_sint64,
@@ -244,12 +244,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session():
             # Batch fetch all messages in one query
-            placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
+            placeholders, params = build_sql_in_params(
+                [str(mid) for mid in message_ids], "mid"
+            )
             query = f"""
                 SELECT * FROM message_ins
                 WHERE message_id IN ({placeholders})
             """
-            params = {f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)}
             message_rows = self.query(query, params)
 
             if not message_rows:
@@ -262,12 +263,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
             # Collect unique run_ids for batch federation lookup
             run_ids = {row["run_id"] for row in message_rows}
-            placeholders = ",".join([f":rid_{i}" for i in range(len(run_ids))])
+            placeholders, params = build_sql_in_params(run_ids, "rid")
             query = f"""
                 SELECT run_id, federation_id FROM run
                 WHERE run_id IN ({placeholders})
             """
-            params = {f"rid_{i}": rid for i, rid in enumerate(run_ids)}
             run_rows = self.query(query, params)
 
             # Build run_id to federation ID mapping
@@ -393,14 +393,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def _load_message_ins_rows(self, message_ids: set[str]) -> list[dict[str, Any]]:
         """Load instruction Messages by IDs."""
-        placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
+        placeholders, params = build_sql_in_params(message_ids, "mid")
         query = f"""
             SELECT *
             FROM message_ins
             WHERE message_id IN ({placeholders})
             ORDER BY created_at, message_id
         """
-        params = {f"mid_{i}": msg_id for i, msg_id in enumerate(message_ids)}
         return self.query(query, params)
 
     def store_message_res(  # pylint: disable=too-many-return-statements
@@ -502,13 +501,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             # Verify Message IDs
             self._check_stored_messages(message_ids)
             current = now().timestamp()
-            placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
+            placeholders, params = build_sql_in_params(
+                [str(mid) for mid in message_ids], "mid"
+            )
             query = f"""
                 SELECT *
                 FROM message_ins
                 WHERE message_id IN ({placeholders})
             """
-            params = {f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)}
             rows = self.query(query, params)
             found_message_ins_dict: dict[str, Message] = {}
             for row in rows:
@@ -532,16 +532,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 sint_node_id = uint64_to_int64(in_message.metadata.dst_node_id)
                 dst_node_ids.add(sint_node_id)
             if dst_node_ids:
-                placeholders = ",".join([f":nid_{i}" for i in range(len(dst_node_ids))])
+                placeholders, node_params = build_sql_in_params(dst_node_ids, "nid")
                 query = f"""
                     SELECT node_id, online_until
                     FROM node
                     WHERE node_id IN ({placeholders})
                     AND status != :unregistered
                 """
-                node_params: dict[str, int | str] = {
-                    f"nid_{i}": nid for i, nid in enumerate(dst_node_ids)
-                }
                 node_params["unregistered"] = NodeStatus.UNREGISTERED
                 rows = self.query(query, node_params)
             else:
@@ -561,7 +558,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 return list(ret.values())
 
             # Atomically claim all eligible reply Messages
-            placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
+            placeholders, in_params = build_sql_in_params(
+                [str(mid) for mid in message_ids], "mid"
+            )
             delivered_at = now().isoformat()
             query = f"""
                 UPDATE message_res
@@ -571,7 +570,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 RETURNING *
             """
             params = {"delivered_at": delivered_at}
-            params.update({f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)})
+            params.update(in_params)
             rows = self.query(query, params)
             for row in rows:
                 convert_sint64_values_in_dict_to_uint64(
@@ -610,8 +609,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if not message_ins_ids:
             return
 
-        placeholders = ",".join([f":mid_{i}" for i in range(len(message_ins_ids))])
-        params = {f"mid_{i}": str(mid) for i, mid in enumerate(message_ins_ids)}
+        placeholders, params = build_sql_in_params(
+            [str(mid) for mid in message_ins_ids], "mid"
+        )
 
         # Delete Message
         query_1 = f"""
@@ -852,11 +852,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if node_ids is not None:
             if not node_ids:
                 return
-            placeholders = ",".join([f":nid_{i}" for i in range(len(node_ids))])
+            sint64_node_ids = [uint64_to_int64(nid) for nid in node_ids]
+            placeholders, in_params = build_sql_in_params(sint64_node_ids, "nid")
             query += f" AND node_id IN ({placeholders})"
-            params.update(
-                {f"nid_{i}": uint64_to_int64(nid) for i, nid in enumerate(node_ids)}
-            )
+            params.update(in_params)
 
         # Select candidate node_ids first so `last_deactivated_at` can preserve the
         # expiry time without relying on database-specific epoch formatting functions
@@ -911,22 +910,17 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             params: dict[str, Any] = {}
             if node_ids is not None:
                 sint64_node_ids = [uint64_to_int64(node_id) for node_id in node_ids]
-                placeholders = ",".join(
-                    [f":nid_{i}" for i in range(len(sint64_node_ids))]
-                )
+                placeholders, in_params = build_sql_in_params(sint64_node_ids, "nid")
                 conditions.append(f"node_id IN ({placeholders})")
-                for i, nid in enumerate(sint64_node_ids):
-                    params[f"nid_{i}"] = nid
+                params.update(in_params)
             if owner_aids is not None:
-                placeholders = ",".join([f":aid_{i}" for i in range(len(owner_aids))])
+                placeholders, in_params = build_sql_in_params(owner_aids, "aid")
                 conditions.append(f"owner_aid IN ({placeholders})")
-                for i, aid in enumerate(owner_aids):
-                    params[f"aid_{i}"] = aid
+                params.update(in_params)
             if statuses is not None:
-                placeholders = ",".join([f":st_{i}" for i in range(len(statuses))])
+                placeholders, in_params = build_sql_in_params(statuses, "st")
                 conditions.append(f"status IN ({placeholders})")
-                for i, status in enumerate(statuses):
-                    params[f"st_{i}"] = status
+                params.update(in_params)
 
             # Construct the final query
             query = "SELECT * FROM node"
@@ -1087,11 +1081,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not run_ids:
                 return []
             sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            placeholders = ",".join([f":rid_{i}" for i in range(len(sint64_run_ids))])
+            placeholders, in_params = build_sql_in_params(sint64_run_ids, "rid")
             conditions.append(f"r.run_id IN ({placeholders})")
-            params.update(
-                {f"rid_{i}": run_id for i, run_id in enumerate(sint64_run_ids)}
-            )
+            params.update(in_params)
 
         # Filter by statuses
         if statuses is not None:
@@ -1111,17 +1103,17 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if flwr_aids is not None:
             if not flwr_aids:
                 return []
-            placeholders = ",".join([f":aid_{i}" for i in range(len(flwr_aids))])
+            placeholders, in_params = build_sql_in_params(flwr_aids, "aid")
             conditions.append(f"r.flwr_aid IN ({placeholders})")
-            params.update({f"aid_{i}": aid for i, aid in enumerate(flwr_aids)})
+            params.update(in_params)
 
         # Filter by federation IDs
         if federation_ids is not None:
             if not federation_ids:
                 return []
-            placeholders = ",".join([f":fed_{i}" for i in range(len(federation_ids))])
+            placeholders, in_params = build_sql_in_params(federation_ids, "fed")
             conditions.append(f"r.federation_id IN ({placeholders})")
-            params.update({f"fed_{i}": _id for i, _id in enumerate(federation_ids)})
+            params.update(in_params)
 
         # Construct the final query
         query = """
@@ -1151,9 +1143,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             query += " LIMIT :limit"
             params["limit"] = limit
 
-        rows = self.query(query, params)
         # Convert DB rows into domain-level `Run` objects.
-        return [_run_from_row(row) for row in rows]
+        return [_run_from_row(row) for row in self.query(query, params)]
 
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:
         """Retrieve the statuses for the specified runs."""
@@ -1162,7 +1153,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             return {}
 
         # Convert the uint64 value to sint64 for SQLite
-        placeholders = ",".join([f":rid_{i}" for i in range(len(run_ids))])
+        sint64_run_ids = [uint64_to_int64(rid) for rid in run_ids]
+        placeholders, params = build_sql_in_params(sint64_run_ids, "rid")
         query = f"""
             SELECT
                 r.run_id,
@@ -1176,7 +1168,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             JOIN task AS t ON t.task_id = r.primary_task_id
             WHERE r.run_id IN ({placeholders})
         """
-        params = {f"rid_{i}": uint64_to_int64(rid) for i, rid in enumerate(run_ids)}
         rows = self.query(query, params)
 
         return {
@@ -1213,8 +1204,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         sint_run_ids = [pair[0] for pair in run_primary_pairs]
         sint_task_ids = [pair[1] for pair in run_primary_pairs]
-        run_id_ph, run_id_params = build_params(sint_run_ids, "run_id")
-        pt_id_ph, pt_id_params = build_params(sint_task_ids, "pt_id")
+        run_id_ph, run_id_params = build_sql_in_params(sint_run_ids, "run_id")
+        pt_id_ph, pt_id_params = build_sql_in_params(sint_task_ids, "pt_id")
 
         self.query(
             f"""
@@ -1275,7 +1266,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             return
 
         # Check if any of the expired tasks is referenced as a run's primary task.
-        task_id_ph, task_id_params = build_params(
+        task_id_ph, task_id_params = build_sql_in_params(
             [uint64_to_int64(task.task_id) for task in tasks], "task_id"
         )
         rows = self.query(

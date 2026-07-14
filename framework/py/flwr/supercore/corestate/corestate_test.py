@@ -31,12 +31,13 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskEvent,
     TaskStatus,
     TaskUsage,
 )
-from flwr.supercore.constant import TaskType
+from flwr.supercore.constant import AutomationStatus, TaskType
 from flwr.supercore.date import now
 
 from . import CoreState
@@ -77,6 +78,33 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         mock_datetime.now.side_effect = timestamps
         return stack
+
+    def store_automation(  # pylint: disable=too-many-arguments
+        self,
+        state: CoreState,
+        *,
+        series_id: int,
+        federation_id: str = "@me/fed-a",
+        flwr_aid: str = "aid-a",
+        next_run_at: str | None = None,
+        fixed_interval: int | None = None,
+        max_runs: int | None = 1,
+    ) -> Automation:
+        """Store a minimal automation."""
+        return state.store_automation(
+            federation_id=federation_id,
+            flwr_aid=flwr_aid,
+            fab_id=None,
+            fab_version=None,
+            fab_hash=None,
+            override_config={},
+            federation_config=None,
+            primary_task_type=TaskType.SERVER_APP,
+            series_id=series_id,
+            next_run_at=next_run_at or now().isoformat(),
+            fixed_interval=fixed_interval,
+            max_runs=max_runs,
+        )
 
     def test_store_run_in_series_creates_id(self) -> None:
         """Storing a run in a run series should create a nonzero ID."""
@@ -156,6 +184,75 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(state.get_run_series(series_ids=[]), [])
         self.assertEqual(state.get_run_series(federation_ids=[]), [])
+
+    def test_store_list_and_stop_automation(self) -> None:
+        """Automation storage should support list, due filtering, and stop."""
+        state = self.state_factory()
+        current = now()
+        due_at = (current - timedelta(seconds=60)).isoformat()
+
+        due = self.store_automation(
+            state,
+            series_id=1,
+            next_run_at=due_at,
+            fixed_interval=60,
+        )
+        future = self.store_automation(
+            state,
+            series_id=2,
+            next_run_at=(current + timedelta(seconds=60)).isoformat(),
+        )
+        _ = self.store_automation(
+            state,
+            series_id=3,
+            federation_id="@me/fed-b",
+            next_run_at=(current - timedelta(seconds=30)).isoformat(),
+        )
+
+        self.assertEqual(due.next_run_at, due_at)
+
+        listed = state.list_automations(federation="@me/fed-a", order_by="updated_at")
+        self.assertSetEqual(
+            {automation.automation_id for automation in listed},
+            {due.automation_id, future.automation_id},
+        )
+
+        due_list = state.list_automations(
+            federation="@me/fed-a",
+            statuses=["active"],
+            due_before=current,
+            order_by="next_run_at",
+            limit=10,
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in due_list], [due.automation_id]
+        )
+        self.assertEqual(due_list[0].remaining_runs, 1)
+
+        self.assertTrue(state.stop_automation(due.automation_id))
+        self.assertFalse(state.stop_automation(due.automation_id))
+
+        stopped = state.list_automations(
+            federation="@me/fed-a",
+            statuses=[AutomationStatus.STOPPED],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in stopped], [due.automation_id]
+        )
+        self.assertEqual(stopped[0].next_run_at, due_at)
+
+    def test_store_automation_preserves_series_id_without_validation(self) -> None:
+        """Automation storage should preserve caller-provided series IDs."""
+        state = self.state_factory()
+        series_id = 123
+
+        automation = self.store_automation(
+            state, federation_id="@me/fed-b", series_id=series_id
+        )
+
+        self.assertEqual(automation.series_id, series_id)
+        self.assertEqual(automation.federation, "@me/fed-b")
 
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""

@@ -29,6 +29,7 @@ from flwr import __version__
 from flwr.common import log
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_SQLITE_DB_URL
+from flwr.supercore.error import http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink import extensions
 from flwr.superlink.federation import NoOpFederationManager
@@ -137,6 +138,9 @@ def create_app(
     extensions.configure_app(fastapi_app)
 
     validate_unique_route_operation_ids(fastapi_app)
+
+    # Apply the FlowerError translation layer last to make it outermost
+    fastapi_app.middleware("http")(http_error_translator)
 
     return fastapi_app
 
