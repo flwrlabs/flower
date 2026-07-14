@@ -19,7 +19,7 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
 
@@ -167,26 +167,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             "credentials_json": credentials_json,
             "config_json": config_json,
         }
-        with self.session():
-            self.query(
-                """
-                DELETE FROM connector
-                WHERE flwr_aid = :flwr_aid
-                  AND connector_ref = :connector_ref
-                """,
-                params,
+        self.query(
+            """
+            INSERT INTO connector (
+                flwr_aid, connector_ref, credentials_json, config_json
             )
-            self.query(
-                """
-                INSERT INTO connector (
-                    flwr_aid, connector_ref, credentials_json, config_json
-                )
-                VALUES (
-                    :flwr_aid, :connector_ref, :credentials_json, :config_json
-                )
-                """,
-                params,
+            VALUES (
+                :flwr_aid, :connector_ref, :credentials_json, :config_json
             )
+            ON CONFLICT(flwr_aid, connector_ref) DO UPDATE SET
+                credentials_json = excluded.credentials_json,
+                config_json = excluded.config_json
+            """,
+            params,
+        )
         return True
 
     def get_connector(
@@ -250,11 +244,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         state: str,
         redirect_uri: str,
         pkce_verifier: str | None,
-        expires_at: str,
+        expires_at: datetime,
     ) -> ConnectorOAuthSessionRecord | None:
         """Create and return a connector OAuth session."""
-        if not oauth_session_id or not flwr_aid or not connector_ref:
+        if (
+            not oauth_session_id
+            or not flwr_aid
+            or not connector_ref
+            or expires_at.utcoffset() is None
+        ):
             return None
+        expires_at = expires_at.astimezone(UTC)
         created_at = now()
         session = ConnectorOAuthSessionRecord(
             oauth_session_id=oauth_session_id,
@@ -264,7 +264,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             redirect_uri=redirect_uri,
             pkce_verifier=pkce_verifier,
             created_at=created_at.isoformat(),
-            expires_at=expires_at,
+            expires_at=expires_at.isoformat(),
             completed_at=None,
         )
         try:
@@ -289,7 +289,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     "redirect_uri": session.redirect_uri,
                     "pkce_verifier": session.pkce_verifier,
                     "created_at": created_at,
-                    "expires_at": session.expires_at,
+                    "expires_at": expires_at,
                     "completed_at": session.completed_at,
                 },
             )
@@ -324,52 +324,24 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Mark a pending connector OAuth session as completed."""
         if not oauth_session_id or not flwr_aid:
             return False
-        params = {"oauth_session_id": oauth_session_id, "flwr_aid": flwr_aid}
         completed_at = now()
-        with self.session():
-            rows = self.query(
-                """
-                SELECT oauth_session_id, flwr_aid, connector_ref, state,
-                       redirect_uri, pkce_verifier, created_at, expires_at,
-                       completed_at
-                FROM connector_oauth_session
-                WHERE oauth_session_id = :oauth_session_id
-                  AND flwr_aid = :flwr_aid
-                """,
-                params,
-            )
-            if not rows:
-                return False
-            session = _connector_oauth_session_from_row(rows[0])
-            if session.completed_at is not None or (
-                datetime.fromisoformat(session.expires_at) <= completed_at
-            ):
-                return False
-            update_params = {**params, "completed_at": completed_at}
-            self.query(
-                """
-                UPDATE connector_oauth_session
-                SET completed_at = :completed_at
-                WHERE oauth_session_id = :oauth_session_id
-                  AND flwr_aid = :flwr_aid
-                  AND completed_at IS NULL
-                  AND expires_at > :completed_at
-                """,
-                update_params,
-            )
-            updated = self.query(
-                """
-                SELECT completed_at
-                FROM connector_oauth_session
-                WHERE oauth_session_id = :oauth_session_id
-                  AND flwr_aid = :flwr_aid
-                """,
-                params,
-            )
-        return (
-            bool(updated)
-            and timestamp_to_iso(updated[0]["completed_at"]) == completed_at.isoformat()
+        updated = self.query(
+            """
+            UPDATE connector_oauth_session
+            SET completed_at = :completed_at
+            WHERE oauth_session_id = :oauth_session_id
+              AND flwr_aid = :flwr_aid
+              AND completed_at IS NULL
+              AND expires_at > :completed_at
+            RETURNING oauth_session_id
+            """,
+            {
+                "oauth_session_id": oauth_session_id,
+                "flwr_aid": flwr_aid,
+                "completed_at": completed_at,
+            },
         )
+        return bool(updated)
 
     def get_run_series(  # pylint: disable=R0914
         self,

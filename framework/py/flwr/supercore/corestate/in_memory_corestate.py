@@ -20,7 +20,7 @@ import secrets
 from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from threading import Lock
 from typing import Literal, cast
@@ -213,11 +213,17 @@ class InMemoryCoreState(
         state: str,
         redirect_uri: str,
         pkce_verifier: str | None,
-        expires_at: str,
+        expires_at: datetime,
     ) -> ConnectorOAuthSessionRecord | None:
         """Create and return a connector OAuth session."""
-        if not oauth_session_id or not flwr_aid or not connector_ref:
+        if (
+            not oauth_session_id
+            or not flwr_aid
+            or not connector_ref
+            or expires_at.utcoffset() is None
+        ):
             return None
+        expires_at = expires_at.astimezone(UTC)
         session = ConnectorOAuthSessionRecord(
             oauth_session_id=oauth_session_id,
             flwr_aid=flwr_aid,
@@ -226,7 +232,7 @@ class InMemoryCoreState(
             redirect_uri=redirect_uri,
             pkce_verifier=pkce_verifier,
             created_at=now().isoformat(),
-            expires_at=expires_at,
+            expires_at=expires_at.isoformat(),
             completed_at=None,
         )
         with self.lock_connector_oauth_session_store:

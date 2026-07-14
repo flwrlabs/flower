@@ -18,7 +18,7 @@
 # pylint: disable=too-many-lines
 import unittest
 from contextlib import ExitStack
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any, cast
 from unittest.mock import patch
 
@@ -147,7 +147,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_connector_oauth_session_create_and_get(self) -> None:
         """OAuth session creation should preserve data and account isolation."""
         state = self.state_factory()
-        expires_at = (now() + timedelta(minutes=10)).isoformat()
+        expires_at = (now() + timedelta(minutes=10)).astimezone(
+            timezone(timedelta(hours=2))
+        )
+        expected_expires_at = expires_at.astimezone(UTC).isoformat()
 
         session = state.create_connector_oauth_session(
             oauth_session_id="session-1",
@@ -168,7 +171,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertIsNone(session.pkce_verifier)
         self.assertIsInstance(session.created_at, str)
         self.assertIsNotNone(datetime.fromisoformat(session.created_at).tzinfo)
-        self.assertEqual(session.expires_at, expires_at)
+        self.assertEqual(session.expires_at, expected_expires_at)
         self.assertIsNone(session.completed_at)
         self.assertEqual(
             state.get_connector_oauth_session(
@@ -210,6 +213,28 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             session,
         )
 
+    def test_connector_oauth_session_rejects_naive_expiry(self) -> None:
+        """OAuth session creation should reject a timezone-naive expiry."""
+        state = self.state_factory()
+        expires_at = (now() + timedelta(minutes=10)).replace(tzinfo=None)
+
+        self.assertIsNone(
+            state.create_connector_oauth_session(
+                oauth_session_id="invalid-session",
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                state="oauth-state",
+                redirect_uri="https://example.test/callback",
+                pkce_verifier=None,
+                expires_at=expires_at,
+            )
+        )
+        self.assertIsNone(
+            state.get_connector_oauth_session(
+                oauth_session_id="invalid-session", flwr_aid="account-a"
+            )
+        )
+
     def test_complete_connector_oauth_session(self) -> None:
         """Only pending, unexpired OAuth sessions should be completed once."""
         state = self.state_factory()
@@ -220,7 +245,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state="oauth-state",
             redirect_uri="https://example.test/callback",
             pkce_verifier="pkce-verifier",
-            expires_at=(now() + timedelta(minutes=10)).isoformat(),
+            expires_at=now() + timedelta(minutes=10),
         )
         assert session is not None
 
@@ -262,7 +287,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state="expired-state",
             redirect_uri="https://example.test/callback",
             pkce_verifier=None,
-            expires_at=(now() - timedelta(seconds=1)).isoformat(),
+            expires_at=now() - timedelta(seconds=1),
         )
         assert expired is not None
         self.assertFalse(
