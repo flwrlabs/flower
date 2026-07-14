@@ -124,7 +124,6 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
 # Default federation names for every Flower account
 DEFAULT_FEDERATION_SIMULATION = "workspace"
 
-
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
 TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
@@ -186,6 +185,15 @@ class InvitationStatus(StrEnum):
     REJECTED = "rejected"
     REVOKED = "revoked"
     EXPIRED = "expired"
+
+
+class AutomationStatus(StrEnum):
+    """Status of an automation."""
+
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    STOPPED = "stopped"
 
 
 class RunTime(StrEnum):

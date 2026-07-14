@@ -124,7 +124,7 @@ def create_corestate_metadata() -> MetaData:
         Column("primary_task_type", String, nullable=False),
         Column("created_at", TIMESTAMP(timezone=True), nullable=False),
         Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
-        Column("next_run_at", TIMESTAMP(timezone=True), nullable=True),
+        Column("next_run_at", TIMESTAMP(timezone=True), nullable=False),
         Column("fixed_interval", BigInteger, nullable=True),
         Column("remaining_runs", Integer, nullable=True),
         Column("stopped_at", TIMESTAMP(timezone=True), nullable=True),
