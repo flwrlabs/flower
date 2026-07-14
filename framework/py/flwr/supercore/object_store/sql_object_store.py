@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower SQLAlchemy-based ObjectStore implementation."""
 
-
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -30,7 +29,7 @@ from flwr.supercore.inflatable.inflatable_object import (
 from flwr.supercore.inflatable.inflatable_utils import validate_object_content
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.objectstore_tables import create_objectstore_metadata
-from flwr.supercore.utils import uint64_to_int64
+from flwr.supercore.utils import build_sql_in_params, uint64_to_int64
 
 from .object_store import NoObjectInStoreError, ObjectStore
 
@@ -230,8 +229,7 @@ class SqlObjectStore(ObjectStore, SqlMixin):
                 return
 
             if child_ids:
-                placeholders = ", ".join(f":cid{i}" for i in range(len(child_ids)))
-                params = {f"cid{i}": cid for i, cid in enumerate(child_ids)}
+                placeholders, params = build_sql_in_params(child_ids, "cid")
                 self.query(
                     "UPDATE objects SET ref_count = ref_count - 1 "
                     f"WHERE object_id IN ({placeholders}) AND ref_count > 0",

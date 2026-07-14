@@ -14,7 +14,6 @@
 # ==============================================================================
 """Utility functions for the infrastructure."""
 
-
 import ctypes
 import json
 import os
@@ -124,6 +123,15 @@ def int64_to_uint64(signed: int) -> int:
     if signed < 0:
         return signed + (1 << 64)
     return signed
+
+
+def build_sql_in_params(
+    values: Iterable[Any], prefix: str
+) -> tuple[str, dict[str, Any]]:
+    """Build SQL IN-clause placeholders and a matching parameter dictionary."""
+    params = {f"{prefix}_{i}": value for i, value in enumerate(values)}
+    placeholders = ",".join(f":{key}" for key in params)
+    return placeholders, params
 
 
 def get_flwr_home() -> Path:

@@ -14,7 +14,6 @@
 # ==============================================================================
 """SQLAlchemy-based CoreState implementation."""
 
-
 # pylint: disable=too-many-lines
 import hashlib
 import json
@@ -58,7 +57,11 @@ from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
-from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
+from flwr.supercore.utils import (
+    build_sql_in_params,
+    int64_to_uint64,
+    uint64_to_int64,
+)
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -165,17 +168,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         params: dict[str, Any] = {}
         if series_ids is not None:
             sint64_series_ids = [uint64_to_int64(series_id) for series_id in series_ids]
-            placeholders = ",".join(
-                [f":sid_{i}" for i in range(len(sint64_series_ids))]
-            )
+            placeholders, in_params = build_sql_in_params(sint64_series_ids, "sid")
             conditions.append(f"series_id IN ({placeholders})")
-            params.update(
-                {f"sid_{i}": series_id for i, series_id in enumerate(sint64_series_ids)}
-            )
+            params.update(in_params)
         if federation_ids is not None:
-            placeholders = ",".join([f":fed_{i}" for i in range(len(federation_ids))])
+            placeholders, in_params = build_sql_in_params(federation_ids, "fed")
             conditions.append(f"federation_id IN ({placeholders})")
-            params.update({f"fed_{i}": _id for i, _id in enumerate(federation_ids)})
+            params.update(in_params)
         if updated_before is not None:
             conditions.append("updated_at < :updated_before")
             params["updated_before"] = datetime.fromisoformat(updated_before)
@@ -454,21 +453,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if not task_ids:
                 return []
             sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            placeholders = ",".join([f":tid_{i}" for i in range(len(sint64_task_ids))])
+            placeholders, in_params = build_sql_in_params(sint64_task_ids, "tid")
             conditions.append(f"task_id IN ({placeholders})")
-            params.update(
-                {f"tid_{i}": task_id for i, task_id in enumerate(sint64_task_ids)}
-            )
+            params.update(in_params)
 
         if run_ids is not None:
             if not run_ids:
                 return []
             sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            placeholders = ",".join([f":rid_{i}" for i in range(len(sint64_run_ids))])
+            placeholders, in_params = build_sql_in_params(sint64_run_ids, "rid")
             conditions.append(f"run_id IN ({placeholders})")
-            params.update(
-                {f"rid_{i}": run_id for i, run_id in enumerate(sint64_run_ids)}
-            )
+            params.update(in_params)
 
         if statuses is not None:
             if not statuses:
@@ -541,21 +536,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if not run_ids:
                 return []
             sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            placeholders = ",".join([f":rid_{i}" for i in range(len(sint64_run_ids))])
+            placeholders, in_params = build_sql_in_params(sint64_run_ids, "rid")
             conditions.append(f"run_id IN ({placeholders})")
-            params.update(
-                {f"rid_{i}": run_id for i, run_id in enumerate(sint64_run_ids)}
-            )
+            params.update(in_params)
 
         if task_ids is not None:
             if not task_ids:
                 return []
             sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            placeholders = ",".join([f":tid_{i}" for i in range(len(sint64_task_ids))])
+            placeholders, in_params = build_sql_in_params(sint64_task_ids, "tid")
             conditions.append(f"task_id IN ({placeholders})")
-            params.update(
-                {f"tid_{i}": task_id for i, task_id in enumerate(sint64_task_ids)}
-            )
+            params.update(in_params)
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
@@ -851,13 +842,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         # Filter by destination task IDs
         if dst_task_ids is not None:
             sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
-            placeholders = ",".join(
-                f":dtid_{i}" for i in range(len(sint64_dst_task_ids))
-            )
+            placeholders, in_params = build_sql_in_params(sint64_dst_task_ids, "dtid")
             conditions.append(f"dst_task_id IN ({placeholders})")
-            params.update(
-                {f"dtid_{i}": tid for i, tid in enumerate(sint64_dst_task_ids)}
-            )
+            params.update(in_params)
 
         where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
         order_clause = f"ORDER BY {order_by}" if order_by else ""
