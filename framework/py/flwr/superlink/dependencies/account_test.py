@@ -79,7 +79,7 @@ def test_account_access_dependency_refreshes_tokens_and_sets_response_headers() 
 
     assert result is account
     assert response.headers.get("x-access-token") == "new-token"
-    assert (b"x-refresh-token", b"new-refresh") in response.raw_headers
+    assert response.headers.get("x-refresh-token") == "new-refresh"
     authz_plugin.authorize.assert_called_once_with(account)
 
 

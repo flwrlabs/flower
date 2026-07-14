@@ -98,11 +98,8 @@ class AccountAccessDependency:
     ) -> None:
         """Add refreshed authentication tokens to the HTTP response."""
         for key, value in tokens:
-            response.raw_headers.append(
-                (
-                    key.encode("latin-1"),
-                    value if isinstance(value, bytes) else value.encode("latin-1"),
-                )
+            response.headers[key] = (
+                value.decode("latin-1") if isinstance(value, bytes) else value
             )
 
 
