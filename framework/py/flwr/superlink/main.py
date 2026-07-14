@@ -142,7 +142,7 @@ def create_app(
     # fastapi_app.include_router(health.router)
 
     # SuperLink APIs
-    # fastapi_app.include_router(control_router)
+    # fastapi_app.include_router(control.router)
     # fastapi_app.include_router(runtime.router)
 
     # Extension hooks
