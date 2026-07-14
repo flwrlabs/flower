@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-10 00:27+0000\n"
+"POT-Creation-Date: 2026-07-14 00:19+0000\n"
 "PO-Revision-Date: 2026-05-23 06:54+0000\n"
 "Last-Translator: Gustavo Bertoli <gubertoli@gmail.com>\n"
 "Language: pt_BR\n"
@@ -380,17 +380,16 @@ msgstr "Argumento de compilação"
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #: ../../source/how-to-configure-audit-logging.rst:58
 #: ../../source/ref-exit-codes/0.rst:7 ../../source/ref-exit-codes/1.rst:7
-#: ../../source/ref-exit-codes/100.rst:7 ../../source/ref-exit-codes/101.rst:7
-#: ../../source/ref-exit-codes/102.rst:7 ../../source/ref-exit-codes/103.rst:7
-#: ../../source/ref-exit-codes/104.rst:7 ../../source/ref-exit-codes/105.rst:7
-#: ../../source/ref-exit-codes/2.rst:7 ../../source/ref-exit-codes/200.rst:23
-#: ../../source/ref-exit-codes/201.rst:7 ../../source/ref-exit-codes/202.rst:7
-#: ../../source/ref-exit-codes/203.rst:7 ../../source/ref-exit-codes/250.rst:7
-#: ../../source/ref-exit-codes/3.rst:7 ../../source/ref-exit-codes/302.rst:7
-#: ../../source/ref-exit-codes/303.rst:7 ../../source/ref-exit-codes/304.rst:7
-#: ../../source/ref-exit-codes/400.rst:7 ../../source/ref-exit-codes/401.rst:7
-#: ../../source/ref-exit-codes/402.rst:7 ../../source/ref-exit-codes/500.rst:7
-#: ../../source/ref-exit-codes/600.rst:7 ../../source/ref-exit-codes/601.rst:7
+#: ../../source/ref-exit-codes/101.rst:7 ../../source/ref-exit-codes/102.rst:7
+#: ../../source/ref-exit-codes/103.rst:7 ../../source/ref-exit-codes/104.rst:7
+#: ../../source/ref-exit-codes/105.rst:7 ../../source/ref-exit-codes/2.rst:7
+#: ../../source/ref-exit-codes/200.rst:23 ../../source/ref-exit-codes/201.rst:7
+#: ../../source/ref-exit-codes/202.rst:7 ../../source/ref-exit-codes/203.rst:7
+#: ../../source/ref-exit-codes/250.rst:7 ../../source/ref-exit-codes/3.rst:7
+#: ../../source/ref-exit-codes/302.rst:7 ../../source/ref-exit-codes/303.rst:7
+#: ../../source/ref-exit-codes/304.rst:7 ../../source/ref-exit-codes/400.rst:7
+#: ../../source/ref-exit-codes/401.rst:7 ../../source/ref-exit-codes/402.rst:7
+#: ../../source/ref-exit-codes/500.rst:7 ../../source/ref-exit-codes/600.rst:7
 #: ../../source/ref-exit-codes/602.rst:7 ../../source/ref-exit-codes/603.rst:7
 #: ../../source/ref-exit-codes/604.rst:7 ../../source/ref-exit-codes/605.rst:7
 #: ../../source/ref-exit-codes/606.rst:7 ../../source/ref-exit-codes/607.rst:7
@@ -632,14 +631,14 @@ msgid ""
 "those translations! This might also be a great opportunity for those "
 "wanting to become open source contributors with little prerequisites."
 msgstr ""
-"Desde o `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_ nós introduzimos traduções para "
-"nossas páginas de documentação, mas, como você pode ter notado, as "
-"traduções são muitas vezes imperfeitas. Se você fala línguas diferentes "
-"do inglês, você pode ser capaz de nos ajudar neste esforço para tornar o "
-"aprendizado federado acessível a tantas pessoas quanto possível, "
-"contribuindo para essas traduções! Isso também pode ser uma grande "
-"oportunidade para aqueles que querem se tornar contribuintes de código "
-"aberto com poucos pré-requisitos."
+"Desde o `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_ nós "
+"introduzimos traduções para nossas páginas de documentação, mas, como "
+"você pode ter notado, as traduções são muitas vezes imperfeitas. Se você "
+"fala línguas diferentes do inglês, você pode ser capaz de nos ajudar "
+"neste esforço para tornar o aprendizado federado acessível a tantas "
+"pessoas quanto possível, contribuindo para essas traduções! Isso também "
+"pode ser uma grande oportunidade para aqueles que querem se tornar "
+"contribuintes de código aberto com poucos pré-requisitos."
 
 #: ../../source/contributor-how-to-contribute-translations.rst:12
 #, fuzzy
@@ -18371,44 +18370,53 @@ msgstr "O nome do repositório da imagem base."
 msgid "Classes"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 msgid ":py:obj:`AgentApp <flwr.agentapp.AgentApp>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #: flwr.agentapp.agent_app.AgentApp:1 of
 #, fuzzy
 msgid "Flower AgentApp."
 msgstr "O nome do repositório da imagem base."
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+msgid ":py:obj:`AgentConnectors <flwr.agentapp.AgentConnectors>`\\ \\(\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: flwr.agentapp.base.AgentConnectors:1 of
+msgid "Abstract base class for AgentApp connector execution."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 msgid ":py:obj:`AgentResponses <flwr.agentapp.AgentResponses>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #: flwr.agentapp.base.AgentResponses:1 of
 msgid "Abstract base class for AgentApp model response creation."
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 msgid ":py:obj:`AgentSession <flwr.agentapp.AgentSession>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #: flwr.agentapp.base.AgentSession:1 of
 msgid "Abstract base class for AgentApp runtime capabilities."
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:31
+#: ../../source/ref-api/flwr.agentapp.rst:32
 #, fuzzy
 msgid "Exceptions"
 msgstr "Descrição"
 
-#: ../../source/ref-api/flwr.agentapp.rst:35:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:36:<autosummary>:1
 msgid ":py:obj:`LoadAgentAppError <flwr.agentapp.LoadAgentAppError>`\\"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:35:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:36:<autosummary>:1
 #: flwr.agentapp.agent_app.LoadAgentAppError:1 of
 msgid "Error when trying to load `AgentApp`."
 msgstr ""
@@ -18481,6 +18489,7 @@ msgid "Define an AgentApp with a single main function::"
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentApp.rst:15
+#: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentSession.rst:15
 #: ../../source/ref-api/flwr.app.Array.rst:15
@@ -18601,17 +18610,40 @@ msgstr ""
 msgid "Return a decorator that registers the main fn with the agent app."
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2
-msgid "AgentResponses"
+#: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:2
+#, fuzzy
+msgid "AgentConnectors"
 msgstr ""
 
-#: flwr.agentapp.base.AgentResponses:1 flwr.agentapp.base.AgentSession:1
-#: flwr.compat.client.client.Client:1
+#: flwr.agentapp.base.AgentConnectors:1 flwr.agentapp.base.AgentResponses:1
+#: flwr.agentapp.base.AgentSession:1 flwr.compat.client.client.Client:1
 #: flwr.compat.client.numpy_client.NumPyClient:1
 #: flwr.server.client_manager.ClientManager:1
 #: flwr.server.strategy.strategy.Strategy:1 flwr.serverapp.grid.grid.Grid:1
 #: flwr.serverapp.strategy.strategy.Strategy:1 of
 msgid "Bases: :py:class:`~abc.ABC`"
+msgstr ""
+
+#: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
+msgid ":py:obj:`call <flwr.agentapp.AgentConnectors.call>`\\ \\(tool\\_call\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentConnectors.call:1
+#: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
+msgid "Execute one model function_call and return a function_call_output item."
+msgstr ""
+
+#: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
+msgid ":py:obj:`tools <flwr.agentapp.AgentConnectors.tools>`\\ \\(names\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1
+#: flwr.agentapp.base.AgentConnectors.tools:1 of
+msgid "Return model-facing tool schemas for built-in connectors."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2
+msgid "AgentResponses"
 msgstr ""
 
 #: flwr.agentapp.base.AgentResponses.create:1:<autosummary>:1 of
@@ -18625,10 +18657,7 @@ msgid "Create a model response."
 msgstr "``FLWR_VERSION``"
 
 #: flwr.agentapp.base.AgentResponses.create:3 of
-msgid ""
-"Open Responses-compatible create request. Built-in connector tools can be"
-" requested by name in ``tools``, for example ``[\"web_search\"]``. Built-"
-"in connector names are reserved for runtime-managed tools."
+msgid "Open Responses-compatible create request."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst
@@ -18686,7 +18715,7 @@ msgstr ""
 msgid "Returns"
 msgstr ""
 
-#: flwr.agentapp.base.AgentResponses.create:9 of
+#: flwr.agentapp.base.AgentResponses.create:6 of
 msgid "**response** -- Open Responses-compatible response."
 msgstr ""
 
@@ -18801,12 +18830,21 @@ msgstr ""
 msgid "Attributes"
 msgstr ""
 
-#: flwr.agentapp.AgentSession.responses:1:<autosummary>:1 of
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
+msgid ":py:obj:`connectors <flwr.agentapp.AgentSession.connectors>`\\"
+msgstr ""
+
+#: flwr.agentapp.AgentSession.connectors:1
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
+msgid "Connector tool schema and execution API."
+msgstr ""
+
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 msgid ":py:obj:`responses <flwr.agentapp.AgentSession.responses>`\\"
 msgstr ""
 
-#: flwr.agentapp.AgentSession.responses:1
-#: flwr.agentapp.AgentSession.responses:1:<autosummary>:1 of
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
+#: flwr.agentapp.AgentSession.responses:1 of
 msgid "Model response creation API."
 msgstr ""
 
@@ -41108,80 +41146,6 @@ msgstr ""
 msgid "The process exited gracefully, triggered by ``SIGINT``."
 msgstr ""
 
-#: ../../source/ref-exit-codes/100.rst:3
-msgid "[100] SUPERLINK_THREAD_CRASH"
-msgstr ""
-
-#: ../../source/ref-exit-codes/100.rst:9
-msgid ""
-"A critical background thread has crashed in the SuperLink, causing it to "
-"exit prematurely. This indicates a serious issue with the SuperLink that "
-"requires immediate investigation."
-msgstr ""
-
-#: ../../source/ref-exit-codes/100.rst:13
-msgid "Critical background threads include:"
-msgstr ""
-
-#: ../../source/ref-exit-codes/100.rst:15
-msgid ""
-"**Scheduler**: Schedules the execution of runs. This thread exists only "
-"when the isolation mode is set to ``subprocess`` (default)."
-msgstr ""
-
-#: ../../source/ref-exit-codes/100.rst:17
-msgid ""
-"**REST API server**: Manages the REST API server. This thread exists only"
-" when the Fleet API type is set to ``rest``."
-msgstr ""
-
-#: ../../source/ref-exit-codes/100.rst:22
-#: ../../source/ref-exit-codes/101.rst:20
-#: ../../source/ref-exit-codes/102.rst:13
-#: ../../source/ref-exit-codes/103.rst:13
-#: ../../source/ref-exit-codes/104.rst:13
-#: ../../source/ref-exit-codes/105.rst:17
-#: ../../source/ref-exit-codes/200.rst:32
-#: ../../source/ref-exit-codes/201.rst:13
-#: ../../source/ref-exit-codes/202.rst:13
-#: ../../source/ref-exit-codes/203.rst:15
-#: ../../source/ref-exit-codes/250.rst:14
-#: ../../source/ref-exit-codes/302.rst:15
-#: ../../source/ref-exit-codes/303.rst:14
-#: ../../source/ref-exit-codes/304.rst:15
-#: ../../source/ref-exit-codes/400.rst:14
-#: ../../source/ref-exit-codes/401.rst:13
-#: ../../source/ref-exit-codes/402.rst:14
-#: ../../source/ref-exit-codes/500.rst:17
-#: ../../source/ref-exit-codes/600.rst:14
-#: ../../source/ref-exit-codes/601.rst:13
-#: ../../source/ref-exit-codes/602.rst:17
-#: ../../source/ref-exit-codes/603.rst:14
-#: ../../source/ref-exit-codes/604.rst:13
-#: ../../source/ref-exit-codes/605.rst:13
-#: ../../source/ref-exit-codes/606.rst:13
-#: ../../source/ref-exit-codes/607.rst:15
-#: ../../source/ref-exit-codes/608.rst:13
-#: ../../source/ref-exit-codes/700.rst:13
-#: ../../source/ref-exit-codes/701.rst:13
-#: ../../source/ref-exit-codes/800.rst:13
-msgid "How to Resolve"
-msgstr ""
-
-#: ../../source/ref-exit-codes/100.rst:24
-msgid "Check the logs for any errors that may have caused the thread to crash."
-msgstr ""
-
-#: ../../source/ref-exit-codes/100.rst:25
-msgid "Ensure the SuperLink's configuration is correct."
-msgstr ""
-
-#: ../../source/ref-exit-codes/100.rst:26
-#: ../../source/ref-exit-codes/101.rst:25
-#: ../../source/ref-exit-codes/103.rst:19
-msgid "If the issue persists, please contact support for further assistance."
-msgstr ""
-
 #: ../../source/ref-exit-codes/101.rst:3
 msgid "[101] SUPERLINK_LICENSE_INVALID"
 msgstr ""
@@ -41212,6 +41176,37 @@ msgid ""
 "its signature failed verification against signing key."
 msgstr ""
 
+#: ../../source/ref-exit-codes/101.rst:20
+#: ../../source/ref-exit-codes/102.rst:13
+#: ../../source/ref-exit-codes/103.rst:13
+#: ../../source/ref-exit-codes/104.rst:13
+#: ../../source/ref-exit-codes/105.rst:17
+#: ../../source/ref-exit-codes/200.rst:32
+#: ../../source/ref-exit-codes/201.rst:13
+#: ../../source/ref-exit-codes/202.rst:13
+#: ../../source/ref-exit-codes/203.rst:15
+#: ../../source/ref-exit-codes/250.rst:14
+#: ../../source/ref-exit-codes/302.rst:15
+#: ../../source/ref-exit-codes/303.rst:14
+#: ../../source/ref-exit-codes/304.rst:15
+#: ../../source/ref-exit-codes/400.rst:14
+#: ../../source/ref-exit-codes/401.rst:13
+#: ../../source/ref-exit-codes/402.rst:14
+#: ../../source/ref-exit-codes/500.rst:17
+#: ../../source/ref-exit-codes/600.rst:14
+#: ../../source/ref-exit-codes/602.rst:17
+#: ../../source/ref-exit-codes/603.rst:14
+#: ../../source/ref-exit-codes/604.rst:13
+#: ../../source/ref-exit-codes/605.rst:13
+#: ../../source/ref-exit-codes/606.rst:13
+#: ../../source/ref-exit-codes/607.rst:15
+#: ../../source/ref-exit-codes/608.rst:13
+#: ../../source/ref-exit-codes/700.rst:13
+#: ../../source/ref-exit-codes/701.rst:13
+#: ../../source/ref-exit-codes/800.rst:13
+msgid "How to Resolve"
+msgstr ""
+
 #: ../../source/ref-exit-codes/101.rst:22
 msgid "Ensure that the ``FLWR_LICENSE_KEY`` is valid."
 msgstr ""
@@ -41220,6 +41215,11 @@ msgstr ""
 msgid ""
 "Ensure that the correct public key endpoint is used and is reachable by "
 "the SuperLink."
+msgstr ""
+
+#: ../../source/ref-exit-codes/101.rst:25
+#: ../../source/ref-exit-codes/103.rst:19
+msgid "If the issue persists, please contact support for further assistance."
 msgstr ""
 
 #: ../../source/ref-exit-codes/102.rst:3
@@ -41721,18 +41721,6 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/600.rst:19
 msgid "IPv6 (e.g., ``[2001:0db8::1]:9092``)"
-msgstr ""
-
-#: ../../source/ref-exit-codes/601.rst:3
-msgid "[601] COMMON_MISSING_EXTRA_REST"
-msgstr ""
-
-#: ../../source/ref-exit-codes/601.rst:9
-msgid "Dependencies required for using the REST-based Fleet API are missing."
-msgstr ""
-
-#: ../../source/ref-exit-codes/601.rst:15
-msgid "Reinstall or upgrade ``flwr``, then retry:"
 msgstr ""
 
 #: ../../source/ref-exit-codes/602.rst:3
@@ -88026,3 +88014,56 @@ msgstr ""
 #~ "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 #~ " Let's run the project:"
 #~ msgstr ""
+
+#~ msgid "[100] SUPERLINK_THREAD_CRASH"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A critical background thread has crashed"
+#~ " in the SuperLink, causing it to "
+#~ "exit prematurely. This indicates a "
+#~ "serious issue with the SuperLink that"
+#~ " requires immediate investigation."
+#~ msgstr ""
+
+#~ msgid "Critical background threads include:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "**Scheduler**: Schedules the execution of "
+#~ "runs. This thread exists only when "
+#~ "the isolation mode is set to "
+#~ "``subprocess`` (default)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "**REST API server**: Manages the REST"
+#~ " API server. This thread exists only"
+#~ " when the Fleet API type is set"
+#~ " to ``rest``."
+#~ msgstr ""
+
+#~ msgid "Check the logs for any errors that may have caused the thread to crash."
+#~ msgstr ""
+
+#~ msgid "Ensure the SuperLink's configuration is correct."
+#~ msgstr ""
+
+#~ msgid "[601] COMMON_MISSING_EXTRA_REST"
+#~ msgstr ""
+
+#~ msgid "Dependencies required for using the REST-based Fleet API are missing."
+#~ msgstr ""
+
+#~ msgid "Reinstall or upgrade ``flwr``, then retry:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Open Responses-compatible create request. "
+#~ "Built-in connector tools can be "
+#~ "requested by name in ``tools``, for "
+#~ "example ``[\"web_search\"]``. Built-in "
+#~ "connector names are reserved for "
+#~ "runtime-managed tools."
+#~ msgstr ""
+
