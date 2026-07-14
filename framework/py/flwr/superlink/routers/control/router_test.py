@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for the Control API router."""
 
+
 from datetime import datetime
 from unittest.mock import Mock
 
