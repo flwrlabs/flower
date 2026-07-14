@@ -64,6 +64,21 @@ service Control {
   // Get auth tokens upon request
   rpc GetAuthTokens(GetAuthTokensRequest) returns (GetAuthTokensResponse) {}
 
+  // List OAuth connectors available to the authenticated account
+  rpc ListConnectors(ListConnectorsRequest) returns (ListConnectorsResponse) {}
+
+  // Disconnect connector credentials for the authenticated account
+  rpc DisconnectConnector(DisconnectConnectorRequest)
+      returns (DisconnectConnectorResponse) {}
+
+  // Begin OAuth connector authorization flow
+  rpc BeginConnectorOAuth(BeginConnectorOAuthRequest)
+      returns (BeginConnectorOAuthResponse) {}
+
+  // Complete OAuth connector authorization flow
+  rpc CompleteConnectorOAuth(CompleteConnectorOAuthRequest)
+      returns (CompleteConnectorOAuthResponse) {}
+
   // Pull artifacts generated during a run (flwr pull)
   rpc PullArtifacts(PullArtifactsRequest) returns (PullArtifactsResponse) {}
 
@@ -170,7 +185,7 @@ message Automation {
   string flwr_aid = 5;
   string created_at = 6;
   string updated_at = 7;
-  optional string next_run_at = 8;
+  string next_run_at = 8;
   optional uint64 fixed_interval = 9;
   optional uint32 remaining_runs = 10;
   optional string stopped_at = 11;
@@ -224,6 +239,36 @@ message GetAuthTokensResponse {
   string access_token = 1;
   string refresh_token = 2;
 }
+
+message ListConnectorsRequest {}
+message Connector {
+  string connector_ref = 1;
+  string display_name = 2;
+  string description = 3;
+  bool connected = 4;
+}
+message ListConnectorsResponse { repeated Connector connectors = 1; }
+
+message DisconnectConnectorRequest { string connector_ref = 1; }
+message DisconnectConnectorResponse {}
+
+message BeginConnectorOAuthRequest {
+  string connector_ref = 1;
+  string redirect_uri = 2;
+}
+message BeginConnectorOAuthResponse {
+  string oauth_session_id = 1;
+  string authorization_url = 2;
+  string connector_ref = 3;
+  string expires_at = 4;
+}
+
+message CompleteConnectorOAuthRequest {
+  string oauth_session_id = 1;
+  string code = 2;
+  string state = 3;
+}
+message CompleteConnectorOAuthResponse { string connector_ref = 1; }
 
 message StopRunRequest { uint64 run_id = 1; }
 message StopRunResponse { bool success = 1; }

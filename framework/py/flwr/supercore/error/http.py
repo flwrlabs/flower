@@ -15,11 +15,12 @@
 """HTTP-specific translation utilities for Flower API errors."""
 
 
-from collections.abc import Iterator
-from contextlib import contextmanager
 from logging import ERROR
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, Response, status
+from fastapi.exception_handlers import http_exception_handler
+from starlette.datastructures import State
+from starlette.middleware.base import RequestResponseEndpoint
 
 from flwr.common.logger import log
 
@@ -29,11 +30,12 @@ from .catalog import API_ERROR_MAP
 INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error."
 
 
-@contextmanager
-def http_error_translator(route_name: str) -> Iterator[None]:
-    """Translate FlowerError into a sanitized HTTP error."""
+async def http_error_translator(
+    request: Request[State], call_next: RequestResponseEndpoint
+) -> Response:
+    """Translate FlowerError into a sanitized HTTP response."""
     try:
-        yield
+        return await call_next(request)
     except FlowerError as err:
         try:
             error_spec = API_ERROR_MAP[err.code]
@@ -44,20 +46,21 @@ def http_error_translator(route_name: str) -> Iterator[None]:
             public_message = INTERNAL_SERVER_ERROR_MESSAGE
 
         # Log error as is
-        msg = f"[{route_name}][ApiError:{err.code}] {err.message}"
+        msg = f"[{request.url.path}][ApiError:{err.code}] {err.message}"
         log(ERROR, msg)
         # Return sanitized error to client
-        raise HTTPException(
+        return Response(
             status_code=http_status,
-            detail=err.to_json(public_message),
-        ) from None
-    except HTTPException:
-        raise
-    except Exception as err:
+            content=err.to_json(public_message),
+            media_type="application/json",
+        )
+    except HTTPException as err:
+        return await http_exception_handler(request, err)
+    except Exception as err:  # pylint: disable=broad-exception-caught
         # Log unexpected exceptions and translate into INTERNAL
-        msg = f"[{route_name}][UnexpectedError:{type(err).__name__}] {err}"
+        msg = f"[{request.url.path}][UnexpectedError:{type(err).__name__}] {err}"
         log(ERROR, msg)
-        raise HTTPException(
+        return Response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=INTERNAL_SERVER_ERROR_MESSAGE,
-        ) from None
+            content=INTERNAL_SERVER_ERROR_MESSAGE,
+        )
