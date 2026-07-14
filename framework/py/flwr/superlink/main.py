@@ -20,7 +20,6 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
 from logging import INFO
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
@@ -36,8 +35,6 @@ from flwr.superlink import extensions
 from flwr.superlink.auth_plugin import (
     ControlAuthnPlugin,
     ControlAuthzPlugin,
-    NoOpControlAuthnPlugin,
-    NoOpControlAuthzPlugin,
 )
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.federation import NoOpFederationManager
