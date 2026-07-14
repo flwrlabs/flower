@@ -37,6 +37,23 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Return the ObjectStore instance used by this CoreState."""
 
     @abstractmethod
+    def start_session(self, run_id: int) -> str:
+        """Start a run-scoped object push session."""
+
+    @abstractmethod
+    def preregister_object_tree(
+        self, object_tree: ObjectTree, session_id: str
+    ) -> list[str]:
+        """Preregister an object tree and record its missing objects."""
+
+    @abstractmethod
+    def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
+        """Remove an object push session and optionally its messages."""
+
+    def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
+        """Handle message metadata belonging to an expired push session."""
+
+    @abstractmethod
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB and return its canonical SHA-256 hash."""
 

@@ -31,6 +31,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskEvent,
     TaskStatus,
@@ -77,6 +78,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         mock_datetime.now.side_effect = timestamps
         return stack
+
+    def test_preregister_object_tree(self) -> None:
+        """Preregistering an object tree returns its missing objects."""
+        state = self.state_factory()
+        object_id = "a" * 64
+        object_tree = ObjectTree(object_id=object_id)
+        run_id = self.task_run_id(state)
+
+        missing_objects = state.preregister_object_tree(
+            object_tree, state.start_session(run_id)
+        )
+        replacement_missing_objects = state.preregister_object_tree(
+            object_tree, state.start_session(run_id)
+        )
+
+        self.assertEqual(missing_objects, [object_id])
+        self.assertEqual(replacement_missing_objects, [object_id])
 
     def test_store_run_in_series_creates_id(self) -> None:
         """Storing a run in a run series should create a nonzero ID."""

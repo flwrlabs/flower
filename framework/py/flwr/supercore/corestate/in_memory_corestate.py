@@ -22,8 +22,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from logging import ERROR
-from threading import Lock
+from threading import Lock, RLock
 from typing import Literal, cast
+from uuid import uuid4
 
 from flwr.app import Context, Message
 from flwr.common.constant import (
@@ -36,6 +37,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.logger import log
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     Task,
@@ -43,6 +45,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
+from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 
@@ -73,6 +76,16 @@ class TaskUsageRecord:
     usage: TaskUsage
     created_at: datetime
     reported_at: datetime | None
+
+
+@dataclass
+class ObjectPushSession:
+    """In-memory object push session."""
+
+    run_id: int
+    expires_at: datetime
+    root_object_ids: set[str]
+    pending_object_ids: set[str]
 
 
 class InMemoryCoreState(
@@ -106,11 +119,69 @@ class InMemoryCoreState(
         self.task_event_store: dict[int, list[TaskEvent]] = {}
         self.lock_task_event_store = Lock()
         self._next_task_event_id = 1
+        self._object_push_sessions: dict[str, ObjectPushSession] = {}
+        self._object_push_session_by_root: dict[str, str] = {}
+        self._lock_object_push_sessions = RLock()
 
     @property
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
         return self._object_store
+
+    def start_session(self, run_id: int) -> str:
+        """Start a run-scoped object push session."""
+        session_id = str(uuid4())
+        with self._lock_object_push_sessions:
+            self._object_push_sessions[session_id] = ObjectPushSession(
+                run_id=run_id,
+                expires_at=now() + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS),
+                root_object_ids=set(),
+                pending_object_ids=set(),
+            )
+        return session_id
+
+    def preregister_object_tree(
+        self, object_tree: ObjectTree, session_id: str
+    ) -> list[str]:
+        """Preregister an object tree and record its missing objects."""
+        with self._lock_object_push_sessions:
+            session = self._object_push_sessions.get(session_id)
+            if session is None:
+                raise ValueError(f"Unknown object push session: {session_id}")
+
+            # Preregister the tree and collect its currently missing objects
+            missing_objects = self.object_store.preregister(session.run_id, object_tree)
+
+            # Remove bookkeeping for an older session owning the same root
+            old_session_id = self._object_push_session_by_root.get(
+                object_tree.object_id
+            )
+            if old_session_id is not None and old_session_id != session_id:
+                self._cleanup_push_session(old_session_id, cleanup_messages=False)
+
+            # Record root ownership and pending objects for the session
+            session.root_object_ids.add(object_tree.object_id)
+            session.pending_object_ids.update(missing_objects)
+            self._object_push_session_by_root[object_tree.object_id] = session_id
+            return missing_objects
+
+    def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
+        """Remove an object push session and optionally its messages."""
+        with self._lock_object_push_sessions:
+            session = self._object_push_sessions.pop(session_id, None)
+            if session is None:
+                return
+
+            # Remove root ownership entries still belonging to this session
+            for object_id in session.root_object_ids:
+                if self._object_push_session_by_root.get(object_id) == session_id:
+                    del self._object_push_session_by_root[object_id]
+
+            # Delete expired object trees and their message metadata
+            if cleanup_messages and session.root_object_ids:
+                for object_id in session.root_object_ids:
+                    self.object_store.delete(object_id)
+                self._on_push_session_expired(session.root_object_ids)
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
