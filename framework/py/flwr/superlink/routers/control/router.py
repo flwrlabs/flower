@@ -55,6 +55,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RevokeInvitationResponse,
     ShowFederationRequest,
     ShowFederationResponse,
+    StartRunRequest,
+    StartRunResponse,
     StopRunRequest,
     StopRunResponse,
     UnregisterNodeRequest,
@@ -72,6 +74,17 @@ protobuf_router = ProtobufRouter(router)
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
+
+
+@protobuf_router.unary_unary("/start-run")
+def start_run(
+    request: StartRunRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> StartRunResponse:
+    """Start a run."""
+    # Temporary: pass an empty Fleet API type
+    return control_handlers.start_run(request, account, linkstate, "")
 
 
 @protobuf_router.unary_unary("/list-runs")
