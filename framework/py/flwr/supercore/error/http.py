@@ -56,7 +56,7 @@ async def http_error_translator(
         )
     except HTTPException as err:
         return await http_exception_handler(request, err)
-    except Exception as err:
+    except Exception as err:  # pylint: disable=broad-exception-caught
         # Log unexpected exceptions and translate into INTERNAL
         msg = f"[{request.url.path}][UnexpectedError:{type(err).__name__}] {err}"
         log(ERROR, msg)
