@@ -20,7 +20,7 @@ erDiagram
     VARCHAR federation_id
     BIGINT fixed_interval "nullable"
     VARCHAR flwr_aid
-    TIMESTAMP next_run_at "nullable"
+    TIMESTAMP next_run_at
     VARCHAR override_config
     VARCHAR primary_task_type
     INTEGER remaining_runs "nullable"
