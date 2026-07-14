@@ -31,6 +31,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    GetAuthTokensRequest,
+    GetAuthTokensResponse,
+    GetLoginDetailsRequest,
+    GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
     ListFederationsRequest,
@@ -65,7 +69,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.protobuf.routing import ProtobufRouter
-from flwr.superlink.dependencies.account import get_account
+from flwr.superlink.auth_plugin import ControlAuthnPlugin
+from flwr.superlink.dependencies.account import get_account, get_authn_plugin
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.servicer.control import control_handlers
 
@@ -74,6 +79,7 @@ protobuf_router = ProtobufRouter(router)
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
+AuthnPluginDependency = Annotated[ControlAuthnPlugin, Depends(get_authn_plugin)]
 
 
 @protobuf_router.unary_unary("/start-run")
@@ -93,22 +99,7 @@ def list_runs(
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> ListRunsResponse:
-    """List runs.
-
-    Parameters
-    ----------
-    request : ListRunsRequest
-        Filters for the requested runs.
-    linkstate : LinkState
-        State used to retrieve runs.
-    account : AccountInfo
-        Authenticated account making the request.
-
-    Returns
-    -------
-    ListRunsResponse
-        Runs that match the requested filters.
-    """
+    """List runs."""
     return control_handlers.list_runs(request, account, linkstate)
 
 
@@ -140,6 +131,24 @@ def stop_run(
 ) -> StopRunResponse:
     """Stop a run."""
     return control_handlers.stop_run(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/get-login-details")
+def get_login_details(
+    request: GetLoginDetailsRequest,
+    authn_plugin: AuthnPluginDependency,
+) -> GetLoginDetailsResponse:
+    """Get login details."""
+    return control_handlers.get_login_details(request, authn_plugin)
+
+
+@protobuf_router.unary_unary("/get-auth-tokens")
+def get_auth_tokens(
+    request: GetAuthTokensRequest,
+    authn_plugin: AuthnPluginDependency,
+) -> GetAuthTokensResponse:
+    """Get authentication tokens."""
+    return control_handlers.get_auth_tokens(request, authn_plugin)
 
 
 @protobuf_router.unary_unary("/register-node")

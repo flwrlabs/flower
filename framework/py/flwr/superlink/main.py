@@ -110,6 +110,7 @@ def create_app(
 
             fastapi_app.state.linkstate_factory = linkstate_factory
             fastapi_app.state.get_account = account_access_dep
+            fastapi_app.state.authn_plugin = authn_plugin
 
             lifespan_state: dict[str, object] = {}
             async with AsyncExitStack() as stack:

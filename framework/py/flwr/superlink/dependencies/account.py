@@ -15,6 +15,7 @@
 """FastAPI dependency for Control API account authentication."""
 
 from collections.abc import Sequence
+from typing import cast
 
 from fastapi import HTTPException, Request, Response, status
 
@@ -119,3 +120,16 @@ def get_account(
             detail="SuperLink account authentication is not initialized.",
         )
     return account_access(request, response)
+
+
+def get_authn_plugin(
+    request: Request,  # type: ignore[type-arg]
+) -> ControlAuthnPlugin:
+    """Return the configured Control authentication plugin."""
+    authn_plugin = getattr(request.app.state, "authn_plugin", None)
+    if authn_plugin is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="SuperLink authentication is not initialized.",
+        )
+    return cast(ControlAuthnPlugin, authn_plugin)
