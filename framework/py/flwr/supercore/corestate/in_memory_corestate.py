@@ -26,6 +26,7 @@ from threading import Lock
 from typing import Literal, cast
 
 from flwr.app import Context, Message
+from flwr.app.user_config import UserConfig
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -36,6 +37,8 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.logger import log
+from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     Task,
@@ -43,6 +46,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
+from flwr.supercore.constant import AutomationStatus
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 
@@ -75,6 +79,19 @@ class TaskUsageRecord:
     reported_at: datetime | None
 
 
+@dataclass
+class AutomationRecord:
+    """Record containing automation metadata and run template."""
+
+    automation: Automation
+    fab_id: str | None
+    fab_version: str | None
+    fab_hash: str | None
+    override_config: UserConfig
+    federation_config: SimulationConfig | None
+    primary_task_type: str
+
+
 class InMemoryCoreState(
     CoreState
 ):  # pylint: disable=R0904,too-many-instance-attributes
@@ -90,6 +107,9 @@ class InMemoryCoreState(
         self.lock_run_series_store = Lock()
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
+        self.automation_store: dict[int, AutomationRecord] = {}
+        self.lock_automation_store = Lock()
+        self._next_automation_id = 1
         self.task_store: dict[int, Task] = {}
         # Store task ID to token mapping
         self.task_token_store: dict[int, TokenRecord] = {}
@@ -241,6 +261,111 @@ class InMemoryCoreState(
             if series_id is not None:
                 run_series.updated_at = now().isoformat()
             return resolved_series_id
+
+    def store_automation(  # pylint: disable=too-many-arguments,too-many-locals
+        self,
+        *,
+        federation_id: str,
+        flwr_aid: str,
+        fab_id: str | None,
+        fab_version: str | None,
+        fab_hash: str | None,
+        override_config: UserConfig,
+        federation_config: SimulationConfig | None,
+        primary_task_type: str,
+        series_id: int,
+        next_run_at: str,
+        fixed_interval: int | None = None,
+        max_runs: int | None = None,
+    ) -> Automation:
+        """Store an automation and return its metadata."""
+        with self.lock_automation_store:
+            current = now()
+            automation_id = self._next_automation_id
+            self._next_automation_id += 1
+            automation = Automation(
+                automation_id=automation_id,
+                status=AutomationStatus.ACTIVE,
+                federation=federation_id,
+                series_id=series_id,
+                flwr_aid=flwr_aid,
+                created_at=current.isoformat(),
+                updated_at=current.isoformat(),
+                next_run_at=next_run_at,
+                fixed_interval=fixed_interval,
+                remaining_runs=max_runs,
+            )
+
+            self.automation_store[automation_id] = AutomationRecord(
+                automation=automation,
+                fab_id=fab_id,
+                fab_version=fab_version,
+                fab_hash=fab_hash,
+                override_config=dict(override_config),
+                federation_config=federation_config,
+                primary_task_type=primary_task_type,
+            )
+            return automation
+
+    def list_automations(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        federation: str | None = None,
+        statuses: Sequence[str] | None = None,
+        due_before: datetime | None = None,
+        order_by: Literal["next_run_at", "updated_at"],
+        limit: int | None = None,
+    ) -> Sequence[Automation]:
+        """Return automations matching the given filters."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if limit == 0 or (statuses is not None and not statuses):
+            return []
+
+        status_set = set(statuses) if statuses is not None else None
+        cutoff = due_before.isoformat() if due_before is not None else None
+        with self.lock_automation_store:
+            automations: list[Automation] = []
+            for record in self.automation_store.values():
+                automation = record.automation
+
+                # Apply federation filter.
+                if federation is not None and automation.federation != federation:
+                    continue
+
+                # Apply status filter.
+                if status_set is not None and automation.status not in status_set:
+                    continue
+
+                # Apply due time filter.
+                if cutoff is not None and automation.next_run_at > cutoff:
+                    continue
+
+                automations.append(automation)
+
+            if order_by == "updated_at":
+                automations.sort(
+                    key=lambda automation: automation.updated_at,
+                    reverse=True,
+                )
+            else:
+                automations.sort(key=lambda automation: automation.next_run_at)
+            if limit is not None:
+                automations = automations[:limit]
+            return automations
+
+    def stop_automation(self, automation_id: int) -> bool:
+        """Stop an active automation."""
+        with self.lock_automation_store:
+            record = self.automation_store.get(automation_id)
+            if record is None or record.automation.status != AutomationStatus.ACTIVE:
+                return False
+
+            stopped_at = now().isoformat()
+            record.automation.status = AutomationStatus.STOPPED
+            record.automation.updated_at = stopped_at
+            record.automation.stopped_at = stopped_at
+            return True
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

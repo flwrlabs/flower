@@ -17,9 +17,13 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Literal
 
 from flwr.app import Context, Message
+from flwr.app.user_config import UserConfig
+from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
@@ -152,6 +156,110 @@ class CoreState(ABC):  # pylint: disable=R0904
             new run series could not be created, the caller-provided run
             series is invalid, or the run could not be associated with the
             run series.
+        """
+
+    @abstractmethod
+    def store_automation(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        federation_id: str,
+        flwr_aid: str,
+        fab_id: str | None,
+        fab_version: str | None,
+        fab_hash: str | None,
+        override_config: UserConfig,
+        federation_config: SimulationConfig | None,
+        primary_task_type: str,
+        series_id: int,
+        next_run_at: str,
+        fixed_interval: int | None = None,
+        max_runs: int | None = None,
+    ) -> Automation:
+        """Store an automation and return its metadata.
+
+        Parameters
+        ----------
+        federation_id : str
+            Federation ID the automation belongs to.
+        flwr_aid : str
+            FLWR account ID used to dispatch the automation.
+        fab_id : str | None
+            FAB ID used by future runs.
+        fab_version : str | None
+            FAB version used by future runs.
+        fab_hash : str | None
+            FAB hash used by future runs.
+        override_config : UserConfig
+            Run override config used by future runs.
+        federation_config : SimulationConfig | None
+            Federation config override used by future runs.
+        primary_task_type : str
+            Primary task type used by future runs.
+        series_id : int
+            Run series ID to use when dispatching automation runs.
+        next_run_at : str
+            Initial due time as a timestamp string. This is required when
+            storing an automation. For one-shot automations, this is the
+            requested `start_at`; for recurring automations, this is the first
+            scheduled run time.
+        fixed_interval : int | None (default: None)
+            Recurring interval in seconds.
+        max_runs : int | None (default: None)
+            Maximum number of runs, if finite. The value initializes the
+            persisted `remaining_runs` counter.
+
+        Returns
+        -------
+        Automation
+            Stored automation metadata.
+        """
+
+    @abstractmethod
+    def list_automations(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        federation: str | None = None,
+        statuses: Sequence[str] | None = None,
+        due_before: datetime | None = None,
+        order_by: Literal["next_run_at", "updated_at"],
+        limit: int | None = None,
+    ) -> Sequence[Automation]:
+        """Return automations matching the given filters.
+
+        Parameters
+        ----------
+        federation : str | None (default: None)
+            Federation ID to filter by.
+        statuses : Sequence[str] | None (default: None)
+            Automation statuses to filter by.
+        due_before : datetime | None (default: None)
+            If set, return only automations with `next_run_at` at or before this
+            timestamp.
+        order_by : Literal["next_run_at", "updated_at"]
+            Field used to order the result. `next_run_at` orders ascending;
+            `updated_at` orders descending.
+        limit : int | None (default: None)
+            Maximum number of automation records to return.
+
+        Returns
+        -------
+        Sequence[Automation]
+            Automation metadata ordered by `order_by`.
+        """
+
+    @abstractmethod
+    def stop_automation(self, automation_id: int) -> bool:
+        """Stop an active automation.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to stop.
+
+        Returns
+        -------
+        bool
+            True if an active automation was stopped, otherwise False.
         """
 
     @abstractmethod

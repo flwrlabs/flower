@@ -170,7 +170,7 @@ message Automation {
   string flwr_aid = 5;
   string created_at = 6;
   string updated_at = 7;
-  optional string next_run_at = 8;
+  string next_run_at = 8;
   optional uint64 fixed_interval = 9;
   optional uint32 remaining_runs = 10;
   optional string stopped_at = 11;
