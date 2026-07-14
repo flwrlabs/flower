@@ -18613,7 +18613,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:2
 #, fuzzy
 msgid "AgentConnectors"
-msgstr "Descrição"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors:1 flwr.agentapp.base.AgentResponses:1
 #: flwr.agentapp.base.AgentSession:1 flwr.compat.client.client.Client:1

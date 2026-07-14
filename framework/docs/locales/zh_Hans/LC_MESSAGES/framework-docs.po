@@ -19329,13 +19329,13 @@ msgstr "Flower 客户端。"
 #: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentConnectors <flwr.agentapp.AgentConnectors>`\\ \\(\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors:1 of
 #, fuzzy
 msgid "Abstract base class for AgentApp connector execution."
-msgstr "服务器策略实现的抽象基类。"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #, fuzzy
@@ -19571,7 +19571,7 @@ msgstr "返回向服务器应用程序注册 main fn 的装饰器。"
 #: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:2
 #, fuzzy
 msgid "AgentConnectors"
-msgstr "启用 TLS 连接"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors:1 flwr.agentapp.base.AgentResponses:1
 #: flwr.agentapp.base.AgentSession:1 flwr.compat.client.client.Client:1
@@ -19586,7 +19586,7 @@ msgstr "Bases: :py:class:`~abc.ABC`"
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`call <flwr.agentapp.AgentConnectors.call>`\\ \\(tool\\_call\\)"
-msgstr ":py:obj:`items <flwr.common.MetricsRecord.items>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors.call:1
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
@@ -19596,7 +19596,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`tools <flwr.agentapp.AgentConnectors.tools>`\\ \\(names\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors.tools:1 of
@@ -19796,7 +19796,7 @@ msgstr "属性"
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`connectors <flwr.agentapp.AgentSession.connectors>`\\"
-msgstr ":py:obj:`reason <flwr.common.Error.reason>`\\"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of

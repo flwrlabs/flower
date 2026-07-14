@@ -23267,13 +23267,13 @@ msgstr "Agent Flower App."
 #: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentConnectors <flwr.agentapp.AgentConnectors>`\\ \\(\\)"
-msgstr ":py:obj:`keys <flwr.app.ConfigRecord.keys>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors:1 of
 #, fuzzy
 msgid "Abstract base class for AgentApp connector execution."
-msgstr "Classe abstraite de base pour la création de réponse du modèle AgentApp."
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 msgid ":py:obj:`AgentResponses <flwr.agentapp.AgentResponses>`\\ \\(\\)"
@@ -23501,7 +23501,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:2
 #, fuzzy
 msgid "AgentConnectors"
-msgstr "Activer les connexions TLS"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors:1 flwr.agentapp.base.AgentResponses:1
 #: flwr.agentapp.base.AgentSession:1 flwr.compat.client.client.Client:1
@@ -23515,7 +23515,7 @@ msgstr "Bases : :py:class:`~abc.ABC`"
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`call <flwr.agentapp.AgentConnectors.call>`\\ \\(tool\\_call\\)"
-msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors.call:1
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
@@ -23525,7 +23525,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`tools <flwr.agentapp.AgentConnectors.tools>`\\ \\(names\\)"
-msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors.tools:1 of
@@ -23548,7 +23548,7 @@ msgstr "Créer une réponse du modèle."
 #: flwr.agentapp.base.AgentResponses.create:3 of
 #, fuzzy
 msgid "Open Responses-compatible create request."
-msgstr "**Réponse** -- Réponse compatible avec Open Responses."
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst
 #: ../../source/ref-api/flwr.app.Array.rst
@@ -23722,7 +23722,7 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`connectors <flwr.agentapp.AgentSession.connectors>`\\"
-msgstr ":py:obj:`count_bytes <flwr.app.ConfigRecord.count_bytes>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of

@@ -19335,7 +19335,7 @@ msgstr "Flower ClientApp."
 #: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentConnectors <flwr.agentapp.AgentConnectors>`\\ \\(\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors:1 of
@@ -19572,7 +19572,7 @@ msgstr "클라이언트 앱에 query fn을 등록하는 데코레이터를 반�
 #: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:2
 #, fuzzy
 msgid "AgentConnectors"
-msgstr "TLS 연결 사용"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors:1 flwr.agentapp.base.AgentResponses:1
 #: flwr.agentapp.base.AgentSession:1 flwr.compat.client.client.Client:1
@@ -19586,7 +19586,7 @@ msgstr "Bases: :py:class:`~abc.ABC`"
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`call <flwr.agentapp.AgentConnectors.call>`\\ \\(tool\\_call\\)"
-msgstr ":py:obj:`items <flwr.common.MetricsRecord.items>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors.call:1
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
@@ -19596,7 +19596,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`tools <flwr.agentapp.AgentConnectors.tools>`\\ \\(names\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors.tools:1 of
@@ -19795,7 +19795,7 @@ msgstr "속성"
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`connectors <flwr.agentapp.AgentSession.connectors>`\\"
-msgstr ":py:obj:`reason <flwr.common.Error.reason>`\\"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
