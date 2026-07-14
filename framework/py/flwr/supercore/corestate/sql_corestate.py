@@ -435,7 +435,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             conditions.append(f"status IN ({placeholders})")
             params.update({f"status_{i}": status for i, status in enumerate(statuses)})
         if due_before is not None:
-            conditions.append("next_run_at IS NOT NULL")
             conditions.append("next_run_at <= :due_before")
             params["due_before"] = due_before.isoformat()
 
