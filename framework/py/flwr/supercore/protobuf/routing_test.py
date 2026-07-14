@@ -19,7 +19,8 @@ from collections.abc import AsyncIterator, Iterator
 from threading import get_ident
 from typing import Annotated, cast
 
-from fastapi import APIRouter, Depends, FastAPI
+import pytest
+from fastapi import APIRouter, Depends, FastAPI, Response
 from fastapi.testclient import TestClient
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -77,6 +78,53 @@ def test_unary_unary_parses_and_returns_protobuf() -> None:
     assert proto_response.now == "10"
 
 
+def test_unary_unary_preserves_dependency_response_headers() -> None:
+    """The router preserves headers set by FastAPI dependencies."""
+    app = FastAPI()
+    fastapi_router = APIRouter()
+    protobuf_router = ProtobufRouter(fastapi_router)
+
+    def set_refreshed_tokens(response: Response) -> None:
+        response.headers["x-access-token"] = "new-access-token"
+
+    @protobuf_router.unary_unary("/rpc/ListRuns")
+    def list_runs(
+        _request: ListRunsRequest,
+        _: Annotated[None, Depends(set_refreshed_tokens)],
+    ) -> ListRunsResponse:
+        return ListRunsResponse()
+
+    app.include_router(fastapi_router)
+    client = TestClient(app)
+
+    response = client.post(
+        "/rpc/ListRuns",
+        content=ListRunsRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["x-access-token"] == "new-access-token"
+
+
+def test_unary_unary_rejects_http_response_dependency_parameter() -> None:
+    """The router should reject the response parameter reserved by its wrapper."""
+    protobuf_router = ProtobufRouter(APIRouter())
+
+    with pytest.raises(
+        TypeError,
+        match="list_runs dependency parameter 'http_response' is reserved",
+    ):
+
+        @protobuf_router.unary_unary("/rpc/ListRuns")
+        def list_runs(
+            _request: ListRunsRequest,
+            http_response: Annotated[None, Depends(lambda: None)],
+        ) -> ListRunsResponse:
+            del http_response
+            return ListRunsResponse()
+
+
 def test_sync_stream_handler_runs_in_threadpool() -> None:
     """The router creates synchronous streams outside the event-loop thread."""
     app = FastAPI()
@@ -87,10 +135,14 @@ def test_sync_stream_handler_runs_in_threadpool() -> None:
     async def get_event_loop_thread_id() -> int:
         return get_ident()
 
+    def set_refreshed_tokens(response: Response) -> None:
+        response.headers["x-access-token"] = "new-access-token"
+
     @protobuf_router.unary_stream("/rpc/StreamLogs")
     def stream_logs(
         _request: StreamLogsRequest,
         event_loop_thread_id: Annotated[int, Depends(get_event_loop_thread_id)],
+        _: Annotated[None, Depends(set_refreshed_tokens)],
     ) -> Iterator[StreamLogsResponse]:
         handler_thread_ids.append(get_ident())
         assert handler_thread_ids[-1] != event_loop_thread_id
@@ -106,6 +158,7 @@ def test_sync_stream_handler_runs_in_threadpool() -> None:
     )
 
     assert response.status_code == 200
+    assert response.headers["x-access-token"] == "new-access-token"
     assert handler_thread_ids
 
 

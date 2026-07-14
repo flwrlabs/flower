@@ -60,8 +60,14 @@ def _create_app_with_linkstate_factory(
 ) -> FastAPI:
     """Create a FastAPI app for either SuperLink HTTP mode."""
     linkstate_factory = cast(LinkStateFactory, state_factory_mock)
+    authn_plugin = Mock()
+    authz_plugin = Mock()
     if not start_legacy_grpc:
-        return create_app(linkstate_factory=linkstate_factory)
+        return create_app(
+            linkstate_factory=linkstate_factory,
+            authn_plugin=authn_plugin,
+            authz_plugin=authz_plugin,
+        )
 
     superlink_lifespan = Mock()
     superlink_lifespan.state_factory = None
@@ -70,6 +76,8 @@ def _create_app_with_linkstate_factory(
     )
     return create_app(
         linkstate_factory=linkstate_factory,
+        authn_plugin=authn_plugin,
+        authz_plugin=authz_plugin,
         superlink_lifespan=cast(Any, superlink_lifespan),
         start_legacy_grpc=True,
     )
