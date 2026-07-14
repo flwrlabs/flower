@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-13 00:22+0000\n"
+"POT-Creation-Date: 2026-07-14 00:19+0000\n"
 "PO-Revision-Date: 2026-06-11 04:01+0000\n"
 "Last-Translator: reducedradius <feixiang512@outlook.com>\n"
 "Language: zh_Hans\n"
@@ -19315,50 +19315,61 @@ msgstr "客户端"
 msgid "Classes"
 msgstr "类别"
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentApp <flwr.agentapp.AgentApp>`\\ \\(\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #: flwr.agentapp.agent_app.AgentApp:1 of
 #, fuzzy
 msgid "Flower AgentApp."
 msgstr "Flower 客户端。"
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`AgentConnectors <flwr.agentapp.AgentConnectors>`\\ \\(\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: flwr.agentapp.base.AgentConnectors:1 of
+#, fuzzy
+msgid "Abstract base class for AgentApp connector execution."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentResponses <flwr.agentapp.AgentResponses>`\\ \\(\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #: flwr.agentapp.base.AgentResponses:1 of
 #, fuzzy
 msgid "Abstract base class for AgentApp model response creation."
 msgstr "服务器策略实现的抽象基类。"
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentSession <flwr.agentapp.AgentSession>`\\ \\(\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #: flwr.agentapp.base.AgentSession:1 of
 #, fuzzy
 msgid "Abstract base class for AgentApp runtime capabilities."
 msgstr "服务器策略实现的抽象基类。"
 
-#: ../../source/ref-api/flwr.agentapp.rst:31
+#: ../../source/ref-api/flwr.agentapp.rst:32
 #, fuzzy
 msgid "Exceptions"
 msgstr "说明"
 
-#: ../../source/ref-api/flwr.agentapp.rst:35:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:36:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`LoadAgentAppError <flwr.agentapp.LoadAgentAppError>`\\"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.agentapp.rst:35:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:36:<autosummary>:1
 #: flwr.agentapp.agent_app.LoadAgentAppError:1 of
 msgid "Error when trying to load `AgentApp`."
 msgstr ""
@@ -19433,6 +19444,7 @@ msgid "Define an AgentApp with a single main function::"
 msgstr "使用带有自定义主函数的 `ServerApp`："
 
 #: ../../source/ref-api/flwr.agentapp.AgentApp.rst:15
+#: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentSession.rst:15
 #: ../../source/ref-api/flwr.app.Array.rst:15
@@ -19556,12 +19568,13 @@ msgstr "server.strategy.Strategy"
 msgid "Return a decorator that registers the main fn with the agent app."
 msgstr "返回向服务器应用程序注册 main fn 的装饰器。"
 
-#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2
-msgid "AgentResponses"
+#: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:2
+#, fuzzy
+msgid "AgentConnectors"
 msgstr ""
 
-#: flwr.agentapp.base.AgentResponses:1 flwr.agentapp.base.AgentSession:1
-#: flwr.compat.client.client.Client:1
+#: flwr.agentapp.base.AgentConnectors:1 flwr.agentapp.base.AgentResponses:1
+#: flwr.agentapp.base.AgentSession:1 flwr.compat.client.client.Client:1
 #: flwr.compat.client.numpy_client.NumPyClient:1
 #: flwr.server.client_manager.ClientManager:1
 #: flwr.server.strategy.strategy.Strategy:1 flwr.serverapp.grid.grid.Grid:1
@@ -19569,6 +19582,30 @@ msgstr ""
 #, fuzzy
 msgid "Bases: :py:class:`~abc.ABC`"
 msgstr "Bases: :py:class:`~abc.ABC`"
+
+#: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`call <flwr.agentapp.AgentConnectors.call>`\\ \\(tool\\_call\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentConnectors.call:1
+#: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
+msgid "Execute one model function_call and return a function_call_output item."
+msgstr ""
+
+#: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`tools <flwr.agentapp.AgentConnectors.tools>`\\ \\(names\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1
+#: flwr.agentapp.base.AgentConnectors.tools:1 of
+msgid "Return model-facing tool schemas for built-in connectors."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2
+msgid "AgentResponses"
+msgstr ""
 
 #: flwr.agentapp.base.AgentResponses.create:1:<autosummary>:1 of
 #, fuzzy
@@ -19582,10 +19619,7 @@ msgid "Create a model response."
 msgstr "创建新页面"
 
 #: flwr.agentapp.base.AgentResponses.create:3 of
-msgid ""
-"Open Responses-compatible create request. Built-in connector tools can be"
-" requested by name in ``tools``, for example ``[\"web_search\"]``. Built-"
-"in connector names are reserved for runtime-managed tools."
+msgid "Open Responses-compatible create request."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst
@@ -19643,7 +19677,7 @@ msgstr ""
 msgid "Returns"
 msgstr "返回"
 
-#: flwr.agentapp.base.AgentResponses.create:9 of
+#: flwr.agentapp.base.AgentResponses.create:6 of
 msgid "**response** -- Open Responses-compatible response."
 msgstr ""
 
@@ -19759,13 +19793,23 @@ msgstr ""
 msgid "Attributes"
 msgstr "属性"
 
-#: flwr.agentapp.AgentSession.responses:1:<autosummary>:1 of
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`connectors <flwr.agentapp.AgentSession.connectors>`\\"
+msgstr ""
+
+#: flwr.agentapp.AgentSession.connectors:1
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
+msgid "Connector tool schema and execution API."
+msgstr ""
+
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`responses <flwr.agentapp.AgentSession.responses>`\\"
 msgstr ":py:obj:`reason <flwr.common.Error.reason>`\\"
 
-#: flwr.agentapp.AgentSession.responses:1
-#: flwr.agentapp.AgentSession.responses:1:<autosummary>:1 of
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
+#: flwr.agentapp.AgentSession.responses:1 of
 msgid "Model response creation API."
 msgstr ""
 
@@ -84395,5 +84439,14 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Reinstall or upgrade ``flwr``, then retry:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Open Responses-compatible create request. "
+#~ "Built-in connector tools can be "
+#~ "requested by name in ``tools``, for "
+#~ "example ``[\"web_search\"]``. Built-in "
+#~ "connector names are reserved for "
+#~ "runtime-managed tools."
 #~ msgstr ""
 
