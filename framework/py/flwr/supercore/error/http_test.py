@@ -15,10 +15,11 @@
 """Tests for HTTP error translation utilities."""
 
 
+import asyncio
 import json
 
-import pytest
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, Response, status
+from starlette.datastructures import State
 
 from .base import ApiErrorCode, FlowerError
 from .catalog import API_ERROR_MAP
@@ -26,19 +27,28 @@ from .exceptions import EntitlementError
 from .http import INTERNAL_SERVER_ERROR_MESSAGE, http_error_translator
 
 
+def _run_translator(exception: Exception) -> Response:
+    """Run the HTTP error translator with a failing request handler."""
+
+    async def call_next(_: Request[State]) -> Response:
+        raise exception
+
+    request = Request({"type": "http", "path": "/mock-route", "headers": []})
+    return asyncio.run(http_error_translator(request, call_next))
+
+
 def test_http_error_translator_mapped_flower_error() -> None:
     """Translate a mapped FlowerError into its configured HTTP contract."""
-    with pytest.raises(HTTPException) as exc:
-        with http_error_translator("MockRoute"):
-            raise FlowerError(
-                ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
-                "internal diagnostic message",
-            )
+    response = _run_translator(
+        FlowerError(
+            ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
+            "internal diagnostic message",
+        )
+    )
 
     spec = API_ERROR_MAP[ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT]
-    assert exc.value.status_code == spec.http_status_code
-    assert isinstance(exc.value.detail, str)
-    assert json.loads(exc.value.detail) == {
+    assert response.status_code == spec.http_status_code
+    assert json.loads(response.body) == {
         "code": ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
         "public_message": spec.public_message,
         "public_details": None,
@@ -47,13 +57,10 @@ def test_http_error_translator_mapped_flower_error() -> None:
 
 def test_http_error_translator_unmapped_flower_error() -> None:
     """Translate an unmapped FlowerError into INTERNAL."""
-    with pytest.raises(HTTPException) as exc:
-        with http_error_translator("MockRoute"):
-            raise FlowerError(999, "internal diagnostic message")
+    response = _run_translator(FlowerError(999, "internal diagnostic message"))
 
-    assert exc.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert isinstance(exc.value.detail, str)
-    assert json.loads(exc.value.detail) == {
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert json.loads(response.body) == {
         "code": 999,
         "public_message": INTERNAL_SERVER_ERROR_MESSAGE,
         "public_details": None,
@@ -65,18 +72,17 @@ def test_http_error_translator_entitlement_error_preserves_error_message() -> No
     error_message = "Entitlement check failed: plan does not allow this action."
     entitlement_code = 101
 
-    with pytest.raises(HTTPException) as exc:
-        with http_error_translator("MockRoute"):
-            raise EntitlementError(
-                "internal diagnostic message",
-                public_details=error_message,
-                entitlement_code=entitlement_code,
-            )
+    response = _run_translator(
+        EntitlementError(
+            "internal diagnostic message",
+            public_details=error_message,
+            entitlement_code=entitlement_code,
+        )
+    )
 
     spec = API_ERROR_MAP[ApiErrorCode.ENTITLEMENT_ERROR]
-    assert exc.value.status_code == spec.http_status_code
-    assert isinstance(exc.value.detail, str)
-    assert json.loads(exc.value.detail) == {
+    assert response.status_code == spec.http_status_code
+    assert json.loads(response.body) == {
         "code": ApiErrorCode.ENTITLEMENT_ERROR,
         "public_message": spec.public_message,
         "public_details": error_message,
@@ -85,24 +91,21 @@ def test_http_error_translator_entitlement_error_preserves_error_message() -> No
 
 
 def test_http_error_translator_http_exception() -> None:
-    """Allow existing HTTPException to propagate unmodified."""
+    """Translate an HTTPException into a response."""
     http_error = HTTPException(
         status_code=status.HTTP_418_IM_A_TEAPOT,
         detail={"message": "short and stout"},
     )
 
-    with pytest.raises(HTTPException) as exc:
-        with http_error_translator("MockRoute"):
-            raise http_error
+    response = _run_translator(http_error)
 
-    assert exc.value is http_error
+    assert response.status_code == status.HTTP_418_IM_A_TEAPOT
+    assert json.loads(response.body) == {"detail": {"message": "short and stout"}}
 
 
 def test_http_error_translator_unexpected_error() -> None:
     """Translate unexpected errors into INTERNAL."""
-    with pytest.raises(HTTPException) as exc:
-        with http_error_translator("MockRoute"):
-            raise RuntimeError("unexpected failure")
+    response = _run_translator(RuntimeError("unexpected failure"))
 
-    assert exc.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert exc.value.detail == INTERNAL_SERVER_ERROR_MESSAGE
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert response.body == INTERNAL_SERVER_ERROR_MESSAGE.encode()
