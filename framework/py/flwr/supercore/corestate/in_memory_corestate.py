@@ -213,7 +213,7 @@ class InMemoryCoreState(
         state: str,
         redirect_uri: str,
         pkce_verifier: str | None,
-        expires_at: datetime,
+        expires_at: str,
     ) -> ConnectorOAuthSessionRecord | None:
         """Create and return a connector OAuth session."""
         if not oauth_session_id or not flwr_aid or not connector_ref:
@@ -225,7 +225,7 @@ class InMemoryCoreState(
             state=state,
             redirect_uri=redirect_uri,
             pkce_verifier=pkce_verifier,
-            created_at=now(),
+            created_at=now().isoformat(),
             expires_at=expires_at,
             completed_at=None,
         )
@@ -260,11 +260,11 @@ class InMemoryCoreState(
                 session is None
                 or session.flwr_aid != flwr_aid
                 or session.completed_at is not None
-                or session.expires_at <= completed_at
+                or datetime.fromisoformat(session.expires_at) <= completed_at
             ):
                 return False
             self.connector_oauth_session_store[oauth_session_id] = replace(
-                session, completed_at=completed_at
+                session, completed_at=completed_at.isoformat()
             )
         return True
 

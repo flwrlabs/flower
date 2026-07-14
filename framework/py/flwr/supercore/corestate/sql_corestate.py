@@ -19,7 +19,7 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
 
@@ -250,11 +250,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         state: str,
         redirect_uri: str,
         pkce_verifier: str | None,
-        expires_at: datetime,
+        expires_at: str,
     ) -> ConnectorOAuthSessionRecord | None:
         """Create and return a connector OAuth session."""
         if not oauth_session_id or not flwr_aid or not connector_ref:
             return None
+        created_at = now()
         session = ConnectorOAuthSessionRecord(
             oauth_session_id=oauth_session_id,
             flwr_aid=flwr_aid,
@@ -262,7 +263,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             state=state,
             redirect_uri=redirect_uri,
             pkce_verifier=pkce_verifier,
-            created_at=now(),
+            created_at=created_at.isoformat(),
             expires_at=expires_at,
             completed_at=None,
         )
@@ -287,7 +288,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     "state": session.state,
                     "redirect_uri": session.redirect_uri,
                     "pkce_verifier": session.pkce_verifier,
-                    "created_at": session.created_at,
+                    "created_at": created_at,
                     "expires_at": session.expires_at,
                     "completed_at": session.completed_at,
                 },
@@ -340,7 +341,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if not rows:
                 return False
             session = _connector_oauth_session_from_row(rows[0])
-            if session.completed_at is not None or session.expires_at <= completed_at:
+            if session.completed_at is not None or (
+                datetime.fromisoformat(session.expires_at) <= completed_at
+            ):
                 return False
             update_params = {**params, "completed_at": completed_at}
             self.query(
@@ -363,8 +366,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 """,
                 params,
             )
-        return bool(updated) and _datetime_from_row(updated[0]["completed_at"]) == (
-            completed_at
+        return (
+            bool(updated)
+            and timestamp_to_iso(updated[0]["completed_at"]) == completed_at.isoformat()
         )
 
     def get_run_series(  # pylint: disable=R0914
@@ -1370,14 +1374,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return False
 
 
-def _datetime_from_row(value: datetime | str) -> datetime:
-    """Convert a timestamp row value to a timezone-aware UTC datetime."""
-    timestamp = value if isinstance(value, datetime) else datetime.fromisoformat(value)
-    if timestamp.tzinfo is None:
-        return timestamp.replace(tzinfo=UTC)
-    return timestamp.astimezone(UTC)
-
-
 def _connector_oauth_session_from_row(
     row: dict[str, Any],
 ) -> ConnectorOAuthSessionRecord:
@@ -1390,11 +1386,9 @@ def _connector_oauth_session_from_row(
         state=row["state"],
         redirect_uri=row["redirect_uri"],
         pkce_verifier=row["pkce_verifier"],
-        created_at=_datetime_from_row(row["created_at"]),
-        expires_at=_datetime_from_row(row["expires_at"]),
-        completed_at=(
-            None if completed_at is None else _datetime_from_row(completed_at)
-        ),
+        created_at=timestamp_to_iso(row["created_at"]),
+        expires_at=timestamp_to_iso(row["expires_at"]),
+        completed_at=(None if completed_at is None else timestamp_to_iso(completed_at)),
     )
 
 

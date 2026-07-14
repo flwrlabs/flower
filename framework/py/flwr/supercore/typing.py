@@ -17,7 +17,6 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from typing import TypeAlias
 
 from flwr.supercore.constant import RunTime
@@ -48,9 +47,9 @@ class ConnectorOAuthSessionRecord:  # pylint: disable=too-many-instance-attribut
     state: str
     redirect_uri: str
     pkce_verifier: str | None
-    created_at: datetime
-    expires_at: datetime
-    completed_at: datetime | None
+    created_at: str
+    expires_at: str
+    completed_at: str | None
 
 
 @dataclass(frozen=True)

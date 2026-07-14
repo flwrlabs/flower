@@ -97,12 +97,12 @@ class CoreState(ABC):  # pylint: disable=R0904
         state: str,
         redirect_uri: str,
         pkce_verifier: str | None,
-        expires_at: datetime,
+        expires_at: str,
     ) -> ConnectorOAuthSessionRecord | None:
         """Create and return a connector OAuth session.
 
         Returns ``None`` if the session ID already exists or a required identifier
-        is empty. ``expires_at`` must be timezone-aware.
+        is empty. ``expires_at`` must be an ISO-formatted UTC timestamp.
         """
 
     @abstractmethod

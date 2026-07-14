@@ -147,7 +147,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_connector_oauth_session_create_and_get(self) -> None:
         """OAuth session creation should preserve data and account isolation."""
         state = self.state_factory()
-        expires_at = now() + timedelta(minutes=10)
+        expires_at = (now() + timedelta(minutes=10)).isoformat()
 
         session = state.create_connector_oauth_session(
             oauth_session_id="session-1",
@@ -166,6 +166,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(session.state, "oauth-state")
         self.assertEqual(session.redirect_uri, "https://example.test/callback")
         self.assertIsNone(session.pkce_verifier)
+        self.assertIsInstance(session.created_at, str)
+        self.assertIsNotNone(datetime.fromisoformat(session.created_at).tzinfo)
         self.assertEqual(session.expires_at, expires_at)
         self.assertIsNone(session.completed_at)
         self.assertEqual(
@@ -187,7 +189,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state="other-state",
             redirect_uri="https://example.test/other",
             pkce_verifier="other-verifier",
-            expires_at=expires_at + timedelta(minutes=10),
+            expires_at=expires_at,
         )
         self.assertIsNone(duplicate)
         self.assertIsNone(
@@ -218,7 +220,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state="oauth-state",
             redirect_uri="https://example.test/callback",
             pkce_verifier="pkce-verifier",
-            expires_at=now() + timedelta(minutes=10),
+            expires_at=(now() + timedelta(minutes=10)).isoformat(),
         )
         assert session is not None
 
@@ -244,8 +246,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         assert completed is not None
         assert completed.completed_at is not None
-        self.assertLessEqual(before_completion, completed.completed_at)
-        self.assertLessEqual(completed.completed_at, after_completion)
+        completed_at = datetime.fromisoformat(completed.completed_at)
+        self.assertLessEqual(before_completion, completed_at)
+        self.assertLessEqual(completed_at, after_completion)
         self.assertFalse(
             state.complete_connector_oauth_session(
                 oauth_session_id="session-1", flwr_aid="account-a"
@@ -259,7 +262,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state="expired-state",
             redirect_uri="https://example.test/callback",
             pkce_verifier=None,
-            expires_at=now() - timedelta(seconds=1),
+            expires_at=(now() - timedelta(seconds=1)).isoformat(),
         )
         assert expired is not None
         self.assertFalse(
