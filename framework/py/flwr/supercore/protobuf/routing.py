@@ -93,9 +93,10 @@ def _request_type_and_dependency_parameters(
                 f"{func.__name__} dependency parameter {parameter.name!r} must be "
                 "positional-or-keyword or keyword-only"
             )
-        if parameter.name == "http_request":
+        if parameter.name in {"http_request", "http_response"}:
+            # The generated endpoint signature reserves these names for FastAPI.
             raise TypeError(
-                f"{func.__name__} dependency parameter 'http_request' is reserved"
+                f"{func.__name__} dependency parameter {parameter.name!r} is reserved"
             )
 
     return cast(type[RequestT], request_type), dependency_parameters
@@ -156,6 +157,12 @@ def _build_endpoint_signature(
         inspect.Parameter.POSITIONAL_OR_KEYWORD,
         annotation=cast(type[Request[State]], Request),
     )
+    # Dependencies use FastAPI's mutable response to set headers.
+    http_response_parameter = inspect.Parameter(
+        "http_response",
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        annotation=Response,
+    )
     keyword_dependency_parameters = [
         inspect.Parameter(
             parameter.name,
@@ -166,7 +173,11 @@ def _build_endpoint_signature(
         for parameter in dependency_parameters
     ]
     return inspect.Signature(
-        parameters=[http_request_parameter, *keyword_dependency_parameters],
+        parameters=[
+            http_request_parameter,
+            http_response_parameter,
+            *keyword_dependency_parameters,
+        ],
         return_annotation=Response,
     )
 
@@ -231,6 +242,7 @@ class ProtobufRouter:
 
             async def wrapper(
                 http_request: Request[State],
+                http_response: Response,
                 **dependency_values: object,
             ) -> Response:
                 _check_request_media_type(http_request)
@@ -244,10 +256,14 @@ class ProtobufRouter:
                         status_code=500,
                         detail="Invalid response returned from unary handler",
                     )
-                return Response(
+                response = Response(
                     content=result.SerializeToString(),
                     media_type=PROTOBUF_MEDIA_TYPE,
                 )
+                # The wrapper replaces FastAPI's injected response, so preserve
+                # headers written by dependencies, such as refreshed tokens.
+                response.headers.raw.extend(http_response.headers.raw)
+                return response
 
             wrapper.__name__ = func.__name__
             wrapper.__signature__ = (  # type: ignore[attr-defined]
@@ -279,6 +295,7 @@ class ProtobufRouter:
 
             async def wrapper(
                 http_request: Request[State],
+                http_response: Response,
                 **dependency_values: object,
             ) -> Response:
                 _check_request_media_type(http_request)
@@ -304,10 +321,14 @@ class ProtobufRouter:
                         detail="Invalid response returned from stream handler",
                     )
 
-                return StreamingResponse(
+                response = StreamingResponse(
                     content,
                     media_type=PROTOBUF_STREAM_MEDIA_TYPE,
                 )
+                # The wrapper replaces FastAPI's injected response, so preserve
+                # headers written by dependencies, such as refreshed tokens.
+                response.headers.raw.extend(http_response.headers.raw)
+                return response
 
             wrapper.__name__ = func.__name__
             wrapper.__signature__ = (  # type: ignore[attr-defined]
