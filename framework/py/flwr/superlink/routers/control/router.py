@@ -19,8 +19,46 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AcceptInvitationRequest,
+    AcceptInvitationResponse,
+    AddNodeToFederationRequest,
+    AddNodeToFederationResponse,
+    ArchiveFederationRequest,
+    ArchiveFederationResponse,
+    ConfigureSimulationFederationRequest,
+    ConfigureSimulationFederationResponse,
+    CreateFederationRequest,
+    CreateFederationResponse,
+    CreateInvitationRequest,
+    CreateInvitationResponse,
+    GetRunSeriesRequest,
+    GetRunSeriesResponse,
+    ListFederationsRequest,
+    ListFederationsResponse,
+    ListInvitationsRequest,
+    ListInvitationsResponse,
+    ListNodesRequest,
+    ListNodesResponse,
+    ListRunSeriesRequest,
+    ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
+    RegisterNodeRequest,
+    RegisterNodeResponse,
+    RejectInvitationRequest,
+    RejectInvitationResponse,
+    RemoveAccountFromFederationRequest,
+    RemoveAccountFromFederationResponse,
+    RemoveNodeFromFederationRequest,
+    RemoveNodeFromFederationResponse,
+    RevokeInvitationRequest,
+    RevokeInvitationResponse,
+    ShowFederationRequest,
+    ShowFederationResponse,
+    StopRunRequest,
+    StopRunResponse,
+    UnregisterNodeRequest,
+    UnregisterNodeResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
@@ -32,12 +70,15 @@ from flwr.superlink.servicer.control import control_handlers
 router = APIRouter(prefix="/control", tags=["control"])
 protobuf_router = ProtobufRouter(router)
 
+LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
+AccountDependency = Annotated[AccountInfo, Depends(get_account)]
 
-@protobuf_router.unary_unary("/rpc/ListRuns")
+
+@protobuf_router.unary_unary("/list-runs")
 def list_runs(
     request: ListRunsRequest,
-    linkstate: Annotated[LinkState, Depends(get_linkstate)],
-    account: Annotated[AccountInfo, Depends(get_account)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
 ) -> ListRunsResponse:
     """List runs.
 
@@ -56,3 +97,193 @@ def list_runs(
         Runs that match the requested filters.
     """
     return control_handlers.list_runs(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/list-run-series")
+def list_run_series(
+    request: ListRunSeriesRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListRunSeriesResponse:
+    """List run series."""
+    return control_handlers.list_run_series(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/get-run-series")
+def get_run_series(
+    request: GetRunSeriesRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> GetRunSeriesResponse:
+    """Get a run series."""
+    return control_handlers.get_run_series(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/stop-run")
+def stop_run(
+    request: StopRunRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> StopRunResponse:
+    """Stop a run."""
+    return control_handlers.stop_run(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/register-node")
+def register_node(
+    request: RegisterNodeRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> RegisterNodeResponse:
+    """Register a SuperNode."""
+    return control_handlers.register_node(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/unregister-node")
+def unregister_node(
+    request: UnregisterNodeRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> UnregisterNodeResponse:
+    """Unregister a SuperNode."""
+    return control_handlers.unregister_node(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/list-nodes")
+def list_nodes(
+    request: ListNodesRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListNodesResponse:
+    """List SuperNodes."""
+    return control_handlers.list_nodes(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/list-federations")
+def list_federations(
+    request: ListFederationsRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListFederationsResponse:
+    """List federations."""
+    return control_handlers.list_federations(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/show-federation")
+def show_federation(
+    request: ShowFederationRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ShowFederationResponse:
+    """Show a federation."""
+    return control_handlers.show_federation(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/create-federation")
+def create_federation(
+    request: CreateFederationRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> CreateFederationResponse:
+    """Create a federation."""
+    return control_handlers.create_federation(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/archive-federation")
+def archive_federation(
+    request: ArchiveFederationRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ArchiveFederationResponse:
+    """Archive a federation."""
+    return control_handlers.archive_federation(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/add-node-to-federation")
+def add_node_to_federation(
+    request: AddNodeToFederationRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> AddNodeToFederationResponse:
+    """Add a SuperNode to a federation."""
+    return control_handlers.add_node_to_federation(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/remove-node-from-federation")
+def remove_node_from_federation(
+    request: RemoveNodeFromFederationRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> RemoveNodeFromFederationResponse:
+    """Remove a SuperNode from a federation."""
+    return control_handlers.remove_node_from_federation(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/remove-account-from-federation")
+def remove_account_from_federation(
+    request: RemoveAccountFromFederationRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> RemoveAccountFromFederationResponse:
+    """Remove an account from a federation."""
+    return control_handlers.remove_account_from_federation(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/create-invitation")
+def create_invitation(
+    request: CreateInvitationRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> CreateInvitationResponse:
+    """Create a federation invitation."""
+    return control_handlers.create_invitation(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/list-invitations")
+def list_invitations(
+    request: ListInvitationsRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListInvitationsResponse:
+    """List federation invitations."""
+    return control_handlers.list_invitations(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/accept-invitation")
+def accept_invitation(
+    request: AcceptInvitationRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> AcceptInvitationResponse:
+    """Accept a federation invitation."""
+    return control_handlers.accept_invitation(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/reject-invitation")
+def reject_invitation(
+    request: RejectInvitationRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> RejectInvitationResponse:
+    """Reject a federation invitation."""
+    return control_handlers.reject_invitation(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/revoke-invitation")
+def revoke_invitation(
+    request: RevokeInvitationRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> RevokeInvitationResponse:
+    """Revoke a federation invitation."""
+    return control_handlers.revoke_invitation(request, account, linkstate)
+
+
+@protobuf_router.unary_unary("/configure-simulation-federation")
+def configure_simulation_federation(
+    request: ConfigureSimulationFederationRequest,
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ConfigureSimulationFederationResponse:
+    """Configure a federation for simulation."""
+    return control_handlers.configure_simulation_federation(request, account, linkstate)

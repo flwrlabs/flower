@@ -53,7 +53,7 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     client = TestClient(app)
 
     response = client.post(
-        "/control/rpc/ListRuns",
+        "/control/list-runs",
         content=ListRunsRequest(limit=1).SerializeToString(),
         headers={"content-type": PROTOBUF_MEDIA_TYPE},
     )
