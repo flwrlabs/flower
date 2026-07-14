@@ -39,7 +39,6 @@ from flwr.superlink.auth_plugin import (
 )
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.federation import NoOpFederationManager
-from flwr.superlink.routers.control import router as control_router
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
@@ -143,7 +142,7 @@ def create_app(
     # fastapi_app.include_router(health.router)
 
     # SuperLink APIs
-    fastapi_app.include_router(control_router)
+    # fastapi_app.include_router(control_router)
     # fastapi_app.include_router(runtime.router)
 
     # Extension hooks
