@@ -126,6 +126,15 @@ def int64_to_uint64(signed: int) -> int:
     return signed
 
 
+def build_sql_in_params(
+    values: Iterable[Any], prefix: str
+) -> tuple[str, dict[str, Any]]:
+    """Build SQL IN-clause placeholders and a matching parameter dictionary."""
+    params = {f"{prefix}_{i}": value for i, value in enumerate(values)}
+    placeholders = ",".join(f":{key}" for key in params)
+    return placeholders, params
+
+
 def get_flwr_home() -> Path:
     """Get the Flower home directory path.
 

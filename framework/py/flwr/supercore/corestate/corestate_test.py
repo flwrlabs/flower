@@ -88,7 +88,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         flwr_aid: str = "aid-a",
         next_run_at: str | None = None,
         fixed_interval: int | None = None,
-        remaining_runs: int | None = 1,
+        max_runs: int | None = 1,
     ) -> Automation:
         """Store a minimal automation."""
         return state.store_automation(
@@ -103,7 +103,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             series_id=series_id,
             next_run_at=next_run_at or now().isoformat(),
             fixed_interval=fixed_interval,
-            remaining_runs=remaining_runs,
+            max_runs=max_runs,
         )
 
     def test_store_run_in_series_creates_id(self) -> None:
@@ -227,6 +227,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [automation.automation_id for automation in due_list], [due.automation_id]
         )
+        self.assertEqual(due_list[0].remaining_runs, 1)
 
         self.assertTrue(state.stop_automation(due.automation_id))
         self.assertFalse(state.stop_automation(due.automation_id))

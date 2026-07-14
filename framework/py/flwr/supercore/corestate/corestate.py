@@ -24,6 +24,10 @@ from flwr.app import Context, Message
 from flwr.app.user_config import UserConfig
 from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+<<<<<<< HEAD
+=======
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+>>>>>>> origin
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
@@ -47,6 +51,27 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
+
+    @abstractmethod
+    def store_message_and_object_tree(
+        self, message: Message, object_tree: ObjectTree
+    ) -> tuple[bool, list[str]]:
+        """Store a Message and preregister its ObjectTree.
+
+        Parameters
+        ----------
+        message : Message
+            The Message to store.
+        object_tree : ObjectTree
+            The ObjectTree containing the IDs of objects to preregister.
+
+        Returns
+        -------
+        tuple[bool, list[str]]
+            A tuple containing a boolean indicating whether the Message was
+            stored and a list of object IDs that still need to be pushed. If
+            storing the Message fails, returns `(False, [])`.
+        """
 
     @abstractmethod
     def get_run_series(
@@ -152,7 +177,11 @@ class CoreState(ABC):  # pylint: disable=R0904
         series_id: int,
         next_run_at: str,
         fixed_interval: int | None = None,
+<<<<<<< HEAD
         remaining_runs: int | None = None,
+=======
+        max_runs: int | None = None,
+>>>>>>> origin
     ) -> Automation:
         """Store an automation and return its metadata.
 
@@ -177,12 +206,15 @@ class CoreState(ABC):  # pylint: disable=R0904
         series_id : int
             Run series ID to use when dispatching automation runs.
         next_run_at : str
-            Next due time as a timestamp string. For one-shot automations, this
-            is the requested `start_at`.
+            Initial due time as a timestamp string. This is required when
+            storing an automation. For one-shot automations, this is the
+            requested `start_at`; for recurring automations, this is the first
+            scheduled run time.
         fixed_interval : int | None (default: None)
             Recurring interval in seconds.
-        remaining_runs : int | None (default: None)
-            Remaining number of runs, if finite.
+        max_runs : int | None (default: None)
+            Maximum number of runs, if finite. The value initializes the
+            persisted `remaining_runs` counter.
 
         Returns
         -------

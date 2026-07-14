@@ -276,7 +276,7 @@ class InMemoryCoreState(
         series_id: int,
         next_run_at: str,
         fixed_interval: int | None = None,
-        remaining_runs: int | None = None,
+        max_runs: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
         with self.lock_automation_store:
@@ -293,7 +293,7 @@ class InMemoryCoreState(
                 updated_at=current.isoformat(),
                 next_run_at=next_run_at,
                 fixed_interval=fixed_interval,
-                remaining_runs=remaining_runs,
+                remaining_runs=max_runs,
             )
 
             self.automation_store[automation_id] = AutomationRecord(
@@ -338,10 +338,7 @@ class InMemoryCoreState(
                     continue
 
                 # Apply due time filter.
-                if cutoff is not None and (
-                    not automation.HasField("next_run_at")
-                    or automation.next_run_at > cutoff
-                ):
+                if cutoff is not None and automation.next_run_at > cutoff:
                     continue
 
                 automations.append(automation)

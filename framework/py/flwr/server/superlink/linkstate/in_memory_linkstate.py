@@ -37,6 +37,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
@@ -180,6 +181,24 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         return message_id
 
+    def store_message_and_object_tree(
+        self, message: Message, object_tree: ObjectTree
+    ) -> tuple[bool, list[str]]:
+        """Store a Message and preregister its ObjectTree."""
+        with self.lock:
+            if message.metadata.reply_to_message_id:
+                stored = self.store_message_res(message) is not None
+            else:
+                stored = self.store_message_ins(message) is not None
+
+            if not stored:
+                return False, []
+
+            missing_objects = self.object_store.preregister(
+                message.metadata.run_id, object_tree
+            )
+            return True, missing_objects
+
     def _check_stored_messages(self, message_ids: set[str]) -> None:
         """Check and delete the message if it's invalid."""
         with self.lock:
@@ -249,6 +268,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         res_metadata = message.metadata
         with self.lock:
+            message_id = res_metadata.message_id
             # Check if the Message it is replying to exists and is valid
             msg_ins_id = res_metadata.reply_to_message_id
             self._check_stored_messages({msg_ins_id})
@@ -267,15 +287,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 log(
                     ERROR,
                     "Message with ID %s does not exist.",
-                    msg_ins_id,
-                )
-                return None
-
-            if msg_ins_id in self.message_ins_id_to_message_res_id:
-                log(
-                    ERROR,
-                    "Failed to store Message reply: duplicate reply for "
-                    "reply_to_message_id %s.",
                     msg_ins_id,
                 )
                 return None
@@ -310,7 +321,18 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
                 return None
 
-            message_id = message.metadata.message_id
+            if message_id in self.message_res_store:
+                return message_id
+
+            if msg_ins_id in self.message_ins_id_to_message_res_id:
+                log(
+                    ERROR,
+                    "Failed to store Message reply: duplicate reply for "
+                    "reply_to_message_id %s.",
+                    msg_ins_id,
+                )
+                return None
+
             self.message_res_store[message_id] = message
             self.message_ins_id_to_message_res_id[msg_ins_id] = message_id
 

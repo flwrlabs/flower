@@ -17,11 +17,12 @@
 
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Sequence
 from typing import cast
 
-from flwr.agentapp import AgentResponses, AgentSession
+from flwr.agentapp import AgentConnectors, AgentResponses, AgentSession
 from flwr.app import Context, Message
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -36,11 +37,7 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorResponse,
 )
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
-from flwr.supercore.task_process.connector.tool_call import (
-    ConnectorToolCall,
-    extract_builtin_connector_tool_calls,
-    with_builtin_connector_tools,
-)
+from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_dumps
 
@@ -53,13 +50,47 @@ _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
 class RuntimeAgentSession(AgentSession):
     """AgentSession bound to one AgentApp task."""
 
-    def __init__(self, responses: AgentResponses) -> None:
+    def __init__(self, responses: AgentResponses, connectors: AgentConnectors) -> None:
         self._responses = responses
+        self._connectors = connectors
 
     @property
     def responses(self) -> AgentResponses:
         """Model response creation API."""
         return self._responses
+
+    @property
+    def connectors(self) -> AgentConnectors:
+        """Connector tool schema and execution API."""
+        return self._connectors
+
+
+class RuntimeAgentConnectors(AgentConnectors):
+    """AgentConnectors implementation backed by connector tasks."""
+
+    def __init__(self, responses: RuntimeAgentResponses) -> None:
+        self._responses = responses
+
+    def tools(self, names: Sequence[str]) -> list[JSONObject]:
+        """Return model-facing tool schemas for built-in connectors."""
+        return [get_builtin_connector_tool(name) for name in names]
+
+    def call(self, tool_call: JSONObject) -> JSONObject:
+        """Execute one model function_call and return a function_call_output item."""
+        arguments = tool_call["arguments"]
+        if isinstance(arguments, str):
+            arguments = json.loads(arguments)
+
+        output = self._responses.create_connector_response(
+            name=cast(str, tool_call["name"]),
+            call_id=cast(str, tool_call["call_id"]),
+            arguments=cast(JSONObject, arguments),
+        )
+        return {
+            "type": "function_call_output",
+            "call_id": tool_call["call_id"],
+            "output": strict_json_dumps(output, compact=True),
+        }
 
 
 class RuntimeAgentResponses(AgentResponses):
@@ -79,53 +110,8 @@ class RuntimeAgentResponses(AgentResponses):
         self._task_id = task_id
 
     def create(self, request: JSONObject) -> JSONObject:
-        """Create a model response through child model and connector tasks."""
-        # Expand requested built-in connector names into function tools while
-        # keeping track of which names this request explicitly enabled.
-        prepared_tools = with_builtin_connector_tools(request)
-        model_request = prepared_tools.request
-        response_payload = self._create_model_response(model_request)
-
-        tool_calls = extract_builtin_connector_tool_calls(
-            response_payload, prepared_tools.enabled_builtin_connectors
-        )
-        if tool_calls:
-            # Execute one connector batch; further tool-call loops stay in AgentApp.
-            followup_input: list[JSONObject] = []
-            for tool_call in tool_calls:
-                output = self._create_connector_response(tool_call)
-                followup_input.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": tool_call.call_id,
-                        "output": strict_json_dumps(output, compact=True),
-                    }
-                )
-
-            # Continue with caller-defined tools only; runtime built-ins were only
-            # advertised for the hidden connector-planning turn.
-            followup_request = dict(model_request)
-            followup_request.pop("tool_choice", None)
-            if prepared_tools.followup_tools is None:
-                followup_request.pop("tools", None)
-            else:
-                followup_request["tools"] = prepared_tools.followup_tools
-            if request.get("stream") is True:
-                followup_request["stream"] = True
-
-            previous_response_id = response_payload.get("id")
-            if isinstance(previous_response_id, str) and previous_response_id:
-                followup_request["input"] = followup_input
-                followup_request["previous_response_id"] = previous_response_id
-            else:
-                output = response_payload.get("output")
-                prior_output: list[JSONObject] = []
-                if _is_json_object_list(output):
-                    prior_output = cast(list[JSONObject], output)
-                # Some providers do not return a reusable response id, so replay
-                # the first response output with the connector results appended.
-                followup_request["input"] = [*prior_output, *followup_input]
-            response_payload = self._create_model_response(followup_request)
+        """Create a model response through a child model task."""
+        response_payload = self._create_model_response(request)
 
         output = response_payload.get("output")
         if _is_json_object_list(output):
@@ -165,9 +151,10 @@ class RuntimeAgentResponses(AgentResponses):
         response = ModelResponse.from_message(response_message)
         return response.payload
 
-    def _create_connector_response(self, tool_call: ConnectorToolCall) -> JSONValue:
+    def create_connector_response(
+        self, *, name: str, call_id: str, arguments: JSONObject
+    ) -> JSONValue:
         """Create one connector response through a child connector task."""
-        name = tool_call.name
         create_res = self._stub.CreateTask(
             CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=name)
         )
@@ -178,8 +165,8 @@ class RuntimeAgentResponses(AgentResponses):
         message = ConnectorRequest(
             dst_task_id=connector_task_id,
             name=name,
-            call_id=tool_call.call_id,
-            arguments=tool_call.arguments,
+            call_id=call_id,
+            arguments=arguments,
         )
         response_message = self._send_and_receive(message)
         response = ConnectorResponse.from_message(response_message)
