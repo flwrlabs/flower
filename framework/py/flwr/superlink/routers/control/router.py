@@ -18,15 +18,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from flwr.common.serde import run_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsRequest,
     ListRunsResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
-from flwr.supercore.date import now
+from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.protobuf.routing import ProtobufRouter
+from flwr.superlink.dependencies.account import get_account
 from flwr.superlink.dependencies.linkstate import get_linkstate
+from flwr.superlink.servicer.control import control_handlers
 
 router = APIRouter(prefix="/control", tags=["control"])
 protobuf_router = ProtobufRouter(router)
@@ -36,6 +37,7 @@ protobuf_router = ProtobufRouter(router)
 def list_runs(
     request: ListRunsRequest,
     linkstate: Annotated[LinkState, Depends(get_linkstate)],
+    account: Annotated[AccountInfo, Depends(get_account)],
 ) -> ListRunsResponse:
     """List runs.
 
@@ -45,25 +47,12 @@ def list_runs(
         Filters for the requested runs.
     linkstate : LinkState
         State used to retrieve runs.
+    account : AccountInfo
+        Authenticated account making the request.
 
     Returns
     -------
     ListRunsResponse
         Runs that match the requested filters.
     """
-    # This is a temporary implementation of list_runs.
-    # Eventually it will rely on its control_handlers.py counterpart
-    if request.HasField("run_id"):
-        runs = linkstate.get_run_info(run_ids=[request.run_id])
-    else:
-        limit = request.limit if request.HasField("limit") else None
-        runs = linkstate.get_run_info(
-            order_by="pending_at",
-            ascending=False,
-            limit=limit,
-        )
-
-    return ListRunsResponse(
-        run_dict={run.run_id: run_to_proto(run) for run in runs},
-        now=now().isoformat(),
-    )
+    return control_handlers.list_runs(request, account, linkstate)

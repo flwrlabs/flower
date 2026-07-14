@@ -1,0 +1,141 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Tests for the Control API account dependency."""
+
+from unittest.mock import Mock
+
+import pytest
+from fastapi import HTTPException, Request, Response, status
+
+from flwr.supercore.auth.typing import AccountInfo
+
+from .account import AccountAccessDependency
+
+
+def _make_request() -> Request:  # type: ignore[type-arg]
+    """Return a minimal request with authentication metadata."""
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/",
+            "headers": [(b"authorization", b"Bearer access-token")],
+            "query_string": b"",
+            "server": ("testserver", 80),
+            "client": ("testclient", 50000),
+            "scheme": "http",
+        }
+    )
+
+
+def test_account_access_dependency_returns_authorized_account() -> None:
+    """AccountAccessDependency should return the account when tokens are valid."""
+    authn_plugin = Mock()
+    authz_plugin = Mock()
+    account = AccountInfo(flwr_aid="aid", account_name="account")
+    authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
+    authz_plugin.authorize.return_value = True
+
+    result = AccountAccessDependency(authn_plugin, authz_plugin)(
+        _make_request(), Response()
+    )
+
+    assert result is account
+    authn_plugin.validate_tokens_in_metadata.assert_called_once_with(
+        [("authorization", "Bearer access-token")]
+    )
+    authn_plugin.refresh_tokens.assert_not_called()
+    authz_plugin.authorize.assert_called_once_with(account)
+
+
+def test_account_access_dependency_refreshes_tokens_and_sets_response_headers() -> None:
+    """AccountAccessDependency returns an authorized account after token refresh."""
+    authn_plugin = Mock()
+    authz_plugin = Mock()
+    account = AccountInfo(flwr_aid="aid", account_name="account")
+    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
+    authn_plugin.refresh_tokens.return_value = (
+        [("x-access-token", "new-token"), ("x-refresh-token", b"new-refresh")],
+        account,
+    )
+    authz_plugin.authorize.return_value = True
+    response = Response()
+
+    result = AccountAccessDependency(authn_plugin, authz_plugin)(
+        _make_request(), response
+    )
+
+    assert result is account
+    assert response.headers.get("x-access-token") == "new-token"
+    assert response.headers.get("x-refresh-token") == "new-refresh"
+    authz_plugin.authorize.assert_called_once_with(account)
+
+
+@pytest.mark.parametrize(
+    ("valid_tokens", "tokens", "account", "status_code", "detail"),
+    [
+        (
+            True,
+            None,
+            None,
+            status.HTTP_401_UNAUTHORIZED,
+            "Tokens validated, but account info not found",
+        ),
+        (False, None, None, status.HTTP_401_UNAUTHORIZED, "Access denied"),
+        (
+            False,
+            [("x-access-token", "new-token")],
+            None,
+            status.HTTP_401_UNAUTHORIZED,
+            "Tokens refreshed, but account info not found",
+        ),
+    ],
+)
+def test_account_access_dependency_rejects_unauthenticated_requests(
+    valid_tokens: bool,
+    tokens: list[tuple[str, str]] | None,
+    account: AccountInfo | None,
+    status_code: int,
+    detail: str,
+) -> None:
+    """AccountAccessDependency should reject absent or incomplete authentication."""
+    authn_plugin = Mock()
+    authz_plugin = Mock()
+    authn_plugin.validate_tokens_in_metadata.return_value = (valid_tokens, account)
+    authn_plugin.refresh_tokens.return_value = (tokens, account)
+
+    with pytest.raises(HTTPException) as exc_info:
+        AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(), Response())
+
+    assert exc_info.value.status_code == status_code
+    assert exc_info.value.detail == detail
+    authz_plugin.authorize.assert_not_called()
+
+
+def test_account_access_dependency_rejects_unauthorized_account() -> None:
+    """AccountAccessDependency should reject accounts denied by authorization."""
+    authn_plugin = Mock()
+    authz_plugin = Mock()
+    account = AccountInfo(flwr_aid="aid", account_name="account")
+    authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
+    authz_plugin.authorize.return_value = False
+
+    with pytest.raises(HTTPException) as exc_info:
+        AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(), Response())
+
+    assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
+    assert exc_info.value.detail == (
+        "❗️ Account not authorized. Please contact the SuperLink administrator."
+    )
