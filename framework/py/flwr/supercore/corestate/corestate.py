@@ -24,10 +24,7 @@ from flwr.app import Context, Message
 from flwr.app.user_config import UserConfig
 from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-<<<<<<< HEAD
-=======
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
->>>>>>> origin
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
@@ -177,11 +174,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         series_id: int,
         next_run_at: str,
         fixed_interval: int | None = None,
-<<<<<<< HEAD
-        remaining_runs: int | None = None,
-=======
         max_runs: int | None = None,
->>>>>>> origin
     ) -> Automation:
         """Store an automation and return its metadata.
 

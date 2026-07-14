@@ -516,8 +516,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 """
                 UPDATE automation
                 SET status = :status,
-                    updated_at = :updated_at,
-                    next_run_at = NULL
+                    updated_at = :updated_at
                 WHERE automation_id = :automation_id
                 AND status = :active_status
                 AND next_run_at = :previous_next_run_at
@@ -533,7 +532,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return bool(rows)
 
-        next_run_sql = "NULL"
+        next_run_sql = "next_run_at"
         status_sql = ":completed_status"
         params: dict[str, Any] = {
             "automation_id": automation_id,
@@ -553,7 +552,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             next_run_sql = """
                 CASE
                     WHEN remaining_runs IS NOT NULL AND remaining_runs <= 1
-                        THEN NULL
+                        THEN next_run_at
                     ELSE :next_run_at
                 END
             """

@@ -240,35 +240,34 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [automation.automation_id for automation in stopped], [due.automation_id]
         )
-        self.assertFalse(stopped[0].HasField("next_run_at"))
+        self.assertEqual(stopped[0].next_run_at, due_at)
 
     def test_update_automation(self) -> None:
         """Automation updates should advance and fail records."""
         state = self.state_factory()
         current = now()
 
+        previous_next_run_at = (current - timedelta(seconds=30)).isoformat()
+        next_run_at = (current + timedelta(seconds=30)).isoformat()
         completing = self.store_automation(
             state,
             series_id=1,
-            next_run_at=(current - timedelta(seconds=30)).isoformat(),
+            next_run_at=previous_next_run_at,
             fixed_interval=60,
-            remaining_runs=2,
+            max_runs=2,
         )
-        next_run_at = (current + timedelta(seconds=30)).isoformat()
         self.assertTrue(
             state.update_automation(
                 completing.automation_id,
-                previous_next_run_at=(current - timedelta(seconds=30)).isoformat(),
+                previous_next_run_at=previous_next_run_at,
                 next_run_at=next_run_at,
-                status=AutomationStatus.ACTIVE,
             )
         )
         self.assertFalse(
             state.update_automation(
                 completing.automation_id,
-                previous_next_run_at=(current - timedelta(seconds=30)).isoformat(),
+                previous_next_run_at=previous_next_run_at,
                 next_run_at=next_run_at,
-                status=AutomationStatus.ACTIVE,
             )
         )
         updated = state.list_automations(
@@ -279,15 +278,16 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(updated[0].remaining_runs, 1)
         self.assertEqual(updated[0].next_run_at, next_run_at)
 
+        failed_previous_next_run_at = (current - timedelta(seconds=15)).isoformat()
         failing = self.store_automation(
             state,
             series_id=2,
-            next_run_at=(current - timedelta(seconds=15)).isoformat(),
+            next_run_at=failed_previous_next_run_at,
         )
         self.assertTrue(
             state.update_automation(
                 failing.automation_id,
-                previous_next_run_at=(current - timedelta(seconds=15)).isoformat(),
+                previous_next_run_at=failed_previous_next_run_at,
                 next_run_at=None,
                 status=AutomationStatus.FAILED,
             )
@@ -301,7 +301,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [automation.automation_id for automation in failed],
             [failing.automation_id],
         )
-        self.assertFalse(failed[0].HasField("next_run_at"))
+        self.assertEqual(failed[0].next_run_at, failed_previous_next_run_at)
 
     def test_store_automation_preserves_series_id_without_validation(self) -> None:
         """Automation storage should preserve caller-provided series IDs."""

@@ -365,7 +365,6 @@ class InMemoryCoreState(
             record.automation.status = AutomationStatus.STOPPED
             record.automation.updated_at = stopped_at
             record.automation.stopped_at = stopped_at
-            record.automation.ClearField("next_run_at")
             return True
 
     def update_automation(
@@ -385,7 +384,6 @@ class InMemoryCoreState(
             if (
                 record is None
                 or record.automation.status != AutomationStatus.ACTIVE
-                or not record.automation.HasField("next_run_at")
                 or record.automation.next_run_at != previous_next_run_at
             ):
                 return False
@@ -395,7 +393,6 @@ class InMemoryCoreState(
 
             if status == AutomationStatus.FAILED:
                 record.automation.status = AutomationStatus.FAILED
-                record.automation.ClearField("next_run_at")
                 return True
 
             if record.automation.HasField("remaining_runs"):
@@ -408,7 +405,6 @@ class InMemoryCoreState(
                 and record.automation.remaining_runs == 0
             ) or next_run_at is None:
                 record.automation.status = AutomationStatus.COMPLETED
-                record.automation.ClearField("next_run_at")
                 return True
 
             record.automation.next_run_at = next_run_at
