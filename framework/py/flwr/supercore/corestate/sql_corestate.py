@@ -511,7 +511,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         automation_id: int,
         *,
-        expected_next_run_at: str,
+        previous_next_run_at: str,
         next_run_at: str | None,
         status: AutomationStatus = AutomationStatus.ACTIVE,
     ) -> bool:
@@ -529,7 +529,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     next_run_at = NULL
                 WHERE automation_id = :automation_id
                 AND status = :active_status
-                AND next_run_at = :expected_next_run_at
+                AND next_run_at = :previous_next_run_at
                 RETURNING automation_id
                 """,
                 {
@@ -537,7 +537,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     "status": AutomationStatus.FAILED,
                     "updated_at": timestamp,
                     "active_status": AutomationStatus.ACTIVE,
-                    "expected_next_run_at": expected_next_run_at,
+                    "previous_next_run_at": previous_next_run_at,
                 },
             )
             return bool(rows)
@@ -549,7 +549,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             "active_status": AutomationStatus.ACTIVE,
             "completed_status": AutomationStatus.COMPLETED,
             "updated_at": timestamp,
-            "expected_next_run_at": expected_next_run_at,
+            "previous_next_run_at": previous_next_run_at,
         }
         if next_run_at is not None:
             status_sql = """
@@ -583,7 +583,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 END
             WHERE automation_id = :automation_id
             AND status = :active_status
-            AND next_run_at = :expected_next_run_at
+            AND next_run_at = :previous_next_run_at
             RETURNING automation_id
             """,
             params,

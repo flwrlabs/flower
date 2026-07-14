@@ -375,7 +375,7 @@ class InMemoryCoreState(
         self,
         automation_id: int,
         *,
-        expected_next_run_at: str,
+        previous_next_run_at: str,
         next_run_at: str | None,
         status: AutomationStatus = AutomationStatus.ACTIVE,
     ) -> bool:
@@ -389,7 +389,7 @@ class InMemoryCoreState(
                 record is None
                 or record.automation.status != AutomationStatus.ACTIVE
                 or not record.automation.HasField("next_run_at")
-                or record.automation.next_run_at != expected_next_run_at
+                or record.automation.next_run_at != previous_next_run_at
             ):
                 return False
 

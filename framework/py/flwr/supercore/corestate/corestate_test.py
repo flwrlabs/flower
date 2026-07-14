@@ -257,7 +257,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(
             state.update_automation(
                 completing.automation_id,
-                expected_next_run_at=(current - timedelta(seconds=30)).isoformat(),
+                previous_next_run_at=(current - timedelta(seconds=30)).isoformat(),
                 next_run_at=next_run_at,
                 status=AutomationStatus.ACTIVE,
             )
@@ -265,7 +265,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(
             state.update_automation(
                 completing.automation_id,
-                expected_next_run_at=(current - timedelta(seconds=30)).isoformat(),
+                previous_next_run_at=(current - timedelta(seconds=30)).isoformat(),
                 next_run_at=next_run_at,
                 status=AutomationStatus.ACTIVE,
             )
@@ -286,7 +286,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(
             state.update_automation(
                 failing.automation_id,
-                expected_next_run_at=(current - timedelta(seconds=15)).isoformat(),
+                previous_next_run_at=(current - timedelta(seconds=15)).isoformat(),
                 next_run_at=None,
                 status=AutomationStatus.FAILED,
             )

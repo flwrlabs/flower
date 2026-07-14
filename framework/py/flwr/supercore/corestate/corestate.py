@@ -243,7 +243,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         automation_id: int,
         *,
-        expected_next_run_at: str,
+        previous_next_run_at: str,
         next_run_at: str | None,
         status: AutomationStatus = AutomationStatus.ACTIVE,
     ) -> bool:
@@ -253,9 +253,9 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         automation_id : int
             Automation ID to update.
-        expected_next_run_at : str
-            Current due time timestamp string expected by the caller. The update
-            only succeeds if the stored `next_run_at` still matches this value.
+        previous_next_run_at : str
+            Previously observed due time timestamp string. The update only
+            succeeds if the stored `next_run_at` still matches this value.
         next_run_at : str | None
             Next due time timestamp string after a successful dispatch. If
             `None`, the automation is completed.
