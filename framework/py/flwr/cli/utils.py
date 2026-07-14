@@ -42,7 +42,7 @@ from flwr.supercore.constant import (
     MAX_NAME_LENGTH,
 )
 from flwr.supercore.credential_store import get_credential_store
-from flwr.supercore.error import FlowerError
+from flwr.supercore.error import FlowerError, format_flower_error
 from flwr.supercore.grpc import (
     GRPC_MAX_MESSAGE_LENGTH,
     create_channel,
@@ -85,14 +85,6 @@ def log_superlink_connection(superlink_connection: SuperLinkConnection) -> None:
         f"({superlink_connection.address})",
         fg=typer.colors.BLUE,
     )
-
-
-def _format_flower_error(err: FlowerError) -> str:
-    """Return the CLI-facing message for a FlowerError."""
-    msg = err.message
-    if err.public_details:
-        msg += f"\n{err.public_details}"
-    return msg
 
 
 @contextmanager  # docsig: ignore=SIG503
@@ -450,7 +442,7 @@ def flwr_cli_grpc_exc_handler(
         # not a valid FlowerError, the raw gRPC fallback below handles it.
         details = cast(str, e.details())  # pylint: disable=E1101
         if flower_error := FlowerError.from_json(details):
-            raise click.ClickException(_format_flower_error(flower_error)) from None
+            raise click.ClickException(format_flower_error(flower_error)) from None
 
         # Keep special handling only for transport-level errors that are not part
         # of the FlowerError catalog.
