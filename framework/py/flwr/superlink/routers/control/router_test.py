@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for the Control API router."""
 
-
 from datetime import datetime
 from unittest.mock import Mock
 
@@ -30,7 +29,7 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.run import Run
-from flwr.superlink.dependencies.account import GetAccount
+from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.routers.control.router import router
 
@@ -47,7 +46,7 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
     authz_plugin.authorize.return_value = True
     app = FastAPI()
-    app.state.get_account = GetAccount(authn_plugin, authz_plugin)
+    app.state.get_account = AccountAccessDependency(authn_plugin, authz_plugin)
     app.include_router(router)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     client = TestClient(app)

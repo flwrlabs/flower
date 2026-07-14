@@ -14,7 +14,6 @@
 # ==============================================================================
 """FastAPI dependency for Control API account authentication."""
 
-
 from collections.abc import Sequence
 
 from fastapi import HTTPException, Request, Response, status
@@ -23,12 +22,12 @@ from flwr.supercore.auth.typing import AccountInfo
 from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
 
 
-class GetAccount:
+class AccountAccessDependency:
     """Authenticate and authorize a Control API request.
 
     Instances are FastAPI dependencies. For example::
 
-        get_account = GetAccount(authn_plugin, authz_plugin)
+        get_account = AccountAccessDependency(authn_plugin, authz_plugin)
 
         @router.get("/")
         def endpoint(account: Annotated[AccountInfo, Depends(get_account)]) -> None:
@@ -113,11 +112,11 @@ def get_account(
 ) -> AccountInfo:
     """Return the authenticated account for the current request.
 
-    The application must configure ``app.state.get_account`` with a ``GetAccount``
-    instance during application setup.
+    The application must configure ``app.state.get_account`` with an
+    ``AccountAccessDependency`` instance during application setup.
     """
     account_dependency = getattr(request.app.state, "get_account", None)
-    if not isinstance(account_dependency, GetAccount):
+    if not isinstance(account_dependency, AccountAccessDependency):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="SuperLink account authentication is not initialized.",

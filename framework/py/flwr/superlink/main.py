@@ -14,7 +14,6 @@
 # ==============================================================================
 """SuperLink API."""
 
-
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Mapping
@@ -38,7 +37,7 @@ from flwr.superlink.auth_plugin import (
     NoOpControlAuthnPlugin,
     NoOpControlAuthzPlugin,
 )
-from flwr.superlink.dependencies.account import GetAccount
+from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.routers.control import router as control_router
 
@@ -96,7 +95,7 @@ def create_app(
        in-memory SQLite LinkStateFactory and NoOp Control authentication
        plugins. Direct callers of `create_app` must provide all dependencies.
     """
-    account_dependency = GetAccount(authn_plugin, authz_plugin)
+    account_dependency = AccountAccessDependency(authn_plugin, authz_plugin)
 
     @asynccontextmanager
     async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[dict[str, object]]:

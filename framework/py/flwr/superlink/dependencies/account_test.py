@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for the Control API account dependency."""
 
-
 from unittest.mock import Mock
 
 import pytest
@@ -22,7 +21,7 @@ from fastapi import HTTPException, Request, Response, status
 
 from flwr.supercore.auth.typing import AccountInfo
 
-from .account import GetAccount
+from .account import AccountAccessDependency
 
 
 def _make_request() -> Request:  # type: ignore[type-arg]
@@ -41,15 +40,17 @@ def _make_request() -> Request:  # type: ignore[type-arg]
     )
 
 
-def test_get_account_returns_authorized_account() -> None:
-    """GetAccount should return the account when tokens are valid."""
+def test_account_access_dependency_returns_authorized_account() -> None:
+    """AccountAccessDependency should return the account when tokens are valid."""
     authn_plugin = Mock()
     authz_plugin = Mock()
     account = AccountInfo(flwr_aid="aid", account_name="account")
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
     authz_plugin.authorize.return_value = True
 
-    result = GetAccount(authn_plugin, authz_plugin)(_make_request(), Response())
+    result = AccountAccessDependency(authn_plugin, authz_plugin)(
+        _make_request(), Response()
+    )
 
     assert result is account
     authn_plugin.validate_tokens_in_metadata.assert_called_once_with(
@@ -59,8 +60,8 @@ def test_get_account_returns_authorized_account() -> None:
     authz_plugin.authorize.assert_called_once_with(account)
 
 
-def test_get_account_refreshes_tokens_and_sets_response_headers() -> None:
-    """GetAccount should return an authorized account after token refresh."""
+def test_account_access_dependency_refreshes_tokens_and_sets_response_headers() -> None:
+    """AccountAccessDependency returns an authorized account after token refresh."""
     authn_plugin = Mock()
     authz_plugin = Mock()
     account = AccountInfo(flwr_aid="aid", account_name="account")
@@ -72,7 +73,9 @@ def test_get_account_refreshes_tokens_and_sets_response_headers() -> None:
     authz_plugin.authorize.return_value = True
     response = Response()
 
-    result = GetAccount(authn_plugin, authz_plugin)(_make_request(), response)
+    result = AccountAccessDependency(authn_plugin, authz_plugin)(
+        _make_request(), response
+    )
 
     assert result is account
     assert response.headers.get("x-access-token") == "new-token"
@@ -100,29 +103,29 @@ def test_get_account_refreshes_tokens_and_sets_response_headers() -> None:
         ),
     ],
 )
-def test_get_account_rejects_unauthenticated_requests(
+def test_account_access_dependency_rejects_unauthenticated_requests(
     valid_tokens: bool,
     tokens: list[tuple[str, str]] | None,
     account: AccountInfo | None,
     status_code: int,
     detail: str,
 ) -> None:
-    """GetAccount should reject absent or incomplete authentication."""
+    """AccountAccessDependency should reject absent or incomplete authentication."""
     authn_plugin = Mock()
     authz_plugin = Mock()
     authn_plugin.validate_tokens_in_metadata.return_value = (valid_tokens, account)
     authn_plugin.refresh_tokens.return_value = (tokens, account)
 
     with pytest.raises(HTTPException) as exc_info:
-        GetAccount(authn_plugin, authz_plugin)(_make_request(), Response())
+        AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(), Response())
 
     assert exc_info.value.status_code == status_code
     assert exc_info.value.detail == detail
     authz_plugin.authorize.assert_not_called()
 
 
-def test_get_account_rejects_unauthorized_account() -> None:
-    """GetAccount should reject authenticated accounts denied by authorization."""
+def test_account_access_dependency_rejects_unauthorized_account() -> None:
+    """AccountAccessDependency should reject accounts denied by authorization."""
     authn_plugin = Mock()
     authz_plugin = Mock()
     account = AccountInfo(flwr_aid="aid", account_name="account")
@@ -130,7 +133,7 @@ def test_get_account_rejects_unauthorized_account() -> None:
     authz_plugin.authorize.return_value = False
 
     with pytest.raises(HTTPException) as exc_info:
-        GetAccount(authn_plugin, authz_plugin)(_make_request(), Response())
+        AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(), Response())
 
     assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
     assert exc_info.value.detail == (
