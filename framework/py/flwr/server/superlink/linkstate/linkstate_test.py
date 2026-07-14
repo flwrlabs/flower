@@ -869,11 +869,17 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 3
         assert state.num_message_res() == 2
 
+        state._on_push_session_expired(  # pylint: disable=protected-access
+            {msg_res_0.metadata.message_id}
+        )
+        assert state.num_message_ins() == 3
+        assert state.num_message_res() == 1
+
         state.delete_messages({msg_id_0})
         assert state.num_message_ins() == 2
         assert state.num_message_res() == 1
 
-        state.delete_messages({msg_id_1})
+        state._on_push_session_expired({msg_id_1})  # pylint: disable=protected-access
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
 

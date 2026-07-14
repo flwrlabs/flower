@@ -196,11 +196,11 @@ class InMemoryCoreState(
                 if self._object_push_session_by_root.get(object_id) == session_id:
                     del self._object_push_session_by_root[object_id]
 
-            # Delete expired object trees and their message metadata
-            if cleanup_messages and session.root_object_ids:
-                for object_id in session.root_object_ids:
-                    self.object_store.delete(object_id)
-                self._on_push_session_expired(session.root_object_ids)
+        # Delete expired object trees and their message metadata
+        if cleanup_messages and session.root_object_ids:
+            for object_id in session.root_object_ids:
+                self.object_store.delete(object_id)
+            self._on_push_session_expired(session.root_object_ids)
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
