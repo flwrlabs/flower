@@ -181,9 +181,5 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
             operation_ids.add(op_id)
 
 
-# Temporary: we need a way to provision the FastAPI server
-app = create_app(
-    linkstate_factory=_create_default_linkstate_factory(),
-    authn_plugin=NoOpControlAuthnPlugin(Path(), False),
-    authz_plugin=NoOpControlAuthzPlugin(Path(), False),
-)
+# Uncomment this once the FastAPI app is configurable.
+# app = create_app(...)
