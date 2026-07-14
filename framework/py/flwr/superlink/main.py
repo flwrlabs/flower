@@ -109,7 +109,7 @@ def create_app(
                 superlink_lifespan.startup()
 
             fastapi_app.state.linkstate_factory = linkstate_factory
-            fastapi_app.state.get_account = account_access_dep
+            fastapi_app.state.account_access_dep = account_access_dep
             fastapi_app.state.authn_plugin = authn_plugin
 
             lifespan_state: dict[str, object] = {}

@@ -110,10 +110,10 @@ def get_account(
 ) -> AccountInfo:
     """Return the authenticated account for the current request.
 
-    The application must configure ``app.state.get_account`` with an
+    The application must configure ``app.state.account_access_dep`` with an
     ``AccountAccessDependency`` instance during application setup.
     """
-    account_access = getattr(request.app.state, "get_account", None)
+    account_access = getattr(request.app.state, "account_access_dep", None)
     if not isinstance(account_access, AccountAccessDependency):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

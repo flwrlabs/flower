@@ -47,6 +47,7 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
     authz_plugin.authorize.return_value = True
     app = FastAPI()
+    app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
     app.state.get_account = AccountAccessDependency(authn_plugin, authz_plugin)
     app.include_router(router)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
