@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-07-10 00:27+0000\n"
+"POT-Creation-Date: 2026-07-14 00:19+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -467,17 +467,16 @@ msgstr "Argument de construction"
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #: ../../source/how-to-configure-audit-logging.rst:58
 #: ../../source/ref-exit-codes/0.rst:7 ../../source/ref-exit-codes/1.rst:7
-#: ../../source/ref-exit-codes/100.rst:7 ../../source/ref-exit-codes/101.rst:7
-#: ../../source/ref-exit-codes/102.rst:7 ../../source/ref-exit-codes/103.rst:7
-#: ../../source/ref-exit-codes/104.rst:7 ../../source/ref-exit-codes/105.rst:7
-#: ../../source/ref-exit-codes/2.rst:7 ../../source/ref-exit-codes/200.rst:23
-#: ../../source/ref-exit-codes/201.rst:7 ../../source/ref-exit-codes/202.rst:7
-#: ../../source/ref-exit-codes/203.rst:7 ../../source/ref-exit-codes/250.rst:7
-#: ../../source/ref-exit-codes/3.rst:7 ../../source/ref-exit-codes/302.rst:7
-#: ../../source/ref-exit-codes/303.rst:7 ../../source/ref-exit-codes/304.rst:7
-#: ../../source/ref-exit-codes/400.rst:7 ../../source/ref-exit-codes/401.rst:7
-#: ../../source/ref-exit-codes/402.rst:7 ../../source/ref-exit-codes/500.rst:7
-#: ../../source/ref-exit-codes/600.rst:7 ../../source/ref-exit-codes/601.rst:7
+#: ../../source/ref-exit-codes/101.rst:7 ../../source/ref-exit-codes/102.rst:7
+#: ../../source/ref-exit-codes/103.rst:7 ../../source/ref-exit-codes/104.rst:7
+#: ../../source/ref-exit-codes/105.rst:7 ../../source/ref-exit-codes/2.rst:7
+#: ../../source/ref-exit-codes/200.rst:23 ../../source/ref-exit-codes/201.rst:7
+#: ../../source/ref-exit-codes/202.rst:7 ../../source/ref-exit-codes/203.rst:7
+#: ../../source/ref-exit-codes/250.rst:7 ../../source/ref-exit-codes/3.rst:7
+#: ../../source/ref-exit-codes/302.rst:7 ../../source/ref-exit-codes/303.rst:7
+#: ../../source/ref-exit-codes/304.rst:7 ../../source/ref-exit-codes/400.rst:7
+#: ../../source/ref-exit-codes/401.rst:7 ../../source/ref-exit-codes/402.rst:7
+#: ../../source/ref-exit-codes/500.rst:7 ../../source/ref-exit-codes/600.rst:7
 #: ../../source/ref-exit-codes/602.rst:7 ../../source/ref-exit-codes/603.rst:7
 #: ../../source/ref-exit-codes/604.rst:7 ../../source/ref-exit-codes/605.rst:7
 #: ../../source/ref-exit-codes/606.rst:7 ../../source/ref-exit-codes/607.rst:7
@@ -489,7 +488,7 @@ msgstr "Description"
 #: ../../source/contributor-how-to-build-docker-images.rst:42
 #: ../../source/contributor-how-to-build-docker-images.rst:109
 msgid "Required"
-msgstr "Required"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:43
 #: ../../source/contributor-how-to-build-docker-images.rst:110
@@ -501,7 +500,7 @@ msgstr "Exemple"
 
 #: ../../source/contributor-how-to-build-docker-images.rst:44
 msgid "``DISTRO``"
-msgstr "``DISTRO``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:45
 msgid "The Linux distribution to use as the base image."
@@ -514,15 +513,15 @@ msgstr "La distribution Linux à utiliser comme image de base."
 #: ../../source/contributor-how-to-build-docker-images.rst:77
 #: ../../source/contributor-how-to-build-docker-images.rst:113
 msgid "No"
-msgstr "No"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:47
 msgid "``ubuntu``"
-msgstr "``ubuntu``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:48
 msgid "``DISTRO_VERSION``"
-msgstr "``DISTRO_VERSION``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:49
 msgid "Version of the Linux distribution."
@@ -530,11 +529,11 @@ msgstr "Version de la distribution Linux."
 
 #: ../../source/contributor-how-to-build-docker-images.rst:51
 msgid ":substitution-code:`|ubuntu_version|`"
-msgstr ":substitution-code:`|ubuntu_version|`"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:52
 msgid "``PYTHON_VERSION``"
-msgstr "``PYTHON_VERSION``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:53
 msgid "Version of ``python`` to be installed."
@@ -542,11 +541,11 @@ msgstr "Version de ``python`` à installer."
 
 #: ../../source/contributor-how-to-build-docker-images.rst:55
 msgid "``3.11`` or ``3.11.1``"
-msgstr "``3.11`` or ``3.11.1``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:56
 msgid "``PIP_VERSION``"
-msgstr "``PIP_VERSION``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:57
 msgid "Version of ``pip`` to be installed."
@@ -557,15 +556,15 @@ msgstr "Version de ``pip`` à installer."
 #: ../../source/contributor-how-to-build-docker-images.rst:66
 #: ../../source/contributor-how-to-build-docker-images.rst:117
 msgid "Yes"
-msgstr "Yes"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:59
 msgid ":substitution-code:`|pip_version|`"
-msgstr ":substitution-code:`|pip_version|`"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:60
 msgid "``SETUPTOOLS_VERSION``"
-msgstr "``SETUPTOOLS_VERSION``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:61
 msgid "Version of ``setuptools`` to be installed."
@@ -573,11 +572,11 @@ msgstr "Version de ``setuptools`` à installer."
 
 #: ../../source/contributor-how-to-build-docker-images.rst:63
 msgid ":substitution-code:`|setuptools_version|`"
-msgstr ":substitution-code:`|setuptools_version|`"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:64
 msgid "``FLWR_VERSION``"
-msgstr "``FLWR_VERSION``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:65
 msgid "Version of Flower to be installed."
@@ -585,11 +584,11 @@ msgstr "Version de Flower à installer."
 
 #: ../../source/contributor-how-to-build-docker-images.rst:67
 msgid ":substitution-code:`|stable_flwr_version|`"
-msgstr ":substitution-code:`|stable_flwr_version|`"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:68
 msgid "``FLWR_PACKAGE``"
-msgstr "``FLWR_PACKAGE``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:69
 msgid "The Flower package to be installed."
@@ -597,11 +596,11 @@ msgstr "Le paquet Flower à installer."
 
 #: ../../source/contributor-how-to-build-docker-images.rst:71
 msgid "``flwr`` or ``flwr-nightly``"
-msgstr "``flwr`` or ``flwr-nightly``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:72
 msgid "``FLWR_VERSION_REF``"
-msgstr "``FLWR_VERSION_REF``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:73
 msgid ""
@@ -650,7 +649,7 @@ msgstr "Construire une image binaire Flower"
 
 #: ../../source/contributor-how-to-build-docker-images.rst:111
 msgid "``BASE_REPOSITORY``"
-msgstr "``BASE_REPOSITORY``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:112
 msgid "The repository name of the base image."
@@ -658,11 +657,11 @@ msgstr "Le nom du dépôt de l'image de base."
 
 #: ../../source/contributor-how-to-build-docker-images.rst:114
 msgid "``flwr/base``"
-msgstr "``flwr/base``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:115
 msgid "``BASE_IMAGE``"
-msgstr "``BASE_IMAGE``"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:116
 msgid "The Tag of the Flower base image."
@@ -670,7 +669,7 @@ msgstr "La balise de l'image de base Flower."
 
 #: ../../source/contributor-how-to-build-docker-images.rst:118
 msgid ":substitution-code:`|stable_flwr_version|-py3.11-ubuntu|ubuntu_version|`"
-msgstr ":substitution-code:`|stable_flwr_version|-py3.11-ubuntu|ubuntu_version|`"
+msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:120
 msgid ""
@@ -714,14 +713,14 @@ msgid ""
 "those translations! This might also be a great opportunity for those "
 "wanting to become open source contributors with little prerequisites."
 msgstr ""
-"Depuis `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_, nous avons introduit des traductions"
-" dans nos pages de documentation, mais, comme vous avez pu le remarquer, "
-"les traductions sont souvent imparfaites. Si vous parlez des langues "
-"autres que l'anglais, vous pourriez être en mesure d'aider notre effort "
-"pour rendre l'apprentissage fédéré accessible à autant de personnes que "
-"possible en contribuant à ces traductions ! Cela pourrait également être "
-"une excellente opportunité pour ceux qui souhaitent devenir contributeurs"
-" open source avec peu de prérequis."
+"Depuis `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_, nous avons "
+"introduit des traductions dans nos pages de documentation, mais, comme "
+"vous avez pu le remarquer, les traductions sont souvent imparfaites. Si "
+"vous parlez des langues autres que l'anglais, vous pourriez être en "
+"mesure d'aider notre effort pour rendre l'apprentissage fédéré accessible"
+" à autant de personnes que possible en contribuant à ces traductions ! "
+"Cela pourrait également être une excellente opportunité pour ceux qui "
+"souhaitent devenir contributeurs open source avec peu de prérequis."
 
 #: ../../source/contributor-how-to-contribute-translations.rst:12
 msgid ""
@@ -1151,7 +1150,7 @@ msgstr ""
 #: ../../source/contributor-how-to-migrate-database.rst:15
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:41
 msgid "Pre-requisites"
-msgstr "Pre-requisites"
+msgstr ""
 
 #: ../../source/contributor-how-to-migrate-database.rst:17
 msgid ""
@@ -1384,19 +1383,19 @@ msgstr "Voici quelques exemples :"
 
 #: ../../source/contributor-how-to-release-flower.rst:57
 msgid "``1.0.0a0``"
-msgstr "``1.0.0a0``"
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:58
 msgid "``1.0.0b0``"
-msgstr "``1.0.0b0``"
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:59
 msgid "``1.0.0rc0``"
-msgstr "``1.0.0rc0``"
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:60
 msgid "``1.0.0rc1``"
-msgstr "1.0.0rc1"
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:62
 msgid ""
@@ -1408,7 +1407,7 @@ msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:65
 msgid "`PEP-440 <https://peps.python.org/pep-0440/>`_"
-msgstr "`PEP-440 <https://peps.python.org/pep-0440/>`_"
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:66
 msgid ""
@@ -2061,7 +2060,7 @@ msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:167
 msgid "**Commit changes**"
-msgstr "**Commit changes**"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:168
 msgid ""
@@ -2402,7 +2401,7 @@ msgstr "Changez le nom du fichier en ``save-progress.rst``"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:328
 msgid "Add a redirect rule to ``framework/docs/source/conf.py``"
-msgstr "Add a redirect rule to ``framework/docs/source/conf.py``"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:330
 msgid ""
@@ -2533,15 +2532,15 @@ msgstr "Exemples valides :"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:386
 msgid "``feat(framework) Add flwr build CLI command``"
-msgstr "``feat(framework) Add flwr build CLI command``"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:387
 msgid "``refactor(examples:skip) Improve quickstart-pytorch logging``"
-msgstr "``refactor(examples:skip) Improve quickstart-pytorch logging``"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:388
 msgid "``ci(*:skip) Enforce PR title format``"
-msgstr "``ci(*:skip) Enforce PR title format``"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:390
 msgid "Invalid examples:"
@@ -2549,7 +2548,7 @@ msgstr "Exemples invalides :"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:392
 msgid "``feat(framework): Add flwr build CLI command`` (extra ``:``)"
-msgstr "``feat(framework): Add flwr build CLI command`` (extra ``:``)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:393
 msgid ""
@@ -2561,11 +2560,11 @@ msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:394
 msgid "``feat(skip) Add flwr build CLI command`` (missing ``<project>``)"
-msgstr "``feat(skip) Add flwr build CLI command`` (missing ``<project>``)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:395
 msgid "``feat(framework) add flwr build CLI command`` (non capitalised verb)"
-msgstr "``feat(framework) add flwr build CLI command`` (non capitalised verb)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:396
 msgid "``feat(framework) Add flwr build CLI command.`` (dot at the end)"
@@ -2573,7 +2572,7 @@ msgstr "``feat(framework) Add flwr build CLI command.`` (point à la fin)"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:397
 msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>)``)"
-msgstr "``Add flwr build CLI command.`` (missing ``<type>(<project>)``)"
+msgstr ""
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:3
 msgid "Get started as a contributor"
@@ -2619,7 +2618,7 @@ msgstr "Setup de la machine"
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:22
 msgid "Preliminaries"
-msgstr "Preliminaries"
+msgstr ""
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:24
 msgid "Some system-wide dependencies are needed."
@@ -2898,8 +2897,8 @@ msgid ""
 msgstr ""
 "Pour des fins de test, vous pouvez générer vos propres certificats auto-"
 "signés. La page `Enable TLS connections <../how-to-enable-tls-"
-"connections.html#certificates>`__ contient une section"
-" qui vous guidera à travers le processus."
+"connections.html#certificates>`__ contient une section qui vous guidera à"
+" travers le processus."
 
 #: ../../source/docker/enable-tls.rst:20
 msgid ""
@@ -2942,7 +2941,7 @@ msgstr ""
 
 #: ../../source/docker/enable-tls.rst
 msgid "Isolation Mode ``subprocess``"
-msgstr "Isolation Mode ``subprocess``"
+msgstr ""
 
 #: ../../source/docker/enable-tls.rst:36
 msgid ""
@@ -2969,7 +2968,7 @@ msgstr ""
 
 #: ../../source/docker/enable-tls.rst:44
 msgid "**SuperLink**"
-msgstr "**SuperLink**"
+msgstr ""
 
 #: ../../source/docker/enable-tls.rst:46
 msgid ""
@@ -3072,7 +3071,7 @@ msgstr ""
 
 #: ../../source/docker/enable-tls.rst
 msgid "SuperLink."
-msgstr "SuperLink."
+msgstr ""
 
 #: ../../source/docker/enable-tls.rst
 msgid ""
@@ -3124,7 +3123,7 @@ msgstr "le réseau."
 
 #: ../../source/docker/enable-tls.rst:86
 msgid "**SuperNode**"
-msgstr "**SuperNode**"
+msgstr ""
 
 #: ../../source/docker/enable-tls.rst:90 ../../source/docker/enable-tls.rst:196
 msgid ""
@@ -3381,7 +3380,7 @@ msgstr ""
 #: ../../source/how-to-upgrade-to-flower-1.28.rst:80
 #: ../../source/how-to-upgrade-to-flower-1.28.rst:99
 msgid "config.toml"
-msgstr "config.toml"
+msgstr ""
 
 #: ../../source/docker/enable-tls.rst:268
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:84
@@ -3752,12 +3751,12 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.ServerApp.rst:2
 #: ../../source/ref-api/flwr.serverapp.ServerApp.rst:2
 msgid "ServerApp"
-msgstr "ServerApp"
+msgstr ""
 
 #: ../../source/docker/run-as-subprocess.rst:38
 #: ../../source/docker/run-as-subprocess.rst:79
 msgid "**Prerequisites**"
-msgstr "**Prerequisites**"
+msgstr ""
 
 #: ../../source/docker/run-as-subprocess.rst:40
 msgid ""
@@ -3771,7 +3770,7 @@ msgstr ""
 
 #: ../../source/docker/run-as-subprocess.rst:43
 msgid "superlink.Dockerfile"
-msgstr "superlink.Dockerfile"
+msgstr ""
 
 #: ../../source/docker/run-as-subprocess.rst:57
 msgid ""
@@ -3799,7 +3798,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.client.ClientApp.rst:2
 #: ../../source/ref-api/flwr.clientapp.ClientApp.rst:2
 msgid "ClientApp"
-msgstr "ClientApp"
+msgstr ""
 
 #: ../../source/docker/run-as-subprocess.rst:81
 msgid ""
@@ -3813,7 +3812,7 @@ msgstr ""
 
 #: ../../source/docker/run-as-subprocess.rst:85
 msgid "supernode.Dockerfile"
-msgstr "supernode.Dockerfile"
+msgstr ""
 
 #: ../../source/docker/run-as-subprocess.rst:99
 msgid ""
@@ -3984,7 +3983,7 @@ msgstr "Exemple de Démarrage Rapide"
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:123
 msgid "quickstart-fastai"
-msgstr "quickstart-fastai"
+msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:124
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:126
@@ -4003,15 +4002,15 @@ msgstr "Aucun"
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:125
 msgid "quickstart-huggingface"
-msgstr "quickstart-huggingface"
+msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:127
 msgid "quickstart-jax"
-msgstr "quickstart-jax"
+msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:129
 msgid "quickstart-mlcube"
-msgstr "quickstart-mlcube"
+msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:130
 msgid ""
@@ -4023,7 +4022,7 @@ msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:131
 msgid "quickstart-mlx"
-msgstr "quickstart-mlx"
+msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:132
 msgid ""
@@ -4035,15 +4034,15 @@ msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:134
 msgid "quickstart-monai"
-msgstr "quickstart-monai"
+msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:136
 msgid "quickstart-pandas"
-msgstr "quickstart-pandas"
+msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:138
 msgid "quickstart-pytorch-lightning"
-msgstr "quickstart-pytorch-lightning"
+msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:139
 msgid ""
@@ -4055,15 +4054,15 @@ msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:140
 msgid "quickstart-pytorch"
-msgstr "quickstart-pytorch"
+msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:142
 msgid "quickstart-sklearn"
-msgstr "quickstart-sklearn"
+msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:144
 msgid "quickstart-tensorflow"
-msgstr "quickstart-tensorflow"
+msgstr ""
 
 #: ../../source/docker/set-environment-variables.rst:-1
 msgid ""
@@ -4382,7 +4381,7 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:7
 msgid "Quickstart with Docker"
-msgstr "Quickstart with Docker"
+msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:9
 msgid ""
@@ -4621,7 +4620,7 @@ msgstr ""
 #: ../../source/docker/tutorial-quickstart-docker.rst:179
 #: ../../source/how-to-run-flower-on-gcp.rst
 msgid "superexec.Dockerfile"
-msgstr "superexec.Dockerfile"
+msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker.rst
 msgid "Understand the Dockerfile"
@@ -4857,7 +4856,7 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:347
 msgid "pytorchexample/task.py"
-msgstr "pytorchexample/task.py"
+msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:354
 msgid "Stop the running containers:"
@@ -4909,15 +4908,15 @@ msgstr "Où aller ensuite ?"
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:427
 msgid ":doc:`enable-tls`"
-msgstr ":doc:`enable-tls`"
+msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:428
 msgid ":doc:`persist-superlink-state`"
-msgstr ":doc:`persist-superlink-state`"
+msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:429
 msgid ":doc:`tutorial-quickstart-docker-compose`"
-msgstr ":doc:`tutorial-quickstart-docker-compose`"
+msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:-1
 msgid ""
@@ -5088,7 +5087,7 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:133
 msgid "quickstart-pytorch/pytorchexample/task.py"
-msgstr "quickstart-pytorch/pytorchexample/task.py"
+msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:144
 msgid "Rebuild and restart the services."
@@ -5238,7 +5237,7 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:276
 msgid "compose.yml"
-msgstr "compose.yml"
+msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:330
 msgid ""
@@ -5250,7 +5249,7 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:333
 msgid "with-tls.yml"
-msgstr "with-tls.yml"
+msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:354
 msgid "Restart the services with:"
@@ -5275,7 +5274,7 @@ msgstr "Commentez les lignes 2-6 et décommentez les lignes 7-13 :"
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:371
 msgid "with-state.yml"
-msgstr "with-state.yml"
+msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:392
 msgid "Restart the services:"
@@ -5313,7 +5312,7 @@ msgstr "Supprimez tous les services et volumes :"
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:434
 msgid ":doc:`run-quickstart-examples-docker-compose`"
-msgstr ":doc:`run-quickstart-examples-docker-compose`"
+msgstr ""
 
 #: ../../source/docker/use-a-different-version.rst:-1
 msgid ""
@@ -5635,7 +5634,7 @@ msgstr ""
 
 #: ../../source/explanation-differential-privacy.rst:123
 msgid "clipping"
-msgstr "clipping"
+msgstr ""
 
 #: ../../source/explanation-differential-privacy.rst:128
 msgid ""
@@ -5654,7 +5653,7 @@ msgstr ""
 
 #: ../../source/explanation-differential-privacy.rst:134
 msgid "Clipping"
-msgstr "Clipping"
+msgstr ""
 
 #: ../../source/explanation-differential-privacy.rst:136
 msgid ""
@@ -5763,7 +5762,7 @@ msgstr ""
 
 #: ../../source/explanation-differential-privacy.rst:177
 msgid "**References:**"
-msgstr "**References:**"
+msgstr ""
 
 #: ../../source/explanation-differential-privacy.rst:179
 msgid "[1] Dwork et al. The Algorithmic Foundations of Differential Privacy."
@@ -6882,8 +6881,7 @@ msgstr ""
 "Vous pouvez trouver un exemple détaillé dans le `Secure Aggregation "
 "Example <https://flower.ai/docs/examples/flower-secure-"
 "aggregation.html>`_. La documentation de la configuration du protocole "
-"``SecAgg+`` est disponible à l'adresse `SecAggPlusWorkflow "
-"<ref-"
+"``SecAgg+`` est disponible à l'adresse `SecAggPlusWorkflow <ref-"
 "api/flwr.server.workflow.SecAggPlusWorkflow.html>`_."
 
 #: ../../source/explanation-ref-secure-aggregation-protocols.rst:35
@@ -7127,7 +7125,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:49
 msgid "Change Log Verbosity Level"
-msgstr "Change Log Verbosity Level"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:51
 msgid ""
@@ -7142,7 +7140,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:54
 msgid "Setting Global Log Level"
-msgstr "Setting Global Log Level"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:56
 msgid ""
@@ -7156,7 +7154,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:66
 msgid "Setting Log Level for a Specific Service"
-msgstr "Setting Log Level for a Specific Service"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:68
 msgid ""
@@ -7797,7 +7795,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:560
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:110
 msgid "**Important:**"
-msgstr "**Important:**"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:562
 msgid ""
@@ -7870,7 +7868,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:613
 msgid "SSL-Passthrough"
-msgstr "SSL-Passthrough"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:615
 msgid ""
@@ -8006,12 +8004,12 @@ msgstr "Paramètres Helm"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Name"
-msgstr "Name"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Value"
-msgstr "Value"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
@@ -12112,15 +12110,15 @@ msgstr "Par défaut, le schéma d'sortie est le suivant :"
 
 #: ../../source/how-to-configure-audit-logging.rst:52
 msgid "where,"
-msgstr "where,"
+msgstr ""
 
 #: ../../source/how-to-configure-audit-logging.rst:57
 msgid "Field"
-msgstr "Field"
+msgstr ""
 
 #: ../../source/how-to-configure-audit-logging.rst:59
 msgid "``timestamp``"
-msgstr "``timestamp``"
+msgstr ""
 
 #: ../../source/how-to-configure-audit-logging.rst:60
 msgid "Timestamp of the event in UTC format and RFC-3339 compliant"
@@ -12128,7 +12126,7 @@ msgstr "Heure de l'événement en format UTC et conforme à RFC-3339"
 
 #: ../../source/how-to-configure-audit-logging.rst:61
 msgid "``actor.id``"
-msgstr "``actor.id``"
+msgstr ""
 
 #: ../../source/how-to-configure-audit-logging.rst:62
 msgid ""
@@ -12140,7 +12138,7 @@ msgstr ""
 
 #: ../../source/how-to-configure-audit-logging.rst:64
 msgid "``actor.description``"
-msgstr "``actor.description``"
+msgstr ""
 
 #: ../../source/how-to-configure-audit-logging.rst:65
 msgid "Username registered on the OIDC provider or ``SuperNode``"
@@ -12148,7 +12146,7 @@ msgstr "Nom d'utilisateur enregistré sur le fournisseur OIDC ou ``SuperNode``"
 
 #: ../../source/how-to-configure-audit-logging.rst:66
 msgid "``actor.ip_address``"
-msgstr "``actor.ip_address``"
+msgstr ""
 
 #: ../../source/how-to-configure-audit-logging.rst:67
 msgid "IPv4 or IPv6 address of the actor"
@@ -12156,7 +12154,7 @@ msgstr "Adresse IPv4 ou IPv6 de l'acteur"
 
 #: ../../source/how-to-configure-audit-logging.rst:68
 msgid "``event.action``"
-msgstr "``event.action``"
+msgstr ""
 
 #: ../../source/how-to-configure-audit-logging.rst:69
 msgid ""
@@ -12168,7 +12166,7 @@ msgstr ""
 
 #: ../../source/how-to-configure-audit-logging.rst:71
 msgid "``event.run_id``"
-msgstr "``event.run_id``"
+msgstr ""
 
 #: ../../source/how-to-configure-audit-logging.rst:72
 msgid "The run ID of the Flower workflow"
@@ -12176,7 +12174,7 @@ msgstr "ID de la tâche Flower"
 
 #: ../../source/how-to-configure-audit-logging.rst:73
 msgid "``event.fab_hash``"
-msgstr "``event.fab_hash``"
+msgstr ""
 
 #: ../../source/how-to-configure-audit-logging.rst:74
 msgid "The FAB hash of the Flower app"
@@ -12184,7 +12182,7 @@ msgstr "Hachage FAB de l'application Flower"
 
 #: ../../source/how-to-configure-audit-logging.rst:75
 msgid "``status``"
-msgstr "``status``"
+msgstr ""
 
 #: ../../source/how-to-configure-audit-logging.rst:76
 msgid "A string describing whether the action is started, completed or failed"
@@ -12261,7 +12259,7 @@ msgstr ""
 
 #: ../../source/how-to-configure-clients.rst:43
 msgid "Sending ``ConfigRecords`` to a ``ClientApp``"
-msgstr "Sending ``ConfigRecords`` to a ``ClientApp``"
+msgstr ""
 
 #: ../../source/how-to-configure-clients.rst:45
 msgid ""
@@ -12333,7 +12331,7 @@ msgstr ""
 
 #: ../../source/how-to-configure-clients.rst:112
 msgid "Dynamic modification of ``ConfigRecord``"
-msgstr "Dynamic modification of ``ConfigRecord``"
+msgstr ""
 
 #: ../../source/how-to-configure-clients.rst:114
 msgid ""
@@ -12503,7 +12501,7 @@ msgstr "Un fichier ``pyproject.toml`` complet, par exemple, ressemble à ceci :"
 
 #: ../../source/how-to-configure-pyproject-toml.rst
 msgid "Example ``pyproject.toml``"
-msgstr "Example ``pyproject.toml``"
+msgstr ""
 
 #: ../../source/how-to-configure-pyproject-toml.rst:50
 msgid "Here are a few key sections to look out for:"
@@ -12780,7 +12778,7 @@ msgstr ""
 
 #: ../../source/how-to-configure-pyproject-toml.rst:195
 msgid "**Allowed file types** (``FAB_INCLUDE_PATTERNS``):"
-msgstr "**Allowed file types** (``FAB_INCLUDE_PATTERNS``):"
+msgstr ""
 
 #: ../../source/how-to-configure-pyproject-toml.rst:197
 msgid ""
@@ -12797,7 +12795,7 @@ msgstr ""
 
 #: ../../source/how-to-configure-pyproject-toml.rst:212
 msgid "**Always excluded** (``FAB_EXCLUDE_PATTERNS``):"
-msgstr "**Always excluded** (``FAB_EXCLUDE_PATTERNS``):"
+msgstr ""
 
 #: ../../source/how-to-configure-pyproject-toml.rst:214
 msgid ""
@@ -14454,11 +14452,11 @@ msgstr ""
 
 #: ../../source/how-to-enable-tls-connections.rst:266
 msgid "`Let's Encrypt <https://letsencrypt.org/docs/>`_"
-msgstr "`Let's Encrypt <https://letsencrypt.org/docs/>`_"
+msgstr ""
 
 #: ../../source/how-to-enable-tls-connections.rst:267
 msgid "`certbot <https://certbot.eff.org/>`_"
-msgstr "`certbot <https://certbot.eff.org/>`_"
+msgstr ""
 
 #: ../../source/how-to-implement-fedbn.rst:-1
 msgid ""
@@ -14495,7 +14493,7 @@ msgstr ""
 
 #: ../../source/how-to-implement-fedbn.rst:18
 msgid "Model"
-msgstr "Model"
+msgstr ""
 
 #: ../../source/how-to-implement-fedbn.rst:20
 msgid ""
@@ -14529,7 +14527,7 @@ msgstr ""
 
 #: ../../source/how-to-implement-fedbn.rst:62
 msgid "FedBN"
-msgstr "FedBN"
+msgstr ""
 
 #: ../../source/how-to-implement-fedbn.rst:64
 msgid ""
@@ -14838,7 +14836,7 @@ msgstr "Installez via Docker"
 
 #: ../../source/how-to-install-flower.rst:86
 msgid ":doc:`Run Flower using Docker <docker/index>`"
-msgstr ":doc:`Run Flower using Docker <docker/index>`"
+msgstr ""
 
 #: ../../source/how-to-install-flower.rst:89
 msgid "Install pre-release"
@@ -15113,7 +15111,7 @@ msgstr "Exemple OpenFL"
 
 #: ../../source/how-to-migrate-from-openfl.rst:104
 msgid "Flower Quickstart (PyTorch)"
-msgstr "Flower Quickstart (PyTorch)"
+msgstr ""
 
 #: ../../source/how-to-migrate-from-openfl.rst:118
 msgid ""
@@ -15395,14 +15393,14 @@ msgid ""
 " to get in touch with our team!"
 msgstr ""
 "Pour un exemple PyTorch complet qui entre dans les détails sur diverses "
-"composantes Flower, voir le tutoriel `Get started with Flower "
-"<tutorial-series-write-your-first-"
-"flower-app-pytorch.html>`_. Même si nous attendons que ce guide aidera la"
-" plupart des utilisateurs à se migrer rapidement vers l'écosystème "
-"Flower, certaines charges de travail OpenFL complexes peuvent nécessiter "
-"plus de clarification ou d'aide. Si vous avez d'autres questions, `join "
-"the Flower Slack <https://flower.ai/join-slack/>`_ (et utilisez le canal "
-"``#questions``) ou rejoignez notre `OpenFL Continuity Program "
+"composantes Flower, voir le tutoriel `Get started with Flower <tutorial-"
+"series-write-your-first-flower-app-pytorch.html>`_. Même si nous "
+"attendons que ce guide aidera la plupart des utilisateurs à se migrer "
+"rapidement vers l'écosystème Flower, certaines charges de travail OpenFL "
+"complexes peuvent nécessiter plus de clarification ou d'aide. Si vous "
+"avez d'autres questions, `join the Flower Slack <https://flower.ai/join-"
+"slack/>`_ (et utilisez le canal ``#questions``) ou rejoignez notre "
+"`OpenFL Continuity Program "
 "<https://docs.google.com/forms/d/e/1FAIpQLScprGGX_jFRoEUv4HbJkkhkg6O7e5eCiq7uP95_0xK5Qnt1gA/viewform>`_"
 " pour nous contacter !"
 
@@ -15895,7 +15893,7 @@ msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:168
 msgid "macOS/Linux"
-msgstr "macOS/Linux"
+msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:170
 #: ../../source/how-to-run-flower-locally.rst:185
@@ -15909,7 +15907,7 @@ msgstr "Arrêtez le processus :"
 
 #: ../../source/how-to-run-flower-locally.rst:183
 msgid "Windows PowerShell"
-msgstr "Windows PowerShell"
+msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:205
 msgid ""
@@ -15922,7 +15920,7 @@ msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:210
 msgid "Troubleshooting"
-msgstr "Troubleshooting"
+msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:212
 msgid ""
@@ -16000,7 +15998,7 @@ msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:41
 msgid "Azure VMs"
-msgstr "Azure VMs"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:43
 msgid ""
@@ -16049,7 +16047,7 @@ msgstr "dans ce guide, nous utilisons ``Ubuntu Server 24.04 - x64 Gen2 LTS``"
 
 #: ../../source/how-to-run-flower-on-azure.rst:63
 msgid "**Size**"
-msgstr "**Size**"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:64
 msgid "in this guide, we use ``Standard_D2s_v3 - 2 vcpus, 8GiB memory``"
@@ -16135,11 +16133,11 @@ msgstr "Le reste des champs peut être laissé à leurs valeurs par défaut."
 #: ../../source/how-to-run-flower-on-azure.rst:107
 #: ../../source/how-to-run-flower-on-azure.rst:148
 msgid "**Source**"
-msgstr "**Source**"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:108
 msgid "``IP Addresses``"
-msgstr "``IP Addresses``"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:109
 #: ../../source/how-to-run-flower-on-azure.rst:136
@@ -16152,20 +16150,20 @@ msgstr "Ajoutez les adresses IP publiques des clients (séparées par une virgul
 
 #: ../../source/how-to-run-flower-on-azure.rst:111
 msgid "**Destination**"
-msgstr "**Destination**"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:112
 #: ../../source/how-to-run-flower-on-azure.rst:149
 msgid "``Any``"
-msgstr "``Any``"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:113
 msgid "**Service**"
-msgstr "**Service**"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:114
 msgid "``custom``"
-msgstr "``custom``"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:115
 #: ../../source/how-to-run-flower-on-azure.rst:138
@@ -16175,15 +16173,15 @@ msgstr "**Plages de ports de destination**"
 
 #: ../../source/how-to-run-flower-on-azure.rst:116
 msgid "``9092``"
-msgstr "``9092``"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:117
 msgid "**Protocol**"
-msgstr "**Protocol**"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:118
 msgid "``TCP``"
-msgstr "``TCP``"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:120
 msgid ""
@@ -16220,7 +16218,7 @@ msgstr "Ajoutez l'adresse IP publique de la machine"
 #: ../../source/how-to-run-flower-on-azure.rst:139
 #: ../../source/how-to-run-flower-on-azure.rst:151
 msgid "``9093``"
-msgstr "``9093``"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-azure.rst:141
 msgid "Otherwise, we change the properties as follows:"
@@ -16699,9 +16697,8 @@ msgstr ""
 "ClientApp sera exécuté. Après avoir construit l'image, nous la taggeons "
 "et la poussons dans le registre Google récemment créé. La plupart des "
 "étapes sur la façon de construire les images Docker discutées ci-dessous "
-"sont basées sur le `Flower Quickstart with Docker Tutorial "
-"<docker/tutorial-quickstart-"
-"docker.html>`_."
+"sont basées sur le `Flower Quickstart with Docker Tutorial <docker"
+"/tutorial-quickstart-docker.html>`_."
 
 #: ../../source/how-to-run-flower-on-gcp.rst:220
 msgid "We create the Flower NumPy app as follows:"
@@ -16828,30 +16825,30 @@ msgstr ""
 #: ../../source/how-to-run-flower-on-gcp.rst
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst
 msgid "superlink-deployment.yaml"
-msgstr "superlink-deployment.yaml"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-gcp.rst
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst
 msgid "supernode-1-deployment.yaml"
-msgstr "supernode-1-deployment.yaml"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-gcp.rst
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst
 msgid "supernode-2-deployment.yaml"
-msgstr "supernode-2-deployment.yaml"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-gcp.rst
 msgid "superexec-serverapp-deployment.yaml"
-msgstr "superexec-serverapp-deployment.yaml"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-gcp.rst
 msgid "superexec-clientapp-1-deployment.yaml"
-msgstr "superexec-clientapp-1-deployment.yaml"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-gcp.rst
 msgid "superexec-clientapp-2-deployment.yaml"
-msgstr "superexec-clientapp-2-deployment.yaml"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-gcp.rst:544
 msgid ""
@@ -16871,7 +16868,7 @@ msgstr ""
 
 #: ../../source/how-to-run-flower-on-gcp.rst
 msgid "k8s-deploy.sh"
-msgstr "k8s-deploy.sh"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-gcp.rst:579
 msgid ""
@@ -16938,9 +16935,9 @@ msgid ""
 msgstr ""
 "Notez que dans la mise en production actuelle, la communication n'est pas"
 " chiffrée. Pour activer TLS pour les connexions sécurisées, consultez les"
-" instructions `guide <how-to-enable-tls-"
-"connections.html>`_. Nous mettrons également à jour ce guide bientôt avec"
-" plus de détails sur la configuration de TLS."
+" instructions `guide <how-to-enable-tls-connections.html>`_. Nous "
+"mettrons également à jour ce guide bientôt avec plus de détails sur la "
+"configuration de TLS."
 
 #: ../../source/how-to-run-flower-on-gcp.rst:644
 msgid ""
@@ -16983,7 +16980,7 @@ msgstr ""
 
 #: ../../source/how-to-run-flower-on-gcp.rst
 msgid "k8s-shutdown.sh"
-msgstr "k8s-shutdown.sh"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:-1
 msgid ""
@@ -17480,7 +17477,7 @@ msgstr ""
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:372
 msgid "`Skupper concepts <https://skupperproject.github.io/refdog/concepts/>`_"
-msgstr "`Skupper concepts <https://skupperproject.github.io/refdog/concepts/>`_"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:374
 msgid ""
@@ -17651,19 +17648,19 @@ msgstr ""
 
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:54
 msgid "``AmazonEC2FullAccess``"
-msgstr "``AmazonEC2FullAccess``"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:55
 msgid "``AWSCloudFormationFullAccess``"
-msgstr "``AWSCloudFormationFullAccess``"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:56
 msgid "``IAMFullAccess``"
-msgstr "``IAMFullAccess``"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:57
 msgid "``ServiceQuotasReadOnlyAccess``"
-msgstr "``ServiceQuotasReadOnlyAccess``"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:59
 msgid ""
@@ -17825,7 +17822,7 @@ msgstr ""
 
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:148
 msgid "**Networking**"
-msgstr "**Networking**"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:150
 msgid ""
@@ -17996,7 +17993,7 @@ msgstr ""
 
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst
 msgid "superlink-service.yaml"
-msgstr "superlink-service.yaml"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:297
 msgid "Finally, spin up two SuperNode pods with the following YAML definitions:"
@@ -18147,7 +18144,7 @@ msgstr ""
 
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst
 msgid "rhosai-datasciencecluster.yaml"
-msgstr "rhosai-datasciencecluster.yaml"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:518
 msgid ""
@@ -18276,7 +18273,7 @@ msgstr ""
 
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst
 msgid "Dockerfile"
-msgstr "Dockerfile"
+msgstr ""
 
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:583
 msgid ""
@@ -19920,7 +19917,7 @@ msgstr ""
 
 #: ../../source/how-to-save-and-load-model-checkpoints.rst:62
 msgid "NumPy"
-msgstr "NumPy"
+msgstr ""
 
 #: ../../source/how-to-save-and-load-model-checkpoints.rst:74
 msgid "How to save model checkpoints in ``ServerApp``"
@@ -20096,7 +20093,7 @@ msgstr ""
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:58
 #: ../../source/ref-api/flwr.client.Client.rst:2
 msgid "Client"
-msgstr "Client"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:60
 msgid ""
@@ -20171,7 +20168,7 @@ msgstr "Renomme les fonctions de conversion des paramètres et des tableaux :"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:83
 msgid "``parameters_to_weights`` --> ``parameters_to_ndarrays``"
-msgstr "``parameters_to_weights`` --> ``parameters_to_ndarrays``"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:84
 msgid "``weights_to_parameters`` --> ``ndarrays_to_parameters``"
@@ -20200,7 +20197,7 @@ msgstr "Renommer les paramètres de stratégie intégrés (par exemple, ``FedAvg
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:94
 msgid "``fraction_eval`` --> ``fraction_evaluate``"
-msgstr "``fraction_eval`` --> ``fraction_evaluate``"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:95
 msgid "``min_eval_clients`` --> ``min_evaluate_clients``"
@@ -20208,7 +20205,7 @@ msgstr "``min_eval_clients` --> ``min_evaluate_clients``"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:96
 msgid "``eval_fn`` --> ``evaluate_fn``"
-msgstr "``eval_fn`` --> ``evaluate_fn``"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:98
 msgid ""
@@ -20444,7 +20441,7 @@ msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.13.rst:117
 msgid "|clientapp_link|_"
-msgstr "|clientapp_link|_"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.13.rst:119
 msgid ""
@@ -20456,7 +20453,7 @@ msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.13.rst:154
 msgid "|serverapp_link|_"
-msgstr "|serverapp_link|_"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.13.rst:156
 msgid ""
@@ -20468,7 +20465,7 @@ msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.13.rst:195
 msgid "Deployment"
-msgstr "Deployment"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.13.rst:197
 msgid ""
@@ -20513,7 +20510,7 @@ msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.13.rst:256
 msgid "Simulation (CLI)"
-msgstr "Simulation (CLI)"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.13.rst:258
 msgid ""
@@ -20614,7 +20611,7 @@ msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.13.rst:387
 msgid "Simulation (Notebook)"
-msgstr "Simulation (Notebook)"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.13.rst:389
 msgid ""
@@ -21035,7 +21032,7 @@ msgstr ""
 
 #: ../../source/how-to-upgrade-to-message-api.rst:133
 msgid "pyproject.toml"
-msgstr "pyproject.toml"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-message-api.rst:142
 msgid "Then, run the following command to install the updated dependencies:"
@@ -21045,7 +21042,7 @@ msgstr ""
 
 #: ../../source/how-to-upgrade-to-message-api.rst:151
 msgid "Update your ``ServerApp``"
-msgstr "Update your ``ServerApp``"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-message-api.rst:153
 msgid ""
@@ -21212,19 +21209,19 @@ msgstr ""
 
 #: ../../source/how-to-upgrade-to-message-api.rst:242
 msgid "``fraction_fit`` → ``fraction_train``"
-msgstr "``fraction_fit`` → ``fraction_train``"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-message-api.rst:243
 msgid "``min_fit_clients`` → ``min_train_nodes``"
-msgstr "``min_fit_clients`` → ``min_train_nodes``"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-message-api.rst:244
 msgid "``min_evaluate_clients`` → ``min_evaluate_nodes``"
-msgstr "``min_evaluate_clients`` → ``min_evaluate_nodes``"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-message-api.rst:245
 msgid "``min_available_clients`` → ``min_available_nodes``"
-msgstr "``min_available_clients`` → ``min_available_nodes``"
+msgstr ""
 
 #: ../../source/how-to-upgrade-to-message-api.rst:278
 msgid "Update your ClientApp"
@@ -21575,42 +21572,42 @@ msgstr "L'ordre d'exécution pour un message **train** entrant est le suivant :"
 #: ../../source/how-to-use-built-in-mods.rst:155
 #: ../../source/how-to-use-built-in-mods.rst:167
 msgid "``example_mod_1`` (before handling)"
-msgstr "``example_mod_1`` (before handling)"
+msgstr ""
 
 #: ../../source/how-to-use-built-in-mods.rst:156
 #: ../../source/how-to-use-built-in-mods.rst:168
 msgid "``example_mod_2`` (before handling)"
-msgstr "``example_mod_2`` (before handling)"
+msgstr ""
 
 #: ../../source/how-to-use-built-in-mods.rst:157
 msgid "``example_mod_3`` (before handling)"
-msgstr "``example_mod_3`` (before handling)"
+msgstr ""
 
 #: ../../source/how-to-use-built-in-mods.rst:158
 msgid "``example_mod_4`` (before handling)"
-msgstr "``example_mod_4`` (before handling)"
+msgstr ""
 
 #: ../../source/how-to-use-built-in-mods.rst:159
 msgid "``train`` (handling message)"
-msgstr "``train`` (handling message)"
+msgstr ""
 
 #: ../../source/how-to-use-built-in-mods.rst:160
 msgid "``example_mod_4`` (after handling)"
-msgstr "``example_mod_4`` (after handling)"
+msgstr ""
 
 #: ../../source/how-to-use-built-in-mods.rst:161
 msgid "``example_mod_3`` (after handling)"
-msgstr "``example_mod_3`` (after handling)"
+msgstr ""
 
 #: ../../source/how-to-use-built-in-mods.rst:162
 #: ../../source/how-to-use-built-in-mods.rst:170
 msgid "``example_mod_2`` (after handling)"
-msgstr "``example_mod_2`` (after handling)"
+msgstr ""
 
 #: ../../source/how-to-use-built-in-mods.rst:163
 #: ../../source/how-to-use-built-in-mods.rst:171
 msgid "``example_mod_1`` (after handling)"
-msgstr "``example_mod_1`` (after handling)"
+msgstr ""
 
 #: ../../source/how-to-use-built-in-mods.rst:165
 msgid "The execution order for an incoming **evaluate** message is as follows:"
@@ -21620,7 +21617,7 @@ msgstr ""
 
 #: ../../source/how-to-use-built-in-mods.rst:169
 msgid "``evaluate`` (handling message)"
-msgstr "``evaluate`` (handling message)"
+msgstr ""
 
 #: ../../source/how-to-use-built-in-mods.rst:177
 msgid ""
@@ -21669,15 +21666,15 @@ msgstr "Ce guide montre l'sortie JSON pour :"
 
 #: ../../source/how-to-use-cli-json-output.rst:17
 msgid "|flwr_run|"
-msgstr "|flwr_run|"
+msgstr ""
 
 #: ../../source/how-to-use-cli-json-output.rst:18
 msgid "|flwr_list|"
-msgstr "|flwr_list|"
+msgstr ""
 
 #: ../../source/how-to-use-cli-json-output.rst:19
 msgid "|flwr_stop|"
-msgstr "|flwr_stop|"
+msgstr ""
 
 #: ../../source/how-to-use-cli-json-output.rst:35
 msgid "``flwr run`` JSON output"
@@ -21789,7 +21786,7 @@ msgstr "``status``: le statut actuel de run"
 
 #: ../../source/how-to-use-cli-json-output.rst:163
 msgid "``status-details``: additional status detail text"
-msgstr "``status-details``: additional status detail text"
+msgstr ""
 
 #: ../../source/how-to-use-cli-json-output.rst:164
 msgid "``elapsed``: elapsed run time in seconds"
@@ -22414,15 +22411,15 @@ msgstr "Tutoriel"
 
 #: ../../source/index.rst:80
 msgid "Build"
-msgstr "Build"
+msgstr ""
 
 #: ../../source/index.rst:80
 msgid "Simulate"
-msgstr "Simulate"
+msgstr ""
 
 #: ../../source/index.rst:80
 msgid "Deploy"
-msgstr "Deploy"
+msgstr ""
 
 #: ../../source/index.rst:76 ../../source/index.rst:80
 msgid "How-to Guides"
@@ -22468,11 +22465,11 @@ msgstr ""
 
 #: ../../source/index.rst:18
 msgid "Join us on Slack"
-msgstr "Join us on Slack"
+msgstr ""
 
 #: ../../source/index.rst:26
 msgid "Flower Framework"
-msgstr "Flower Framework"
+msgstr ""
 
 #: ../../source/index.rst:28
 msgid ""
@@ -22527,7 +22524,7 @@ msgstr "Commandes de base"
 
 #: ../../source/ref-api-cli.rst:12
 msgid "``flwr`` CLI"
-msgstr "``flwr`` CLI"
+msgstr ""
 
 #: ../../flwr:1
 msgid "flwr is the Flower command line interface."
@@ -22568,7 +22565,7 @@ msgstr ""
 
 #: ../../source/ref-api-cli.rst
 msgid "Arguments"
-msgstr "Arguments"
+msgstr ""
 
 #: ../../flwr accept:1 add-supernode:1 app archive:1 create:1 federation
 #: install:1 invite list:1 log:1 login:1 new:1 publish:1 pull:1 register:1
@@ -22657,7 +22654,7 @@ msgstr ""
 #: invite list:1 register:1 reject:1 remove-account:1 remove-supernode:1
 #: revoke:1 run:1 simulation-config:1 stop:1 supernode unregister:1
 msgid "``'default'``"
-msgstr "``'default'``"
+msgstr ""
 
 #: ../../flwr accept add-supernode archive config create federation invite list
 #: register reject remove-account remove-supernode revoke run simulation-config
@@ -22831,7 +22828,7 @@ msgstr "Choix du nom de backend (Actuellement, seul 'ray' est pris en charge)."
 
 #: ../../flwr federation simulation-config:1
 msgid "ray"
-msgstr "ray"
+msgstr ""
 
 #: ../../flwr federation simulation-config:1
 msgid "Number of CPUs to make available to the Simulation Runtime."
@@ -22851,7 +22848,7 @@ msgstr "Propager les journaux du Simulation Runtime vers le haut."
 
 #: ../../flwr federation simulation-config:1
 msgid "true | false"
-msgstr "true | false"
+msgstr ""
 
 #: ../../flwr federation simulation-config:1
 #, fuzzy
@@ -22868,7 +22865,7 @@ msgstr "Il peut être lancé avec un seul fichier FAB en argument :"
 
 #: ../../flwr install:1
 msgid "``flwr install ./target_project.fab``"
-msgstr "``flwr install ./target_project.fab``"
+msgstr ""
 
 #: ../../flwr install:1
 msgid "Apps are installed to:"
@@ -22965,7 +22962,7 @@ msgstr "Drapeau pour diffuser ou imprimer les logs du run Flower"
 
 #: ../../flwr log:1
 msgid "``True``"
-msgstr "``True``"
+msgstr ""
 
 #: ../../flwr log:1
 msgid "The Flower run ID to query"
@@ -23136,11 +23133,11 @@ msgstr "Désinscrivez un SuperNode de la fédération."
 
 #: ../../source/ref-api-cli.rst:21
 msgid "``flower-superlink``"
-msgstr "``flower-superlink``"
+msgstr ""
 
 #: ../../source/ref-api-cli.rst:31
 msgid "``flower-supernode``"
-msgstr "``flower-supernode``"
+msgstr ""
 
 #: ../../source/ref-api-cli.rst:40
 msgid "Advanced Commands"
@@ -23163,11 +23160,11 @@ msgstr "Package principal Flower."
 #: ../../source/ref-api/flwr.server.rst:49
 #: ../../source/ref-api/flwr.serverapp.rst:34
 msgid "Modules"
-msgstr "Modules"
+msgstr ""
 
 #: ../../source/ref-api/flwr.rst:49:<autosummary>:1
 msgid ":py:obj:`agentapp <flwr.agentapp>`\\"
-msgstr ":py:obj:`agentapp <flwr.agentapp>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.rst:49:<autosummary>:1 flwr.agentapp:1 of
 msgid "Public Flower AgentApp APIs."
@@ -23175,7 +23172,7 @@ msgstr "API publiques des agents Flower AgentApp."
 
 #: ../../source/ref-api/flwr.rst:49:<autosummary>:1
 msgid ":py:obj:`app <flwr.app>`\\"
-msgstr ":py:obj:`app <flwr.app>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.rst:49:<autosummary>:1 flwr.app:1 of
 msgid "Public Flower App APIs."
@@ -23183,7 +23180,7 @@ msgstr "API publiques de l'application Flower."
 
 #: ../../source/ref-api/flwr.rst:49:<autosummary>:1
 msgid ":py:obj:`clientapp <flwr.clientapp>`\\"
-msgstr ":py:obj:`clientapp <flwr.clientapp>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.rst:49:<autosummary>:1 flwr.clientapp:1 of
 msgid "Public Flower ClientApp APIs."
@@ -23191,7 +23188,7 @@ msgstr "API publiques du ClientApp Flower."
 
 #: ../../source/ref-api/flwr.rst:49:<autosummary>:1
 msgid ":py:obj:`serverapp <flwr.serverapp>`\\"
-msgstr ":py:obj:`serverapp <flwr.serverapp>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.rst:49:<autosummary>:1 flwr.serverapp:1 of
 msgid "Public Flower ServerApp APIs."
@@ -23240,7 +23237,7 @@ msgstr "FAQ pour les simulations"
 
 #: ../../source/ref-api/flwr.agentapp.rst:2
 msgid "agentapp"
-msgstr "agentapp"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:17
 #: ../../source/ref-api/flwr.app.rst:17
@@ -23256,53 +23253,64 @@ msgstr "agentapp"
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:17
 #: ../../source/ref-api/flwr.simulation.rst:26
 msgid "Classes"
-msgstr "Classes"
+msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 msgid ":py:obj:`AgentApp <flwr.agentapp.AgentApp>`\\ \\(\\)"
-msgstr ":py:obj:`AgentApp <flwr.agentapp.AgentApp>`\\ \\(\\)"
+msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #: flwr.agentapp.agent_app.AgentApp:1 of
 msgid "Flower AgentApp."
 msgstr "Agent Flower App."
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
-msgid ":py:obj:`AgentResponses <flwr.agentapp.AgentResponses>`\\ \\(\\)"
-msgstr ":py:obj:`AgentResponses <flwr.agentapp.AgentResponses>`\\ \\(\\)"
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`AgentConnectors <flwr.agentapp.AgentConnectors>`\\ \\(\\)"
+msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+#: flwr.agentapp.base.AgentConnectors:1 of
+#, fuzzy
+msgid "Abstract base class for AgentApp connector execution."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
+msgid ":py:obj:`AgentResponses <flwr.agentapp.AgentResponses>`\\ \\(\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #: flwr.agentapp.base.AgentResponses:1 of
 msgid "Abstract base class for AgentApp model response creation."
 msgstr "Classe abstraite de base pour la création de réponse du modèle AgentApp."
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 msgid ":py:obj:`AgentSession <flwr.agentapp.AgentSession>`\\ \\(\\)"
-msgstr ":py:obj:`AgentSession <flwr.agentapp.AgentSession>`\\ \\(\\)"
+msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:29:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:30:<autosummary>:1
 #: flwr.agentapp.base.AgentSession:1 of
 msgid "Abstract base class for AgentApp runtime capabilities."
 msgstr ""
 "Classe abstraite de base pour les capacités d'exécution en temps réel de "
 "l'agent."
 
-#: ../../source/ref-api/flwr.agentapp.rst:31
+#: ../../source/ref-api/flwr.agentapp.rst:32
 msgid "Exceptions"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:35:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:36:<autosummary>:1
 msgid ":py:obj:`LoadAgentAppError <flwr.agentapp.LoadAgentAppError>`\\"
 msgstr ""
 
-#: ../../source/ref-api/flwr.agentapp.rst:35:<autosummary>:1
+#: ../../source/ref-api/flwr.agentapp.rst:36:<autosummary>:1
 #: flwr.agentapp.agent_app.LoadAgentAppError:1 of
 msgid "Error when trying to load `AgentApp`."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentApp.rst:2
 msgid "AgentApp"
-msgstr "AgentApp"
+msgstr ""
 
 #: flwr.agentapp.agent_app.AgentApp:1 flwr.app.error.Error:1
 #: flwr.app.message.context.Context:1 flwr.app.message_type.MessageType:1
@@ -23367,6 +23375,7 @@ msgid "Define an AgentApp with a single main function::"
 msgstr "Définir un agent avec une seule fonction principale::"
 
 #: ../../source/ref-api/flwr.agentapp.AgentApp.rst:15
+#: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:15
 #: ../../source/ref-api/flwr.agentapp.AgentSession.rst:15
 #: ../../source/ref-api/flwr.app.Array.rst:15
@@ -23476,11 +23485,11 @@ msgstr "Définir un agent avec une seule fonction principale::"
 #: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst:15
 #: ../../source/ref-api/flwr.simulation.SimulationIoConnection.rst:15
 msgid "Methods"
-msgstr "Methods"
+msgstr ""
 
 #: flwr.agentapp.agent_app.AgentApp.main:1:<autosummary>:1 of
 msgid ":py:obj:`main <flwr.agentapp.AgentApp.main>`\\ \\(\\)"
-msgstr ":py:obj:`main <flwr.agentapp.AgentApp.main>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.agent_app.AgentApp.main:1
 #: flwr.agentapp.agent_app.AgentApp.main:1:<autosummary>:1 of
@@ -23489,12 +23498,13 @@ msgstr ""
 "Retourner un décorateur qui enregistre la fonction principale avec "
 "l'application agent."
 
-#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2
-msgid "AgentResponses"
-msgstr "AgentResponses"
+#: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst:2
+#, fuzzy
+msgid "AgentConnectors"
+msgstr ""
 
-#: flwr.agentapp.base.AgentResponses:1 flwr.agentapp.base.AgentSession:1
-#: flwr.compat.client.client.Client:1
+#: flwr.agentapp.base.AgentConnectors:1 flwr.agentapp.base.AgentResponses:1
+#: flwr.agentapp.base.AgentSession:1 flwr.compat.client.client.Client:1
 #: flwr.compat.client.numpy_client.NumPyClient:1
 #: flwr.server.client_manager.ClientManager:1
 #: flwr.server.strategy.strategy.Strategy:1 flwr.serverapp.grid.grid.Grid:1
@@ -23502,9 +23512,33 @@ msgstr "AgentResponses"
 msgid "Bases: :py:class:`~abc.ABC`"
 msgstr "Bases : :py:class:`~abc.ABC`"
 
+#: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`call <flwr.agentapp.AgentConnectors.call>`\\ \\(tool\\_call\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentConnectors.call:1
+#: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
+msgid "Execute one model function_call and return a function_call_output item."
+msgstr ""
+
+#: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`tools <flwr.agentapp.AgentConnectors.tools>`\\ \\(names\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1
+#: flwr.agentapp.base.AgentConnectors.tools:1 of
+msgid "Return model-facing tool schemas for built-in connectors."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2
+msgid "AgentResponses"
+msgstr ""
+
 #: flwr.agentapp.base.AgentResponses.create:1:<autosummary>:1 of
 msgid ":py:obj:`create <flwr.agentapp.AgentResponses.create>`\\ \\(request\\)"
-msgstr ":py:obj:`create <flwr.agentapp.AgentResponses.create>`\\ \\(request\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentResponses.create:1
 #: flwr.agentapp.base.AgentResponses.create:1:<autosummary>:1 of
@@ -23512,10 +23546,8 @@ msgid "Create a model response."
 msgstr "Créer une réponse du modèle."
 
 #: flwr.agentapp.base.AgentResponses.create:3 of
-msgid ""
-"Open Responses-compatible create request. Built-in connector tools can be"
-" requested by name in ``tools``, for example ``[\"web_search\"]``. Built-"
-"in connector names are reserved for runtime-managed tools."
+#, fuzzy
+msgid "Open Responses-compatible create request."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentResponses.rst
@@ -23572,7 +23604,7 @@ msgstr ""
 msgid "Returns"
 msgstr ""
 
-#: flwr.agentapp.base.AgentResponses.create:9 of
+#: flwr.agentapp.base.AgentResponses.create:6 of
 msgid "**response** -- Open Responses-compatible response."
 msgstr "**Réponse** -- Réponse compatible avec Open Responses."
 
@@ -23632,7 +23664,7 @@ msgstr "Type de retour"
 
 #: ../../source/ref-api/flwr.agentapp.AgentSession.rst:2
 msgid "AgentSession"
-msgstr "AgentSession"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.AgentSession.rst:25
 #: ../../source/ref-api/flwr.app.Array.rst:43
@@ -23685,14 +23717,24 @@ msgstr "AgentSession"
 #: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst:43
 #: ../../source/ref-api/flwr.serverapp.strategy.Result.rst:25
 msgid "Attributes"
-msgstr "Attributes"
+msgstr ""
 
-#: flwr.agentapp.AgentSession.responses:1:<autosummary>:1 of
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`connectors <flwr.agentapp.AgentSession.connectors>`\\"
+msgstr ""
+
+#: flwr.agentapp.AgentSession.connectors:1
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
+msgid "Connector tool schema and execution API."
+msgstr ""
+
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 msgid ":py:obj:`responses <flwr.agentapp.AgentSession.responses>`\\"
-msgstr ":py:obj:`responses <flwr.agentapp.AgentSession.responses>`\\"
+msgstr ""
 
-#: flwr.agentapp.AgentSession.responses:1
-#: flwr.agentapp.AgentSession.responses:1:<autosummary>:1 of
+#: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
+#: flwr.agentapp.AgentSession.responses:1 of
 msgid "Model response creation API."
 msgstr "API de création de réponse de modèle."
 
@@ -23702,11 +23744,11 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.app.rst:2
 msgid "app"
-msgstr "app"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ":py:obj:`Array <flwr.app.Array>`\\ \\(\\)"
-msgstr ":py:obj:`Array <flwr.app.Array>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: ../../source/ref-api/flwr.common.rst:67:<autosummary>:1
@@ -23716,7 +23758,7 @@ msgstr "Type d'array."
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ":py:obj:`ArrayRecord <flwr.app.ArrayRecord>`\\ \\(\\)"
-msgstr ":py:obj:`ArrayRecord <flwr.app.ArrayRecord>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: ../../source/ref-api/flwr.common.rst:67:<autosummary>:1
@@ -23754,7 +23796,7 @@ msgstr "Contexte de votre run."
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ":py:obj:`Error <flwr.app.Error>`\\ \\(code\\[\\, reason\\]\\)"
-msgstr ":py:obj:`Error <flwr.app.Error>`\\ \\(code\\[\\, reason\\]\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: ../../source/ref-api/flwr.common.rst:67:<autosummary>:1
@@ -23764,7 +23806,7 @@ msgstr "La classe stockant des informations sur une erreur qui s'est produite."
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ":py:obj:`Message <flwr.app.Message>`\\ \\(\\)"
-msgstr ":py:obj:`Message <flwr.app.Message>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: ../../source/ref-api/flwr.common.rst:67:<autosummary>:1
@@ -23774,7 +23816,7 @@ msgstr "Représente un message échangé entre ClientApp et ServerApp."
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ":py:obj:`MessageType <flwr.app.MessageType>`\\ \\(\\)"
-msgstr ":py:obj:`MessageType <flwr.app.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: ../../source/ref-api/flwr.common.rst:67:<autosummary>:1
@@ -23827,7 +23869,7 @@ msgstr "RecordDict stocke des groupes d'arrays, de métriques et de configuratio
 #: ../../source/ref-api/flwr.app.Array.rst:2
 #: ../../source/ref-api/flwr.common.Array.rst:2
 msgid "Array"
-msgstr "Array"
+msgstr ""
 
 #: flwr.app.message.array.Array:1 flwr.app.message.message.Message:1 of
 msgid ""
@@ -23941,7 +23983,7 @@ msgstr "Initialisation avec une tensor PyTorch::"
 
 #: ../../source/ref-api/flwr.app.Array.rst:41:<autosummary>:1
 msgid ":py:obj:`deflate <flwr.app.Array.deflate>`\\ \\(\\)"
-msgstr ":py:obj:`deflate <flwr.app.Array.deflate>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Array.rst:41:<autosummary>:1
 #: ../../source/ref-api/flwr.common.Array.rst:41:<autosummary>:1
@@ -23995,7 +24037,7 @@ msgstr "Infléer un tableau à partir de bytes."
 
 #: ../../source/ref-api/flwr.app.Array.rst:41:<autosummary>:1
 msgid ":py:obj:`numpy <flwr.app.Array.numpy>`\\ \\(\\)"
-msgstr ":py:obj:`numpy <flwr.app.Array.numpy>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Array.rst:41:<autosummary>:1
 #: ../../source/ref-api/flwr.common.Array.rst:41:<autosummary>:1
@@ -24005,7 +24047,7 @@ msgstr "Retourner le tableau sous forme de tableau NumPy."
 
 #: ../../source/ref-api/flwr.app.Array.rst:41:<autosummary>:1
 msgid ":py:obj:`slice_array <flwr.app.Array.slice_array>`\\ \\(\\)"
-msgstr ":py:obj:`slice_array <flwr.app.Array.slice_array>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Array.rst:41:<autosummary>:1
 #: ../../source/ref-api/flwr.common.Array.rst:41:<autosummary>:1
@@ -24015,7 +24057,7 @@ msgstr "Couper les données du tableau et construire une liste de ArrayChunks."
 
 #: flwr.app.Array.children:1:<autosummary>:1 of
 msgid ":py:obj:`children <flwr.app.Array.children>`\\"
-msgstr ":py:obj:`children <flwr.app.Array.children>`\\"
+msgstr ""
 
 #: flwr.app.Array.children:1 flwr.app.Array.children:1:<autosummary>:1
 #: flwr.common.Array.children:1 flwr.common.Array.children:1:<autosummary>:1 of
@@ -24026,7 +24068,7 @@ msgstr ""
 
 #: flwr.app.Array.children:1:<autosummary>:1 of
 msgid ":py:obj:`is_dirty <flwr.app.Array.is_dirty>`\\"
-msgstr ":py:obj:`is_dirty <flwr.app.Array.is_dirty>`\\"
+msgstr ""
 
 #: flwr.app.Array.children:1:<autosummary>:1 flwr.app.Array.is_dirty:1
 #: flwr.app.ArrayRecord.children:1:<autosummary>:1
@@ -24061,7 +24103,7 @@ msgstr "Vérifier si l'objet est sale après la dernière déflation."
 
 #: flwr.app.Array.children:1:<autosummary>:1 of
 msgid ":py:obj:`object_id <flwr.app.Array.object_id>`\\"
-msgstr ":py:obj:`object_id <flwr.app.Array.object_id>`\\"
+msgstr ""
 
 #: flwr.app.Array.children:1:<autosummary>:1 flwr.app.Array.object_id:1
 #: flwr.app.ArrayRecord.children:1:<autosummary>:1
@@ -24076,19 +24118,19 @@ msgstr "Obtenir l'ID d'objet."
 
 #: flwr.app.Array.children:1:<autosummary>:1 of
 msgid ":py:obj:`dtype <flwr.app.Array.dtype>`\\"
-msgstr ":py:obj:`dtype <flwr.app.Array.dtype>`\\"
+msgstr ""
 
 #: flwr.app.Array.children:1:<autosummary>:1 of
 msgid ":py:obj:`shape <flwr.app.Array.shape>`\\"
-msgstr ":py:obj:`shape <flwr.app.Array.shape>`\\"
+msgstr ""
 
 #: flwr.app.Array.children:1:<autosummary>:1 of
 msgid ":py:obj:`stype <flwr.app.Array.stype>`\\"
-msgstr ":py:obj:`stype <flwr.app.Array.stype>`\\"
+msgstr ""
 
 #: flwr.app.Array.children:1:<autosummary>:1 of
 msgid ":py:obj:`data <flwr.app.Array.data>`\\"
-msgstr ":py:obj:`data <flwr.app.Array.data>`\\"
+msgstr ""
 
 #: flwr.app.message.array.Array.inflate:3 of
 msgid "The deflated object content of the Array."
@@ -24110,7 +24152,7 @@ msgstr "L'inflé Array."
 #: ../../source/ref-api/flwr.common.ArrayRecord.rst:2
 #: flwr.serverapp.strategy.result.Result:13 of
 msgid "ArrayRecord"
-msgstr "ArrayRecord"
+msgstr ""
 
 #: flwr.app.message.arrayrecord.ArrayRecord:1 of
 msgid ""
@@ -24243,11 +24285,11 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ":py:obj:`clear <flwr.app.ArrayRecord.clear>`\\ \\(\\)"
-msgstr ":py:obj:`clear <flwr.app.ArrayRecord.clear>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ":py:obj:`copy <flwr.app.ArrayRecord.copy>`\\ \\(\\)"
-msgstr ":py:obj:`copy <flwr.app.ArrayRecord.copy>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
@@ -24267,7 +24309,7 @@ msgstr "Retourner une copie superficielle du dictionnaire."
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ":py:obj:`count_bytes <flwr.app.ArrayRecord.count_bytes>`\\ \\(\\)"
-msgstr ":py:obj:`count_bytes <flwr.app.ArrayRecord.count_bytes>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
@@ -24286,7 +24328,7 @@ msgstr "Retourner le nombre de Bytes stockés dans cet objet."
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ":py:obj:`deflate <flwr.app.ArrayRecord.deflate>`\\ \\(\\)"
-msgstr ":py:obj:`deflate <flwr.app.ArrayRecord.deflate>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 #: ../../source/ref-api/flwr.common.ArrayRecord.rst:77:<autosummary>:1
@@ -24346,7 +24388,7 @@ msgstr "Créez ArrayRecord à partir de PyTorch ``state_dict``."
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ":py:obj:`get <flwr.app.ArrayRecord.get>`\\ \\(k\\[\\,d\\]\\)"
-msgstr ":py:obj:`get <flwr.app.ArrayRecord.get>`\\ \\(k\\[\\,d\\]\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ""
@@ -24365,15 +24407,15 @@ msgstr "Infléitez un ArrayRecord à partir de bytes."
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ":py:obj:`items <flwr.app.ArrayRecord.items>`\\ \\(\\)"
-msgstr ":py:obj:`items <flwr.app.ArrayRecord.items>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ":py:obj:`keys <flwr.app.ArrayRecord.keys>`\\ \\(\\)"
-msgstr ":py:obj:`keys <flwr.app.ArrayRecord.keys>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ":py:obj:`pop <flwr.app.ArrayRecord.pop>`\\ \\(k\\[\\,d\\]\\)"
-msgstr ":py:obj:`pop <flwr.app.ArrayRecord.pop>`\\ \\(k\\[\\,d\\]\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
@@ -24395,7 +24437,7 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ":py:obj:`popitem <flwr.app.ArrayRecord.popitem>`\\ \\(\\)"
-msgstr ":py:obj:`popitem <flwr.app.ArrayRecord.popitem>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
@@ -24415,7 +24457,7 @@ msgstr "Comme une 2-tuple ; mais levez KeyError si D est vide."
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ":py:obj:`setdefault <flwr.app.ArrayRecord.setdefault>`\\ \\(k\\[\\,d\\]\\)"
-msgstr ":py:obj:`setdefault <flwr.app.ArrayRecord.setdefault>`\\ \\(k\\[\\,d\\]\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ""
@@ -24451,7 +24493,7 @@ msgstr "Retournez l'ArrayRecord sous forme de PyTorch ``state_dict``."
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ":py:obj:`update <flwr.app.ArrayRecord.update>`\\ \\(\\[E\\, \\]\\*\\*F\\)"
-msgstr ":py:obj:`update <flwr.app.ArrayRecord.update>`\\ \\(\\[E\\, \\]\\*\\*F\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
@@ -24478,11 +24520,11 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 msgid ":py:obj:`values <flwr.app.ArrayRecord.values>`\\ \\(\\)"
-msgstr ":py:obj:`values <flwr.app.ArrayRecord.values>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.app.ArrayRecord.children:1:<autosummary>:1 of
 msgid ":py:obj:`children <flwr.app.ArrayRecord.children>`\\"
-msgstr ":py:obj:`children <flwr.app.ArrayRecord.children>`\\"
+msgstr ""
 
 #: flwr.app.ArrayRecord.children:1
 #: flwr.app.ArrayRecord.children:1:<autosummary>:1
@@ -24495,11 +24537,11 @@ msgstr "Retournez un dictionnaire des Arrays avec leurs IDs d'objet comme clés.
 
 #: flwr.app.ArrayRecord.children:1:<autosummary>:1 of
 msgid ":py:obj:`is_dirty <flwr.app.ArrayRecord.is_dirty>`\\"
-msgstr ":py:obj:`is_dirty <flwr.app.ArrayRecord.is_dirty>`\\"
+msgstr ""
 
 #: flwr.app.ArrayRecord.children:1:<autosummary>:1 of
 msgid ":py:obj:`object_id <flwr.app.ArrayRecord.object_id>`\\"
-msgstr ":py:obj:`object_id <flwr.app.ArrayRecord.object_id>`\\"
+msgstr ""
 
 #: flwr.app.message.arrayrecord.ArrayRecord.count_bytes:3 of
 msgid ""
@@ -24530,7 +24572,7 @@ msgstr "L'ArrayRecord gonflé."
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:2
 #: ../../source/ref-api/flwr.common.ConfigRecord.rst:2
 msgid "ConfigRecord"
-msgstr "ConfigRecord"
+msgstr ""
 
 #: flwr.app.message.configrecord.ConfigRecord:1 of
 msgid ""
@@ -24628,19 +24670,19 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`clear <flwr.app.ConfigRecord.clear>`\\ \\(\\)"
-msgstr ":py:obj:`clear <flwr.app.ConfigRecord.clear>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`copy <flwr.app.ConfigRecord.copy>`\\ \\(\\)"
-msgstr ":py:obj:`copy <flwr.app.ConfigRecord.copy>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`count_bytes <flwr.app.ConfigRecord.count_bytes>`\\ \\(\\)"
-msgstr ":py:obj:`count_bytes <flwr.app.ConfigRecord.count_bytes>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`deflate <flwr.app.ConfigRecord.deflate>`\\ \\(\\)"
-msgstr ":py:obj:`deflate <flwr.app.ConfigRecord.deflate>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
@@ -24655,7 +24697,7 @@ msgstr "Défléter l'objet."
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`get <flwr.app.ConfigRecord.get>`\\ \\(k\\[\\,d\\]\\)"
-msgstr ":py:obj:`get <flwr.app.ConfigRecord.get>`\\ \\(k\\[\\,d\\]\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 msgid ""
@@ -24674,19 +24716,19 @@ msgstr "Infléitez un ConfigRecord à partir de bytes."
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`items <flwr.app.ConfigRecord.items>`\\ \\(\\)"
-msgstr ":py:obj:`items <flwr.app.ConfigRecord.items>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`keys <flwr.app.ConfigRecord.keys>`\\ \\(\\)"
-msgstr ":py:obj:`keys <flwr.app.ConfigRecord.keys>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`pop <flwr.app.ConfigRecord.pop>`\\ \\(k\\[\\,d\\]\\)"
-msgstr ":py:obj:`pop <flwr.app.ConfigRecord.pop>`\\ \\(k\\[\\,d\\]\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`popitem <flwr.app.ConfigRecord.popitem>`\\ \\(\\)"
-msgstr ":py:obj:`popitem <flwr.app.ConfigRecord.popitem>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 msgid ""
@@ -24698,15 +24740,15 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`update <flwr.app.ConfigRecord.update>`\\ \\(\\[E\\, \\]\\*\\*F\\)"
-msgstr ":py:obj:`update <flwr.app.ConfigRecord.update>`\\ \\(\\[E\\, \\]\\*\\*F\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`values <flwr.app.ConfigRecord.values>`\\ \\(\\)"
-msgstr ":py:obj:`values <flwr.app.ConfigRecord.values>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.app.ConfigRecord.children:1:<autosummary>:1 of
 msgid ":py:obj:`children <flwr.app.ConfigRecord.children>`\\"
-msgstr ":py:obj:`children <flwr.app.ConfigRecord.children>`\\"
+msgstr ""
 
 #: flwr.app.ConfigRecord.children:1
 #: flwr.app.ConfigRecord.children:1:<autosummary>:1
@@ -24727,11 +24769,11 @@ msgstr ""
 
 #: flwr.app.ConfigRecord.children:1:<autosummary>:1 of
 msgid ":py:obj:`is_dirty <flwr.app.ConfigRecord.is_dirty>`\\"
-msgstr ":py:obj:`is_dirty <flwr.app.ConfigRecord.is_dirty>`\\"
+msgstr ""
 
 #: flwr.app.ConfigRecord.children:1:<autosummary>:1 of
 msgid ":py:obj:`object_id <flwr.app.ConfigRecord.object_id>`\\"
-msgstr ":py:obj:`object_id <flwr.app.ConfigRecord.object_id>`\\"
+msgstr ""
 
 #: flwr.app.ConfigRecord.children:1:<autosummary>:1
 #: flwr.app.ConfigRecord.object_id:1
@@ -24793,7 +24835,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.app.Context.rst:2
 #: ../../source/ref-api/flwr.common.Context.rst:2
 msgid "Context"
-msgstr "Context"
+msgstr ""
 
 #: flwr.app.message.context.Context:3 of
 msgid "The ID that identifies the run."
@@ -24849,32 +24891,32 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 msgid ":py:obj:`run_id <flwr.app.Context.run_id>`\\"
-msgstr ":py:obj:`run_id <flwr.app.Context.run_id>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 msgid ":py:obj:`node_id <flwr.app.Context.node_id>`\\"
-msgstr ":py:obj:`node_id <flwr.app.Context.node_id>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 msgid ":py:obj:`node_config <flwr.app.Context.node_config>`\\"
-msgstr ":py:obj:`node_config <flwr.app.Context.node_config>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 msgid ":py:obj:`state <flwr.app.Context.state>`\\"
-msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 msgid ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
-msgstr ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 msgid ":py:obj:`series_id <flwr.app.Context.series_id>`\\"
-msgstr ":py:obj:`series_id <flwr.app.Context.series_id>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Error.rst:2
 #: ../../source/ref-api/flwr.common.Error.rst:2
 msgid "Error"
-msgstr "Error"
+msgstr ""
 
 #: flwr.app.error.Error:3 of
 msgid "An identifier for the error."
@@ -24888,7 +24930,7 @@ msgstr ""
 
 #: flwr.app.Error.code:1:<autosummary>:1 of
 msgid ":py:obj:`code <flwr.app.Error.code>`\\"
-msgstr ":py:obj:`code <flwr.app.Error.code>`\\"
+msgstr ""
 
 #: flwr.app.Error.code:1 flwr.app.Error.code:1:<autosummary>:1
 #: flwr.common.Error.code:1 flwr.common.Error.code:1:<autosummary>:1 of
@@ -24897,7 +24939,7 @@ msgstr "Code d'erreur."
 
 #: flwr.app.Error.code:1:<autosummary>:1 of
 msgid ":py:obj:`reason <flwr.app.Error.reason>`\\"
-msgstr ":py:obj:`reason <flwr.app.Error.reason>`\\"
+msgstr ""
 
 #: flwr.app.Error.code:1:<autosummary>:1 flwr.app.Error.reason:1
 #: flwr.common.Error.code:1:<autosummary>:1 flwr.common.Error.reason:1 of
@@ -24907,7 +24949,7 @@ msgstr "Raison signalée concernant l'erreur."
 #: ../../source/ref-api/flwr.app.Message.rst:2
 #: ../../source/ref-api/flwr.common.Message.rst:2
 msgid "Message"
-msgstr "Message"
+msgstr ""
 
 #: flwr.app.message.message.Message:3 of
 msgid ""
@@ -25015,7 +25057,7 @@ msgstr "Créer une réponse à ce message avec du contenu spécifié et TTL."
 
 #: ../../source/ref-api/flwr.app.Message.rst:41:<autosummary>:1
 msgid ":py:obj:`deflate <flwr.app.Message.deflate>`\\ \\(\\)"
-msgstr ":py:obj:`deflate <flwr.app.Message.deflate>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Message.rst:41:<autosummary>:1
 #: ../../source/ref-api/flwr.common.Message.rst:41:<autosummary>:1
@@ -25025,7 +25067,7 @@ msgstr "Défléter le message."
 
 #: ../../source/ref-api/flwr.app.Message.rst:41:<autosummary>:1
 msgid ":py:obj:`has_content <flwr.app.Message.has_content>`\\ \\(\\)"
-msgstr ":py:obj:`has_content <flwr.app.Message.has_content>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Message.rst:41:<autosummary>:1
 #: ../../source/ref-api/flwr.common.Message.rst:41:<autosummary>:1
@@ -25035,7 +25077,7 @@ msgstr "Renvoyer True si le message a du contenu, sinon False."
 
 #: ../../source/ref-api/flwr.app.Message.rst:41:<autosummary>:1
 msgid ":py:obj:`has_error <flwr.app.Message.has_error>`\\ \\(\\)"
-msgstr ":py:obj:`has_error <flwr.app.Message.has_error>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Message.rst:41:<autosummary>:1
 #: ../../source/ref-api/flwr.common.Message.rst:41:<autosummary>:1
@@ -25059,7 +25101,7 @@ msgstr "Infléitez un Message à partir de bytes."
 
 #: flwr.app.Message.children:1:<autosummary>:1 of
 msgid ":py:obj:`children <flwr.app.Message.children>`\\"
-msgstr ":py:obj:`children <flwr.app.Message.children>`\\"
+msgstr ""
 
 #: flwr.app.Message.children:1 flwr.app.Message.children:1:<autosummary>:1
 #: flwr.common.Message.children:1
@@ -25071,7 +25113,7 @@ msgstr ""
 
 #: flwr.app.Message.children:1:<autosummary>:1 of
 msgid ":py:obj:`content <flwr.app.Message.content>`\\"
-msgstr ":py:obj:`content <flwr.app.Message.content>`\\"
+msgstr ""
 
 #: flwr.app.Message.children:1:<autosummary>:1 flwr.app.Message.content:1
 #: flwr.common.Message.children:1:<autosummary>:1 flwr.common.Message.content:1
@@ -25081,7 +25123,7 @@ msgstr "Le contenu de ce message."
 
 #: flwr.app.Message.children:1:<autosummary>:1 of
 msgid ":py:obj:`error <flwr.app.Message.error>`\\"
-msgstr ":py:obj:`error <flwr.app.Message.error>`\\"
+msgstr ""
 
 #: flwr.app.Message.children:1:<autosummary>:1 flwr.app.Message.error:1
 #: flwr.common.Message.children:1:<autosummary>:1 flwr.common.Message.error:1
@@ -25091,11 +25133,11 @@ msgstr "Erreur capturée par ce message."
 
 #: flwr.app.Message.children:1:<autosummary>:1 of
 msgid ":py:obj:`is_dirty <flwr.app.Message.is_dirty>`\\"
-msgstr ":py:obj:`is_dirty <flwr.app.Message.is_dirty>`\\"
+msgstr ""
 
 #: flwr.app.Message.children:1:<autosummary>:1 of
 msgid ":py:obj:`metadata <flwr.app.Message.metadata>`\\"
-msgstr ":py:obj:`metadata <flwr.app.Message.metadata>`\\"
+msgstr ""
 
 #: flwr.app.Message.children:1:<autosummary>:1 flwr.app.Message.metadata:1
 #: flwr.common.Message.children:1:<autosummary>:1
@@ -25105,7 +25147,7 @@ msgstr "Un dataclass incluant des informations sur le message à exécuter."
 
 #: flwr.app.Message.children:1:<autosummary>:1 of
 msgid ":py:obj:`object_id <flwr.app.Message.object_id>`\\"
-msgstr ":py:obj:`object_id <flwr.app.Message.object_id>`\\"
+msgstr ""
 
 #: flwr.app.message.message.Message.create_error_reply:3 of
 msgid "The error that was encountered."
@@ -25138,7 +25180,7 @@ msgstr ""
 #: flwr.app.message.message.Message.create_error_reply:9
 #: flwr.app.message.message.Message.create_reply:13 of
 msgid "ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)"
-msgstr "ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)"
+msgstr ""
 
 #: flwr.app.message.message.Message.create_error_reply:12 of
 msgid "**message** -- A Message containing only the relevant error and metadata."
@@ -25183,19 +25225,19 @@ msgstr "Le Message gonflé."
 #: ../../source/ref-api/flwr.app.MessageType.rst:2
 #: ../../source/ref-api/flwr.common.MessageType.rst:2
 msgid "MessageType"
-msgstr "MessageType"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.MessageType.rst:30:<autosummary>:1
 msgid ":py:obj:`EVALUATE <flwr.app.MessageType.EVALUATE>`\\"
-msgstr ":py:obj:`EVALUATE <flwr.app.MessageType.EVALUATE>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.MessageType.rst:30:<autosummary>:1
 msgid ":py:obj:`QUERY <flwr.app.MessageType.QUERY>`\\"
-msgstr ":py:obj:`QUERY <flwr.app.MessageType.QUERY>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.MessageType.rst:30:<autosummary>:1
 msgid ":py:obj:`TRAIN <flwr.app.MessageType.TRAIN>`\\"
-msgstr ":py:obj:`TRAIN <flwr.app.MessageType.TRAIN>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Metadata.rst:2
 #: ../../source/ref-api/flwr.common.Metadata.rst:2
@@ -25257,11 +25299,11 @@ msgstr "Un identifiant pour la tâche destination qui reçoit ce message."
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`created_at <flwr.app.Metadata.created_at>`\\"
-msgstr ":py:obj:`created_at <flwr.app.Metadata.created_at>`\\"
+msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`delivered_at <flwr.app.Metadata.delivered_at>`\\"
-msgstr ":py:obj:`delivered_at <flwr.app.Metadata.delivered_at>`\\"
+msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1
 #: flwr.app.Metadata.delivered_at:1
@@ -25272,15 +25314,15 @@ msgstr "Heure Unix à laquelle le message a été transmis."
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`dst_node_id <flwr.app.Metadata.dst_node_id>`\\"
-msgstr ":py:obj:`dst_node_id <flwr.app.Metadata.dst_node_id>`\\"
+msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`dst_task_id <flwr.app.Metadata.dst_task_id>`\\"
-msgstr ":py:obj:`dst_task_id <flwr.app.Metadata.dst_task_id>`\\"
+msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`group_id <flwr.app.Metadata.group_id>`\\"
-msgstr ":py:obj:`group_id <flwr.app.Metadata.group_id>`\\"
+msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 flwr.app.Metadata.group_id:1
 #: flwr.common.Metadata.created_at:1:<autosummary>:1
@@ -25290,31 +25332,31 @@ msgstr "Un identifiant pour regrouper les messages."
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`message_id <flwr.app.Metadata.message_id>`\\"
-msgstr ":py:obj:`message_id <flwr.app.Metadata.message_id>`\\"
+msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`message_type <flwr.app.Metadata.message_type>`\\"
-msgstr ":py:obj:`message_type <flwr.app.Metadata.message_type>`\\"
+msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`reply_to_message_id <flwr.app.Metadata.reply_to_message_id>`\\"
-msgstr ":py:obj:`reply_to_message_id <flwr.app.Metadata.reply_to_message_id>`\\"
+msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`run_id <flwr.app.Metadata.run_id>`\\"
-msgstr ":py:obj:`run_id <flwr.app.Metadata.run_id>`\\"
+msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`src_node_id <flwr.app.Metadata.src_node_id>`\\"
-msgstr ":py:obj:`src_node_id <flwr.app.Metadata.src_node_id>`\\"
+msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`src_task_id <flwr.app.Metadata.src_task_id>`\\"
-msgstr ":py:obj:`src_task_id <flwr.app.Metadata.src_task_id>`\\"
+msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`ttl <flwr.app.Metadata.ttl>`\\"
-msgstr ":py:obj:`ttl <flwr.app.Metadata.ttl>`\\"
+msgstr ""
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 flwr.app.Metadata.ttl:1
 #: flwr.common.Metadata.created_at:1:<autosummary>:1 flwr.common.Metadata.ttl:1
@@ -25325,7 +25367,7 @@ msgstr "Durée de vie pour ce message."
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:2
 #: ../../source/ref-api/flwr.common.MetricRecord.rst:2
 msgid "MetricRecord"
-msgstr "MetricRecord"
+msgstr ""
 
 #: flwr.app.message.metricrecord.MetricRecord:1 of
 msgid ""
@@ -25427,23 +25469,23 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`clear <flwr.app.MetricRecord.clear>`\\ \\(\\)"
-msgstr ":py:obj:`clear <flwr.app.MetricRecord.clear>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`copy <flwr.app.MetricRecord.copy>`\\ \\(\\)"
-msgstr ":py:obj:`copy <flwr.app.MetricRecord.copy>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`count_bytes <flwr.app.MetricRecord.count_bytes>`\\ \\(\\)"
-msgstr ":py:obj:`count_bytes <flwr.app.MetricRecord.count_bytes>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`deflate <flwr.app.MetricRecord.deflate>`\\ \\(\\)"
-msgstr ":py:obj:`deflate <flwr.app.MetricRecord.deflate>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`get <flwr.app.MetricRecord.get>`\\ \\(k\\[\\,d\\]\\)"
-msgstr ":py:obj:`get <flwr.app.MetricRecord.get>`\\ \\(k\\[\\,d\\]\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 msgid ""
@@ -25462,19 +25504,19 @@ msgstr "Infléitez un RecordMetric à partir de bytes."
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`items <flwr.app.MetricRecord.items>`\\ \\(\\)"
-msgstr ":py:obj:`items <flwr.app.MetricRecord.items>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`keys <flwr.app.MetricRecord.keys>`\\ \\(\\)"
-msgstr ":py:obj:`keys <flwr.app.MetricRecord.keys>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`pop <flwr.app.MetricRecord.pop>`\\ \\(k\\[\\,d\\]\\)"
-msgstr ":py:obj:`pop <flwr.app.MetricRecord.pop>`\\ \\(k\\[\\,d\\]\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`popitem <flwr.app.MetricRecord.popitem>`\\ \\(\\)"
-msgstr ":py:obj:`popitem <flwr.app.MetricRecord.popitem>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 msgid ""
@@ -25486,23 +25528,23 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`update <flwr.app.MetricRecord.update>`\\ \\(\\[E\\, \\]\\*\\*F\\)"
-msgstr ":py:obj:`update <flwr.app.MetricRecord.update>`\\ \\(\\[E\\, \\]\\*\\*F\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 msgid ":py:obj:`values <flwr.app.MetricRecord.values>`\\ \\(\\)"
-msgstr ":py:obj:`values <flwr.app.MetricRecord.values>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.app.MetricRecord.children:1:<autosummary>:1 of
 msgid ":py:obj:`children <flwr.app.MetricRecord.children>`\\"
-msgstr ":py:obj:`children <flwr.app.MetricRecord.children>`\\"
+msgstr ""
 
 #: flwr.app.MetricRecord.children:1:<autosummary>:1 of
 msgid ":py:obj:`is_dirty <flwr.app.MetricRecord.is_dirty>`\\"
-msgstr ":py:obj:`is_dirty <flwr.app.MetricRecord.is_dirty>`\\"
+msgstr ""
 
 #: flwr.app.MetricRecord.children:1:<autosummary>:1 of
 msgid ":py:obj:`object_id <flwr.app.MetricRecord.object_id>`\\"
-msgstr ":py:obj:`object_id <flwr.app.MetricRecord.object_id>`\\"
+msgstr ""
 
 #: flwr.app.message.metricrecord.MetricRecord.inflate:3 of
 msgid "The deflated object content of the MetricRecord."
@@ -25523,7 +25565,7 @@ msgstr "L'objet MetricRecord infléi."
 #: ../../source/ref-api/flwr.app.RecordDict.rst:2
 #: ../../source/ref-api/flwr.common.RecordDict.rst:2
 msgid "RecordDict"
-msgstr "RecordDict"
+msgstr ""
 
 #: flwr.app.message.recorddict.RecordDict:1 of
 msgid ""
@@ -25598,15 +25640,15 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
 msgid ":py:obj:`clear <flwr.app.RecordDict.clear>`\\ \\(\\)"
-msgstr ":py:obj:`clear <flwr.app.RecordDict.clear>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
 msgid ":py:obj:`copy <flwr.app.RecordDict.copy>`\\ \\(\\)"
-msgstr ":py:obj:`copy <flwr.app.RecordDict.copy>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
 msgid ":py:obj:`deflate <flwr.app.RecordDict.deflate>`\\ \\(\\)"
-msgstr ":py:obj:`deflate <flwr.app.RecordDict.deflate>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
 #: ../../source/ref-api/flwr.common.RecordDict.rst:59:<autosummary>:1
@@ -25617,7 +25659,7 @@ msgstr "Déflatez le RecordDict."
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
 msgid ":py:obj:`get <flwr.app.RecordDict.get>`\\ \\(k\\[\\,d\\]\\)"
-msgstr ":py:obj:`get <flwr.app.RecordDict.get>`\\ \\(k\\[\\,d\\]\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
 msgid ""
@@ -25636,35 +25678,35 @@ msgstr "Infléitez un RecordDict à partir de bytes."
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
 msgid ":py:obj:`items <flwr.app.RecordDict.items>`\\ \\(\\)"
-msgstr ":py:obj:`items <flwr.app.RecordDict.items>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
 msgid ":py:obj:`keys <flwr.app.RecordDict.keys>`\\ \\(\\)"
-msgstr ":py:obj:`keys <flwr.app.RecordDict.keys>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
 msgid ":py:obj:`pop <flwr.app.RecordDict.pop>`\\ \\(k\\[\\,d\\]\\)"
-msgstr ":py:obj:`pop <flwr.app.RecordDict.pop>`\\ \\(k\\[\\,d\\]\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
 msgid ":py:obj:`popitem <flwr.app.RecordDict.popitem>`\\ \\(\\)"
-msgstr ":py:obj:`popitem <flwr.app.RecordDict.popitem>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
 msgid ":py:obj:`setdefault <flwr.app.RecordDict.setdefault>`\\ \\(k\\[\\,d\\]\\)"
-msgstr ":py:obj:`setdefault <flwr.app.RecordDict.setdefault>`\\ \\(k\\[\\,d\\]\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
 msgid ":py:obj:`update <flwr.app.RecordDict.update>`\\ \\(\\[E\\, \\]\\*\\*F\\)"
-msgstr ":py:obj:`update <flwr.app.RecordDict.update>`\\ \\(\\[E\\, \\]\\*\\*F\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
 msgid ":py:obj:`values <flwr.app.RecordDict.values>`\\ \\(\\)"
-msgstr ":py:obj:`values <flwr.app.RecordDict.values>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1 of
 msgid ":py:obj:`array_records <flwr.app.RecordDict.array_records>`\\"
-msgstr ":py:obj:`array_records <flwr.app.RecordDict.array_records>`\\"
+msgstr ""
 
 #: flwr.app.RecordDict.array_records:1
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1
@@ -25677,7 +25719,7 @@ msgstr "Dictionnaire contenant uniquement des instances ArrayRecord."
 
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1 of
 msgid ":py:obj:`children <flwr.app.RecordDict.children>`\\"
-msgstr ":py:obj:`children <flwr.app.RecordDict.children>`\\"
+msgstr ""
 
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1
 #: flwr.app.RecordDict.children:1
@@ -25690,7 +25732,7 @@ msgstr "Retournez un dictionnaire de records avec leurs ID d'objet comme clés."
 
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1 of
 msgid ":py:obj:`config_records <flwr.app.RecordDict.config_records>`\\"
-msgstr ":py:obj:`config_records <flwr.app.RecordDict.config_records>`\\"
+msgstr ""
 
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1
 #: flwr.app.RecordDict.config_records:1
@@ -25703,7 +25745,7 @@ msgstr "Dictionnaire contenant uniquement des instances ConfigRecord."
 
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1 of
 msgid ":py:obj:`configs_records <flwr.app.RecordDict.configs_records>`\\"
-msgstr ":py:obj:`configs_records <flwr.app.RecordDict.configs_records>`\\"
+msgstr ""
 
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1
 #: flwr.app.RecordDict.configs_records:1 flwr.app.RecordDict.metrics_records:1
@@ -25721,11 +25763,11 @@ msgstr "Propriété dépréciée."
 
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1 of
 msgid ":py:obj:`is_dirty <flwr.app.RecordDict.is_dirty>`\\"
-msgstr ":py:obj:`is_dirty <flwr.app.RecordDict.is_dirty>`\\"
+msgstr ""
 
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1 of
 msgid ":py:obj:`metric_records <flwr.app.RecordDict.metric_records>`\\"
-msgstr ":py:obj:`metric_records <flwr.app.RecordDict.metric_records>`\\"
+msgstr ""
 
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1
 #: flwr.app.RecordDict.metric_records:1
@@ -25738,15 +25780,15 @@ msgstr "Dictionnaire contenant uniquement des instances MetricRecord."
 
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1 of
 msgid ":py:obj:`metrics_records <flwr.app.RecordDict.metrics_records>`\\"
-msgstr ":py:obj:`metrics_records <flwr.app.RecordDict.metrics_records>`\\"
+msgstr ""
 
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1 of
 msgid ":py:obj:`object_id <flwr.app.RecordDict.object_id>`\\"
-msgstr ":py:obj:`object_id <flwr.app.RecordDict.object_id>`\\"
+msgstr ""
 
 #: flwr.app.RecordDict.array_records:1:<autosummary>:1 of
 msgid ":py:obj:`parameters_records <flwr.app.RecordDict.parameters_records>`\\"
-msgstr ":py:obj:`parameters_records <flwr.app.RecordDict.parameters_records>`\\"
+msgstr ""
 
 #: flwr.app.RecordDict.configs_records:3
 #: flwr.common.RecordDict.configs_records:3
@@ -25795,7 +25837,7 @@ msgstr "Client"
 #: ../../source/ref-api/flwr.server.rst:13
 #: ../../source/ref-api/flwr.simulation.rst:13
 msgid "Functions"
-msgstr "Functions"
+msgstr ""
 
 #: ../../source/ref-api/flwr.client.rst:23:<autosummary>:1
 #, fuzzy
@@ -26289,7 +26331,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.client.mod.rst:2
 #: ../../source/ref-api/flwr.clientapp.mod.rst:2
 msgid "mod"
-msgstr "mod"
+msgstr ""
 
 #: ../../source/ref-api/flwr.client.mod.rst:28:<autosummary>:1
 #, fuzzy
@@ -26410,7 +26452,7 @@ msgstr "Modificateur pour la vie privée différentielle locale."
 #: ../../source/ref-api/flwr.client.mod.LocalDpMod.rst:2
 #: ../../source/ref-api/flwr.clientapp.mod.LocalDpMod.rst:2
 msgid "LocalDpMod"
-msgstr "LocalDpMod"
+msgstr ""
 
 #: flwr.client.mod.localdp_mod.LocalDpMod:3
 #: flwr.clientapp.mod.localdp_mod.LocalDpMod:3 of
@@ -26478,7 +26520,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.client.mod.adaptiveclipping_mod.rst:2
 #: ../../source/ref-api/flwr.clientapp.mod.adaptiveclipping_mod.rst:2
 msgid "adaptiveclipping\\_mod"
-msgstr "adaptiveclipping\\_mod"
+msgstr ""
 
 #: flwr.client.mod.centraldp_mods.adaptiveclipping_mod:3
 #: flwr.clientapp.mod.centraldp_mods.adaptiveclipping_mod:3 of
@@ -26524,7 +26566,7 @@ msgstr ""
 #: flwr.serverapp.grid.grid.Grid.send_and_receive:18
 #: flwr.serverapp.strategy.multikrum.MultiKrum:42 of
 msgid "Notes"
-msgstr "Notes"
+msgstr ""
 
 #: flwr.client.mod.centraldp_mods.adaptiveclipping_mod:16
 #: flwr.client.mod.centraldp_mods.fixedclipping_mod:14
@@ -26543,7 +26585,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.client.mod.arrays_size_mod.rst:2
 #: ../../source/ref-api/flwr.clientapp.mod.arrays_size_mod.rst:2
 msgid "arrays\\_size\\_mod"
-msgstr "arrays\\_size\\_mod"
+msgstr ""
 
 #: flwr.clientapp.mod.comms_mods.arrays_size_mod:3 of
 msgid ""
@@ -26556,7 +26598,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.client.mod.fixedclipping_mod.rst:2
 #: ../../source/ref-api/flwr.clientapp.mod.fixedclipping_mod.rst:2
 msgid "fixedclipping\\_mod"
-msgstr "fixedclipping\\_mod"
+msgstr ""
 
 #: flwr.client.mod.centraldp_mods.fixedclipping_mod:3 of
 #, fuzzy
@@ -26585,7 +26627,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.client.mod.message_size_mod.rst:2
 #: ../../source/ref-api/flwr.clientapp.mod.message_size_mod.rst:2
 msgid "message\\_size\\_mod"
-msgstr "message\\_size\\_mod"
+msgstr ""
 
 #: flwr.clientapp.mod.comms_mods.message_size_mod:3 of
 msgid "This mod logs the size in bytes of the message being transmited."
@@ -26719,7 +26761,7 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.clientapp.rst:2
 msgid "clientapp"
-msgstr "clientapp"
+msgstr ""
 
 #: ../../source/ref-api/flwr.clientapp.rst:22:<autosummary>:1
 msgid ""
@@ -26731,7 +26773,7 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.clientapp.rst:41:<autosummary>:1
 msgid ":py:obj:`mod <flwr.clientapp.mod>`\\"
-msgstr ":py:obj:`mod <flwr.clientapp.mod>`\\"
+msgstr ""
 
 #: flwr.clientapp.client_app.ClientApp.evaluate:1:<autosummary>:1 of
 msgid ""
@@ -26743,7 +26785,7 @@ msgstr ""
 
 #: flwr.clientapp.client_app.ClientApp.evaluate:1:<autosummary>:1 of
 msgid ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
-msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.clientapp.client_app.ClientApp.evaluate:1:<autosummary>:1 of
 msgid ""
@@ -30287,7 +30329,7 @@ msgstr "Le ``Run`` à l'intérieur duquel cet objet ``Grid`` opère."
 #: ../../source/ref-api/flwr.server.Grid.rst:2
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:2
 msgid "Grid"
-msgstr "Grid"
+msgstr ""
 
 #: ../../source/ref-api/flwr.server.Grid.rst:41:<autosummary>:1
 #, fuzzy
@@ -30827,7 +30869,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.strategy.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:2
 msgid "strategy"
-msgstr "strategy"
+msgstr ""
 
 #: ../../source/ref-api/flwr.server.strategy.rst:45:<autosummary>:1
 #, fuzzy
@@ -31224,7 +31266,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.strategy.Bulyan.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.Bulyan.rst:2
 msgid "Bulyan"
-msgstr "Bulyan"
+msgstr ""
 
 #: flwr.server.strategy.bulyan.Bulyan:1
 #: flwr.server.strategy.fault_tolerant_fedavg.FaultTolerantFedAvg:1
@@ -31574,7 +31616,7 @@ msgstr ""
 #: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1
 #: flwr.server.strategy.qfedavg.QFedAvg.aggregate_evaluate:1:<autosummary>:1
 #: flwr.server.strategy.qfedavg.QFedAvg.num_evaluation_clients:1 of
-#, fuzzy, python-format
+#, fuzzy
 msgid "Use a fraction of available clients for evaluation."
 msgstr ""
 "``fraction-evaluate=1.0`` → sélectionner 100% des clients disponibles "
@@ -31881,7 +31923,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst:2
 msgid "DifferentialPrivacyClientSideAdaptiveClipping"
-msgstr "DifferentialPrivacyClientSideAdaptiveClipping"
+msgstr ""
 
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:3
 #: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:3
@@ -32091,7 +32133,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.strategy.DifferentialPrivacyClientSideFixedClipping.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.rst:2
 msgid "DifferentialPrivacyClientSideFixedClipping"
-msgstr "DifferentialPrivacyClientSideFixedClipping"
+msgstr ""
 
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:3
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:3
@@ -32226,7 +32268,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.strategy.DifferentialPrivacyServerSideAdaptiveClipping.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideAdaptiveClipping.rst:2
 msgid "DifferentialPrivacyServerSideAdaptiveClipping"
-msgstr "DifferentialPrivacyServerSideAdaptiveClipping"
+msgstr ""
 
 #: flwr.server.strategy.dp_adaptive_clipping.DifferentialPrivacyServerSideAdaptiveClipping:17
 #: of
@@ -32325,7 +32367,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.strategy.DifferentialPrivacyServerSideFixedClipping.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.rst:2
 msgid "DifferentialPrivacyServerSideFixedClipping"
-msgstr "DifferentialPrivacyServerSideFixedClipping"
+msgstr ""
 
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:19
 #: of
@@ -32530,7 +32572,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.serverapp.strategy.FedAdagrad.rst:2
 #: ../../source/ref-changelog.md:2676
 msgid "FedAdagrad"
-msgstr "FedAdagrad"
+msgstr ""
 
 #: flwr.server.strategy.fedadagrad.FedAdagrad:1
 #: flwr.server.strategy.fedadam.FedAdam:1
@@ -32667,7 +32709,7 @@ msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedAdagrad.summary>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.server.strategy.FedAdam.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.FedAdam.rst:2
 msgid "FedAdam"
-msgstr "FedAdam"
+msgstr ""
 
 #: flwr.server.strategy.fedadam.FedAdam:33
 #: flwr.server.strategy.fedyogi.FedYogi:36
@@ -32765,7 +32807,7 @@ msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedAdam.summary>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.server.strategy.FedAvg.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.FedAvg.rst:2
 msgid "FedAvg"
-msgstr "FedAvg"
+msgstr ""
 
 #: flwr.server.strategy.fedavg.FedAvg:3
 #: flwr.server.strategy.fedavg_android.FedAvgAndroid:3
@@ -33035,7 +33077,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.strategy.FedAvgM.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.FedAvgM.rst:2
 msgid "FedAvgM"
-msgstr "FedAvgM"
+msgstr ""
 
 #: flwr.server.strategy.fedavgm.FedAvgM:3
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:3 of
@@ -33138,7 +33180,7 @@ msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedAvgM.summary>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.server.strategy.FedMedian.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.FedMedian.rst:2
 msgid "FedMedian"
-msgstr "FedMedian"
+msgstr ""
 
 #: flwr.server.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1 of
 #, fuzzy
@@ -33319,7 +33361,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.strategy.FedProx.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.FedProx.rst:2
 msgid "FedProx"
-msgstr "FedProx"
+msgstr ""
 
 #: flwr.server.strategy.fedprox.FedProx:3
 #: flwr.serverapp.strategy.fedprox.FedProx:3 of
@@ -33471,7 +33513,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.strategy.FedTrimmedAvg.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.FedTrimmedAvg.rst:2
 msgid "FedTrimmedAvg"
-msgstr "FedTrimmedAvg"
+msgstr ""
 
 #: flwr.server.strategy.fedtrimmedavg.FedTrimmedAvg:3
 #: flwr.serverapp.strategy.fedtrimmedavg.FedTrimmedAvg:3 of
@@ -33572,7 +33614,7 @@ msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedTrimmedAvg.summary>`\\ \\(\
 #: ../../source/ref-api/flwr.server.strategy.FedXgbBagging.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst:2
 msgid "FedXgbBagging"
-msgstr "FedXgbBagging"
+msgstr ""
 
 #: flwr.server.strategy.fedxgb_bagging.FedXgbBagging.aggregate_evaluate:1:<autosummary>:1
 #: of
@@ -33684,7 +33726,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.strategy.FedXgbCyclic.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.FedXgbCyclic.rst:2
 msgid "FedXgbCyclic"
-msgstr "FedXgbCyclic"
+msgstr ""
 
 #: flwr.server.strategy.fedxgb_cyclic.FedXgbCyclic.aggregate_evaluate:1:<autosummary>:1
 #: of
@@ -33871,7 +33913,7 @@ msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedAvg.summary>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.server.strategy.FedYogi.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.FedYogi.rst:2
 msgid "FedYogi"
-msgstr "FedYogi"
+msgstr ""
 
 #: flwr.server.strategy.fedyogi.FedYogi:32
 #: flwr.serverapp.strategy.fedyogi.FedYogi:37 of
@@ -33972,7 +34014,7 @@ msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedYogi.summary>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.server.strategy.Krum.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.Krum.rst:2
 msgid "Krum"
-msgstr "Krum"
+msgstr ""
 
 #: flwr.server.strategy.krum.Krum:3 flwr.serverapp.strategy.krum.Krum:3
 #: flwr.serverapp.strategy.multikrum.MultiKrum:3 of
@@ -34071,7 +34113,7 @@ msgstr ":py:obj:`summary <flwr.serverapp.strategy.Krum.summary>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.server.strategy.QFedAvg.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.QFedAvg.rst:2
 msgid "QFedAvg"
-msgstr "QFedAvg"
+msgstr ""
 
 #: flwr.server.strategy.qfedavg.QFedAvg.aggregate_evaluate:1:<autosummary>:1 of
 #, fuzzy
@@ -34155,7 +34197,7 @@ msgstr ":py:obj:`summary <flwr.serverapp.strategy.QFedAvg.summary>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.server.strategy.Strategy.rst:2
 #: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst:2
 msgid "Strategy"
-msgstr "Strategy"
+msgstr ""
 
 #: flwr.server.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
 #: of
@@ -34691,11 +34733,11 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.rst:2
 msgid "serverapp"
-msgstr "serverapp"
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.rst:23:<autosummary>:1
 msgid ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
-msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.rst:23:<autosummary>:1
 msgid ""
@@ -34707,7 +34749,7 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.rst:42:<autosummary>:1
 msgid ":py:obj:`strategy <flwr.serverapp.strategy>`\\"
-msgstr ":py:obj:`strategy <flwr.serverapp.strategy>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.rst:42:<autosummary>:1
 #: flwr.serverapp.strategy:1 of
@@ -34724,7 +34766,7 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
 msgid ":py:obj:`get_node_ids <flwr.serverapp.Grid.get_node_ids>`\\ \\(\\)"
-msgstr ":py:obj:`get_node_ids <flwr.serverapp.Grid.get_node_ids>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
 msgid ""
@@ -34752,19 +34794,19 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
 msgid ":py:obj:`set_run <flwr.serverapp.Grid.set_run>`\\ \\(run\\)"
-msgstr ":py:obj:`set_run <flwr.serverapp.Grid.set_run>`\\ \\(run\\)"
+msgstr ""
 
 #: flwr.serverapp.grid.grid.Grid.create_message:1:<autosummary>:1 of
 msgid ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
-msgstr ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
+msgstr ""
 
 #: flwr.serverapp.server_app.ServerApp.lifespan:1:<autosummary>:1 of
 msgid ":py:obj:`lifespan <flwr.serverapp.ServerApp.lifespan>`\\ \\(\\)"
-msgstr ":py:obj:`lifespan <flwr.serverapp.ServerApp.lifespan>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.serverapp.server_app.ServerApp.lifespan:1:<autosummary>:1 of
 msgid ":py:obj:`main <flwr.serverapp.ServerApp.main>`\\ \\(\\)"
-msgstr ":py:obj:`main <flwr.serverapp.ServerApp.main>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 msgid ""
@@ -34956,7 +34998,7 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 msgid ":py:obj:`Strategy <flwr.serverapp.strategy.Strategy>`\\ \\(\\)"
-msgstr ":py:obj:`Strategy <flwr.serverapp.strategy.Strategy>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.serverapp.strategy.bulyan.Bulyan:1
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:1
@@ -35327,7 +35369,7 @@ msgstr "Exécution de la stratégie d'apprentissage fédéré."
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.Bulyan.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.Bulyan.summary>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst:41:<autosummary>:1
 #: flwr.serverapp.strategy.bulyan.Bulyan.summary:1
@@ -35792,7 +35834,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedAdagrad.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedAdagrad.summary>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
@@ -35850,7 +35892,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedAdam.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedAdam.summary>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.serverapp.strategy.fedavg.FedAvg:1 of
 msgid "Bases: :py:class:`~flwr.serverapp.strategy.strategy.Strategy`"
@@ -35912,7 +35954,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedAvg.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedAvg.summary>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:36 of
 msgid "Server-side learning rate used in server-side optimization."
@@ -35980,7 +36022,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedAvgM.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedAvgM.summary>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.serverapp.strategy.fedmedian.FedMedian:3 of
 msgid "Implementation based on https://arxiv.org/pdf/1803.01498v1"
@@ -36042,7 +36084,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedMedian.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedMedian.summary>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.serverapp.strategy.fedprox.FedProx:5 of
 msgid ""
@@ -36063,8 +36105,6 @@ msgid ""
 "\\frac{\\mu}{2} || w - w^t ||^2\n"
 "\n"
 msgstr ""
-"\\frac{\\mu}{2} || w - w^t ||^2\n"
-"\n"
 
 #: flwr.serverapp.strategy.fedprox.FedProx:13 of
 msgid ""
@@ -36152,7 +36192,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedProx.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedProx.summary>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.serverapp.strategy.fedtrimmedavg.FedTrimmedAvg:36 of
 msgid "Fraction to cut off of both tails of the distribution."
@@ -36214,7 +36254,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedTrimmedAvg.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedTrimmedAvg.summary>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst:41:<autosummary>:1
 msgid ""
@@ -36266,7 +36306,7 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst:41:<autosummary>:1
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedXgbBagging.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedXgbBagging.summary>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
@@ -36333,7 +36373,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedXgbCyclic.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedXgbCyclic.summary>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
@@ -36391,7 +36431,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.FedYogi.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.FedYogi.summary>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.serverapp.strategy.krum.Krum:1 of
 msgid "Bases: :py:class:`~flwr.serverapp.strategy.multikrum.MultiKrum`"
@@ -36458,11 +36498,11 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.Krum.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.Krum.summary>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.MultiKrum.rst:2
 msgid "MultiKrum"
-msgstr "MultiKrum"
+msgstr ""
 
 #: flwr.serverapp.strategy.multikrum.MultiKrum:21 of
 msgid "Number of nodes to select before averaging."
@@ -36532,7 +36572,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.MultiKrum.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.MultiKrum.summary>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.serverapp.strategy.qfedavg.QFedAvg:3 of
 msgid "Implementation based on openreview.net/pdf?id=ByexElSYDr"
@@ -36623,11 +36663,11 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.QFedAvg.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.QFedAvg.summary>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.Result.rst:2
 msgid "Result"
-msgstr "Result"
+msgstr ""
 
 #: flwr.serverapp.strategy.result.Result:3 of
 msgid ""
@@ -36651,7 +36691,7 @@ msgstr ""
 
 #: flwr.serverapp.strategy.result.Result of
 msgid "type"
-msgstr "type"
+msgstr ""
 
 #: flwr.serverapp.strategy.result.Result:17 of
 msgid ""
@@ -36668,7 +36708,7 @@ msgstr ""
 #: flwr.serverapp.strategy.result.Result:30
 #: flwr.serverapp.strategy.result.Result:38 of
 msgid "dict[int, MetricRecord]"
-msgstr "dict[int, MetricRecord]"
+msgstr ""
 
 #: flwr.serverapp.strategy.result.Result:25 of
 msgid ""
@@ -36695,7 +36735,7 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.Result.rst:31:<autosummary>:1
 msgid ":py:obj:`arrays <flwr.serverapp.strategy.Result.arrays>`\\"
-msgstr ":py:obj:`arrays <flwr.serverapp.strategy.Result.arrays>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.Result.rst:31:<autosummary>:1
 msgid ""
@@ -36788,7 +36828,7 @@ msgstr ""
 #: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ":py:obj:`summary <flwr.serverapp.strategy.Strategy.summary>`\\ \\(\\)"
-msgstr ":py:obj:`summary <flwr.serverapp.strategy.Strategy.summary>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:5 of
 msgid ""
@@ -37022,7 +37062,7 @@ msgstr "`quickstart_simulation`"
 
 #: ../../source/ref-changelog.md:1
 msgid "Changelog"
-msgstr "Changelog"
+msgstr ""
 
 #: ../../source/ref-changelog.md:3
 msgid "v1.32.1 (2026-07-01)"
@@ -37648,7 +37688,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:131
 msgid "v1.30.0 (2026-05-20)"
-msgstr "v1.30.0 (2026-05-20)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:137
 msgid ""
@@ -38025,7 +38065,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:171
 msgid "v1.29.0 (2026-04-12)"
-msgstr "v1.29.0 (2026-04-12)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:177
 msgid ""
@@ -38304,7 +38344,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:223
 msgid "v1.28.0 (2026-04-02)"
-msgstr "v1.28.0 (2026-04-02)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:229
 msgid ""
@@ -38768,7 +38808,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:279
 msgid "v1.27.0 (2026-03-10)"
-msgstr "v1.27.0 (2026-03-10)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:285
 msgid ""
@@ -39227,7 +39267,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:343
 msgid "v1.26.1 (2026-02-07)"
-msgstr "v1.26.1 (2026-02-07)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:349
 msgid ""
@@ -39288,7 +39328,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:361
 msgid "v1.26.0 (2026-02-05)"
-msgstr "v1.26.0 (2026-02-05)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:367
 msgid ""
@@ -39833,7 +39873,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:411
 msgid "v1.25.0 (2025-12-16)"
-msgstr "v1.25.0 (2025-12-16)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:417
 msgid ""
@@ -40102,7 +40142,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:453
 msgid "v1.24.0 (2025-11-30)"
-msgstr "v1.24.0 (2025-11-30)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:459
 msgid ""
@@ -40508,7 +40548,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:509
 msgid "v1.23.0 (2025-11-03)"
-msgstr "v1.23.0 (2025-11-03)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:515
 msgid ""
@@ -40644,7 +40684,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:533
 msgid "The old `flwr ls` command remains available as an alias."
-msgstr "The old `flwr ls` command remains available as an alias."
+msgstr ""
 
 #: ../../source/ref-changelog.md:535
 msgid ""
@@ -40794,7 +40834,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:551
 msgid "**Bugfix** ([#5979](https://github.com/flwrlabs/flower/pull/5979))"
-msgstr "**Bugfix** ([#5979](https://github.com/flwrlabs/flower/pull/5979))"
+msgstr ""
 
 #: ../../source/ref-changelog.md:553
 msgid ""
@@ -40920,7 +40960,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:571
 msgid "v1.22.0 (2025-09-21)"
-msgstr "v1.22.0 (2025-09-21)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:577
 msgid ""
@@ -41250,7 +41290,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:611
 msgid "v1.21.0 (2025-09-10)"
-msgstr "v1.21.0 (2025-09-10)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:617
 msgid ""
@@ -41574,15 +41614,15 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:651
 msgid "The following classes are now re-exported:"
-msgstr "The following classes are now re-exported:"
+msgstr ""
 
 #: ../../source/ref-changelog.md:653
 msgid "From `flwr.serverapp`: `ServerApp`, `Grid`"
-msgstr "From `flwr.serverapp`: `ServerApp`, `Grid`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:654
 msgid "From `flwr.clientapp`: `ClientApp`, `arrays_size_mod`, `message_size_mod`"
-msgstr "From `flwr.clientapp`: `ClientApp`, `arrays_size_mod`, `message_size_mod`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:655
 msgid ""
@@ -41768,7 +41808,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:681
 msgid "v1.20.0 (2025-07-29)"
-msgstr "v1.20.0 (2025-07-29)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:687
 msgid ""
@@ -42214,7 +42254,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:753
 msgid "v1.19.0 (2025-06-17)"
-msgstr "v1.19.0 (2025-06-17)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:759
 msgid ""
@@ -42836,7 +42876,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:821
 msgid "v1.18.0 (2025-04-23)"
-msgstr "v1.18.0 (2025-04-23)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:827
 msgid ""
@@ -43162,7 +43202,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:879
 msgid "v1.17.0 (2025-03-24)"
-msgstr "v1.17.0 (2025-03-24)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:885
 msgid ""
@@ -43236,23 +43276,23 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:917
 msgid "`Driver` → `Grid`"
-msgstr "`Driver` → `Grid`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:918
 msgid "`RecordSet` → `RecordDict`"
-msgstr "`RecordSet` → `RecordDict`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:919
 msgid "`ParametersRecord` → `ArrayRecord`"
-msgstr "`ParametersRecord` → `ArrayRecord`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:920
 msgid "`MetricsRecord` → `MetricRecord`"
-msgstr "`MetricsRecord` → `MetricRecord`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:921
 msgid "`ConfigsRecord` → `ConfigRecord`"
-msgstr "`ConfigsRecord` → `ConfigRecord`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:923
 msgid ""
@@ -43322,7 +43362,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:933
 msgid "`Driver.create_message(...)` → `Message(...)`"
-msgstr "`Driver.create_message(...)` → `Message(...)`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:934
 msgid ""
@@ -43518,7 +43558,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:964
 msgid "v1.16.0 (2025-03-11)"
-msgstr "v1.16.0 (2025-03-11)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:970
 msgid ""
@@ -43872,7 +43912,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1028
 msgid "v1.15.2 (2025-02-17)"
-msgstr "v1.15.2 (2025-02-17)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1034
 msgid ""
@@ -43962,7 +44002,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1054
 msgid "v1.15.1 (2025-02-05)"
-msgstr "v1.15.1 (2025-02-05)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1060
 msgid ""
@@ -44110,7 +44150,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1090
 msgid "v1.15.0 (2025-01-31)"
-msgstr "v1.15.0 (2025-01-31)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1096
 msgid ""
@@ -44700,7 +44740,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1180
 msgid "v1.14.0 (2024-12-20)"
-msgstr "v1.14.0 (2024-12-20)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1186
 msgid ""
@@ -44762,11 +44802,11 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1194
 msgid "`flwr stop <run-id>`"
-msgstr "`flwr stop <run-id>`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1195
 msgid "`flwr stop <run-id> [<app>] [<federation>]`"
-msgstr "`flwr stop <run-id> [<app>] [<federation>]`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1197
 msgid ""
@@ -45163,7 +45203,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1249
 msgid "v1.13.1 (2024-11-26)"
-msgstr "v1.13.1 (2024-11-26)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1255
 msgid ""
@@ -45225,7 +45265,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1269
 msgid "The example now uses the `flwr run` command and the Deployment Engine."
-msgstr "The example now uses the `flwr run` command and the Deployment Engine."
+msgstr ""
 
 #: ../../source/ref-changelog.md:1271
 msgid ""
@@ -45301,7 +45341,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1281
 msgid "v1.13.0 (2024-11-20)"
-msgstr "v1.13.0 (2024-11-20)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1287
 msgid ""
@@ -45337,7 +45377,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1295
 msgid "`flwr ls --runs [<app>] [<federation>]`: Lists all runs."
-msgstr "`flwr ls --runs [<app>] [<federation>]`: Lists all runs."
+msgstr ""
 
 #: ../../source/ref-changelog.md:1296
 msgid ""
@@ -45920,7 +45960,7 @@ msgstr "Dépréciations"
 
 #: ../../source/ref-changelog.md:1352
 msgid "**Deprecate Python 3.9**"
-msgstr "**Deprecate Python 3.9**"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1354
 msgid ""
@@ -46044,7 +46084,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1382
 msgid "v1.12.0 (2024-10-14)"
-msgstr "v1.12.0 (2024-10-14)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1388
 msgid ""
@@ -46574,7 +46614,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1452
 msgid "v1.11.1 (2024-09-11)"
-msgstr "v1.11.1 (2024-09-11)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1458
 msgid ""
@@ -46586,7 +46626,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1460
 msgid "Improvements"
-msgstr "Improvements"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1462
 msgid ""
@@ -46662,7 +46702,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1484
 msgid "v1.11.0 (2024-08-30)"
-msgstr "v1.11.0 (2024-08-30)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1490
 msgid ""
@@ -46756,7 +46796,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1500
 msgid "`flwr run` is all you need."
-msgstr "`flwr run` is all you need."
+msgstr ""
 
 #: ../../source/ref-changelog.md:1502
 msgid ""
@@ -46806,7 +46846,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1506
 msgid "`flower-supernode` supports three `--isolation` modes:"
-msgstr "`flower-supernode` supports three `--isolation` modes:"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1508
 msgid ""
@@ -46866,7 +46906,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1516
 msgid "`flwr/supernode` comes with a new Alpine Docker image."
-msgstr "`flwr/supernode` comes with a new Alpine Docker image."
+msgstr ""
 
 #: ../../source/ref-changelog.md:1517
 msgid ""
@@ -47100,7 +47140,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1543
 msgid "Many code examples have been migrated to use new Flower APIs."
-msgstr "Many code examples have been migrated to use new Flower APIs."
+msgstr ""
 
 #: ../../source/ref-changelog.md:1545
 msgid ""
@@ -47242,7 +47282,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1568
 msgid "`flower-client-app` has been disabled. Use `flower-supernode` instead."
-msgstr "`flower-client-app` has been disabled. Use `flower-supernode` instead."
+msgstr ""
 
 #: ../../source/ref-changelog.md:1570
 msgid ""
@@ -47262,7 +47302,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1578
 msgid "Previously, you could pass configs using commas, like this:"
-msgstr "Previously, you could pass configs using commas, like this:"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1584
 msgid ""
@@ -47282,7 +47322,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1588
 msgid "v1.10.0 (2024-07-24)"
-msgstr "v1.10.0 (2024-07-24)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1594
 msgid ""
@@ -47738,7 +47778,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1656
 msgid "Documentation improvements"
-msgstr "Documentation improvements"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1658
 msgid ""
@@ -47808,7 +47848,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1668
 msgid "**Deprecate** `client_fn(cid: str)`"
-msgstr "**Deprecate** `client_fn(cid: str)`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1670
 msgid ""
@@ -47902,7 +47942,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1686
 msgid "v1.9.0 (2024-06-10)"
-msgstr "v1.9.0 (2024-06-10)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1692
 msgid ""
@@ -48450,7 +48490,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1754
 msgid "As always, Flower code examples have received many updates."
-msgstr "As always, Flower code examples have received many updates."
+msgstr ""
 
 #: ../../source/ref-changelog.md:1756
 msgid ""
@@ -48528,7 +48568,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1760
 msgid "**Deprecate Python 3.8 support**"
-msgstr "**Deprecate Python 3.8 support**"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1762
 msgid ""
@@ -48648,7 +48688,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1786
 msgid "v1.8.0 (2024-04-03)"
-msgstr "v1.8.0 (2024-04-03)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1792
 msgid ""
@@ -49296,7 +49336,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1850
 msgid "v1.7.0 (2024-02-05)"
-msgstr "v1.7.0 (2024-02-05)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1856
 msgid ""
@@ -49558,11 +49598,11 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1900
 msgid "Many Flower code examples received substantial updates."
-msgstr "Many Flower code examples received substantial updates."
+msgstr ""
 
 #: ../../source/ref-changelog.md:1902 ../../source/ref-changelog.md:1993
 msgid "**Update Flower Baselines**"
-msgstr "**Update Flower Baselines**"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1904
 msgid ""
@@ -49574,23 +49614,23 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1905
 msgid "FedVSSL ([#2412](https://github.com/flwrlabs/flower/pull/2412))"
-msgstr "FedVSSL ([#2412](https://github.com/flwrlabs/flower/pull/2412))"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1906
 msgid "FedNova ([#2179](https://github.com/flwrlabs/flower/pull/2179))"
-msgstr "FedNova ([#2179](https://github.com/flwrlabs/flower/pull/2179))"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1907
 msgid "HeteroFL ([#2439](https://github.com/flwrlabs/flower/pull/2439))"
-msgstr "HeteroFL ([#2439](https://github.com/flwrlabs/flower/pull/2439))"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1908
 msgid "FedAvgM ([#2246](https://github.com/flwrlabs/flower/pull/2246))"
-msgstr "FedAvgM ([#2246](https://github.com/flwrlabs/flower/pull/2246))"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1909
 msgid "FedPara ([#2722](https://github.com/flwrlabs/flower/pull/2722))"
-msgstr "FedPara ([#2722](https://github.com/flwrlabs/flower/pull/2722))"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1911
 msgid ""
@@ -49906,7 +49946,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1943
 msgid "v1.6.0 (2023-11-28)"
-msgstr "v1.6.0 (2023-11-28)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:1949
 msgid ""
@@ -50004,7 +50044,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1969
 msgid "Add gRPC request-response capability to the Android SDK."
-msgstr "Add gRPC request-response capability to the Android SDK."
+msgstr ""
 
 #: ../../source/ref-changelog.md:1971
 msgid ""
@@ -50022,7 +50062,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:1973
 msgid "Add gRPC request-response capability to the C++ SDK."
-msgstr "Add gRPC request-response capability to the C++ SDK."
+msgstr ""
 
 #: ../../source/ref-changelog.md:1975
 msgid ""
@@ -50158,31 +50198,31 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2003
 msgid "FedMeta [#2438](https://github.com/flwrlabs/flower/pull/2438)"
-msgstr "FedMeta [#2438](https://github.com/flwrlabs/flower/pull/2438)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2005
 msgid "FjORD [#2431](https://github.com/flwrlabs/flower/pull/2431)"
-msgstr "FjORD [#2431](https://github.com/flwrlabs/flower/pull/2431)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2007
 msgid "MOON [#2421](https://github.com/flwrlabs/flower/pull/2421)"
-msgstr "MOON [#2421](https://github.com/flwrlabs/flower/pull/2421)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2009
 msgid "DepthFL [#2295](https://github.com/flwrlabs/flower/pull/2295)"
-msgstr "DepthFL [#2295](https://github.com/flwrlabs/flower/pull/2295)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2011
 msgid "FedPer [#2266](https://github.com/flwrlabs/flower/pull/2266)"
-msgstr "FedPer [#2266](https://github.com/flwrlabs/flower/pull/2266)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2013
 msgid "FedWav2vec [#2551](https://github.com/flwrlabs/flower/pull/2551)"
-msgstr "FedWav2vec [#2551](https://github.com/flwrlabs/flower/pull/2551)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2015
 msgid "niid-Bench [#2428](https://github.com/flwrlabs/flower/pull/2428)"
-msgstr "niid-Bench [#2428](https://github.com/flwrlabs/flower/pull/2428)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2017
 msgid ""
@@ -50388,7 +50428,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2041
 msgid "v1.5.0 (2023-08-31)"
-msgstr "v1.5.0 (2023-08-31)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2047
 msgid ""
@@ -50767,7 +50807,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2111
 msgid "There's a new 30min Federated Learning PyTorch tutorial!"
-msgstr "There's a new 30min Federated Learning PyTorch tutorial!"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2113
 msgid ""
@@ -50829,7 +50869,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2125
 msgid "v1.4.0 (2023-04-21)"
-msgstr "v1.4.0 (2023-04-21)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2131
 msgid ""
@@ -51241,7 +51281,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2189
 msgid "v1.3.0 (2023-02-06)"
-msgstr "v1.3.0 (2023-02-06)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2195
 msgid ""
@@ -51532,7 +51572,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2247
 msgid "v1.2.0 (2023-01-13)"
-msgstr "v1.2.0 (2023-01-13)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2253
 msgid ""
@@ -51875,7 +51915,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2316
 msgid "v1.1.0 (2022-10-31)"
-msgstr "v1.1.0 (2022-10-31)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2320
 msgid ""
@@ -52174,7 +52214,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2378
 msgid "v1.0.0 (2022-07-28)"
-msgstr "v1.0.0 (2022-07-28)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2380
 msgid "Highlights"
@@ -52341,15 +52381,15 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2407
 msgid "`fraction_eval` --> `fraction_evaluate`"
-msgstr "`fraction_eval` --> `fraction_evaluate`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2408
 msgid "`min_eval_clients` --> `min_evaluate_clients`"
-msgstr "`min_eval_clients` --> `min_evaluate_clients`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2409
 msgid "`eval_fn` --> `evaluate_fn`"
-msgstr "`eval_fn` --> `evaluate_fn`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2411
 msgid ""
@@ -52600,11 +52640,11 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2465
 msgid "`scikit-learn`"
-msgstr "`scikit-learn`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2466
 msgid "`simulation_pytorch`"
-msgstr "`simulation_pytorch`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2467
 msgid "`quickstart_pytorch`"
@@ -52612,11 +52652,11 @@ msgstr "`quickstart_pytorch` (démarrage rapide)"
 
 #: ../../source/ref-changelog.md:2468
 msgid "`quickstart_simulation`"
-msgstr "`quickstart_simulation`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2469
 msgid "`quickstart_tensorflow`"
-msgstr "`quickstart_tensorflow`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2470
 msgid "`advanced_tensorflow`"
@@ -52724,7 +52764,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2486
 msgid "v0.19.0 (2022-05-18)"
-msgstr "v0.19.0 (2022-05-18)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2490
 msgid ""
@@ -53048,7 +53088,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2558
 msgid "v0.18.0 (2022-02-28)"
-msgstr "v0.18.0 (2022-02-28)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2562
 msgid ""
@@ -53371,7 +53411,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2624
 msgid "v0.17.0 (2021-09-24)"
-msgstr "v0.17.0 (2021-09-24)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2628
 msgid ""
@@ -53583,7 +53623,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2669
 msgid "v0.16.0 (2021-05-11)"
-msgstr "v0.16.0 (2021-05-11)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2673
 msgid ""
@@ -53764,7 +53804,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2708
 msgid "v0.15.0 (2021-03-12)"
-msgstr "v0.15.0 (2021-03-12)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2712
 msgid ""
@@ -53818,7 +53858,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2741
 msgid "v0.14.0 (2021-02-18)"
-msgstr "v0.14.0 (2021-02-18)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2745
 msgid ""
@@ -53924,7 +53964,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2791
 msgid "v0.13.0 (2021-01-08)"
-msgstr "v0.13.0 (2021-01-08)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2795
 msgid ""
@@ -53948,7 +53988,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2798
 msgid "New API reference ([#554](https://github.com/flwrlabs/flower/pull/554))"
-msgstr "New API reference ([#554](https://github.com/flwrlabs/flower/pull/554))"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2799
 msgid ""
@@ -53984,7 +54024,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2806
 msgid "v0.12.0 (2020-12-07)"
-msgstr "v0.12.0 (2020-12-07)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2808 ../../source/ref-changelog.md:2824
 msgid "Important changes:"
@@ -54022,7 +54062,7 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2814
 msgid "v0.11.0 (2020-11-30)"
-msgstr "v0.11.0 (2020-11-30)"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2816
 msgid "Incompatible changes:"
@@ -54046,19 +54086,19 @@ msgstr ""
 
 #: ../../source/ref-changelog.md:2819
 msgid "`on_configure_evaluate` => `configure_evaluate`"
-msgstr "`on_configure_evaluate` => `configure_evaluate`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2820
 msgid "`on_aggregate_evaluate` => `aggregate_evaluate`"
-msgstr "`on_aggregate_evaluate` => `aggregate_evaluate`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2821
 msgid "`on_configure_fit` => `configure_fit`"
-msgstr "`on_configure_fit` => `configure_fit`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2822
 msgid "`on_aggregate_fit` => `aggregate_fit`"
-msgstr "`on_aggregate_fit` => `aggregate_fit`"
+msgstr ""
 
 #: ../../source/ref-changelog.md:2826
 msgid ""
@@ -54149,7 +54189,7 @@ msgstr ""
 
 #: ../../source/ref-example-projects.rst:21
 msgid ":doc:`Quickstart TensorFlow (Tutorial) <tutorial-quickstart-tensorflow>`"
-msgstr ":doc:`Quickstart TensorFlow (Tutorial) <tutorial-quickstart-tensorflow>`"
+msgstr ""
 
 #: ../../source/ref-example-projects.rst:22
 msgid ""
@@ -54163,7 +54203,7 @@ msgstr ""
 #: ../../source/ref-example-projects.rst:27
 #: ../../source/tutorial-quickstart-pytorch.rst:45
 msgid "Quickstart PyTorch"
-msgstr "Quickstart PyTorch"
+msgstr ""
 
 #: ../../source/ref-example-projects.rst:29
 msgid ""
@@ -54185,7 +54225,7 @@ msgstr ""
 
 #: ../../source/ref-example-projects.rst:34
 msgid ":doc:`Quickstart PyTorch (Tutorial) <tutorial-quickstart-pytorch>`"
-msgstr ":doc:`Quickstart PyTorch (Tutorial) <tutorial-quickstart-pytorch>`"
+msgstr ""
 
 #: ../../source/ref-example-projects.rst:38
 msgid "PyTorch: From Centralized To Federated"
@@ -54297,11 +54337,11 @@ msgstr ""
 
 #: ../../source/ref-exit-codes-dir.rst:22
 msgid "Indices"
-msgstr "Indices"
+msgstr ""
 
 #: ../../source/ref-exit-codes/0.rst:3
 msgid "[0] SUCCESS"
-msgstr "[0] SUCCESS"
+msgstr ""
 
 #: ../../source/ref-exit-codes/0.rst:9
 msgid "The process completed successfully."
@@ -54309,117 +54349,31 @@ msgstr "Le processus s'est terminé avec succès."
 
 #: ../../source/ref-exit-codes/1.rst:3
 msgid "[1] GRACEFUL_EXIT_SIGINT"
-msgstr "[1] GRACEFUL_EXIT_SIGINT"
+msgstr ""
 
 #: ../../source/ref-exit-codes/1.rst:9
 msgid "The process exited gracefully, triggered by ``SIGINT``."
 msgstr "Le processus a quitté de manière gracieuse, déclenché par ``SIGINT``."
 
-#: ../../source/ref-exit-codes/100.rst:3
-msgid "[100] SUPERLINK_THREAD_CRASH"
-msgstr "[100] SUPERLINK_THREAD_CRASH"
-
-#: ../../source/ref-exit-codes/100.rst:9
-msgid ""
-"A critical background thread has crashed in the SuperLink, causing it to "
-"exit prematurely. This indicates a serious issue with the SuperLink that "
-"requires immediate investigation."
-msgstr ""
-"Un thread de fond critique a crashé dans le SuperLink, provoquant son "
-"exit prématuré. Cela indique un problème grave avec le SuperLink qui "
-"nécessite une investigation immédiate."
-
-#: ../../source/ref-exit-codes/100.rst:13
-msgid "Critical background threads include:"
-msgstr "Les threads de fond critiques incluent :"
-
-#: ../../source/ref-exit-codes/100.rst:15
-msgid ""
-"**Scheduler**: Schedules the execution of runs. This thread exists only "
-"when the isolation mode is set to ``subprocess`` (default)."
-msgstr ""
-"**Scheduler** : Planifie l'exécution des runs. Ce thread existe "
-"uniquement lorsque le mode d'isolement est défini sur ``subprocess`` (par"
-" défaut)."
-
-#: ../../source/ref-exit-codes/100.rst:17
-msgid ""
-"**REST API server**: Manages the REST API server. This thread exists only"
-" when the Fleet API type is set to ``rest``."
-msgstr ""
-"**REST API serveur** : Gère le serveur REST API. Ce thread existe "
-"uniquement lorsque le type de Fleet est défini sur API pour ``rest``."
-
-#: ../../source/ref-exit-codes/100.rst:22
-#: ../../source/ref-exit-codes/101.rst:20
-#: ../../source/ref-exit-codes/102.rst:13
-#: ../../source/ref-exit-codes/103.rst:13
-#: ../../source/ref-exit-codes/104.rst:13
-#: ../../source/ref-exit-codes/105.rst:17
-#: ../../source/ref-exit-codes/200.rst:32
-#: ../../source/ref-exit-codes/201.rst:13
-#: ../../source/ref-exit-codes/202.rst:13
-#: ../../source/ref-exit-codes/203.rst:15
-#: ../../source/ref-exit-codes/250.rst:14
-#: ../../source/ref-exit-codes/302.rst:15
-#: ../../source/ref-exit-codes/303.rst:14
-#: ../../source/ref-exit-codes/304.rst:15
-#: ../../source/ref-exit-codes/400.rst:14
-#: ../../source/ref-exit-codes/401.rst:13
-#: ../../source/ref-exit-codes/402.rst:14
-#: ../../source/ref-exit-codes/500.rst:17
-#: ../../source/ref-exit-codes/600.rst:14
-#: ../../source/ref-exit-codes/601.rst:13
-#: ../../source/ref-exit-codes/602.rst:17
-#: ../../source/ref-exit-codes/603.rst:14
-#: ../../source/ref-exit-codes/604.rst:13
-#: ../../source/ref-exit-codes/605.rst:13
-#: ../../source/ref-exit-codes/606.rst:13
-#: ../../source/ref-exit-codes/607.rst:15
-#: ../../source/ref-exit-codes/608.rst:13
-#: ../../source/ref-exit-codes/700.rst:13
-#: ../../source/ref-exit-codes/701.rst:13
-#: ../../source/ref-exit-codes/800.rst:13
-msgid "How to Resolve"
-msgstr "Comment Résoudre"
-
-#: ../../source/ref-exit-codes/100.rst:24
-msgid "Check the logs for any errors that may have caused the thread to crash."
-msgstr ""
-"Vérifiez les journaux pour toute erreur qui aurait pu causer le thread à "
-"crasher."
-
-#: ../../source/ref-exit-codes/100.rst:25
-msgid "Ensure the SuperLink's configuration is correct."
-msgstr "Assurez-vous que la configuration du SuperLink est correcte."
-
-#: ../../source/ref-exit-codes/100.rst:26
-#: ../../source/ref-exit-codes/101.rst:25
-#: ../../source/ref-exit-codes/103.rst:19
-msgid "If the issue persists, please contact support for further assistance."
-msgstr ""
-"Si le problème persiste, veuillez contacter le support pour une "
-"assistance supplémentaire."
-
 #: ../../source/ref-exit-codes/101.rst:3
 msgid "[101] SUPERLINK_LICENSE_INVALID"
-msgstr "[101] SUPERLINK_LICENSE_INVALID"
+msgstr ""
 
 #: ../../source/ref-exit-codes/101.rst:9
 msgid ""
 "The license of the SuperLink is invalid, causing it to exit prematurely "
 "on startup."
 msgstr ""
-"Le licence du SuperLink est invalide, provoquant son exit prématuré à "
+"La licence du SuperLink est invalide, provoquant son arrêt prématuré à "
 "l'initialisation."
 
 #: ../../source/ref-exit-codes/101.rst:11
 msgid "Possible causes of invalid license include:"
-msgstr "Les causes possibles d'une licence invalides incluent :"
+msgstr "Les causes possibles d'une licence invalide incluent :"
 
 #: ../../source/ref-exit-codes/101.rst:13
 msgid "``FLWR_LICENSE_KEY`` environment variable set to an invalid license key."
-msgstr "``FLWR_LICENSE_KEY`` environment variable set to an invalid license key."
+msgstr ""
 
 #: ../../source/ref-exit-codes/101.rst:14
 msgid ""
@@ -54438,6 +54392,37 @@ msgstr ""
 "type de clé) ou sa signature a échoué la vérification contre la clé "
 "d'attribution."
 
+#: ../../source/ref-exit-codes/101.rst:20
+#: ../../source/ref-exit-codes/102.rst:13
+#: ../../source/ref-exit-codes/103.rst:13
+#: ../../source/ref-exit-codes/104.rst:13
+#: ../../source/ref-exit-codes/105.rst:17
+#: ../../source/ref-exit-codes/200.rst:32
+#: ../../source/ref-exit-codes/201.rst:13
+#: ../../source/ref-exit-codes/202.rst:13
+#: ../../source/ref-exit-codes/203.rst:15
+#: ../../source/ref-exit-codes/250.rst:14
+#: ../../source/ref-exit-codes/302.rst:15
+#: ../../source/ref-exit-codes/303.rst:14
+#: ../../source/ref-exit-codes/304.rst:15
+#: ../../source/ref-exit-codes/400.rst:14
+#: ../../source/ref-exit-codes/401.rst:13
+#: ../../source/ref-exit-codes/402.rst:14
+#: ../../source/ref-exit-codes/500.rst:17
+#: ../../source/ref-exit-codes/600.rst:14
+#: ../../source/ref-exit-codes/602.rst:17
+#: ../../source/ref-exit-codes/603.rst:14
+#: ../../source/ref-exit-codes/604.rst:13
+#: ../../source/ref-exit-codes/605.rst:13
+#: ../../source/ref-exit-codes/606.rst:13
+#: ../../source/ref-exit-codes/607.rst:15
+#: ../../source/ref-exit-codes/608.rst:13
+#: ../../source/ref-exit-codes/700.rst:13
+#: ../../source/ref-exit-codes/701.rst:13
+#: ../../source/ref-exit-codes/800.rst:13
+msgid "How to Resolve"
+msgstr "Comment Résoudre"
+
 #: ../../source/ref-exit-codes/101.rst:22
 msgid "Ensure that the ``FLWR_LICENSE_KEY`` is valid."
 msgstr "Assurez-vous que le ``FLWR_LICENSE_KEY`` est valide."
@@ -54450,9 +54435,16 @@ msgstr ""
 "Assurez-vous d'utiliser la bonne clé publique et qu'elle est accessible "
 "par SuperLink."
 
+#: ../../source/ref-exit-codes/101.rst:25
+#: ../../source/ref-exit-codes/103.rst:19
+msgid "If the issue persists, please contact support for further assistance."
+msgstr ""
+"Si le problème persiste, veuillez contacter le support pour une "
+"assistance supplémentaire."
+
 #: ../../source/ref-exit-codes/102.rst:3
 msgid "[102] SUPERLINK_LICENSE_MISSING"
-msgstr "[102] SUPERLINK_LICENSE_MISSING"
+msgstr ""
 
 #: ../../source/ref-exit-codes/102.rst:9
 msgid ""
@@ -54472,7 +54464,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/103.rst:3
 msgid "[103] SUPERLINK_LICENSE_URL_INVALID"
-msgstr "[103] SUPERLINK_LICENSE_URL_INVALID"
+msgstr ""
 
 #: ../../source/ref-exit-codes/103.rst:9
 msgid ""
@@ -54500,7 +54492,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/104.rst:3
 msgid "[104] SUPERLINK_INVALID_ARGS"
-msgstr "[104] SUPERLINK_INVALID_ARGS"
+msgstr ""
 
 #: ../../source/ref-exit-codes/104.rst:9
 msgid "The SuperLink was started with invalid arguments."
@@ -54518,7 +54510,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/105.rst:3
 msgid "[105] SUPERLINK_DATABASE_SCHEMA_MISMATCH"
-msgstr "[105] SUPERLINK_DATABASE_SCHEMA_MISMATCH"
+msgstr ""
 
 #: ../../source/ref-exit-codes/105.rst:9
 msgid ""
@@ -54546,7 +54538,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/2.rst:3
 msgid "[2] GRACEFUL_EXIT_SIGQUIT"
-msgstr "[2] GRACEFUL_EXIT_SIGQUIT"
+msgstr ""
 
 #: ../../source/ref-exit-codes/2.rst:9
 msgid "The process exited gracefully, triggered by ``SIGQUIT``."
@@ -54554,7 +54546,7 @@ msgstr "Le processus a quitté de manière gracieuse, déclenché par ``SIGQUIT`
 
 #: ../../source/ref-exit-codes/200.rst:3
 msgid "[200] SERVERAPP_STRATEGY_PRECONDITION_UNMET"
-msgstr "[200] SERVERAPP_STRATEGY_PRECONDITION_UNMET"
+msgstr ""
 
 #: ../../source/ref-exit-codes/200.rst:25
 msgid ""
@@ -54642,7 +54634,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/201.rst:3
 msgid "[201] SERVERAPP_EXCEPTION"
-msgstr "[201] SERVERAPP_EXCEPTION"
+msgstr ""
 
 #: ../../source/ref-exit-codes/201.rst:9
 msgid ""
@@ -54665,7 +54657,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/202.rst:3
 msgid "[202] SERVERAPP_STRATEGY_AGGREGATION_ERROR"
-msgstr "[202] SERVERAPP_STRATEGY_AGGREGATION_ERROR"
+msgstr ""
 
 #: ../../source/ref-exit-codes/202.rst:9
 msgid "The strategy encountered an error during aggregation."
@@ -54681,7 +54673,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/203.rst:3
 msgid "[203] SERVERAPP_RUN_START_REJECTED"
-msgstr "[203] SERVERAPP_RUN_START_REJECTED"
+msgstr ""
 
 #: ../../source/ref-exit-codes/203.rst:9
 msgid ""
@@ -54714,7 +54706,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/250.rst:3
 msgid "[250] CLIENTAPP_COMMUNICATION_ERROR"
-msgstr "[250] CLIENTAPP_COMMUNICATION_ERROR"
+msgstr ""
 
 #: ../../source/ref-exit-codes/250.rst:9
 msgid ""
@@ -54752,7 +54744,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/3.rst:3
 msgid "[3] GRACEFUL_EXIT_SIGTERM"
-msgstr "[3] GRACEFUL_EXIT_SIGTERM"
+msgstr ""
 
 #: ../../source/ref-exit-codes/3.rst:9
 msgid "The process exited gracefully, triggered by ``SIGTERM``."
@@ -54760,7 +54752,7 @@ msgstr "Le processus a quitté de manière gracieuse, déclenché par ``SIGTERM`
 
 #: ../../source/ref-exit-codes/302.rst:3
 msgid "[302] SUPERNODE_NODE_AUTH_KEY_INVALID"
-msgstr "[302] SUPERNODE_NODE_AUTH_KEY_INVALID"
+msgstr ""
 
 #: ../../source/ref-exit-codes/302.rst:9
 msgid ""
@@ -54797,7 +54789,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/303.rst:3
 msgid "[303] SUPERNODE_STARTED_WITHOUT_TLS_BUT_NODE_AUTH_ENABLED"
-msgstr "[303] SUPERNODE_STARTED_WITHOUT_TLS_BUT_NODE_AUTH_ENABLED"
+msgstr ""
 
 #: ../../source/ref-exit-codes/303.rst:9
 msgid ""
@@ -54853,7 +54845,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/304.rst:3
 msgid "[304] SUPERNODE_INVALID_TRUSTED_ENTITIES"
-msgstr "[304] SUPERNODE_INVALID_TRUSTED_ENTITIES"
+msgstr ""
 
 #: ../../source/ref-exit-codes/304.rst:9
 msgid ""
@@ -54918,7 +54910,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/400.rst:3
 msgid "[400] SUPEREXEC_INVALID_PLUGIN_CONFIG"
-msgstr "[400] SUPEREXEC_INVALID_PLUGIN_CONFIG"
+msgstr ""
 
 #: ../../source/ref-exit-codes/400.rst:9
 msgid ""
@@ -54958,7 +54950,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/401.rst:3
 msgid "[401] SUPEREXEC_AUTH_SECRET_LOAD_FAILED"
-msgstr "[401] SUPEREXEC_AUTH_SECRET_LOAD_FAILED"
+msgstr ""
 
 #: ../../source/ref-exit-codes/401.rst:9
 msgid ""
@@ -55020,7 +55012,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/500.rst:3
 msgid "[500] FLWRCLI_NODE_AUTH_PUBLIC_KEY_INVALID"
-msgstr "[500] FLWRCLI_NODE_AUTH_PUBLIC_KEY_INVALID"
+msgstr ""
 
 #: ../../source/ref-exit-codes/500.rst:9
 msgid ""
@@ -55071,7 +55063,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/600.rst:3
 msgid "[600] COMMON_ADDRESS_INVALID"
-msgstr "[600] COMMON_ADDRESS_INVALID"
+msgstr ""
 
 #: ../../source/ref-exit-codes/600.rst:9
 msgid ""
@@ -55095,29 +55087,15 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/600.rst:18
 msgid "IPv4 (e.g., ``192.168.1.1:9091``)"
-msgstr "IPv4 (e.g., ``192.168.1.1:9091``)"
+msgstr ""
 
 #: ../../source/ref-exit-codes/600.rst:19
 msgid "IPv6 (e.g., ``[2001:0db8::1]:9092``)"
-msgstr "IPv6 (e.g., ``[2001:0db8::1]:9092``)"
-
-#: ../../source/ref-exit-codes/601.rst:3
-msgid "[601] COMMON_MISSING_EXTRA_REST"
-msgstr "[601] COMMON_MISSING_EXTRA_REST"
-
-#: ../../source/ref-exit-codes/601.rst:9
-msgid "Dependencies required for using the REST-based Fleet API are missing."
 msgstr ""
-"Les dépendances requises pour utiliser l'API Fleet basée sur REST sont "
-"manquantes."
-
-#: ../../source/ref-exit-codes/601.rst:15
-msgid "Reinstall or upgrade ``flwr``, then retry:"
-msgstr "Réinstallez ou mettez à niveau ``flwr``, puis réessayez :"
 
 #: ../../source/ref-exit-codes/602.rst:3
 msgid "[602] COMMON_TLS_NOT_SUPPORTED"
-msgstr "[602] COMMON_TLS_NOT_SUPPORTED"
+msgstr ""
 
 #: ../../source/ref-exit-codes/602.rst:9
 msgid ""
@@ -55140,7 +55118,7 @@ msgstr "Utilisez la flag ``--insecure`` pour poursuivre sans TLS."
 
 #: ../../source/ref-exit-codes/603.rst:3
 msgid "[603] COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE"
-msgstr "[603] COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE"
+msgstr ""
 
 #: ../../source/ref-exit-codes/603.rst:9
 msgid ""
@@ -55166,7 +55144,7 @@ msgstr "Supprimez ``--root-certificates`` pour exécuter sans TLS"
 
 #: ../../source/ref-exit-codes/604.rst:3
 msgid "[604] COMMON_PATH_INVALID"
-msgstr "[604] COMMON_PATH_INVALID"
+msgstr ""
 
 #: ../../source/ref-exit-codes/604.rst:9
 msgid "The provided path is invalid or does not point to the expected file."
@@ -55184,7 +55162,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/605.rst:3
 msgid "[605] COMMON_TLS_SERVER_CERTIFICATES_INVALID"
-msgstr "[605] COMMON_TLS_SERVER_CERTIFICATES_INVALID"
+msgstr ""
 
 #: ../../source/ref-exit-codes/605.rst:9
 msgid "TLS server certificate configuration is incomplete or invalid."
@@ -55205,7 +55183,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/606.rst:3
 msgid "[606] RUNTIME_VERSION_INCOMPATIBLE"
-msgstr "[606] RUNTIME_VERSION_INCOMPATIBLE"
+msgstr ""
 
 #: ../../source/ref-exit-codes/606.rst:9
 msgid "The Flower runtime versions are incompatible."
@@ -55328,7 +55306,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/700.rst:3
 msgid "[700] SIMULATION_EXCEPTION"
-msgstr "[700] SIMULATION_EXCEPTION"
+msgstr ""
 
 #: ../../source/ref-exit-codes/700.rst:9
 msgid "An unhandled exception occurred when running the simulation."
@@ -55362,7 +55340,7 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/701.rst:3
 msgid "[701] SIMULATION_MISSING_EXTRA"
-msgstr "[701] SIMULATION_MISSING_EXTRA"
+msgstr ""
 
 #: ../../source/ref-exit-codes/701.rst:9
 msgid "Extra dependencies required for simulation are missing."
@@ -55396,7 +55374,7 @@ msgstr ""
 
 #: ../../source/ref-faq.rst:3
 msgid "FAQ"
-msgstr "FAQ"
+msgstr ""
 
 #: ../../source/ref-faq.rst:5
 msgid ""
@@ -55453,7 +55431,7 @@ msgstr ""
 
 #: ../../source/ref-faq.rst:17
 msgid "`Android Java example <https://flower.ai/docs/examples/android.html>`_"
-msgstr "`Android Java example <https://flower.ai/docs/examples/android.html>`_"
+msgstr ""
 
 #: ../../source/ref-faq.rst
 msgid ":fa:`eye,mr-1` Can I combine federated learning with blockchain?"
@@ -55471,7 +55449,7 @@ msgstr ""
 
 #: ../../source/ref-faq.rst:23
 msgid "`FLock: A Decentralised AI Training Platform <https://www.flock.io/#/>`_."
-msgstr "`FLock: A Decentralised AI Training Platform <https://www.flock.io/#/>`_."
+msgstr ""
 
 #: ../../source/ref-faq.rst:24
 msgid "Contribute to on-chain training the model and earn rewards."
@@ -55539,15 +55517,15 @@ msgstr ""
 
 #: ../../source/ref-faq.rst:38
 msgid "``� □[32m□[1m``"
-msgstr "``� □[32m□[1m``"
+msgstr ""
 
 #: ../../source/ref-faq.rst:39
 msgid "``□[0m□[96m□[1m``"
-msgstr "``□[0m□[96m□[1m``"
+msgstr ""
 
 #: ../../source/ref-faq.rst:40
 msgid "``�``"
-msgstr "``�``"
+msgstr ""
 
 #: ../../source/ref-faq.rst:42
 msgid ""
@@ -55801,7 +55779,7 @@ msgstr "**Exemple de base**"
 #: ../../source/ref-flower-configuration.rst:84
 #: ../../source/ref-flower-configuration.rst:187
 msgid "**Explanation**"
-msgstr "**Explanation**"
+msgstr ""
 
 #: ../../source/ref-flower-configuration.rst:86
 msgid ""
@@ -55955,10 +55933,9 @@ msgid ""
 " guide about other optional parameters you can use to configure your "
 "local simulation."
 msgstr ""
-"En savoir plus dans la guide `How to Run Simulations "
-"<how-to-run-simulations.html>`_ sur les "
-"autres paramètres facultatifs que vous pouvez utiliser pour configurer "
-"votre simulation locale."
+"En savoir plus dans le guide `How to Run Simulations <how-to-run-"
+"simulations.html>`_ sur les autres paramètres facultatifs que vous pouvez"
+" utiliser pour configurer votre simulation locale."
 
 #: ../../source/ref-flower-configuration.rst:164
 msgid ""
@@ -56069,8 +56046,8 @@ msgid ""
 "Refer to the `deployment documentation <deploy.html>`_ for TLS setup and "
 "advanced configurations."
 msgstr ""
-"Référez-vous au `deployment documentation <deploy.html>`_ pour la configuration de"
-" TLS et les configurations avancées."
+"Référez-vous au `deployment documentation <deploy.html>`_ pour la "
+"configuration de TLS et les configurations avancées."
 
 #: ../../source/ref-flower-configuration.rst:214
 msgid "Upgrading from previous versions of Flower"
@@ -56285,7 +56262,7 @@ msgstr "Port par défaut"
 
 #: ../../source/ref-flower-network-communication.rst:118
 msgid "API"
-msgstr "API"
+msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:119
 msgid "Purpose"
@@ -56293,11 +56270,11 @@ msgstr "Objectif"
 
 #: ../../source/ref-flower-network-communication.rst:120
 msgid "SuperLink"
-msgstr "SuperLink"
+msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:121
 msgid "9091"
-msgstr "9091"
+msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:122
 msgid "ServerAppIo API"
@@ -56309,11 +56286,11 @@ msgstr "Utilisé par les processus SuperExec et les processus ``ServerApp``"
 
 #: ../../source/ref-flower-network-communication.rst:125
 msgid "9092"
-msgstr "9092"
+msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:126
 msgid "Fleet API"
-msgstr "Fleet API"
+msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:127
 msgid "Used by the SuperNodes"
@@ -56321,7 +56298,7 @@ msgstr "Utilisé par les SuperNodes"
 
 #: ../../source/ref-flower-network-communication.rst:129
 msgid "9093"
-msgstr "9093"
+msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:130
 msgid "Control API"
@@ -56337,11 +56314,11 @@ msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:133
 msgid "SuperNode"
-msgstr "SuperNode"
+msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:134
 msgid "9094"
-msgstr "9094"
+msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:135
 msgid "ClientAppIo API"
@@ -56712,15 +56689,15 @@ msgstr ""
 
 #: ../../source/ref-flower-runtime-comparison.rst:24
 msgid "Dimension"
-msgstr "Dimension"
+msgstr ""
 
 #: ../../source/ref-flower-runtime-comparison.rst:25
 msgid "Simulation Runtime"
-msgstr "Simulation Runtime"
+msgstr ""
 
 #: ../../source/ref-flower-runtime-comparison.rst:26
 msgid "Deployment Runtime"
-msgstr "Deployment Runtime"
+msgstr ""
 
 #: ../../source/ref-flower-runtime-comparison.rst:27
 msgid "**Lifecycle Stage**"
@@ -56744,7 +56721,7 @@ msgstr ""
 
 #: ../../source/ref-flower-runtime-comparison.rst:32
 msgid "**Environment**"
-msgstr "**Environment**"
+msgstr ""
 
 #: ../../source/ref-flower-runtime-comparison.rst:33
 msgid "Local or remote, single-node or multi-node, controlled."
@@ -56756,7 +56733,7 @@ msgstr "Distribué, distant."
 
 #: ../../source/ref-flower-runtime-comparison.rst:35
 msgid "**Data**"
-msgstr "**Data**"
+msgstr ""
 
 #: ../../source/ref-flower-runtime-comparison.rst:36
 msgid ""
@@ -56776,7 +56753,7 @@ msgstr ""
 
 #: ../../source/ref-flower-runtime-comparison.rst:39
 msgid "**Backend**"
-msgstr "**Backend**"
+msgstr ""
 
 #: ../../source/ref-flower-runtime-comparison.rst:40
 msgid ""
@@ -56814,7 +56791,7 @@ msgstr ""
 
 #: ../../source/ref-flower-runtime-comparison.rst:48
 msgid "**Communication**"
-msgstr "**Communication**"
+msgstr ""
 
 #: ../../source/ref-flower-runtime-comparison.rst:49
 msgid "In-memory communication."
@@ -57217,11 +57194,11 @@ msgstr "Référence pour la documentation"
 
 #: ../../source/reference.rst:3
 msgid "Reference"
-msgstr "Reference"
+msgstr ""
 
 #: ../../source/reference.rst:18:<autosummary>:1
 msgid ":py:obj:`flwr <flwr>`\\"
-msgstr ":py:obj:`flwr <flwr>`\\"
+msgstr ""
 
 #: ../../source/simulate.rst:-1
 msgid ""
@@ -57300,7 +57277,7 @@ msgstr ""
 
 #: ../../source/tutorial-quickstart-fastai.rst:9
 msgid "Quickstart fastai"
-msgstr "Quickstart fastai"
+msgstr ""
 
 #: ../../source/tutorial-quickstart-fastai.rst:11
 msgid ""
@@ -57426,7 +57403,7 @@ msgstr ""
 
 #: ../../source/tutorial-quickstart-huggingface.rst:8
 msgid "Quickstart 🤗 Transformers"
-msgstr "Quickstart 🤗 Transformers"
+msgstr ""
 
 #: ../../source/tutorial-quickstart-huggingface.rst:10
 msgid ""
@@ -58112,7 +58089,7 @@ msgstr ""
 
 #: ../../source/tutorial-quickstart-jax.rst:9
 msgid "Quickstart JAX"
-msgstr "Quickstart JAX"
+msgstr ""
 
 #: ../../source/tutorial-quickstart-jax.rst:11
 msgid ""
@@ -58278,7 +58255,7 @@ msgstr ""
 
 #: ../../source/tutorial-quickstart-mlx.rst:45
 msgid "Quickstart MLX"
-msgstr "Quickstart MLX"
+msgstr ""
 
 #: ../../source/tutorial-quickstart-mlx.rst:47
 msgid ""
@@ -58583,7 +58560,7 @@ msgstr ""
 
 #: ../../source/tutorial-quickstart-pandas.rst:5
 msgid "Quickstart Pandas"
-msgstr "Quickstart Pandas"
+msgstr ""
 
 #: ../../source/tutorial-quickstart-pandas.rst:10
 msgid "Let's build a federated analytics system using Pandas and Flower!"
@@ -58777,7 +58754,7 @@ msgstr ""
 
 #: ../../source/tutorial-quickstart-pytorch-lightning.rst:9
 msgid "Quickstart PyTorch Lightning"
-msgstr "Quickstart PyTorch Lightning"
+msgstr ""
 
 #: ../../source/tutorial-quickstart-pytorch-lightning.rst:11
 msgid ""
@@ -58847,7 +58824,7 @@ msgstr ""
 
 #: ../../source/tutorial-quickstart-scikitlearn.rst:37
 msgid "Quickstart scikit-learn"
-msgstr "Quickstart scikit-learn"
+msgstr ""
 
 #: ../../source/tutorial-quickstart-scikitlearn.rst:39
 msgid ""
@@ -58998,7 +58975,7 @@ msgstr ""
 
 #: ../../source/tutorial-quickstart-tensorflow.rst:37
 msgid "Quickstart TensorFlow"
-msgstr "Quickstart TensorFlow"
+msgstr ""
 
 #: ../../source/tutorial-quickstart-tensorflow.rst:39
 msgid ""
@@ -59133,7 +59110,7 @@ msgstr ""
 
 #: ../../source/tutorial-quickstart-xgboost.rst:45
 msgid "Quickstart XGBoost"
-msgstr "Quickstart XGBoost"
+msgstr ""
 
 #: ../../source/tutorial-quickstart-xgboost.rst:47
 msgid ""
@@ -60059,7 +60036,7 @@ msgstr "`Lire la documentation sur Flower <https://flower.ai/docs/>`__"
 
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:383
 msgid "`Check out Flower Code Examples <https://flower.ai/docs/examples/>`__"
-msgstr "`Check out Flower Code Examples <https://flower.ai/docs/examples/>`__"
+msgstr ""
 
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:384
 msgid ""
@@ -61211,7 +61188,7 @@ msgstr ""
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:330
 msgid "Flower"
-msgstr "Flower"
+msgstr ""
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:332
 msgid ""
@@ -62506,7 +62483,7 @@ msgstr ""
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:567
 msgid "Flower sends a ``TRAIN`` message to each selected ``ClientApp``."
-msgstr "Flower sends a ``TRAIN`` message to each selected ``ClientApp``."
+msgstr ""
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:568
 msgid ""
@@ -62540,7 +62517,7 @@ msgstr "**Évaluation**"
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:578
 msgid "Flower sends an ``EVALUATE`` message to each ``ClientApp``."
-msgstr "Flower sends an ``EVALUATE`` message to each ``ClientApp``."
+msgstr ""
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:579
 msgid ""
@@ -62554,7 +62531,7 @@ msgstr ""
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:583
 msgid "``FedAvg`` aggregates all ``MetricRecord``."
-msgstr "``FedAvg`` aggregates all ``MetricRecord``."
+msgstr ""
 
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:585
 msgid ""
@@ -62943,3 +62920,75 @@ msgstr ""
 #~ "api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_."
 #~ " Let's run the project:"
 #~ msgstr ""
+
+#~ msgid "[100] SUPERLINK_THREAD_CRASH"
+#~ msgstr "[100] SUPERLINK_THREAD_CRASH"
+
+#~ msgid ""
+#~ "A critical background thread has crashed"
+#~ " in the SuperLink, causing it to "
+#~ "exit prematurely. This indicates a "
+#~ "serious issue with the SuperLink that"
+#~ " requires immediate investigation."
+#~ msgstr ""
+#~ "Un thread de fond critique a "
+#~ "crashé dans le SuperLink, provoquant son"
+#~ " exit prématuré. Cela indique un "
+#~ "problème grave avec le SuperLink qui "
+#~ "nécessite une investigation immédiate."
+
+#~ msgid "Critical background threads include:"
+#~ msgstr "Les threads de fond critiques incluent :"
+
+#~ msgid ""
+#~ "**Scheduler**: Schedules the execution of "
+#~ "runs. This thread exists only when "
+#~ "the isolation mode is set to "
+#~ "``subprocess`` (default)."
+#~ msgstr ""
+#~ "**Scheduler** : Planifie l'exécution des "
+#~ "runs. Ce thread existe uniquement "
+#~ "lorsque le mode d'isolement est défini"
+#~ " sur ``subprocess`` (par défaut)."
+
+#~ msgid ""
+#~ "**REST API server**: Manages the REST"
+#~ " API server. This thread exists only"
+#~ " when the Fleet API type is set"
+#~ " to ``rest``."
+#~ msgstr ""
+#~ "**REST API serveur** : Gère le "
+#~ "serveur REST API. Ce thread existe "
+#~ "uniquement lorsque le type de Fleet "
+#~ "est défini sur API pour ``rest``."
+
+#~ msgid "Check the logs for any errors that may have caused the thread to crash."
+#~ msgstr ""
+#~ "Vérifiez les journaux pour toute erreur"
+#~ " qui aurait pu causer le thread "
+#~ "à crasher."
+
+#~ msgid "Ensure the SuperLink's configuration is correct."
+#~ msgstr "Assurez-vous que la configuration du SuperLink est correcte."
+
+#~ msgid "[601] COMMON_MISSING_EXTRA_REST"
+#~ msgstr "[601] COMMON_MISSING_EXTRA_REST"
+
+#~ msgid "Dependencies required for using the REST-based Fleet API are missing."
+#~ msgstr ""
+#~ "Les dépendances requises pour utiliser "
+#~ "l'API Fleet basée sur REST sont "
+#~ "manquantes."
+
+#~ msgid "Reinstall or upgrade ``flwr``, then retry:"
+#~ msgstr "Réinstallez ou mettez à niveau ``flwr``, puis réessayez :"
+
+#~ msgid ""
+#~ "Open Responses-compatible create request. "
+#~ "Built-in connector tools can be "
+#~ "requested by name in ``tools``, for "
+#~ "example ``[\"web_search\"]``. Built-in "
+#~ "connector names are reserved for "
+#~ "runtime-managed tools."
+#~ msgstr ""
+
