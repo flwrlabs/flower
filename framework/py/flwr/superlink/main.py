@@ -90,7 +90,7 @@ def create_app(
        in-memory SQLite LinkStateFactory and NoOp Control authentication
        plugins. Direct callers of `create_app` must provide all dependencies.
     """
-    account_access = AccountAccessDependency(authn_plugin, authz_plugin)
+    account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
 
     @asynccontextmanager
     async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[dict[str, object]]:
@@ -109,7 +109,7 @@ def create_app(
                 superlink_lifespan.startup()
 
             fastapi_app.state.linkstate_factory = linkstate_factory
-            fastapi_app.state.get_account = account_access
+            fastapi_app.state.get_account = account_access_dep
 
             lifespan_state: dict[str, object] = {}
             async with AsyncExitStack() as stack:
