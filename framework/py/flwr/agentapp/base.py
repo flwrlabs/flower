@@ -48,7 +48,7 @@ class AgentConnectors(ABC):
 
     @abstractmethod
     def tools(self, names: Sequence[str]) -> list[JSONObject]:
-        """Return model-facing tool schemas for built-in connectors."""
+        """Return model-facing tool schemas for the requested connectors."""
 
     @abstractmethod
     def call(self, tool_call: JSONObject) -> JSONObject:
