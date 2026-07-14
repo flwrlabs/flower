@@ -112,10 +112,10 @@ def get_account(
     The application must configure ``app.state.get_account`` with an
     ``AccountAccessDependency`` instance during application setup.
     """
-    account_dependency = getattr(request.app.state, "get_account", None)
-    if not isinstance(account_dependency, AccountAccessDependency):
+    account_access_dep = getattr(request.app.state, "get_account", None)
+    if not isinstance(account_access_dep, AccountAccessDependency):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="SuperLink account authentication is not initialized.",
         )
-    return account_dependency(request, response)
+    return account_access_dep(request, response)
