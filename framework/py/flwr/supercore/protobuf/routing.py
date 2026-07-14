@@ -94,6 +94,7 @@ def _request_type_and_dependency_parameters(
                 "positional-or-keyword or keyword-only"
             )
         if parameter.name in {"http_request", "http_response"}:
+            # The generated endpoint signature reserves these names for FastAPI.
             raise TypeError(
                 f"{func.__name__} dependency parameter {parameter.name!r} is reserved"
             )
@@ -156,6 +157,7 @@ def _build_endpoint_signature(
         inspect.Parameter.POSITIONAL_OR_KEYWORD,
         annotation=cast(type[Request[State]], Request),
     )
+    # Dependencies use FastAPI's mutable response to set headers.
     http_response_parameter = inspect.Parameter(
         "http_response",
         inspect.Parameter.POSITIONAL_OR_KEYWORD,
@@ -258,6 +260,8 @@ class ProtobufRouter:
                     content=result.SerializeToString(),
                     media_type=PROTOBUF_MEDIA_TYPE,
                 )
+                # The wrapper replaces FastAPI's injected response, so preserve
+                # headers written by dependencies, such as refreshed tokens.
                 response.headers.raw.extend(http_response.headers.raw)
                 return response
 
@@ -321,6 +325,8 @@ class ProtobufRouter:
                     content,
                     media_type=PROTOBUF_STREAM_MEDIA_TYPE,
                 )
+                # The wrapper replaces FastAPI's injected response, so preserve
+                # headers written by dependencies, such as refreshed tokens.
                 response.headers.raw.extend(http_response.headers.raw)
                 return response
 
