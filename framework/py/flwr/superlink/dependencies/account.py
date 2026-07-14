@@ -17,9 +17,10 @@
 from collections.abc import Sequence
 from typing import cast
 
-from fastapi import HTTPException, Request, Response, status
+from fastapi import Request, Response
 
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
 
 
@@ -59,9 +60,9 @@ class AccountAccessDependency:
 
         tokens, account = self.authn_plugin.refresh_tokens(metadata)
         if tokens is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Access denied",
+            raise FlowerError(
+                ApiErrorCode.AUTHENTICATION_FAILED,
+                "Token refresh failed: authentication plugin returned no tokens.",
             )
 
         account = self._authorize(
@@ -78,17 +79,16 @@ class AccountAccessDependency:
     ) -> AccountInfo:
         """Require account information and authorization."""
         if account is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=missing_account_detail,
+            raise FlowerError(
+                ApiErrorCode.AUTHENTICATION_FAILED,
+                f"{missing_account_detail}: authentication plugin returned no account.",
             )
         if not self.authz_plugin.authorize(account):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=(
-                    "❗️ Account not authorized. "
-                    "Please contact the SuperLink administrator."
-                ),
+            raise FlowerError(
+                ApiErrorCode.NO_PERMISSIONS,
+                "Account authorization failed for "
+                f"flwr_aid={account.flwr_aid!r}, "
+                f"account_name={account.account_name!r}.",
             )
         return account
 
@@ -115,9 +115,10 @@ def get_account(
     """
     account_access = getattr(request.app.state, "account_access_dep", None)
     if not isinstance(account_access, AccountAccessDependency):
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="SuperLink account authentication is not initialized.",
+        raise FlowerError(
+            ApiErrorCode.AUTHENTICATION_NOT_INITIALIZED,
+            "SuperLink account authentication is not initialized: expected "
+            f"AccountAccessDependency, got {type(account_access).__name__}.",
         )
     return account_access(request, response)
 
@@ -128,8 +129,9 @@ def get_authn_plugin(
     """Return the configured Control authentication plugin."""
     authn_plugin = getattr(request.app.state, "authn_plugin", None)
     if authn_plugin is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="SuperLink authentication is not initialized.",
+        raise FlowerError(
+            ApiErrorCode.AUTHENTICATION_NOT_INITIALIZED,
+            "SuperLink authentication is not initialized: expected ControlAuthnPlugin, "
+            "got None.",
         )
     return cast(ControlAuthnPlugin, authn_plugin)
