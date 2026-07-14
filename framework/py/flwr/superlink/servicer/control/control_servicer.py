@@ -146,7 +146,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     ) -> StartRunResponse:
         """Create run ID."""
         return control_handlers.start_run(
-            request, _get_account(), self.linkstate_factory.state(), self.fleet_api_type
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            self.fleet_api_type,
+            self.connector_oauth_providers,
         )
 
     def StreamLogs(  # pylint: disable=C0103

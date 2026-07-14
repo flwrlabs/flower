@@ -18,7 +18,7 @@
 import base64
 import hashlib
 import secrets
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timedelta
 from logging import INFO
 from typing import NoReturn, TypeVar
@@ -46,6 +46,30 @@ from .provider import ConnectorOAuthProvider, normalize_connector_ref
 OAUTH_SESSION_TTL = timedelta(minutes=10)
 ProviderMap = Mapping[str, ConnectorOAuthProvider]
 T = TypeVar("T")
+
+
+def validate_run_connector_refs(
+    connector_refs: Sequence[str],
+    account: AccountInfo,
+    state: LinkState,
+    providers: ProviderMap,
+) -> list[str]:
+    """Validate and canonicalize OAuth connector references for a new run."""
+    validated_refs: list[str] = []
+    seen: set[str] = set()
+    for requested_ref in connector_refs:
+        connector_ref = _request_connector_ref(requested_ref)
+        if connector_ref in seen:
+            continue
+        _get_provider(connector_ref, providers)
+        if not _is_connector_connected(state, account.flwr_aid, connector_ref):
+            raise FlowerError(
+                ApiErrorCode.CONNECTOR_NOT_FOUND,
+                f"Connector '{connector_ref}' is not connected for this account.",
+            )
+        seen.add(connector_ref)
+        validated_refs.append(connector_ref)
+    return validated_refs
 
 
 def list_connectors(

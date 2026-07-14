@@ -21,6 +21,7 @@ from typing import cast
 
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetConnectorRequest,
     PullTaskMessageRequest,
     PushTaskMessageRequest,
 )
@@ -31,8 +32,9 @@ from flwr.supercore.json_message.connector_message import (
 )
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_loads
 
-from .registry import invoke_connector
+from .registry import invoke_connector, requires_connector_credentials
 
 
 def handle_task(
@@ -61,22 +63,42 @@ def handle_task(
         stub.PushTaskMessage(PushTaskMessageRequest(message=message_to_proto(message)))
 
     response = None
+    name = cast(str, request_message.payload["name"])
+    uses_credentials = requires_connector_credentials(name)
+    credential_failure = False
     try:
+        credentials: JSONObject | None = None
+        config: JSONObject | None = None
+        if uses_credentials:
+            connector = stub.GetConnector(GetConnectorRequest(connector_ref=name))
+            if connector.connector_ref != name:
+                raise RuntimeError("Connector credentials could not be loaded.")
+            credentials = _parse_connector_json(connector.credentials_json)
+            config = _parse_connector_json(connector.config_json)
         response = {
             "output": invoke_connector(
-                name=cast(str, request_message.payload["name"]),
+                name=name,
                 arguments=cast(JSONObject, request_message.payload["arguments"]),
                 usage_recorder=TaskUsageRecorder(stub),
+                credentials=credentials,
+                config=config,
             ),
             "error": None,
         }
     except Exception as ex:
-        response = _make_error_response(ex)
-        raise
+        if uses_credentials:
+            response = _make_error_response(None)
+            credential_failure = True
+        else:
+            response = _make_error_response(ex)
+            raise
     finally:
         # Push the response
         if response is not None:
             _push_connector_response(response)
+
+    if credential_failure:
+        raise RuntimeError("Credential-backed connector execution failed.")
 
 
 def _pull_connector_request(stub: ServerAppIoStub) -> ConnectorRequest:
@@ -91,12 +113,23 @@ def _pull_connector_request(stub: ServerAppIoStub) -> ConnectorRequest:
         time.sleep(1)  # Wait for 1 second before trying again.
 
 
-def _make_error_response(ex: Exception) -> JSONObject:
+def _parse_connector_json(value: str) -> JSONObject:
+    """Parse one connector JSON object without exposing its content in errors."""
+    try:
+        parsed = strict_json_loads(value)
+    except (TypeError, ValueError):
+        raise RuntimeError("Connector credentials could not be loaded.") from None
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Connector credentials could not be loaded.")
+    return parsed
+
+
+def _make_error_response(ex: Exception | None) -> JSONObject:
     """Create a JSON error response from an exception."""
     return {
         "output": None,
         "error": {
             "code": "connector_error",
-            "message": str(ex),
+            "message": str(ex) if ex is not None else "Connector execution failed.",
         },
     }

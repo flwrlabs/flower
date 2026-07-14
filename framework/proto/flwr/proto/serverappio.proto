@@ -85,6 +85,9 @@ service ServerAppIo {
   rpc RecordTaskUsage(RecordTaskUsageRequest)
       returns (RecordTaskUsageResponse) {}
 
+  // Resolve credentials for the authenticated connector task
+  rpc GetConnector(GetConnectorRequest) returns (GetConnectorResponse) {}
+
   // Push task logs
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
 

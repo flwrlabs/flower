@@ -47,6 +47,7 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import (
+    BUILTIN_CONNECTOR_REFS,
     TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
     TASK_TYPES_REQUIRING_FAB_HASH,
@@ -105,9 +106,8 @@ class AppIoServicer(ABC):
         task = get_authenticated_task()
         run_id = task.run_id
 
-        _validate_create_task_request(request, task, context)
-
         state = self.state()
+        _validate_create_task_request(request, task, state, context)
         created_task_id = state.create_task(
             task_type=request.type,
             run_id=run_id,
@@ -217,7 +217,10 @@ class AppIoServicer(ABC):
 
 
 def _validate_create_task_request(
-    request: CreateTaskRequest, requesting_task: Task, context: grpc.ServicerContext
+    request: CreateTaskRequest,
+    requesting_task: Task,
+    state: CoreState,
+    context: grpc.ServicerContext,
 ) -> None:
     """Validate the task creation request."""
     if requesting_task.type not in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
@@ -248,4 +251,15 @@ def _validate_create_task_request(
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires connector_ref.",
+        )
+
+    if (
+        request.type == TaskType.CONNECTOR
+        and request.connector_ref not in BUILTIN_CONNECTOR_REFS
+        and request.connector_ref
+        not in state.get_run_connector_refs(run_id=requesting_task.run_id)
+    ):
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Connector is not available to this run.",
         )

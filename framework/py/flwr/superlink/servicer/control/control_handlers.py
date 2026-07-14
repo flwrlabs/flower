@@ -129,12 +129,15 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 
+from .connectors import handlers as connector_handlers
+
 
 def start_run(  # pylint: disable=too-many-locals, too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
     state: LinkState,
     fleet_api_type: str | None,
+    connector_oauth_providers: connector_handlers.ProviderMap,
 ) -> StartRunResponse:
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")
@@ -163,6 +166,12 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     flwr_aid = account.flwr_aid
     account_name = account.account_name
     override_config = user_config_from_proto(request.override_config)
+    connector_refs = connector_handlers.validate_run_connector_refs(
+        request.connector_refs,
+        account,
+        state,
+        connector_oauth_providers,
+    )
 
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
 
@@ -238,6 +247,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
             flwr_aid,
             primary_task_type,
             request.series_id if request.HasField("series_id") else None,
+            connector_refs=connector_refs,
         )
 
         if run_id == 0:

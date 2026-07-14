@@ -70,4 +70,7 @@ def _build_runtime_method_auth_policy(
 
 
 SERVERAPPIO_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy("ServerAppIo")
+SERVERAPPIO_METHOD_AUTH_POLICY["/flwr.proto.ServerAppIo/GetConnector"] = (
+    MethodTokenPolicy.token_required()
+)
 CLIENTAPPIO_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy("ClientAppIo")

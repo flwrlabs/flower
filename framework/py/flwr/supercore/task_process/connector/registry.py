@@ -30,6 +30,7 @@ _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
 }
+_CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {}
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.make_web_search_tool,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.make_web_fetch_tool,
@@ -41,12 +42,30 @@ def invoke_connector(
     name: str,
     arguments: JSONObject,
     usage_recorder: TaskUsageRecorder,
+    credentials: JSONObject | None = None,
+    config: JSONObject | None = None,
 ) -> JSONValue:
     """Invoke one connector by name."""
     handler = _CONNECTOR_HANDLERS.get(name)
+    if handler is not None:
+        return handler(**arguments, usage_recorder=usage_recorder)
+
+    handler = _CREDENTIAL_CONNECTOR_HANDLERS.get(name)
     if handler is None:
         raise ValueError(f"Unsupported connector '{name}'.")
-    return handler(**arguments, usage_recorder=usage_recorder)
+    if credentials is None or config is None:
+        raise RuntimeError("Connector credentials are required.")
+    return handler(
+        **arguments,
+        credentials=credentials,
+        config=config,
+        usage_recorder=usage_recorder,
+    )
+
+
+def requires_connector_credentials(name: str) -> bool:
+    """Return whether a connector uses account-scoped credentials."""
+    return name in _CREDENTIAL_CONNECTOR_HANDLERS
 
 
 def get_builtin_connector_tools() -> list[JSONObject]:

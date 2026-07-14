@@ -144,6 +144,32 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state.get_connector(flwr_aid="account-b", connector_ref="calendar")
         )
 
+    def test_bind_and_get_run_connectors(self) -> None:
+        """Run connector bindings should be deterministic and idempotent."""
+        state = self.state_factory()
+
+        self.assertFalse(
+            state.bind_connectors_to_run(run_id=0, connector_refs=["calendar"])
+        )
+        self.assertFalse(state.bind_connectors_to_run(run_id=42, connector_refs=[""]))
+        self.assertTrue(
+            state.bind_connectors_to_run(
+                run_id=42,
+                connector_refs=["notion", "calendar", "notion"],
+            )
+        )
+        self.assertTrue(
+            state.bind_connectors_to_run(run_id=42, connector_refs=["drive"])
+        )
+        self.assertTrue(state.bind_connectors_to_run(run_id=7, connector_refs=[]))
+
+        self.assertEqual(
+            list(state.get_run_connector_refs(run_id=42)),
+            ["calendar", "drive", "notion"],
+        )
+        self.assertEqual(list(state.get_run_connector_refs(run_id=7)), [])
+        self.assertEqual(list(state.get_run_connector_refs(run_id=0)), [])
+
     def test_connector_oauth_session_create_and_get(self) -> None:
         """OAuth session creation should preserve data and account isolation."""
         state = self.state_factory()
