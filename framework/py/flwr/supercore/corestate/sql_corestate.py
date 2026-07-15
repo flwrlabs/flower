@@ -874,9 +874,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         status: Literal[AutomationStatus.COMPLETED, AutomationStatus.FAILED],
     ) -> bool:
         """Finish an active automation with a terminal status."""
-        if status not in (AutomationStatus.COMPLETED, AutomationStatus.FAILED):
-            raise AssertionError("`status` must be completed or failed")
-
         completed_condition = ""
         if status == AutomationStatus.COMPLETED:
             completed_condition = "AND remaining_runs = 0"

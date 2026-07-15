@@ -600,9 +600,6 @@ class InMemoryCoreState(
         status: Literal[AutomationStatus.COMPLETED, AutomationStatus.FAILED],
     ) -> bool:
         """Finish an active automation with a terminal status."""
-        if status not in (AutomationStatus.COMPLETED, AutomationStatus.FAILED):
-            raise ValueError("`status` must be completed or failed")
-
         with self.lock_automation_store:
             record = self.automation_store.get(automation_id)
             if record is None or record.automation.status != AutomationStatus.ACTIVE:
