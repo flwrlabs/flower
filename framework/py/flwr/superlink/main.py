@@ -27,9 +27,11 @@ from fastapi.routing import APIRoute, iter_route_contexts
 
 from flwr import __version__
 from flwr.common import log
+from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_SQLITE_DB_URL
 from flwr.supercore.error import http_error_translator
+from flwr.supercore.license_plugin import LicensePlugin
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink import extensions
 from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
@@ -38,6 +40,14 @@ from flwr.superlink.federation import NoOpFederationManager
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
+
+
+try:
+    from flwr.ee import get_license_plugin
+except ImportError:
+
+    def get_license_plugin() -> LicensePlugin | None:
+        """Return the license plugin when Flower Enterprise is installed."""
 
 
 def generate_unique_route_id(route: APIRoute) -> str:
@@ -71,11 +81,13 @@ def _create_default_linkstate_factory() -> LinkStateFactory:
     )
 
 
+# pylint: disable-next=too-many-arguments
 def create_app(
     *,
     linkstate_factory: LinkStateFactory,
     authn_plugin: ControlAuthnPlugin,
     authz_plugin: ControlAuthzPlugin,
+    event_log_plugin: EventLogWriterPlugin | None = None,
     superlink_lifespan: SuperLinkLifespan | None = None,
     start_legacy_grpc: bool = False,
 ) -> FastAPI:
@@ -110,6 +122,8 @@ def create_app(
 
             fastapi_app.state.linkstate_factory = linkstate_factory
             fastapi_app.state.account_access_dep = account_access_dep
+            fastapi_app.state.control_event_log_plugin = event_log_plugin
+            fastapi_app.state.control_license_plugin = get_license_plugin()
 
             lifespan_state: dict[str, object] = {}
             async with AsyncExitStack() as stack:
@@ -133,7 +147,6 @@ def create_app(
         lifespan=lifespan,
         generate_unique_id_function=generate_unique_route_id,
     )
-
     # Core APIs
     # fastapi_app.include_router(health.router)
 

@@ -68,14 +68,15 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.protobuf.routing import ProtobufRouter
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.dependencies.account import get_account, get_authn_plugin
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.servicer.control import control_handlers
 
+from .protobuf_router import ControlProtobufRouter
+
 router = APIRouter(prefix="/control", tags=["control"])
-protobuf_router = ProtobufRouter(router)
+protobuf_router = ControlProtobufRouter(router)
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]

@@ -728,6 +728,7 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
     fastapi_app = create_app(
         authn_plugin=lifespan_config.authn_plugin,
         authz_plugin=lifespan_config.authz_plugin,
+        event_log_plugin=lifespan_config.event_log_plugin,
         superlink_lifespan=superlink_lifespan,
         linkstate_factory=linkstate_factory,
         start_legacy_grpc=start_legacy_grpc,

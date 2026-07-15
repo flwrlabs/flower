@@ -225,6 +225,21 @@ class ProtobufRouter:
     def __init__(self, router: APIRouter) -> None:
         self.router = router
 
+    async def _call_handler(
+        self,
+        func: Callable[..., object],
+        http_request: Request[State],
+        proto_request: Message,
+        dependency_values: dict[str, object],
+    ) -> object:
+        """Call a route handler.
+
+        Subclasses can override this to add router-specific behavior around a
+        decoded protobuf request.
+        """
+        del http_request
+        return await _call_handler(func, proto_request, dependency_values)
+
     def unary_unary(
         self,
         path: str,
@@ -256,7 +271,9 @@ class ProtobufRouter:
                 proto_request = _parse_protobuf_body(
                     await http_request.body(), request_type
                 )
-                result = await _call_handler(func, proto_request, dependency_values)
+                result = await self._call_handler(
+                    func, http_request, proto_request, dependency_values
+                )
                 # Fail clearly when a handler violates its declared response contract.
                 if not isinstance(result, Message):
                     raise FlowerError(
@@ -310,7 +327,9 @@ class ProtobufRouter:
                 proto_request = _parse_protobuf_body(
                     await http_request.body(), request_type
                 )
-                result = await _call_handler(func, proto_request, dependency_values)
+                result = await self._call_handler(
+                    func, http_request, proto_request, dependency_values
+                )
 
                 content: AsyncIterable[bytes] | Iterable[bytes]
                 # Select framing based on the stream type and reject invalid results.
