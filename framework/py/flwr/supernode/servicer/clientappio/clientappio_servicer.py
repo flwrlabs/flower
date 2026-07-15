@@ -52,9 +52,8 @@ from flwr.proto.message_pb2 import (
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
-from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.interceptors import get_authenticated_task
-from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
+from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.servicer.appio import AppIoServicer
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 
@@ -284,19 +283,12 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         run_id = get_authenticated_task().run_id
 
         # Insert in state
-        stored = False
-        try:
-            stored = state.store_object(
-                run_id,
-                request.session_id,
-                request.object_id,
-                request.object_content,
-            )
-        except (NoObjectInStoreError, ValueError) as e:
-            log(ERROR, str(e))
-        except UnexpectedObjectContentError as e:
-            # Object content is not valid
-            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
+        stored = state.store_object(
+            run_id,
+            request.session_id,
+            request.object_id,
+            request.object_content,
+        )
 
         return PushObjectResponse(stored=stored)
 

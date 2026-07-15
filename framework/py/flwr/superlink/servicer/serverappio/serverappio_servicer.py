@@ -58,7 +58,6 @@ from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import TaskType
 from flwr.supercore.inflatable.inflatable_object import (
-    UnexpectedObjectContentError,
     get_all_nested_objects,
     get_object_tree,
     no_object_id_recompute,
@@ -326,19 +325,12 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Unexpected node ID.")
 
         # Insert in state
-        stored = False
-        try:
-            stored = state.store_object(
-                run_id,
-                request.session_id,
-                request.object_id,
-                request.object_content,
-            )
-        except (NoObjectInStoreError, ValueError) as e:
-            log(ERROR, str(e))
-        except UnexpectedObjectContentError as e:
-            # Object content is not valid
-            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
+        stored = state.store_object(
+            run_id,
+            request.session_id,
+            request.object_id,
+            request.object_content,
+        )
 
         return PushObjectResponse(stored=stored)
 

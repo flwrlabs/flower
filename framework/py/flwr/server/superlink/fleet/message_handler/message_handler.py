@@ -62,7 +62,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.utils import check_abort
-from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
 from flwr.supercore.run import InvalidRunStatusException, Run
 
@@ -291,25 +290,17 @@ def push_object(
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
-    stored = False
-    try:
-        stored = state.store_object(
-            request.run_id,
-            request.session_id,
-            request.object_id,
-            request.object_content,
+    stored = state.store_object(
+        request.run_id,
+        request.session_id,
+        request.object_id,
+        request.object_content,
+    )
+    # Record bytes traffic pushed from SuperNode
+    if stored:
+        state.store_traffic(
+            request.run_id, bytes_sent=0, bytes_recv=len(request.object_content)
         )
-        # Record bytes traffic pushed from SuperNode
-        if stored:
-            state.store_traffic(
-                request.run_id, bytes_sent=0, bytes_recv=len(request.object_content)
-            )
-    except (NoObjectInStoreError, ValueError) as e:
-        log(ERROR, str(e))
-    except UnexpectedObjectContentError as e:
-        # Object content is not valid
-        log(ERROR, str(e))
-        raise
     return PushObjectResponse(stored=stored)
 
 
