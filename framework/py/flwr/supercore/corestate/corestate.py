@@ -51,6 +51,51 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Preregister the object tree for the object push session."""
 
     @abstractmethod
+    def store_object(
+        self,
+        run_id: int,
+        session_id: str,
+        object_id: str,
+        object_content: bytes,
+    ) -> bool:
+        """Store an object if it is pending for an active push session.
+
+        Parameters
+        ----------
+        run_id : int
+            The ID of the run with which the push session is associated.
+        session_id : str
+            The ID of the object push session.
+        object_id : str
+            The ID of the object to store.
+        object_content : bytes
+            The object content to store.
+
+        Returns
+        -------
+        bool
+            True if the object was stored, otherwise False.
+        """
+
+    @abstractmethod
+    def get_object(self, run_id: int, object_id: str) -> bytes | None:
+        """Get an object and clean up expired push sessions when needed.
+
+        Parameters
+        ----------
+        run_id : int
+            The ID of the run requesting the object.
+        object_id : str
+            The ID of the object to retrieve.
+
+        Returns
+        -------
+        bytes | None
+            The object content, `b""` if it is known but unavailable, or None if it
+            is unknown.
+        """
+
+    @abstractmethod
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
         """Remove an object push session and optionally its messages."""
 

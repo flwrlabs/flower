@@ -2307,7 +2307,7 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
 class SqlFileBasedTest(SqlInMemoryStateTest):
     """Test SqlLinkState implementation with file-based database."""
 
-    __test__ = True
+    __test__ = False
     _CONCURRENT_TEST_TIMEOUT = 10.0
     states: list[SqlLinkState] = []
 

@@ -18,9 +18,9 @@
 # pylint: disable=too-many-lines
 import unittest
 from contextlib import ExitStack
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from parameterized import parameterized
 
@@ -38,7 +38,11 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
-from flwr.supercore.constant import AutomationStatus, TaskType
+from flwr.supercore.constant import (
+    OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AutomationStatus,
+    TaskType,
+)
 from flwr.supercore.date import now
 
 from . import CoreState
@@ -123,6 +127,155 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(missing_objects, [object_id])
         self.assertEqual(replacement_missing_objects, [object_id])
+
+    def test_store_object_rejects_invalid_session_membership(self) -> None:
+        """Objects must be pending in a session belonging to the run."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        session_id = state.start_session(run_id)
+        state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        with (
+            patch.object(state.object_store, "put") as put_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            self.assertFalse(
+                state.store_object(run_id + 1, session_id, object_id, b"content")
+            )
+            self.assertFalse(
+                state.store_object(run_id, "unknown-session", object_id, b"content")
+            )
+            self.assertFalse(
+                state.store_object(run_id, session_id, "unknown-object-id", b"content")
+            )
+
+        put_object.assert_not_called()
+        cleanup_session.assert_not_called()
+
+    def test_store_object_cleans_up_expired_session(self) -> None:
+        """An object cannot be stored after its push session expires."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = created_at
+            session_id = state.start_session(run_id)
+            state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        expired_at = created_at + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1)
+        with (
+            patch("flwr.supercore.date.datetime.datetime") as mock_datetime,
+            patch.object(state.object_store, "put") as put_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            mock_datetime.now.return_value = expired_at
+            stored = state.store_object(run_id, session_id, object_id, b"content")
+
+        self.assertFalse(stored)
+        put_object.assert_not_called()
+        cleanup_session.assert_called_once_with(session_id, cleanup_messages=True)
+
+    def test_store_object_refreshes_session_and_cleans_up_on_completion(self) -> None:
+        """A successful store refreshes TTL and cleans up an empty session."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        parent_id = "a" * 64
+        child_id = "b" * 64
+        created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        object_tree = ObjectTree(
+            object_id=parent_id,
+            children=[ObjectTree(object_id=child_id)],
+        )
+        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = created_at
+            session_id = state.start_session(run_id)
+            state.preregister_object_tree(object_tree, session_id)
+
+        first_store_at = created_at + timedelta(
+            seconds=OBJECT_PUSH_SESSION_TTL_SECONDS - 1
+        )
+        second_store_at = created_at + timedelta(
+            seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1
+        )
+        with (
+            patch.object(state.object_store, "put") as put_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+                mock_datetime.now.return_value = first_store_at
+                self.assertTrue(
+                    state.store_object(run_id, session_id, child_id, b"child")
+                )
+            cleanup_session.assert_not_called()
+
+            with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+                mock_datetime.now.return_value = second_store_at
+                self.assertTrue(
+                    state.store_object(run_id, session_id, parent_id, b"parent")
+                )
+
+        self.assertEqual(put_object.call_count, 2)
+        cleanup_session.assert_called_once_with(session_id, cleanup_messages=False)
+
+    def test_get_object_returns_object_store_result_without_cleanup(self) -> None:
+        """Available, unknown, and unowned unavailable objects are returned directly."""
+        state = self.state_factory()
+        with (
+            patch.object(
+                state.object_store,
+                "get",
+                side_effect=[b"content", None, b""],
+            ) as load_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            self.assertEqual(state.get_object(1, "available"), b"content")
+            self.assertIsNone(state.get_object(1, "unknown"))
+            self.assertEqual(state.get_object(1, "unavailable"), b"")
+
+        self.assertEqual(load_object.call_count, 3)
+        cleanup_session.assert_not_called()
+
+    def test_get_object_cleans_up_expired_sessions_and_reloads(self) -> None:
+        """An unavailable object triggers cleanup for all expired sessions."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = created_at
+            session_ids = []
+            for root_object_id in ("b" * 64, "c" * 64):
+                session_id = state.start_session(run_id)
+                session_ids.append(session_id)
+                state.preregister_object_tree(
+                    ObjectTree(
+                        object_id=root_object_id,
+                        children=[ObjectTree(object_id=object_id)],
+                    ),
+                    session_id,
+                )
+
+        expired_at = created_at + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1)
+        with (
+            patch("flwr.supercore.date.datetime.datetime") as mock_datetime,
+            patch.object(
+                state.object_store, "get", wraps=state.object_store.get
+            ) as load_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            mock_datetime.now.return_value = expired_at
+            self.assertEqual(state.get_object(run_id + 1, object_id), b"")
+            cleanup_session.assert_not_called()
+            self.assertEqual(state.get_object(run_id, object_id), b"")
+
+        self.assertEqual(load_object.call_count, 3)
+        cleanup_session.assert_has_calls(
+            [call(session_id, cleanup_messages=True) for session_id in session_ids],
+            any_order=True,
+        )
+        self.assertEqual(cleanup_session.call_count, 2)
 
     def test_store_run_in_series_creates_id(self) -> None:
         """Storing a run in a run series should create a nonzero ID."""
