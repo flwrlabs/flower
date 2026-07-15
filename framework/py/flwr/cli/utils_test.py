@@ -300,17 +300,20 @@ def test_custom_grpc_err_handler() -> None:
 
 
 def test_format_flower_error() -> None:
-    """Format FlowerError message and public details."""
+    """Format FlowerError code, message, and public details."""
     err = FlowerError(
         ApiErrorCode.INVALID_RUN_CONFIG,
         "Invalid run configuration.",
         "Unknown override key: tool.invalid-key",
     )
 
-    assert (
-        _format_flower_error(err)
-        == "Invalid run configuration.\nUnknown override key: tool.invalid-key"
+    formatted = _format_flower_error(err)
+
+    assert click.unstyle(formatted) == (
+        "[code: 15] Invalid run configuration. "
+        "Unknown override key: tool.invalid-key"
     )
+    assert formatted.startswith("\033[2m[code: 15]\033[0m")
 
 
 def test_cli_output_handler_raises_click_exception_for_json_error() -> None:
