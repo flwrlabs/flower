@@ -300,6 +300,28 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(put_object.call_count, 2)
         cleanup_session.assert_called_once_with(session_id, cleanup_messages=False)
 
+    def test_store_object_preserves_pending_claim_when_object_store_fails(self) -> None:
+        """An ObjectStore error returns False without consuming the pending claim."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        session_id = state.start_session(run_id)
+        state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        with patch.object(
+            state.object_store,
+            "put",
+            side_effect=[RuntimeError("write failed"), None],
+        ) as put_object:
+            self.assertFalse(
+                state.store_object(run_id, session_id, object_id, b"content")
+            )
+            self.assertTrue(
+                state.store_object(run_id, session_id, object_id, b"content")
+            )
+
+        self.assertEqual(put_object.call_count, 2)
+
     def test_get_object_returns_object_store_result_without_cleanup(self) -> None:
         """Available, unknown, and unowned unavailable objects are returned directly."""
         state = self.state_factory()
