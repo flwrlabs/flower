@@ -382,7 +382,9 @@ class PullTaskInputResponse(google.protobuf.message.Message):
     FAB_FIELD_NUMBER: builtins.int
     FEDERATION_CONFIG_FIELD_NUMBER: builtins.int
     TASK_ID_FIELD_NUMBER: builtins.int
+    SHOULD_GENERATE_SERIES_DESCRIPTION_FIELD_NUMBER: builtins.int
     task_id: builtins.int
+    should_generate_series_description: builtins.bool
     @property
     def context(self) -> flwr.proto.message_pb2.Context: ...
     @property
@@ -399,9 +401,10 @@ class PullTaskInputResponse(google.protobuf.message.Message):
         fab: flwr.proto.fab_pb2.Fab | None = ...,
         federation_config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
         task_id: builtins.int = ...,
+        should_generate_series_description: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run", "task_id", b"task_id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run", "should_generate_series_description", b"should_generate_series_description", "task_id", b"task_id"]) -> None: ...
 
 global___PullTaskInputResponse = PullTaskInputResponse
 
@@ -415,10 +418,12 @@ class PushTaskOutputRequest(google.protobuf.message.Message):
     SUB_STATUS_FIELD_NUMBER: builtins.int
     DETAILS_FIELD_NUMBER: builtins.int
     CLIENTAPP_RUNTIME_FIELD_NUMBER: builtins.int
+    SERIES_DESCRIPTION_FIELD_NUMBER: builtins.int
     sub_status: builtins.str
     details: builtins.str
     clientapp_runtime: builtins.float
     """Simulation Runtime usage only."""
+    series_description: builtins.str
     @property
     def context(self) -> flwr.proto.message_pb2.Context: ...
     def __init__(
@@ -428,10 +433,14 @@ class PushTaskOutputRequest(google.protobuf.message.Message):
         sub_status: builtins.str = ...,
         details: builtins.str = ...,
         clientapp_runtime: builtins.float | None = ...,
+        series_description: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_clientapp_runtime", b"_clientapp_runtime", "clientapp_runtime", b"clientapp_runtime", "context", b"context"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_clientapp_runtime", b"_clientapp_runtime", "clientapp_runtime", b"clientapp_runtime", "context", b"context", "details", b"details", "sub_status", b"sub_status"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_clientapp_runtime", b"_clientapp_runtime", "_series_description", b"_series_description", "clientapp_runtime", b"clientapp_runtime", "context", b"context", "series_description", b"series_description"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_clientapp_runtime", b"_clientapp_runtime", "_series_description", b"_series_description", "clientapp_runtime", b"clientapp_runtime", "context", b"context", "details", b"details", "series_description", b"series_description", "sub_status", b"sub_status"]) -> None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_clientapp_runtime", b"_clientapp_runtime"]) -> typing.Literal["clientapp_runtime"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_series_description", b"_series_description"]) -> typing.Literal["series_description"] | None: ...
 
 global___PushTaskOutputRequest = PushTaskOutputRequest
 

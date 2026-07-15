@@ -544,6 +544,29 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 series_by_id[series_id].run_ids.append(int64_to_uint64(row["run_id"]))
         return list(series_by_id.values())
 
+    def set_run_series_description_if_empty(
+        self, series_id: int, description: str
+    ) -> bool:
+        """Set a RunSeries description only when its current value is blank."""
+        normalized = description.strip()
+        if not normalized:
+            return False
+        updated = self.query(
+            """
+            UPDATE run_series
+            SET description = :description, updated_at = :updated_at
+            WHERE series_id = :series_id
+              AND COALESCE(TRIM(description), '') = ''
+            RETURNING series_id
+            """,
+            {
+                "series_id": uint64_to_int64(series_id),
+                "description": normalized,
+                "updated_at": now(),
+            },
+        )
+        return bool(updated)
+
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
         rows = self.query(

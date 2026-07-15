@@ -493,6 +493,76 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert stored_context is not None
         assert stored_context == request_context
 
+    def test_push_task_output_sets_run_series_description_once(self) -> None:
+        """The authenticated primary task can title its own RunSeries once."""
+        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        assert run.series_id
+        request = PushTaskOutputRequest(
+            sub_status=SubStatus.COMPLETED,
+            details="",
+            series_description="  Generated title  ",
+        )
+
+        response, call = self._push_task_output.with_call(request=request)
+
+        assert isinstance(response, PushTaskOutputResponse)
+        assert grpc.StatusCode.OK == call.code()
+        stored = self.state.get_run_series(series_ids=[run.series_id])[0]
+        assert stored.description == "Generated title"
+
+    def test_push_task_output_does_not_overwrite_run_series_description(self) -> None:
+        """An existing RunSeries description is preserved."""
+        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        assert run.series_id
+        assert self.state.set_run_series_description_if_empty(
+            run.series_id, "Existing title"
+        )
+
+        _, call = self._push_task_output.with_call(
+            request=PushTaskOutputRequest(
+                sub_status=SubStatus.COMPLETED,
+                details="",
+                series_description="Replacement title",
+            )
+        )
+
+        assert grpc.StatusCode.OK == call.code()
+        stored = self.state.get_run_series(series_ids=[run.series_id])[0]
+        assert stored.description == "Existing title"
+
+    def test_push_task_output_ignores_description_from_child_task(self) -> None:
+        """A child task cannot set its run's RunSeries description."""
+        create_response = self._create_task(
+            CreateTaskRequest(type=TaskType.MODEL, model_ref="models/abc")
+        )
+        assert create_response.HasField("task_id")
+        child_token = self.state.claim_task(create_response.task_id)
+        assert child_token is not None
+        assert self.state.activate_task(create_response.task_id)
+        child_channel = grpc.intercept_channel(
+            grpc.insecure_channel("localhost:9091"),
+            AppIoTokenClientInterceptor(child_token),
+        )
+        push_task_output = child_channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PushTaskOutput",
+            request_serializer=PushTaskOutputRequest.SerializeToString,
+            response_deserializer=PushTaskOutputResponse.FromString,
+        )
+
+        _, call = push_task_output.with_call(
+            PushTaskOutputRequest(
+                sub_status=SubStatus.COMPLETED,
+                details="",
+                series_description="Child title",
+            )
+        )
+
+        assert grpc.StatusCode.OK == call.code()
+        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        stored = self.state.get_run_series(series_ids=[run.series_id])[0]
+        assert stored.description == ""
+        child_channel.close()
+
     def test_get_node(self) -> None:
         """Test `GetNode` success."""
         # Prepare
@@ -862,8 +932,16 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert: Message is removed from LinkState
         assert len(self.store) == 0
 
-    def test_run_status_transitions(self) -> None:
-        """Test `PullTaskInput` activates a claimed task and marks the run running."""
+    @parameterized.expand(
+        [
+            ("", True),
+            ("Existing title", False),
+        ]
+    )
+    def test_run_status_transitions(
+        self, series_description: str, should_generate: bool
+    ) -> None:
+        """PullTaskInput activates a task and reports title eligibility."""
         # Prepare: Create a run with FAB
         fab_content = b"mock fab content"
         fab_hash = self.state.store_fab(
@@ -888,6 +966,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             series_id=run.series_id,
         )
         self.state.set_run_series_context(run.series_id, context)
+        if series_description:
+            assert self.state.set_run_series_description_if_empty(
+                run.series_id, series_description
+            )
 
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.STARTING
@@ -905,6 +987,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert isinstance(response, PullTaskInputResponse)
         assert response.context.run_id == 123
         assert response.context.series_id == run.series_id
+        assert response.should_generate_series_description is should_generate
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.RUNNING
 

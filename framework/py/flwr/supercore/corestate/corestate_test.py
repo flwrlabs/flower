@@ -284,6 +284,44 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(state.get_run_series(series_ids=[]), [])
         self.assertEqual(state.get_run_series(federation_ids=[]), [])
 
+    def test_set_run_series_description_if_empty_is_write_once(self) -> None:
+        """A blank RunSeries description can be set exactly once."""
+        state = self.state_factory()
+        series_id = state.store_run_in_series(
+            run_id=123, federation_id="@me/fed-a", series_id=None
+        )
+        assert series_id is not None
+        original_updated_at = state.get_run_series(series_ids=[series_id])[0].updated_at
+
+        self.assertTrue(
+            state.set_run_series_description_if_empty(series_id, "  First title  ")
+        )
+        updated = state.get_run_series(series_ids=[series_id])[0]
+        self.assertEqual(updated.description, "First title")
+        self.assertGreater(updated.updated_at, original_updated_at)
+
+        self.assertFalse(
+            state.set_run_series_description_if_empty(series_id, "Second title")
+        )
+        unchanged = state.get_run_series(series_ids=[series_id])[0]
+        self.assertEqual(unchanged.description, "First title")
+        self.assertEqual(unchanged.updated_at, updated.updated_at)
+
+    def test_set_run_series_description_if_empty_rejects_invalid_input(self) -> None:
+        """Blank descriptions and unknown RunSeries IDs are rejected."""
+        state = self.state_factory()
+        series_id = state.store_run_in_series(
+            run_id=123, federation_id="@me/fed-a", series_id=None
+        )
+        assert series_id is not None
+
+        self.assertFalse(state.set_run_series_description_if_empty(series_id, "  "))
+        self.assertFalse(
+            state.set_run_series_description_if_empty(series_id + 1, "Title")
+        )
+        stored = state.get_run_series(series_ids=[series_id])[0]
+        self.assertEqual(stored.description, "")
+
     def test_store_list_and_stop_automation(self) -> None:
         """Automation storage should support list, due filtering, and stop."""
         state = self.state_factory()

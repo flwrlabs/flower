@@ -84,6 +84,7 @@ message PullTaskInputResponse {
   Fab fab = 3;
   SimulationConfig federation_config = 4;
   uint64 task_id = 5;
+  bool should_generate_series_description = 6;
 }
 
 // PushTaskOutput messages
@@ -93,6 +94,7 @@ message PushTaskOutputRequest {
   string details = 3;
   // Simulation Runtime usage only.
   optional double clientapp_runtime = 4;
+  optional string series_description = 5;
 }
 message PushTaskOutputResponse {}
 

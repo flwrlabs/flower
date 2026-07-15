@@ -118,6 +118,10 @@ class RuntimeAgentResponses(AgentResponses):
             append_items(self._context, cast(list[JSONObject], output))
         return response_payload
 
+    def create_private(self, request: JSONObject) -> JSONObject:
+        """Create a model response without recording its output in context."""
+        return self._create_model_response(request)
+
     def _create_model_response(self, request: JSONObject) -> JSONObject:
         """Create one model response through a child model task."""
         model = request.get("model")

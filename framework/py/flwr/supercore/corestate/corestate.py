@@ -260,6 +260,25 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def set_run_series_description_if_empty(
+        self, series_id: int, description: str
+    ) -> bool:
+        """Set a RunSeries description only when its current value is blank.
+
+        Parameters
+        ----------
+        series_id : int
+            The ID of the RunSeries to update.
+        description : str
+            The non-empty description to store.
+
+        Returns
+        -------
+        bool
+            Whether the description was stored.
+        """
+
+    @abstractmethod
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present.
 

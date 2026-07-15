@@ -382,6 +382,21 @@ class InMemoryCoreState(
                 run_series = run_series[:limit]
             return list(run_series)
 
+    def set_run_series_description_if_empty(
+        self, series_id: int, description: str
+    ) -> bool:
+        """Set a RunSeries description only when its current value is blank."""
+        normalized = description.strip()
+        if not normalized:
+            return False
+        with self.lock_run_series_store:
+            run_series = self.run_series_store.get(series_id)
+            if run_series is None or run_series.description.strip():
+                return False
+            run_series.description = normalized
+            run_series.updated_at = now().isoformat()
+            return True
+
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
         with self.lock_run_series_context_store:

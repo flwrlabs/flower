@@ -59,6 +59,11 @@ from flwr.supercore.typing import JSONObject
 from flwr.superlink.grid import GrpcGrid
 
 from .context_items import append_items
+from .conversation_title import (
+    fallback_title,
+    generate_series_description,
+    select_title_seed,
+)
 from .session import RuntimeAgentConnectors, RuntimeAgentResponses, RuntimeAgentSession
 
 _AGENT_INPUT_KEY = "agent.input"
@@ -94,6 +99,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     context: Context | None = None
     runtime_env_dir: Path | None = None
     exit_code = ExitCode.SUCCESS
+    series_description: str | None = None
 
     def on_exit() -> None:
         log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
@@ -108,6 +114,8 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             sub_status=sub_status,
             details=details,
         )
+        if series_description:
+            pushoutput_req.series_description = series_description
         try:
             grid._stub.PushTaskOutput(pushoutput_req)
         except grpc.RpcError as err:
@@ -140,6 +148,11 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
         task_id = res.task_id
+        should_generate_series_description = res.should_generate_series_description
+        title_seed = ""
+        if should_generate_series_description:
+            title_seed = select_title_seed(context, None)
+            series_description = fallback_title(title_seed)
 
         hash_run_id = get_sha256_hash(run.run_id)
 
@@ -192,6 +205,10 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         if agent_input is not None:
             if not isinstance(agent_input, str):
                 raise ValueError("context.run_config['agent.input'] must be a string.")
+        if should_generate_series_description:
+            title_seed = select_title_seed(context, agent_input)
+            series_description = fallback_title(title_seed)
+        if agent_input is not None:
             if agent_input:
                 item: JSONObject = {
                     "type": "message",
@@ -227,7 +244,16 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             raise LoadAgentAppError(
                 f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
             ) from None
-        agent_app(agent=agent, context=context)
+        try:
+            agent_app(agent=agent, context=context)
+        finally:
+            if should_generate_series_description and title_seed:
+                try:
+                    series_description = generate_series_description(
+                        responses, title_seed
+                    )
+                except Exception as ex:  # pylint: disable=broad-exception-caught
+                    log(ERROR, "Failed to resolve RunSeries description: %s", ex)
 
         # Set sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED

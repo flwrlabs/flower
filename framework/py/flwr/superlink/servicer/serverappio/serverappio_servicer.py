@@ -247,13 +247,16 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         task = get_authenticated_task()
         run_id = task.run_id
 
-        # Retrieve Run, FAB, and shared RunSeries context for the run_id
+        # Retrieve Run, FAB, and shared RunSeries data for the run_id
         runs = state.get_run_info(run_ids=[run_id])
         run = runs[0] if runs else None
         fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
         series_context = None
+        run_series = None
         if run and run.series_id:
             series_context = state.get_run_series_context(run.series_id)
+            series = state.get_run_series(series_ids=[run.series_id])
+            run_series = series[0] if series else None
         if run and fab and series_context:
             if state.activate_task(task.task_id):
                 log(INFO, "Started task %d of run %d", task.task_id, run_id)
@@ -263,6 +266,9 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                     fab=fab_to_proto(fab),
                     federation_config=state.get_federation_config(run_id),
                     task_id=task.task_id,
+                    should_generate_series_description=bool(
+                        run_series and not run_series.description.strip()
+                    ),
                 )
 
         # Raise an exception if the Run or Fab is not found,
@@ -296,14 +302,27 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             task.task_id, sub_status=request.sub_status, details=request.details
         ):
             log(INFO, "Finished task %d of run %d", task.task_id, run_id)
-            if request.HasField("context"):
+            if request.HasField("context") or request.HasField("series_description"):
                 runs = state.get_run_info(run_ids=[run_id])
                 run = runs[0] if runs else None
                 if run and run.series_id and run.primary_task_id == task.task_id:
-                    state.set_run_series_context(
-                        run.series_id,
-                        context_from_proto(request.context),
-                    )
+                    if request.HasField("context"):
+                        state.set_run_series_context(
+                            run.series_id,
+                            context_from_proto(request.context),
+                        )
+                    if request.HasField("series_description"):
+                        try:
+                            state.set_run_series_description_if_empty(
+                                run.series_id, request.series_description
+                            )
+                        except Exception as ex:  # pylint: disable=W0718
+                            log(
+                                ERROR,
+                                "Failed to store description for RunSeries %d: %s",
+                                run.series_id,
+                                ex,
+                            )
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushTaskOutputResponse()
