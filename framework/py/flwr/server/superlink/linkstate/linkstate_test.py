@@ -54,8 +54,8 @@ from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
 from flwr.supercore.constant import (
-    AutomationStatus,
     NOOP_FEDERATION_ID,
+    AutomationStatus,
     NodeStatus,
     TaskType,
 )
