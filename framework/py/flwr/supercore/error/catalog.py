@@ -229,11 +229,6 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         public_message="LinkState is not initialized.",
     ),
-    ApiErrorCode.RUNTIME_API_NOT_IMPLEMENTED: ApiErrorSpec(
-        status_code=StatusCode.UNIMPLEMENTED,
-        http_status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        public_message="Runtime API is not implemented.",
-    ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,

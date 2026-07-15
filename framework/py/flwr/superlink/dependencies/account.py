@@ -15,7 +15,6 @@
 """FastAPI dependency for Control API account authentication."""
 
 from collections.abc import Sequence
-from typing import cast
 
 from fastapi import Request, Response
 

@@ -15,9 +15,7 @@
 """Runtime API router."""
 
 
-from fastapi import APIRouter, Response
-
-from flwr.supercore.error import ApiErrorCode, FlowerError
+from fastapi import APIRouter, HTTPException, Response, status
 
 router = APIRouter(prefix="/runtime", tags=["runtime"])
 
@@ -25,7 +23,7 @@ router = APIRouter(prefix="/runtime", tags=["runtime"])
 @router.post("/messages")
 def pull_messages() -> Response:
     """Pull messages for the ServerApp."""
-    raise FlowerError(
-        ApiErrorCode.RUNTIME_API_NOT_IMPLEMENTED,
-        "Not implemented",
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Not implemented",
     )
