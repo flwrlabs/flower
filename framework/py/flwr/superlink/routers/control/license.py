@@ -34,6 +34,7 @@ class ControlLicenseChecker:
             LicensePlugin | None,
             getattr(http_request.app.state, "control_license_plugin", None),
         )
+        # License plugins are synchronous and might perform I/O.
         if license_plugin is not None and not await run_in_threadpool(
             license_plugin.check_license
         ):

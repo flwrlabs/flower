@@ -15,10 +15,11 @@
 """Tests for the Control API router."""
 
 
+from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import Mock
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
 from flwr.common.constant import NOOP_FLWR_AID
@@ -35,6 +36,7 @@ from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.run import Run
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
+from flwr.superlink.routers.control.protobuf_router import ControlProtobufRouter
 from flwr.superlink.routers.control.router import router
 
 
@@ -139,3 +141,59 @@ def test_list_runs_rejects_an_invalid_license() -> None:
     assert response.status_code == 403
     license_plugin.check_license.assert_called_once_with()
     event_log_plugin.write_log.assert_not_called()
+
+
+def test_stream_logs_after_consumption() -> None:
+    """A streamed response is recorded after its final message is consumed."""
+    fastapi_router = APIRouter()
+    protobuf_router = ControlProtobufRouter(fastapi_router)
+    streamed_response = ListRunsResponse()
+
+    @protobuf_router.unary_stream("/stream")
+    def stream(_: ListRunsRequest) -> Iterator[ListRunsResponse]:
+        """Return a one-item stream."""
+        yield streamed_response
+
+    event_log_plugin = Mock(spec=EventLogWriterPlugin)
+    app = FastAPI()
+    app.state.control_event_log_plugin = event_log_plugin
+    app.include_router(fastapi_router)
+
+    response = TestClient(app).post(
+        "/stream",
+        content=ListRunsRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 200
+    assert event_log_plugin.compose_log_after_event.call_args.kwargs["response"] == (
+        streamed_response
+    )
+    assert event_log_plugin.write_log.call_count == 2
+
+
+def test_stream_logs_exception_after_consumption() -> None:
+    """A streamed exception is recorded after the stream fails."""
+    fastapi_router = APIRouter()
+    protobuf_router = ControlProtobufRouter(fastapi_router)
+
+    @protobuf_router.unary_stream("/stream")
+    def stream(_: ListRunsRequest) -> Iterator[ListRunsResponse]:
+        """Return a stream that fails after yielding one item."""
+        yield ListRunsResponse()
+        raise RuntimeError("stream failed")
+
+    event_log_plugin = Mock(spec=EventLogWriterPlugin)
+    app = FastAPI()
+    app.state.control_event_log_plugin = event_log_plugin
+    app.include_router(fastapi_router)
+
+    TestClient(app, raise_server_exceptions=False).post(
+        "/stream",
+        content=ListRunsRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    stream_error = event_log_plugin.compose_log_after_event.call_args.kwargs["response"]
+    assert isinstance(stream_error, RuntimeError)
+    assert str(stream_error) == "stream failed"

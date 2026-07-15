@@ -37,6 +37,7 @@ class ControlProtobufRouter(ProtobufRouter):
         dependency_values: dict[str, object],
     ) -> object:
         """Run the license and event-log components around a handler call."""
+        # Match the gRPC interceptor order: reject unlicensed calls before logging.
         await ControlLicenseChecker.check(http_request)
         return await ControlEventLogger.call(
             func, http_request, proto_request, dependency_values

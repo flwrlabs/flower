@@ -14,40 +14,48 @@
 # ==============================================================================
 """Control API event logging for FastAPI requests."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Iterator
 from functools import partial
-from typing import cast
+from typing import Protocol, cast
 
-import grpc
 from fastapi import Request
 from google.protobuf.message import Message
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import State
 
-from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.event_log.typing import LogEntry
 from flwr.supercore.protobuf.routing import _call_handler
 
 
-class _HttpServicerContext:
-    """Expose the gRPC context attributes used by Control event log plugins."""
+class FastAPIEventLogWriterPlugin(Protocol):
+    """Write Control API event logs from FastAPI requests."""
 
-    def __init__(self, request: Request[State]) -> None:
-        self.request = request
+    def compose_log_before_event(  # pylint: disable=too-many-arguments
+        self,
+        request: Message,
+        context: Request[State],
+        account_info: AccountInfo | None,
+        method_name: str,
+    ) -> LogEntry:
+        """Compose a before-event log entry."""
 
-    def invocation_metadata(self) -> tuple[tuple[str, str], ...]:
-        """Return HTTP headers in the same shape as gRPC metadata."""
-        return tuple(self.request.headers.items())
+    def compose_log_after_event(  # pylint: disable=too-many-arguments,R0917
+        self,
+        request: Message,
+        context: Request[State],
+        account_info: AccountInfo | None,
+        method_name: str,
+        response: Message | BaseException | None,
+    ) -> LogEntry:
+        """Compose an after-event log entry."""
 
-    def peer(self) -> str:
-        """Return the request client address."""
-        client = self.request.client
-        return "" if client is None else f"{client.host}:{client.port}"
+    def write_log(self, log_entry: LogEntry) -> None:
+        """Write an event log entry."""
 
 
 def _write_event(
-    event_log_plugin: EventLogWriterPlugin,
+    event_log_plugin: FastAPIEventLogWriterPlugin,
     compose_log: Callable[[], LogEntry],
 ) -> None:
     """Compose and write an event log entry."""
@@ -65,8 +73,9 @@ class ControlEventLogger:
         dependency_values: dict[str, object],
     ) -> object:
         """Call a handler and write before and after events when configured."""
+        # Event log plugins are optional and resolve from application startup state.
         event_log_plugin = cast(
-            EventLogWriterPlugin | None,
+            FastAPIEventLogWriterPlugin | None,
             getattr(http_request.app.state, "control_event_log_plugin", None),
         )
         if event_log_plugin is None:
@@ -75,10 +84,25 @@ class ControlEventLogger:
         account = cast(AccountInfo | None, dependency_values.get("account"))
         if account is None:
             account = AccountInfo(flwr_aid="", account_name="")
-        context = cast(grpc.ServicerContext, _HttpServicerContext(http_request))
         method_name = "/flwr.proto.Control/" + "".join(
             part.capitalize() for part in func.__name__.split("_")
         )
+        context = http_request
+
+        def compose_after_event(
+            response: Message | BaseException | None,
+        ) -> Callable[[], LogEntry]:
+            """Bind the common fields shared by all after-event entries."""
+            return partial(
+                event_log_plugin.compose_log_after_event,
+                request=proto_request,
+                context=context,
+                account_info=account,
+                method_name=method_name,
+                response=response,
+            )
+
+        # Plugin composition and writes can perform I/O, so keep them off the loop.
         await run_in_threadpool(
             _write_event,
             event_log_plugin,
@@ -90,25 +114,41 @@ class ControlEventLogger:
                 method_name=method_name,
             ),
         )
-        response: Message | BaseException | None = None
         try:
-            response = cast(
-                Message, await _call_handler(func, proto_request, dependency_values)
-            )
-            return response
+            result = await _call_handler(func, proto_request, dependency_values)
         except BaseException as exc:
-            response = exc
-            raise
-        finally:
             await run_in_threadpool(
                 _write_event,
                 event_log_plugin,
-                partial(
-                    event_log_plugin.compose_log_after_event,
-                    request=proto_request,
-                    context=context,
-                    account_info=account,
-                    method_name=method_name,
-                    response=response,
-                ),
+                compose_after_event(exc),
             )
+            raise
+
+        if isinstance(result, Iterable):
+
+            def response_wrapper() -> Iterator[Message]:
+                response: Message | BaseException | None = None
+                try:
+                    # Keep the final message for the after-event log.
+                    # pylint: disable=use-yield-from
+                    for response in cast(Iterable[Message], result):
+                        yield response
+                except BaseException as exc:
+                    response = exc
+                    raise
+                finally:
+                    # StreamingResponse consumes sync iterables in a worker thread.
+                    _write_event(
+                        event_log_plugin,
+                        compose_after_event(response),
+                    )
+
+            return response_wrapper()
+
+        response = cast(Message, result)
+        await run_in_threadpool(
+            _write_event,
+            event_log_plugin,
+            compose_after_event(response),
+        )
+        return response

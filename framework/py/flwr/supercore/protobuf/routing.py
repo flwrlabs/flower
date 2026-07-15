@@ -271,6 +271,7 @@ class ProtobufRouter:
                 proto_request = _parse_protobuf_body(
                     await http_request.body(), request_type
                 )
+                # Let specialized routers access HTTP request state around the handler.
                 result = await self._call_handler(
                     func, http_request, proto_request, dependency_values
                 )
@@ -327,6 +328,7 @@ class ProtobufRouter:
                 proto_request = _parse_protobuf_body(
                     await http_request.body(), request_type
                 )
+                # Let specialized routers access HTTP request state around the handler.
                 result = await self._call_handler(
                     func, http_request, proto_request, dependency_values
                 )
