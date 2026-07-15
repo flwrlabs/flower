@@ -755,6 +755,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             params.update({f"status_{i}": status for i, status in enumerate(statuses)})
         if due_before is not None:
             conditions.append("next_run_at <= :due_before")
+            # Finite automations with no remaining runs are already claimed.
             conditions.append("(remaining_runs IS NULL OR remaining_runs > 0)")
             params["due_before"] = due_before.isoformat()
 
@@ -870,7 +871,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         automation_id: int,
         *,
-        status: AutomationStatus,
+        status: Literal[AutomationStatus.COMPLETED, AutomationStatus.FAILED],
     ) -> bool:
         """Finish an active automation with a terminal status."""
         if status not in (AutomationStatus.COMPLETED, AutomationStatus.FAILED):

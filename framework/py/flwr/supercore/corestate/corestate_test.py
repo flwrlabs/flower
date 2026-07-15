@@ -346,6 +346,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         current = now()
 
+        # Create a recurring automation with two finite occurrences.
         previous_next_run_at = (current - timedelta(seconds=30)).isoformat()
         next_run_at = (current + timedelta(seconds=30)).isoformat()
         recurring = self.store_automation(
@@ -355,6 +356,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             fixed_interval=60,
             max_runs=2,
         )
+
+        # Advance the first occurrence and reject the stale due-time claim.
         self.assertTrue(
             state.advance_automation(
                 recurring.automation_id,
@@ -377,6 +380,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(updated[0].remaining_runs, 1)
         self.assertEqual(updated[0].next_run_at, next_run_at)
 
+        # Advance the final occurrence, then complete the automation.
         self.assertTrue(
             state.advance_automation(
                 recurring.automation_id,
@@ -400,6 +404,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [recurring.automation_id],
         )
 
+        # Mark an advanced automation as failed when execution cannot proceed.
         failed_previous_next_run_at = (current - timedelta(seconds=15)).isoformat()
         failing = self.store_automation(
             state,

@@ -521,6 +521,7 @@ class InMemoryCoreState(
                 # Apply due time filter.
                 if cutoff is not None and automation.next_run_at > cutoff:
                     continue
+                # Finite automations with no remaining runs are already claimed.
                 if (
                     cutoff is not None
                     and automation.HasField("remaining_runs")
@@ -596,7 +597,7 @@ class InMemoryCoreState(
         self,
         automation_id: int,
         *,
-        status: AutomationStatus,
+        status: Literal[AutomationStatus.COMPLETED, AutomationStatus.FAILED],
     ) -> bool:
         """Finish an active automation with a terminal status."""
         if status not in (AutomationStatus.COMPLETED, AutomationStatus.FAILED):

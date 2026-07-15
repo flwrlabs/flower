@@ -454,7 +454,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         automation_id: int,
         *,
-        status: AutomationStatus,
+        status: Literal[AutomationStatus.COMPLETED, AutomationStatus.FAILED],
     ) -> bool:
         """Finish an active automation with a terminal status.
 
