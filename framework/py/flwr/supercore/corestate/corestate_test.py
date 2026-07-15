@@ -40,6 +40,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore.constant import AutomationStatus, TaskType
 from flwr.supercore.date import now
+from flwr.supercore.typing import ConnectorRecord
 
 from . import CoreState
 from .utils_test import create_task_message
@@ -79,6 +80,86 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         mock_datetime.now.side_effect = timestamps
         return stack
+
+    def test_connector_upsert_get_and_delete(self) -> None:
+        """A connector can be created, updated, retrieved, and deleted."""
+        state = self.state_factory()
+
+        self.assertTrue(
+            state.upsert_connector(
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                credentials_json='{"token":"first"}',
+                config_json='{"calendar":"primary"}',
+            )
+        )
+        self.assertEqual(
+            state.get_connector(flwr_aid="account-a", connector_ref="calendar"),
+            ConnectorRecord(
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                credentials_json='{"token":"first"}',
+                config_json='{"calendar":"primary"}',
+            ),
+        )
+        self.assertTrue(
+            state.upsert_connector(
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                credentials_json='{"token":"updated"}',
+                config_json='{"calendar":"work"}',
+            )
+        )
+        updated = state.get_connector(flwr_aid="account-a", connector_ref="calendar")
+        assert updated is not None
+        self.assertEqual(updated.credentials_json, '{"token":"updated"}')
+        self.assertEqual(updated.config_json, '{"calendar":"work"}')
+
+        self.assertTrue(
+            state.delete_connector(flwr_aid="account-a", connector_ref="calendar")
+        )
+        self.assertIsNone(
+            state.get_connector(flwr_aid="account-a", connector_ref="calendar")
+        )
+
+    def test_connector_oauth_session_lifecycle(self) -> None:
+        """An OAuth session can be created, retrieved, and completed once."""
+        state = self.state_factory()
+        expires_at = now() + timedelta(minutes=10)
+
+        session = state.create_connector_oauth_session(
+            oauth_session_id="session-1",
+            flwr_aid="account-a",
+            connector_ref="calendar",
+            state="oauth-state",
+            redirect_uri="https://example.test/callback",
+            pkce_verifier=None,
+            expires_at=expires_at,
+        )
+        assert session is not None
+        self.assertEqual(session.expires_at, expires_at.isoformat())
+        self.assertIsNone(session.completed_at)
+        self.assertEqual(
+            state.get_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-a"
+            ),
+            session,
+        )
+        self.assertTrue(
+            state.complete_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-a"
+            )
+        )
+        completed = state.get_connector_oauth_session(
+            oauth_session_id="session-1", flwr_aid="account-a"
+        )
+        assert completed is not None
+        self.assertIsNotNone(completed.completed_at)
+        self.assertFalse(
+            state.complete_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-a"
+            )
+        )
 
     def store_automation(  # pylint: disable=too-many-arguments
         self,

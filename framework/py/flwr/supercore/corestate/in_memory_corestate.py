@@ -14,13 +14,13 @@
 # ==============================================================================
 """In-memory CoreState implementation."""
 
-
+# pylint: disable=too-many-lines
 import hashlib
 import secrets
 from bisect import bisect_right
 from collections.abc import Sequence
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from threading import Lock, RLock
 from typing import Literal, cast
@@ -51,6 +51,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
 from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
+from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -113,6 +114,10 @@ class InMemoryCoreState(
         self._object_store = object_store
         self.fab_store: dict[str, Fab] = {}
         self.lock_fab_store = Lock()
+        self.connector_store: dict[tuple[str, str], ConnectorRecord] = {}
+        self.lock_connector_store = Lock()
+        self.connector_oauth_session_store: dict[str, ConnectorOAuthSessionRecord] = {}
+        self.lock_connector_oauth_session_store = Lock()
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
         self.run_series_store: dict[int, RunSeries] = {}
@@ -232,6 +237,111 @@ class InMemoryCoreState(
                 content=fab.content,
                 verifications=dict(fab.verifications),
             )
+
+    def upsert_connector(
+        self,
+        flwr_aid: str,
+        connector_ref: str,
+        credentials_json: str,
+        config_json: str,
+    ) -> bool:
+        """Create or update a connector for an account."""
+        if not flwr_aid or not connector_ref:
+            return False
+        connector = ConnectorRecord(
+            flwr_aid=flwr_aid,
+            connector_ref=connector_ref,
+            credentials_json=credentials_json,
+            config_json=config_json,
+        )
+        with self.lock_connector_store:
+            self.connector_store[(flwr_aid, connector_ref)] = connector
+        return True
+
+    def get_connector(
+        self, flwr_aid: str, connector_ref: str
+    ) -> ConnectorRecord | None:
+        """Return an account's connector, if present."""
+        if not flwr_aid or not connector_ref:
+            return None
+        with self.lock_connector_store:
+            return self.connector_store.get((flwr_aid, connector_ref))
+
+    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
+        """Delete an account's connector if it exists."""
+        if not flwr_aid or not connector_ref:
+            return False
+        with self.lock_connector_store:
+            return self.connector_store.pop((flwr_aid, connector_ref), None) is not None
+
+    def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        oauth_session_id: str,
+        flwr_aid: str,
+        connector_ref: str,
+        state: str,
+        redirect_uri: str,
+        pkce_verifier: str | None,
+        expires_at: datetime,
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Create and return a connector OAuth session."""
+        if (
+            not oauth_session_id
+            or not flwr_aid
+            or not connector_ref
+            or expires_at.utcoffset() is None
+        ):
+            return None
+        expires_at = expires_at.astimezone(UTC)
+        session = ConnectorOAuthSessionRecord(
+            oauth_session_id=oauth_session_id,
+            flwr_aid=flwr_aid,
+            connector_ref=connector_ref,
+            state=state,
+            redirect_uri=redirect_uri,
+            pkce_verifier=pkce_verifier,
+            created_at=now().isoformat(),
+            expires_at=expires_at.isoformat(),
+            completed_at=None,
+        )
+        with self.lock_connector_oauth_session_store:
+            if oauth_session_id in self.connector_oauth_session_store:
+                return None
+            self.connector_oauth_session_store[oauth_session_id] = session
+        return session
+
+    def get_connector_oauth_session(
+        self, oauth_session_id: str, flwr_aid: str
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Return an account's connector OAuth session, if present."""
+        if not oauth_session_id or not flwr_aid:
+            return None
+        with self.lock_connector_oauth_session_store:
+            session = self.connector_oauth_session_store.get(oauth_session_id)
+            if session is None or session.flwr_aid != flwr_aid:
+                return None
+            return session
+
+    def complete_connector_oauth_session(
+        self, oauth_session_id: str, flwr_aid: str
+    ) -> bool:
+        """Mark a pending connector OAuth session as completed."""
+        if not oauth_session_id or not flwr_aid:
+            return False
+        completed_at = now()
+        with self.lock_connector_oauth_session_store:
+            session = self.connector_oauth_session_store.get(oauth_session_id)
+            if (
+                session is None
+                or session.flwr_aid != flwr_aid
+                or session.completed_at is not None
+                or datetime.fromisoformat(session.expires_at) <= completed_at
+            ):
+                return False
+            self.connector_oauth_session_store[oauth_session_id] = replace(
+                session, completed_at=completed_at.isoformat()
+            )
+        return True
 
     def get_run_series(
         self,
