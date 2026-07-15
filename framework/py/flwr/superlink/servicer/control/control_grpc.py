@@ -15,7 +15,6 @@
 """Control API server."""
 
 
-from collections.abc import Sequence
 from logging import INFO
 
 import grpc
@@ -39,7 +38,6 @@ from flwr.superlink.auth_plugin import (
     NoOpControlAuthnPlugin,
 )
 
-from .connectors import ConnectorOAuthProvider
 from .control_account_auth_interceptor import ControlAccountAuthInterceptor
 from .control_event_log_interceptor import ControlEventLogInterceptor
 from .control_license_interceptor import ControlLicenseInterceptor
@@ -64,7 +62,6 @@ def run_control_api_grpc(
     event_log_plugin: EventLogWriterPlugin | None = None,
     artifact_provider: ArtifactProvider | None = None,
     fleet_api_type: str | None = None,
-    connector_oauth_providers: Sequence[ConnectorOAuthProvider] = (),
 ) -> grpc.Server:
     """Run Control API (gRPC, request-response)."""
     license_plugin: LicensePlugin | None = get_license_plugin()
@@ -77,7 +74,6 @@ def run_control_api_grpc(
         authn_plugin=authn_plugin,
         artifact_provider=artifact_provider,
         fleet_api_type=fleet_api_type,
-        connector_oauth_providers=connector_oauth_providers,
     )
     interceptors = [
         RpcErrorTranslationServerInterceptor(),

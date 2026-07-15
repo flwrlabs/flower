@@ -15,7 +15,7 @@
 """Control API servicer."""
 
 import time
-from collections.abc import Generator, Sequence
+from collections.abc import Generator
 from logging import INFO
 from typing import Any, NoReturn, cast
 
@@ -100,9 +100,6 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
 from . import control_handlers
-from .connectors import ConnectorOAuthProvider
-from .connectors import handlers as connector_handlers
-from .connectors import make_connector_oauth_provider_map
 from .control_account_auth_interceptor import get_current_account_info
 from .control_handlers import (
     _resolve_federation_id,
@@ -130,16 +127,12 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         authn_plugin: ControlAuthnPlugin,
         artifact_provider: ArtifactProvider | None = None,
         fleet_api_type: str | None = None,
-        connector_oauth_providers: Sequence[ConnectorOAuthProvider] = (),
     ) -> None:
         self.linkstate_factory = linkstate_factory
         self.objectstore_factory = objectstore_factory
         self.authn_plugin = authn_plugin
         self.artifact_provider = artifact_provider
         self.fleet_api_type = fleet_api_type
-        self.connector_oauth_providers = make_connector_oauth_provider_map(
-            connector_oauth_providers
-        )
 
     def StartRun(
         self, request: StartRunRequest, context: grpc.ServicerContext
@@ -268,44 +261,40 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: ListConnectorsRequest, context: grpc.ServicerContext
     ) -> ListConnectorsResponse:
         """List OAuth connectors available to the authenticated account."""
-        return connector_handlers.list_connectors(
+        return control_handlers.list_connectors(
             request,
             _get_account(),
             self.linkstate_factory.state(),
-            self.connector_oauth_providers,
         )
 
     def DisconnectConnector(
         self, request: DisconnectConnectorRequest, context: grpc.ServicerContext
     ) -> DisconnectConnectorResponse:
         """Disconnect connector credentials for the authenticated account."""
-        return connector_handlers.disconnect_connector(
+        return control_handlers.disconnect_connector(
             request,
             _get_account(),
             self.linkstate_factory.state(),
-            self.connector_oauth_providers,
         )
 
     def BeginConnectorOAuth(
         self, request: BeginConnectorOAuthRequest, context: grpc.ServicerContext
     ) -> BeginConnectorOAuthResponse:
         """Begin OAuth connector authorization flow."""
-        return connector_handlers.begin_connector_oauth(
+        return control_handlers.begin_connector_oauth(
             request,
             _get_account(),
             self.linkstate_factory.state(),
-            self.connector_oauth_providers,
         )
 
     def CompleteConnectorOAuth(
         self, request: CompleteConnectorOAuthRequest, context: grpc.ServicerContext
     ) -> CompleteConnectorOAuthResponse:
         """Complete OAuth connector authorization flow."""
-        return connector_handlers.complete_connector_oauth(
+        return control_handlers.complete_connector_oauth(
             request,
             _get_account(),
             self.linkstate_factory.state(),
-            self.connector_oauth_providers,
         )
 
     def PullArtifacts(

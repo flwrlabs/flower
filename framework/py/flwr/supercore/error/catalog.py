@@ -234,25 +234,10 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_404_NOT_FOUND,
         public_message="Connector not found.",
     ),
-    ApiErrorCode.CONNECTOR_OAUTH_SESSION_NOT_FOUND: ApiErrorSpec(
-        status_code=StatusCode.NOT_FOUND,
-        http_status_code=status.HTTP_404_NOT_FOUND,
-        public_message="Connector OAuth session not found.",
-    ),
-    ApiErrorCode.CONNECTOR_OAUTH_SESSION_INVALID: ApiErrorSpec(
-        status_code=StatusCode.FAILED_PRECONDITION,
-        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
-        public_message="Connector OAuth session is invalid, expired, or already used.",
-    ),
-    ApiErrorCode.CONNECTOR_OAUTH_PROVIDER_FAILURE: ApiErrorSpec(
-        status_code=StatusCode.UNAVAILABLE,
-        http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        public_message="Connector OAuth provider request failed.",
-    ),
-    ApiErrorCode.CONNECTOR_PERSISTENCE_FAILURE: ApiErrorSpec(
+    ApiErrorCode.CONNECTOR_FAILURE: ApiErrorSpec(
         status_code=StatusCode.INTERNAL,
         http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        public_message="Failed to persist connector state.",
+        public_message="Connector operation failed.",
     ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,

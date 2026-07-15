@@ -20,11 +20,13 @@ from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
 from . import browser_use, web_fetch, web_search
+from .oauth import ConnectorOAuthProvider
 
 ConnectorHandler = Callable[..., JSONValue]
 ConnectorToolFactory = Callable[[], JSONObject]
 
 
+_OAUTH_CONNECTOR_PROVIDERS: tuple[ConnectorOAuthProvider, ...] = ()
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,

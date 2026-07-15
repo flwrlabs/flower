@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for Control OAuth connector handlers and servicer wiring."""
+"""Tests for Control OAuth connector RPCs."""
 
 
 import json
-from collections.abc import Sequence
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
@@ -33,14 +32,13 @@ from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.typing import JSONObject
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 from flwr.superlink.servicer.control.control_account_auth_interceptor import (
     shared_account_info,
 )
 from flwr.superlink.servicer.control.control_servicer import ControlServicer
-
-from .provider import ConnectorDefinition, ConnectorOAuthProvider, ConnectorOAuthResult
 
 ACCOUNT_A = AccountInfo(flwr_aid="account-a", account_name="Account A")
 ACCOUNT_B = AccountInfo(flwr_aid="account-b", account_name="Account B")
@@ -49,22 +47,15 @@ ACCOUNT_B = AccountInfo(flwr_aid="account-b", account_name="Account B")
 class FakeOAuthProvider:
     """Controllable OAuth provider used by connector handler tests."""
 
-    def __init__(
-        self,
-        connector_ref: str = "slack",
-        *,
-        supports_pkce: bool = True,
-    ) -> None:
-        self.definition = ConnectorDefinition(
-            connector_ref=connector_ref,
-            display_name=connector_ref.title(),
-            description=f"Connect {connector_ref.title()}.",
-            supports_pkce=supports_pkce,
-        )
+    def __init__(self, connector_ref: str = "slack") -> None:
+        self.connector_ref = connector_ref
+        self.display_name = connector_ref.title()
+        self.description = f"Connect {connector_ref.title()}."
         self.invalid_redirect = False
         self.fail_exchange = False
         self.authorization_state: str | None = None
         self.authorization_pkce_challenge: str | None = None
+        self.exchanged_code: str | None = None
         self.exchange_calls = 0
 
     def resolve_redirect_uri(self, requested_redirect_uri: str) -> str:
@@ -91,9 +82,10 @@ class FakeOAuthProvider:
         code: str,
         redirect_uri: str,
         pkce_verifier: str | None,
-    ) -> ConnectorOAuthResult:
+    ) -> tuple[JSONObject, JSONObject]:
         """Return test credentials or simulate a provider failure."""
         self.exchange_calls += 1
+        self.exchanged_code = code
         if self.fail_exchange:
             raise RuntimeError(f"Provider rejected sensitive code {code}")
         credentials: JSONObject = {
@@ -101,7 +93,7 @@ class FakeOAuthProvider:
             "refresh_token": "refresh-secret",
         }
         config: JSONObject = {"workspace": "flower"}
-        return ConnectorOAuthResult(credentials=credentials, config=config)
+        return credentials, config
 
 
 class TestControlConnectorOAuth:
@@ -117,23 +109,25 @@ class TestControlConnectorOAuth:
             self.objectstore_factory,
         )
         self.provider = FakeOAuthProvider()
-        self.servicer = self._make_servicer([self.provider])
+        self.provider_patch = patch.object(
+            connector_registry, "_OAUTH_CONNECTOR_PROVIDERS", (self.provider,)
+        )
+        self.provider_patch.start()
+        self.servicer = self._make_servicer()
         self.state = self.linkstate_factory.state()
         self.account_token = shared_account_info.set(ACCOUNT_A)
 
     def teardown_method(self) -> None:
         """Restore the authentication context after each test."""
         shared_account_info.reset(self.account_token)
+        self.provider_patch.stop()
 
-    def _make_servicer(
-        self, providers: Sequence[ConnectorOAuthProvider]
-    ) -> ControlServicer:
+    def _make_servicer(self) -> ControlServicer:
         """Create a Control servicer sharing this test's LinkState."""
         return ControlServicer(
             linkstate_factory=self.linkstate_factory,
             objectstore_factory=self.objectstore_factory,
             authn_plugin=Mock(),
-            connector_oauth_providers=providers,
         )
 
     def _begin_oauth(self) -> tuple[str, str]:
@@ -154,8 +148,9 @@ class TestControlConnectorOAuth:
 
     def test_list_connectors_is_sorted_and_account_scoped(self) -> None:
         """List registered providers with status for only the current account."""
-        github = FakeOAuthProvider("GitHub", supports_pkce=False)
-        servicer = self._make_servicer([self.provider, github])
+        github = FakeOAuthProvider("github")
+        connector_registry._OAUTH_CONNECTOR_PROVIDERS = (self.provider, github)
+        servicer = self._make_servicer()
         assert self.state.upsert_connector(
             flwr_aid=ACCOUNT_A.flwr_aid,
             connector_ref="slack",
@@ -227,7 +222,7 @@ class TestControlConnectorOAuth:
         oauth_session_id, oauth_state = self._begin_oauth()
         request = CompleteConnectorOAuthRequest(
             oauth_session_id=oauth_session_id,
-            code="authorization-code",
+            code=" authorization-code ",
             state=oauth_state,
         )
 
@@ -244,10 +239,11 @@ class TestControlConnectorOAuth:
         }
         assert json.loads(connector.config_json) == {"workspace": "flower"}
         assert self.provider.exchange_calls == 1
+        assert self.provider.exchanged_code == "authorization-code"
 
         with pytest.raises(FlowerError) as exc_info:
             self.servicer.CompleteConnectorOAuth(request, Mock())
-        assert exc_info.value.code == ApiErrorCode.CONNECTOR_OAUTH_SESSION_INVALID
+        assert exc_info.value.code == ApiErrorCode.INVALID_CONNECTOR_REQUEST
         assert self.provider.exchange_calls == 1
 
     def test_invalid_state_does_not_consume_oauth_session(self) -> None:
@@ -263,7 +259,7 @@ class TestControlConnectorOAuth:
                 ),
                 Mock(),
             )
-        assert exc_info.value.code == ApiErrorCode.CONNECTOR_OAUTH_SESSION_INVALID
+        assert exc_info.value.code == ApiErrorCode.INVALID_CONNECTOR_REQUEST
 
         response = self.servicer.CompleteConnectorOAuth(
             CompleteConnectorOAuthRequest(
@@ -298,7 +294,7 @@ class TestControlConnectorOAuth:
                 Mock(),
             )
 
-        assert exc_info.value.code == ApiErrorCode.CONNECTOR_OAUTH_SESSION_INVALID
+        assert exc_info.value.code == ApiErrorCode.INVALID_CONNECTOR_REQUEST
         assert self.provider.exchange_calls == 0
 
     def test_oauth_sessions_and_connections_are_isolated_by_account(self) -> None:
@@ -321,9 +317,7 @@ class TestControlConnectorOAuth:
                 ),
                 Mock(),
             )
-        assert (
-            complete_error.value.code == ApiErrorCode.CONNECTOR_OAUTH_SESSION_NOT_FOUND
-        )
+        assert complete_error.value.code == ApiErrorCode.CONNECTOR_NOT_FOUND
 
         with pytest.raises(FlowerError) as disconnect_error:
             self.servicer.DisconnectConnector(
@@ -348,7 +342,7 @@ class TestControlConnectorOAuth:
         with pytest.raises(FlowerError) as exc_info:
             self.servicer.CompleteConnectorOAuth(request, Mock())
 
-        assert exc_info.value.code == ApiErrorCode.CONNECTOR_OAUTH_PROVIDER_FAILURE
+        assert exc_info.value.code == ApiErrorCode.CONNECTOR_FAILURE
         assert sensitive_code not in exc_info.value.message
         assert (
             self.state.get_connector(flwr_aid=ACCOUNT_A.flwr_aid, connector_ref="slack")
@@ -357,7 +351,7 @@ class TestControlConnectorOAuth:
 
         with pytest.raises(FlowerError) as retry_error:
             self.servicer.CompleteConnectorOAuth(request, Mock())
-        assert retry_error.value.code == ApiErrorCode.CONNECTOR_OAUTH_SESSION_INVALID
+        assert retry_error.value.code == ApiErrorCode.INVALID_CONNECTOR_REQUEST
         assert self.provider.exchange_calls == 1
 
     def test_persistence_failure_after_exchange_is_translated(self) -> None:
@@ -377,7 +371,7 @@ class TestControlConnectorOAuth:
                 Mock(),
             )
 
-        assert exc_info.value.code == ApiErrorCode.CONNECTOR_PERSISTENCE_FAILURE
+        assert exc_info.value.code == ApiErrorCode.CONNECTOR_FAILURE
         assert "access-secret" not in exc_info.value.message
 
     def test_disconnect_only_deletes_current_account_connection(self) -> None:
@@ -455,12 +449,6 @@ class TestControlConnectorOAuth:
         with pytest.raises(FlowerError) as exc_info:
             self.servicer.DisconnectConnector(DisconnectConnectorRequest(), Mock())
         assert exc_info.value.code == ApiErrorCode.INVALID_CONNECTOR_REQUEST
-
-    def test_duplicate_provider_references_are_rejected(self) -> None:
-        """Reject ambiguous providers after connector-ref normalization."""
-        duplicate = FakeOAuthProvider(" SLACK ")
-        with pytest.raises(ValueError, match="Duplicate connector OAuth provider"):
-            self._make_servicer([self.provider, duplicate])
 
 
 def _parse_iso(value: str) -> datetime:
