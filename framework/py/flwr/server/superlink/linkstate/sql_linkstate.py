@@ -629,6 +629,21 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             self.query(query_1, params)
             self.query(query_2, params)
 
+    def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
+        """Delete Messages belonging to an expired push session."""
+        if not message_object_ids:
+            return
+
+        placeholders, params = build_sql_in_params(
+            [str(message_id) for message_id in message_object_ids], "m_id"
+        )
+        with self.session():
+            self.delete_messages(message_object_ids)
+            self.query(
+                f"DELETE FROM message_res WHERE message_id IN ({placeholders})",
+                params,
+            )
+
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
         query = """

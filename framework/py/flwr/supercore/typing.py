@@ -28,6 +28,31 @@ JSONObject: TypeAlias = dict[str, JSONValue]
 
 
 @dataclass(frozen=True)
+class ConnectorRecord:
+    """Persisted connector configuration and credentials."""
+
+    flwr_aid: str
+    connector_ref: str
+    credentials_json: str
+    config_json: str
+
+
+@dataclass(frozen=True)
+class ConnectorOAuthSessionRecord:  # pylint: disable=too-many-instance-attributes
+    """Persisted OAuth session for connector authorization."""
+
+    oauth_session_id: str
+    flwr_aid: str
+    connector_ref: str
+    state: str
+    redirect_uri: str
+    pkce_verifier: str | None
+    created_at: str
+    expires_at: str
+    completed_at: str | None
+
+
+@dataclass(frozen=True)
 class ActionContext:
     """Base context for authorization checks in ``can_execute``."""
 
