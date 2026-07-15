@@ -300,16 +300,16 @@ def test_custom_grpc_err_handler() -> None:
 
 
 def test_format_flower_error() -> None:
-    """Format FlowerError message and public details."""
+    """Format FlowerError code, message, and public details."""
     err = FlowerError(
         ApiErrorCode.INVALID_RUN_CONFIG,
         "Invalid run configuration.",
         "Unknown override key: tool.invalid-key",
     )
 
-    assert (
-        _format_flower_error(err)
-        == "Invalid run configuration.\nUnknown override key: tool.invalid-key"
+    assert _format_flower_error(err) == (
+        "[code: 15] Invalid run configuration. "
+        "Unknown override key: tool.invalid-key"
     )
 
 
