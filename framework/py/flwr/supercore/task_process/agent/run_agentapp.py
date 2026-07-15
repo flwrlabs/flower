@@ -248,12 +248,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             agent_app(agent=agent, context=context)
         finally:
             if should_generate_series_description and title_seed:
-                try:
-                    series_description = generate_series_description(
-                        responses, title_seed
-                    )
-                except Exception as ex:  # pylint: disable=broad-exception-caught
-                    log(ERROR, "Failed to resolve RunSeries description: %s", ex)
+                series_description = generate_series_description(responses, title_seed)
 
         # Set sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED

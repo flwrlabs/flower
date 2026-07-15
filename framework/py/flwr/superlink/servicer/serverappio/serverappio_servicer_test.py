@@ -937,7 +937,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             ("", True),
             ("Existing title", False),
         ]
-    )
+    )  # type: ignore[misc]
     def test_run_status_transitions(
         self, series_description: str, should_generate: bool
     ) -> None:

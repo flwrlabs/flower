@@ -27,7 +27,7 @@ from .run_agentapp import run_agentapp
 
 
 def _run_with_title(
-    *, app_error: Exception | None, title_error: Exception | None
+    *, app_error: Exception | None, generated_title: str
 ) -> tuple[PushTaskOutputRequest, list[str]]:
     order: list[str] = []
     app = AgentApp()
@@ -66,9 +66,7 @@ def _run_with_title(
 
     def generate_title(_responses: object, _seed: str) -> str:
         order.append("title")
-        if title_error:
-            raise title_error
-        return "Generated title"
+        return generated_title
 
     module = "flwr.supercore.task_process.agent.run_agentapp"
     with (
@@ -112,10 +110,10 @@ def _run_with_title(
     return request, order
 
 
-def test_title_failure_does_not_change_success_status() -> None:
-    """A title exception preserves success and the deterministic fallback."""
+def test_title_fallback_does_not_change_success_status() -> None:
+    """A fallback title preserves successful AgentApp completion."""
     request, order = _run_with_title(
-        app_error=None, title_error=RuntimeError("title failed")
+        app_error=None, generated_title="one two three four"
     )
 
     assert order == ["app", "title"]
@@ -127,7 +125,7 @@ def test_title_failure_does_not_change_success_status() -> None:
 def test_title_generation_does_not_mask_agentapp_failure() -> None:
     """The original AgentApp failure is preserved after title generation."""
     request, order = _run_with_title(
-        app_error=RuntimeError("app failed"), title_error=None
+        app_error=RuntimeError("app failed"), generated_title="Generated title"
     )
 
     assert order == ["app", "title"]
