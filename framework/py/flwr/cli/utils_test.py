@@ -307,13 +307,10 @@ def test_format_flower_error() -> None:
         "Unknown override key: tool.invalid-key",
     )
 
-    formatted = _format_flower_error(err)
-
-    assert click.unstyle(formatted) == (
+    assert _format_flower_error(err) == (
         "[code: 15] Invalid run configuration. "
         "Unknown override key: tool.invalid-key"
     )
-    assert formatted.startswith("\033[2m[code: 15]\033[0m")
 
 
 def test_cli_output_handler_raises_click_exception_for_json_error() -> None:

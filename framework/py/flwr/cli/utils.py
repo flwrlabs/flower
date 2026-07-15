@@ -89,7 +89,7 @@ def log_superlink_connection(superlink_connection: SuperLinkConnection) -> None:
 
 def _format_flower_error(err: FlowerError) -> str:
     """Return the CLI-facing message for a FlowerError."""
-    parts = [typer.style(f"[code: {err.code}]", dim=True), err.message]
+    parts = [f"[code: {err.code}]", err.message]
     if err.public_details:
         parts.append(err.public_details)
     return " ".join(parts)
