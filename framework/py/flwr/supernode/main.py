@@ -53,6 +53,7 @@ def create_app() -> FastAPI:
     # SuperNode APIs
     fastapi_app.include_router(runtime.router)
 
+    # Apply the FlowerError translation layer last to make it outermost
     fastapi_app.middleware("http")(http_error_translator)
 
     return fastapi_app
