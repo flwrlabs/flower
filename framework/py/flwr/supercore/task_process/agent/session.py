@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Sequence
-from typing import cast
+from typing import Literal, cast
 
 from flwr.agentapp import AgentConnectors, AgentResponses, AgentSession
 from flwr.app import Context, Message
@@ -40,10 +40,11 @@ from flwr.supercore.json_message.connector_message import (
 )
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
+from flwr.supercore.task_process.connector.web_fetch import WEB_FETCH_CONNECTOR_NAME
+from flwr.supercore.task_process.connector.web_search import WEB_SEARCH_CONNECTOR_NAME
 from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_dumps
 
-from . import connector_events
 from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
@@ -88,13 +89,10 @@ class RuntimeAgentConnectors(AgentConnectors):
         call_id = cast(str, tool_call["call_id"])
         arguments_obj = cast(JSONObject, arguments)
 
-        return connector_events.call_with_events(
+        return self._responses.call_connector_with_events(
             name=name,
             call_id=call_id,
             arguments=arguments_obj,
-            create_response=self._responses.create_connector_response,
-            append_and_push_events=self._responses.append_and_push_run_events,
-            append_context_items=self._responses.append_context_items,
         )
 
 
@@ -184,6 +182,62 @@ class RuntimeAgentResponses(AgentResponses):
             raise RuntimeError(f"Connector '{name}' failed.")
 
         return response_payload["output"]
+
+    def call_connector_with_events(
+        self, *, name: str, call_id: str, arguments: JSONObject
+    ) -> JSONObject:
+        """Call a connector and emit/persist its activity events."""
+        def connector_event(
+            status: Literal["started", "completed", "failed"],
+            *,
+            output: JSONValue = None,
+            message: str | None = None,
+        ) -> list[JSONObject]:
+            if name not in (WEB_SEARCH_CONNECTOR_NAME, WEB_FETCH_CONNECTOR_NAME):
+                return []
+
+            event: JSONObject = {
+                "type": f"response.tool_call.{status}",
+                "tool_call_id": call_id,
+                "connector_ref": name,
+                "arguments": arguments,
+            }
+
+            query = arguments.get("query")
+            if isinstance(query, str) and query:
+                event["query"] = query
+
+            url = arguments.get("url")
+            if name == WEB_FETCH_CONNECTOR_NAME and isinstance(url, str) and url:
+                event["links"] = [url]
+
+            if status == "completed":
+                event["output"] = output
+            elif status == "failed" and message is not None:
+                event["error"] = {"code": "connector_error", "message": message}
+
+            return [event]
+
+        self.append_and_push_run_events(connector_event("started"))
+
+        try:
+            output = self.create_connector_response(
+                name=name,
+                call_id=call_id,
+                arguments=arguments,
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            self.append_and_push_run_events(connector_event("failed", message=str(exc)))
+            raise
+
+        output_item: JSONObject = {
+            "type": "function_call_output",
+            "call_id": call_id,
+            "output": strict_json_dumps(output, compact=True),
+        }
+        self.append_and_push_run_events(connector_event("completed", output=output))
+        self.append_context_items([output_item])
+        return output_item
 
     def push_run_events(self, events: Sequence[JSONObject]) -> None:
         """Push structured run events for `StreamRunEvents` clients."""
