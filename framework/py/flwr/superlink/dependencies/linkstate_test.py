@@ -22,10 +22,11 @@ from typing import Any, cast
 from unittest.mock import Mock, patch
 
 import pytest
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, Request
 from starlette.datastructures import State
 
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
+from flwr.supercore.error import ApiErrorCode, FlowerError
 
 from ..main import create_app
 from .linkstate import get_linkstate
@@ -60,8 +61,14 @@ def _create_app_with_linkstate_factory(
 ) -> FastAPI:
     """Create a FastAPI app for either SuperLink HTTP mode."""
     linkstate_factory = cast(LinkStateFactory, state_factory_mock)
+    authn_plugin = Mock()
+    authz_plugin = Mock()
     if not start_legacy_grpc:
-        return create_app(linkstate_factory=linkstate_factory)
+        return create_app(
+            linkstate_factory=linkstate_factory,
+            authn_plugin=authn_plugin,
+            authz_plugin=authz_plugin,
+        )
 
     superlink_lifespan = Mock()
     superlink_lifespan.state_factory = None
@@ -70,6 +77,8 @@ def _create_app_with_linkstate_factory(
     )
     return create_app(
         linkstate_factory=linkstate_factory,
+        authn_plugin=authn_plugin,
+        authz_plugin=authz_plugin,
         superlink_lifespan=cast(Any, superlink_lifespan),
         start_legacy_grpc=True,
     )
@@ -107,8 +116,8 @@ def test_get_linkstate_raises_when_linkstate_factory_is_missing(
     if set_linkstate_factory:
         app.state.linkstate_factory = None
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(FlowerError) as exc_info:
         get_linkstate(_make_request(app))
 
-    assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    assert exc_info.value.detail == "SuperLink LinkStateFactory is not initialized."
+    assert exc_info.value.code == ApiErrorCode.LINKSTATE_NOT_INITIALIZED
+    assert exc_info.value.message == "SuperLink LinkStateFactory is not initialized."

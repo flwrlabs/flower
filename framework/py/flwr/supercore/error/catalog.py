@@ -214,10 +214,40 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
         public_message="FAB download failed.",
     ),
+    ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED: ApiErrorSpec(
+        status_code=StatusCode.UNAUTHENTICATED,
+        http_status_code=status.HTTP_401_UNAUTHORIZED,
+        public_message="Authentication failed.",
+    ),
+    ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED: ApiErrorSpec(
+        status_code=StatusCode.UNAVAILABLE,
+        http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        public_message="Authentication is not initialized.",
+    ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
         public_message="Runtime version compatibility check failed.",
+    ),
+    ApiErrorCode.UNSUPPORTED_CONTENT_TYPE: ApiErrorSpec(
+        status_code=StatusCode.INVALID_ARGUMENT,
+        http_status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        public_message="Unsupported Content-Type.",
+    ),
+    ApiErrorCode.INVALID_PROTOBUF_PAYLOAD: ApiErrorSpec(
+        status_code=StatusCode.INVALID_ARGUMENT,
+        http_status_code=status.HTTP_400_BAD_REQUEST,
+        public_message="Invalid protobuf payload.",
+    ),
+    ApiErrorCode.INVALID_HANDLER_RESPONSE: ApiErrorSpec(
+        status_code=StatusCode.INTERNAL,
+        http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        public_message="Invalid response returned from handler.",
+    ),
+    ApiErrorCode.LINKSTATE_NOT_INITIALIZED: ApiErrorSpec(
+        status_code=StatusCode.UNAVAILABLE,
+        http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        public_message="LinkState is not initialized.",
     ),
     ApiErrorCode.FLEET_SUPERNODE_REGISTRATION_DISABLED: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,

@@ -25,6 +25,7 @@ from fastapi import FastAPI
 
 from flwr import __version__
 from flwr.common import log
+from flwr.supercore.error import http_error_translator
 from flwr.supercore.routers import health
 from flwr.supernode.routers import runtime
 
@@ -51,6 +52,9 @@ def create_app() -> FastAPI:
 
     # SuperNode APIs
     fastapi_app.include_router(runtime.router)
+
+    # Apply the FlowerError translation layer last to make it outermost
+    fastapi_app.middleware("http")(http_error_translator)
 
     return fastapi_app
 
