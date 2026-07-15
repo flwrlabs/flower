@@ -109,11 +109,13 @@ def test_list_runs_checks_license_and_logs_event() -> None:
     assert before_args["method_name"] == "/flwr.proto.Control/ListRuns"
     assert after_args["account_info"] == account
     assert after_args["method_name"] == "/flwr.proto.Control/ListRuns"
+    assert event_log_plugin.write_log.call_count == 2
 
 
 def test_list_runs_rejects_an_invalid_license() -> None:
     """ListRuns does not call its handler when the license check fails."""
     license_plugin = Mock(spec=LicensePlugin)
+    event_log_plugin = Mock(spec=EventLogWriterPlugin)
     license_plugin.check_license.return_value = False
     authn_plugin = Mock()
     authz_plugin = Mock()
@@ -123,6 +125,7 @@ def test_list_runs_rejects_an_invalid_license() -> None:
     app = FastAPI()
     app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
     app.state.control_license_plugin = license_plugin
+    app.state.control_event_log_plugin = event_log_plugin
     app.include_router(router)
     app.dependency_overrides[get_linkstate] = lambda: Mock(spec=LinkState)
     app.middleware("http")(http_error_translator)
@@ -135,3 +138,4 @@ def test_list_runs_rejects_an_invalid_license() -> None:
 
     assert response.status_code == 403
     license_plugin.check_license.assert_called_once_with()
+    event_log_plugin.write_log.assert_not_called()

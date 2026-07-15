@@ -15,15 +15,18 @@
 """Control API event logging for FastAPI requests."""
 
 from collections.abc import Callable
+from functools import partial
 from typing import cast
 
 import grpc
 from fastapi import Request
 from google.protobuf.message import Message
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import State
 
 from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.event_log.typing import LogEntry
 from flwr.supercore.protobuf.routing import _call_handler
 
 
@@ -41,6 +44,14 @@ class _HttpServicerContext:
         """Return the request client address."""
         client = self.request.client
         return "" if client is None else f"{client.host}:{client.port}"
+
+
+def _write_event(
+    event_log_plugin: EventLogWriterPlugin,
+    compose_log: Callable[[], LogEntry],
+) -> None:
+    """Compose and write an event log entry."""
+    event_log_plugin.write_log(compose_log())
 
 
 class ControlEventLogger:
@@ -68,13 +79,16 @@ class ControlEventLogger:
         method_name = "/flwr.proto.Control/" + "".join(
             part.capitalize() for part in func.__name__.split("_")
         )
-        event_log_plugin.write_log(
-            event_log_plugin.compose_log_before_event(
+        await run_in_threadpool(
+            _write_event,
+            event_log_plugin,
+            partial(
+                event_log_plugin.compose_log_before_event,
                 request=proto_request,
                 context=context,
                 account_info=account,
                 method_name=method_name,
-            )
+            ),
         )
         response: Message | BaseException | None = None
         try:
@@ -86,12 +100,15 @@ class ControlEventLogger:
             response = exc
             raise
         finally:
-            event_log_plugin.write_log(
-                event_log_plugin.compose_log_after_event(
+            await run_in_threadpool(
+                _write_event,
+                event_log_plugin,
+                partial(
+                    event_log_plugin.compose_log_after_event,
                     request=proto_request,
                     context=context,
                     account_info=account,
                     method_name=method_name,
                     response=response,
-                )
+                ),
             )

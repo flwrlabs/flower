@@ -17,6 +17,7 @@
 from typing import cast
 
 from fastapi import Request
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import State
 
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -27,13 +28,15 @@ class ControlLicenseChecker:
     """Check the configured Control API license."""
 
     @staticmethod
-    def check(http_request: Request[State]) -> None:
+    async def check(http_request: Request[State]) -> None:
         """Raise when the configured license is invalid."""
         license_plugin = cast(
             LicensePlugin | None,
             getattr(http_request.app.state, "control_license_plugin", None),
         )
-        if license_plugin is not None and not license_plugin.check_license():
+        if license_plugin is not None and not await run_in_threadpool(
+            license_plugin.check_license
+        ):
             raise FlowerError(
                 ApiErrorCode.NO_PERMISSIONS,
                 "License check failed. Please contact the SuperLink administrator.",
