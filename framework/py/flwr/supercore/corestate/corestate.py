@@ -264,34 +264,53 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def update_automation(
+    def dispatch_automation(
         self,
         automation_id: int,
         *,
         previous_next_run_at: str,
         next_run_at: str | None,
-        status: AutomationStatus = AutomationStatus.ACTIVE,
     ) -> bool:
-        """Update an automation after dispatch or mark it failed.
+        """Dispatch an active automation occurrence.
 
         Parameters
         ----------
         automation_id : int
-            Automation ID to update.
+            Automation ID to dispatch.
         previous_next_run_at : str
             Previously observed due time timestamp string. The update only
             succeeds if the stored `next_run_at` still matches this value.
         next_run_at : str | None
-            Next due time timestamp string after a successful dispatch. If
-            `None`, the automation is completed.
-        status : AutomationStatus
-            Target status. Use `active` to advance after successful dispatch and
-            `failed` to terminally fail the automation.
+            Next due time timestamp string. If `None`, the current occurrence is
+            treated as the last finite occurrence and no next due time is stored.
 
         Returns
         -------
         bool
-            True if the active automation was updated, otherwise False.
+            True if the active automation occurrence was dispatched, otherwise
+            False.
+        """
+
+    @abstractmethod
+    def finish_automation(
+        self,
+        automation_id: int,
+        *,
+        status: AutomationStatus,
+    ) -> bool:
+        """Finish an active automation with a terminal status.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to finish.
+        status : AutomationStatus
+            Terminal target status. Must be `completed` or `failed`.
+
+        Returns
+        -------
+        bool
+            True if the active automation was finished, otherwise False.
         """
 
     @abstractmethod

@@ -242,14 +242,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(stopped[0].next_run_at, due_at)
 
-    def test_update_automation(self) -> None:
-        """Automation updates should advance and fail records."""
+    def test_dispatch_and_finish_automation(self) -> None:
+        """Automation dispatch should advance records and finish terminally."""
         state = self.state_factory()
         current = now()
 
         previous_next_run_at = (current - timedelta(seconds=30)).isoformat()
         next_run_at = (current + timedelta(seconds=30)).isoformat()
-        completing = self.store_automation(
+        recurring = self.store_automation(
             state,
             series_id=1,
             next_run_at=previous_next_run_at,
@@ -257,15 +257,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             max_runs=2,
         )
         self.assertTrue(
-            state.update_automation(
-                completing.automation_id,
+            state.dispatch_automation(
+                recurring.automation_id,
                 previous_next_run_at=previous_next_run_at,
                 next_run_at=next_run_at,
             )
         )
         self.assertFalse(
-            state.update_automation(
-                completing.automation_id,
+            state.dispatch_automation(
+                recurring.automation_id,
                 previous_next_run_at=previous_next_run_at,
                 next_run_at=next_run_at,
             )
@@ -278,6 +278,29 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(updated[0].remaining_runs, 1)
         self.assertEqual(updated[0].next_run_at, next_run_at)
 
+        self.assertTrue(
+            state.dispatch_automation(
+                recurring.automation_id,
+                previous_next_run_at=next_run_at,
+                next_run_at=None,
+            )
+        )
+        self.assertTrue(
+            state.finish_automation(
+                recurring.automation_id,
+                status=AutomationStatus.COMPLETED,
+            )
+        )
+        completed = state.list_automations(
+            federation="@me/fed-a",
+            statuses=[AutomationStatus.COMPLETED],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in completed],
+            [recurring.automation_id],
+        )
+
         failed_previous_next_run_at = (current - timedelta(seconds=15)).isoformat()
         failing = self.store_automation(
             state,
@@ -285,10 +308,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             next_run_at=failed_previous_next_run_at,
         )
         self.assertTrue(
-            state.update_automation(
+            state.dispatch_automation(
                 failing.automation_id,
                 previous_next_run_at=failed_previous_next_run_at,
                 next_run_at=None,
+            )
+        )
+        self.assertTrue(
+            state.finish_automation(
+                failing.automation_id,
                 status=AutomationStatus.FAILED,
             )
         )

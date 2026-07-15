@@ -432,6 +432,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             params.update({f"status_{i}": status for i, status in enumerate(statuses)})
         if due_before is not None:
             conditions.append("next_run_at <= :due_before")
+            conditions.append("(remaining_runs IS NULL OR remaining_runs > 0)")
             params["due_before"] = due_before.isoformat()
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
@@ -498,72 +499,32 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         return bool(rows)
 
-    def update_automation(
+    def dispatch_automation(
         self,
         automation_id: int,
         *,
         previous_next_run_at: str,
         next_run_at: str | None,
-        status: AutomationStatus = AutomationStatus.ACTIVE,
     ) -> bool:
-        """Update an automation after dispatch or mark it failed."""
-        if status not in (AutomationStatus.ACTIVE, AutomationStatus.FAILED):
-            raise AssertionError("`status` must be active or failed")
-
+        """Dispatch an active automation occurrence."""
         timestamp = now()
-        if status == AutomationStatus.FAILED:
-            rows = self.query(
-                """
-                UPDATE automation
-                SET status = :status,
-                    updated_at = :updated_at
-                WHERE automation_id = :automation_id
-                AND status = :active_status
-                AND next_run_at = :previous_next_run_at
-                RETURNING automation_id
-                """,
-                {
-                    "automation_id": automation_id,
-                    "status": AutomationStatus.FAILED,
-                    "updated_at": timestamp,
-                    "active_status": AutomationStatus.ACTIVE,
-                    "previous_next_run_at": previous_next_run_at,
-                },
-            )
-            return bool(rows)
-
-        next_run_sql = "next_run_at"
-        status_sql = ":completed_status"
         params: dict[str, Any] = {
             "automation_id": automation_id,
             "active_status": AutomationStatus.ACTIVE,
-            "completed_status": AutomationStatus.COMPLETED,
             "updated_at": timestamp,
             "previous_next_run_at": previous_next_run_at,
+            "next_run_at": next_run_at,
         }
-        if next_run_at is not None:
-            status_sql = """
-                CASE
-                    WHEN remaining_runs IS NOT NULL AND remaining_runs <= 1
-                        THEN :completed_status
-                    ELSE :active_status
-                END
+
+        rows = self.query(
             """
-            next_run_sql = """
-                CASE
+            UPDATE automation
+            SET updated_at = :updated_at,
+                next_run_at = CASE
                     WHEN remaining_runs IS NOT NULL AND remaining_runs <= 1
                         THEN next_run_at
                     ELSE :next_run_at
-                END
-            """
-            params["next_run_at"] = next_run_at
-
-        rows = self.query(
-            f"""
-            UPDATE automation
-            SET status = {status_sql},
-                updated_at = :updated_at,
-                next_run_at = {next_run_sql},
+                END,
                 remaining_runs = CASE
                     WHEN remaining_runs IS NULL
                         THEN NULL
@@ -574,9 +535,44 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             WHERE automation_id = :automation_id
             AND status = :active_status
             AND next_run_at = :previous_next_run_at
+            AND (remaining_runs IS NULL OR remaining_runs > 0)
+            AND (:next_run_at IS NOT NULL OR remaining_runs <= 1)
             RETURNING automation_id
             """,
             params,
+        )
+        return bool(rows)
+
+    def finish_automation(
+        self,
+        automation_id: int,
+        *,
+        status: AutomationStatus,
+    ) -> bool:
+        """Finish an active automation with a terminal status."""
+        if status not in (AutomationStatus.COMPLETED, AutomationStatus.FAILED):
+            raise AssertionError("`status` must be completed or failed")
+
+        completed_condition = ""
+        if status == AutomationStatus.COMPLETED:
+            completed_condition = "AND remaining_runs = 0"
+
+        rows = self.query(
+            f"""
+            UPDATE automation
+            SET status = :status,
+                updated_at = :updated_at
+            WHERE automation_id = :automation_id
+            AND status = :active_status
+            {completed_condition}
+            RETURNING automation_id
+            """,
+            {
+                "automation_id": automation_id,
+                "status": status,
+                "updated_at": now(),
+                "active_status": AutomationStatus.ACTIVE,
+            },
         )
         return bool(rows)
 
