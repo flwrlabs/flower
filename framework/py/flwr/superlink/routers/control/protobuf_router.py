@@ -18,6 +18,7 @@ from collections.abc import Callable
 
 from fastapi import Request
 from google.protobuf.message import Message
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import State
 
 from flwr.supercore.protobuf.routing import ProtobufRouter
@@ -38,7 +39,8 @@ class ControlProtobufRouter(ProtobufRouter):
     ) -> object:
         """Run the license and event-log components around a handler call."""
         # Match the gRPC interceptor order: reject unlicensed calls before logging.
-        await ControlLicenseChecker.check(http_request)
+        # The synchronous license plugin might perform I/O, so keep it off the loop.
+        await run_in_threadpool(ControlLicenseChecker.check, http_request)
         return await ControlEventLogger.call(
             func, http_request, proto_request, dependency_values
         )

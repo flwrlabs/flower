@@ -79,15 +79,12 @@ class ControlEventLogger:
             getattr(http_request.app.state, "control_event_log_plugin", None),
         )
         if event_log_plugin is None:
+            # If no event log isn't configured, call the underlying handler directly
             return await _call_handler(func, proto_request, dependency_values)
 
         account = cast(AccountInfo | None, dependency_values.get("account"))
         if account is None:
             account = AccountInfo(flwr_aid="", account_name="")
-        method_name = "/flwr.proto.Control/" + "".join(
-            part.capitalize() for part in func.__name__.split("_")
-        )
-        context = http_request
 
         def compose_after_event(
             response: Message | BaseException | None,
@@ -96,27 +93,29 @@ class ControlEventLogger:
             return partial(
                 event_log_plugin.compose_log_after_event,
                 request=proto_request,
-                context=context,
+                context=http_request,
                 account_info=account,
-                method_name=method_name,
+                method_name=http_request.url.path,
                 response=response,
             )
 
-        # Plugin composition and writes can perform I/O, so keep them off the loop.
+        # 1. Write the event recorded before handler execution off the event loop.
         await run_in_threadpool(
             _write_event,
             event_log_plugin,
             partial(
                 event_log_plugin.compose_log_before_event,
                 request=proto_request,
-                context=context,
+                context=http_request,
                 account_info=account,
-                method_name=method_name,
+                method_name=http_request.url.path,
             ),
         )
         try:
+            # 2. Execute the Control handler.
             result = await _call_handler(func, proto_request, dependency_values)
         except BaseException as exc:
+            # 3. Record handler failures as after-events before propagating them.
             await run_in_threadpool(
                 _write_event,
                 event_log_plugin,
@@ -137,6 +136,7 @@ class ControlEventLogger:
                     response = exc
                     raise
                 finally:
+                    # 3. Streams finish after iteration, so write the after-event here.
                     # StreamingResponse consumes sync iterables in a worker thread.
                     _write_event(
                         event_log_plugin,
@@ -146,6 +146,7 @@ class ControlEventLogger:
             return response_wrapper()
 
         response = cast(Message, result)
+        # 3. Unary responses are complete, so write the after-event immediately.
         await run_in_threadpool(
             _write_event,
             event_log_plugin,

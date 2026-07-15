@@ -108,9 +108,9 @@ def test_list_runs_checks_license_and_logs_event() -> None:
     after_args = event_log_plugin.compose_log_after_event.call_args.kwargs
     assert before_args["request"] == ListRunsRequest()
     assert before_args["account_info"] == account
-    assert before_args["method_name"] == "/flwr.proto.Control/ListRuns"
+    assert before_args["method_name"] == "/control/list-runs"
     assert after_args["account_info"] == account
-    assert after_args["method_name"] == "/flwr.proto.Control/ListRuns"
+    assert after_args["method_name"] == "/control/list-runs"
     assert event_log_plugin.write_log.call_count == 2
 
 
