@@ -169,7 +169,6 @@ class InMemoryCoreState(
 
     def upsert_connector(
         self,
-        *,
         flwr_aid: str,
         connector_ref: str,
         credentials_json: str,
@@ -189,7 +188,7 @@ class InMemoryCoreState(
         return True
 
     def get_connector(
-        self, *, flwr_aid: str, connector_ref: str
+        self, flwr_aid: str, connector_ref: str
     ) -> ConnectorRecord | None:
         """Return an account's connector, if present."""
         if not flwr_aid or not connector_ref:
@@ -197,16 +196,15 @@ class InMemoryCoreState(
         with self.lock_connector_store:
             return self.connector_store.get((flwr_aid, connector_ref))
 
-    def delete_connector(self, *, flwr_aid: str, connector_ref: str) -> bool:
+    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
         """Delete an account's connector if it exists."""
         if not flwr_aid or not connector_ref:
             return False
         with self.lock_connector_store:
             return self.connector_store.pop((flwr_aid, connector_ref), None) is not None
 
-    def create_connector_oauth_session(  # pylint: disable=too-many-arguments
+    def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        *,
         oauth_session_id: str,
         flwr_aid: str,
         connector_ref: str,
@@ -242,7 +240,7 @@ class InMemoryCoreState(
         return session
 
     def get_connector_oauth_session(
-        self, *, oauth_session_id: str, flwr_aid: str
+        self, oauth_session_id: str, flwr_aid: str
     ) -> ConnectorOAuthSessionRecord | None:
         """Return an account's connector OAuth session, if present."""
         if not oauth_session_id or not flwr_aid:
@@ -254,7 +252,7 @@ class InMemoryCoreState(
             return session
 
     def complete_connector_oauth_session(
-        self, *, oauth_session_id: str, flwr_aid: str
+        self, oauth_session_id: str, flwr_aid: str
     ) -> bool:
         """Mark a pending connector OAuth session as completed."""
         if not oauth_session_id or not flwr_aid:

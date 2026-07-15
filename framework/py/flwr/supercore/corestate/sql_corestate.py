@@ -152,7 +152,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def upsert_connector(
         self,
-        *,
         flwr_aid: str,
         connector_ref: str,
         credentials_json: str,
@@ -184,7 +183,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         return True
 
     def get_connector(
-        self, *, flwr_aid: str, connector_ref: str
+        self, flwr_aid: str, connector_ref: str
     ) -> ConnectorRecord | None:
         """Return an account's connector, if present."""
         if not flwr_aid or not connector_ref:
@@ -208,7 +207,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             config_json=row["config_json"],
         )
 
-    def delete_connector(self, *, flwr_aid: str, connector_ref: str) -> bool:
+    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
         """Delete an account's connector if it exists."""
         if not flwr_aid or not connector_ref:
             return False
@@ -235,9 +234,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         return True
 
-    def create_connector_oauth_session(  # pylint: disable=too-many-arguments
+    def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        *,
         oauth_session_id: str,
         flwr_aid: str,
         connector_ref: str,
@@ -298,7 +296,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         return session
 
     def get_connector_oauth_session(
-        self, *, oauth_session_id: str, flwr_aid: str
+        self, oauth_session_id: str, flwr_aid: str
     ) -> ConnectorOAuthSessionRecord | None:
         """Return an account's connector OAuth session, if present."""
         if not oauth_session_id or not flwr_aid:
@@ -319,7 +317,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         return _connector_oauth_session_from_row(rows[0])
 
     def complete_connector_oauth_session(
-        self, *, oauth_session_id: str, flwr_aid: str
+        self, oauth_session_id: str, flwr_aid: str
     ) -> bool:
         """Mark a pending connector OAuth session as completed."""
         if not oauth_session_id or not flwr_aid:
@@ -1350,7 +1348,6 @@ def _connector_oauth_session_from_row(
     row: dict[str, Any],
 ) -> ConnectorOAuthSessionRecord:
     """Convert a connector OAuth session row to its persistence record."""
-    completed_at = row["completed_at"]
     return ConnectorOAuthSessionRecord(
         oauth_session_id=row["oauth_session_id"],
         flwr_aid=row["flwr_aid"],
@@ -1360,7 +1357,7 @@ def _connector_oauth_session_from_row(
         pkce_verifier=row["pkce_verifier"],
         created_at=timestamp_to_iso(row["created_at"]),
         expires_at=timestamp_to_iso(row["expires_at"]),
-        completed_at=(None if completed_at is None else timestamp_to_iso(completed_at)),
+        completed_at=timestamp_to_iso(row["completed_at"]) or None,
     )
 
 

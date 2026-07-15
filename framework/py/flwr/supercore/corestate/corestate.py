@@ -52,7 +52,6 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def upsert_connector(
         self,
-        *,
         flwr_aid: str,
         connector_ref: str,
         credentials_json: str,
@@ -79,18 +78,43 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def get_connector(
-        self, *, flwr_aid: str, connector_ref: str
+        self, flwr_aid: str, connector_ref: str
     ) -> ConnectorRecord | None:
-        """Return an account's connector, if present."""
+        """Return an account's connector, if present.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the connector.
+        connector_ref : str
+            Connector reference unique within the account.
+
+        Returns
+        -------
+        ConnectorRecord | None
+            The stored connector, or `None` if it does not exist.
+        """
 
     @abstractmethod
-    def delete_connector(self, *, flwr_aid: str, connector_ref: str) -> bool:
-        """Delete an account's connector if it exists."""
+    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
+        """Delete an account's connector if it exists.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the connector.
+        connector_ref : str
+            Connector reference unique within the account.
+
+        Returns
+        -------
+        bool
+            `True` if the connector was deleted, otherwise `False`.
+        """
 
     @abstractmethod
-    def create_connector_oauth_session(  # pylint: disable=too-many-arguments
+    def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        *,
         oauth_session_id: str,
         flwr_aid: str,
         connector_ref: str,
@@ -101,25 +125,67 @@ class CoreState(ABC):  # pylint: disable=R0904
     ) -> ConnectorOAuthSessionRecord | None:
         """Create and return a connector OAuth session.
 
-        Returns ``None`` if the session ID already exists, a required identifier is
-        empty, or ``expires_at`` is timezone-naive. Valid expiry timestamps are
-        normalized to UTC.
+        Parameters
+        ----------
+        oauth_session_id : str
+            Unique ID of the OAuth session.
+        flwr_aid : str
+            Account ID owning the OAuth session.
+        connector_ref : str
+            Reference of the connector being authorized.
+        state : str
+            OAuth state used to protect against cross-site request forgery.
+        redirect_uri : str
+            URI to redirect to after authorization.
+        pkce_verifier : str | None
+            PKCE verifier used for the authorization code exchange, if present.
+        expires_at : datetime
+            Timezone-aware expiration timestamp, normalized to UTC before storage.
+
+        Returns
+        -------
+        ConnectorOAuthSessionRecord | None
+            The created session, or `None` if the session ID already exists, a
+            required identifier is empty, or `expires_at` is timezone-naive.
         """
 
     @abstractmethod
     def get_connector_oauth_session(
-        self, *, oauth_session_id: str, flwr_aid: str
+        self, oauth_session_id: str, flwr_aid: str
     ) -> ConnectorOAuthSessionRecord | None:
-        """Return an account's connector OAuth session, if present."""
+        """Return an account's connector OAuth session, if present.
+
+        Parameters
+        ----------
+        oauth_session_id : str
+            Unique ID of the OAuth session.
+        flwr_aid : str
+            Account ID owning the OAuth session.
+
+        Returns
+        -------
+        ConnectorOAuthSessionRecord | None
+            The stored session, or `None` if it does not exist for the account.
+        """
 
     @abstractmethod
     def complete_connector_oauth_session(
-        self, *, oauth_session_id: str, flwr_aid: str
+        self, oauth_session_id: str, flwr_aid: str
     ) -> bool:
         """Mark a pending connector OAuth session as completed.
 
-        Returns ``False`` when the session is missing, belongs to another account,
-        is expired, or has already been completed.
+        Parameters
+        ----------
+        oauth_session_id : str
+            Unique ID of the OAuth session.
+        flwr_aid : str
+            Account ID owning the OAuth session.
+
+        Returns
+        -------
+        bool
+            `True` if the session was completed. `False` if the session is missing,
+            belongs to another account, is expired, or was already completed.
         """
 
     @abstractmethod
