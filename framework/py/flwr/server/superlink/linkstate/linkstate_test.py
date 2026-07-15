@@ -663,10 +663,11 @@ class StateTest(CoreStateTest):
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
             )
         )
+        session_id = state.start_session(run_id)
 
         # Execute
         stored, missing_objects = state.store_message_and_object_tree(
-            msg, get_object_tree(msg)
+            msg, get_object_tree(msg), session_id
         )
 
         # Assert
@@ -686,7 +687,7 @@ class StateTest(CoreStateTest):
             )
         )
         stored, missing_objects = state.store_message_and_object_tree(
-            invalid_msg, get_object_tree(invalid_msg)
+            invalid_msg, get_object_tree(invalid_msg), session_id
         )
         assert not stored
         assert missing_objects == []
@@ -709,10 +710,11 @@ class StateTest(CoreStateTest):
         res_msg = Message(RecordDict(), reply_to=ins_msg)
         # pylint: disable-next=W0212
         res_msg.metadata._message_id = res_msg.object_id  # type: ignore
+        session_id = state.start_session(run_id)
 
         # Execute
         stored, missing_objects = state.store_message_and_object_tree(
-            res_msg, get_object_tree(res_msg)
+            res_msg, get_object_tree(res_msg), session_id
         )
 
         # Assert

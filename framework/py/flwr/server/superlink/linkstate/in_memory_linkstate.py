@@ -182,7 +182,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         return message_id
 
     def store_message_and_object_tree(
-        self, message: Message, object_tree: ObjectTree
+        self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree."""
         with self.lock:
@@ -194,9 +194,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if not stored:
                 return False, []
 
-            missing_objects = self.object_store.preregister(
-                message.metadata.run_id, object_tree
-            )
+            missing_objects = self.preregister_object_tree(object_tree, session_id)
             return True, missing_objects
 
     def _check_stored_messages(self, message_ids: set[str]) -> None:

@@ -252,7 +252,7 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def store_message_and_object_tree(
-        self, message: Message, object_tree: ObjectTree
+        self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree.
 
@@ -262,6 +262,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             The Message to store.
         object_tree : ObjectTree
             The ObjectTree containing the IDs of objects to preregister.
+        session_id : str
+            The ID of the object push session.
 
         Returns
         -------

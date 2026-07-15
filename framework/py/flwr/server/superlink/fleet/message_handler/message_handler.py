@@ -204,8 +204,9 @@ def push_messages(
         raise InvalidRunStatusException(abort_msg)
 
     # Store Message in State and preregister its objects.
+    session_id = state.start_session(run_id)
     _, objects_to_push = state.store_message_and_object_tree(
-        msg, request.message_object_trees[0]
+        msg, request.message_object_trees[0], session_id
     )
 
     # Build response
@@ -213,6 +214,7 @@ def push_messages(
         reconnect=Reconnect(reconnect=5),
         results={msg.metadata.message_id: 0},
         objects_to_push=objects_to_push,
+        session_id=session_id,
     )
 
     # Record outgoing traffic size
@@ -291,12 +293,17 @@ def push_object(
 
     stored = False
     try:
-        store.put(request.object_id, request.object_content)
-        stored = True
-        # Record bytes traffic pushed from SuperNode
-        state.store_traffic(
-            request.run_id, bytes_sent=0, bytes_recv=len(request.object_content)
+        stored = state.store_object(
+            request.run_id,
+            request.session_id,
+            request.object_id,
+            request.object_content,
         )
+        # Record bytes traffic pushed from SuperNode
+        if stored:
+            state.store_traffic(
+                request.run_id, bytes_sent=0, bytes_recv=len(request.object_content)
+            )
     except (NoObjectInStoreError, ValueError) as e:
         log(ERROR, str(e))
     except UnexpectedObjectContentError as e:
@@ -319,8 +326,8 @@ def pull_object(
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
-    # Fetch from store
-    content = store.get(request.object_id)
+    # Fetch from state
+    content = state.get_object(request.run_id, request.object_id)
     if content is not None:
         object_available = content != b""
         # Record bytes traffic pulled by SuperNode

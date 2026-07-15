@@ -219,7 +219,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         return message.metadata.message_id
 
     def store_message_and_object_tree(
-        self, message: Message, object_tree: ObjectTree
+        self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree."""
         with self.session():
@@ -231,9 +231,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not stored:
                 return False, []
 
-            missing_objects = self.object_store.preregister(
-                message.metadata.run_id, object_tree
-            )
+            missing_objects = self.preregister_object_tree(object_tree, session_id)
             return True, missing_objects
 
     # pylint: disable-next=too-many-locals
