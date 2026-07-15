@@ -28,9 +28,11 @@ from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     PullTaskMessageRequest,
+    PushTaskEventsRequest,
     PushTaskMessageRequest,
 )
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
@@ -41,6 +43,7 @@ from flwr.supercore.task_process.connector.registry import get_builtin_connector
 from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_dumps
 
+from . import connector_events
 from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
@@ -81,16 +84,18 @@ class RuntimeAgentConnectors(AgentConnectors):
         if isinstance(arguments, str):
             arguments = json.loads(arguments)
 
-        output = self._responses.create_connector_response(
-            name=cast(str, tool_call["name"]),
-            call_id=cast(str, tool_call["call_id"]),
-            arguments=cast(JSONObject, arguments),
+        name = cast(str, tool_call["name"])
+        call_id = cast(str, tool_call["call_id"])
+        arguments_obj = cast(JSONObject, arguments)
+
+        return connector_events.call_with_events(
+            name=name,
+            call_id=call_id,
+            arguments=arguments_obj,
+            create_response=self._responses.create_connector_response,
+            append_and_push_events=self._responses.append_and_push_run_events,
+            append_context_items=self._responses.append_context_items,
         )
-        return {
-            "type": "function_call_output",
-            "call_id": tool_call["call_id"],
-            "output": strict_json_dumps(output, compact=True),
-        }
 
 
 class RuntimeAgentResponses(AgentResponses):
@@ -179,6 +184,33 @@ class RuntimeAgentResponses(AgentResponses):
             raise RuntimeError(f"Connector '{name}' failed.")
 
         return response_payload["output"]
+
+    def push_run_events(self, events: Sequence[JSONObject]) -> None:
+        """Push structured run events for `StreamRunEvents` clients."""
+        if not events:
+            return
+        self._stub.PushTaskEvents(
+            PushTaskEventsRequest(
+                events=[
+                    TaskEvent(
+                        event=cast(str, event["type"]),
+                        data=strict_json_dumps(event, compact=True),
+                    )
+                    for event in events
+                ]
+            )
+        )
+
+    def append_and_push_run_events(self, events: list[JSONObject]) -> None:
+        """Append run events to context and push them to `StreamRunEvents` clients."""
+        if not events:
+            return
+        append_items(self._context, events)
+        self.push_run_events(events)
+
+    def append_context_items(self, items: list[JSONObject]) -> None:
+        """Append OpenResponses items to the AgentApp context."""
+        append_items(self._context, items)
 
     def _push_task_message(self, message: Message) -> None:
         """Push one task message and return its message ID."""
