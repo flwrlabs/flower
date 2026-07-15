@@ -414,6 +414,17 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     )
                     del self.message_res_store[message_res_id]
 
+    def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
+        """Delete Messages belonging to an expired push session."""
+        with self.lock:
+            self.delete_messages(message_object_ids)
+            for message_id in message_object_ids:
+                message_res = self.message_res_store.pop(message_id, None)
+                if message_res is not None:
+                    self.message_ins_id_to_message_res_id.pop(
+                        message_res.metadata.reply_to_message_id, None
+                    )
+
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
         message_id_list: set[str] = set()
