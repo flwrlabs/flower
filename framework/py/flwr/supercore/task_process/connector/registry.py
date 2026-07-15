@@ -26,7 +26,7 @@ ConnectorHandler = Callable[..., JSONValue]
 ConnectorToolFactory = Callable[[], JSONObject]
 
 
-_OAUTH_CONNECTOR_PROVIDERS: tuple[ConnectorOAuthProvider, ...] = ()
+OAUTH_CONNECTOR_PROVIDERS: tuple[ConnectorOAuthProvider, ...] = ()
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,

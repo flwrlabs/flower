@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for Control OAuth connector RPCs."""
 
+# pylint: disable=attribute-defined-outside-init
 
 import json
 from datetime import datetime, timedelta
@@ -44,7 +45,7 @@ ACCOUNT_A = AccountInfo(flwr_aid="account-a", account_name="Account A")
 ACCOUNT_B = AccountInfo(flwr_aid="account-b", account_name="Account B")
 
 
-class FakeOAuthProvider:
+class FakeOAuthProvider:  # pylint: disable=too-many-instance-attributes
     """Controllable OAuth provider used by connector handler tests."""
 
     def __init__(self, connector_ref: str = "slack") -> None:
@@ -72,6 +73,7 @@ class FakeOAuthProvider:
         pkce_challenge: str | None,
     ) -> str:
         """Capture authorization inputs and return a deterministic URL."""
+        _ = redirect_uri
         self.authorization_state = state
         self.authorization_pkce_challenge = pkce_challenge
         return f"https://oauth.example/authorize?state={state}"
@@ -84,6 +86,7 @@ class FakeOAuthProvider:
         pkce_verifier: str | None,
     ) -> tuple[JSONObject, JSONObject]:
         """Return test credentials or simulate a provider failure."""
+        _ = redirect_uri, pkce_verifier
         self.exchange_calls += 1
         self.exchanged_code = code
         if self.fail_exchange:
@@ -110,7 +113,7 @@ class TestControlConnectorOAuth:
         )
         self.provider = FakeOAuthProvider()
         self.provider_patch = patch.object(
-            connector_registry, "_OAUTH_CONNECTOR_PROVIDERS", (self.provider,)
+            connector_registry, "OAUTH_CONNECTOR_PROVIDERS", (self.provider,)
         )
         self.provider_patch.start()
         self.servicer = self._make_servicer()
@@ -149,7 +152,10 @@ class TestControlConnectorOAuth:
     def test_list_connectors_is_sorted_and_account_scoped(self) -> None:
         """List registered providers with status for only the current account."""
         github = FakeOAuthProvider("github")
-        connector_registry._OAUTH_CONNECTOR_PROVIDERS = (self.provider, github)
+        connector_registry.OAUTH_CONNECTOR_PROVIDERS = (
+            self.provider,
+            github,
+        )
         servicer = self._make_servicer()
         assert self.state.upsert_connector(
             flwr_aid=ACCOUNT_A.flwr_aid,

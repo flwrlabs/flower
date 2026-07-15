@@ -160,7 +160,7 @@ def list_connectors(
 
     connectors: list[Connector] = []
     for provider in sorted(
-        connector_registry._OAUTH_CONNECTOR_PROVIDERS,
+        connector_registry.OAUTH_CONNECTOR_PROVIDERS,
         key=lambda item: item.connector_ref,
     ):
         connector_ref = provider.connector_ref
@@ -233,7 +233,8 @@ def begin_connector_oauth(
         _raise_invalid_connector_request(
             "redirect_uri is not allowed for this connector"
         )
-    except Exception as err:  # Provider boundary
+    # Provider implementations can raise arbitrary exceptions; sanitize them.
+    except Exception as err:  # pylint: disable=broad-exception-caught
         _raise_connector_provider_failure(
             connector_ref, "resolve redirect URI", type(err).__name__
         )
@@ -285,7 +286,7 @@ def begin_connector_oauth(
     )
 
 
-def complete_connector_oauth(
+def complete_connector_oauth(  # pylint: disable=too-many-locals
     request: CompleteConnectorOAuthRequest,
     account: AccountInfo,
     state: LinkState,
@@ -381,7 +382,7 @@ def complete_connector_oauth(
 
 def _get_connector_oauth_provider(connector_ref: str) -> ConnectorOAuthProvider:
     """Return the registered OAuth provider for a connector reference."""
-    for provider in connector_registry._OAUTH_CONNECTOR_PROVIDERS:
+    for provider in connector_registry.OAUTH_CONNECTOR_PROVIDERS:
         if provider.connector_ref == connector_ref:
             return provider
     raise FlowerError(
@@ -396,7 +397,8 @@ def _call_connector_provider(
     """Call provider code without exposing provider exception details."""
     try:
         return operation()
-    except Exception as err:  # Provider boundary
+    # Provider implementations can raise arbitrary exceptions; sanitize them.
+    except Exception as err:  # pylint: disable=broad-exception-caught
         _raise_connector_provider_failure(connector_ref, action, type(err).__name__)
 
 
