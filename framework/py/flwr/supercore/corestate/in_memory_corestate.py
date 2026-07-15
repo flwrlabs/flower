@@ -14,7 +14,7 @@
 # ==============================================================================
 """In-memory CoreState implementation."""
 
-
+# pylint: disable=too-many-lines
 import hashlib
 import secrets
 from bisect import bisect_right
