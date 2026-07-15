@@ -394,12 +394,9 @@ class InMemoryCoreState(
             ):
                 return False
 
-            if (
-                next_run_at is None
-                and (
-                    not record.automation.HasField("remaining_runs")
-                    or record.automation.remaining_runs > 1
-                )
+            if next_run_at is None and (
+                not record.automation.HasField("remaining_runs")
+                or record.automation.remaining_runs > 1
             ):
                 return False
 
@@ -431,12 +428,9 @@ class InMemoryCoreState(
             record = self.automation_store.get(automation_id)
             if record is None or record.automation.status != AutomationStatus.ACTIVE:
                 return False
-            if (
-                status == AutomationStatus.COMPLETED
-                and (
-                    not record.automation.HasField("remaining_runs")
-                    or record.automation.remaining_runs != 0
-                )
+            if status == AutomationStatus.COMPLETED and (
+                not record.automation.HasField("remaining_runs")
+                or record.automation.remaining_runs != 0
             ):
                 return False
 
