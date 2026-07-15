@@ -214,20 +214,15 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
         public_message="FAB download failed.",
     ),
-    ApiErrorCode.AUTHENTICATION_FAILED: ApiErrorSpec(
+    ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED: ApiErrorSpec(
         status_code=StatusCode.UNAUTHENTICATED,
         http_status_code=status.HTTP_401_UNAUTHORIZED,
         public_message="Authentication failed.",
     ),
-    ApiErrorCode.AUTHENTICATION_NOT_INITIALIZED: ApiErrorSpec(
+    ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED: ApiErrorSpec(
         status_code=StatusCode.UNAVAILABLE,
         http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         public_message="Authentication is not initialized.",
-    ),
-    ApiErrorCode.LINKSTATE_NOT_INITIALIZED: ApiErrorSpec(
-        status_code=StatusCode.UNAVAILABLE,
-        http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        public_message="LinkState is not initialized.",
     ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
@@ -248,6 +243,11 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         status_code=StatusCode.INTERNAL,
         http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         public_message="Invalid response returned from handler.",
+    ),
+    ApiErrorCode.LINKSTATE_NOT_INITIALIZED: ApiErrorSpec(
+        status_code=StatusCode.UNAVAILABLE,
+        http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        public_message="LinkState is not initialized.",
     ),
     ApiErrorCode.FLEET_SUPERNODE_REGISTRATION_DISABLED: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,

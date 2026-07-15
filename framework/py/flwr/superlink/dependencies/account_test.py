@@ -131,7 +131,7 @@ def test_account_access_dependency_rejects_unauthenticated_requests(
     with pytest.raises(FlowerError) as exc_info:
         AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(), Response())
 
-    assert exc_info.value.code == ApiErrorCode.AUTHENTICATION_FAILED
+    assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED
     assert exc_info.value.message == detail
     authz_plugin.authorize.assert_not_called()
 
@@ -167,7 +167,7 @@ def test_get_authn_plugin_raises_when_plugin_is_missing() -> None:
     with pytest.raises(FlowerError) as exc_info:
         get_authn_plugin(_make_app_request(FastAPI()))
 
-    assert exc_info.value.code == ApiErrorCode.AUTHENTICATION_NOT_INITIALIZED
+    assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED
     assert exc_info.value.message == (
         "SuperLink authentication is not initialized: expected ControlAuthnPlugin, "
         "got None."
@@ -179,7 +179,7 @@ def test_get_account_raises_when_dependency_is_missing() -> None:
     with pytest.raises(FlowerError) as exc_info:
         get_account(_make_app_request(FastAPI()), Response())
 
-    assert exc_info.value.code == ApiErrorCode.AUTHENTICATION_NOT_INITIALIZED
+    assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED
     assert (
         exc_info.value.message
         == "SuperLink account authentication is not initialized: expected "

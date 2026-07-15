@@ -60,7 +60,7 @@ class AccountAccessDependency:
         tokens, account = self.authn_plugin.refresh_tokens(metadata)
         if tokens is None:
             raise FlowerError(
-                ApiErrorCode.AUTHENTICATION_FAILED,
+                ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
                 "Token refresh failed: authentication plugin returned no tokens.",
             )
 
@@ -79,7 +79,7 @@ class AccountAccessDependency:
         """Require account information and authorization."""
         if account is None:
             raise FlowerError(
-                ApiErrorCode.AUTHENTICATION_FAILED,
+                ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
                 f"{missing_account_detail}: authentication plugin returned no account.",
             )
         if not self.authz_plugin.authorize(account):
@@ -115,7 +115,7 @@ def get_account(
     account_access = getattr(request.app.state, "account_access_dep", None)
     if not isinstance(account_access, AccountAccessDependency):
         raise FlowerError(
-            ApiErrorCode.AUTHENTICATION_NOT_INITIALIZED,
+            ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED,
             "SuperLink account authentication is not initialized: expected "
             f"AccountAccessDependency, got {type(account_access).__name__}.",
         )
@@ -129,7 +129,7 @@ def get_authn_plugin(
     account_access = getattr(request.app.state, "account_access_dep", None)
     if not isinstance(account_access, AccountAccessDependency):
         raise FlowerError(
-            ApiErrorCode.AUTHENTICATION_NOT_INITIALIZED,
+            ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED,
             "SuperLink authentication is not initialized: expected ControlAuthnPlugin, "
             "got None.",
         )
