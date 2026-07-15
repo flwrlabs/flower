@@ -127,11 +127,11 @@ def get_authn_plugin(
     request: Request,  # type: ignore[type-arg]
 ) -> ControlAuthnPlugin:
     """Return the configured Control authentication plugin."""
-    authn_plugin = getattr(request.app.state, "authn_plugin", None)
-    if authn_plugin is None:
+    account_access = getattr(request.app.state, "account_access_dep", None)
+    if not isinstance(account_access, AccountAccessDependency):
         raise FlowerError(
             ApiErrorCode.AUTHENTICATION_NOT_INITIALIZED,
             "SuperLink authentication is not initialized: expected ControlAuthnPlugin, "
             "got None.",
         )
-    return cast(ControlAuthnPlugin, authn_plugin)
+    return account_access.authn_plugin

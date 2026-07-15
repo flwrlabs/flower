@@ -185,3 +185,21 @@ def test_get_account_raises_when_dependency_is_missing() -> None:
         == "SuperLink account authentication is not initialized: expected "
         "AccountAccessDependency, got NoneType."
     )
+
+
+def test_get_authn_plugin_returns_configured_plugin() -> None:
+    """get_authn_plugin should return the configured authentication plugin."""
+    app = FastAPI()
+    authn_plugin = Mock()
+    app.state.account_access_dep = AccountAccessDependency(authn_plugin, Mock())
+
+    assert get_authn_plugin(_make_app_request(app)) is authn_plugin
+
+
+def test_get_authn_plugin_raises_when_plugin_is_missing() -> None:
+    """get_authn_plugin should fail clearly when the app is not configured."""
+    with pytest.raises(HTTPException) as exc_info:
+        get_authn_plugin(_make_app_request(FastAPI()))
+
+    assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert exc_info.value.detail == "SuperLink authentication is not initialized."
