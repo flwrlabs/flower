@@ -635,7 +635,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             return
 
         placeholders, params = build_sql_in_params(
-            [str(message_id) for message_id in message_object_ids], "mid"
+            [str(message_id) for message_id in message_object_ids], "m_id"
         )
         with self.session():
             self.delete_messages(message_object_ids)
