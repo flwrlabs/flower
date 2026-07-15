@@ -214,7 +214,11 @@ class InMemoryCoreState(
                 return False
 
             # Store the object, mark it complete, and refresh the session TTL
-            self.object_store.put(object_id, object_content)
+            try:
+                self.object_store.put(object_id, object_content)
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to store object %s: %s", object_id, err)
+                return False
             session.pending_object_ids.remove(object_id)
             session.expires_at = now() + timedelta(
                 seconds=OBJECT_PUSH_SESSION_TTL_SECONDS

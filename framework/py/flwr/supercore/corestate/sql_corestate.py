@@ -253,39 +253,43 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         object_content: bytes,
     ) -> bool:
         """Store an object if it is pending for an active push session."""
-        with self.session():
-            # Atomically validate the session and claim its pending object
-            expires_at = self._claim_pending_object(run_id, session_id, object_id)
-            if expires_at is None:
-                return False
+        try:
+            with self.session():
+                # Atomically validate the session and claim its pending object
+                expires_at = self._claim_pending_object(run_id, session_id, object_id)
+                if expires_at is None:
+                    return False
 
-            # Reject expired sessions and clean up their messages and objects
-            if expires_at <= now():
-                self._cleanup_push_session(session_id, cleanup_messages=True)
-                return False
+                # Reject expired sessions and clean up their messages and objects
+                if expires_at <= now():
+                    self._cleanup_push_session(session_id, cleanup_messages=True)
+                    return False
 
-            # Store the object, decrement pending work, and refresh the session TTL
-            self.object_store.put(object_id, object_content)
-            rows = self.query(
-                """
-                UPDATE object_push_sessions
-                SET pending_count = pending_count - 1,
-                    expires_at = :expires_at
-                WHERE session_id = :session_id
-                RETURNING pending_count
-                """,
-                {
-                    "session_id": session_id,
-                    "expires_at": now()
-                    + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS),
-                },
-            )
-            pending_count = rows[0]["pending_count"]
+                # Store the object, decrement pending work, and refresh the session TTL
+                self.object_store.put(object_id, object_content)
+                rows = self.query(
+                    """
+                    UPDATE object_push_sessions
+                    SET pending_count = pending_count - 1,
+                        expires_at = :expires_at
+                    WHERE session_id = :session_id
+                    RETURNING pending_count
+                    """,
+                    {
+                        "session_id": session_id,
+                        "expires_at": now()
+                        + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS),
+                    },
+                )
+                pending_count = rows[0]["pending_count"]
 
-            # Remove session bookkeeping once every pending object is stored
-            if pending_count == 0:
-                self._cleanup_push_session(session_id, cleanup_messages=False)
-            return True
+                # Remove session bookkeeping once every pending object is stored
+                if pending_count == 0:
+                    self._cleanup_push_session(session_id, cleanup_messages=False)
+                return True
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            log(ERROR, "Failed to store object %s: %s", object_id, err)
+            return False
 
     def get_object(self, run_id: int, object_id: str) -> bytes | None:
         """Get an object and clean up expired push sessions when needed."""
