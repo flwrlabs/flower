@@ -321,7 +321,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Automation ID to dispatch.
         previous_next_run_at : str
             Previously observed due time timestamp string. Dispatch only succeeds
-            if the stored `next_run_at` still matches this value.
+            if the stored `next_run_at` still matches this value, preventing
+            multiple workers from executing the same scheduled run concurrently.
         next_run_at : str | None
             Next due time timestamp string. If `None`, the current occurrence is
             treated as the last finite occurrence and no next due time is stored.
