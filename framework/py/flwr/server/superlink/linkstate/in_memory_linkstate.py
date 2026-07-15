@@ -716,6 +716,42 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
             return run_id
 
+    def dispatch_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> int | None:
+        """Create a run from a due automation and advance the automation."""
+        with self.lock_automation_store:
+            record = self.automation_store.get(automation_id)
+            if not self._can_advance_automation_locked(
+                record,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            ):
+                return None
+
+            assert record is not None
+            automation = record.automation
+            run_id = self.create_run(
+                fab_id=record.fab_id,
+                fab_version=record.fab_version,
+                fab_hash=record.fab_hash,
+                override_config=dict(record.override_config),
+                federation_id=automation.federation,
+                federation_config=record.federation_config,
+                flwr_aid=automation.flwr_aid,
+                primary_task_type=record.primary_task_type,
+                series_id=automation.series_id,
+            )
+            if run_id == 0:
+                return None
+
+            self._advance_automation_locked(record, next_run_at=next_run_at)
+            return run_id
+
     def get_run_info(
         self,
         *,

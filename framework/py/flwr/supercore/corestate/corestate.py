@@ -421,19 +421,19 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def dispatch_automation(
+    def advance_automation(
         self,
         automation_id: int,
         *,
         previous_next_run_at: str,
         next_run_at: str | None,
     ) -> bool:
-        """Dispatch an active automation occurrence.
+        """Advance an active automation occurrence.
 
         Parameters
         ----------
         automation_id : int
-            Automation ID to dispatch.
+            Automation ID to advance.
         previous_next_run_at : str
             Previously observed due time timestamp string. The update only
             succeeds if the stored `next_run_at` still matches this value.
@@ -444,7 +444,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         Returns
         -------
         bool
-            True if the active automation occurrence was dispatched, otherwise
+            True if the active automation occurrence was advanced, otherwise
             False.
         """
 

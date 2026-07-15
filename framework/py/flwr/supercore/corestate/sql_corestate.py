@@ -822,14 +822,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         return bool(rows)
 
-    def dispatch_automation(
+    def advance_automation(
         self,
         automation_id: int,
         *,
         previous_next_run_at: str,
         next_run_at: str | None,
     ) -> bool:
-        """Dispatch an active automation occurrence."""
+        """Advance an active automation occurrence."""
         timestamp = now()
         params: dict[str, Any] = {
             "automation_id": automation_id,

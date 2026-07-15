@@ -341,8 +341,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(stopped[0].next_run_at, due_at)
 
-    def test_dispatch_and_finish_automation(self) -> None:
-        """Automation dispatch should advance records and finish terminally."""
+    def test_advance_and_finish_automation(self) -> None:
+        """Automation advance should update records and finish terminally."""
         state = self.state_factory()
         current = now()
 
@@ -356,14 +356,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             max_runs=2,
         )
         self.assertTrue(
-            state.dispatch_automation(
+            state.advance_automation(
                 recurring.automation_id,
                 previous_next_run_at=previous_next_run_at,
                 next_run_at=next_run_at,
             )
         )
         self.assertFalse(
-            state.dispatch_automation(
+            state.advance_automation(
                 recurring.automation_id,
                 previous_next_run_at=previous_next_run_at,
                 next_run_at=next_run_at,
@@ -378,7 +378,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(updated[0].next_run_at, next_run_at)
 
         self.assertTrue(
-            state.dispatch_automation(
+            state.advance_automation(
                 recurring.automation_id,
                 previous_next_run_at=next_run_at,
                 next_run_at=None,
@@ -407,7 +407,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             next_run_at=failed_previous_next_run_at,
         )
         self.assertTrue(
-            state.dispatch_automation(
+            state.advance_automation(
                 failing.automation_id,
                 previous_next_run_at=failed_previous_next_run_at,
                 next_run_at=None,
