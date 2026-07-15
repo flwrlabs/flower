@@ -14,7 +14,6 @@
 # ==============================================================================
 """Kubernetes executor for SuperExec TaskExecutor processes."""
 
-
 import importlib
 import re
 import time
@@ -154,6 +153,10 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     env : list[JSONObject] | None
         Optional explicit TaskExecutor container environment. Only literal
         name/value entries are supported.
+    volumes : list[JSONObject] | None
+        Optional Kubernetes Pod volumes.
+    volume_mounts : list[JSONObject] | None
+        Optional Kubernetes TaskExecutor container volume mounts.
     node_selector : dict[str, str] | None
         Optional Kubernetes nodeSelector.
     tolerations : list[JSONObject] | None
@@ -180,6 +183,8 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     resource_pool: str | None = None
     resources: JSONObject | None = None
     env: list[JSONObject] | None = None
+    volumes: list[JSONObject] | None = None
+    volume_mounts: list[JSONObject] | None = None
     node_selector: dict[str, str] | None = None
     tolerations: list[JSONObject] | None = None
     affinity: JSONObject | None = None
@@ -198,6 +203,10 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         """Validate config values used to build TaskExecutor Pods."""
         if self.env is not None:
             self.env = _taskexecutor_env(self.env)
+        if self.volumes is not None:
+            self.volumes = _taskexecutor_volumes(self.volumes)
+        if self.volume_mounts is not None:
+            self.volume_mounts = _taskexecutor_volume_mounts(self.volume_mounts)
 
 
 class KubernetesExecutor:
@@ -429,18 +438,22 @@ def _build_taskexecutor_pod(
     launch_attempt_id: str,
 ) -> JSONObject:
     """Build the TaskExecutor Pod for a claimed SuperExec task."""
+    volume_mounts: list[JSONObject] = [
+        {
+            "name": "appio-credentials",
+            "mountPath": APPIO_CREDENTIALS_MOUNT_PATH,
+            "readOnly": True,
+        }
+    ]
+    if config.volume_mounts is not None:
+        volume_mounts.extend(config.volume_mounts)
+
     container: JSONObject = {
         "name": "taskexecutor",
         "image": config.image,
         "command": [TASK_TYPE_TO_COMMAND[spec.task_type]],
         "args": _taskexecutor_args(spec, appio_root_certificates),
-        "volumeMounts": [
-            {
-                "name": "appio-credentials",
-                "mountPath": APPIO_CREDENTIALS_MOUNT_PATH,
-                "readOnly": True,
-            }
-        ],
+        "volumeMounts": volume_mounts,
     }
     if config.image_pull_policy is not None:
         container["imagePullPolicy"] = config.image_pull_policy
@@ -451,19 +464,23 @@ def _build_taskexecutor_pod(
     if config.container_security_context is not None:
         container["securityContext"] = config.container_security_context
 
+    volumes: list[JSONObject] = [
+        {
+            "name": "appio-credentials",
+            "secret": {
+                "secretName": _credential_secret_name(spec, launch_attempt_id),
+                "defaultMode": 0o444,
+            },
+        }
+    ]
+    if config.volumes is not None:
+        volumes.extend(config.volumes)
+
     pod_spec: JSONObject = {
         "automountServiceAccountToken": False,
         "restartPolicy": "Never",
         "containers": [container],
-        "volumes": [
-            {
-                "name": "appio-credentials",
-                "secret": {
-                    "secretName": _credential_secret_name(spec, launch_attempt_id),
-                    "defaultMode": 0o444,
-                },
-            }
-        ],
+        "volumes": volumes,
     }
     if config.service_account_name is not None:
         pod_spec["serviceAccountName"] = config.service_account_name
@@ -550,6 +567,65 @@ def _taskexecutor_env(env: list[JSONObject]) -> list[JSONObject]:
         # Copy only the validated Kubernetes env shape into the generated Pod spec.
         entries.append({"name": name, "value": value})
     return entries
+
+
+def _taskexecutor_volumes(volumes: list[JSONObject]) -> list[JSONObject]:
+    """Build validated TaskExecutor Pod volumes."""
+    if not isinstance(volumes, list):
+        raise ValueError("TaskExecutor volumes must be a list of mappings.")
+    entries: list[JSONObject] = []
+    for entry in volumes:
+        if not isinstance(entry, dict):
+            raise ValueError("TaskExecutor volume entries must be mappings.")
+        if entry.get("name") == "appio-credentials":
+            raise ValueError(
+                "TaskExecutor volume name 'appio-credentials' is reserved."
+            )
+        if "secret" in entry:
+            raise ValueError("TaskExecutor secret volumes are not supported.")
+        if _has_rejected_projected_source(entry):
+            raise ValueError(
+                "TaskExecutor projected secret and serviceAccountToken volumes "
+                "are not supported."
+            )
+        entries.append(entry)
+    return entries
+
+
+def _taskexecutor_volume_mounts(volume_mounts: list[JSONObject]) -> list[JSONObject]:
+    """Build validated TaskExecutor container volume mounts."""
+    if not isinstance(volume_mounts, list):
+        raise ValueError("TaskExecutor volume mounts must be a list of mappings.")
+    entries: list[JSONObject] = []
+    for entry in volume_mounts:
+        if not isinstance(entry, dict):
+            raise ValueError("TaskExecutor volume mount entries must be mappings.")
+        if entry.get("name") == "appio-credentials":
+            raise ValueError(
+                "TaskExecutor volume mount name 'appio-credentials' is reserved."
+            )
+        if entry.get("mountPath") == APPIO_CREDENTIALS_MOUNT_PATH:
+            raise ValueError(
+                f"TaskExecutor volume mount path {APPIO_CREDENTIALS_MOUNT_PATH!r} "
+                "is reserved."
+            )
+        entries.append(entry)
+    return entries
+
+
+def _has_rejected_projected_source(volume: JSONObject) -> bool:
+    """Return true if a projected volume source exposes credentials."""
+    projected = volume.get("projected")
+    if not isinstance(projected, dict):
+        return False
+    sources = projected.get("sources")
+    if not isinstance(sources, list):
+        return False
+    return any(
+        isinstance(source, dict)
+        and ("secret" in source or "serviceAccountToken" in source)
+        for source in sources
+    )
 
 
 def _get_appio_root_certificates(

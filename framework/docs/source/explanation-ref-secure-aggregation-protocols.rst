@@ -30,7 +30,7 @@ is a special case of the ``SecAgg+`` protocol, and one may use ``SecAggWorkflow`
 You may find a detailed example in the `Secure Aggregation Example
 <https://flower.ai/docs/examples/flower-secure-aggregation.html>`_. The documentation
 for the ``SecAgg+`` protocol configuration is available at `SecAggPlusWorkflow
-<https://flower.ai/docs/framework/ref-api/flwr.server.workflow.SecAggPlusWorkflow.html>`_.
+<ref-api/flwr.server.workflow.SecAggPlusWorkflow.html>`_.
 
 The logic of the ``SecAgg+`` protocol is illustrated in the following sequence diagram:
 the dashed lines represent communication over the network, and the solid lines represent

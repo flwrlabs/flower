@@ -42,7 +42,6 @@ from flwr.common.constant import (
     RUNTIME_DEPENDENCY_INSTALL,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_REST,
     TRANSPORT_TYPES,
     ErrorCode,
     ExecPluginType,
@@ -136,7 +135,6 @@ def start_client_internal(
         Configure the transport layer. Allowed values:
         - 'grpc-rere': gRPC, request-response
         - 'grpc-adapter': gRPC via 3rd party adapter (experimental)
-        - 'rest': HTTP (experimental)
     authentication_keys : Optional[Tuple[PrivateKey, PublicKey]] (default: None)
         Tuple containing the elliptic curve private key and public key for
         authentication from the cryptography library.
@@ -488,8 +486,8 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
 def _push_messages(
     state: NodeState,
     object_store: ObjectStore,
-    send: Callable[[Message, ObjectTree, float], set[str]],
-    push_object: Callable[[int, str, bytes], None],
+    send: Callable[[Message, ObjectTree, float], tuple[set[str], str]],
+    push_object: Callable[[int, str, str, bytes], None],
 ) -> None:
     """Push reply messages to the SuperLink."""
     # This is to ensure that only one message is processed at a time
@@ -541,7 +539,7 @@ def _push_messages(
             )
             # Send the reply message with its ObjectTree and ClientApp runtime
             # Get the IDs of objects to send
-            ids_obj_to_send = send(message, object_tree, clientapp_runtime)
+            ids_obj_to_send, session_id = send(message, object_tree, clientapp_runtime)
 
             # Push object contents from the ObjectStore
             run_id = message.metadata.run_id
@@ -550,8 +548,10 @@ def _push_messages(
                 # Use functools.partial to bind run_id explicitly,
                 # avoiding late binding issues and satisfying flake8 (B023)
                 # Equivalent to:
-                # lambda object_id, content: push_object(run_id, object_id, content)
-                push_object_fn=partial(push_object, run_id),
+                # lambda object_id, content: push_object(
+                #     run_id, session_id, object_id, content
+                # )
+                push_object_fn=partial(push_object, run_id, session_id),
             )
             log(INFO, "Sent successfully")
         except RunNotRunningException:
@@ -598,11 +598,11 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
     tuple[
         int,
         Callable[[], tuple[Message, ObjectTree] | None],
-        Callable[[Message, ObjectTree, float], set[str]],
+        Callable[[Message, ObjectTree, float], tuple[set[str], str]],
         Callable[[int], Run],
         Callable[[str, int], Fab],
         Callable[[int, str], bytes],
-        Callable[[int, str, bytes], None],
+        Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
     ]
 ]:
@@ -617,21 +617,11 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
     host, port, is_v6 = parsed_address
     address = f"[{host}]:{port}" if is_v6 else f"{host}:{port}"
 
-    # Use either gRPC bidirectional streaming or REST request/response
-    if transport == TRANSPORT_TYPE_REST:
-        try:
-            from requests.exceptions import ConnectionError as RequestsConnectionError
-
-            from flwr.client.rest_client.connection import http_request_response
-        except ModuleNotFoundError:
-            flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
-        if server_address[:4] != "http":
-            flwr_exit(ExitCode.SUPERNODE_REST_ADDRESS_INVALID)
-        connection, error_type = http_request_response, RequestsConnectionError
-    elif transport == TRANSPORT_TYPE_GRPC_RERE:
+    # Use one of the supported gRPC transports
+    if transport == TRANSPORT_TYPE_GRPC_RERE:
         connection, error_type = grpc_request_response, RpcError
     elif transport == TRANSPORT_TYPE_GRPC_ADAPTER:
-        connection, error_type = grpc_adapter, RpcError
+        connection, error_type = grpc_adapter, RpcError  # type: ignore[assignment]
     else:
         raise ValueError(
             f"Unknown transport type: {transport} (possible: {TRANSPORT_TYPES})"

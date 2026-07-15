@@ -108,6 +108,7 @@ message PushMessagesResponse {
   Reconnect reconnect = 1;
   map<string, uint32> results = 2;
   repeated string objects_to_push = 3;
+  string session_id = 4;
 }
 
 message Reconnect { uint64 reconnect = 1; }

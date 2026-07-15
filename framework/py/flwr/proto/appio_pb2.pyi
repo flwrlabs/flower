@@ -152,6 +152,8 @@ class PushAppMessagesResponse(google.protobuf.message.Message):
 
     MESSAGE_IDS_FIELD_NUMBER: builtins.int
     OBJECTS_TO_PUSH_FIELD_NUMBER: builtins.int
+    SESSION_ID_FIELD_NUMBER: builtins.int
+    session_id: builtins.str
     @property
     def message_ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
@@ -161,8 +163,9 @@ class PushAppMessagesResponse(google.protobuf.message.Message):
         *,
         message_ids: collections.abc.Iterable[builtins.str] | None = ...,
         objects_to_push: collections.abc.Iterable[builtins.str] | None = ...,
+        session_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["message_ids", b"message_ids", "objects_to_push", b"objects_to_push"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["message_ids", b"message_ids", "objects_to_push", b"objects_to_push", "session_id", b"session_id"]) -> None: ...
 
 global___PushAppMessagesResponse = PushAppMessagesResponse
 

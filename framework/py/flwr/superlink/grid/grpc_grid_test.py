@@ -118,6 +118,7 @@ class TestGrpcGrid(unittest.TestCase):
         mock_response = Mock(
             message_ids=[msg1.object_id, msg2.object_id],
             objects_to_push=[msg1.object_id, RecordDict().object_id, msg2.object_id],
+            session_id="",
         )
         self.mock_stub.PushMessages.return_value = mock_response
         self.mock_stub.PushObject.return_value = Mock(stored=True)
@@ -193,6 +194,7 @@ class TestGrpcGrid(unittest.TestCase):
         self.mock_stub.PushMessages.return_value = Mock(
             message_ids=[msg.object_id],
             objects_to_push=[msg.object_id, RecordDict().object_id],
+            session_id="",
         )
         self.mock_stub.PushObject.return_value = Mock(stored=True)
 
@@ -223,6 +225,7 @@ class TestGrpcGrid(unittest.TestCase):
         mock_response = Mock(
             message_ids=[msg.object_id],
             objects_to_push=[msg.object_id, RecordDict().object_id],
+            session_id="",
         )
         self.mock_stub.PushMessages.return_value = mock_response
         self.mock_stub.PushObject.return_value = Mock(stored=True)

@@ -88,7 +88,7 @@ class TestInflatableStubHelpers(unittest.TestCase):  # pylint: disable=R0902
         node = Node(node_id=456)
         run_id = 1234
         self.push_object_fn = make_push_object_fn_protobuf(
-            self.mock_stub.PushObject, node, run_id
+            self.mock_stub.PushObject, node, run_id, session_id=""
         )
         self.pull_object_fn = make_pull_object_fn_protobuf(
             self.mock_stub.PullObject, node, run_id

@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for utility functions for the infrastructure."""
 
-
 import json
 import sys
 from typing import Any
@@ -28,6 +27,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 
 from .utils import (
     MetadataLookupError,
+    build_sql_in_params,
     find_metadata_keys,
     get_metadata_bytes,
     get_metadata_str,
@@ -45,6 +45,35 @@ from .utils import (
     strict_json_loads,
     uint64_to_int64,
 )
+
+
+@pytest.mark.parametrize(
+    ("prefix", "values", "expected_placeholders", "expected_params"),
+    [
+        ("a", [10, 20, 30], ":a_0,:a_1,:a_2", {"a_0": 10, "a_1": 20, "a_2": 30}),
+        ("x", ["hello"], ":x_0", {"x_0": "hello"}),
+        ("p", [], "", {}),
+    ],
+)
+def test_build_sql_in_params(
+    prefix: str,
+    values: list[Any],
+    expected_placeholders: str,
+    expected_params: dict[str, Any],
+) -> None:
+    """Build matching SQL placeholders and parameters from ordered values."""
+    placeholders, params = build_sql_in_params(values, prefix)
+
+    assert placeholders == expected_placeholders
+    assert params == expected_params
+
+
+def test_build_sql_in_params_from_set() -> None:
+    """Keep placeholders aligned with parameters for unordered values."""
+    placeholders, params = build_sql_in_params({10, 20, 30}, "value")
+
+    assert placeholders == ",".join(f":{key}" for key in params)
+    assert set(params.values()) == {10, 20, 30}
 
 
 def test_find_metadata_keys() -> None:

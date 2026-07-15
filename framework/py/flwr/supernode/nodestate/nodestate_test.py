@@ -29,6 +29,7 @@ from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
+from flwr.supercore.inflatable.inflatable_object import get_object_tree
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run
 
@@ -130,6 +131,38 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         result = self.state.get_messages()
         self.assertEqual(len(result), 0)
 
+    def test_store_message_and_object_tree(self) -> None:
+        """Test storing a message and preregistering its object tree."""
+        # Prepare
+        msg = make_dummy_message()
+
+        # Execute
+        stored, missing_objects = self.state.store_message_and_object_tree(
+            msg, get_object_tree(msg)
+        )
+
+        # Assert
+        self.assertTrue(stored)
+        self.assertIn(msg.metadata.message_id, missing_objects)
+        self.assertTrue(msg.metadata.message_id in self.state.object_store)
+        self.assertEqual(self.state.get_messages()[0], msg)
+
+    def test_store_message_duplicate_same_message_is_idempotent(self) -> None:
+        """Test storing a duplicate message returns its message ID."""
+        # Prepare
+        msg = make_dummy_message(msg_id="test_msg")
+
+        # Execute
+        first_msg_id = self.state.store_message(msg)
+        second_msg_id = self.state.store_message(msg)
+        messages = self.state.get_messages()
+
+        # Assert
+        self.assertEqual(first_msg_id, "test_msg")
+        self.assertEqual(second_msg_id, "test_msg")
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0], msg)
+
     @parameterized.expand(  # type: ignore
         [
             ({"run_ids": [1]}, {"msg1", "msg2"}),
@@ -180,6 +213,16 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         msg_ids = {msg.metadata.message_id for msg in msgs}
         self.assertNotIn("msg1", msg_ids)
         self.assertIn("msg2", msg_ids)
+
+    def test_push_session_expiry_deletes_message(self) -> None:
+        """Test deleting a Message belonging to an expired push session."""
+        self.state.store_message(make_dummy_message(msg_id="msg1"))
+
+        self.state._on_push_session_expired(  # pylint: disable=protected-access
+            {"msg1"}
+        )
+
+        self.assertEqual(self.state.get_messages(), [])
 
     def test_get_error_reply_when_running_task_claim_expires(self) -> None:
         """Test that error replies are created when running task claims expire."""

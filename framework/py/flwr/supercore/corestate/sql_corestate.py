@@ -14,15 +14,15 @@
 # ==============================================================================
 """SQLAlchemy-based CoreState implementation."""
 
-
 # pylint: disable=too-many-lines
 import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
+from uuid import uuid4
 
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
@@ -30,6 +30,7 @@ from sqlalchemy.exc import IntegrityError
 from flwr.app import Context, Message
 from flwr.app.message import make_message
 from flwr.app.metadata import Metadata
+from flwr.app.user_config import UserConfig
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -43,7 +44,10 @@ from flwr.common.constant import (
 from flwr.common.logger import log
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
+from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
@@ -54,11 +58,18 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
+from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
-from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
+from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
+from flwr.supercore.utils import (
+    build_sql_in_params,
+    int64_to_uint64,
+    simulation_config_to_json,
+    uint64_to_int64,
+)
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -97,6 +108,135 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
         return self._object_store
+
+    def start_session(self, run_id: int) -> str:
+        """Start a run-scoped object push session."""
+        session_id = str(uuid4())
+        self.query(
+            """
+            INSERT INTO object_push_sessions (
+                session_id, run_id, expires_at, pending_count
+            )
+            VALUES (:session_id, :run_id, :expires_at, 0)
+            """,
+            {
+                "session_id": session_id,
+                "run_id": uint64_to_int64(run_id),
+                "expires_at": now()
+                + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS),
+            },
+        )
+        return session_id
+
+    def preregister_object_tree(
+        self, object_tree: ObjectTree, session_id: str
+    ) -> list[str]:
+        """Preregister an object tree and record its missing objects."""
+        with self.session():
+            # Load the run associated with the session
+            rows = self.query(
+                """
+                SELECT run_id
+                FROM object_push_sessions
+                WHERE session_id = :session_id
+                """,
+                {"session_id": session_id},
+            )
+            if not rows:
+                raise ValueError(f"Unknown object push session: {session_id}")
+            run_id = int64_to_uint64(rows[0]["run_id"])
+
+            # Preregister the tree and collect its currently missing objects
+            missing_objects = self.object_store.preregister(run_id, object_tree)
+
+            # Remove bookkeeping for an older session owning the same root
+            rows = self.query(
+                """
+                SELECT session_id
+                FROM object_push_session_roots
+                WHERE root_object_id = :root_object_id AND session_id != :session_id
+                """,
+                {
+                    "root_object_id": object_tree.object_id,
+                    "session_id": session_id,
+                },
+            )
+            if rows:
+                self._cleanup_push_session(
+                    rows[0]["session_id"], cleanup_messages=False
+                )
+
+            # Record ownership of the root
+            self.query(
+                """
+                INSERT INTO object_push_session_roots (session_id, root_object_id)
+                VALUES (:session_id, :root_object_id)
+                """,
+                {
+                    "session_id": session_id,
+                    "root_object_id": object_tree.object_id,
+                },
+            )
+
+            # Record the objects that still need to be pushed
+            if missing_objects:
+                self.query(
+                    """
+                    INSERT INTO object_push_session_pending (session_id, object_id)
+                    VALUES (:session_id, :object_id)
+                    ON CONFLICT(session_id, object_id) DO NOTHING
+                    """,
+                    [
+                        {"session_id": session_id, "object_id": object_id}
+                        for object_id in missing_objects
+                    ],
+                )
+
+            # Synchronize the materialized pending count.
+            self.query(
+                """
+                UPDATE object_push_sessions
+                SET pending_count = (
+                    SELECT COUNT(*)
+                    FROM object_push_session_pending
+                    WHERE session_id = :session_id
+                )
+                WHERE session_id = :session_id
+                """,
+                {"session_id": session_id},
+            )
+            return missing_objects
+
+    def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
+        """Remove an object push session and optionally its messages."""
+        with self.session():
+            # Load message roots only when their data must also be cleaned up
+            message_object_ids: set[str] = set()
+            if cleanup_messages:
+                rows = self.query(
+                    """
+                    SELECT root_object_id
+                    FROM object_push_session_roots
+                    WHERE session_id = :session_id
+                    """,
+                    {"session_id": session_id},
+                )
+                message_object_ids = {row["root_object_id"] for row in rows}
+
+            # Delete the session and its cascaded root and pending rows
+            self.query(
+                """
+                DELETE FROM object_push_sessions
+                WHERE session_id = :session_id
+                """,
+                {"session_id": session_id},
+            )
+
+            # Delete expired object trees and their message metadata.
+            if message_object_ids:
+                for object_id in message_object_ids:
+                    self.object_store.delete(object_id)
+                self._on_push_session_expired(message_object_ids)
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
@@ -141,6 +281,197 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             verifications=json.loads(row["verifications"]),
         )
 
+    def upsert_connector(
+        self,
+        flwr_aid: str,
+        connector_ref: str,
+        credentials_json: str,
+        config_json: str,
+    ) -> bool:
+        """Create or update a connector for an account."""
+        if not flwr_aid or not connector_ref:
+            return False
+        params = {
+            "flwr_aid": flwr_aid,
+            "connector_ref": connector_ref,
+            "credentials_json": credentials_json,
+            "config_json": config_json,
+        }
+        self.query(
+            """
+            INSERT INTO connector (
+                flwr_aid, connector_ref, credentials_json, config_json
+            )
+            VALUES (
+                :flwr_aid, :connector_ref, :credentials_json, :config_json
+            )
+            ON CONFLICT(flwr_aid, connector_ref) DO UPDATE SET
+                credentials_json = excluded.credentials_json,
+                config_json = excluded.config_json
+            """,
+            params,
+        )
+        return True
+
+    def get_connector(
+        self, flwr_aid: str, connector_ref: str
+    ) -> ConnectorRecord | None:
+        """Return an account's connector, if present."""
+        if not flwr_aid or not connector_ref:
+            return None
+        rows = self.query(
+            """
+            SELECT flwr_aid, connector_ref, credentials_json, config_json
+            FROM connector
+            WHERE flwr_aid = :flwr_aid
+              AND connector_ref = :connector_ref
+            """,
+            {"flwr_aid": flwr_aid, "connector_ref": connector_ref},
+        )
+        if not rows:
+            return None
+        row = rows[0]
+        return ConnectorRecord(
+            flwr_aid=row["flwr_aid"],
+            connector_ref=row["connector_ref"],
+            credentials_json=row["credentials_json"],
+            config_json=row["config_json"],
+        )
+
+    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
+        """Delete an account's connector if it exists."""
+        if not flwr_aid or not connector_ref:
+            return False
+        params = {"flwr_aid": flwr_aid, "connector_ref": connector_ref}
+        with self.session():
+            rows = self.query(
+                """
+                SELECT connector_ref
+                FROM connector
+                WHERE flwr_aid = :flwr_aid
+                  AND connector_ref = :connector_ref
+                """,
+                params,
+            )
+            if not rows:
+                return False
+            self.query(
+                """
+                DELETE FROM connector
+                WHERE flwr_aid = :flwr_aid
+                  AND connector_ref = :connector_ref
+                """,
+                params,
+            )
+        return True
+
+    def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        oauth_session_id: str,
+        flwr_aid: str,
+        connector_ref: str,
+        state: str,
+        redirect_uri: str,
+        pkce_verifier: str | None,
+        expires_at: datetime,
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Create and return a connector OAuth session."""
+        if (
+            not oauth_session_id
+            or not flwr_aid
+            or not connector_ref
+            or expires_at.utcoffset() is None
+        ):
+            return None
+        expires_at = expires_at.astimezone(UTC)
+        created_at = now()
+        session = ConnectorOAuthSessionRecord(
+            oauth_session_id=oauth_session_id,
+            flwr_aid=flwr_aid,
+            connector_ref=connector_ref,
+            state=state,
+            redirect_uri=redirect_uri,
+            pkce_verifier=pkce_verifier,
+            created_at=created_at.isoformat(),
+            expires_at=expires_at.isoformat(),
+            completed_at=None,
+        )
+        try:
+            self.query(
+                """
+                INSERT INTO connector_oauth_session (
+                    oauth_session_id, flwr_aid, connector_ref, state,
+                    redirect_uri, pkce_verifier, created_at, expires_at,
+                    completed_at
+                )
+                VALUES (
+                    :oauth_session_id, :flwr_aid, :connector_ref, :state,
+                    :redirect_uri, :pkce_verifier, :created_at, :expires_at,
+                    :completed_at
+                )
+                """,
+                {
+                    "oauth_session_id": session.oauth_session_id,
+                    "flwr_aid": session.flwr_aid,
+                    "connector_ref": session.connector_ref,
+                    "state": session.state,
+                    "redirect_uri": session.redirect_uri,
+                    "pkce_verifier": session.pkce_verifier,
+                    "created_at": created_at,
+                    "expires_at": expires_at,
+                    "completed_at": session.completed_at,
+                },
+            )
+        except IntegrityError:
+            return None
+        return session
+
+    def get_connector_oauth_session(
+        self, oauth_session_id: str, flwr_aid: str
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Return an account's connector OAuth session, if present."""
+        if not oauth_session_id or not flwr_aid:
+            return None
+        rows = self.query(
+            """
+            SELECT oauth_session_id, flwr_aid, connector_ref, state,
+                   redirect_uri, pkce_verifier, created_at, expires_at,
+                   completed_at
+            FROM connector_oauth_session
+            WHERE oauth_session_id = :oauth_session_id
+              AND flwr_aid = :flwr_aid
+            """,
+            {"oauth_session_id": oauth_session_id, "flwr_aid": flwr_aid},
+        )
+        if not rows:
+            return None
+        return _connector_oauth_session_from_row(rows[0])
+
+    def complete_connector_oauth_session(
+        self, oauth_session_id: str, flwr_aid: str
+    ) -> bool:
+        """Mark a pending connector OAuth session as completed."""
+        if not oauth_session_id or not flwr_aid:
+            return False
+        completed_at = now()
+        updated = self.query(
+            """
+            UPDATE connector_oauth_session
+            SET completed_at = :completed_at
+            WHERE oauth_session_id = :oauth_session_id
+              AND flwr_aid = :flwr_aid
+              AND completed_at IS NULL
+              AND expires_at > :completed_at
+            RETURNING oauth_session_id
+            """,
+            {
+                "oauth_session_id": oauth_session_id,
+                "flwr_aid": flwr_aid,
+                "completed_at": completed_at,
+            },
+        )
+        return bool(updated)
+
     def get_run_series(  # pylint: disable=R0914
         self,
         *,
@@ -165,17 +496,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         params: dict[str, Any] = {}
         if series_ids is not None:
             sint64_series_ids = [uint64_to_int64(series_id) for series_id in series_ids]
-            placeholders = ",".join(
-                [f":sid_{i}" for i in range(len(sint64_series_ids))]
-            )
+            placeholders, in_params = build_sql_in_params(sint64_series_ids, "sid")
             conditions.append(f"series_id IN ({placeholders})")
-            params.update(
-                {f"sid_{i}": series_id for i, series_id in enumerate(sint64_series_ids)}
-            )
+            params.update(in_params)
         if federation_ids is not None:
-            placeholders = ",".join([f":fed_{i}" for i in range(len(federation_ids))])
+            placeholders, in_params = build_sql_in_params(federation_ids, "fed")
             conditions.append(f"federation_id IN ({placeholders})")
-            params.update({f"fed_{i}": _id for i, _id in enumerate(federation_ids)})
+            params.update(in_params)
         if updated_before is not None:
             conditions.append("updated_at < :updated_before")
             params["updated_before"] = datetime.fromisoformat(updated_before)
@@ -322,6 +649,178 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         except IntegrityError:
             return None
 
+    def store_automation(  # pylint: disable=too-many-arguments,too-many-locals
+        self,
+        *,
+        federation_id: str,
+        flwr_aid: str,
+        fab_id: str | None,
+        fab_version: str | None,
+        fab_hash: str | None,
+        override_config: UserConfig,
+        federation_config: SimulationConfig | None,
+        primary_task_type: str,
+        series_id: int,
+        next_run_at: str,
+        fixed_interval: int | None = None,
+        max_runs: int | None = None,
+    ) -> Automation:
+        """Store an automation and return its metadata."""
+        federation_config_json = None
+        if federation_config is not None:
+            federation_config_json = json.dumps(
+                simulation_config_to_json(federation_config)
+            )
+
+        try:
+            with self.session():
+                current = now()
+                rows = self.query(
+                    """
+                    INSERT INTO automation (
+                        federation_id, status, series_id, flwr_aid,
+                        fab_id, fab_version, fab_hash, override_config,
+                        federation_config, primary_task_type,
+                        created_at, updated_at, next_run_at, fixed_interval,
+                        remaining_runs, stopped_at
+                    )
+                    VALUES (
+                        :federation_id, :status, :series_id, :flwr_aid,
+                        :fab_id, :fab_version, :fab_hash, :override_config,
+                        :federation_config, :primary_task_type,
+                        :created_at, :updated_at, :next_run_at, :fixed_interval,
+                        :remaining_runs, :stopped_at
+                    )
+                    RETURNING *
+                    """,
+                    {
+                        "federation_id": federation_id,
+                        "status": AutomationStatus.ACTIVE,
+                        "series_id": uint64_to_int64(series_id),
+                        "flwr_aid": flwr_aid,
+                        "fab_id": fab_id,
+                        "fab_version": fab_version,
+                        "fab_hash": fab_hash,
+                        "override_config": json.dumps(override_config),
+                        "federation_config": federation_config_json,
+                        "primary_task_type": primary_task_type,
+                        "created_at": current,
+                        "updated_at": current,
+                        "next_run_at": next_run_at,
+                        "fixed_interval": fixed_interval,
+                        "remaining_runs": max_runs,
+                        "stopped_at": None,
+                    },
+                )
+        except IntegrityError as exc:
+            raise ValueError(f"Could not store automation: {exc}") from exc
+
+        row = rows[0]
+        return Automation(
+            automation_id=row["automation_id"],
+            status=row["status"],
+            federation=row["federation_id"],
+            series_id=int64_to_uint64(row["series_id"]),
+            flwr_aid=row["flwr_aid"],
+            created_at=timestamp_to_iso(row["created_at"]),
+            updated_at=timestamp_to_iso(row["updated_at"]),
+            next_run_at=timestamp_to_iso(row["next_run_at"]),
+            fixed_interval=row["fixed_interval"],
+            remaining_runs=row["remaining_runs"],
+        )
+
+    def list_automations(  # pylint: disable=too-many-arguments,too-many-locals
+        self,
+        *,
+        federation: str | None = None,
+        statuses: Sequence[str] | None = None,
+        due_before: datetime | None = None,
+        order_by: Literal["next_run_at", "updated_at"],
+        limit: int | None = None,
+    ) -> Sequence[Automation]:
+        """Return automations matching the given filters."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if limit == 0 or (statuses is not None and not statuses):
+            return []
+
+        conditions: list[str] = []
+        params: dict[str, Any] = {}
+        if federation is not None:
+            conditions.append("federation_id = :federation_id")
+            params["federation_id"] = federation
+        if statuses is not None:
+            placeholders = ",".join(f":status_{i}" for i in range(len(statuses)))
+            conditions.append(f"status IN ({placeholders})")
+            params.update({f"status_{i}": status for i, status in enumerate(statuses)})
+        if due_before is not None:
+            conditions.append("next_run_at <= :due_before")
+            params["due_before"] = due_before.isoformat()
+
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        order_clause = "ORDER BY updated_at DESC, automation_id DESC"
+        if order_by == "next_run_at":
+            order_clause = "ORDER BY next_run_at ASC, automation_id ASC"
+
+        limit_clause = ""
+        if limit is not None:
+            limit_clause = "LIMIT :limit"
+            params["limit"] = limit
+
+        rows = self.query(
+            f"""
+            SELECT *
+            FROM automation
+            {where_clause}
+            {order_clause}
+            {limit_clause}
+            """,
+            params,
+        )
+        automations = []
+        for row in rows:
+            next_run_at = row["next_run_at"]
+            stopped_at = row["stopped_at"]
+            automations.append(
+                Automation(
+                    automation_id=row["automation_id"],
+                    status=row["status"],
+                    federation=row["federation_id"],
+                    series_id=int64_to_uint64(row["series_id"]),
+                    flwr_aid=row["flwr_aid"],
+                    created_at=timestamp_to_iso(row["created_at"]),
+                    updated_at=timestamp_to_iso(row["updated_at"]),
+                    next_run_at=timestamp_to_iso(next_run_at),
+                    fixed_interval=row["fixed_interval"],
+                    remaining_runs=row["remaining_runs"],
+                    stopped_at=timestamp_to_iso(stopped_at) if stopped_at else None,
+                )
+            )
+        return automations
+
+    def stop_automation(self, automation_id: int) -> bool:
+        """Stop an active automation."""
+        stopped_at = now()
+        rows = self.query(
+            """
+            UPDATE automation
+            SET status = :status,
+                updated_at = :updated_at,
+                stopped_at = :stopped_at
+            WHERE automation_id = :automation_id
+            AND status = :active_status
+            RETURNING automation_id
+            """,
+            {
+                "automation_id": automation_id,
+                "status": AutomationStatus.STOPPED,
+                "updated_at": stopped_at,
+                "stopped_at": stopped_at,
+                "active_status": AutomationStatus.ACTIVE,
+            },
+        )
+        return bool(rows)
+
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""
         sint64_task_id = uint64_to_int64(task_id)
@@ -454,21 +953,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if not task_ids:
                 return []
             sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            placeholders = ",".join([f":tid_{i}" for i in range(len(sint64_task_ids))])
+            placeholders, in_params = build_sql_in_params(sint64_task_ids, "tid")
             conditions.append(f"task_id IN ({placeholders})")
-            params.update(
-                {f"tid_{i}": task_id for i, task_id in enumerate(sint64_task_ids)}
-            )
+            params.update(in_params)
 
         if run_ids is not None:
             if not run_ids:
                 return []
             sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            placeholders = ",".join([f":rid_{i}" for i in range(len(sint64_run_ids))])
+            placeholders, in_params = build_sql_in_params(sint64_run_ids, "rid")
             conditions.append(f"run_id IN ({placeholders})")
-            params.update(
-                {f"rid_{i}": run_id for i, run_id in enumerate(sint64_run_ids)}
-            )
+            params.update(in_params)
 
         if statuses is not None:
             if not statuses:
@@ -541,21 +1036,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if not run_ids:
                 return []
             sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            placeholders = ",".join([f":rid_{i}" for i in range(len(sint64_run_ids))])
+            placeholders, in_params = build_sql_in_params(sint64_run_ids, "rid")
             conditions.append(f"run_id IN ({placeholders})")
-            params.update(
-                {f"rid_{i}": run_id for i, run_id in enumerate(sint64_run_ids)}
-            )
+            params.update(in_params)
 
         if task_ids is not None:
             if not task_ids:
                 return []
             sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            placeholders = ",".join([f":tid_{i}" for i in range(len(sint64_task_ids))])
+            placeholders, in_params = build_sql_in_params(sint64_task_ids, "tid")
             conditions.append(f"task_id IN ({placeholders})")
-            params.update(
-                {f"tid_{i}": task_id for i, task_id in enumerate(sint64_task_ids)}
-            )
+            params.update(in_params)
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
@@ -851,13 +1342,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         # Filter by destination task IDs
         if dst_task_ids is not None:
             sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
-            placeholders = ",".join(
-                f":dtid_{i}" for i in range(len(sint64_dst_task_ids))
-            )
+            placeholders, in_params = build_sql_in_params(sint64_dst_task_ids, "dtid")
             conditions.append(f"dst_task_id IN ({placeholders})")
-            params.update(
-                {f"dtid_{i}": tid for i, tid in enumerate(sint64_dst_task_ids)}
-            )
+            params.update(in_params)
 
         where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
         order_clause = f"ORDER BY {order_by}" if order_by else ""
@@ -986,6 +1473,23 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         # IntegrityError can only arise from (namespace, nonce) uniqueness.
         except IntegrityError:
             return False
+
+
+def _connector_oauth_session_from_row(
+    row: dict[str, Any],
+) -> ConnectorOAuthSessionRecord:
+    """Convert a connector OAuth session row to its persistence record."""
+    return ConnectorOAuthSessionRecord(
+        oauth_session_id=row["oauth_session_id"],
+        flwr_aid=row["flwr_aid"],
+        connector_ref=row["connector_ref"],
+        state=row["state"],
+        redirect_uri=row["redirect_uri"],
+        pkce_verifier=row["pkce_verifier"],
+        created_at=timestamp_to_iso(row["created_at"]),
+        expires_at=timestamp_to_iso(row["expires_at"]),
+        completed_at=timestamp_to_iso(row["completed_at"]) or None,
+    )
 
 
 def determine_task_status(row: dict[str, Any]) -> TaskStatus:

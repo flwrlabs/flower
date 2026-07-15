@@ -292,6 +292,7 @@ def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> N
                 stub.PushObject,
                 Node(node_id=context.node_id),
                 run_id=context.run_id,
+                session_id=push_msg_res.session_id,
             ),
             object_ids_to_push=object_ids_to_push,
         )
