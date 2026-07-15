@@ -214,6 +214,16 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.assertNotIn("msg1", msg_ids)
         self.assertIn("msg2", msg_ids)
 
+    def test_push_session_expiry_deletes_message(self) -> None:
+        """Test deleting a Message belonging to an expired push session."""
+        self.state.store_message(make_dummy_message(msg_id="msg1"))
+
+        self.state._on_push_session_expired(  # pylint: disable=protected-access
+            {"msg1"}
+        )
+
+        self.assertEqual(self.state.get_messages(), [])
+
     def test_get_error_reply_when_running_task_claim_expires(self) -> None:
         """Test that error replies are created when running task claims expire."""
         # Prepare: Create a running task for a run

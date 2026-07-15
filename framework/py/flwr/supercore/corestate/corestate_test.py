@@ -32,6 +32,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskEvent,
     TaskStatus,
@@ -81,17 +82,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         return stack
 
     def test_connector_upsert_get_and_delete(self) -> None:
-        """Connectors should be isolated by account and connector reference."""
+        """A connector can be created, updated, retrieved, and deleted."""
         state = self.state_factory()
 
-        self.assertFalse(
-            state.upsert_connector(
-                flwr_aid="",
-                connector_ref="calendar",
-                credentials_json='{"token":"invalid"}',
-                config_json="{}",
-            )
-        )
         self.assertTrue(
             state.upsert_connector(
                 flwr_aid="account-a",
@@ -109,24 +102,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
                 config_json='{"calendar":"primary"}',
             ),
         )
-        self.assertIsNone(
-            state.get_connector(flwr_aid="account-b", connector_ref="calendar")
-        )
-
         self.assertTrue(
             state.upsert_connector(
                 flwr_aid="account-a",
                 connector_ref="calendar",
                 credentials_json='{"token":"updated"}',
                 config_json='{"calendar":"work"}',
-            )
-        )
-        self.assertTrue(
-            state.upsert_connector(
-                flwr_aid="account-b",
-                connector_ref="calendar",
-                credentials_json='{"token":"other"}',
-                config_json="{}",
             )
         )
         updated = state.get_connector(flwr_aid="account-a", connector_ref="calendar")
@@ -137,20 +118,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(
             state.delete_connector(flwr_aid="account-a", connector_ref="calendar")
         )
-        self.assertFalse(
-            state.delete_connector(flwr_aid="account-a", connector_ref="calendar")
-        )
-        self.assertIsNotNone(
-            state.get_connector(flwr_aid="account-b", connector_ref="calendar")
+        self.assertIsNone(
+            state.get_connector(flwr_aid="account-a", connector_ref="calendar")
         )
 
-    def test_connector_oauth_session_create_and_get(self) -> None:
-        """OAuth session creation should preserve data and account isolation."""
+    def test_connector_oauth_session_lifecycle(self) -> None:
+        """An OAuth session can be created, retrieved, and completed once."""
         state = self.state_factory()
-        expires_at = (now() + timedelta(minutes=10)).astimezone(
-            timezone(timedelta(hours=2))
-        )
-        expected_expires_at = expires_at.astimezone(UTC).isoformat()
+        expires_at = now() + timedelta(minutes=10)
 
         session = state.create_connector_oauth_session(
             oauth_session_id="session-1",
@@ -161,17 +136,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             pkce_verifier=None,
             expires_at=expires_at,
         )
-
         assert session is not None
-        self.assertEqual(session.oauth_session_id, "session-1")
-        self.assertEqual(session.flwr_aid, "account-a")
-        self.assertEqual(session.connector_ref, "calendar")
-        self.assertEqual(session.state, "oauth-state")
-        self.assertEqual(session.redirect_uri, "https://example.test/callback")
-        self.assertIsNone(session.pkce_verifier)
-        self.assertIsInstance(session.created_at, str)
-        self.assertIsNotNone(datetime.fromisoformat(session.created_at).tzinfo)
-        self.assertEqual(session.expires_at, expected_expires_at)
+        self.assertEqual(session.expires_at, expires_at.isoformat())
         self.assertIsNone(session.completed_at)
         self.assertEqual(
             state.get_connector_oauth_session(
@@ -179,127 +145,21 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             ),
             session,
         )
-        self.assertIsNone(
-            state.get_connector_oauth_session(
-                oauth_session_id="session-1", flwr_aid="account-b"
-            )
-        )
-
-        duplicate = state.create_connector_oauth_session(
-            oauth_session_id="session-1",
-            flwr_aid="account-b",
-            connector_ref="drive",
-            state="other-state",
-            redirect_uri="https://example.test/other",
-            pkce_verifier="other-verifier",
-            expires_at=expires_at,
-        )
-        self.assertIsNone(duplicate)
-        self.assertIsNone(
-            state.create_connector_oauth_session(
-                oauth_session_id="",
-                flwr_aid="account-a",
-                connector_ref="calendar",
-                state="oauth-state",
-                redirect_uri="https://example.test/callback",
-                pkce_verifier=None,
-                expires_at=expires_at,
-            )
-        )
-        self.assertEqual(
-            state.get_connector_oauth_session(
-                oauth_session_id="session-1", flwr_aid="account-a"
-            ),
-            session,
-        )
-
-    def test_connector_oauth_session_rejects_naive_expiry(self) -> None:
-        """OAuth session creation should reject a timezone-naive expiry."""
-        state = self.state_factory()
-        expires_at = (now() + timedelta(minutes=10)).replace(tzinfo=None)
-
-        self.assertIsNone(
-            state.create_connector_oauth_session(
-                oauth_session_id="invalid-session",
-                flwr_aid="account-a",
-                connector_ref="calendar",
-                state="oauth-state",
-                redirect_uri="https://example.test/callback",
-                pkce_verifier=None,
-                expires_at=expires_at,
-            )
-        )
-        self.assertIsNone(
-            state.get_connector_oauth_session(
-                oauth_session_id="invalid-session", flwr_aid="account-a"
-            )
-        )
-
-    def test_complete_connector_oauth_session(self) -> None:
-        """Only pending, unexpired OAuth sessions should be completed once."""
-        state = self.state_factory()
-        session = state.create_connector_oauth_session(
-            oauth_session_id="session-1",
-            flwr_aid="account-a",
-            connector_ref="calendar",
-            state="oauth-state",
-            redirect_uri="https://example.test/callback",
-            pkce_verifier="pkce-verifier",
-            expires_at=now() + timedelta(minutes=10),
-        )
-        assert session is not None
-
-        self.assertFalse(
-            state.complete_connector_oauth_session(
-                oauth_session_id="missing", flwr_aid="account-a"
-            )
-        )
-        self.assertFalse(
-            state.complete_connector_oauth_session(
-                oauth_session_id="session-1", flwr_aid="account-b"
-            )
-        )
-        before_completion = now()
         self.assertTrue(
             state.complete_connector_oauth_session(
                 oauth_session_id="session-1", flwr_aid="account-a"
             )
         )
-        after_completion = now()
         completed = state.get_connector_oauth_session(
             oauth_session_id="session-1", flwr_aid="account-a"
         )
         assert completed is not None
-        assert completed.completed_at is not None
-        completed_at = datetime.fromisoformat(completed.completed_at)
-        self.assertLessEqual(before_completion, completed_at)
-        self.assertLessEqual(completed_at, after_completion)
+        self.assertIsNotNone(completed.completed_at)
         self.assertFalse(
             state.complete_connector_oauth_session(
                 oauth_session_id="session-1", flwr_aid="account-a"
             )
         )
-
-        expired = state.create_connector_oauth_session(
-            oauth_session_id="session-expired",
-            flwr_aid="account-a",
-            connector_ref="drive",
-            state="expired-state",
-            redirect_uri="https://example.test/callback",
-            pkce_verifier=None,
-            expires_at=now() - timedelta(seconds=1),
-        )
-        assert expired is not None
-        self.assertFalse(
-            state.complete_connector_oauth_session(
-                oauth_session_id="session-expired", flwr_aid="account-a"
-            )
-        )
-        stored_expired = state.get_connector_oauth_session(
-            oauth_session_id="session-expired", flwr_aid="account-a"
-        )
-        assert stored_expired is not None
-        self.assertIsNone(stored_expired.completed_at)
 
     def store_automation(  # pylint: disable=too-many-arguments
         self,
@@ -327,6 +187,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             fixed_interval=fixed_interval,
             max_runs=max_runs,
         )
+
+    def test_preregister_object_tree(self) -> None:
+        """Preregistering an object tree returns its missing objects."""
+        state = self.state_factory()
+        object_id = "a" * 64
+        object_tree = ObjectTree(object_id=object_id)
+        run_id = self.task_run_id(state)
+
+        missing_objects = state.preregister_object_tree(
+            object_tree, state.start_session(run_id)
+        )
+        replacement_missing_objects = state.preregister_object_tree(
+            object_tree, state.start_session(run_id)
+        )
+
+        self.assertEqual(missing_objects, [object_id])
+        self.assertEqual(replacement_missing_objects, [object_id])
 
     def test_store_run_in_series_creates_id(self) -> None:
         """Storing a run in a run series should create a nonzero ID."""

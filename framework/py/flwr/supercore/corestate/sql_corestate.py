@@ -22,6 +22,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
+from uuid import uuid4
 
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
@@ -46,6 +47,7 @@ from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
@@ -56,7 +58,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
-from flwr.supercore.constant import AutomationStatus
+from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
@@ -107,6 +109,135 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Return the ObjectStore instance used by this CoreState."""
         return self._object_store
 
+    def start_session(self, run_id: int) -> str:
+        """Start a run-scoped object push session."""
+        session_id = str(uuid4())
+        self.query(
+            """
+            INSERT INTO object_push_sessions (
+                session_id, run_id, expires_at, pending_count
+            )
+            VALUES (:session_id, :run_id, :expires_at, 0)
+            """,
+            {
+                "session_id": session_id,
+                "run_id": uint64_to_int64(run_id),
+                "expires_at": now()
+                + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS),
+            },
+        )
+        return session_id
+
+    def preregister_object_tree(
+        self, object_tree: ObjectTree, session_id: str
+    ) -> list[str]:
+        """Preregister an object tree and record its missing objects."""
+        with self.session():
+            # Load the run associated with the session
+            rows = self.query(
+                """
+                SELECT run_id
+                FROM object_push_sessions
+                WHERE session_id = :session_id
+                """,
+                {"session_id": session_id},
+            )
+            if not rows:
+                raise ValueError(f"Unknown object push session: {session_id}")
+            run_id = int64_to_uint64(rows[0]["run_id"])
+
+            # Preregister the tree and collect its currently missing objects
+            missing_objects = self.object_store.preregister(run_id, object_tree)
+
+            # Remove bookkeeping for an older session owning the same root
+            rows = self.query(
+                """
+                SELECT session_id
+                FROM object_push_session_roots
+                WHERE root_object_id = :root_object_id AND session_id != :session_id
+                """,
+                {
+                    "root_object_id": object_tree.object_id,
+                    "session_id": session_id,
+                },
+            )
+            if rows:
+                self._cleanup_push_session(
+                    rows[0]["session_id"], cleanup_messages=False
+                )
+
+            # Record ownership of the root
+            self.query(
+                """
+                INSERT INTO object_push_session_roots (session_id, root_object_id)
+                VALUES (:session_id, :root_object_id)
+                """,
+                {
+                    "session_id": session_id,
+                    "root_object_id": object_tree.object_id,
+                },
+            )
+
+            # Record the objects that still need to be pushed
+            if missing_objects:
+                self.query(
+                    """
+                    INSERT INTO object_push_session_pending (session_id, object_id)
+                    VALUES (:session_id, :object_id)
+                    ON CONFLICT(session_id, object_id) DO NOTHING
+                    """,
+                    [
+                        {"session_id": session_id, "object_id": object_id}
+                        for object_id in missing_objects
+                    ],
+                )
+
+            # Synchronize the materialized pending count.
+            self.query(
+                """
+                UPDATE object_push_sessions
+                SET pending_count = (
+                    SELECT COUNT(*)
+                    FROM object_push_session_pending
+                    WHERE session_id = :session_id
+                )
+                WHERE session_id = :session_id
+                """,
+                {"session_id": session_id},
+            )
+            return missing_objects
+
+    def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
+        """Remove an object push session and optionally its messages."""
+        with self.session():
+            # Load message roots only when their data must also be cleaned up
+            message_object_ids: set[str] = set()
+            if cleanup_messages:
+                rows = self.query(
+                    """
+                    SELECT root_object_id
+                    FROM object_push_session_roots
+                    WHERE session_id = :session_id
+                    """,
+                    {"session_id": session_id},
+                )
+                message_object_ids = {row["root_object_id"] for row in rows}
+
+            # Delete the session and its cascaded root and pending rows
+            self.query(
+                """
+                DELETE FROM object_push_sessions
+                WHERE session_id = :session_id
+                """,
+                {"session_id": session_id},
+            )
+
+            # Delete expired object trees and their message metadata.
+            if message_object_ids:
+                for object_id in message_object_ids:
+                    self.object_store.delete(object_id)
+                self._on_push_session_expired(message_object_ids)
+
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
         fab_hash = hashlib.sha256(fab.content).hexdigest()
@@ -152,7 +283,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def upsert_connector(
         self,
-        *,
         flwr_aid: str,
         connector_ref: str,
         credentials_json: str,
@@ -184,7 +314,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         return True
 
     def get_connector(
-        self, *, flwr_aid: str, connector_ref: str
+        self, flwr_aid: str, connector_ref: str
     ) -> ConnectorRecord | None:
         """Return an account's connector, if present."""
         if not flwr_aid or not connector_ref:
@@ -208,7 +338,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             config_json=row["config_json"],
         )
 
-    def delete_connector(self, *, flwr_aid: str, connector_ref: str) -> bool:
+    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
         """Delete an account's connector if it exists."""
         if not flwr_aid or not connector_ref:
             return False
@@ -235,9 +365,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         return True
 
-    def create_connector_oauth_session(  # pylint: disable=too-many-arguments
+    def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        *,
         oauth_session_id: str,
         flwr_aid: str,
         connector_ref: str,
@@ -298,7 +427,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         return session
 
     def get_connector_oauth_session(
-        self, *, oauth_session_id: str, flwr_aid: str
+        self, oauth_session_id: str, flwr_aid: str
     ) -> ConnectorOAuthSessionRecord | None:
         """Return an account's connector OAuth session, if present."""
         if not oauth_session_id or not flwr_aid:
@@ -319,7 +448,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         return _connector_oauth_session_from_row(rows[0])
 
     def complete_connector_oauth_session(
-        self, *, oauth_session_id: str, flwr_aid: str
+        self, oauth_session_id: str, flwr_aid: str
     ) -> bool:
         """Mark a pending connector OAuth session as completed."""
         if not oauth_session_id or not flwr_aid:
@@ -1350,7 +1479,6 @@ def _connector_oauth_session_from_row(
     row: dict[str, Any],
 ) -> ConnectorOAuthSessionRecord:
     """Convert a connector OAuth session row to its persistence record."""
-    completed_at = row["completed_at"]
     return ConnectorOAuthSessionRecord(
         oauth_session_id=row["oauth_session_id"],
         flwr_aid=row["flwr_aid"],
@@ -1360,7 +1488,7 @@ def _connector_oauth_session_from_row(
         pkce_verifier=row["pkce_verifier"],
         created_at=timestamp_to_iso(row["created_at"]),
         expires_at=timestamp_to_iso(row["expires_at"]),
-        completed_at=(None if completed_at is None else timestamp_to_iso(completed_at)),
+        completed_at=timestamp_to_iso(row["completed_at"]) or None,
     )
 
 

@@ -19,9 +19,10 @@ from __future__ import annotations
 
 from typing import cast
 
-from fastapi import HTTPException, Request, status
+from fastapi import Request
 
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
+from flwr.supercore.error import ApiErrorCode, FlowerError
 
 
 def get_linkstate(request: Request) -> LinkState:  # type: ignore[type-arg]
@@ -31,9 +32,9 @@ def get_linkstate(request: Request) -> LinkState:  # type: ignore[type-arg]
         getattr(request.app.state, "linkstate_factory", None),
     )
     if linkstate_factory is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="SuperLink LinkStateFactory is not initialized.",
+        raise FlowerError(
+            ApiErrorCode.LINKSTATE_NOT_INITIALIZED,
+            "SuperLink LinkStateFactory is not initialized.",
         )
 
     return linkstate_factory.state()
