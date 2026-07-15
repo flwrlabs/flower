@@ -55,7 +55,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Remove an object push session and optionally its messages."""
 
     def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
-        """Handle message metadata belonging to an expired push session."""
+        """Handle messages when a push session expires."""
 
     @abstractmethod
     def store_fab(self, fab: Fab) -> str:
