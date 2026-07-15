@@ -19,9 +19,10 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
+from uuid import uuid4
 
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
@@ -46,6 +47,7 @@ from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
@@ -56,11 +58,12 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
-from flwr.supercore.constant import AutomationStatus
+from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
+from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import (
     build_sql_in_params,
     int64_to_uint64,
@@ -106,6 +109,135 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Return the ObjectStore instance used by this CoreState."""
         return self._object_store
 
+    def start_session(self, run_id: int) -> str:
+        """Start a run-scoped object push session."""
+        session_id = str(uuid4())
+        self.query(
+            """
+            INSERT INTO object_push_sessions (
+                session_id, run_id, expires_at, pending_count
+            )
+            VALUES (:session_id, :run_id, :expires_at, 0)
+            """,
+            {
+                "session_id": session_id,
+                "run_id": uint64_to_int64(run_id),
+                "expires_at": now()
+                + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS),
+            },
+        )
+        return session_id
+
+    def preregister_object_tree(
+        self, object_tree: ObjectTree, session_id: str
+    ) -> list[str]:
+        """Preregister an object tree and record its missing objects."""
+        with self.session():
+            # Load the run associated with the session
+            rows = self.query(
+                """
+                SELECT run_id
+                FROM object_push_sessions
+                WHERE session_id = :session_id
+                """,
+                {"session_id": session_id},
+            )
+            if not rows:
+                raise ValueError(f"Unknown object push session: {session_id}")
+            run_id = int64_to_uint64(rows[0]["run_id"])
+
+            # Preregister the tree and collect its currently missing objects
+            missing_objects = self.object_store.preregister(run_id, object_tree)
+
+            # Remove bookkeeping for an older session owning the same root
+            rows = self.query(
+                """
+                SELECT session_id
+                FROM object_push_session_roots
+                WHERE root_object_id = :root_object_id AND session_id != :session_id
+                """,
+                {
+                    "root_object_id": object_tree.object_id,
+                    "session_id": session_id,
+                },
+            )
+            if rows:
+                self._cleanup_push_session(
+                    rows[0]["session_id"], cleanup_messages=False
+                )
+
+            # Record ownership of the root
+            self.query(
+                """
+                INSERT INTO object_push_session_roots (session_id, root_object_id)
+                VALUES (:session_id, :root_object_id)
+                """,
+                {
+                    "session_id": session_id,
+                    "root_object_id": object_tree.object_id,
+                },
+            )
+
+            # Record the objects that still need to be pushed
+            if missing_objects:
+                self.query(
+                    """
+                    INSERT INTO object_push_session_pending (session_id, object_id)
+                    VALUES (:session_id, :object_id)
+                    ON CONFLICT(session_id, object_id) DO NOTHING
+                    """,
+                    [
+                        {"session_id": session_id, "object_id": object_id}
+                        for object_id in missing_objects
+                    ],
+                )
+
+            # Synchronize the materialized pending count.
+            self.query(
+                """
+                UPDATE object_push_sessions
+                SET pending_count = (
+                    SELECT COUNT(*)
+                    FROM object_push_session_pending
+                    WHERE session_id = :session_id
+                )
+                WHERE session_id = :session_id
+                """,
+                {"session_id": session_id},
+            )
+            return missing_objects
+
+    def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
+        """Remove an object push session and optionally its messages."""
+        with self.session():
+            # Load message roots only when their data must also be cleaned up
+            message_object_ids: set[str] = set()
+            if cleanup_messages:
+                rows = self.query(
+                    """
+                    SELECT root_object_id
+                    FROM object_push_session_roots
+                    WHERE session_id = :session_id
+                    """,
+                    {"session_id": session_id},
+                )
+                message_object_ids = {row["root_object_id"] for row in rows}
+
+            # Delete the session and its cascaded root and pending rows
+            self.query(
+                """
+                DELETE FROM object_push_sessions
+                WHERE session_id = :session_id
+                """,
+                {"session_id": session_id},
+            )
+
+            # Delete expired object trees and their message metadata.
+            if message_object_ids:
+                for object_id in message_object_ids:
+                    self.object_store.delete(object_id)
+                self._on_push_session_expired(message_object_ids)
+
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
         fab_hash = hashlib.sha256(fab.content).hexdigest()
@@ -148,6 +280,197 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             content=row["content"],
             verifications=json.loads(row["verifications"]),
         )
+
+    def upsert_connector(
+        self,
+        flwr_aid: str,
+        connector_ref: str,
+        credentials_json: str,
+        config_json: str,
+    ) -> bool:
+        """Create or update a connector for an account."""
+        if not flwr_aid or not connector_ref:
+            return False
+        params = {
+            "flwr_aid": flwr_aid,
+            "connector_ref": connector_ref,
+            "credentials_json": credentials_json,
+            "config_json": config_json,
+        }
+        self.query(
+            """
+            INSERT INTO connector (
+                flwr_aid, connector_ref, credentials_json, config_json
+            )
+            VALUES (
+                :flwr_aid, :connector_ref, :credentials_json, :config_json
+            )
+            ON CONFLICT(flwr_aid, connector_ref) DO UPDATE SET
+                credentials_json = excluded.credentials_json,
+                config_json = excluded.config_json
+            """,
+            params,
+        )
+        return True
+
+    def get_connector(
+        self, flwr_aid: str, connector_ref: str
+    ) -> ConnectorRecord | None:
+        """Return an account's connector, if present."""
+        if not flwr_aid or not connector_ref:
+            return None
+        rows = self.query(
+            """
+            SELECT flwr_aid, connector_ref, credentials_json, config_json
+            FROM connector
+            WHERE flwr_aid = :flwr_aid
+              AND connector_ref = :connector_ref
+            """,
+            {"flwr_aid": flwr_aid, "connector_ref": connector_ref},
+        )
+        if not rows:
+            return None
+        row = rows[0]
+        return ConnectorRecord(
+            flwr_aid=row["flwr_aid"],
+            connector_ref=row["connector_ref"],
+            credentials_json=row["credentials_json"],
+            config_json=row["config_json"],
+        )
+
+    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
+        """Delete an account's connector if it exists."""
+        if not flwr_aid or not connector_ref:
+            return False
+        params = {"flwr_aid": flwr_aid, "connector_ref": connector_ref}
+        with self.session():
+            rows = self.query(
+                """
+                SELECT connector_ref
+                FROM connector
+                WHERE flwr_aid = :flwr_aid
+                  AND connector_ref = :connector_ref
+                """,
+                params,
+            )
+            if not rows:
+                return False
+            self.query(
+                """
+                DELETE FROM connector
+                WHERE flwr_aid = :flwr_aid
+                  AND connector_ref = :connector_ref
+                """,
+                params,
+            )
+        return True
+
+    def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        oauth_session_id: str,
+        flwr_aid: str,
+        connector_ref: str,
+        state: str,
+        redirect_uri: str,
+        pkce_verifier: str | None,
+        expires_at: datetime,
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Create and return a connector OAuth session."""
+        if (
+            not oauth_session_id
+            or not flwr_aid
+            or not connector_ref
+            or expires_at.utcoffset() is None
+        ):
+            return None
+        expires_at = expires_at.astimezone(UTC)
+        created_at = now()
+        session = ConnectorOAuthSessionRecord(
+            oauth_session_id=oauth_session_id,
+            flwr_aid=flwr_aid,
+            connector_ref=connector_ref,
+            state=state,
+            redirect_uri=redirect_uri,
+            pkce_verifier=pkce_verifier,
+            created_at=created_at.isoformat(),
+            expires_at=expires_at.isoformat(),
+            completed_at=None,
+        )
+        try:
+            self.query(
+                """
+                INSERT INTO connector_oauth_session (
+                    oauth_session_id, flwr_aid, connector_ref, state,
+                    redirect_uri, pkce_verifier, created_at, expires_at,
+                    completed_at
+                )
+                VALUES (
+                    :oauth_session_id, :flwr_aid, :connector_ref, :state,
+                    :redirect_uri, :pkce_verifier, :created_at, :expires_at,
+                    :completed_at
+                )
+                """,
+                {
+                    "oauth_session_id": session.oauth_session_id,
+                    "flwr_aid": session.flwr_aid,
+                    "connector_ref": session.connector_ref,
+                    "state": session.state,
+                    "redirect_uri": session.redirect_uri,
+                    "pkce_verifier": session.pkce_verifier,
+                    "created_at": created_at,
+                    "expires_at": expires_at,
+                    "completed_at": session.completed_at,
+                },
+            )
+        except IntegrityError:
+            return None
+        return session
+
+    def get_connector_oauth_session(
+        self, oauth_session_id: str, flwr_aid: str
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Return an account's connector OAuth session, if present."""
+        if not oauth_session_id or not flwr_aid:
+            return None
+        rows = self.query(
+            """
+            SELECT oauth_session_id, flwr_aid, connector_ref, state,
+                   redirect_uri, pkce_verifier, created_at, expires_at,
+                   completed_at
+            FROM connector_oauth_session
+            WHERE oauth_session_id = :oauth_session_id
+              AND flwr_aid = :flwr_aid
+            """,
+            {"oauth_session_id": oauth_session_id, "flwr_aid": flwr_aid},
+        )
+        if not rows:
+            return None
+        return _connector_oauth_session_from_row(rows[0])
+
+    def complete_connector_oauth_session(
+        self, oauth_session_id: str, flwr_aid: str
+    ) -> bool:
+        """Mark a pending connector OAuth session as completed."""
+        if not oauth_session_id or not flwr_aid:
+            return False
+        completed_at = now()
+        updated = self.query(
+            """
+            UPDATE connector_oauth_session
+            SET completed_at = :completed_at
+            WHERE oauth_session_id = :oauth_session_id
+              AND flwr_aid = :flwr_aid
+              AND completed_at IS NULL
+              AND expires_at > :completed_at
+            RETURNING oauth_session_id
+            """,
+            {
+                "oauth_session_id": oauth_session_id,
+                "flwr_aid": flwr_aid,
+                "completed_at": completed_at,
+            },
+        )
+        return bool(updated)
 
     def get_run_series(  # pylint: disable=R0914
         self,
@@ -1150,6 +1473,23 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         # IntegrityError can only arise from (namespace, nonce) uniqueness.
         except IntegrityError:
             return False
+
+
+def _connector_oauth_session_from_row(
+    row: dict[str, Any],
+) -> ConnectorOAuthSessionRecord:
+    """Convert a connector OAuth session row to its persistence record."""
+    return ConnectorOAuthSessionRecord(
+        oauth_session_id=row["oauth_session_id"],
+        flwr_aid=row["flwr_aid"],
+        connector_ref=row["connector_ref"],
+        state=row["state"],
+        redirect_uri=row["redirect_uri"],
+        pkce_verifier=row["pkce_verifier"],
+        created_at=timestamp_to_iso(row["created_at"]),
+        expires_at=timestamp_to_iso(row["expires_at"]),
+        completed_at=timestamp_to_iso(row["completed_at"]) or None,
+    )
 
 
 def determine_task_status(row: dict[str, Any]) -> TaskStatus:

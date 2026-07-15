@@ -29,11 +29,19 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsRequest,
     StreamLogsResponse,
 )
+from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
 )
 from flwr.supercore.protobuf.routing import ProtobufRouter
+
+
+def _create_app() -> FastAPI:
+    """Create a FastAPI app with Flower error translation enabled."""
+    app = FastAPI()
+    app.middleware("http")(http_error_translator)
+    return app
 
 
 def test_unary_unary_parses_and_returns_protobuf() -> None:
@@ -164,7 +172,7 @@ def test_sync_stream_handler_runs_in_threadpool() -> None:
 
 def test_unary_unary_rejects_non_protobuf_response() -> None:
     """The router reports a clear error for invalid unary response values."""
-    app = FastAPI()
+    app = _create_app()
     fastapi_router = APIRouter()
     protobuf_router = ProtobufRouter(fastapi_router)
 
@@ -182,12 +190,12 @@ def test_unary_unary_rejects_non_protobuf_response() -> None:
     )
 
     assert response.status_code == 500
-    assert response.json()["detail"] == ("Invalid response returned from unary handler")
+    assert response.json()["code"] == ApiErrorCode.INVALID_HANDLER_RESPONSE
 
 
 def test_unary_stream_rejects_non_iterable_response() -> None:
     """The router reports a clear error for invalid stream response values."""
-    app = FastAPI()
+    app = _create_app()
     fastapi_router = APIRouter()
     protobuf_router = ProtobufRouter(fastapi_router)
 
@@ -205,9 +213,46 @@ def test_unary_stream_rejects_non_iterable_response() -> None:
     )
 
     assert response.status_code == 500
-    assert response.json()["detail"] == (
-        "Invalid response returned from stream handler"
-    )
+    assert response.json()["code"] == ApiErrorCode.INVALID_HANDLER_RESPONSE
+
+
+@pytest.mark.parametrize(
+    ("content", "headers", "error_code", "status_code"),
+    [
+        (
+            ListRunsRequest().SerializeToString(),
+            {"content-type": "application/json"},
+            ApiErrorCode.UNSUPPORTED_CONTENT_TYPE,
+            415,
+        ),
+        (
+            b"\x80",
+            {"content-type": PROTOBUF_MEDIA_TYPE},
+            ApiErrorCode.INVALID_PROTOBUF_PAYLOAD,
+            400,
+        ),
+    ],
+)
+def test_unary_unary_rejects_invalid_requests_with_flower_error(
+    content: bytes,
+    headers: dict[str, str],
+    error_code: ApiErrorCode,
+    status_code: int,
+) -> None:
+    """The router translates invalid requests into catalogued Flower errors."""
+    app = _create_app()
+    fastapi_router = APIRouter()
+    protobuf_router = ProtobufRouter(fastapi_router)
+
+    @protobuf_router.unary_unary("/list-runs")
+    def list_runs(_request: ListRunsRequest) -> ListRunsResponse:
+        return ListRunsResponse()
+
+    app.include_router(fastapi_router)
+    response = TestClient(app).post("/list-runs", content=content, headers=headers)
+
+    assert response.status_code == status_code
+    assert response.json()["code"] == error_code
 
 
 def test_unary_stream_returns_framed_protobuf_stream() -> None:

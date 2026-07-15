@@ -28,12 +28,13 @@ from collections.abc import (
 )
 from typing import TypeVar, cast, get_args, get_origin, get_type_hints
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import Response, StreamingResponse
 from google.protobuf.message import DecodeError, Message
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import State
 
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
@@ -50,7 +51,10 @@ def _check_request_media_type(request: Request[State]) -> None:
     content_type = request.headers.get("content-type", "")
     media_type = content_type.partition(";")[0].strip().lower()
     if media_type != PROTOBUF_MEDIA_TYPE:
-        raise HTTPException(status_code=415, detail="Unsupported Content-Type")
+        raise FlowerError(
+            ApiErrorCode.UNSUPPORTED_CONTENT_TYPE,
+            f"Unsupported Content-Type: {content_type!r}",
+        )
 
 
 def _request_type_and_dependency_parameters(
@@ -188,7 +192,10 @@ def _parse_protobuf_body(body: bytes, message_type: type[RequestT]) -> RequestT:
     try:
         message.ParseFromString(body)
     except DecodeError as exc:
-        raise HTTPException(status_code=400, detail="Invalid protobuf payload") from exc
+        raise FlowerError(
+            ApiErrorCode.INVALID_PROTOBUF_PAYLOAD,
+            f"Invalid protobuf payload: {exc!r}",
+        ) from exc
     return message
 
 
@@ -252,9 +259,10 @@ class ProtobufRouter:
                 result = await _call_handler(func, proto_request, dependency_values)
                 # Fail clearly when a handler violates its declared response contract.
                 if not isinstance(result, Message):
-                    raise HTTPException(
-                        status_code=500,
-                        detail="Invalid response returned from unary handler",
+                    raise FlowerError(
+                        ApiErrorCode.INVALID_HANDLER_RESPONSE,
+                        "Invalid response returned from unary handler: "
+                        f"{result!r} ({type(result).__name__})",
                     )
                 response = Response(
                     content=result.SerializeToString(),
@@ -316,9 +324,10 @@ class ProtobufRouter:
                         for message in cast(Iterable[Message], result)
                     )
                 else:
-                    raise HTTPException(
-                        status_code=500,
-                        detail="Invalid response returned from stream handler",
+                    raise FlowerError(
+                        ApiErrorCode.INVALID_HANDLER_RESPONSE,
+                        "Invalid response returned from stream handler: "
+                        f"{result!r} ({type(result).__name__})",
                     )
 
                 response = StreamingResponse(

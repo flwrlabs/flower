@@ -17,11 +17,12 @@
 from unittest.mock import Mock
 
 import pytest
-from fastapi import FastAPI, HTTPException, Request, Response, status
+from fastapi import FastAPI, Request, Response
 
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.error import ApiErrorCode, FlowerError
 
-from .account import AccountAccessDependency, get_authn_plugin
+from .account import AccountAccessDependency, get_account, get_authn_plugin
 
 
 def _make_request() -> Request:  # type: ignore[type-arg]
@@ -91,22 +92,27 @@ def test_account_access_dependency_refreshes_tokens_and_sets_response_headers() 
 
 
 @pytest.mark.parametrize(
-    ("valid_tokens", "tokens", "account", "status_code", "detail"),
+    ("valid_tokens", "tokens", "account", "detail"),
     [
         (
             True,
             None,
             None,
-            status.HTTP_401_UNAUTHORIZED,
-            "Tokens validated, but account info not found",
+            "Tokens validated, but account info not found: authentication plugin "
+            "returned no account.",
         ),
-        (False, None, None, status.HTTP_401_UNAUTHORIZED, "Access denied"),
+        (
+            False,
+            None,
+            None,
+            "Token refresh failed: authentication plugin returned no tokens.",
+        ),
         (
             False,
             [("x-access-token", "new-token")],
             None,
-            status.HTTP_401_UNAUTHORIZED,
-            "Tokens refreshed, but account info not found",
+            "Tokens refreshed, but account info not found: authentication plugin "
+            "returned no account.",
         ),
     ],
 )
@@ -114,7 +120,6 @@ def test_account_access_dependency_rejects_unauthenticated_requests(
     valid_tokens: bool,
     tokens: list[tuple[str, str]] | None,
     account: AccountInfo | None,
-    status_code: int,
     detail: str,
 ) -> None:
     """AccountAccessDependency should reject absent or incomplete authentication."""
@@ -123,11 +128,11 @@ def test_account_access_dependency_rejects_unauthenticated_requests(
     authn_plugin.validate_tokens_in_metadata.return_value = (valid_tokens, account)
     authn_plugin.refresh_tokens.return_value = (tokens, account)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(FlowerError) as exc_info:
         AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(), Response())
 
-    assert exc_info.value.status_code == status_code
-    assert exc_info.value.detail == detail
+    assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED
+    assert exc_info.value.message == detail
     authz_plugin.authorize.assert_not_called()
 
 
@@ -139,12 +144,12 @@ def test_account_access_dependency_rejects_unauthorized_account() -> None:
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
     authz_plugin.authorize.return_value = False
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(FlowerError) as exc_info:
         AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(), Response())
 
-    assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
-    assert exc_info.value.detail == (
-        "❗️ Account not authorized. Please contact the SuperLink administrator."
+    assert exc_info.value.code == ApiErrorCode.NO_PERMISSIONS
+    assert exc_info.value.message == (
+        "Account authorization failed for flwr_aid='aid', account_name='account'."
     )
 
 
@@ -159,8 +164,24 @@ def test_get_authn_plugin_returns_configured_plugin() -> None:
 
 def test_get_authn_plugin_raises_when_plugin_is_missing() -> None:
     """get_authn_plugin should fail clearly when the app is not configured."""
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(FlowerError) as exc_info:
         get_authn_plugin(_make_app_request(FastAPI()))
 
-    assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    assert exc_info.value.detail == "SuperLink authentication is not initialized."
+    assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED
+    assert exc_info.value.message == (
+        "SuperLink authentication is not initialized: expected ControlAuthnPlugin, "
+        "got None."
+    )
+
+
+def test_get_account_raises_when_dependency_is_missing() -> None:
+    """get_account should fail clearly when the app is not configured."""
+    with pytest.raises(FlowerError) as exc_info:
+        get_account(_make_app_request(FastAPI()), Response())
+
+    assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED
+    assert (
+        exc_info.value.message
+        == "SuperLink account authentication is not initialized: expected "
+        "AccountAccessDependency, got NoneType."
+    )
