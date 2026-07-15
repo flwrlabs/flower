@@ -84,6 +84,7 @@ from flwr.supercore.interceptors import (
     RpcErrorTranslationServerInterceptor,
     create_fleet_runtime_version_server_interceptor,
 )
+from flwr.supercore.license_plugin import LicensePlugin
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import (
@@ -118,6 +119,7 @@ try:
         get_ee_linkstate_factory,
         get_ee_objectstore_factory,
         get_fleet_event_log_writer_plugins,
+        get_license_plugin,
     )
 except ImportError:
 
@@ -164,6 +166,9 @@ except ImportError:
     ) -> LinkStateFactory:
         """Return an EE LinkStateFactory for supported non-SQLite database URLs."""
         raise NotImplementedError("No additional state backends are supported.")
+
+    def get_license_plugin() -> LicensePlugin | None:
+        """Return the license plugin."""
 
 
 def get_control_authn_plugins() -> dict[str, type[ControlAuthnPlugin]]:
@@ -729,6 +734,7 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
         authn_plugin=lifespan_config.authn_plugin,
         authz_plugin=lifespan_config.authz_plugin,
         event_log_plugin=lifespan_config.event_log_plugin,
+        license_plugin=get_license_plugin(),
         superlink_lifespan=superlink_lifespan,
         linkstate_factory=linkstate_factory,
         start_legacy_grpc=start_legacy_grpc,

@@ -42,14 +42,6 @@ if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
 
 
-try:
-    from flwr.ee import get_license_plugin
-except ImportError:
-
-    def get_license_plugin() -> LicensePlugin | None:
-        """Return the license plugin when Flower Enterprise is installed."""
-
-
 def generate_unique_route_id(route: APIRoute) -> str:
     """Generate stable route IDs from route handler names."""
     return route.name
@@ -88,6 +80,7 @@ def create_app(
     authn_plugin: ControlAuthnPlugin,
     authz_plugin: ControlAuthzPlugin,
     event_log_plugin: EventLogWriterPlugin | None = None,
+    license_plugin: LicensePlugin | None = None,
     superlink_lifespan: SuperLinkLifespan | None = None,
     start_legacy_grpc: bool = False,
 ) -> FastAPI:
@@ -123,7 +116,7 @@ def create_app(
             fastapi_app.state.linkstate_factory = linkstate_factory
             fastapi_app.state.account_access_dep = account_access_dep
             fastapi_app.state.control_event_log_plugin = event_log_plugin
-            fastapi_app.state.control_license_plugin = get_license_plugin()
+            fastapi_app.state.control_license_plugin = license_plugin
 
             lifespan_state: dict[str, object] = {}
             async with AsyncExitStack() as stack:
