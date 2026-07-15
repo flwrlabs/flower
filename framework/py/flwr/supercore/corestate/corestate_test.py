@@ -18,7 +18,7 @@
 # pylint: disable=too-many-lines
 import unittest
 from contextlib import ExitStack
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any, cast
 from unittest.mock import patch
 

@@ -214,6 +214,16 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
         public_message="FAB download failed.",
     ),
+    ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED: ApiErrorSpec(
+        status_code=StatusCode.UNAUTHENTICATED,
+        http_status_code=status.HTTP_401_UNAUTHORIZED,
+        public_message="Authentication failed.",
+    ),
+    ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED: ApiErrorSpec(
+        status_code=StatusCode.UNAVAILABLE,
+        http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        public_message="Authentication is not initialized.",
+    ),
     ApiErrorCode.INVALID_CONNECTOR_REQUEST: ApiErrorSpec(
         status_code=StatusCode.INVALID_ARGUMENT,
         http_status_code=status.HTTP_400_BAD_REQUEST,
