@@ -26,7 +26,7 @@ from flwr.proto.appio_pb2 import PushTaskOutputRequest  # pylint: disable=E0611
 from .run_agentapp import run_agentapp
 
 
-def _run_with_title(
+def _run_with_title(  # pylint: disable=too-many-locals
     *, app_error: Exception | None, generated_title: str
 ) -> tuple[PushTaskOutputRequest, list[str]]:
     order: list[str] = []
@@ -47,6 +47,7 @@ def _run_with_title(
     )
     fab = Mock(content=b"fab", hash_str="fab-hash")
     grid = Mock()
+    # pylint: disable-next=protected-access
     grid._stub.PullTaskInput.return_value = Mock(
         context=Mock(),
         run=Mock(),
@@ -106,6 +107,7 @@ def _run_with_title(
             runtime_dependency_install=False,
         )
 
+    # pylint: disable-next=protected-access
     request = grid._stub.PushTaskOutput.call_args.args[0]
     return request, order
 
