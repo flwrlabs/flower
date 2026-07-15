@@ -48,7 +48,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def preregister_object_tree(
         self, object_tree: ObjectTree, session_id: str
     ) -> list[str]:
-        """Preregister an object tree and record its missing objects."""
+        """Preregister the object tree for the object push session."""
 
     @abstractmethod
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:

@@ -139,6 +139,7 @@ class InMemoryCoreState(
         self.lock_task_event_store = Lock()
         self._next_task_event_id = 1
         self._object_push_sessions: dict[str, ObjectPushSession] = {}
+        # Store root object ID to session ID mapping
         self._object_push_session_by_root: dict[str, str] = {}
         self._lock_object_push_sessions = RLock()
 
