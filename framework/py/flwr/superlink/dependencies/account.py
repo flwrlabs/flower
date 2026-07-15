@@ -126,7 +126,8 @@ def get_authn_plugin(
     request: Request,  # type: ignore[type-arg]
 ) -> ControlAuthnPlugin:
     """Return the configured Control authentication plugin."""
-    authn_plugin = getattr(request.app.state, "authn_plugin", None)
+    account_access = getattr(request.app.state, "account_access_dep", None)
+    authn_plugin = account_access.authn_plugin
     if authn_plugin is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
