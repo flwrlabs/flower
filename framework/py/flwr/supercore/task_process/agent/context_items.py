@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""OpenResponses item/event storage helpers for AgentApp context state."""
+"""OpenResponses item storage helpers for AgentApp context state."""
 
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ JSON_KEY = "json"
 
 
 def append_items(context: Context, new_items: list[JSONObject]) -> None:
-    """Append OpenResponses items or events to ``context.state``."""
+    """Append OpenResponses items to ``context.state``."""
     # Initialize the items storage if it doesn't exist yet
     record = context.state.setdefault(ITEMS_KEY, ConfigRecord({JSON_KEY: []}))
     items = cast(list[str], record[JSON_KEY])
