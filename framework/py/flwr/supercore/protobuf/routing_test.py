@@ -50,7 +50,7 @@ def test_unary_unary_parses_and_returns_protobuf() -> None:
     async def get_event_loop_thread_id() -> int:
         return get_ident()
 
-    @protobuf_router.unary_unary("/rpc/ListRuns")
+    @protobuf_router.unary_unary("/list-runs")
     def list_runs(
         request: ListRunsRequest,
         limit: Annotated[int, Depends(get_limit)],
@@ -65,7 +65,7 @@ def test_unary_unary_parses_and_returns_protobuf() -> None:
     client = TestClient(app)
 
     response = client.post(
-        "/rpc/ListRuns",
+        "/list-runs",
         content=ListRunsRequest(run_id=7).SerializeToString(),
         headers={"content-type": PROTOBUF_MEDIA_TYPE},
     )
@@ -87,7 +87,7 @@ def test_unary_unary_preserves_dependency_response_headers() -> None:
     def set_refreshed_tokens(response: Response) -> None:
         response.headers["x-access-token"] = "new-access-token"
 
-    @protobuf_router.unary_unary("/rpc/ListRuns")
+    @protobuf_router.unary_unary("/list-runs")
     def list_runs(
         _request: ListRunsRequest,
         _: Annotated[None, Depends(set_refreshed_tokens)],
@@ -98,7 +98,7 @@ def test_unary_unary_preserves_dependency_response_headers() -> None:
     client = TestClient(app)
 
     response = client.post(
-        "/rpc/ListRuns",
+        "/list-runs",
         content=ListRunsRequest().SerializeToString(),
         headers={"content-type": PROTOBUF_MEDIA_TYPE},
     )
@@ -116,7 +116,7 @@ def test_unary_unary_rejects_http_response_dependency_parameter() -> None:
         match="list_runs dependency parameter 'http_response' is reserved",
     ):
 
-        @protobuf_router.unary_unary("/rpc/ListRuns")
+        @protobuf_router.unary_unary("/list-runs")
         def list_runs(
             _request: ListRunsRequest,
             http_response: Annotated[None, Depends(lambda: None)],
@@ -168,7 +168,7 @@ def test_unary_unary_rejects_non_protobuf_response() -> None:
     fastapi_router = APIRouter()
     protobuf_router = ProtobufRouter(fastapi_router)
 
-    @protobuf_router.unary_unary("/rpc/ListRuns")
+    @protobuf_router.unary_unary("/list-runs")
     def list_runs(_request: ListRunsRequest) -> ListRunsResponse:
         return cast(ListRunsResponse, object())
 
@@ -176,7 +176,7 @@ def test_unary_unary_rejects_non_protobuf_response() -> None:
     client = TestClient(app)
 
     response = client.post(
-        "/rpc/ListRuns",
+        "/list-runs",
         content=ListRunsRequest().SerializeToString(),
         headers={"content-type": PROTOBUF_MEDIA_TYPE},
     )

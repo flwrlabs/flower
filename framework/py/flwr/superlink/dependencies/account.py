@@ -119,3 +119,16 @@ def get_account(
             detail="SuperLink account authentication is not initialized.",
         )
     return account_access(request, response)
+
+
+def get_authn_plugin(
+    request: Request,  # type: ignore[type-arg]
+) -> ControlAuthnPlugin:
+    """Return the configured Control authentication plugin."""
+    account_access = getattr(request.app.state, "account_access_dep", None)
+    if not isinstance(account_access, AccountAccessDependency):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="SuperLink authentication is not initialized.",
+        )
+    return account_access.authn_plugin

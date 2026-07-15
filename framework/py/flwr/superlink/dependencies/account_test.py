@@ -17,11 +17,11 @@
 from unittest.mock import Mock
 
 import pytest
-from fastapi import HTTPException, Request, Response, status
+from fastapi import FastAPI, HTTPException, Request, Response, status
 
 from flwr.supercore.auth.typing import AccountInfo
 
-from .account import AccountAccessDependency
+from .account import AccountAccessDependency, get_authn_plugin
 
 
 def _make_request() -> Request:  # type: ignore[type-arg]
@@ -38,6 +38,13 @@ def _make_request() -> Request:  # type: ignore[type-arg]
             "scheme": "http",
         }
     )
+
+
+def _make_app_request(app: FastAPI) -> Request:  # type: ignore[type-arg]
+    """Return a minimal request bound to an application."""
+    request = _make_request()
+    request.scope["app"] = app
+    return request
 
 
 def test_account_access_dependency_returns_authorized_account() -> None:
@@ -139,3 +146,21 @@ def test_account_access_dependency_rejects_unauthorized_account() -> None:
     assert exc_info.value.detail == (
         "❗️ Account not authorized. Please contact the SuperLink administrator."
     )
+
+
+def test_get_authn_plugin_returns_configured_plugin() -> None:
+    """get_authn_plugin should return the configured authentication plugin."""
+    app = FastAPI()
+    authn_plugin = Mock()
+    app.state.account_access_dep = AccountAccessDependency(authn_plugin, Mock())
+
+    assert get_authn_plugin(_make_app_request(app)) is authn_plugin
+
+
+def test_get_authn_plugin_raises_when_plugin_is_missing() -> None:
+    """get_authn_plugin should fail clearly when the app is not configured."""
+    with pytest.raises(HTTPException) as exc_info:
+        get_authn_plugin(_make_app_request(FastAPI()))
+
+    assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert exc_info.value.detail == "SuperLink authentication is not initialized."
