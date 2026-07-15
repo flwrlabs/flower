@@ -152,7 +152,7 @@ def test_get_authn_plugin_returns_configured_plugin() -> None:
     """get_authn_plugin should return the configured authentication plugin."""
     app = FastAPI()
     authn_plugin = Mock()
-    app.state.authn_plugin = authn_plugin
+    app.state.account_access_dep = AccountAccessDependency(authn_plugin, Mock())
 
     assert get_authn_plugin(_make_app_request(app)) is authn_plugin
 
