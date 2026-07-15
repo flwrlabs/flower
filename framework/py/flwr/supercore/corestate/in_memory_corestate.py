@@ -568,7 +568,10 @@ class InMemoryCoreState(
                 record is None
                 or record.automation.status != AutomationStatus.ACTIVE
                 or record.automation.next_run_at != previous_next_run_at
-                or record.automation.remaining_runs == 0
+                or (
+                    record.automation.HasField("remaining_runs")
+                    and record.automation.remaining_runs == 0
+                )
             ):
                 return False
 
