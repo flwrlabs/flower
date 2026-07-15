@@ -554,50 +554,6 @@ class InMemoryCoreState(
             record.automation.stopped_at = stopped_at
             return True
 
-    def _can_advance_automation_locked(
-        self,
-        record: AutomationRecord | None,
-        *,
-        previous_next_run_at: str,
-        next_run_at: str | None,
-    ) -> bool:
-        """Return whether the locked automation record can be advanced."""
-        if (
-            record is None
-            or record.automation.status != AutomationStatus.ACTIVE
-            or record.automation.next_run_at != previous_next_run_at
-            or (
-                record.automation.HasField("remaining_runs")
-                and record.automation.remaining_runs == 0
-            )
-        ):
-            return False
-
-        return not (
-            next_run_at is None
-            and (
-                not record.automation.HasField("remaining_runs")
-                or record.automation.remaining_runs > 1
-            )
-        )
-
-    def _advance_automation_locked(
-        self,
-        record: AutomationRecord,
-        *,
-        next_run_at: str | None,
-    ) -> None:
-        """Advance a locked automation record."""
-        record.automation.updated_at = now().isoformat()
-
-        if record.automation.HasField("remaining_runs"):
-            record.automation.remaining_runs = max(
-                record.automation.remaining_runs - 1, 0
-            )
-
-        if next_run_at is not None:
-            record.automation.next_run_at = next_run_at
-
     def advance_automation(
         self,
         automation_id: int,
@@ -608,15 +564,32 @@ class InMemoryCoreState(
         """Advance an active automation occurrence."""
         with self.lock_automation_store:
             record = self.automation_store.get(automation_id)
-            if not self._can_advance_automation_locked(
-                record,
-                previous_next_run_at=previous_next_run_at,
-                next_run_at=next_run_at,
+            if (
+                record is None
+                or record.automation.status != AutomationStatus.ACTIVE
+                or record.automation.next_run_at != previous_next_run_at
+                or (
+                    record.automation.HasField("remaining_runs")
+                    and record.automation.remaining_runs == 0
+                )
             ):
                 return False
 
-            assert record is not None
-            self._advance_automation_locked(record, next_run_at=next_run_at)
+            if next_run_at is None and (
+                not record.automation.HasField("remaining_runs")
+                or record.automation.remaining_runs > 1
+            ):
+                return False
+
+            record.automation.updated_at = now().isoformat()
+
+            if record.automation.HasField("remaining_runs"):
+                record.automation.remaining_runs = max(
+                    record.automation.remaining_runs - 1, 0
+                )
+
+            if next_run_at is not None:
+                record.automation.next_run_at = next_run_at
             return True
 
     def finish_automation(
