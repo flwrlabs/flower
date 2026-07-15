@@ -436,7 +436,7 @@ class CoreState(ABC):  # pylint: disable=R0904
             Automation ID to advance.
         previous_next_run_at : str
             Previously observed due time timestamp string. The update only
-            succeeds if the stored `next_run_at` still matches this value, preventing 
+            succeeds if the stored `next_run_at` still matches this value, preventing
             multiple workers from executing the same scheduled run concurrently.
         next_run_at : str | None
             Next due time timestamp string. If `None`, the current occurrence is
