@@ -206,7 +206,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(run_context.series_id, response.series_id)
 
     def test_start_automation(self) -> None:
-        """Test StartAutomation stores a validated run template."""
+        """Test StartAutomation stores the automation schedule."""
         # Prepare
         fab_content = b"test automation FAB content"
         fab_hash = hashlib.sha256(fab_content).hexdigest()
@@ -220,19 +220,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request.start_run_request.series_id = 123
 
         # Execute
-        with (
-            patch(
-                "flwr.superlink.servicer.control.control_handlers.get_fab_config"
-            ) as mock_get_fab_config,
-            patch(
-                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config"
-            ) as mock_get_metadata_from_config,
-        ):
-            mock_get_fab_config.return_value = {
-                "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
-            }
-            mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
-            response = self.servicer.StartAutomation(request, Mock())
+        response = self.servicer.StartAutomation(request, Mock())
 
         automations = self.state.list_automations(
             federation=NOOP_FEDERATION_ID,

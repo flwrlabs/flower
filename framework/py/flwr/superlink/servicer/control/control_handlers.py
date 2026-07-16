@@ -274,7 +274,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     )
 
 
-def start_automation(  # pylint: disable=too-many-locals,too-many-statements
+def start_automation(  # pylint: disable=unused-argument
     request: StartAutomationRequest,
     account: AccountInfo,
     state: LinkState,
@@ -307,115 +307,32 @@ def start_automation(  # pylint: disable=too-many-locals,too-many-statements
     max_runs = (
         request.max_runs
         if request.HasField("max_runs")
-        else 1
-        if fixed_interval is None
-        else None
+        else 1 if fixed_interval is None else None
     )
-
-    verification_dict: dict[str, str] = {}
-    builtin_agent_fab = try_resolve_builtin_agent_fab(start_run_request.app_spec)
-    if builtin_agent_fab is not None:
-        fab_file, verification_dict = builtin_agent_fab
-    elif start_run_request.app_spec:
-        fab_file, verification_dict, _ = _get_remote_fab(
-            fleet_api_type, start_run_request.app_spec
-        )
-    else:
-        fab_file = start_run_request.fab.content
-
-    if len(fab_file) > FAB_MAX_SIZE:
-        log(
-            ERROR,
-            "FAB size exceeds maximum allowed size of %d bytes.",
-            FAB_MAX_SIZE,
-        )
-        return StartAutomationResponse()
 
     flwr_aid = account.flwr_aid
-    account_name = account.account_name
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+    federation_id = _resolve_federation_id(
+        state, account.account_name, start_run_request.federation
+    )
     override_config = user_config_from_proto(start_run_request.override_config)
 
-    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
-
-    federation_id = _resolve_federation_id(
-        state, account_name, start_run_request.federation
-    )
-    if not state.federation_manager.exists(federation_id):
-        if start_run_request.federation:
-            raise FlowerError(
-                ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
-                f"Federation '{federation_id}' not found or has been archived.",
-            )
-        raise FlowerError(
-            ApiErrorCode.FEDERATION_NOT_SPECIFIED, "No federation specified."
-        )
-
-    if not state.federation_manager.has_member(flwr_aid, federation_id):
-        raise FlowerError(
-            ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
-            f"Account with ID '{flwr_aid}' is not a member of the "
-            f"federation '{federation_id}'.",
-        )
-
-    try:
-        fab_config = get_fab_config(fab_file)
-        run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
-        _ = fuse_dicts(run_config, override_config)
-
-        components = fab_config["tool"]["flwr"]["app"].get("components", {})
-        is_agentapp_bundle = "agentapp" in components
-        primary_task_type = (
-            TaskType.AGENT_APP if is_agentapp_bundle else TaskType.SERVER_APP
-        )
-        resolved_federation_config = None
-        runtime = RunTime.DEPLOYMENT
-        sim_cfg = state.federation_manager.get_simulation_config(federation_id)
-        if sim_cfg and not is_agentapp_bundle:
-            primary_task_type = TaskType.SIMULATION
-            runtime = RunTime.SIMULATION
-            resolved_federation_config = SimulationConfig()
-            resolved_federation_config.CopyFrom(sim_cfg)
-            resolved_federation_config.MergeFrom(
-                start_run_request.override_federation_config
-            )
-
-        state.federation_manager.can_execute(
-            flwr_aid,
-            ActionType.START_RUN,
-            StartRunContext(federation_id=federation_id, runtime=runtime),
-        )
-
-        fab = Fab(
-            hashlib.sha256(fab_file).hexdigest(),
-            fab_file,
-            verification_dict,
-        )
+    fab_hash = start_run_request.fab.hash_str or None
+    if start_run_request.fab.content:
+        fab_file = start_run_request.fab.content
+        fab = Fab(hashlib.sha256(fab_file).hexdigest(), fab_file, {})
         fab_hash = state.store_fab(fab)
-
-        if fab_hash != fab.hash_str:
-            raise ValueError(
-                f"FAB ({fab.hash_str}) hash from request doesn't match contents"
-            )
-        fab_id, fab_version = get_metadata_from_config(fab_config)
-
-    except ValueError as e:
-        log(ERROR, "Could not start automation: %s", str(e))
-        raise FlowerError(
-            ApiErrorCode.INVALID_RUN_CONFIG,
-            "Could not start automation for "
-            f"flwr_aid={flwr_aid}, federation_id={federation_id}: {e}",
-        ) from e
 
     try:
         automation = state.store_automation(
             federation_id=federation_id,
             flwr_aid=flwr_aid,
-            fab_id=fab_id,
-            fab_version=fab_version,
+            fab_id=None,
+            fab_version=None,
             fab_hash=fab_hash,
             override_config=override_config,
-            federation_config=resolved_federation_config,
-            primary_task_type=primary_task_type,
+            federation_config=None,
+            primary_task_type=TaskType.SERVER_APP,
             series_id=start_run_request.series_id,
             next_run_at=next_run_at,
             fixed_interval=fixed_interval,
@@ -426,8 +343,7 @@ def start_automation(  # pylint: disable=too-many-locals,too-many-statements
             ApiErrorCode.FAILED_TO_CREATE_RUN,
             "Failed to create automation for "
             f"flwr_aid={flwr_aid}, federation_id={federation_id}, "
-            f"fab_id={fab_id}, fab_version={fab_version}, "
-            f"fab_hash={fab_hash}, primary_task_type={primary_task_type}.",
+            f"fab_hash={fab_hash}, primary_task_type={TaskType.SERVER_APP}.",
         ) from e
 
     return StartAutomationResponse(
