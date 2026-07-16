@@ -50,7 +50,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def delete_sessions_in_run(self, run_id: int) -> None:
         """Delete all object push session bookkeeping for a run.
 
-            This does not delete any messages or objects associated with the sessions.
+        This does not delete any messages or objects associated with the sessions.
         """
 
     @abstractmethod
