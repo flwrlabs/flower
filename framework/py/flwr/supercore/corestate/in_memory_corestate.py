@@ -165,6 +165,17 @@ class InMemoryCoreState(
             )
         return session_id
 
+    def delete_sessions_in_run(self, run_id: int) -> None:
+        """Delete all object push session bookkeeping for a run."""
+        with self._lock_object_push_sessions:
+            session_ids = [
+                session_id
+                for session_id, session in self._object_push_sessions.items()
+                if session.run_id == run_id
+            ]
+            for session_id in session_ids:
+                self._cleanup_push_session(session_id, cleanup_messages=False)
+
     def preregister_object_tree(
         self, object_tree: ObjectTree, session_id: str
     ) -> list[str]:

@@ -307,7 +307,7 @@ def list_runs(
             state, flwr_aid, runs[0].federation_id
         )
 
-    # Clear objects of finished runs
+    # Clean up resources of finished runs
     # Resolve only non-caller run owners; caller-owned runs use `account_name`.
     account_names = resolve_account_ids(
         {run.flwr_aid for run in runs if run.flwr_aid != flwr_aid}
@@ -316,7 +316,7 @@ def list_runs(
     for run in runs:
         run.account_name = account_names[run.flwr_aid]
         if run.status.status == Status.FINISHED:
-            state.object_store.delete_objects_in_run(run.run_id)
+            state.cleanup_run(run.run_id)
 
     # Construct and return response
     return ListRunsResponse(

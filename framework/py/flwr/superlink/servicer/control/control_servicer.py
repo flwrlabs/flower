@@ -196,8 +196,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             if run.status.status == Status.FINISHED:
                 log(INFO, "All logs for run ID `%s` returned", run_id)
 
-                # Delete objects of the run from the object store
-                self.objectstore_factory.store().delete_objects_in_run(run_id)
+                state.cleanup_run(run_id)
                 break
 
             time.sleep(LOG_STREAM_INTERVAL)  # Sleep briefly to avoid busy waiting

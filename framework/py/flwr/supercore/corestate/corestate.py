@@ -47,6 +47,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Start a run-scoped object push session."""
 
     @abstractmethod
+    def delete_sessions_in_run(self, run_id: int) -> None:
+        """Delete all object push session bookkeeping for a run."""
+
+    @abstractmethod
     def preregister_object_tree(
         self, object_tree: ObjectTree, session_id: str
     ) -> list[str]:
