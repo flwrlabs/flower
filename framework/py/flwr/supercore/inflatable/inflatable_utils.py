@@ -120,8 +120,7 @@ class ObjectPushError(Exception):
         super().__init__(
             f"Failed to push object with ID '{object_id}' for run {run_id} using "
             f"session '{session_id}'. The push session may have expired or been "
-            "replaced, or the servicer may have "
-            "failed to store it."
+            "replaced."
         )
 
 
