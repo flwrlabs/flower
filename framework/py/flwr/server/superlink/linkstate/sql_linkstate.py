@@ -43,7 +43,13 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.utils.validator import validate_message
-from flwr.supercore.constant import AutomationStatus, NodeStatus
+from flwr.supercore.constant import (
+    ActionType,
+    AutomationStatus,
+    NodeStatus,
+    RunTime,
+    TaskType,
+)
 from flwr.supercore.corestate.sql_corestate import SqlCoreState, determine_task_status
 from flwr.supercore.corestate.utils import timestamp_to_iso
 from flwr.supercore.date import now
@@ -51,6 +57,7 @@ from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
+from flwr.supercore.typing import StartRunContext
 from flwr.supercore.utils import (
     build_sql_in_params,
     int64_to_uint64,
@@ -1105,6 +1112,20 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 if not rows:
                     return None
 
+                row = rows[0]
+                runtime = (
+                    RunTime.SIMULATION
+                    if row["primary_task_type"] == TaskType.SIMULATION
+                    else RunTime.DEPLOYMENT
+                )
+                self.federation_manager.can_execute(
+                    row["flwr_aid"],
+                    ActionType.START_RUN,
+                    StartRunContext(
+                        federation_id=row["federation_id"],
+                        runtime=runtime,
+                    ),
+                )
                 if not self.advance_automation(
                     automation_id,
                     previous_next_run_at=previous_next_run_at,
@@ -1112,7 +1133,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 ):
                     return None
 
-                row = rows[0]
                 federation_config = None
                 if row["federation_config"] is not None:
                     federation_config = simulation_config_from_json(

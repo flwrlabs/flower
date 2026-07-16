@@ -93,6 +93,7 @@ from flwr.supercore.tls import (
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import get_popen_detach_kwargs
 from flwr.supercore.version import package_version
+from flwr.superlink.automation import run_automation_scheduler_worker
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import (
     ControlAuthnPlugin,
@@ -270,6 +271,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self.objectstore_factory = state_factory.objectstore_factory
         self.state_factory = state_factory
         self._serverappio_server: grpc.Server | None = None
+        self._background_stop_event = threading.Event()
         self._started = False
 
     def startup(self) -> None:
@@ -280,11 +282,13 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
         # Force initialization before starting network servers
         self.state_factory.state()
+        self._background_stop_event.clear()
 
         self._start_control_api()
         self._start_serverappio_api()
         self._start_fleet_api()
         self._start_superexec_if_needed()
+        self._start_automation_scheduler()
         self._start_health_server_if_needed()
         self._started = True
 
@@ -294,9 +298,14 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         if (
             not self._started
             and not self.grpc_servers
+            and not self.bckg_threads
             and self.superexec_process is None
         ):
             return
+
+        self._background_stop_event.set()
+        for thread in self.bckg_threads:
+            thread.join(timeout=1.0)
 
         # Stop in reverse startup order so dependent services disappear before
         # their backing state is considered unavailable.
@@ -311,17 +320,13 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
                 log(WARN, "SuperExec subprocess did not terminate within 1 second.")
 
         self.grpc_servers.clear()
+        self.bckg_threads.clear()
         self.superexec_process = None
         self._serverappio_server = None
         self._started = False
 
     def wait_until_background_thread_exits(self) -> None:
-        """Block like the historical `flower-superlink` command.
-
-        With only gRPC servers, `self.bckg_threads` is empty and `all([])` is
-        intentionally true, so this loop blocks until a signal handler exits the
-        process. This preserves the current CLI behavior.
-        """
+        """Block until a background thread exits."""
         while all(thread.is_alive() for thread in self.bckg_threads):
             sleep(0.1)
 
@@ -420,6 +425,16 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         )
         # pylint: disable-next=consider-using-with
         self.superexec_process = subprocess.Popen(command, **get_popen_detach_kwargs())
+
+    def _start_automation_scheduler(self) -> None:
+        thread = threading.Thread(
+            target=run_automation_scheduler_worker,
+            args=(self.state_factory, self._background_stop_event),
+            name="automation-scheduler",
+            daemon=True,
+        )
+        thread.start()
+        self.bckg_threads.append(thread)
 
     def _start_health_server_if_needed(self) -> None:
         if self.config.health_server_address is None:
