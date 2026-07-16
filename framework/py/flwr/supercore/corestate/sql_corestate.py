@@ -128,6 +128,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         return session_id
 
+    def delete_sessions_in_run(self, run_id: int) -> None:
+        """Delete all object push session bookkeeping for a run."""
+        self.query(
+            """
+            DELETE FROM object_push_sessions
+            WHERE run_id = :run_id
+            """,
+            {"run_id": uint64_to_int64(run_id)},
+        )
+
     def preregister_object_tree(
         self, object_tree: ObjectTree, session_id: str
     ) -> list[str]:

@@ -182,7 +182,6 @@ def pull_messages(  # pylint: disable=too-many-locals
 def push_messages(
     request: PushMessagesRequest,
     state: LinkState,
-    store: ObjectStore,
 ) -> PushMessagesResponse:
     """Push Messages handler."""
     # Convert Message from proto
@@ -197,7 +196,6 @@ def push_messages(
         run_id,
         [Status.PENDING, Status.STARTING, Status.FINISHED],
         state,
-        store,
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
@@ -228,9 +226,7 @@ def push_messages(
     return response
 
 
-def get_run(
-    request: GetRunRequest, state: LinkState, store: ObjectStore
-) -> GetRunResponse:
+def get_run(request: GetRunRequest, state: LinkState) -> GetRunResponse:
     """Get run information."""
     # Validate that the requesting SuperNode is part of the federation
     run = _validate_node_in_federation(state, request.node.node_id, request.run_id)
@@ -240,7 +236,6 @@ def get_run(
         request.run_id,
         [Status.PENDING, Status.STARTING, Status.FINISHED],
         state,
-        store,
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
@@ -248,9 +243,7 @@ def get_run(
     return GetRunResponse(run=run_to_proto(run))
 
 
-def get_fab(
-    request: GetFabRequest, state: LinkState, store: ObjectStore
-) -> GetFabResponse:
+def get_fab(request: GetFabRequest, state: LinkState) -> GetFabResponse:
     """Get FAB."""
     # Validate that the requesting SuperNode is part of the federation
     run = _validate_node_in_federation(state, request.node.node_id, request.run_id)
@@ -260,7 +253,6 @@ def get_fab(
         request.run_id,
         [Status.PENDING, Status.STARTING, Status.FINISHED],
         state,
-        store,
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
@@ -277,15 +269,12 @@ def get_fab(
     raise ValueError(f"Found no FAB with hash: {request.hash_str}")
 
 
-def push_object(
-    request: PushObjectRequest, state: LinkState, store: ObjectStore
-) -> PushObjectResponse:
+def push_object(request: PushObjectRequest, state: LinkState) -> PushObjectResponse:
     """Push Object."""
     abort_msg = check_abort(
         request.run_id,
         [Status.PENDING, Status.STARTING, Status.FINISHED],
         state,
-        store,
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
@@ -304,15 +293,12 @@ def push_object(
     return PushObjectResponse(stored=stored)
 
 
-def pull_object(
-    request: PullObjectRequest, state: LinkState, store: ObjectStore
-) -> PullObjectResponse:
+def pull_object(request: PullObjectRequest, state: LinkState) -> PullObjectResponse:
     """Pull Object."""
     abort_msg = check_abort(
         request.run_id,
         [Status.PENDING, Status.STARTING, Status.FINISHED],
         state,
-        store,
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
@@ -342,7 +328,6 @@ def confirm_message_received(
         request.run_id,
         [Status.PENDING, Status.STARTING, Status.FINISHED],
         state,
-        store,
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)

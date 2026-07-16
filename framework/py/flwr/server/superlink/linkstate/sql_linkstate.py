@@ -669,9 +669,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if not self.finish_task(primary_task_id, SubStatus.STOPPED, ""):
             return False
 
-        # Clean up messages and their objects related to the run
-        self.delete_messages(self.get_message_ids_from_run_id(run_id))
-        self.object_store.delete_objects_in_run(run_id)
+        self.cleanup_run(run_id)
         return True
 
     def create_node(

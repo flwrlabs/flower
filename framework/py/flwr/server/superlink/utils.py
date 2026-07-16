@@ -16,7 +16,6 @@
 
 from flwr.common.constant import Status, SubStatus
 from flwr.server.superlink.linkstate import LinkState
-from flwr.supercore.object_store import ObjectStore
 from flwr.supercore.run import RunStatus
 
 _STATUS_TO_MSG = {
@@ -31,19 +30,17 @@ def check_abort(
     run_id: int,
     abort_status_list: list[str],
     state: LinkState,
-    store: ObjectStore | None = None,
 ) -> str | None:
     """Check if the status of the provided `run_id` is in `abort_status_list`."""
     run_status: RunStatus = state.get_run_status({run_id})[run_id]
+
+    if run_status.status == Status.FINISHED:
+        state.cleanup_run(run_id)
 
     if run_status.status in abort_status_list:
         msg = _STATUS_TO_MSG[run_status.status]
         if run_status.sub_status == SubStatus.STOPPED:
             msg += " Stopped by user."
         return msg
-
-    # Clear the objects of the run from the store if the run is finished
-    if store and run_status.status == Status.FINISHED:
-        store.delete_objects_in_run(run_id)
 
     return None

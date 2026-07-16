@@ -137,6 +137,12 @@ class LinkState(CoreState):  # pylint: disable=R0904
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
 
+    def cleanup_run(self, run_id: int) -> None:
+        """Clean up run-scoped messages and objects."""
+        self.delete_messages(self.get_message_ids_from_run_id(run_id))
+        self.object_store.delete_objects_in_run(run_id)
+        self.delete_sessions_in_run(run_id)
+
     @abc.abstractmethod
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up run-scoped messages and objects.
