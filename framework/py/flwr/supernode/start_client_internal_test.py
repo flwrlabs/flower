@@ -216,7 +216,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             trusted_entities={},
         )
 
-        assert res == self.run_id
+        assert res is None
         self.mock_state.create_task.assert_called_once_with(
             task_type=TaskType.CLIENT_APP,
             run_id=self.run_id,
@@ -229,7 +229,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.finish_task.assert_called_once_with(
             task_id,
             sub_status=SubStatus.FAILED,
-            details="Pulling message objects failed.",
+            details="Pulling message objects failed: boom",
         )
         self.mock_confirm_message_received.assert_not_called()
 
