@@ -19,6 +19,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 import pytest
+from grpc import RpcError
 
 from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.message import remove_content_from_message
@@ -29,10 +30,12 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
 )
+from flwr.supercore.inflatable.inflatable_utils import ObjectPushError
 
 from .start_client_internal import (
     FAB_VERIFICATION_ERROR,
     _pull_and_store_message,
+    _push_messages,
     start_client_internal,
 )
 
@@ -492,3 +495,101 @@ def test_start_client_internal_launches_superexec_with_bound_appio_address() -> 
 
     command = popen.call_args.args[0]
     assert command[command.index("--appio-api-address") + 1] == "localhost:54321"
+
+
+def _make_reply_message() -> Message:
+    """Create a reply message suitable for testing the sender path."""
+    instruction = Message(content=RecordDict(), dst_node_id=1, message_type="query")
+    reply = Message(content=RecordDict(), reply_to=instruction)
+    reply.metadata.__dict__["_run_id"] = 1
+    reply.metadata.__dict__["_message_id"] = reply.object_id
+    return reply
+
+
+def test_push_messages_deletes_local_state_only_after_success() -> None:
+    """A successful message and object push removes the local reply."""
+    state = Mock()
+    object_store = Mock()
+    message = _make_reply_message()
+    state.get_messages.return_value = [message]
+    state.get_message_processing_duration.return_value = 0.1
+    send = Mock(return_value=({"object-id"}, "session-id"))
+    push_object = Mock()
+
+    with patch(
+        "flwr.supernode.start_client_internal.push_object_contents_from_iterable"
+    ):
+        _push_messages(state, object_store, send, push_object)
+
+    state.delete_messages.assert_called_once_with(
+        message_ids=[message.metadata.message_id, message.metadata.reply_to_message_id]
+    )
+    object_store.delete.assert_called_once_with(message.metadata.message_id)
+
+
+def test_push_messages_retries_after_object_upload_failure() -> None:
+    """A failed object upload retries PushMessages with a new session."""
+    state = Mock()
+    object_store = Mock()
+    message = _make_reply_message()
+    state.get_messages.return_value = [message]
+    state.get_message_processing_duration.return_value = 0.1
+    send = Mock(
+        side_effect=[
+            ({"object-id"}, "old-session"),
+            ({"object-id"}, "new-session"),
+        ]
+    )
+    push_object = Mock()
+
+    with (
+        patch("flwr.supernode.start_client_internal.time.sleep"),
+        patch(
+            "flwr.supernode.start_client_internal.push_object_contents_from_iterable",
+            side_effect=[ObjectPushError("object-id", 1, "old-session"), None],
+        ),
+    ):
+        _push_messages(state, object_store, send, push_object)
+
+    assert send.call_count == 2
+    state.delete_messages.assert_called_once()
+    object_store.delete.assert_called_once_with(message.metadata.message_id)
+
+
+def test_push_messages_retries_after_push_messages_failure() -> None:
+    """A failed PushMessages call retries the complete message push."""
+    state = Mock()
+    object_store = Mock()
+    message = _make_reply_message()
+    state.get_messages.return_value = [message]
+    state.get_message_processing_duration.return_value = 0.1
+    send = Mock(
+        side_effect=[RpcError(), ({"object-id"}, "session-id")],
+    )
+
+    with (
+        patch("flwr.supernode.start_client_internal.time.sleep"),
+        patch(
+            "flwr.supernode.start_client_internal.push_object_contents_from_iterable"
+        ),
+    ):
+        _push_messages(state, object_store, send, Mock())
+
+    assert send.call_count == 2
+    state.delete_messages.assert_called_once()
+    object_store.delete.assert_called_once_with(message.metadata.message_id)
+
+
+def test_push_messages_retains_local_state_after_non_retryable_failure() -> None:
+    """A failed push does not delete a reply that still needs delivery."""
+    state = Mock()
+    object_store = Mock()
+    message = _make_reply_message()
+    state.get_messages.return_value = [message]
+    state.get_message_processing_duration.return_value = 0.1
+    send = Mock(side_effect=ValueError("push failed"))
+
+    _push_messages(state, object_store, send, Mock())
+
+    state.delete_messages.assert_not_called()
+    object_store.delete.assert_not_called()
