@@ -19,14 +19,12 @@
 import hashlib
 import json
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import datetime
 from logging import ERROR, INFO
 
 import requests
 
 from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
-from flwr.app.user_config import UserConfig
 from flwr.cli.utils import validate_federation_name
 from flwr.common.config import (
     flatten_dict,
@@ -139,23 +137,7 @@ from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 
 
-@dataclass(frozen=True)
-class _ResolvedRunInputs:
-    """Run inputs after StartRun validation and template resolution."""
-
-    note: str | None
-    federation_id: str
-    flwr_aid: str
-    fab_id: str
-    fab_version: str
-    fab_hash: str
-    override_config: UserConfig
-    federation_config: SimulationConfig | None
-    primary_task_type: str
-    series_id: int | None
-
-
-def start_run(
+def start_run(  # pylint: disable=too-many-locals, too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
     state: LinkState,
@@ -164,159 +146,6 @@ def start_run(
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")
 
-    resolved = _resolve_start_run_inputs(request, account, state, fleet_api_type)
-    if resolved is None:
-        return StartRunResponse()
-
-    run_id = state.create_run(
-        resolved.fab_id,
-        resolved.fab_version,
-        resolved.fab_hash,
-        resolved.override_config,
-        resolved.federation_id,
-        resolved.federation_config,
-        resolved.flwr_aid,
-        resolved.primary_task_type,
-        resolved.series_id,
-    )
-
-    if run_id == 0:
-        raise FlowerError(
-            ApiErrorCode.FAILED_TO_CREATE_RUN,
-            "Failed to create or initialize run for "
-            f"flwr_aid={resolved.flwr_aid}, federation_id={resolved.federation_id}, "
-            f"fab_id={resolved.fab_id}, fab_version={resolved.fab_version}, "
-            f"fab_hash={resolved.fab_hash}, "
-            f"primary_task_type={resolved.primary_task_type}.",
-        )
-
-    run = state.get_run_info(run_ids=[run_id])[0]
-    series_id = run.series_id
-
-    log_msg = f"Created run {run_id} in federation {run.federation_id}"
-    log(INFO, log_msg)
-    return StartRunResponse(
-        run_id=run_id,
-        note=resolved.note,
-        series_id=series_id,
-        federation=run.federation_id,
-    )
-
-
-def start_automation(
-    request: StartAutomationRequest,
-    account: AccountInfo,
-    state: LinkState,
-    fleet_api_type: str | None,
-) -> StartAutomationResponse:
-    """Create automation."""
-    log(INFO, "ControlServicer.StartAutomation")
-
-    next_run_at = _parse_start_at(request)
-    fixed_interval = (
-        request.fixed_interval if request.HasField("fixed_interval") else None
-    )
-    max_runs = (
-        request.max_runs
-        if request.HasField("max_runs")
-        else 1
-        if fixed_interval is None
-        else None
-    )
-
-    resolved = _resolve_start_run_inputs(
-        request.start_run_request, account, state, fleet_api_type
-    )
-    if resolved is None:
-        return StartAutomationResponse()
-
-    if resolved.series_id is None:
-        raise FlowerError(
-            ApiErrorCode.INVALID_RUN_CONFIG,
-            "StartAutomation requires start_run_request.series_id.",
-        )
-
-    try:
-        automation = state.store_automation(
-            federation_id=resolved.federation_id,
-            flwr_aid=resolved.flwr_aid,
-            fab_id=resolved.fab_id,
-            fab_version=resolved.fab_version,
-            fab_hash=resolved.fab_hash,
-            override_config=resolved.override_config,
-            federation_config=resolved.federation_config,
-            primary_task_type=resolved.primary_task_type,
-            series_id=resolved.series_id,
-            next_run_at=next_run_at,
-            fixed_interval=fixed_interval,
-            max_runs=max_runs,
-        )
-    except ValueError as e:
-        raise FlowerError(
-            ApiErrorCode.FAILED_TO_CREATE_RUN,
-            "Failed to create automation for "
-            f"flwr_aid={resolved.flwr_aid}, federation_id={resolved.federation_id}, "
-            f"fab_id={resolved.fab_id}, fab_version={resolved.fab_version}, "
-            f"fab_hash={resolved.fab_hash}, "
-            f"primary_task_type={resolved.primary_task_type}.",
-        ) from e
-
-    return StartAutomationResponse(
-        automation_id=automation.automation_id,
-        series_id=automation.series_id,
-        next_run_at=automation.next_run_at,
-    )
-
-
-def list_automations(
-    request: ListAutomationsRequest, account: AccountInfo, state: LinkState
-) -> ListAutomationsResponse:
-    """List automations."""
-    log(INFO, "ControlServicer.ListAutomations")
-
-    flwr_aid = account.flwr_aid
-    if request.federation:
-        _validate_federation_membership_in_request(state, flwr_aid, request.federation)
-        automations = state.list_automations(
-            federation=request.federation,
-            order_by="updated_at",
-        )
-    else:
-        federations = state.federation_manager.get_federations(flwr_aid)
-        federation_ids = {federation.id for federation in federations}
-        automations = [
-            automation
-            for automation in state.list_automations(order_by="updated_at")
-            if automation.federation in federation_ids
-        ]
-
-    return ListAutomationsResponse(automations=automations)
-
-
-def stop_automation(
-    request: StopAutomationRequest, account: AccountInfo, state: LinkState
-) -> StopAutomationResponse:
-    """Stop an automation."""
-    log(INFO, "ControlServicer.StopAutomation")
-
-    for automation in state.list_automations(order_by="updated_at"):
-        if automation.automation_id == request.automation_id:
-            _validate_federation_membership_in_request(
-                state, account.flwr_aid, automation.federation
-            )
-            break
-
-    state.stop_automation(request.automation_id)
-    return StopAutomationResponse()
-
-
-def _resolve_start_run_inputs(  # pylint: disable=too-many-locals,too-many-statements
-    request: StartRunRequest,
-    account: AccountInfo,
-    state: LinkState,
-    fleet_api_type: str | None,
-) -> _ResolvedRunInputs | None:
-    """Validate a StartRun request and return the resolved run inputs."""
     verification_dict: dict[str, str] = {}
     note: str | None = None
 
@@ -336,7 +165,7 @@ def _resolve_start_run_inputs(  # pylint: disable=too-many-locals,too-many-state
             "FAB size exceeds maximum allowed size of %d bytes.",
             FAB_MAX_SIZE,
         )
-        return None
+        return StartRunResponse()
 
     flwr_aid = account.flwr_aid
     account_name = account.account_name
@@ -406,39 +235,248 @@ def _resolve_start_run_inputs(  # pylint: disable=too-many-locals,too-many-state
             )
         fab_id, fab_version = get_metadata_from_config(fab_config)
 
+        run_id = state.create_run(
+            fab_id,
+            fab_version,
+            fab_hash,
+            override_config,
+            federation_id,
+            resolved_federation_config,
+            flwr_aid,
+            primary_task_type,
+            request.series_id if request.HasField("series_id") else None,
+        )
+
+        if run_id == 0:
+            raise FlowerError(
+                ApiErrorCode.FAILED_TO_CREATE_RUN,
+                "Failed to create or initialize run for "
+                f"flwr_aid={flwr_aid}, federation_id={federation_id}, "
+                f"fab_id={fab_id}, fab_version={fab_version}, "
+                f"fab_hash={fab_hash}, primary_task_type={primary_task_type}.",
+            )
+
+        run = state.get_run_info(run_ids=[run_id])[0]
+        series_id = run.series_id
+
     except ValueError as e:
-        log(ERROR, "Could not resolve run inputs: %s", str(e))
+        log(ERROR, "Could not start run: %s", str(e))
         raise FlowerError(
             ApiErrorCode.INVALID_RUN_CONFIG,
             "Could not start run for "
             f"flwr_aid={flwr_aid}, federation_id={federation_id}: {e}",
         ) from e
 
-    return _ResolvedRunInputs(
-        note=note,
-        federation_id=federation_id,
-        flwr_aid=flwr_aid,
-        fab_id=fab_id,
-        fab_version=fab_version,
-        fab_hash=fab_hash,
-        override_config=override_config,
-        federation_config=resolved_federation_config,
-        primary_task_type=primary_task_type,
-        series_id=request.series_id if request.HasField("series_id") else None,
+    log_msg = f"Created run {run_id} in federation {run.federation_id}"
+    log(INFO, log_msg)
+    return StartRunResponse(
+        run_id=run_id, note=note, series_id=series_id, federation=run.federation_id
     )
 
 
-def _parse_start_at(request: StartAutomationRequest) -> str:
-    """Return the automation start timestamp."""
+def start_automation(  # pylint: disable=too-many-locals,too-many-statements
+    request: StartAutomationRequest,
+    account: AccountInfo,
+    state: LinkState,
+    fleet_api_type: str | None,
+) -> StartAutomationResponse:
+    """Create automation."""
+    log(INFO, "ControlServicer.StartAutomation")
+
+    start_run_request = request.start_run_request
+    if not start_run_request.HasField("series_id"):
+        raise FlowerError(
+            ApiErrorCode.INVALID_RUN_CONFIG,
+            "StartAutomation requires start_run_request.series_id.",
+        )
+
     if request.HasField("start_at"):
         try:
-            return datetime.fromisoformat(request.start_at).isoformat()
+            next_run_at = datetime.fromisoformat(request.start_at).isoformat()
         except ValueError as e:
             raise FlowerError(
                 ApiErrorCode.INVALID_RUN_CONFIG,
                 f"Invalid automation start_at value: {request.start_at}",
             ) from e
-    return now().isoformat()
+    else:
+        next_run_at = now().isoformat()
+
+    fixed_interval = (
+        request.fixed_interval if request.HasField("fixed_interval") else None
+    )
+    max_runs = (
+        request.max_runs
+        if request.HasField("max_runs")
+        else 1
+        if fixed_interval is None
+        else None
+    )
+
+    verification_dict: dict[str, str] = {}
+    builtin_agent_fab = try_resolve_builtin_agent_fab(start_run_request.app_spec)
+    if builtin_agent_fab is not None:
+        fab_file, verification_dict = builtin_agent_fab
+    elif start_run_request.app_spec:
+        fab_file, verification_dict, _ = _get_remote_fab(
+            fleet_api_type, start_run_request.app_spec
+        )
+    else:
+        fab_file = start_run_request.fab.content
+
+    if len(fab_file) > FAB_MAX_SIZE:
+        log(
+            ERROR,
+            "FAB size exceeds maximum allowed size of %d bytes.",
+            FAB_MAX_SIZE,
+        )
+        return StartAutomationResponse()
+
+    flwr_aid = account.flwr_aid
+    account_name = account.account_name
+    override_config = user_config_from_proto(start_run_request.override_config)
+
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+
+    federation_id = _resolve_federation_id(
+        state, account_name, start_run_request.federation
+    )
+    if not state.federation_manager.exists(federation_id):
+        if start_run_request.federation:
+            raise FlowerError(
+                ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
+                f"Federation '{federation_id}' not found or has been archived.",
+            )
+        raise FlowerError(
+            ApiErrorCode.FEDERATION_NOT_SPECIFIED, "No federation specified."
+        )
+
+    if not state.federation_manager.has_member(flwr_aid, federation_id):
+        raise FlowerError(
+            ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
+            f"Account with ID '{flwr_aid}' is not a member of the "
+            f"federation '{federation_id}'.",
+        )
+
+    try:
+        fab_config = get_fab_config(fab_file)
+        run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
+        _ = fuse_dicts(run_config, override_config)
+
+        components = fab_config["tool"]["flwr"]["app"].get("components", {})
+        is_agentapp_bundle = "agentapp" in components
+        primary_task_type = (
+            TaskType.AGENT_APP if is_agentapp_bundle else TaskType.SERVER_APP
+        )
+        resolved_federation_config = None
+        runtime = RunTime.DEPLOYMENT
+        sim_cfg = state.federation_manager.get_simulation_config(federation_id)
+        if sim_cfg and not is_agentapp_bundle:
+            primary_task_type = TaskType.SIMULATION
+            runtime = RunTime.SIMULATION
+            resolved_federation_config = SimulationConfig()
+            resolved_federation_config.CopyFrom(sim_cfg)
+            resolved_federation_config.MergeFrom(
+                start_run_request.override_federation_config
+            )
+
+        state.federation_manager.can_execute(
+            flwr_aid,
+            ActionType.START_RUN,
+            StartRunContext(federation_id=federation_id, runtime=runtime),
+        )
+
+        fab = Fab(
+            hashlib.sha256(fab_file).hexdigest(),
+            fab_file,
+            verification_dict,
+        )
+        fab_hash = state.store_fab(fab)
+
+        if fab_hash != fab.hash_str:
+            raise ValueError(
+                f"FAB ({fab.hash_str}) hash from request doesn't match contents"
+            )
+        fab_id, fab_version = get_metadata_from_config(fab_config)
+
+    except ValueError as e:
+        log(ERROR, "Could not start automation: %s", str(e))
+        raise FlowerError(
+            ApiErrorCode.INVALID_RUN_CONFIG,
+            "Could not start automation for "
+            f"flwr_aid={flwr_aid}, federation_id={federation_id}: {e}",
+        ) from e
+
+    try:
+        automation = state.store_automation(
+            federation_id=federation_id,
+            flwr_aid=flwr_aid,
+            fab_id=fab_id,
+            fab_version=fab_version,
+            fab_hash=fab_hash,
+            override_config=override_config,
+            federation_config=resolved_federation_config,
+            primary_task_type=primary_task_type,
+            series_id=start_run_request.series_id,
+            next_run_at=next_run_at,
+            fixed_interval=fixed_interval,
+            max_runs=max_runs,
+        )
+    except ValueError as e:
+        raise FlowerError(
+            ApiErrorCode.FAILED_TO_CREATE_RUN,
+            "Failed to create automation for "
+            f"flwr_aid={flwr_aid}, federation_id={federation_id}, "
+            f"fab_id={fab_id}, fab_version={fab_version}, "
+            f"fab_hash={fab_hash}, primary_task_type={primary_task_type}.",
+        ) from e
+
+    return StartAutomationResponse(
+        automation_id=automation.automation_id,
+        series_id=automation.series_id,
+        next_run_at=automation.next_run_at,
+    )
+
+
+def list_automations(
+    request: ListAutomationsRequest, account: AccountInfo, state: LinkState
+) -> ListAutomationsResponse:
+    """List automations."""
+    log(INFO, "ControlServicer.ListAutomations")
+
+    flwr_aid = account.flwr_aid
+    if request.federation:
+        _validate_federation_membership_in_request(state, flwr_aid, request.federation)
+        automations = state.list_automations(
+            federation=request.federation,
+            order_by="updated_at",
+        )
+    else:
+        federations = state.federation_manager.get_federations(flwr_aid)
+        federation_ids = {federation.id for federation in federations}
+        automations = [
+            automation
+            for automation in state.list_automations(order_by="updated_at")
+            if automation.federation in federation_ids
+        ]
+
+    return ListAutomationsResponse(automations=automations)
+
+
+def stop_automation(
+    request: StopAutomationRequest, account: AccountInfo, state: LinkState
+) -> StopAutomationResponse:
+    """Stop an automation."""
+    log(INFO, "ControlServicer.StopAutomation")
+
+    for automation in state.list_automations(order_by="updated_at"):
+        if automation.automation_id == request.automation_id:
+            _validate_federation_membership_in_request(
+                state, account.flwr_aid, automation.federation
+            )
+            break
+
+    state.stop_automation(request.automation_id)
+    return StopAutomationResponse()
 
 
 def list_runs(
