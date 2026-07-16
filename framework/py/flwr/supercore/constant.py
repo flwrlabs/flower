@@ -57,7 +57,7 @@ FLWR_IN_MEMORY_SQLITE_DB_URL = "sqlite:///:memory:"
 # Constants for Hub
 APP_ID_PATTERN = r"^@[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
 APP_VERSION_PATTERN = r"^\d+\.\d+\.\d+$"
-PLATFORM_API_URL = "https://api.flower.ai/v1"
+PLATFORM_API_URL = os.getenv("FLWR_PLATFORM_API_URL", "https://api.flower.ai/v1")
 
 # Constants for Flower CLI update check
 FLWR_DISABLE_UPDATE_CHECK = "FLWR_DISABLE_UPDATE_CHECK"
@@ -73,7 +73,7 @@ UVICORN_DEFAULT_HOST = "127.0.0.1"
 UVICORN_DEFAULT_PORT = 8000
 
 # SuperGrid constants
-SUPERGRID_ADDRESS = "supergrid.flower.ai"
+SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "supergrid.flower.ai")
 
 # Specification for app publishing
 APP_PUBLISH_ALLOWED_LICENSE_FILES = ("LICENSE", "LICENSE.md")
