@@ -20,19 +20,24 @@ from unittest.mock import Mock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pytest import MonkeyPatch
 
 from flwr.common.constant import NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    GetLoginDetailsRequest,
+    GetLoginDetailsResponse,
     ListRunsRequest,
     ListRunsResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.error import ApiErrorCode
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.run import Run
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
-from flwr.superlink.routers.control.router import router
+from flwr.superlink.routers.control.router import configure_middlewares, router
+from flwr.superlink.servicer.control import control_handlers
 
 
 def test_list_runs_returns_runs_from_linkstate() -> None:
@@ -49,6 +54,7 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     app = FastAPI()
     app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
     app.include_router(router)
+    configure_middlewares(app)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     client = TestClient(app)
 
@@ -70,3 +76,83 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
         limit=1,
     )
     authz_plugin.authorize.assert_called_once_with(account)
+    authn_plugin.validate_tokens_in_metadata.assert_called_once()
+
+
+def test_list_runs_preserves_refreshed_authentication_tokens() -> None:
+    """The authentication middleware adds refreshed tokens to protobuf responses."""
+    linkstate = Mock(spec=LinkState)
+    authn_plugin = Mock()
+    authz_plugin = Mock()
+    account = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
+    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
+    authn_plugin.refresh_tokens.return_value = (
+        [("x-access-token", "new-access-token")],
+        account,
+    )
+    authz_plugin.authorize.return_value = True
+    linkstate.get_run_info.return_value = []
+    app = FastAPI()
+    app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
+    app.include_router(router)
+    configure_middlewares(app)
+    app.dependency_overrides[get_linkstate] = lambda: linkstate
+    response = TestClient(app).post(
+        "/control/list-runs",
+        content=ListRunsRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["x-access-token"] == "new-access-token"
+    assert response.headers.get_list("content-length") == [str(len(response.content))]
+
+
+def test_list_runs_rejects_non_protobuf_payload() -> None:
+    """The protobuf translation middleware validates configured request bodies."""
+    linkstate = Mock(spec=LinkState)
+    authn_plugin = Mock()
+    authz_plugin = Mock()
+    account = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
+    authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
+    authz_plugin.authorize.return_value = True
+    app = FastAPI()
+    app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
+    app.include_router(router)
+    configure_middlewares(app)
+    app.dependency_overrides[get_linkstate] = lambda: linkstate
+    response = TestClient(app).post(
+        "/control/list-runs",
+        content=b"{}",
+        headers={"content-type": "application/json"},
+    )
+
+    assert response.status_code == 415
+    assert response.json()["code"] == ApiErrorCode.UNSUPPORTED_CONTENT_TYPE
+
+
+def test_get_login_details_does_not_require_authentication(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """The login bootstrap endpoint remains available before authentication."""
+    authn_plugin = Mock()
+    authz_plugin = Mock()
+    expected = GetLoginDetailsResponse(authn_type="noop")
+    monkeypatch.setattr(
+        control_handlers,
+        "get_login_details",
+        lambda _request, _plugin: expected,
+    )
+    app = FastAPI()
+    app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
+    app.include_router(router)
+    configure_middlewares(app)
+    response = TestClient(app).post(
+        "/control/get-login-details",
+        content=GetLoginDetailsRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 200
+    assert GetLoginDetailsResponse.FromString(response.content) == expected
+    authn_plugin.validate_tokens_in_metadata.assert_not_called()

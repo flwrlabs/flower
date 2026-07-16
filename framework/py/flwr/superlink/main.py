@@ -29,12 +29,13 @@ from flwr import __version__
 from flwr.common import log
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_SQLITE_DB_URL
-from flwr.supercore.error import http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink import extensions
 from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.federation import NoOpFederationManager
+from flwr.superlink.routers.control.router import configure_middlewares
+from flwr.superlink.routers.control.router import router as control_router
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
@@ -138,16 +139,14 @@ def create_app(
     # fastapi_app.include_router(health.router)
 
     # SuperLink APIs
-    # fastapi_app.include_router(control.router)
+    fastapi_app.include_router(control_router)
+    configure_middlewares(fastapi_app)
     # fastapi_app.include_router(runtime.router)
 
     # Extension hooks
     extensions.configure_app(fastapi_app)
 
     validate_unique_route_operation_ids(fastapi_app)
-
-    # Apply the FlowerError translation layer last to make it outermost
-    fastapi_app.middleware("http")(http_error_translator)
 
     return fastapi_app
 
