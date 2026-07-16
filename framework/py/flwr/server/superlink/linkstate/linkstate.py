@@ -306,6 +306,34 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
+    def dispatch_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> int | None:
+        """Create a run from a due automation and advance the automation.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to dispatch.
+        previous_next_run_at : str
+            Previously observed due time timestamp string. Dispatch only succeeds
+            if the stored `next_run_at` still matches this value, preventing
+            multiple workers from executing the same scheduled run concurrently.
+        next_run_at : str | None
+            Next due time timestamp string. If `None`, the current occurrence is
+            treated as the last finite occurrence and no next due time is stored.
+
+        Returns
+        -------
+        int | None
+            The created run ID if dispatch succeeded, otherwise `None`.
+        """
+
+    @abc.abstractmethod
     def get_run_info(  # pylint: disable=too-many-arguments
         self,
         *,

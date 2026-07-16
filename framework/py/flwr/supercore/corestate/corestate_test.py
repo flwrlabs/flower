@@ -341,6 +341,100 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(stopped[0].next_run_at, due_at)
 
+    def test_advance_and_finish_automation(self) -> None:
+        """Automation advance should update records and finish terminally."""
+        state = self.state_factory()
+        current = now()
+
+        # Create a recurring automation with two finite occurrences.
+        previous_next_run_at = (current - timedelta(seconds=30)).isoformat()
+        next_run_at = (current + timedelta(seconds=30)).isoformat()
+        recurring = self.store_automation(
+            state,
+            series_id=1,
+            next_run_at=previous_next_run_at,
+            fixed_interval=60,
+            max_runs=2,
+        )
+
+        # Advance the first occurrence and reject the stale due-time claim.
+        self.assertTrue(
+            state.advance_automation(
+                recurring.automation_id,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            )
+        )
+        self.assertFalse(
+            state.advance_automation(
+                recurring.automation_id,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            )
+        )
+        updated = state.list_automations(
+            federation="@me/fed-a",
+            statuses=[AutomationStatus.ACTIVE],
+            order_by="updated_at",
+        )
+        self.assertEqual(updated[0].remaining_runs, 1)
+        self.assertEqual(updated[0].next_run_at, next_run_at)
+
+        # Advance the final occurrence, then complete the automation.
+        self.assertTrue(
+            state.advance_automation(
+                recurring.automation_id,
+                previous_next_run_at=next_run_at,
+                next_run_at=None,
+            )
+        )
+        self.assertTrue(
+            state.finish_automation(
+                recurring.automation_id,
+                status=AutomationStatus.COMPLETED,
+            )
+        )
+        completed = state.list_automations(
+            federation="@me/fed-a",
+            statuses=[AutomationStatus.COMPLETED],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in completed],
+            [recurring.automation_id],
+        )
+
+        # Mark an advanced automation as failed when execution cannot proceed.
+        failed_previous_next_run_at = (current - timedelta(seconds=15)).isoformat()
+        failing = self.store_automation(
+            state,
+            series_id=2,
+            next_run_at=failed_previous_next_run_at,
+        )
+        self.assertTrue(
+            state.advance_automation(
+                failing.automation_id,
+                previous_next_run_at=failed_previous_next_run_at,
+                next_run_at=None,
+            )
+        )
+        self.assertTrue(
+            state.finish_automation(
+                failing.automation_id,
+                status=AutomationStatus.FAILED,
+            )
+        )
+        failed = state.list_automations(
+            federation="@me/fed-a",
+            statuses=[AutomationStatus.FAILED],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in failed],
+            [failing.automation_id],
+        )
+        self.assertEqual(failed[0].next_run_at, failed_previous_next_run_at)
+
     def test_store_automation_preserves_series_id_without_validation(self) -> None:
         """Automation storage should preserve caller-provided series IDs."""
         state = self.state_factory()

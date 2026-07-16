@@ -30,6 +30,7 @@ from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0
 from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
+from ..constant import AutomationStatus
 from ..object_store import ObjectStore
 
 
@@ -417,6 +418,57 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         bool
             True if an active automation was stopped, otherwise False.
+        """
+
+    @abstractmethod
+    def advance_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> bool:
+        """Advance an active automation occurrence.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to advance.
+        previous_next_run_at : str
+            Previously observed due time timestamp string. The update only
+            succeeds if the stored `next_run_at` still matches this value, preventing
+            multiple workers from executing the same scheduled run concurrently.
+        next_run_at : str | None
+            Next due time timestamp string. If `None`, the current occurrence is
+            treated as the last finite occurrence and no next due time is stored.
+
+        Returns
+        -------
+        bool
+            True if the active automation occurrence was advanced, otherwise
+            False.
+        """
+
+    @abstractmethod
+    def finish_automation(
+        self,
+        automation_id: int,
+        *,
+        status: Literal[AutomationStatus.COMPLETED, AutomationStatus.FAILED],
+    ) -> bool:
+        """Finish an active automation with a terminal status.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to finish.
+        status : AutomationStatus
+            Terminal target status. Must be `completed` or `failed`.
+
+        Returns
+        -------
+        bool
+            True if the active automation was finished, otherwise False.
         """
 
     @abstractmethod
