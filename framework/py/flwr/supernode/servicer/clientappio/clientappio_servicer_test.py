@@ -32,6 +32,7 @@ from flwr.common.serde_test import RecordMaker
 from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
     PullAppInputsResponse,
     PullAppMessagesResponse,
+    PushAppMessagesRequest,
     PushAppMessagesResponse,
     PushAppOutputsResponse,
 )
@@ -167,6 +168,83 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PushClientAppOutputs.assert_called_once()
         self.mock_stub.PushMessage.assert_called_once()
         self.assertSetEqual(pushed_obj_ids, set(all_obj_ids))
+
+    def test_push_message_records_processing_end_before_storing_reply(self) -> None:
+        """Test reply messages are visible only after runtime timing is recorded."""
+        # Prepare
+        token = "test-token"
+        run_id = 1
+        message = make_message(
+            metadata=self.maker.metadata(),
+            content=self.maker.recorddict(2, 2, 1),
+        )
+        request = PushAppMessagesRequest(
+            token=token,
+            messages_list=[message_to_proto(message)],
+            message_object_trees=[get_object_tree(message)],
+        )
+        mock_store = Mock()
+        mock_store.preregister.return_value = []
+        self.servicer.objectstore_factory.store.return_value = mock_store
+        self.mock_state.get_run_id_by_token.return_value = run_id
+        self.mock_state.verify_token.return_value = True
+        calls = []
+
+        def record_end(message_id: str) -> None:
+            calls.append(("record_end", message_id))
+
+        def store_message(_) -> None:
+            calls.append(("store_message", ""))
+
+        self.mock_state.record_message_processing_end.side_effect = record_end
+        self.mock_state.store_message.side_effect = store_message
+
+        # Execute
+        self.servicer.PushMessage(request, Mock())
+
+        # Assert
+        self.mock_state.get_run_id_by_token.assert_called_once_with(token)
+        self.mock_state.verify_token.assert_called_once_with(run_id, token)
+        self.mock_state.store_message.assert_called_once()
+        self.assertEqual(
+            calls,
+            [
+                ("record_end", message.metadata.reply_to_message_id),
+                ("store_message", ""),
+            ],
+        )
+
+    def test_push_message_stores_reply_when_processing_end_is_missing(self) -> None:
+        """Test missing runtime timing does not prevent reply storage."""
+        # Prepare
+        token = "test-token"
+        run_id = 1
+        message = make_message(
+            metadata=self.maker.metadata(),
+            content=self.maker.recorddict(2, 2, 1),
+        )
+        request = PushAppMessagesRequest(
+            token=token,
+            messages_list=[message_to_proto(message)],
+            message_object_trees=[get_object_tree(message)],
+        )
+        mock_store = Mock()
+        mock_store.preregister.return_value = []
+        self.servicer.objectstore_factory.store.return_value = mock_store
+        self.mock_state.get_run_id_by_token.return_value = run_id
+        self.mock_state.verify_token.return_value = True
+        self.mock_state.record_message_processing_end.side_effect = ValueError(
+            "missing timing"
+        )
+
+        # Execute
+        self.servicer.PushMessage(request, Mock())
+
+        # Assert
+        self.mock_state.record_message_processing_end.assert_called_once_with(
+            message_id=message.metadata.reply_to_message_id
+        )
+        self.mock_state.store_message.assert_called_once()
 
     @parameterized.expand([(True,), (False,)])  # type: ignore
     def test_send_app_heartbeat(self, success: bool) -> None:
