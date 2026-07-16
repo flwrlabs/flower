@@ -190,6 +190,70 @@ class InMemoryCoreState(
             self._object_push_session_by_root[object_tree.object_id] = session_id
             return missing_objects
 
+    def store_object(
+        self,
+        run_id: int,
+        session_id: str,
+        object_id: str,
+        object_content: bytes,
+    ) -> bool:
+        """Store an object if it is pending for an active push session."""
+        with self._lock_object_push_sessions:
+            # Validate session ownership and pending-object membership
+            session = self._object_push_sessions.get(session_id)
+            if (
+                session is None
+                or session.run_id != run_id
+                or object_id not in session.pending_object_ids
+            ):
+                return False
+
+            # Reject expired sessions and clean up their messages and objects
+            if session.expires_at <= now():
+                self._cleanup_push_session(session_id, cleanup_messages=True)
+                return False
+
+            # Store the object, mark it complete, and refresh the session TTL
+            try:
+                self.object_store.put(object_id, object_content)
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to store object %s: %s", object_id, err)
+                return False
+            session.pending_object_ids.remove(object_id)
+            session.expires_at = now() + timedelta(
+                seconds=OBJECT_PUSH_SESSION_TTL_SECONDS
+            )
+
+            # Remove session bookkeeping once every pending object is stored
+            if not session.pending_object_ids:
+                self._cleanup_push_session(session_id, cleanup_messages=False)
+            return True
+
+    def get_object(self, run_id: int, object_id: str) -> bytes | None:
+        """Get an object and clean up expired push sessions when needed."""
+        with self._lock_object_push_sessions:
+            # Return immediately unless the object is known but unavailable
+            content = self.object_store.get(object_id)
+            if content != b"":
+                return content
+
+            # Find expired sessions in this run that are waiting for the object
+            current = now()
+            expired_session_ids = [
+                session_id
+                for session_id, session in self._object_push_sessions.items()
+                if session.run_id == run_id
+                and object_id in session.pending_object_ids
+                and session.expires_at <= current
+            ]
+            if not expired_session_ids:
+                return content
+
+            # Clean up every expired session, then return the resulting object state
+            for session_id in expired_session_ids:
+                self._cleanup_push_session(session_id, cleanup_messages=True)
+            return self.object_store.get(object_id)
+
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
         """Remove an object push session and optionally its messages."""
         with self._lock_object_push_sessions:
@@ -521,6 +585,13 @@ class InMemoryCoreState(
                 # Apply due time filter.
                 if cutoff is not None and automation.next_run_at > cutoff:
                     continue
+                # Finite automations with no remaining runs are already claimed.
+                if (
+                    cutoff is not None
+                    and automation.HasField("remaining_runs")
+                    and automation.remaining_runs == 0
+                ):
+                    continue
 
                 automations.append(automation)
 
@@ -546,6 +617,65 @@ class InMemoryCoreState(
             record.automation.status = AutomationStatus.STOPPED
             record.automation.updated_at = stopped_at
             record.automation.stopped_at = stopped_at
+            return True
+
+    def advance_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> bool:
+        """Advance an active automation occurrence."""
+        with self.lock_automation_store:
+            record = self.automation_store.get(automation_id)
+            if (
+                record is None
+                or record.automation.status != AutomationStatus.ACTIVE
+                or record.automation.next_run_at != previous_next_run_at
+                or (
+                    record.automation.HasField("remaining_runs")
+                    and record.automation.remaining_runs == 0
+                )
+            ):
+                return False
+
+            if next_run_at is None and (
+                not record.automation.HasField("remaining_runs")
+                or record.automation.remaining_runs > 1
+            ):
+                return False
+
+            record.automation.updated_at = now().isoformat()
+
+            if record.automation.HasField("remaining_runs"):
+                record.automation.remaining_runs = max(
+                    record.automation.remaining_runs - 1, 0
+                )
+
+            if next_run_at is not None:
+                record.automation.next_run_at = next_run_at
+            return True
+
+    def finish_automation(
+        self,
+        automation_id: int,
+        *,
+        status: Literal[AutomationStatus.COMPLETED, AutomationStatus.FAILED],
+    ) -> bool:
+        """Finish an active automation with a terminal status."""
+        with self.lock_automation_store:
+            record = self.automation_store.get(automation_id)
+            if record is None or record.automation.status != AutomationStatus.ACTIVE:
+                return False
+            if status == AutomationStatus.COMPLETED and (
+                not record.automation.HasField("remaining_runs")
+                or record.automation.remaining_runs != 0
+            ):
+                return False
+
+            record.automation.status = status
+            record.automation.updated_at = now().isoformat()
             return True
 
     def add_task_log(self, task_id: int, log_message: str) -> None:

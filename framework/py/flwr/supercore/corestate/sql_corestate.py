@@ -207,6 +207,123 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return missing_objects
 
+    def _claim_pending_object(
+        self,
+        run_id: int,
+        session_id: str,
+        object_id: str,
+    ) -> datetime | None:
+        """Claim a pending object and return the push session expiry."""
+        rows = self.query(
+            """
+            DELETE FROM object_push_session_pending AS pending
+            WHERE pending.session_id = :session_id
+              AND pending.object_id = :object_id
+              AND EXISTS (
+                  SELECT 1
+                  FROM object_push_sessions AS session
+                  WHERE session.session_id = :session_id
+                    AND session.run_id = :run_id
+              )
+            RETURNING (
+                SELECT expires_at
+                FROM object_push_sessions
+                WHERE session_id = :session_id
+            ) AS expires_at
+            """,
+            {
+                "session_id": session_id,
+                "object_id": object_id,
+                "run_id": uint64_to_int64(run_id),
+            },
+        )
+        if not rows:
+            return None
+
+        expires_at = rows[0]["expires_at"]
+        if isinstance(expires_at, str):  # SQLite returns string for TIMESTAMP column
+            return datetime.fromisoformat(expires_at)
+        return cast(datetime, expires_at)
+
+    def store_object(
+        self,
+        run_id: int,
+        session_id: str,
+        object_id: str,
+        object_content: bytes,
+    ) -> bool:
+        """Store an object if it is pending for an active push session."""
+        try:
+            with self.session():
+                # Atomically validate the session and claim its pending object
+                expires_at = self._claim_pending_object(run_id, session_id, object_id)
+                if expires_at is None:
+                    return False
+
+                # Reject expired sessions and clean up their messages and objects
+                if expires_at <= now():
+                    self._cleanup_push_session(session_id, cleanup_messages=True)
+                    return False
+
+                # Store the object, decrement pending work, and refresh the session TTL
+                self.object_store.put(object_id, object_content)
+                rows = self.query(
+                    """
+                    UPDATE object_push_sessions
+                    SET pending_count = pending_count - 1,
+                        expires_at = :expires_at
+                    WHERE session_id = :session_id
+                    RETURNING pending_count
+                    """,
+                    {
+                        "session_id": session_id,
+                        "expires_at": now()
+                        + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS),
+                    },
+                )
+                pending_count = rows[0]["pending_count"]
+
+                # Remove session bookkeeping once every pending object is stored
+                if pending_count == 0:
+                    self._cleanup_push_session(session_id, cleanup_messages=False)
+                return True
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            log(ERROR, "Failed to store object %s: %s", object_id, err)
+            return False
+
+    def get_object(self, run_id: int, object_id: str) -> bytes | None:
+        """Get an object and clean up expired push sessions when needed."""
+        with self.session():
+            # Return immediately unless the object is known but unavailable
+            content = self.object_store.get(object_id)
+            if content != b"":
+                return content
+
+            # Find expired sessions in this run that are waiting for the object
+            rows = self.query(
+                """
+                SELECT session.session_id
+                FROM object_push_session_pending AS pending
+                INNER JOIN object_push_sessions AS session
+                    ON pending.session_id = session.session_id
+                WHERE pending.object_id = :object_id
+                  AND session.run_id = :run_id
+                  AND session.expires_at <= :current
+                """,
+                {
+                    "object_id": object_id,
+                    "run_id": uint64_to_int64(run_id),
+                    "current": now(),
+                },
+            )
+            if not rows:
+                return content
+
+            # Clean up every expired session, then return the resulting object state
+            for row in rows:
+                self._cleanup_push_session(row["session_id"], cleanup_messages=True)
+            return self.object_store.get(object_id)
+
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
         """Remove an object push session and optionally its messages."""
         with self.session():
@@ -755,6 +872,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             params.update({f"status_{i}": status for i, status in enumerate(statuses)})
         if due_before is not None:
             conditions.append("next_run_at <= :due_before")
+            # Finite automations with no remaining runs are already claimed.
+            conditions.append("(remaining_runs IS NULL OR remaining_runs > 0)")
             params["due_before"] = due_before.isoformat()
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
@@ -816,6 +935,80 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 "status": AutomationStatus.STOPPED,
                 "updated_at": stopped_at,
                 "stopped_at": stopped_at,
+                "active_status": AutomationStatus.ACTIVE,
+            },
+        )
+        return bool(rows)
+
+    def advance_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> bool:
+        """Advance an active automation occurrence."""
+        timestamp = now()
+        params: dict[str, Any] = {
+            "automation_id": automation_id,
+            "active_status": AutomationStatus.ACTIVE,
+            "updated_at": timestamp,
+            "previous_next_run_at": previous_next_run_at,
+            "next_run_at": next_run_at,
+        }
+
+        rows = self.query(
+            """
+            UPDATE automation
+            SET updated_at = :updated_at,
+                next_run_at = CASE
+                    WHEN remaining_runs IS NOT NULL AND remaining_runs <= 1
+                        THEN next_run_at
+                    ELSE :next_run_at
+                END,
+                remaining_runs = CASE
+                    WHEN remaining_runs IS NULL
+                        THEN NULL
+                    WHEN remaining_runs > 0
+                        THEN remaining_runs - 1
+                    ELSE 0
+                END
+            WHERE automation_id = :automation_id
+            AND status = :active_status
+            AND next_run_at = :previous_next_run_at
+            AND (remaining_runs IS NULL OR remaining_runs > 0)
+            AND (:next_run_at IS NOT NULL OR remaining_runs <= 1)
+            RETURNING automation_id
+            """,
+            params,
+        )
+        return bool(rows)
+
+    def finish_automation(
+        self,
+        automation_id: int,
+        *,
+        status: Literal[AutomationStatus.COMPLETED, AutomationStatus.FAILED],
+    ) -> bool:
+        """Finish an active automation with a terminal status."""
+        completed_condition = ""
+        if status == AutomationStatus.COMPLETED:
+            completed_condition = "AND remaining_runs = 0"
+
+        rows = self.query(
+            f"""
+            UPDATE automation
+            SET status = :status,
+                updated_at = :updated_at
+            WHERE automation_id = :automation_id
+            AND status = :active_status
+            {completed_condition}
+            RETURNING automation_id
+            """,
+            {
+                "automation_id": automation_id,
+                "status": status,
+                "updated_at": now(),
                 "active_status": AutomationStatus.ACTIVE,
             },
         )

@@ -30,6 +30,7 @@ from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0
 from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
+from ..constant import AutomationStatus
 from ..object_store import ObjectStore
 
 
@@ -50,6 +51,51 @@ class CoreState(ABC):  # pylint: disable=R0904
         self, object_tree: ObjectTree, session_id: str
     ) -> list[str]:
         """Preregister the object tree for the object push session."""
+
+    @abstractmethod
+    def store_object(
+        self,
+        run_id: int,
+        session_id: str,
+        object_id: str,
+        object_content: bytes,
+    ) -> bool:
+        """Store an object if it is pending for an active push session.
+
+        Parameters
+        ----------
+        run_id : int
+            The ID of the run with which the push session is associated.
+        session_id : str
+            The ID of the object push session.
+        object_id : str
+            The ID of the object to store.
+        object_content : bytes
+            The object content to store.
+
+        Returns
+        -------
+        bool
+            True if the object was stored, otherwise False.
+        """
+
+    @abstractmethod
+    def get_object(self, run_id: int, object_id: str) -> bytes | None:
+        """Get an object and clean up expired push sessions when needed.
+
+        Parameters
+        ----------
+        run_id : int
+            The ID of the run requesting the object.
+        object_id : str
+            The ID of the object to retrieve.
+
+        Returns
+        -------
+        bytes | None
+            The object content, `b""` if it is known but unavailable, or None if it
+            is unknown.
+        """
 
     @abstractmethod
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
@@ -207,7 +253,7 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def store_message_and_object_tree(
-        self, message: Message, object_tree: ObjectTree
+        self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree.
 
@@ -217,6 +263,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             The Message to store.
         object_tree : ObjectTree
             The ObjectTree containing the IDs of objects to preregister.
+        session_id : str
+            The ID of the object push session.
 
         Returns
         -------
@@ -417,6 +465,57 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         bool
             True if an active automation was stopped, otherwise False.
+        """
+
+    @abstractmethod
+    def advance_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> bool:
+        """Advance an active automation occurrence.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to advance.
+        previous_next_run_at : str
+            Previously observed due time timestamp string. The update only
+            succeeds if the stored `next_run_at` still matches this value, preventing
+            multiple workers from executing the same scheduled run concurrently.
+        next_run_at : str | None
+            Next due time timestamp string. If `None`, the current occurrence is
+            treated as the last finite occurrence and no next due time is stored.
+
+        Returns
+        -------
+        bool
+            True if the active automation occurrence was advanced, otherwise
+            False.
+        """
+
+    @abstractmethod
+    def finish_automation(
+        self,
+        automation_id: int,
+        *,
+        status: Literal[AutomationStatus.COMPLETED, AutomationStatus.FAILED],
+    ) -> bool:
+        """Finish an active automation with a terminal status.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to finish.
+        status : AutomationStatus
+            Terminal target status. Must be `completed` or `failed`.
+
+        Returns
+        -------
+        bool
+            True if the active automation was finished, otherwise False.
         """
 
     @abstractmethod
