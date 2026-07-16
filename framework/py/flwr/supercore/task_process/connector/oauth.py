@@ -20,7 +20,7 @@ from typing import Protocol
 from flwr.supercore.typing import JSONObject
 
 
-class ConnectorOAuthProvider(Protocol):
+class OAuthConnectorProvider(Protocol):
     """Provider operations required by OAuth connector flows."""
 
     connector_ref: str

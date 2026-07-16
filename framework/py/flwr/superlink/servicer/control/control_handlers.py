@@ -20,10 +20,10 @@ import base64
 import hashlib
 import json
 import secrets
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from logging import ERROR, INFO
-from typing import NoReturn, TypeVar
+from typing import NoReturn
 
 import requests
 
@@ -127,7 +127,6 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
-from flwr.supercore.task_process.connector.oauth import ConnectorOAuthProvider
 from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
@@ -146,7 +145,6 @@ from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 
 OAUTH_SESSION_TTL = timedelta(minutes=10)
-T = TypeVar("T")
 
 
 def list_connectors(
@@ -164,18 +162,10 @@ def list_connectors(
         key=lambda item: item.connector_ref,
     ):
         connector_ref = provider.connector_ref
-        try:
-            connected = (
-                state.get_connector(
-                    flwr_aid=account.flwr_aid, connector_ref=connector_ref
-                )
-                is not None
-            )
-        except Exception as err:  # Persistence boundary
-            raise FlowerError(
-                ApiErrorCode.CONNECTOR_FAILURE,
-                f"Failed to list connectors ({type(err).__name__}).",
-            ) from None
+        connected = (
+            state.get_connector(flwr_aid=account.flwr_aid, connector_ref=connector_ref)
+            is not None
+        )
         connectors.append(
             Connector(
                 connector_ref=connector_ref,
@@ -197,13 +187,16 @@ def disconnect_connector(
     connector_ref = request.connector_ref.strip().lower()
     if not connector_ref:
         _raise_invalid_connector_request("connector_ref is required")
-    _get_connector_oauth_provider(connector_ref)
+    try:
+        connector_registry.get_oauth_connector_provider(connector_ref)
+    except ValueError:
+        raise FlowerError(
+            ApiErrorCode.CONNECTOR_NOT_FOUND,
+            f"OAuth provider for connector '{connector_ref}' was not found.",
+        ) from None
 
-    deleted = _call_connector_state(
-        lambda: state.delete_connector(
-            flwr_aid=account.flwr_aid, connector_ref=connector_ref
-        ),
-        "disconnect connector",
+    deleted = state.delete_connector(
+        flwr_aid=account.flwr_aid, connector_ref=connector_ref
     )
     if not deleted:
         raise FlowerError(
@@ -226,7 +219,13 @@ def begin_connector_oauth(
     redirect_uri = request.redirect_uri.strip()
     if not redirect_uri:
         _raise_invalid_connector_request("redirect_uri is required")
-    provider = _get_connector_oauth_provider(connector_ref)
+    try:
+        provider = connector_registry.get_oauth_connector_provider(connector_ref)
+    except ValueError:
+        raise FlowerError(
+            ApiErrorCode.CONNECTOR_NOT_FOUND,
+            f"OAuth provider for connector '{connector_ref}' was not found.",
+        ) from None
     try:
         redirect_uri = provider.resolve_redirect_uri(redirect_uri)
     except ValueError:
@@ -235,12 +234,14 @@ def begin_connector_oauth(
         )
     # Provider implementations can raise arbitrary exceptions; sanitize them.
     except Exception as err:  # pylint: disable=broad-exception-caught
-        _raise_connector_provider_failure(
-            connector_ref, "resolve redirect URI", type(err).__name__
+        _raise_connector_failure(
+            f"Connector '{connector_ref}' failed to resolve redirect URI "
+            f"({type(err).__name__})"
         )
     if not redirect_uri:
-        _raise_connector_provider_failure(
-            connector_ref, "resolve redirect URI", "empty response"
+        _raise_connector_failure(
+            f"Connector '{connector_ref}' failed to resolve redirect URI "
+            "(empty response)"
         )
 
     oauth_session_id = secrets.token_urlsafe(32)
@@ -249,31 +250,32 @@ def begin_connector_oauth(
     digest = hashlib.sha256(pkce_verifier.encode("ascii")).digest()
     pkce_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
     expires_at = now() + OAUTH_SESSION_TTL
-    authorization_url = _call_connector_provider(
-        lambda: provider.build_authorization_url(
+    try:
+        authorization_url = provider.build_authorization_url(
             redirect_uri=redirect_uri,
             state=oauth_state,
             pkce_challenge=pkce_challenge,
-        ),
-        connector_ref,
-        "build authorization URL",
-    )
+        )
+    # Provider implementations can raise arbitrary exceptions; sanitize them.
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        _raise_connector_failure(
+            f"Connector '{connector_ref}' failed to build authorization URL "
+            f"({type(err).__name__})"
+        )
     if not authorization_url:
-        _raise_connector_provider_failure(
-            connector_ref, "build authorization URL", "empty response"
+        _raise_connector_failure(
+            f"Connector '{connector_ref}' failed to build authorization URL "
+            "(empty response)"
         )
 
-    session = _call_connector_state(
-        lambda: state.create_connector_oauth_session(
-            oauth_session_id=oauth_session_id,
-            flwr_aid=account.flwr_aid,
-            connector_ref=connector_ref,
-            state=oauth_state,
-            redirect_uri=redirect_uri,
-            pkce_verifier=pkce_verifier,
-            expires_at=expires_at,
-        ),
-        "create OAuth session",
+    session = state.create_connector_oauth_session(
+        oauth_session_id=oauth_session_id,
+        flwr_aid=account.flwr_aid,
+        connector_ref=connector_ref,
+        state=oauth_state,
+        redirect_uri=redirect_uri,
+        pkce_verifier=pkce_verifier,
+        expires_at=expires_at,
     )
     if session is None:
         _raise_connector_failure("OAuth session could not be created")
@@ -302,11 +304,8 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
     if not request.state:
         _raise_invalid_connector_request("state is required")
 
-    session = _call_connector_state(
-        lambda: state.get_connector_oauth_session(
-            oauth_session_id=oauth_session_id, flwr_aid=account.flwr_aid
-        ),
-        "get OAuth session",
+    session = state.get_connector_oauth_session(
+        oauth_session_id=oauth_session_id, flwr_aid=account.flwr_aid
     )
     if session is None:
         raise FlowerError(
@@ -333,13 +332,16 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
         )
 
     connector_ref = session.connector_ref.strip().lower()
-    provider = _get_connector_oauth_provider(connector_ref)
-    claimed = _call_connector_state(
-        lambda: state.complete_connector_oauth_session(
-            oauth_session_id=session.oauth_session_id,
-            flwr_aid=account.flwr_aid,
-        ),
-        "complete OAuth session",
+    try:
+        provider = connector_registry.get_oauth_connector_provider(connector_ref)
+    except ValueError:
+        raise FlowerError(
+            ApiErrorCode.CONNECTOR_NOT_FOUND,
+            f"OAuth provider for connector '{connector_ref}' was not found.",
+        ) from None
+    claimed = state.complete_connector_oauth_session(
+        oauth_session_id=session.oauth_session_id,
+        flwr_aid=account.flwr_aid,
     )
     if not claimed:
         _raise_invalid_connector_request(
@@ -347,70 +349,36 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
             "pending"
         )
 
-    credentials, config = _call_connector_provider(
-        lambda: provider.exchange_code(
+    try:
+        credentials, config = provider.exchange_code(
             code=authorization_code,
             redirect_uri=session.redirect_uri,
             pkce_verifier=session.pkce_verifier,
-        ),
-        connector_ref,
-        "exchange authorization code",
-    )
+        )
+    # Provider implementations can raise arbitrary exceptions; sanitize them.
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        _raise_connector_failure(
+            f"Connector '{connector_ref}' failed to exchange authorization code "
+            f"({type(err).__name__})"
+        )
     try:
         credentials_json = strict_json_dumps(credentials, compact=True)
         config_json = strict_json_dumps(config, compact=True)
     except (TypeError, ValueError) as err:
-        _raise_connector_provider_failure(
-            connector_ref,
-            "serialize exchanged credentials",
-            type(err).__name__,
+        _raise_connector_failure(
+            f"Connector '{connector_ref}' failed to serialize exchanged "
+            f"credentials ({type(err).__name__})"
         )
 
-    stored = _call_connector_state(
-        lambda: state.upsert_connector(
-            flwr_aid=account.flwr_aid,
-            connector_ref=connector_ref,
-            credentials_json=credentials_json,
-            config_json=config_json,
-        ),
-        "store connector credentials",
+    stored = state.upsert_connector(
+        flwr_aid=account.flwr_aid,
+        connector_ref=connector_ref,
+        credentials_json=credentials_json,
+        config_json=config_json,
     )
     if not stored:
         _raise_connector_failure("Connector credentials could not be stored")
     return CompleteConnectorOAuthResponse(connector_ref=connector_ref)
-
-
-def _get_connector_oauth_provider(connector_ref: str) -> ConnectorOAuthProvider:
-    """Return the registered OAuth provider for a connector reference."""
-    for provider in connector_registry.OAUTH_CONNECTOR_PROVIDERS:
-        if provider.connector_ref == connector_ref:
-            return provider
-    raise FlowerError(
-        ApiErrorCode.CONNECTOR_NOT_FOUND,
-        f"OAuth provider for connector '{connector_ref}' was not found.",
-    )
-
-
-def _call_connector_provider(
-    operation: Callable[[], T], connector_ref: str, action: str
-) -> T:
-    """Call provider code without exposing provider exception details."""
-    try:
-        return operation()
-    # Provider implementations can raise arbitrary exceptions; sanitize them.
-    except Exception as err:  # pylint: disable=broad-exception-caught
-        _raise_connector_provider_failure(connector_ref, action, type(err).__name__)
-
-
-def _call_connector_state(operation: Callable[[], T], action: str) -> T:
-    """Call connector state code and translate persistence failures."""
-    try:
-        return operation()
-    except Exception as err:  # Persistence boundary
-        raise FlowerError(
-            ApiErrorCode.CONNECTOR_FAILURE,
-            f"Failed to {action} ({type(err).__name__}).",
-        ) from None
 
 
 def _raise_invalid_connector_request(reason: str) -> NoReturn:
@@ -421,22 +389,12 @@ def _raise_invalid_connector_request(reason: str) -> NoReturn:
     )
 
 
-def _raise_connector_provider_failure(
-    connector_ref: str, action: str, error_type: str
-) -> NoReturn:
-    """Raise a provider failure without including provider exception details."""
-    raise FlowerError(
-        ApiErrorCode.CONNECTOR_FAILURE,
-        f"Connector '{connector_ref}' failed to {action} ({error_type}).",
-    ) from None
-
-
 def _raise_connector_failure(reason: str) -> NoReturn:
     """Raise a sanitized connector failure."""
     raise FlowerError(
         ApiErrorCode.CONNECTOR_FAILURE,
         f"Connector failure: {reason}.",
-    )
+    ) from None
 
 
 def start_run(  # pylint: disable=too-many-locals, too-many-statements
