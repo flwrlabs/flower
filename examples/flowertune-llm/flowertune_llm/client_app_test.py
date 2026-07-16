@@ -15,7 +15,8 @@ class DictConfig(dict):
 
     def __getattr__(self, name: str):
         try:
-            return self[name]
+            value = self[name]
+            return DictConfig(value) if isinstance(value, dict) else value
         except KeyError as exc:
             raise AttributeError(name) from exc
 
@@ -34,9 +35,11 @@ from flowertune_llm.client_app import (  # noqa: E402
     STATE_LAYER_PATHS,
     STATE_NUM_EXAMPLES,
     _persist_layer_files,
+    train,
     train_download,
     train_comms,
 )
+from flowertune_llm import client_app as client_app_module  # noqa: E402
 from flowertune_llm.task import load_layer_from_disk  # noqa: E402
 
 
@@ -141,3 +144,50 @@ def test_train_download_persists_split_chunks_across_processes(tmp_path) -> None
     layer_path = context.state[STATE_LAYER_PATHS]["paths"][0]
     layer = load_layer_from_disk(layer_path, "layer.big")
     assert torch.equal(layer, torch.tensor([1.0, 2.0, 3.0, 4.0]))
+
+
+def test_layerwise_torchtitan_dcp_does_not_load_hf_model(tmp_path, monkeypatch) -> None:
+    """Layerwise DCP training should hand files to the job without get_model."""
+    context = Context(
+        run_id=700,
+        node_id=800,
+        node_config={},
+        state=RecordDict(),
+        run_config={
+            "aggregation.mode": "layerwise",
+            "aggregation.layer-write-dir": str(tmp_path),
+            "trainer.backend": "torchtitan",
+            "trainer.torchtitan.dcp-enabled": True,
+            "train.disable": False,
+        },
+    )
+    _persist_layer_files(context, {"layer.a": torch.ones(2)}, ["layer.a"])
+    message = Message(
+        content=RecordDict({
+            "config": ConfigRecord({
+                "model_preloaded": True,
+                "layer_names": ["layer.a"],
+            })
+        }),
+        dst_node_id=1,
+        message_type="train",
+    )
+    calls: dict[str, object] = {}
+
+    def fail_get_model(_cfg):
+        raise AssertionError("HF model construction should be skipped")
+
+    def fake_run(_cfg, _context, state_dict, **kwargs):
+        calls["state_dict"] = state_dict
+        calls.update(kwargs)
+        return None
+
+    monkeypatch.setattr(client_app_module, "get_model", fail_get_model)
+    monkeypatch.setattr(client_app_module, "run_torchtitan_training", fake_run)
+
+    reply = train(message, context)
+
+    assert calls["state_dict"] is None
+    assert calls["layer_paths"] == list(context.state[STATE_LAYER_PATHS]["paths"])
+    assert isinstance(reply.content["arrays"], ArrayRecord)
+    assert len(reply.content["arrays"]) == 0

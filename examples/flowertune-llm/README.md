@@ -173,6 +173,19 @@ For script-template parameterization (matching job-template workflows), these ke
 - `client.dataset-path` -> `dataset_path`
 - `trainer.torchtitan.config-filename` -> `config_filename`
 - `trainer.num-nodes` -> `num_nodes`
+- `input_layers_dir` -> `input_layers_dir`
+- `dcp_conversion_dir` -> `dcp_conversion_dir`
+- `output_layers_dir` -> `output_layers_dir`
+- `dcp_conversion_command` -> `dcp_conversion_command`
+- `dcp_to_layers_command` -> `dcp_to_layers_command`
+- `flowertune_llm_root` -> `flowertune_llm_root`
+
+When using `trainer.backend=torchtitan` with layerwise DCP enabled, the
+generated Slurm/Flux templates run both DCP conversions inside the training
+job. Custom scheduler templates must include the same conversion blocks and
+invoke `dcp_conversion_command` before creating the `step-0` symlink, then
+invoke `dcp_to_layers_command` before moving the final checkpoint to
+`FLWR_TORCHTITAN_OUTPUT_DCP_DIR`.
 
 Dry-run (render scripts/config but skip submission/training):
 

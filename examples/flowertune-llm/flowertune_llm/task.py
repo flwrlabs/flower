@@ -9,15 +9,19 @@ import re
 import shlex
 import shutil
 import subprocess
+import tempfile
 from textwrap import dedent
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
-from flwr.app import Context
-from omegaconf import DictConfig
+
+if TYPE_CHECKING:
+    from flwr.app import Context
+    from omegaconf import DictConfig
 
 STATE_LAYER_PATHS = "layer_paths"
 DEFAULT_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
+FLOWERTUNE_LLM_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 @dataclass
@@ -82,9 +86,34 @@ def _render_template_file(template_path: str, values: dict[str, Any]) -> str:
     return _render_template_text(template_text, values)
 
 
+def _python_module_command(
+    python_exec: str,
+    module: str,
+    arguments: list[str],
+) -> str:
+    """Build a shell-safe Python module command for a scheduler script."""
+    executable = shlex.split(python_exec) or ["python"]
+    return " ".join(
+        shlex.quote(part)
+        for part in [*executable, "-m", module, *arguments]
+    )
+
+
 def training_disabled(context: Context) -> bool:
     """Return whether client-side training should be skipped."""
     return _as_bool(_config_value(context, "train.disable", False), default=False)
+
+
+def torchtitan_dcp_enabled(context: Context) -> bool:
+    """Return whether TorchTitan DCP handoff is enabled."""
+    return _as_bool(
+        _config_value(
+            context,
+            "trainer.torchtitan.dcp-enabled",
+            _config_value(context, "trainer.torchtitan.dcp_enabled", False),
+        ),
+        default=False,
+    )
 
 
 def sanitize_layer_name(name: str) -> str:
@@ -450,6 +479,13 @@ def load_state_dict_from_layer_files(context: Context) -> dict[str, torch.Tensor
         return {}
 
     layer_paths = list(context.state[STATE_LAYER_PATHS]["paths"])
+    return load_state_dict_from_layer_paths(layer_paths)
+
+
+def load_state_dict_from_layer_paths(
+    layer_paths: list[str],
+) -> dict[str, torch.Tensor]:
+    """Load a state_dict from persisted layer files."""
     state_dict: dict[str, torch.Tensor] = {}
     for layer_path in layer_paths:
         if not os.path.exists(layer_path):
@@ -459,6 +495,163 @@ def load_state_dict_from_layer_files(context: Context) -> dict[str, torch.Tensor
         for layer_name, tensor in layer_dict.items():
             state_dict[str(layer_name)] = tensor.detach().cpu()
     return state_dict
+
+
+def layer_file_paths(layer_directory: str) -> list[str]:
+    """Return direct layer files in deterministic order."""
+    if not os.path.isdir(layer_directory):
+        raise FileNotFoundError(f"Layer directory not found: {layer_directory}")
+    return [
+        os.path.join(layer_directory, name)
+        for name in sorted(os.listdir(layer_directory))
+        if name.endswith(".pt")
+        and os.path.isfile(os.path.join(layer_directory, name))
+    ]
+
+
+def load_state_dict_from_layer_directory(
+    layer_directory: str,
+) -> dict[str, torch.Tensor]:
+    """Load a state_dict from direct layer files in a directory."""
+    return load_state_dict_from_layer_paths(layer_file_paths(layer_directory))
+
+
+def state_dict_fingerprint_from_layer_paths(layer_paths: list[str]) -> float:
+    """Fingerprint layer files without constructing a model object."""
+    fingerprint = 0.0
+    for layer_path in layer_paths:
+        if not os.path.exists(layer_path):
+            continue
+        with open(layer_path, "rb") as file:
+            layer_dict = pickle.load(file)
+        fingerprint += state_dict_fingerprint(layer_dict)
+    return fingerprint
+
+
+def state_dict_fingerprint_from_layer_directory(layer_directory: str) -> float:
+    """Fingerprint a layer directory without constructing a model object."""
+    return state_dict_fingerprint_from_layer_paths(layer_file_paths(layer_directory))
+
+
+def _write_state_dict_as_layer_files(
+    state_dict: dict[str, torch.Tensor],
+    output_directory: str,
+    *,
+    layer_names: list[str] | None = None,
+    ready_marker: str | None = None,
+) -> None:
+    """Publish layer files atomically after a successful conversion."""
+    os.makedirs(output_directory, exist_ok=True)
+    names = layer_names or list(state_dict.keys())
+    missing = [name for name in names if name not in state_dict]
+    if missing:
+        raise KeyError(f"Converted checkpoint is missing layers: {missing[:3]}")
+
+    temporary_directory = tempfile.mkdtemp(
+        prefix=".torchtitan-layers-", dir=output_directory
+    )
+    try:
+        expected_files: set[str] = set()
+        for layer_name in names:
+            file_name = f"{sanitize_layer_name(layer_name)}.pt"
+            expected_files.add(file_name)
+            temporary_path = os.path.join(temporary_directory, file_name)
+            with open(temporary_path, "wb") as file:
+                pickle.dump(
+                    {layer_name: state_dict[layer_name].detach().cpu()},
+                    file,
+                )
+
+        for existing_path in layer_file_paths(output_directory):
+            if os.path.basename(existing_path) not in expected_files:
+                _remove_path(existing_path)
+
+        for file_name in expected_files:
+            os.replace(
+                os.path.join(temporary_directory, file_name),
+                os.path.join(output_directory, file_name),
+            )
+
+        if ready_marker:
+            temporary_marker = f"{ready_marker}.tmp"
+            with open(temporary_marker, "w", encoding="utf-8") as file:
+                file.write("ready\n")
+            os.replace(temporary_marker, ready_marker)
+    finally:
+        shutil.rmtree(temporary_directory, ignore_errors=True)
+
+
+def convert_layer_directory_to_dcp(
+    input_directory: str,
+    output_directory: str,
+    *,
+    train_spec_name: str,
+    model_args_key: str,
+    dcp_threads: int,
+) -> None:
+    """Convert persisted HF-like layer files into TorchTitan DCP."""
+    state_dict = load_state_dict_from_layer_directory(input_directory)
+    if not state_dict:
+        raise ValueError(f"No layer files found in {input_directory}")
+
+    resolved_model_args = model_args_key
+    try:
+        import torchtitan.protocols.train_spec as train_spec_module
+    except Exception:
+        pass
+    else:
+        train_spec = train_spec_module.get_train_spec(train_spec_name)
+        resolved_model_args = _resolve_torchtitan_model_args_key(
+            train_spec, state_dict, model_args_key
+        )
+
+    _save_state_dict_as_dcp(
+        state_dict,
+        output_directory,
+        train_spec_name=train_spec_name,
+        model_args_key=resolved_model_args,
+        dcp_threads=dcp_threads,
+    )
+
+
+def convert_dcp_to_layer_directory(
+    input_directory: str,
+    reference_directory: str,
+    output_directory: str,
+    *,
+    train_spec_name: str,
+    model_args_key: str,
+    dcp_threads: int,
+    ready_marker: str | None = None,
+) -> None:
+    """Convert a TorchTitan DCP checkpoint into atomically published layers."""
+    reference_state = load_state_dict_from_layer_directory(reference_directory)
+    if not reference_state:
+        raise ValueError(f"No reference layer files found in {reference_directory}")
+
+    resolved_model_args = model_args_key
+    try:
+        import torchtitan.protocols.train_spec as train_spec_module
+    except Exception:
+        pass
+    else:
+        train_spec = train_spec_module.get_train_spec(train_spec_name)
+        resolved_model_args = _resolve_torchtitan_model_args_key(
+            train_spec, reference_state, model_args_key
+        )
+
+    state_dict = _load_state_dict_from_dcp(
+        input_directory,
+        train_spec_name=train_spec_name,
+        model_args_key=resolved_model_args,
+        reference_state_dict=reference_state,
+    )
+    _write_state_dict_as_layer_files(
+        state_dict,
+        output_directory,
+        layer_names=list(reference_state.keys()),
+        ready_marker=ready_marker,
+    )
 
 
 def extract_state_dict(payload: object) -> dict[str, torch.Tensor]:
@@ -631,11 +824,18 @@ def _load_state_dict_from_dcp(
 def run_torchtitan_training(
     cfg: DictConfig,
     context: Context,
-    state_dict: dict[str, torch.Tensor],
+    state_dict: dict[str, torch.Tensor] | None,
     *,
     server_round: int | None = None,
-) -> dict[str, torch.Tensor]:
-    """Execute TorchTitan training command and load the updated state_dict."""
+    layer_paths: list[str] | None = None,
+    output_layer_dir: str | None = None,
+) -> dict[str, torch.Tensor] | None:
+    """Execute TorchTitan training and return state only for legacy paths.
+
+    Layerwise DCP training keeps the state on disk. The scheduler job performs
+    both DCP conversions, so the ClientApp never needs to materialize the full
+    model state.
+    """
     trainer_cfg = getattr(cfg, "trainer", {})
     titan_cfg = getattr(trainer_cfg, "torchtitan", {})
     command = str(getattr(titan_cfg, "command", "")).strip()
@@ -659,6 +859,7 @@ def run_torchtitan_training(
         ),
         default=False,
     )
+    layerwise_dcp = dcp_enabled and layer_paths is not None
     dcp_train_spec = str(
         _config_value(
             context,
@@ -739,12 +940,16 @@ def run_torchtitan_training(
         workdir = client_workspace
     os.makedirs(dump_folder, exist_ok=True)
     resolved_dcp_model_args = dcp_model_args
-    if dcp_enabled:
+    if dcp_enabled and not layerwise_dcp:
         try:
             import torchtitan.protocols.train_spec as train_spec_module
         except Exception:
             pass
         else:
+            if state_dict is None:
+                raise ValueError(
+                    "state_dict is required for non-layerwise DCP training"
+                )
             train_spec = train_spec_module.get_train_spec(dcp_train_spec)
             resolved_dcp_model_args = _resolve_torchtitan_model_args_key(
                 train_spec, state_dict, dcp_model_args
@@ -759,6 +964,25 @@ def run_torchtitan_training(
     checkpoint_dir = os.path.join(dump_folder, "checkpoint")
     step0_dcp_dir = os.path.join(checkpoint_dir, "step-0")
     final_dcp_dir = os.path.join(checkpoint_dir, f"step-{train_steps}")
+    input_layer_dir = (
+        os.path.abspath(os.path.dirname(layer_paths[0]))
+        if layer_paths
+        else ""
+    )
+    output_layer_dir = (
+        os.path.abspath(output_layer_dir or input_layer_dir)
+        if layerwise_dcp
+        else ""
+    )
+    output_layers_ready = (
+        os.path.join(output_layer_dir, ".torchtitan_layers_ready")
+        if layerwise_dcp
+        else ""
+    )
+    cache_available = round_id <= 1 and _dcp_checkpoint_exists(dcp_cache_dir)
+    conversion_dir = (
+        dcp_cache_dir if round_id <= 1 else input_dcp_dir
+    )
     env = os.environ.copy()
     scheduler_env = {
         "FLWR_TORCHTITAN_INPUT_STATE": input_state_path,
@@ -769,6 +993,11 @@ def run_torchtitan_training(
         "FLWR_TORCHTITAN_CHECKPOINT_DIR": checkpoint_dir,
         "FLWR_TORCHTITAN_STEP0_DCP_DIR": step0_dcp_dir,
         "FLWR_TORCHTITAN_FINAL_DCP_DIR": final_dcp_dir,
+        "FLWR_TORCHTITAN_INPUT_LAYERS_DIR": input_layer_dir,
+        "FLWR_TORCHTITAN_DCP_CONVERSION_DIR": conversion_dir,
+        "FLWR_TORCHTITAN_OUTPUT_LAYERS_DIR": output_layer_dir,
+        "FLWR_TORCHTITAN_OUTPUT_LAYERS_READY": output_layers_ready,
+        "FLWR_FLOWERTUNE_LLM_ROOT": FLOWERTUNE_LLM_ROOT,
         "FLWR_RUN_ID": str(context.run_id),
         "FLWR_NODE_ID": str(context.node_id),
     }
@@ -782,6 +1011,50 @@ def run_torchtitan_training(
     scheduler_time = _config_str(context, "scheduler.time", "")
     scheduler_extra_args = _config_str(context, "scheduler.extra-args", "")
     env_setup = _config_str(context, "trainer.env-setup", "")
+
+    dcp_conversion_command = ""
+    dcp_to_layers_command = ""
+    if layerwise_dcp:
+        dcp_conversion_command = _python_module_command(
+            python_exec,
+            "flowertune_llm.dcp_converter",
+            [
+                "--direction",
+                "to-dcp",
+                "--input-dir",
+                input_layer_dir,
+                "--output-dir",
+                conversion_dir,
+                "--train-spec",
+                dcp_train_spec,
+                "--model-args",
+                dcp_model_args,
+                "--threads",
+                str(dcp_threads),
+            ],
+        )
+        dcp_to_layers_command = _python_module_command(
+            python_exec,
+            "flowertune_llm.dcp_converter",
+            [
+                "--direction",
+                "to-layers",
+                "--input-dir",
+                final_dcp_dir,
+                "--reference-dir",
+                input_layer_dir,
+                "--output-dir",
+                output_layer_dir,
+                "--ready-marker",
+                output_layers_ready,
+                "--train-spec",
+                dcp_train_spec,
+                "--model-args",
+                dcp_model_args,
+                "--threads",
+                str(dcp_threads),
+            ],
+        )
 
     render_context: dict[str, Any] = {
         "run_id": context.run_id,
@@ -805,6 +1078,13 @@ def run_torchtitan_training(
         "checkpoint_dir": checkpoint_dir,
         "step0_dcp_dir": step0_dcp_dir,
         "final_dcp_dir": final_dcp_dir,
+        "input_layers_dir": input_layer_dir,
+        "dcp_conversion_dir": conversion_dir,
+        "output_layers_dir": output_layer_dir,
+        "output_layers_ready": output_layers_ready,
+        "flowertune_llm_root": FLOWERTUNE_LLM_ROOT,
+        "dcp_conversion_command": dcp_conversion_command,
+        "dcp_to_layers_command": dcp_to_layers_command,
         "work_dir": output_dir,
         "client_workspace": client_workspace,
         "dump_folder": dump_folder,
@@ -847,7 +1127,14 @@ def run_torchtitan_training(
 
     def write_scheduler_script(backend: str) -> str:
         """Render the configured scheduler script and return its path."""
-        if backend == "slurm":
+        if backend == "local":
+            script_path = os.path.join(output_dir, "torchtitan_local.sh")
+            template_path = _template_path(
+                context,
+                "scheduler.slurm.script-template",
+                "slurm_train.sh.j2",
+            )
+        elif backend == "slurm":
             script_path = os.path.join(output_dir, "torchtitan_slurm.sh")
             template_path = _template_path(
                 context,
@@ -913,7 +1200,11 @@ def run_torchtitan_training(
                     """
                 )
             )
-        return _normalize_state_dict_for_hf(state_dict)
+        return (
+            _normalize_state_dict_for_hf(state_dict)
+            if state_dict is not None
+            else None
+        )
 
     if not command and (
         scheduler_backend in {"", "none", "local"} or not custom_scheduler_template
@@ -931,13 +1222,22 @@ def run_torchtitan_training(
     _remove_path(output_state_path)
     _remove_path(input_dcp_dir)
     _remove_path(output_dcp_dir)
+    _remove_path(step0_dcp_dir)
+    _remove_path(output_layers_ready)
 
-    if dcp_enabled:
-        if round_id <= 1 and _dcp_checkpoint_exists(dcp_cache_dir):
+    if layerwise_dcp:
+        if cache_available:
+            _replace_symlink(input_dcp_dir, dcp_cache_dir)
+        else:
+            _remove_path(conversion_dir)
+    elif dcp_enabled:
+        if round_id <= 1 and cache_available:
             _replace_symlink(input_dcp_dir, dcp_cache_dir)
         else:
             conversion_dir = dcp_cache_dir if round_id <= 1 else input_dcp_dir
             _remove_path(conversion_dir)
+            if state_dict is None:
+                raise ValueError("state_dict is required for DCP training")
             _save_state_dict_as_dcp(
                 state_dict,
                 conversion_dir,
@@ -948,10 +1248,23 @@ def run_torchtitan_training(
             if conversion_dir == dcp_cache_dir:
                 _replace_symlink(input_dcp_dir, dcp_cache_dir)
     else:
+        if state_dict is None:
+            raise ValueError("state_dict is required for non-DCP training")
         torch.save(state_dict, input_state_path)
 
     if scheduler_backend in {"", "none", "local"}:
-        result = run_local()
+        if layerwise_dcp:
+            local_script = write_scheduler_script("local")
+            result = subprocess.run(
+                [local_script],
+                env=env,
+                cwd=workdir,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        else:
+            result = run_local()
     elif scheduler_backend == "slurm":
         slurm_submit = str(
             _config_value(context, "scheduler.slurm.submit-command", "sbatch")
@@ -1029,6 +1342,11 @@ def run_torchtitan_training(
             check=False,
         )
     if result.returncode != 0:
+        _remove_path(step0_dcp_dir)
+        _remove_path(input_dcp_dir)
+        _remove_path(output_dcp_dir)
+        if layerwise_dcp and not cache_available:
+            _remove_path(conversion_dir)
         raise RuntimeError(
             "TorchTitan command failed with exit code "
             f"{result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
@@ -1036,6 +1354,27 @@ def run_torchtitan_training(
     if dcp_enabled:
         _remove_path(step0_dcp_dir)
         _remove_path(input_dcp_dir)
+
+    if layerwise_dcp:
+        if not os.path.isdir(output_dcp_dir):
+            _remove_path(output_layers_ready)
+            _remove_path(output_dcp_dir)
+            _remove_path(output_dir)
+            raise FileNotFoundError(
+                "TorchTitan command completed but did not write the output DCP "
+                f"directory: {output_dcp_dir}"
+            )
+        if not os.path.exists(output_layers_ready):
+            _remove_path(output_dcp_dir)
+            _remove_path(output_dir)
+            raise FileNotFoundError(
+                "TorchTitan job completed without publishing converted layer "
+                f"files: {output_layers_ready}"
+            )
+        _remove_path(output_layers_ready)
+        _remove_path(output_dcp_dir)
+        _remove_path(output_dir)
+        return None
 
     if os.path.exists(output_state_path):
         payload = torch.load(output_state_path, map_location="cpu")
@@ -1051,7 +1390,7 @@ def run_torchtitan_training(
             output_dcp_dir,
             train_spec_name=dcp_train_spec,
             model_args_key=resolved_dcp_model_args,
-            reference_state_dict=state_dict,
+            reference_state_dict=state_dict or {},
         )
         _remove_path(output_dcp_dir)
         _remove_path(output_dir)

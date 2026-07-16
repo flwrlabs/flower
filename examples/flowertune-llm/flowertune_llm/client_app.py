@@ -33,7 +33,9 @@ from flowertune_llm.task import (
     sanitize_layer_name,
     shape_from_text,
     state_dict_fingerprint,
+    state_dict_fingerprint_from_layer_paths,
     training_disabled,
+    torchtitan_dcp_enabled,
 )
 
 # Avoid warnings
@@ -472,6 +474,48 @@ def train(msg: Message, context: Context):
                 "num-examples": 1,
                 "train_skipped": 1,
                 "profile.client.train.ms": (t1 - t0) * 1000.0,
+            }
+        )
+        return Message(
+            content=RecordDict({"arrays": ArrayRecord(), "metrics": metrics}),
+            reply_to=msg,
+        )
+
+    layerwise_dcp = (
+        trainer_backend == "torchtitan"
+        and aggregation_mode != "all_at_once"
+        and torchtitan_dcp_enabled(context)
+        and model_preloaded
+        and STATE_LAYER_PATHS in context.state
+    )
+    if layerwise_dcp:
+        layer_paths = list(context.state[STATE_LAYER_PATHS]["paths"])
+        input_fingerprint = state_dict_fingerprint_from_layer_paths(layer_paths)
+
+        server_round = None
+        if "server-round" in config:
+            server_round = int(config["server-round"])
+        elif "current-round" in config:
+            server_round = int(config["current-round"])
+
+        run_torchtitan_training(
+            cfg,
+            context,
+            None,
+            server_round=server_round,
+            layer_paths=layer_paths,
+            output_layer_dir=layer_dir(context),
+        )
+        output_fingerprint = state_dict_fingerprint_from_layer_paths(layer_paths)
+        t1 = perf_counter()
+        metrics = MetricRecord(
+            {
+                "train_loss": 0.0,
+                "num-examples": 1,
+                "profile.client.train.ms": (t1 - t0) * 1000.0,
+                "model.input_fingerprint": input_fingerprint,
+                "model.output_fingerprint": output_fingerprint,
+                "model.fingerprint_delta": output_fingerprint - input_fingerprint,
             }
         )
         return Message(
