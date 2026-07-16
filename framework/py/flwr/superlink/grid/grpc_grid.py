@@ -61,7 +61,7 @@ from flwr.supercore.inflatable.inflatable_protobuf_utils import (
     make_push_object_fn_protobuf,
 )
 from flwr.supercore.inflatable.inflatable_utils import (
-    ObjectUnavailableError,
+    ObjectPullError,
     inflate_object_from_contents,
     pull_objects,
     push_objects,
@@ -340,12 +340,9 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
                             run_id=run_id,
                         ),
                     )
-                except ObjectUnavailableError as e:
-                    # An ObjectUnavailableError indicates that the object is not yet
-                    # available. If this point has been reached, it means that the
-                    # Grid has tried to pull the object for the maximum number of times
-                    # or for the maximum time allowed, so we return an inflated message
-                    # with an error
+                except ObjectPullError as e:
+                    # Return an error message if an object is missing or remains
+                    # unavailable after all pull attempts.
                     inflated_msgs.append(
                         make_message(
                             metadata=Metadata(
