@@ -14,7 +14,7 @@
 # ==============================================================================
 """Control API event logging for FastAPI requests."""
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import AsyncIterable, Callable, Iterable, Iterator
 from functools import partial
 from typing import Protocol, cast
 
@@ -24,6 +24,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import State
 
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.event_log.typing import LogEntry
 from flwr.supercore.protobuf.routing import _call_handler
 
@@ -122,6 +123,18 @@ class ControlEventLogger:
                 compose_after_event(exc),
             )
             raise
+
+        if isinstance(result, AsyncIterable):
+            error = FlowerError(
+                ApiErrorCode.INVALID_HANDLER_RESPONSE,
+                "Async Control streaming handlers are not supported.",
+            )
+            await run_in_threadpool(
+                _write_event,
+                event_log_plugin,
+                compose_after_event(error),
+            )
+            raise error
 
         if isinstance(result, Iterable):
 

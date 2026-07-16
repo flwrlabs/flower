@@ -15,7 +15,7 @@
 """Tests for Control API FastAPI event logging."""
 
 import asyncio
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from typing import cast
 
 import pytest
@@ -28,6 +28,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsResponse,
 )
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.event_log.typing import Actor, Event, LogEntry
 
 from .event_log import ControlEventLogger
@@ -178,3 +179,19 @@ def test_stream_exception_writes_after_event() -> None:
 
     assert event_log_writer.calls[0] == ("before", ListRunsRequest())
     assert isinstance(event_log_writer.calls[1][1], RuntimeError)
+
+
+def test_async_stream_is_not_supported() -> None:
+    """An async stream is rejected and recorded as a failed after-event."""
+    event_log_writer = _EventLogWriter()
+
+    async def handler(_: ListRunsRequest) -> AsyncIterator[ListRunsResponse]:
+        """Return an unsupported async stream."""
+        yield ListRunsResponse()
+
+    with pytest.raises(FlowerError) as error:
+        _call(handler, event_log_writer)
+
+    assert error.value.code == ApiErrorCode.INVALID_HANDLER_RESPONSE
+    assert event_log_writer.calls[0] == ("before", ListRunsRequest())
+    assert isinstance(event_log_writer.calls[1][1], FlowerError)
