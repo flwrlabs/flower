@@ -621,7 +621,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         assert flower_error.code == ApiErrorCode.FLEET_GET_FAB_FAILED
 
     @parameterized.expand([(True,), (False,)])  # type: ignore
-    def test_push_object_succesful(self, include_session_id: bool) -> None:
+    def test_push_object_successful(self, include_session_id: bool) -> None:
         """Test `PushObject`."""
         # Prepare
         run_id = self._create_dummy_run()
