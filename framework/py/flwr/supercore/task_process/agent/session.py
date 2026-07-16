@@ -39,9 +39,11 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorResponse,
 )
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
-from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
+from flwr.supercore.task_process.connector.registry import (
+    get_builtin_connector_tool,
+    has_builtin_connector,
+)
 from flwr.supercore.task_process.connector.web_fetch import WEB_FETCH_CONNECTOR_NAME
-from flwr.supercore.task_process.connector.web_search import WEB_SEARCH_CONNECTOR_NAME
 from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_dumps
 
@@ -193,7 +195,7 @@ class RuntimeAgentResponses(AgentResponses):
             output: JSONValue = None,
             message: str | None = None,
         ) -> list[JSONObject]:
-            if name not in (WEB_SEARCH_CONNECTOR_NAME, WEB_FETCH_CONNECTOR_NAME):
+            if not has_builtin_connector(name):
                 return []
 
             event: JSONObject = {
