@@ -220,9 +220,11 @@ class PushObjectRequest(google.protobuf.message.Message):
     RUN_ID_FIELD_NUMBER: builtins.int
     OBJECT_ID_FIELD_NUMBER: builtins.int
     OBJECT_CONTENT_FIELD_NUMBER: builtins.int
+    SESSION_ID_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     object_id: builtins.str
     object_content: builtins.bytes
+    session_id: builtins.str
     @property
     def node(self) -> flwr.proto.node_pb2.Node: ...
     def __init__(
@@ -232,9 +234,10 @@ class PushObjectRequest(google.protobuf.message.Message):
         run_id: builtins.int = ...,
         object_id: builtins.str = ...,
         object_content: builtins.bytes = ...,
+        session_id: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["node", b"node"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["node", b"node", "object_content", b"object_content", "object_id", b"object_id", "run_id", b"run_id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["node", b"node", "object_content", b"object_content", "object_id", b"object_id", "run_id", b"run_id", "session_id", b"session_id"]) -> None: ...
 
 global___PushObjectRequest = PushObjectRequest
 

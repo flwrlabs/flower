@@ -64,6 +64,7 @@ message PushObjectRequest {
   uint64 run_id = 2;
   string object_id = 3;
   bytes object_content = 4;
+  string session_id = 5;
 }
 message PushObjectResponse { bool stored = 1; }
 

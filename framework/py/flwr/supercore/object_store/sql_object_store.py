@@ -14,6 +14,9 @@
 # ==============================================================================
 """Flower SQLAlchemy-based ObjectStore implementation."""
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 from sqlalchemy import MetaData
 
@@ -26,13 +29,20 @@ from flwr.supercore.inflatable.inflatable_object import (
 from flwr.supercore.inflatable.inflatable_utils import validate_object_content
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.objectstore_tables import create_objectstore_metadata
-from flwr.supercore.utils import uint64_to_int64
+from flwr.supercore.utils import build_sql_in_params, uint64_to_int64
 
 from .object_store import NoObjectInStoreError, ObjectStore
+
+_objectstore_mutation_lock_held: ContextVar[bool] = ContextVar(
+    "objectstore_mutation_lock_held",
+    default=False,
+)
 
 
 class SqlObjectStore(ObjectStore, SqlMixin):
     """SQLAlchemy-based implementation of the ObjectStore interface."""
+
+    _MUTATION_LOCK_ID = "mutation"
 
     def __init__(
         self,
@@ -54,7 +64,7 @@ class SqlObjectStore(ObjectStore, SqlMixin):
             if not is_valid_sha256_hash(tree_node.object_id):
                 raise ValueError(f"Invalid object ID format: {tree_node.object_id}")
 
-        with self.session():
+        with self._mutation_session():
             for tree_node in tree_nodes:
                 obj_id = tree_node.object_id
                 child_ids = [child.object_id for child in tree_node.children]
@@ -195,7 +205,7 @@ class SqlObjectStore(ObjectStore, SqlMixin):
 
     def delete(self, object_id: str) -> None:
         """Delete an object and its unreferenced descendants from the store."""
-        with self.session():
+        with self._mutation_session():
             rows = self.query(
                 "SELECT 1 FROM objects WHERE object_id = :object_id AND ref_count = 0",
                 {"object_id": object_id},
@@ -219,8 +229,7 @@ class SqlObjectStore(ObjectStore, SqlMixin):
                 return
 
             if child_ids:
-                placeholders = ", ".join(f":cid{i}" for i in range(len(child_ids)))
-                params = {f"cid{i}": cid for i, cid in enumerate(child_ids)}
+                placeholders, params = build_sql_in_params(child_ids, "cid")
                 self.query(
                     "UPDATE objects SET ref_count = ref_count - 1 "
                     f"WHERE object_id IN ({placeholders}) AND ref_count > 0",
@@ -233,7 +242,7 @@ class SqlObjectStore(ObjectStore, SqlMixin):
     def delete_objects_in_run(self, run_id: int) -> None:
         """Delete all objects that were registered in a specific run."""
         run_id_sint = uint64_to_int64(run_id)
-        with self.session():
+        with self._mutation_session():
             objs = self.query(
                 "SELECT object_id FROM run_objects WHERE run_id = :run_id",
                 {"run_id": run_id_sint},
@@ -247,10 +256,35 @@ class SqlObjectStore(ObjectStore, SqlMixin):
 
     def clear(self) -> None:
         """Clear the store."""
-        with self.session():
+        with self._mutation_session():
             self.query("DELETE FROM object_children")
             self.query("DELETE FROM run_objects")
             self.query("DELETE FROM objects")
+
+    @contextmanager
+    def _mutation_session(self) -> Iterator[None]:
+        """Start a mutation transaction and acquire its SQL lock once."""
+        with self.session():
+            if _objectstore_mutation_lock_held.get():
+                yield
+                return
+
+            token = _objectstore_mutation_lock_held.set(True)
+            try:
+                self._lock_objectstore_mutation()
+                yield
+            finally:
+                _objectstore_mutation_lock_held.reset(token)
+
+    def _lock_objectstore_mutation(self) -> None:
+        """Serialize structural ObjectStore writes within the active transaction."""
+        self.query(
+            "INSERT INTO objectstore_locks (lock_id, lock_value) "
+            "VALUES (:lock_id, 0) "
+            "ON CONFLICT (lock_id) DO UPDATE "
+            "SET lock_value = objectstore_locks.lock_value",
+            {"lock_id": self._MUTATION_LOCK_ID},
+        )
 
     def __contains__(self, object_id: str) -> bool:
         """Check if an object_id is in the store."""

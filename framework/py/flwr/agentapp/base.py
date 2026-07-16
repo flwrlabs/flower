@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from flwr.app import Context
 from flwr.supercore.typing import JSONObject
@@ -35,15 +35,24 @@ class AgentResponses(ABC):
         ----------
         request : JSONObject
             Open Responses-compatible create request.
-            Built-in connector tools can be requested by name in ``tools``, for
-            example ``["web_search"]``. Built-in connector names are reserved
-            for runtime-managed tools.
 
         Returns
         -------
         response : JSONObject
             Open Responses-compatible response.
         """
+
+
+class AgentConnectors(ABC):
+    """Abstract base class for AgentApp connector execution."""
+
+    @abstractmethod
+    def tools(self, names: Sequence[str]) -> list[JSONObject]:
+        """Return model-facing tool schemas for built-in connectors."""
+
+    @abstractmethod
+    def call(self, tool_call: JSONObject) -> JSONObject:
+        """Execute one model function_call and return a function_call_output item."""
 
 
 class AgentSession(ABC):
@@ -53,6 +62,11 @@ class AgentSession(ABC):
     @abstractmethod
     def responses(self) -> AgentResponses:
         """Model response creation API."""
+
+    @property
+    @abstractmethod
+    def connectors(self) -> AgentConnectors:
+        """Connector tool schema and execution API."""
 
 
 AgentAppCallable = Callable[[AgentSession, Context], None]

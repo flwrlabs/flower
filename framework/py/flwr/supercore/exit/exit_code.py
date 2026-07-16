@@ -28,7 +28,7 @@ class ExitCode:
     GRACEFUL_EXIT_SIGTERM = 3  # Graceful exit triggered by SIGTERM
 
     # SuperLink-specific exit codes (100-199)
-    SUPERLINK_THREAD_CRASH = 100
+    # SUPERLINK_THREAD_CRASH = 100 --- DELETED ---
     SUPERLINK_LICENSE_INVALID = 101
     SUPERLINK_LICENSE_MISSING = 102
     SUPERLINK_LICENSE_URL_INVALID = 103
@@ -45,7 +45,7 @@ class ExitCode:
     CLIENTAPP_COMMUNICATION_ERROR = 250
 
     # SuperNode-specific exit codes (300-399)
-    SUPERNODE_REST_ADDRESS_INVALID = 300
+    # SUPERNODE_REST_ADDRESS_INVALID = 300 --- DELETED ---
     # SUPERNODE_NODE_AUTH_KEYS_REQUIRED = 301 --- DELETED ---
     SUPERNODE_NODE_AUTH_KEY_INVALID = 302
     SUPERNODE_STARTED_WITHOUT_TLS_BUT_NODE_AUTH_ENABLED = 303
@@ -61,7 +61,7 @@ class ExitCode:
 
     # Common exit codes (600-699)
     COMMON_ADDRESS_INVALID = 600
-    COMMON_MISSING_EXTRA_REST = 601
+    # COMMON_MISSING_EXTRA_REST = 601 --- DELETED ---
     COMMON_TLS_NOT_SUPPORTED = 602
     COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE = 603
     COMMON_PATH_INVALID = 604
@@ -90,7 +90,6 @@ EXIT_CODE_HELP = {
     ExitCode.GRACEFUL_EXIT_SIGQUIT: "",
     ExitCode.GRACEFUL_EXIT_SIGTERM: "",
     # SuperLink-specific exit codes (100-199)
-    ExitCode.SUPERLINK_THREAD_CRASH: "An important background thread has crashed.",
     ExitCode.SUPERLINK_LICENSE_INVALID: (
         "The license is invalid or has expired. "
         "Please contact `hello@flower.ai` for assistance."
@@ -137,10 +136,6 @@ EXIT_CODE_HELP = {
         "The ClientApp could not communicate with the ClientAppIo API."
     ),
     # SuperNode-specific exit codes (300-399)
-    ExitCode.SUPERNODE_REST_ADDRESS_INVALID: (
-        "When using the REST API, please provide `https://` or "
-        "`http://` before the server address (e.g. `http://127.0.0.1:8080`)"
-    ),
     ExitCode.SUPERNODE_NODE_AUTH_KEY_INVALID: (
         "Node authentication requires elliptic curve private key. "
         "Please ensure that the file path points to a valid private key "
@@ -176,11 +171,6 @@ EXIT_CODE_HELP = {
     ExitCode.COMMON_ADDRESS_INVALID: (
         "Please provide a valid URL, IPv4 or IPv6 address."
     ),
-    ExitCode.COMMON_MISSING_EXTRA_REST: """
-Dependencies required for using the REST-based Fleet API are missing.
-
-Please reinstall or upgrade `flwr`.
-""",
     ExitCode.COMMON_TLS_NOT_SUPPORTED: "Please use the '--insecure' flag.",
     ExitCode.COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE: (
         "The '--root-certificates' option cannot be used together with '--insecure'."

@@ -2,20 +2,12 @@
 set -e
 
 case "$1" in
-  rest)
-    rest_arg="--rest"
-    server_app_address="http://localhost:9091"
-    server_address="http://localhost:9093"
-    db_arg="--database :flwr-in-memory:"
-    ;;
   sqlite)
-    rest_arg=""
     server_address="127.0.0.1:9092"
     server_app_address="127.0.0.1:9091"
     db_arg="--database $(date +%s).db"
     ;;
   *)
-    rest_arg=""
     server_address="127.0.0.1:9092"
     server_app_address="127.0.0.1:9091"
     db_arg="--database :flwr-in-memory:"
@@ -47,18 +39,18 @@ echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:9093\"\ninsecure 
 sleep 1
 
 timeout 10m flower-superlink \
-  --insecure $db_arg $rest_arg $runtime_dependency_install_arg &
+  --insecure $db_arg $runtime_dependency_install_arg &
 sl_pids=$(pgrep -f "flower-superlink")
 echo "Starting SuperLink"
 sleep 3
 
-timeout 10m flower-supernode --insecure $rest_arg --superlink $server_address \
+timeout 10m flower-supernode --insecure --superlink $server_address \
   --clientappio-api-address="localhost:9094" &
 cl1_pid=$!
 echo "Starting first client"
 sleep 3
 
-timeout 10m flower-supernode --insecure $rest_arg --superlink $server_address \
+timeout 10m flower-supernode --insecure --superlink $server_address \
   --clientappio-api-address="localhost:9095" &
 cl2_pid=$!
 echo "Starting second client"
@@ -71,7 +63,7 @@ sleep 3
 
 # Restart superlink, the clients should now be able to reconnect to it
 timeout 10m flower-superlink \
-  --insecure $db_arg $rest_arg $runtime_dependency_install_arg &
+  --insecure $db_arg $runtime_dependency_install_arg &
 sl_pids=$(pgrep -f "flower-superlink")
 echo "Restarting Superlink"
 sleep 20
@@ -82,7 +74,7 @@ echo "Killing second client"
 sleep 5
 
 # Starting new client, this is so we have enough clients to execute `flwr run`
-timeout 10m flower-supernode --insecure $rest_arg --superlink $server_address \
+timeout 10m flower-supernode --insecure --superlink $server_address \
   --clientappio-api-address "localhost:9094" &
 cl1_pid=$!
 echo "Starting new client"
@@ -101,7 +93,7 @@ echo "Killing first client"
 sleep 3
 
 # Restart first client so enough clients are connected to continue the FL rounds
-timeout 5m flower-supernode --insecure $rest_arg --superlink $server_address \
+timeout 5m flower-supernode --insecure --superlink $server_address \
   --clientappio-api-address "localhost:9094" &
 cl1_pid=$!
 echo "Starting new client"

@@ -26,7 +26,10 @@ import pytest
 from flwr.common.constant import FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
-from flwr.supercore.interceptors import RuntimeVersionServerInterceptor
+from flwr.supercore.interceptors import (
+    RpcErrorTranslationServerInterceptor,
+    RuntimeVersionServerInterceptor,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.version import package_version
 from flwr.superlink.federation import NoOpFederationManager
@@ -237,6 +240,48 @@ def test_flower_superlink_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> 
     assert captured == ["update", "flower-superlink"]
 
 
+def test_flower_superlink_legacy_factory_error_exits_invalid_args(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Legacy mode factory creation errors should use the CLI invalid-args exit."""
+
+    class _SentinelError(Exception):
+        pass
+
+    config = SimpleNamespace(
+        enable_http_api=False,
+        simulation=False,
+        database="dummysql://localhost/flwr",
+    )
+    captured: dict[str, object] = {}
+
+    def _raise_value_error(*_args: object, **_kwargs: object) -> object:
+        raise ValueError("Unsupported value for `--database`.")
+
+    def _capture_exit(code: int, message: str) -> None:
+        captured["code"] = code
+        captured["message"] = message
+        raise _SentinelError()
+
+    monkeypatch.setattr(app_module, "warn_if_flwr_update_available", lambda **_: None)
+    monkeypatch.setattr(app_module, "event", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(app_module, "_parse_superlink_lifespan_config", lambda: config)
+    monkeypatch.setattr(
+        app_module,
+        "_get_objectstore_linkstate_factories",
+        _raise_value_error,
+    )
+    monkeypatch.setattr(app_module, "flwr_exit", _capture_exit)
+
+    with pytest.raises(_SentinelError):
+        app_module.flower_superlink()
+
+    assert captured == {
+        "code": app_module.ExitCode.SUPERLINK_INVALID_ARGS,
+        "message": "Unsupported value for `--database`.",
+    }
+
+
 def test_obtain_superlink_certificates_keeps_appio_separate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -302,10 +347,10 @@ def test_obtain_superlink_certificates_skips_cert_loading_when_insecure(
     obtain_appio_certificates_mock.assert_not_called()
 
 
-def test_run_fleet_api_grpc_rere_adds_runtime_version_interceptor(
+def test_run_fleet_api_grpc_rere_orders_default_interceptors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Fleet gRPC-rere server should observe runtime-version metadata."""
+    """Fleet gRPC-rere server should translate errors before auth interceptors."""
     grpc_server = Mock()
     grpc_server.bound_address = "127.0.0.1:9092"
     create_grpc_server = Mock(return_value=grpc_server)
@@ -322,8 +367,9 @@ def test_run_fleet_api_grpc_rere_adds_runtime_version_interceptor(
     )
 
     interceptors = create_grpc_server.call_args.kwargs["interceptors"]
-    assert interceptors[0] is existing_interceptor
-    assert isinstance(interceptors[1], RuntimeVersionServerInterceptor)
+    assert isinstance(interceptors[0], RpcErrorTranslationServerInterceptor)
+    assert interceptors[1] is existing_interceptor
+    assert isinstance(interceptors[2], RuntimeVersionServerInterceptor)
 
 
 @pytest.mark.parametrize(

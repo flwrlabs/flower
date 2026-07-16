@@ -15,12 +15,13 @@
 """ServerAppIo API servicer."""
 
 
+from itertools import chain
 from logging import DEBUG, ERROR, INFO
 
 import grpc
 
 from flwr.app import Message
-from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -57,7 +58,6 @@ from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import TaskType
 from flwr.supercore.inflatable.inflatable_object import (
-    UnexpectedObjectContentError,
     get_all_nested_objects,
     get_object_tree,
     no_object_id_recompute,
@@ -107,9 +107,8 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Push a set of Messages."""
         log(DEBUG, "ServerAppIoServicer.PushMessages")
 
-        # Init state and store
+        # Init state
         state = self.state_factory.state()
-        store = self.objectstore_factory.store()
 
         run_id = _get_authenticated_serverapp_run_id(context)
 
@@ -119,8 +118,9 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             request_name="PushMessages",
             detail="`messages_list` must not be empty",
         )
-        message_ids: list[str | None] = []
-        objects_to_push: set[str] = set()
+        session_id = state.start_session(run_id)
+        message_ids: list[str] = []
+        missing_objects_lists: list[list[str]] = []
         for message_proto, object_tree in zip(
             request.messages_list, request.message_object_trees, strict=True
         ):
@@ -136,27 +136,23 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 request_name="PushMessages",
                 detail="`Message.metadata` has mismatched `run_id`",
             )
-            # Store objects
-            message_objects_to_push = set(store.preregister(run_id, object_tree))
-            # Store message
-            message_id: str | None = state.store_message_ins(message=message)
-            # This is temporary. We should consider a more robust cleanup
-            # mechanism that protects duplicate messages from premature deletion.
-            # Once that is in place, we can remove the run status check below.
-            if (
-                message_id is None
-                and state.get_run_status({run_id})[run_id].status == Status.FINISHED
-            ):
-                store.delete(object_tree.object_id)
+            # Store message and register in ObjectStore
+            stored, missing_objects = state.store_message_and_object_tree(
+                message, object_tree, session_id
+            )
+            if stored:
+                message_ids.append(message.metadata.message_id)
+                missing_objects_lists.append(missing_objects)
             else:
-                objects_to_push |= message_objects_to_push
-            message_ids.append(message_id)
+                message_ids.append("")
+
+        # Concatenate all missing objects and deduplicate
+        objects_to_push = list(dict.fromkeys(chain(*missing_objects_lists)))
 
         return PushAppMessagesResponse(
-            message_ids=[
-                str(message_id) if message_id else "" for message_id in message_ids
-            ],
+            message_ids=message_ids,
             objects_to_push=objects_to_push,
+            session_id=session_id,
         )
 
     def PullMessages(  # pylint: disable=R0914
@@ -319,25 +315,22 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Push an object to the ObjectStore."""
         log(DEBUG, "ServerAppIoServicer.PushObject")
 
-        # Init store
-        store = self.objectstore_factory.store()
+        # Init state
+        state = self.state_factory.state()
 
-        _ = _get_authenticated_serverapp_run_id(context)
+        run_id = _get_authenticated_serverapp_run_id(context)
 
         if request.node.node_id != SUPERLINK_NODE_ID:
             # Cancel insertion in ObjectStore
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Unexpected node ID.")
 
-        # Insert in store
-        stored = False
-        try:
-            store.put(request.object_id, request.object_content)
-            stored = True
-        except (NoObjectInStoreError, ValueError) as e:
-            log(ERROR, str(e))
-        except UnexpectedObjectContentError as e:
-            # Object content is not valid
-            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
+        # Insert in state
+        stored = state.store_object(
+            run_id,
+            request.session_id,
+            request.object_id,
+            request.object_content,
+        )
 
         return PushObjectResponse(stored=stored)
 
@@ -347,17 +340,17 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Pull an object from the ObjectStore."""
         log(DEBUG, "ServerAppIoServicer.PullObject")
 
-        # Init store
-        store = self.objectstore_factory.store()
+        # Init state
+        state = self.state_factory.state()
 
-        _ = _get_authenticated_serverapp_run_id(context)
+        run_id = _get_authenticated_serverapp_run_id(context)
 
         if request.node.node_id != SUPERLINK_NODE_ID:
             # Cancel insertion in ObjectStore
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Unexpected node ID.")
 
-        # Fetch from store
-        content = store.get(request.object_id)
+        # Fetch from state
+        content = state.get_object(run_id, request.object_id)
         if content is not None:
             object_available = content != b""
             return PullObjectResponse(

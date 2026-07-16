@@ -45,6 +45,24 @@ class ControlStub:
     ]
     """Stop run upon request"""
 
+    StartAutomation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StartAutomationRequest,
+        flwr.proto.control_pb2.StartAutomationResponse,
+    ]
+    """Start automation upon request"""
+
+    ListAutomations: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAutomationsRequest,
+        flwr.proto.control_pb2.ListAutomationsResponse,
+    ]
+    """List automations"""
+
+    StopAutomation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StopAutomationRequest,
+        flwr.proto.control_pb2.StopAutomationResponse,
+    ]
+    """Stop automation"""
+
     StreamLogs: grpc.UnaryStreamMultiCallable[
         flwr.proto.control_pb2.StreamLogsRequest,
         flwr.proto.control_pb2.StreamLogsResponse,
@@ -80,6 +98,30 @@ class ControlStub:
         flwr.proto.control_pb2.GetAuthTokensResponse,
     ]
     """Get auth tokens upon request"""
+
+    ListConnectors: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListConnectorsRequest,
+        flwr.proto.control_pb2.ListConnectorsResponse,
+    ]
+    """List OAuth connectors available to the authenticated account"""
+
+    DisconnectConnector: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DisconnectConnectorRequest,
+        flwr.proto.control_pb2.DisconnectConnectorResponse,
+    ]
+    """Disconnect connector credentials for the authenticated account"""
+
+    BeginConnectorOAuth: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.BeginConnectorOAuthRequest,
+        flwr.proto.control_pb2.BeginConnectorOAuthResponse,
+    ]
+    """Begin OAuth connector authorization flow"""
+
+    CompleteConnectorOAuth: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CompleteConnectorOAuthRequest,
+        flwr.proto.control_pb2.CompleteConnectorOAuthResponse,
+    ]
+    """Complete OAuth connector authorization flow"""
 
     PullArtifacts: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.PullArtifactsRequest,
@@ -207,6 +249,24 @@ class ControlAsyncStub:
     ]
     """Stop run upon request"""
 
+    StartAutomation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StartAutomationRequest,
+        flwr.proto.control_pb2.StartAutomationResponse,
+    ]
+    """Start automation upon request"""
+
+    ListAutomations: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAutomationsRequest,
+        flwr.proto.control_pb2.ListAutomationsResponse,
+    ]
+    """List automations"""
+
+    StopAutomation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StopAutomationRequest,
+        flwr.proto.control_pb2.StopAutomationResponse,
+    ]
+    """Stop automation"""
+
     StreamLogs: grpc.aio.UnaryStreamMultiCallable[
         flwr.proto.control_pb2.StreamLogsRequest,
         flwr.proto.control_pb2.StreamLogsResponse,
@@ -242,6 +302,30 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.GetAuthTokensResponse,
     ]
     """Get auth tokens upon request"""
+
+    ListConnectors: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListConnectorsRequest,
+        flwr.proto.control_pb2.ListConnectorsResponse,
+    ]
+    """List OAuth connectors available to the authenticated account"""
+
+    DisconnectConnector: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DisconnectConnectorRequest,
+        flwr.proto.control_pb2.DisconnectConnectorResponse,
+    ]
+    """Disconnect connector credentials for the authenticated account"""
+
+    BeginConnectorOAuth: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.BeginConnectorOAuthRequest,
+        flwr.proto.control_pb2.BeginConnectorOAuthResponse,
+    ]
+    """Begin OAuth connector authorization flow"""
+
+    CompleteConnectorOAuth: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CompleteConnectorOAuthRequest,
+        flwr.proto.control_pb2.CompleteConnectorOAuthResponse,
+    ]
+    """Complete OAuth connector authorization flow"""
 
     PullArtifacts: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.PullArtifactsRequest,
@@ -374,6 +458,30 @@ class ControlServicer(metaclass=abc.ABCMeta):
         """Stop run upon request"""
 
     @abc.abstractmethod
+    def StartAutomation(
+        self,
+        request: flwr.proto.control_pb2.StartAutomationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.StartAutomationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.StartAutomationResponse]]:
+        """Start automation upon request"""
+
+    @abc.abstractmethod
+    def ListAutomations(
+        self,
+        request: flwr.proto.control_pb2.ListAutomationsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListAutomationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAutomationsResponse]]:
+        """List automations"""
+
+    @abc.abstractmethod
+    def StopAutomation(
+        self,
+        request: flwr.proto.control_pb2.StopAutomationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.StopAutomationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.StopAutomationResponse]]:
+        """Stop automation"""
+
+    @abc.abstractmethod
     def StreamLogs(
         self,
         request: flwr.proto.control_pb2.StreamLogsRequest,
@@ -420,6 +528,38 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.GetAuthTokensResponse, collections.abc.Awaitable[flwr.proto.control_pb2.GetAuthTokensResponse]]:
         """Get auth tokens upon request"""
+
+    @abc.abstractmethod
+    def ListConnectors(
+        self,
+        request: flwr.proto.control_pb2.ListConnectorsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListConnectorsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListConnectorsResponse]]:
+        """List OAuth connectors available to the authenticated account"""
+
+    @abc.abstractmethod
+    def DisconnectConnector(
+        self,
+        request: flwr.proto.control_pb2.DisconnectConnectorRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.DisconnectConnectorResponse, collections.abc.Awaitable[flwr.proto.control_pb2.DisconnectConnectorResponse]]:
+        """Disconnect connector credentials for the authenticated account"""
+
+    @abc.abstractmethod
+    def BeginConnectorOAuth(
+        self,
+        request: flwr.proto.control_pb2.BeginConnectorOAuthRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.BeginConnectorOAuthResponse, collections.abc.Awaitable[flwr.proto.control_pb2.BeginConnectorOAuthResponse]]:
+        """Begin OAuth connector authorization flow"""
+
+    @abc.abstractmethod
+    def CompleteConnectorOAuth(
+        self,
+        request: flwr.proto.control_pb2.CompleteConnectorOAuthRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.CompleteConnectorOAuthResponse, collections.abc.Awaitable[flwr.proto.control_pb2.CompleteConnectorOAuthResponse]]:
+        """Complete OAuth connector authorization flow"""
 
     @abc.abstractmethod
     def PullArtifacts(

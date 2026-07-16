@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,19 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""(De-)Serialization Tests."""
+"""Constants for protobuf-over-HTTP APIs."""
 
 
-from tempfile import TemporaryDirectory
-
-from .tensorboard import tensorboard
-
-
-def test_tensorboard() -> None:
-    """Test if tensorboard returns a decorator."""
-    # Prepare
-    with TemporaryDirectory() as tmpdir:
-        my_decorator = tensorboard(tmpdir)
-
-    # Assert
-    assert callable(my_decorator)
+PROTOBUF_MEDIA_TYPE = "application/protobuf"
+PROTOBUF_STREAM_MEDIA_TYPE = "application/flower-protobuf-stream"
+FRAME_HEADER_SIZE = 4

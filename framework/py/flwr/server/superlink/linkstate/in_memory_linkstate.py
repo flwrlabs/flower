@@ -37,6 +37,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
@@ -180,6 +181,22 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         return message_id
 
+    def store_message_and_object_tree(
+        self, message: Message, object_tree: ObjectTree, session_id: str
+    ) -> tuple[bool, list[str]]:
+        """Store a Message and preregister its ObjectTree."""
+        with self.lock:
+            if message.metadata.reply_to_message_id:
+                stored = self.store_message_res(message) is not None
+            else:
+                stored = self.store_message_ins(message) is not None
+
+            if not stored:
+                return False, []
+
+            missing_objects = self.preregister_object_tree(object_tree, session_id)
+            return True, missing_objects
+
     def _check_stored_messages(self, message_ids: set[str]) -> None:
         """Check and delete the message if it's invalid."""
         with self.lock:
@@ -249,6 +266,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         res_metadata = message.metadata
         with self.lock:
+            message_id = res_metadata.message_id
             # Check if the Message it is replying to exists and is valid
             msg_ins_id = res_metadata.reply_to_message_id
             self._check_stored_messages({msg_ins_id})
@@ -267,15 +285,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 log(
                     ERROR,
                     "Message with ID %s does not exist.",
-                    msg_ins_id,
-                )
-                return None
-
-            if msg_ins_id in self.message_ins_id_to_message_res_id:
-                log(
-                    ERROR,
-                    "Failed to store Message reply: duplicate reply for "
-                    "reply_to_message_id %s.",
                     msg_ins_id,
                 )
                 return None
@@ -310,7 +319,18 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
                 return None
 
-            message_id = message.metadata.message_id
+            if message_id in self.message_res_store:
+                return message_id
+
+            if msg_ins_id in self.message_ins_id_to_message_res_id:
+                log(
+                    ERROR,
+                    "Failed to store Message reply: duplicate reply for "
+                    "reply_to_message_id %s.",
+                    msg_ins_id,
+                )
+                return None
+
             self.message_res_store[message_id] = message
             self.message_ins_id_to_message_res_id[msg_ins_id] = message_id
 
@@ -391,6 +411,17 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         message_id
                     )
                     del self.message_res_store[message_res_id]
+
+    def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
+        """Delete Messages belonging to an expired push session."""
+        with self.lock:
+            self.delete_messages(message_object_ids)
+            for message_id in message_object_ids:
+                message_res = self.message_res_store.pop(message_id, None)
+                if message_res is not None:
+                    self.message_ins_id_to_message_res_id.pop(
+                        message_res.metadata.reply_to_message_id, None
+                    )
 
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
@@ -682,6 +713,51 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             )
 
             return run_id
+
+    def dispatch_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> int | None:
+        """Create a run from a due automation and advance the automation."""
+        with self.lock_automation_store:
+            record = self.automation_store.get(automation_id)
+            if record is None:
+                return None
+
+            fab_id = record.fab_id
+            fab_version = record.fab_version
+            fab_hash = record.fab_hash
+            override_config = dict(record.override_config)
+            federation_id = record.automation.federation
+            federation_config = record.federation_config
+            flwr_aid = record.automation.flwr_aid
+            primary_task_type = record.primary_task_type
+            series_id = record.automation.series_id
+
+        if not self.advance_automation(
+            automation_id,
+            previous_next_run_at=previous_next_run_at,
+            next_run_at=next_run_at,
+        ):
+            return None
+
+        run_id = self.create_run(
+            fab_id=fab_id,
+            fab_version=fab_version,
+            fab_hash=fab_hash,
+            override_config=override_config,
+            federation_id=federation_id,
+            federation_config=federation_config,
+            flwr_aid=flwr_aid,
+            primary_task_type=primary_task_type,
+            series_id=series_id,
+        )
+        if run_id == 0:
+            return None
+        return run_id
 
     def get_run_info(
         self,

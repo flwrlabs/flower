@@ -39,6 +39,7 @@ FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES = int(
 FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS = int(
     os.getenv("FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS", "2")
 )  # Default maximum number of concurrent pulls
+OBJECT_PUSH_SESSION_TTL_SECONDS = 180
 PULL_MAX_TIME = 7200  # Default maximum time to wait for pulling objects
 PULL_MAX_TRIES_PER_OBJECT = 500  # Default maximum number of tries to pull an object
 PULL_INITIAL_BACKOFF = 1  # Initial backoff time for pulling objects
@@ -124,7 +125,6 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
 # Default federation names for every Flower account
 DEFAULT_FEDERATION_SIMULATION = "workspace"
 
-
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
 TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
@@ -186,6 +186,15 @@ class InvitationStatus(StrEnum):
     REJECTED = "rejected"
     REVOKED = "revoked"
     EXPIRED = "expired"
+
+
+class AutomationStatus(StrEnum):
+    """Status of an automation."""
+
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    STOPPED = "stopped"
 
 
 class RunTime(StrEnum):

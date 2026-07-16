@@ -17,7 +17,6 @@
 # pylint: disable=too-many-lines
 
 import argparse
-import importlib.util
 import os
 import subprocess
 import sys
@@ -42,14 +41,12 @@ from flwr.common.constant import (
     AUTHZ_TYPE_YAML_KEY,
     CONTROL_API_DEFAULT_SERVER_ADDRESS,
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
-    FLEET_API_REST_DEFAULT_ADDRESS,
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_REST,
     AuthnType,
     AuthzType,
     EventLogWriterType,
@@ -83,7 +80,10 @@ from flwr.supercore.constant import (
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
-from flwr.supercore.interceptors import create_fleet_runtime_version_server_interceptor
+from flwr.supercore.interceptors import (
+    RpcErrorTranslationServerInterceptor,
+    create_fleet_runtime_version_server_interceptor,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import (
@@ -240,7 +240,6 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     enable_supernode_auth: bool
     fleet_api_type: str
     fleet_api_address: str | None
-    fleet_api_num_workers: int
     simulation: bool
     ssl_keyfile: str | None
     ssl_certfile: str | None
@@ -259,13 +258,17 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
     compatibility adapters.
     """
 
-    def __init__(self, config: SuperLinkLifespanConfig) -> None:
+    def __init__(
+        self,
+        config: SuperLinkLifespanConfig,
+        state_factory: LinkStateFactory,
+    ) -> None:
         self.config = config
         self.grpc_servers: list[grpc.Server] = []
         self.bckg_threads: list[threading.Thread] = []
         self.superexec_process: subprocess.Popen[bytes] | None = None
-        self.objectstore_factory: ObjectStoreFactory | None = None
-        self.state_factory: LinkStateFactory | None = None
+        self.objectstore_factory = state_factory.objectstore_factory
+        self.state_factory = state_factory
         self._serverappio_server: grpc.Server | None = None
         self._started = False
 
@@ -275,15 +278,8 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         if self._started:
             return
 
-        federation_manager = get_federation_manager(
-            is_simulation=self.config.simulation
-        )
-        objectstore_factory, state_factory = _get_objectstore_linkstate_factories(
-            self.config.database, federation_manager
-        )
-        state_factory.state()  # Force initialization before starting network servers
-        self.objectstore_factory = objectstore_factory
-        self.state_factory = state_factory
+        # Force initialization before starting network servers
+        self.state_factory.state()
 
         self._start_control_api()
         self._start_serverappio_api()
@@ -298,7 +294,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         if (
             not self._started
             and not self.grpc_servers
-            and not self.bckg_threads
             and self.superexec_process is None
         ):
             return
@@ -308,20 +303,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         for grpc_server in reversed(self.grpc_servers):
             grpc_server.stop(grace=1)
 
-        # The old REST Fleet server uses `uvicorn.run` in a daemon thread and
-        # does not expose a clean stop handle. Keep the join bounded so FastAPI
-        # shutdown cannot hang forever while this temporary compatibility path
-        # still exists.
-        for thread in self.bckg_threads:
-            thread.join(timeout=1.0)
-            if thread.is_alive():
-                log(
-                    WARN,
-                    "Background thread %s is still running during SuperLink "
-                    "runtime shutdown.",
-                    thread.name,
-                )
-
         if self.superexec_process is not None:
             self.superexec_process.terminate()
             try:
@@ -330,7 +311,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
                 log(WARN, "SuperExec subprocess did not terminate within 1 second.")
 
         self.grpc_servers.clear()
-        self.bckg_threads.clear()
         self.superexec_process = None
         self._serverappio_server = None
         self._started = False
@@ -347,9 +327,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
     def _start_control_api(self) -> None:
         config = self.config
-        if self.state_factory is None or self.objectstore_factory is None:
-            raise RuntimeError("SuperLink lifespan state has not been initialized.")
-
         control_server: grpc.Server = run_control_api_grpc(
             address=config.control_address,
             state_factory=self.state_factory,
@@ -365,9 +342,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
     def _start_serverappio_api(self) -> None:
         config = self.config
-        if self.state_factory is None or self.objectstore_factory is None:
-            raise RuntimeError("SuperLink lifespan state has not been initialized.")
-
         serverappio_server: grpc.Server = run_serverappio_api_grpc(
             address=config.serverappio_address,
             state_factory=self.state_factory,
@@ -382,8 +356,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         config = self.config
         if config.simulation:
             return
-        if self.state_factory is None or self.objectstore_factory is None:
-            raise RuntimeError("SuperLink lifespan state has not been initialized.")
 
         fleet_api_address = config.fleet_api_address
         if not fleet_api_address:
@@ -392,69 +364,17 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
                 TRANSPORT_TYPE_GRPC_ADAPTER,
             ]:
                 fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
-            elif config.fleet_api_type == TRANSPORT_TYPE_REST:
-                fleet_api_address = FLEET_API_REST_DEFAULT_ADDRESS
 
-        fleet_address, host, port = _format_address(cast(str, fleet_api_address))
-        num_workers = config.fleet_api_num_workers
-        if num_workers != 1:
-            log(
-                WARN,
-                "The Fleet API currently supports only 1 worker. "
-                "You have specified %d workers. "
-                "Support for multiple workers will be added in future releases. "
-                "Proceeding with a single worker.",
-                config.fleet_api_num_workers,
-            )
-            num_workers = 1
-
-        if config.fleet_api_type == TRANSPORT_TYPE_REST:
-            self._start_legacy_fleet_rest_api(host, port, num_workers)
-        elif config.fleet_api_type == TRANSPORT_TYPE_GRPC_RERE:
+        fleet_address, _, _ = _format_address(cast(str, fleet_api_address))
+        if config.fleet_api_type == TRANSPORT_TYPE_GRPC_RERE:
             self._start_legacy_fleet_grpc_rere(fleet_address)
         elif config.fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
             self._start_legacy_fleet_grpc_adapter(fleet_address)
         else:
             raise ValueError(f"Unknown fleet_api_type: {config.fleet_api_type}")
 
-    def _start_legacy_fleet_rest_api(
-        self, host: str, port: int, num_workers: int
-    ) -> None:
-        """Start the old Fleet REST API compatibility server.
-
-        TODO: Replace this separate uvicorn server with `flwr.superlink.routers.fleet`
-        routes mounted in the main FastAPI app.
-        """
-        if self.state_factory is None or self.objectstore_factory is None:
-            raise RuntimeError("SuperLink lifespan state has not been initialized.")
-        if (
-            importlib.util.find_spec("requests")
-            and importlib.util.find_spec("starlette")
-            and importlib.util.find_spec("uvicorn")
-        ) is None:
-            flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
-
-        fleet_thread = threading.Thread(
-            target=_run_fleet_api_rest,
-            args=(
-                host,
-                port,
-                self.config.ssl_keyfile,
-                self.config.ssl_certfile,
-                self.state_factory,
-                self.objectstore_factory,
-                num_workers,
-            ),
-            daemon=True,
-        )
-        fleet_thread.start()
-        self.bckg_threads.append(fleet_thread)
-
     def _start_legacy_fleet_grpc_rere(self, fleet_address: str) -> None:
         """Start the current Fleet gRPC request-response API."""
-        if self.state_factory is None or self.objectstore_factory is None:
-            raise RuntimeError("SuperLink lifespan state has not been initialized.")
-
         interceptors = [NodeAuthServerInterceptor(self.state_factory)]
         if self.config.enable_event_log:
             fleet_log_plugin = _try_obtain_fleet_event_log_writer_plugin()
@@ -474,9 +394,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
     def _start_legacy_fleet_grpc_adapter(self, fleet_address: str) -> None:
         """Start the current Fleet GrpcAdapter compatibility API."""
-        if self.state_factory is None or self.objectstore_factory is None:
-            raise RuntimeError("SuperLink lifespan state has not been initialized.")
-
         fleet_server = _run_fleet_api_grpc_adapter(
             address=fleet_address,
             state_factory=self.state_factory,
@@ -690,8 +607,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             TRANSPORT_TYPE_GRPC_ADAPTER,
         ]:
             fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
-        elif args.fleet_api_type == TRANSPORT_TYPE_REST:
-            fleet_api_address = FLEET_API_REST_DEFAULT_ADDRESS
 
     return SuperLinkLifespanConfig(
         serverappio_address=serverappio_address,
@@ -713,7 +628,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         enable_supernode_auth=enable_supernode_auth,
         fleet_api_type=args.fleet_api_type,
         fleet_api_address=fleet_api_address,
-        fleet_api_num_workers=args.fleet_api_num_workers,
         simulation=args.simulation,
         ssl_keyfile=args.ssl_keyfile,
         ssl_certfile=args.ssl_certfile,
@@ -748,11 +662,17 @@ def flower_superlink() -> None:
     # Run SuperLink in Legacy Mode (Only gRPC)
     ###########################################################################
 
-    superlink_lifespan = SuperLinkLifespan(config)
+    superlink_lifespan: SuperLinkLifespan | None = None
     try:
+        federation_manager = get_federation_manager(is_simulation=config.simulation)
+        _, state_factory = _get_objectstore_linkstate_factories(
+            config.database, federation_manager
+        )
+        superlink_lifespan = SuperLinkLifespan(config, state_factory)
         superlink_lifespan.startup()
     except Exception as err:  # pylint: disable=broad-except
-        superlink_lifespan.shutdown()
+        if superlink_lifespan is not None:
+            superlink_lifespan.shutdown()
         flwr_exit(ExitCode.SUPERLINK_INVALID_ARGS, str(err))
 
     # Graceful shutdown
@@ -763,12 +683,7 @@ def flower_superlink() -> None:
         exit_handlers=[superlink_lifespan.shutdown],
     )
 
-    # Block until a thread exits prematurely
     superlink_lifespan.wait_until_background_thread_exits()
-
-    # Exit if any thread has exited prematurely
-    # This code will not be reached if the SuperLink stops gracefully
-    flwr_exit(ExitCode.SUPERLINK_THREAD_CRASH)
 
 
 def _format_address(address: str) -> tuple[str, str, int]:
@@ -792,20 +707,29 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
     """
     start_legacy_grpc = not lifespan_config.disable_grpc_api
 
-    if start_legacy_grpc and lifespan_config.fleet_api_type == TRANSPORT_TYPE_REST:
-        flwr_exit(
-            ExitCode.SUPERLINK_INVALID_ARGS,
-            "`--enable-http-api` cannot be combined with `--fleet-api-type rest`",
-        )
     superlink_lifespan = None
+    federation_manager = get_federation_manager(
+        is_simulation=lifespan_config.simulation
+    )
+    _, linkstate_factory = _get_objectstore_linkstate_factories(
+        lifespan_config.database, federation_manager
+    )
+    # Force initialization before exposing LinkState through FastAPI dependencies
+    linkstate_factory.state()
     if start_legacy_grpc:
-        superlink_lifespan = SuperLinkLifespan(lifespan_config)
+        superlink_lifespan = SuperLinkLifespan(
+            lifespan_config,
+            state_factory=linkstate_factory,
+        )
     from flwr.superlink.main import (  # pylint: disable=import-outside-toplevel
         create_app,
     )
 
     fastapi_app = create_app(
+        authn_plugin=lifespan_config.authn_plugin,
+        authz_plugin=lifespan_config.authz_plugin,
         superlink_lifespan=superlink_lifespan,
+        linkstate_factory=linkstate_factory,
         start_legacy_grpc=start_legacy_grpc,
     )
 
@@ -992,7 +916,10 @@ def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
     interceptors: Sequence[grpc.ServerInterceptor] | None = None,
 ) -> grpc.Server:
     """Run Fleet API (gRPC, request-response)."""
-    interceptors = list(interceptors or [])
+    interceptors = [
+        RpcErrorTranslationServerInterceptor(),
+        *list(interceptors or []),
+    ]
     interceptors.append(create_fleet_runtime_version_server_interceptor())
 
     # Create Fleet API gRPC server
@@ -1050,41 +977,6 @@ def _run_fleet_api_grpc_adapter(
     fleet_grpc_server.start()
 
     return fleet_grpc_server
-
-
-# pylint: disable=import-outside-toplevel,too-many-arguments
-# pylint: disable=too-many-positional-arguments
-def _run_fleet_api_rest(
-    host: str,
-    port: int,
-    ssl_keyfile: str | None,
-    ssl_certfile: str | None,
-    state_factory: LinkStateFactory,
-    objectstore_factory: ObjectStoreFactory,
-    num_workers: int,
-) -> None:
-    """Run Fleet API (REST-based)."""
-    try:
-        from flwr.server.superlink.fleet.rest_rere.rest_api import app as fast_api_app
-    except ModuleNotFoundError:
-        flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
-
-    log(INFO, "Starting Flower REST server")
-
-    # See: https://www.starlette.io/applications/#accessing-the-app-instance
-    fast_api_app.state.STATE_FACTORY = state_factory
-    fast_api_app.state.OBJECTSTORE_FACTORY = objectstore_factory
-
-    uvicorn.run(
-        app="flwr.server.superlink.fleet.rest_rere.rest_api:app",
-        port=port,
-        host=host,
-        reload=False,
-        access_log=True,
-        ssl_keyfile=ssl_keyfile,
-        ssl_certfile=ssl_certfile,
-        workers=num_workers,
-    )
 
 
 def _parse_args_run_superlink() -> argparse.ArgumentParser:
@@ -1293,19 +1185,12 @@ def _add_args_fleet_api(parser: argparse.ArgumentParser) -> None:
         choices=[
             TRANSPORT_TYPE_GRPC_RERE,
             TRANSPORT_TYPE_GRPC_ADAPTER,
-            TRANSPORT_TYPE_REST,
         ],
-        help="Start a gRPC-rere or REST (experimental) Fleet API server.",
+        help="Start a Fleet API server.",
     )
     parser.add_argument(
         "--fleet-api-address",
         help="Fleet API server address (IPv4, IPv6, or a domain name).",
-    )
-    parser.add_argument(
-        "--fleet-api-num-workers",
-        default=1,
-        type=int,
-        help="Set the number of concurrent workers for the Fleet API server.",
     )
 
 
