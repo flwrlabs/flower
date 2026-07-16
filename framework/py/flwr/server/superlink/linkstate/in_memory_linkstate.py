@@ -740,16 +740,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             primary_task_type = record.primary_task_type
             series_id = record.automation.series_id
 
-        runtime = (
-            RunTime.SIMULATION
-            if primary_task_type == TaskType.SIMULATION
-            else RunTime.DEPLOYMENT
-        )
-        self.federation_manager.can_execute(
-            flwr_aid,
-            ActionType.START_RUN,
-            StartRunContext(federation_id=federation_id, runtime=runtime),
-        )
         if not self.advance_automation(
             automation_id,
             previous_next_run_at=previous_next_run_at,
