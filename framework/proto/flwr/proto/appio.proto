@@ -76,6 +76,14 @@ message PullTaskMessageResponse { repeated Message messages = 1; }
 message RecordTaskUsageRequest { TaskUsage task_usage = 1; }
 message RecordTaskUsageResponse {}
 
+// GetConnector messages
+message GetConnectorRequest { string connector_ref = 1; }
+message GetConnectorResponse {
+  string connector_ref = 1;
+  string credentials_json = 2;
+  string config_json = 3;
+}
+
 // PullTaskInput messages
 message PullTaskInputRequest {}
 message PullTaskInputResponse {

@@ -135,6 +135,12 @@ class ServerAppIoStub:
     ]
     """Record task usage"""
 
+    GetConnector: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.GetConnectorRequest,
+        flwr.proto.appio_pb2.GetConnectorResponse,
+    ]
+    """Resolve credentials for the authenticated connector task"""
+
     PushLogs: grpc.UnaryUnaryMultiCallable[
         flwr.proto.log_pb2.PushLogsRequest,
         flwr.proto.log_pb2.PushLogsResponse,
@@ -263,6 +269,12 @@ class ServerAppIoAsyncStub:
         flwr.proto.appio_pb2.RecordTaskUsageResponse,
     ]
     """Record task usage"""
+
+    GetConnector: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.GetConnectorRequest,
+        flwr.proto.appio_pb2.GetConnectorResponse,
+    ]
+    """Resolve credentials for the authenticated connector task"""
 
     PushLogs: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.log_pb2.PushLogsRequest,
@@ -420,6 +432,14 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.RecordTaskUsageResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.RecordTaskUsageResponse]]:
         """Record task usage"""
+
+    @abc.abstractmethod
+    def GetConnector(
+        self,
+        request: flwr.proto.appio_pb2.GetConnectorRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.GetConnectorResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.GetConnectorResponse]]:
+        """Resolve credentials for the authenticated connector task"""
 
     @abc.abstractmethod
     def PushLogs(

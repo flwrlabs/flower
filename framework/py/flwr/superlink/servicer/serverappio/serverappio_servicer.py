@@ -33,6 +33,8 @@ from flwr.common.serde import (
 )
 from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetConnectorRequest,
+    GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     PullAppMessagesRequest,
@@ -234,6 +236,47 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             return GetRunResponse()
 
         return GetRunResponse(run=run_to_proto(runs[0]))
+
+    def GetConnector(
+        self, request: GetConnectorRequest, context: grpc.ServicerContext
+    ) -> GetConnectorResponse:
+        """Return credentials authorized for the authenticated connector task."""
+        task = get_authenticated_task()
+        if (
+            task.type != TaskType.CONNECTOR
+            or task.connector_ref != request.connector_ref
+        ):
+            context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                "Connector credentials are not available to this task.",
+            )
+
+        state = self.state_factory.state()
+        runs = state.get_run_info(run_ids=[task.run_id])
+        run = runs[0] if runs else None
+        if run is None or not run.flwr_aid:
+            context.abort(grpc.StatusCode.NOT_FOUND, "Connector not found.")
+            raise RuntimeError("This line should never be reached.")
+
+        if request.connector_ref not in state.get_run_connector_refs(
+            run_id=task.run_id
+        ):
+            context.abort(grpc.StatusCode.NOT_FOUND, "Connector not found.")
+            raise RuntimeError("This line should never be reached.")
+
+        connector = state.get_connector(
+            flwr_aid=run.flwr_aid,
+            connector_ref=request.connector_ref,
+        )
+        if connector is None:
+            context.abort(grpc.StatusCode.NOT_FOUND, "Connector not found.")
+            raise RuntimeError("This line should never be reached.")
+
+        return GetConnectorResponse(
+            connector_ref=connector.connector_ref,
+            credentials_json=connector.credentials_json,
+            config_json=connector.config_json,
+        )
 
     def PullTaskInput(
         self, request: PullTaskInputRequest, context: grpc.ServicerContext
