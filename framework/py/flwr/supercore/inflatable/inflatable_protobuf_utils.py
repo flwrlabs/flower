@@ -27,11 +27,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 
-from .inflatable_utils import (
-    ObjectIdNotPreregisteredError,
-    ObjectPushError,
-    ObjectUnavailableError,
-)
+from .inflatable_utils import ObjectPullError, ObjectPushError, ObjectUnavailableError
 
 ConfirmMessageReceivedProtobuf = Callable[
     [ConfirmMessageReceivedRequest], ConfirmMessageReceivedResponse
@@ -59,15 +55,15 @@ def make_pull_object_fn_protobuf(
     -------
     Callable[[str], bytes]
         A function that takes an object ID and returns the object content as bytes.
-        The function raises `ObjectIdNotPreregisteredError` if the object ID is not
-        pre-registered, or `ObjectUnavailableError` if the object is not yet available.
+        The function raises `ObjectPullError` if the object cannot be found, or
+        `ObjectUnavailableError` to signal that pulling should be retried.
     """
 
     def pull_object_fn(object_id: str) -> bytes:
         request = PullObjectRequest(node=node, run_id=run_id, object_id=object_id)
         response: PullObjectResponse = pull_object_protobuf(request)
         if not response.object_found:
-            raise ObjectIdNotPreregisteredError(object_id)
+            raise ObjectPullError(object_id, "the object could not be found.")
         if not response.object_available:
             raise ObjectUnavailableError(object_id)
         return response.object_content
