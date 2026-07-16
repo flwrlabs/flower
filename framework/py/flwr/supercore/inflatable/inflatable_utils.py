@@ -113,6 +113,18 @@ class ObjectIdNotPreregisteredError(Exception):
         super().__init__(f"Object with ID '{object_id}' could not be found.")
 
 
+class ObjectPushError(Exception):
+    """Exception raised when an object could not be pushed."""
+
+    def __init__(self, object_id: str, run_id: int, session_id: str):
+        super().__init__(
+            f"Failed to push object with ID '{object_id}' for run {run_id} using "
+            f"session '{session_id}'. The push session may have expired or been "
+            "replaced, or the servicer may have "
+            "failed to store it."
+        )
+
+
 def get_num_workers(max_concurrent: int) -> int:
     """Get number of workers based on the number of CPU cores and the maximum
     allowed."""
@@ -137,8 +149,8 @@ def push_objects(
         `InflatableObject` instances.
     push_object_fn : Callable[[str, bytes], None]
         A function that takes an object ID and its content as bytes, and pushes
-        it to the servicer. This function should raise `ObjectIdNotPreregisteredError`
-        if the object ID is not pre-registered.
+        it to the servicer. This function should raise `ObjectPushError` if the
+        servicer fails to store the object.
     object_ids_to_push : Optional[set[str]] (default: None)
         A set of object IDs to push. If not provided, all objects will be pushed.
     keep_objects : bool (default: False)
@@ -187,8 +199,8 @@ def push_object_contents_from_iterable(
         `object_id` is the object ID, and `object_content` is the object content.
     push_object_fn : Callable[[str, bytes], None]
         A function that takes an object ID and its content as bytes, and pushes
-        it to the servicer. This function should raise `ObjectIdNotPreregisteredError`
-        if the object ID is not pre-registered.
+        it to the servicer. This function should raise `ObjectPushError` if the
+        servicer fails to store the object.
     max_concurrent_pushes : int (default: FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES)
         The maximum number of concurrent pushes to perform.
     """

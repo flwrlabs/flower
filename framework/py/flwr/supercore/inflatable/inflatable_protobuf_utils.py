@@ -27,7 +27,11 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 
-from .inflatable_utils import ObjectIdNotPreregisteredError, ObjectUnavailableError
+from .inflatable_utils import (
+    ObjectIdNotPreregisteredError,
+    ObjectPushError,
+    ObjectUnavailableError,
+)
 
 ConfirmMessageReceivedProtobuf = Callable[
     [ConfirmMessageReceivedRequest], ConfirmMessageReceivedResponse
@@ -95,8 +99,8 @@ def make_push_object_fn_protobuf(
     -------
     Callable[[str, bytes], None]
         A function that takes an object ID and its content as bytes, and pushes it
-        to the servicer. The function raises `ObjectIdNotPreregisteredError` if
-        the object ID is not pre-registered.
+        to the servicer. The function raises `ObjectPushError` if the servicer fails
+        to store the object.
     """
 
     def push_object_fn(object_id: str, object_content: bytes) -> None:
@@ -109,7 +113,7 @@ def make_push_object_fn_protobuf(
         )
         response: PushObjectResponse = push_object_protobuf(request)
         if not response.stored:
-            raise ObjectIdNotPreregisteredError(object_id)
+            raise ObjectPushError(object_id, run_id, session_id)
 
     return push_object_fn
 

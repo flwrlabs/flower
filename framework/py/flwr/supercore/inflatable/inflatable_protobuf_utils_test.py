@@ -32,6 +32,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.inflatable.inflatable_utils import (
     ObjectIdNotPreregisteredError,
+    ObjectPushError,
     ObjectUnavailableError,
     pull_objects,
     push_objects,
@@ -123,6 +124,14 @@ class TestInflatableStubHelpers(unittest.TestCase):  # pylint: disable=R0902
         num_pushed_objects = sum(b != b"" for b in self.mock_store.values())
         assert self.mock_stub.PushObject.call_count == expected_obj_count
         assert num_pushed_objects == expected_obj_count
+
+    def test_push_object_failure(self) -> None:
+        """Test pushing an object that the receiver fails to store."""
+        with self.assertRaisesRegex(
+            ObjectPushError,
+            "Failed to push object with ID 'unknown-object' for run 1234",
+        ):
+            self.push_object_fn("unknown-object", b"content")
 
     @parameterized.expand(base_cases)  # type: ignore
     def test_pull_objects_success(
