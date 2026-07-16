@@ -16,7 +16,7 @@
 
 
 from collections.abc import Callable
-from logging import DEBUG, ERROR, WARN
+from logging import DEBUG, ERROR
 from typing import cast
 
 import grpc
@@ -269,21 +269,12 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         objects_to_push: set[str] = set()
         for object_tree in request.message_object_trees:
             objects_to_push |= set(store.preregister(run_id, object_tree))
-        message = message_from_proto(request.messages_list[0])
-        # Record the processing end time before making the reply visible.
-        try:
-            state.record_message_processing_end(
-                message_id=message.metadata.reply_to_message_id
-            )
-        except ValueError as err:
-            log(
-                WARN,
-                "Could not record ClientApp runtime for message %s: %s",
-                message.metadata.reply_to_message_id,
-                err,
-            )
         # Save the message to the state
-        state.store_message(message)
+        state.store_message(message_from_proto(request.messages_list[0]))
+        # Record message processing end time
+        state.record_message_processing_end(
+            message_id=request.messages_list[0].metadata.reply_to_message_id
+        )
         return PushAppMessagesResponse(objects_to_push=objects_to_push)
 
     def SendAppHeartbeat(

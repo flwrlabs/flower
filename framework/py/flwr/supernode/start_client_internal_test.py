@@ -23,7 +23,7 @@ from flwr.common.inflatable import get_all_nested_objects, get_object_tree
 from flwr.common.message import remove_content_from_message
 from flwr.common.typing import Fab
 
-from .start_client_internal import _pull_and_store_message, _push_messages
+from .start_client_internal import _pull_and_store_message
 
 
 class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
@@ -197,49 +197,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_object_store.delete.assert_called_once_with(
             message_without_content.metadata.message_id
         )
-
-    def test_push_messages_sends_reply_when_runtime_is_missing(self) -> None:
-        """Test replies are sent even when runtime timing is unavailable."""
-        # Prepare
-        message = Message(
-            content=RecordDict({"mock_cfg": ConfigRecord({"key": "value"})}),
-            dst_node_id=self.node_id,
-            message_type="query",
-            group_id="test_group",
-        )
-        message.metadata.__dict__["_run_id"] = self.run_id
-        message.metadata.__dict__["_message_id"] = message.object_id
-        reply = Message(
-            content=RecordDict({"mock_cfg": ConfigRecord({"key": "reply"})}),
-            reply_to=message,
-        )
-        reply.metadata.__dict__["_message_id"] = reply.object_id
-
-        self.mock_state.get_messages.return_value = [reply]
-        self.mock_state.get_message_processing_duration.side_effect = ValueError(
-            "missing timing"
-        )
-        self.mock_object_store.get_object_tree.return_value = get_object_tree(reply)
-        send = Mock(return_value=set())
-
-        # Execute
-        _push_messages(
-            state=self.mock_state,
-            object_store=self.mock_object_store,
-            send=send,
-            push_object=self.mock_push_object,
-        )
-
-        # Assert
-        send.assert_called_once()
-        assert send.call_args.args[2] == 0.0
-        self.mock_state.delete_messages.assert_called_once_with(
-            message_ids=[
-                reply.metadata.message_id,
-                reply.metadata.reply_to_message_id,
-            ]
-        )
-        self.mock_object_store.delete.assert_called_once_with(reply.metadata.message_id)
 
     def test_pull_and_store_message_with_unknown_run_id(self) -> None:
         """Test that a message of an unknown run ID is pulled and stored."""

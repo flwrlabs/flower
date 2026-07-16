@@ -479,8 +479,7 @@ def _push_messages(
 
         # Send the message
         try:
-            clientapp_runtime = _get_message_processing_duration(
-                state=state,
+            clientapp_runtime = state.get_message_processing_duration(
                 message_id=message.metadata.reply_to_message_id,
             )
             # Send the reply message with its ObjectTree and ClientApp runtime
@@ -525,21 +524,6 @@ def _push_messages(
             # No need to delete objects of the message it replies to, as it is
             # already deleted when the ClientApp calls `ConfirmMessageReceived`
             object_store.delete(message.metadata.message_id)
-
-
-def _get_message_processing_duration(state: NodeState, message_id: str) -> float:
-    """Return the message processing duration, falling back to 0.0 if unavailable."""
-    try:
-        return state.get_message_processing_duration(message_id=message_id)
-    except Exception as err:  # pylint: disable=broad-except
-        log(
-            WARN,
-            "Could not get ClientApp runtime for message %s; sending reply "
-            "with runtime 0.0: %s",
-            message_id,
-            err,
-        )
-        return 0.0
 
 
 @contextmanager
