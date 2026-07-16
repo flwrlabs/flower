@@ -243,17 +243,14 @@ class RuntimeAgentResponses(AgentResponses):
         """Push structured run events for `StreamRunEvents` clients."""
         if not events:
             return
-        self._stub.PushTaskEvents(
-            PushTaskEventsRequest(
-                events=[
-                    TaskEvent(
-                        event=cast(str, event["type"]),
-                        data=strict_json_dumps(event, compact=True),
-                    )
-                    for event in events
-                ]
+        task_events = [
+            TaskEvent(
+                event=cast(str, event["type"]),
+                data=strict_json_dumps(event, compact=True),
             )
-        )
+            for event in events
+        ]
+        self._stub.PushTaskEvents(PushTaskEventsRequest(events=task_events))
 
     def append_and_push_run_events(self, events: list[JSONObject]) -> None:
         """Append run events to context and push them to `StreamRunEvents` clients."""
