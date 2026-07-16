@@ -229,7 +229,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.finish_task.assert_called_once_with(
             task_id,
             sub_status=SubStatus.FAILED,
-            details="Pulling message objects failed: boom",
+            details="Pulling message objects failed.",
         )
         self.mock_confirm_message_received.assert_not_called()
 
