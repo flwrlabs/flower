@@ -268,6 +268,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         flwr_aid: str | None,
         primary_task_type: str,
         series_id: int | None = None,
+        connector_refs: Sequence[str] = (),
     ) -> int:
         """Create a new run.
 
@@ -293,6 +294,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Optional run series ID. If `None`, a new run series is created for
             the federation. If set, the series must already exist and belong to
             the federation.
+        connector_refs : Sequence[str] (default: ())
+            Connector references the run is allowed to invoke.
 
         Returns
         -------

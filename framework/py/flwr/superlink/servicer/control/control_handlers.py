@@ -397,6 +397,43 @@ def _raise_connector_failure(reason: str) -> NoReturn:
     ) from None
 
 
+def validate_run_connector_refs(
+    connector_refs: Sequence[str],
+    account: AccountInfo,
+    state: LinkState,
+) -> list[str]:
+    """Validate and canonicalize OAuth connector references for a new run."""
+    validated_refs: list[str] = []
+    seen: set[str] = set()
+    for requested_ref in connector_refs:
+        connector_ref = requested_ref.strip().lower()
+        if not connector_ref:
+            _raise_invalid_connector_request("connector_ref is required")
+        if connector_ref in seen:
+            continue
+        try:
+            connector_registry.get_oauth_connector_provider(connector_ref)
+        except ValueError:
+            raise FlowerError(
+                ApiErrorCode.CONNECTOR_NOT_FOUND,
+                f"OAuth provider for connector '{connector_ref}' was not found.",
+            ) from None
+        if (
+            state.get_connector(
+                flwr_aid=account.flwr_aid,
+                connector_ref=connector_ref,
+            )
+            is None
+        ):
+            raise FlowerError(
+                ApiErrorCode.CONNECTOR_NOT_FOUND,
+                f"Connector '{connector_ref}' is not connected for this account.",
+            )
+        seen.add(connector_ref)
+        validated_refs.append(connector_ref)
+    return validated_refs
+
+
 def start_run(  # pylint: disable=too-many-locals, too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
@@ -430,6 +467,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     flwr_aid = account.flwr_aid
     account_name = account.account_name
     override_config = user_config_from_proto(request.override_config)
+    connector_refs = validate_run_connector_refs(request.connector_refs, account, state)
 
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
 
@@ -505,6 +543,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
             flwr_aid,
             primary_task_type,
             request.series_id if request.HasField("series_id") else None,
+            connector_refs=connector_refs,
         )
 
         if run_id == 0:

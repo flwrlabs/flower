@@ -282,6 +282,47 @@ class StateTest(CoreStateTest):
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
 
+    def test_create_run_binds_connectors(self) -> None:
+        """Creating a run should atomically persist its connector allowlist."""
+        state = self.state_factory()
+
+        run_id = state.create_run(
+            None,
+            None,
+            "9f86d08",
+            {},
+            "@me/health",
+            None,
+            "account-a",
+            TaskType.AGENT_APP,
+            connector_refs=["notion", "github", "notion"],
+        )
+
+        self.assertGreater(run_id, 0)
+        self.assertEqual(
+            list(state.get_run_connector_refs(run_id=run_id)),
+            ["github", "notion"],
+        )
+
+    def test_create_run_rejects_empty_connector_ref(self) -> None:
+        """An invalid connector allowlist should prevent run creation."""
+        state = self.state_factory()
+
+        run_id = state.create_run(
+            None,
+            None,
+            "9f86d08",
+            {},
+            "@me/health",
+            None,
+            "account-a",
+            TaskType.AGENT_APP,
+            connector_refs=[""],
+        )
+
+        self.assertEqual(run_id, 0)
+        self.assertEqual(list(state.get_run_info()), [])
+
     def test_store_messages_rejects_stopped_run(self) -> None:
         """Messages cannot be stored after a run is stopped."""
         state = self.state_factory()
