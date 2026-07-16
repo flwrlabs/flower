@@ -364,6 +364,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         with (
             patch("flwr.supercore.date.datetime.datetime") as mock_datetime,
             patch.object(
+                # pylint: disable-next=W0212
                 state, "_cleanup_push_session", wraps=state._cleanup_push_session
             ) as cleanup_session,
         ):
