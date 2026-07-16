@@ -53,7 +53,12 @@ from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
-from flwr.supercore.constant import NOOP_FEDERATION_ID, NodeStatus, TaskType
+from flwr.supercore.constant import (
+    NOOP_FEDERATION_ID,
+    AutomationStatus,
+    NodeStatus,
+    TaskType,
+)
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.date import now
@@ -202,6 +207,65 @@ class StateTest(CoreStateTest):
         # Assert
         runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
         self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
+
+    def test_dispatch_automation_creates_run_from_stored_template(self) -> None:
+        """Dispatching an automation should create a run from stored inputs."""
+        state = self.state_factory()
+        initial_run_id = create_dummy_run(state, federation_id="@me/health")
+        series_id = state.get_run_info(run_ids=[initial_run_id])[0].series_id
+        previous_next_run_at = (now() - timedelta(seconds=30)).isoformat()
+        next_run_at = (now() + timedelta(seconds=30)).isoformat()
+        automation = state.store_automation(
+            federation_id="@me/health",
+            flwr_aid="aid-a",
+            fab_id="fab-id",
+            fab_version="1.0.0",
+            fab_hash="fab-hash",
+            override_config={"test_key": "test_value"},
+            federation_config=None,
+            primary_task_type=TaskType.SERVER_APP,
+            series_id=series_id,
+            next_run_at=previous_next_run_at,
+            fixed_interval=60,
+            max_runs=2,
+        )
+
+        run_id = state.dispatch_automation(
+            automation.automation_id,
+            previous_next_run_at=previous_next_run_at,
+            next_run_at=next_run_at,
+        )
+
+        self.assertIsNotNone(run_id)
+        assert run_id is not None
+        self.assertIsNone(
+            state.dispatch_automation(
+                automation.automation_id,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            )
+        )
+        run = state.get_run_info(run_ids=[run_id])[0]
+        self.assertEqual(run.federation_id, "@me/health")
+        self.assertEqual(run.flwr_aid, "aid-a")
+        self.assertEqual(run.fab_id, "fab-id")
+        self.assertEqual(run.fab_version, "1.0.0")
+        self.assertEqual(run.fab_hash, "fab-hash")
+        self.assertEqual(run.override_config, {"test_key": "test_value"})
+        self.assertEqual(run.primary_task_type, TaskType.SERVER_APP)
+        self.assertEqual(run.series_id, series_id)
+
+        updated = state.list_automations(
+            federation="@me/health",
+            statuses=[AutomationStatus.ACTIVE],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            [item.automation_id for item in updated],
+            [automation.automation_id],
+        )
+        self.assertEqual(updated[0].remaining_runs, 1)
+        self.assertEqual(updated[0].next_run_at, next_run_at)
 
     def test_create_run_creates_primary_task(self) -> None:
         """Creating a run should also create its primary task."""
