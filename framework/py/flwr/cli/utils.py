@@ -89,10 +89,10 @@ def log_superlink_connection(superlink_connection: SuperLinkConnection) -> None:
 
 def _format_flower_error(err: FlowerError) -> str:
     """Return the CLI-facing message for a FlowerError."""
-    msg = err.message
+    parts = [f"[code: {err.code}]", err.message]
     if err.public_details:
-        msg += f"\n{err.public_details}"
-    return msg
+        parts.append(err.public_details)
+    return " ".join(parts)
 
 
 @contextmanager  # docsig: ignore=SIG503

@@ -25,6 +25,7 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     MetaData,
+    PrimaryKeyConstraint,
     String,
     Table,
     text,
@@ -123,7 +124,7 @@ def create_corestate_metadata() -> MetaData:
         Column("primary_task_type", String, nullable=False),
         Column("created_at", TIMESTAMP(timezone=True), nullable=False),
         Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
-        Column("next_run_at", TIMESTAMP(timezone=True), nullable=True),
+        Column("next_run_at", TIMESTAMP(timezone=True), nullable=False),
         Column("fixed_interval", BigInteger, nullable=True),
         Column("remaining_runs", Integer, nullable=True),
         Column("stopped_at", TIMESTAMP(timezone=True), nullable=True),
@@ -138,6 +139,45 @@ def create_corestate_metadata() -> MetaData:
         automation.c.federation_id,
         automation.c.status,
         automation.c.updated_at,
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: connector
+    # --------------------------------------------------------------------------
+    Table(
+        "connector",
+        metadata,
+        Column("flwr_aid", String, primary_key=True, nullable=False),
+        Column("connector_ref", String, primary_key=True, nullable=False),
+        Column("credentials_json", String, nullable=False),
+        Column("config_json", String, nullable=False),
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: connector_oauth_session
+    # --------------------------------------------------------------------------
+    Table(
+        "connector_oauth_session",
+        metadata,
+        Column("oauth_session_id", String, primary_key=True, nullable=False),
+        Column("flwr_aid", String, nullable=False),
+        Column("connector_ref", String, nullable=False),
+        Column("state", String, nullable=False),
+        Column("redirect_uri", String, nullable=False),
+        Column("pkce_verifier", String, nullable=True),
+        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("expires_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("completed_at", TIMESTAMP(timezone=True), nullable=True),
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: run_connector
+    # --------------------------------------------------------------------------
+    Table(
+        "run_connector",
+        metadata,
+        Column("run_id", BigInteger, primary_key=True, nullable=False),
+        Column("connector_ref", String, primary_key=True, nullable=False),
     )
 
     # --------------------------------------------------------------------------
@@ -204,6 +244,60 @@ def create_corestate_metadata() -> MetaData:
         task_message.c.created_at,
     )
     Index("idx_task_message_run_id", task_message.c.run_id)
+
+    # --------------------------------------------------------------------------
+    #  Table: object_push_sessions
+    # --------------------------------------------------------------------------
+    object_push_sessions = Table(
+        "object_push_sessions",
+        metadata,
+        Column("session_id", String, primary_key=True, nullable=False),
+        Column("run_id", BigInteger, nullable=False),
+        Column("expires_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("pending_count", Integer, nullable=False),
+    )
+    Index("idx_object_push_sessions_run_id", object_push_sessions.c.run_id)
+    Index("idx_object_push_sessions_expires_at", object_push_sessions.c.expires_at)
+
+    # --------------------------------------------------------------------------
+    #  Table: object_push_session_roots
+    # --------------------------------------------------------------------------
+    object_push_session_roots = Table(
+        "object_push_session_roots",
+        metadata,
+        Column(
+            "session_id",
+            String,
+            ForeignKey("object_push_sessions.session_id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        Column("root_object_id", String, primary_key=True, nullable=False),
+    )
+    Index(
+        "idx_object_push_session_roots_session_id",
+        object_push_session_roots.c.session_id,
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: object_push_session_pending
+    # --------------------------------------------------------------------------
+    object_push_session_pending = Table(
+        "object_push_session_pending",
+        metadata,
+        Column(
+            "session_id",
+            String,
+            ForeignKey("object_push_sessions.session_id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        Column("object_id", String, nullable=False),
+        PrimaryKeyConstraint("session_id", "object_id"),
+    )
+    Index(
+        "idx_object_push_session_pending_object_id_session_id",
+        object_push_session_pending.c.object_id,
+        object_push_session_pending.c.session_id,
+    )
 
     # --------------------------------------------------------------------------
     #  Table: task_logs

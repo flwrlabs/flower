@@ -120,7 +120,6 @@ from flwr.supercore.constant import (
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
-from flwr.supercore.object_store import ObjectStore
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.run import Run
 from flwr.supercore.typing import (
@@ -217,7 +216,7 @@ def start_automation(
     fixed_interval = (
         request.fixed_interval if request.HasField("fixed_interval") else None
     )
-    remaining_runs = (
+    max_runs = (
         request.max_runs
         if request.HasField("max_runs")
         else 1
@@ -231,6 +230,12 @@ def start_automation(
     if resolved is None:
         return StartAutomationResponse()
 
+    if resolved.series_id is None:
+        raise FlowerError(
+            ApiErrorCode.INVALID_RUN_CONFIG,
+            "StartAutomation requires start_run_request.series_id.",
+        )
+
     try:
         automation = state.store_automation(
             federation_id=resolved.federation_id,
@@ -241,10 +246,10 @@ def start_automation(
             override_config=resolved.override_config,
             federation_config=resolved.federation_config,
             primary_task_type=resolved.primary_task_type,
+            series_id=resolved.series_id,
             next_run_at=next_run_at,
             fixed_interval=fixed_interval,
-            remaining_runs=remaining_runs,
-            series_id=resolved.series_id,
+            max_runs=max_runs,
         )
     except ValueError as e:
         raise FlowerError(
@@ -272,13 +277,16 @@ def list_automations(
     flwr_aid = account.flwr_aid
     if request.federation:
         _validate_federation_membership_in_request(state, flwr_aid, request.federation)
-        automations = state.list_automations(federation=request.federation)
+        automations = state.list_automations(
+            federation=request.federation,
+            order_by="updated_at",
+        )
     else:
         federations = state.federation_manager.get_federations(flwr_aid)
         federation_ids = {federation.id for federation in federations}
         automations = [
             automation
-            for automation in state.list_automations()
+            for automation in state.list_automations(order_by="updated_at")
             if automation.federation in federation_ids
         ]
 
@@ -291,7 +299,7 @@ def stop_automation(
     """Stop an automation."""
     log(INFO, "ControlServicer.StopAutomation")
 
-    for automation in state.list_automations():
+    for automation in state.list_automations(order_by="updated_at"):
         if automation.automation_id == request.automation_id:
             _validate_federation_membership_in_request(
                 state, account.flwr_aid, automation.federation
@@ -420,24 +428,23 @@ def _resolve_start_run_inputs(  # pylint: disable=too-many-locals,too-many-state
     )
 
 
-def _parse_start_at(request: StartAutomationRequest) -> datetime:
+def _parse_start_at(request: StartAutomationRequest) -> str:
     """Return the automation start timestamp."""
     if request.HasField("start_at"):
         try:
-            return datetime.fromisoformat(request.start_at)
+            return datetime.fromisoformat(request.start_at).isoformat()
         except ValueError as e:
             raise FlowerError(
                 ApiErrorCode.INVALID_RUN_CONFIG,
                 f"Invalid automation start_at value: {request.start_at}",
             ) from e
-    return now()
+    return now().isoformat()
 
 
 def list_runs(
     request: ListRunsRequest,
     account: AccountInfo,
     state: LinkState,
-    store: ObjectStore,
 ) -> ListRunsResponse:
     """Handle `flwr ls` command."""
     log(INFO, "ControlServicer.ListRuns")
@@ -483,7 +490,7 @@ def list_runs(
     for run in runs:
         run.account_name = account_names[run.flwr_aid]
         if run.status.status == Status.FINISHED:
-            store.delete_objects_in_run(run.run_id)
+            state.object_store.delete_objects_in_run(run.run_id)
 
     # Construct and return response
     return ListRunsResponse(

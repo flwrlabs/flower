@@ -80,12 +80,11 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
-    AUTOMATION_STATUS_ACTIVE,
-    AUTOMATION_STATUS_STOPPED,
     DEFAULT_FEDERATION_SIMULATION,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     ActionType,
+    AutomationStatus,
     RunTime,
     TaskType,
 )
@@ -218,6 +217,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request.start_run_request.fab.hash_str = fab_hash
         request.start_run_request.fab.content = fab_content
         request.start_run_request.federation = NOOP_FEDERATION_ID
+        request.start_run_request.series_id = 123
         for key, value in user_config_to_proto({"train.lr": 0.01}).items():
             request.start_run_request.override_config[key].CopyFrom(value)
 
@@ -236,15 +236,19 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
             response = self.servicer.StartAutomation(request, Mock())
 
-        automations = self.state.list_automations(federation=NOOP_FEDERATION_ID)
+        automations = self.state.list_automations(
+            federation=NOOP_FEDERATION_ID,
+            order_by="updated_at",
+        )
         record = cast(Any, self.state).automation_store[response.automation_id]
 
         # Assert
         self.assertEqual(len(self.state.get_run_info()), 0)
         self.assertEqual(len(automations), 1)
         self.assertEqual(automations[0].automation_id, response.automation_id)
+        self.assertEqual(response.series_id, request.start_run_request.series_id)
         self.assertEqual(automations[0].series_id, response.series_id)
-        self.assertEqual(automations[0].status, AUTOMATION_STATUS_ACTIVE)
+        self.assertEqual(automations[0].status, AutomationStatus.ACTIVE)
         self.assertEqual(automations[0].flwr_aid, self.aid)
         self.assertEqual(automations[0].next_run_at, start_at)
         self.assertEqual(automations[0].fixed_interval, 86400)
@@ -264,6 +268,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request.start_run_request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.start_run_request.fab.content = fab_content
         request.start_run_request.federation = NOOP_FEDERATION_ID
+        request.start_run_request.series_id = 456
 
         # Execute
         with (
@@ -278,14 +283,45 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
             response = self.servicer.StartAutomation(request, Mock())
 
-        automation = self.state.list_automations(federation=NOOP_FEDERATION_ID)[0]
+        automation = self.state.list_automations(
+            federation=NOOP_FEDERATION_ID,
+            order_by="updated_at",
+        )[0]
 
         # Assert
         self.assertEqual(automation.automation_id, response.automation_id)
+        self.assertEqual(automation.series_id, request.start_run_request.series_id)
         self.assertTrue(automation.HasField("remaining_runs"))
         self.assertEqual(automation.remaining_runs, 1)
         self.assertFalse(automation.HasField("fixed_interval"))
-        self.assertTrue(automation.HasField("next_run_at"))
+        self.assertEqual(automation.next_run_at, response.next_run_at)
+        self.assertIsNotNone(datetime.fromisoformat(automation.next_run_at))
+
+    def test_start_automation_requires_series_id(self) -> None:
+        """Test StartAutomation rejects requests without a run series ID."""
+        # Prepare
+        fab_content = b"test automation FAB content"
+        request = StartAutomationRequest()
+        request.start_run_request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.start_run_request.fab.content = fab_content
+        request.start_run_request.federation = NOOP_FEDERATION_ID
+
+        # Execute
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config"
+            ) as mock_get_fab_config,
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config"
+            ) as mock_get_metadata_from_config,
+            self.assertRaises(FlowerError) as cm,
+        ):
+            mock_get_fab_config.return_value = {"tool": {"flwr": {"app": {}}}}
+            mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
+            self.servicer.StartAutomation(request, Mock())
+
+        # Assert
+        self.assertEqual(cm.exception.code, ApiErrorCode.INVALID_RUN_CONFIG)
 
     def test_start_run_defaults_to_account_simulation_federation(self) -> None:
         """Test StartRun uses the account default simulation federation."""
@@ -747,8 +783,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             override_config={},
             federation_config=None,
             primary_task_type=TaskType.SERVER_APP,
-            next_run_at=now(),
-            remaining_runs=1,
+            series_id=1,
+            next_run_at=now().isoformat(),
+            max_runs=1,
         )
 
         # Execute
@@ -759,7 +796,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             StopAutomationRequest(automation_id=automation.automation_id), Mock()
         )
         stopped = self.state.list_automations(
-            federation=NOOP_FEDERATION_ID, statuses=[AUTOMATION_STATUS_STOPPED]
+            federation=NOOP_FEDERATION_ID,
+            statuses=[AutomationStatus.STOPPED],
+            order_by="updated_at",
         )
 
         # Assert

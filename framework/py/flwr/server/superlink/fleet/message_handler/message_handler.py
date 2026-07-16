@@ -62,7 +62,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.utils import check_abort
-from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
 from flwr.supercore.run import InvalidRunStatusException, Run
 
@@ -203,28 +202,18 @@ def push_messages(
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
-    # Store Message object to descendants mapping and preregister objects
-    objects_to_push: set[str] = set()
-    for object_tree in request.message_object_trees:
-        objects_to_push |= set(store.preregister(run_id, object_tree))
-    # Store Message in State
-    message_id: str | None = state.store_message_res(message=msg)
-    # This is temporary. We should consider a more robust cleanup
-    # mechanism that protects duplicate messages from premature deletion.
-    # Once that is in place, we can remove the run status check below.
-    if (
-        message_id is None
-        and state.get_run_status({run_id})[run_id].status == Status.FINISHED
-    ):
-        # The request currently contains only one message and its object tree.
-        store.delete(request.message_object_trees[0].object_id)
-        objects_to_push.clear()
+    # Store Message in State and preregister its objects.
+    session_id = state.start_session(run_id)
+    _, objects_to_push = state.store_message_and_object_tree(
+        msg, request.message_object_trees[0], session_id
+    )
 
     # Build response
     response = PushMessagesResponse(
         reconnect=Reconnect(reconnect=5),
-        results={str(message_id): 0},
+        results={msg.metadata.message_id: 0},
         objects_to_push=objects_to_push,
+        session_id=session_id,
     )
 
     # Record outgoing traffic size
@@ -301,20 +290,17 @@ def push_object(
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
-    stored = False
-    try:
-        store.put(request.object_id, request.object_content)
-        stored = True
-        # Record bytes traffic pushed from SuperNode
+    stored = state.store_object(
+        request.run_id,
+        request.session_id,
+        request.object_id,
+        request.object_content,
+    )
+    # Record bytes traffic pushed from SuperNode
+    if stored:
         state.store_traffic(
             request.run_id, bytes_sent=0, bytes_recv=len(request.object_content)
         )
-    except (NoObjectInStoreError, ValueError) as e:
-        log(ERROR, str(e))
-    except UnexpectedObjectContentError as e:
-        # Object content is not valid
-        log(ERROR, str(e))
-        raise
     return PushObjectResponse(stored=stored)
 
 
@@ -331,8 +317,8 @@ def pull_object(
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
-    # Fetch from store
-    content = store.get(request.object_id)
+    # Fetch from state
+    content = state.get_object(request.run_id, request.object_id)
     if content is not None:
         object_available = content != b""
         # Record bytes traffic pulled by SuperNode

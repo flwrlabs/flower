@@ -89,6 +89,26 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.GetAuthTokensRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.GetAuthTokensResponse.FromString,
                 _registered_method=True)
+        self.ListConnectors = channel.unary_unary(
+                '/flwr.proto.Control/ListConnectors',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListConnectorsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListConnectorsResponse.FromString,
+                _registered_method=True)
+        self.DisconnectConnector = channel.unary_unary(
+                '/flwr.proto.Control/DisconnectConnector',
+                request_serializer=flwr_dot_proto_dot_control__pb2.DisconnectConnectorRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.DisconnectConnectorResponse.FromString,
+                _registered_method=True)
+        self.BeginConnectorOAuth = channel.unary_unary(
+                '/flwr.proto.Control/BeginConnectorOAuth',
+                request_serializer=flwr_dot_proto_dot_control__pb2.BeginConnectorOAuthRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.BeginConnectorOAuthResponse.FromString,
+                _registered_method=True)
+        self.CompleteConnectorOAuth = channel.unary_unary(
+                '/flwr.proto.Control/CompleteConnectorOAuth',
+                request_serializer=flwr_dot_proto_dot_control__pb2.CompleteConnectorOAuthRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.CompleteConnectorOAuthResponse.FromString,
+                _registered_method=True)
         self.PullArtifacts = channel.unary_unary(
                 '/flwr.proto.Control/PullArtifacts',
                 request_serializer=flwr_dot_proto_dot_control__pb2.PullArtifactsRequest.SerializeToString,
@@ -256,6 +276,34 @@ class ControlServicer(object):
 
     def GetAuthTokens(self, request, context):
         """Get auth tokens upon request
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListConnectors(self, request, context):
+        """List OAuth connectors available to the authenticated account
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DisconnectConnector(self, request, context):
+        """Disconnect connector credentials for the authenticated account
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def BeginConnectorOAuth(self, request, context):
+        """Begin OAuth connector authorization flow
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CompleteConnectorOAuth(self, request, context):
+        """Complete OAuth connector authorization flow
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -448,6 +496,26 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.GetAuthTokens,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.GetAuthTokensRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.GetAuthTokensResponse.SerializeToString,
+            ),
+            'ListConnectors': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListConnectors,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListConnectorsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListConnectorsResponse.SerializeToString,
+            ),
+            'DisconnectConnector': grpc.unary_unary_rpc_method_handler(
+                    servicer.DisconnectConnector,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.DisconnectConnectorRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.DisconnectConnectorResponse.SerializeToString,
+            ),
+            'BeginConnectorOAuth': grpc.unary_unary_rpc_method_handler(
+                    servicer.BeginConnectorOAuth,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.BeginConnectorOAuthRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.BeginConnectorOAuthResponse.SerializeToString,
+            ),
+            'CompleteConnectorOAuth': grpc.unary_unary_rpc_method_handler(
+                    servicer.CompleteConnectorOAuth,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.CompleteConnectorOAuthRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.CompleteConnectorOAuthResponse.SerializeToString,
             ),
             'PullArtifacts': grpc.unary_unary_rpc_method_handler(
                     servicer.PullArtifacts,
@@ -837,6 +905,114 @@ class Control(object):
             '/flwr.proto.Control/GetAuthTokens',
             flwr_dot_proto_dot_control__pb2.GetAuthTokensRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.GetAuthTokensResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListConnectors(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListConnectors',
+            flwr_dot_proto_dot_control__pb2.ListConnectorsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListConnectorsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DisconnectConnector(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/DisconnectConnector',
+            flwr_dot_proto_dot_control__pb2.DisconnectConnectorRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.DisconnectConnectorResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def BeginConnectorOAuth(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/BeginConnectorOAuth',
+            flwr_dot_proto_dot_control__pb2.BeginConnectorOAuthRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.BeginConnectorOAuthResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CompleteConnectorOAuth(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/CompleteConnectorOAuth',
+            flwr_dot_proto_dot_control__pb2.CompleteConnectorOAuthRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.CompleteConnectorOAuthResponse.FromString,
             options,
             channel_credentials,
             insecure,

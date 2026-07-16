@@ -20,7 +20,7 @@ erDiagram
     VARCHAR federation_id
     BIGINT fixed_interval "nullable"
     VARCHAR flwr_aid
-    TIMESTAMP next_run_at "nullable"
+    TIMESTAMP next_run_at
     VARCHAR override_config
     VARCHAR primary_task_type
     INTEGER remaining_runs "nullable"
@@ -28,6 +28,25 @@ erDiagram
     VARCHAR status
     TIMESTAMP stopped_at "nullable"
     TIMESTAMP updated_at
+  }
+
+  connector {
+    VARCHAR connector_ref PK
+    VARCHAR flwr_aid PK
+    VARCHAR config_json
+    VARCHAR credentials_json
+  }
+
+  connector_oauth_session {
+    VARCHAR oauth_session_id PK
+    TIMESTAMP completed_at "nullable"
+    VARCHAR connector_ref
+    TIMESTAMP created_at
+    TIMESTAMP expires_at
+    VARCHAR flwr_aid
+    VARCHAR pkce_verifier "nullable"
+    VARCHAR redirect_uri
+    VARCHAR state
   }
 
   context {
@@ -103,11 +122,33 @@ erDiagram
     VARCHAR parent_id PK,FK
   }
 
+  object_push_session_pending {
+    VARCHAR object_id PK
+    VARCHAR session_id PK,FK
+  }
+
+  object_push_session_roots {
+    VARCHAR root_object_id PK
+    VARCHAR session_id FK
+  }
+
+  object_push_sessions {
+    VARCHAR session_id PK
+    TIMESTAMP expires_at
+    INTEGER pending_count
+    BIGINT run_id
+  }
+
   objects {
     VARCHAR object_id PK "nullable"
     BLOB content "nullable"
     INTEGER is_available
     INTEGER ref_count
+  }
+
+  objectstore_locks {
+    VARCHAR lock_id PK
+    INTEGER lock_value
   }
 
   run {
@@ -125,6 +166,11 @@ erDiagram
     BIGINT run_id UK "nullable"
     BIGINT series_id "nullable"
     VARCHAR usage_reported_at
+  }
+
+  run_connector {
+    VARCHAR connector_ref PK
+    BIGINT run_id PK
   }
 
   run_objects {
@@ -214,6 +260,8 @@ erDiagram
   run ||--o{ message_res : run_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
+  object_push_sessions ||--o| object_push_session_pending : session_id
+  object_push_sessions ||--o{ object_push_session_roots : session_id
   objects ||--o| run_objects : object_id
   task ||--o{ task_event : task_id
   task ||--o{ task_logs : task_id

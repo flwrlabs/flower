@@ -23,6 +23,7 @@ from threading import Lock, RLock
 from flwr.app import Error, Message
 from flwr.common.constant import ErrorCode
 from flwr.common.logger import log
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
@@ -93,10 +94,25 @@ class InMemoryNodeState(
         # verifies the authenticated task token before storing messages.
         with self.lock_msg_store:
             msg_id = message.metadata.message_id
-            if msg_id == "" or msg_id in self.msg_store:
+            if msg_id == "":
                 return None
+            if msg_id in self.msg_store:
+                return msg_id
             self.msg_store[msg_id] = MessageEntry(message=message)
             return msg_id
+
+    def store_message_and_object_tree(
+        self, message: Message, object_tree: ObjectTree, session_id: str
+    ) -> tuple[bool, list[str]]:
+        """Store a Message and preregister its ObjectTree."""
+        # Always acquire the push-session lock before the message-store lock
+        with self._lock_object_push_sessions, self.lock_msg_store:
+            stored = self.store_message(message) is not None
+            if not stored:
+                return False, []
+
+            missing_objects = self.preregister_object_tree(object_tree, session_id)
+            return True, missing_objects
 
     def get_messages(
         self,
