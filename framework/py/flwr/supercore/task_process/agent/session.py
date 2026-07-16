@@ -189,6 +189,7 @@ class RuntimeAgentResponses(AgentResponses):
         self, *, name: str, call_id: str, arguments: JSONObject
     ) -> JSONObject:
         """Call a connector and emit/persist its activity events."""
+
         def connector_event(
             status: Literal["started", "completed", "failed"],
             *,
