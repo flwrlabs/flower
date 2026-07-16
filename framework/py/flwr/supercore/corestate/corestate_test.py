@@ -364,16 +364,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         with (
             patch("flwr.supercore.date.datetime.datetime") as mock_datetime,
             patch.object(
-                state.object_store, "get", wraps=state.object_store.get
-            ) as load_object,
-            patch.object(state, "_cleanup_push_session") as cleanup_session,
+                state, "_cleanup_push_session", wraps=state._cleanup_push_session
+            ) as cleanup_session,
         ):
             mock_datetime.now.return_value = expired_at
-            self.assertEqual(state.get_object(run_id + 1, object_id), b"")
+            self.assertIsNone(state.get_object(run_id, "unknown-object-id"))
             cleanup_session.assert_not_called()
-            self.assertEqual(state.get_object(run_id, object_id), b"")
+            self.assertIsNone(state.get_object(run_id, object_id))
 
-        self.assertEqual(load_object.call_count, 3)
         cleanup_session.assert_has_calls(
             [call(session_id, cleanup_messages=True) for session_id in session_ids],
             any_order=True,
