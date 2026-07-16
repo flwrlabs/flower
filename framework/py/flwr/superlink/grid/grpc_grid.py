@@ -61,8 +61,7 @@ from flwr.supercore.inflatable.inflatable_protobuf_utils import (
     make_push_object_fn_protobuf,
 )
 from flwr.supercore.inflatable.inflatable_utils import (
-    ObjectIdNotPreregisteredError,
-    ObjectUnavailableError,
+    ObjectPullError,
     inflate_object_from_contents,
     pull_objects,
     push_objects,
@@ -341,7 +340,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
                             run_id=run_id,
                         ),
                     )
-                except (ObjectIdNotPreregisteredError, ObjectUnavailableError) as e:
+                except ObjectPullError as e:
                     # Return an error message if an object is missing or remains
                     # unavailable after all pull attempts.
                     inflated_msgs.append(
