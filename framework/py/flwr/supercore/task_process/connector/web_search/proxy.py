@@ -22,11 +22,15 @@ import requests
 from flwr.supercore.typing import JSONObject, JSONValue
 
 PROXY_WEB_SEARCH_PROVIDER = "proxy"
+WEB_SEARCH_ENDPOINT_ENV = "FLWR_WEB_SEARCH_ENDPOINT"
 REQUEST_TIMEOUT = 60.0
 
 
 class ProxyWebSearchProvider:
     """Proxy web search adapter."""
+
+    name = PROXY_WEB_SEARCH_PROVIDER
+    env = WEB_SEARCH_ENDPOINT_ENV
 
     def __init__(self, endpoint: str) -> None:
         self._endpoint = endpoint
@@ -44,16 +48,14 @@ class ProxyWebSearchProvider:
                 timeout=REQUEST_TIMEOUT,
             )
         except requests.RequestException as exc:
-            raise RuntimeError(
-                f"{PROXY_WEB_SEARCH_PROVIDER} web search request failed: {exc}"
-            ) from exc
+            raise RuntimeError(f"{self.name} web search request failed: {exc}") from exc
         if response.status_code >= 400:
             try:
                 detail = cast(JSONValue, response.json())
             except ValueError:
                 detail = response.text
             raise RuntimeError(
-                f"{PROXY_WEB_SEARCH_PROVIDER} web search request failed: "
+                f"{self.name} web search request failed: "
                 f"{response.status_code} {detail}"
             )
 
@@ -61,16 +63,13 @@ class ProxyWebSearchProvider:
             payload = response.json()
         except ValueError as exc:
             raise RuntimeError(
-                f"{PROXY_WEB_SEARCH_PROVIDER} web search returned invalid JSON."
+                f"{self.name} web search returned invalid JSON."
             ) from exc
         if not isinstance(payload, dict):
-            raise RuntimeError(
-                f"{PROXY_WEB_SEARCH_PROVIDER} web search returned invalid JSON."
-            )
+            raise RuntimeError(f"{self.name} web search returned invalid JSON.")
 
         if not isinstance(payload.get("results"), list):
             raise RuntimeError(
-                f"{PROXY_WEB_SEARCH_PROVIDER} web search response must contain a "
-                "results list."
+                f"{self.name} web search response must contain a results list."
             )
         return cast(JSONObject, payload)

@@ -114,10 +114,9 @@ def test_push_messages() -> None:
     state = MagicMock()
     state.start_session.return_value = "session-id"
     state.store_message_and_object_tree.return_value = (True, ["object-id"])
-    store = MagicMock()
 
     # Execute
-    response = push_messages(request=request, state=state, store=store)
+    response = push_messages(request=request, state=state)
 
     # Assert
     state.create_node.assert_not_called()

@@ -209,6 +209,33 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(missing_objects, [object_id])
         self.assertEqual(replacement_missing_objects, [object_id])
 
+    def test_delete_sessions_in_run(self) -> None:
+        """Deleting sessions for a run preserves sessions belonging to other runs."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        other_run_id = self.other_task_run_id(state)
+        session_ids = [state.start_session(run_id) for _ in range(2)]
+        other_session_id = state.start_session(other_run_id)
+        object_ids = ["a" * 64, "b" * 64, "c" * 64]
+        for session_id, object_id in zip(
+            [*session_ids, other_session_id], object_ids, strict=True
+        ):
+            state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        state.delete_sessions_in_run(run_id)
+
+        for session_id in session_ids:
+            with self.assertRaisesRegex(ValueError, "Unknown object push session"):
+                state.preregister_object_tree(
+                    ObjectTree(object_id="d" * 64), session_id
+                )
+        self.assertEqual(
+            state.preregister_object_tree(
+                ObjectTree(object_id="e" * 64), other_session_id
+            ),
+            ["e" * 64],
+        )
+
     def test_store_object_rejects_invalid_session_membership(self) -> None:
         """Objects must be pending in a session belonging to the run."""
         state = self.state_factory()
