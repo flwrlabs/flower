@@ -297,9 +297,4 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_403_FORBIDDEN,
         public_message="Failed to get FAB.",
     ),
-    ApiErrorCode.FLEET_OBJECT_CONTENT_INVALID: ApiErrorSpec(
-        status_code=StatusCode.FAILED_PRECONDITION,
-        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
-        public_message="Object content is invalid.",
-    ),
 }
