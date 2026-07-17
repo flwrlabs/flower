@@ -347,6 +347,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         run_id: int,
         federation_id: str,
         series_id: int | None,
+        description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID.
 
@@ -360,6 +361,10 @@ class CoreState(ABC):  # pylint: disable=R0904
             Caller-provided series ID. If `None`, a new series ID is generated
             and creation is attempted. If set, the matching series must already
             exist and belong to `federation_id`.
+        description : str | None (default: None)
+            Optional description for a newly created run series. Ignored when
+            `series_id` refers to an existing run series. `None` means no
+            description was provided; an empty string is an explicit description.
 
         Returns
         -------

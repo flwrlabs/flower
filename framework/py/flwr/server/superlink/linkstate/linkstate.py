@@ -274,6 +274,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         flwr_aid: str | None,
         primary_task_type: str,
         series_id: int | None = None,
+        series_description: str | None = None,
     ) -> int:
         """Create a new run.
 
@@ -299,6 +300,10 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Optional run series ID. If `None`, a new run series is created for
             the federation. If set, the series must already exist and belong to
             the federation.
+        series_description : str | None (default: None)
+            Optional description for a newly created run series. Ignored when
+            `series_id` refers to an existing run series. `None` means no
+            description was provided; an empty string is an explicit description.
 
         Returns
         -------
