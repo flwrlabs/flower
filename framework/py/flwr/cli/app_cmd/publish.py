@@ -32,7 +32,7 @@ from flwr.supercore.constant import (
     MAX_FILE_COUNT,
     MAX_TOTAL_BYTES,
     MIME_MAP,
-    PLATFORM_API_URL,
+    FLWR_SUPERGRID_API_URL,
     SUPERGRID_ADDRESS,
     UTF8,
 )
@@ -288,7 +288,7 @@ def _post_files(
     token: str,
 ) -> Response:
     """POST multipart with one part per file."""
-    url = f"{PLATFORM_API_URL}/hub/apps/publish"
+    url = f"{FLWR_SUPERGRID_API_URL}/hub/apps/publish"
     headers = {"Authorization": f"Bearer {token}"}
     body = {"flwr_version": flwr_version}
 
