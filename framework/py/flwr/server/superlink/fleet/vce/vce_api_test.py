@@ -14,14 +14,14 @@
 # ==============================================================================
 """Test Fleet Simulation Runtime API."""
 
-
 import threading
+from collections.abc import Callable
 from itertools import cycle
 from json import JSONDecodeError
 from math import pi
 from pathlib import Path
 from queue import Queue
-from time import sleep
+from time import monotonic, sleep
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -84,9 +84,18 @@ def _make_vce_test_message(run_id: int = 1234, node_id: int = 1) -> Message:
     return message
 
 
-def terminate_simulation(f_stop: threading.Event, sleep_duration: int) -> None:
-    """Set event to terminate Simulation Runtime after `sleep_duration` seconds."""
-    sleep(sleep_duration)
+def terminate_simulation(
+    f_stop: threading.Event,
+    timeout: float,
+    stop_condition: Callable[[], bool] | None = None,
+) -> None:
+    """Set event after a timeout or when the supplied condition is met."""
+    if stop_condition is None:
+        sleep(timeout)
+    else:
+        deadline = monotonic() + timeout
+        while not stop_condition() and monotonic() < deadline:
+            sleep(0.01)
     f_stop.set()
 
 
@@ -201,8 +210,9 @@ def start_and_shutdown(
     num_supernodes: int | None = None,
     state_factory: LinkStateFactory | None = None,
     nodes_mapping: NodeToPartitionMapping | None = None,
-    duration: int = 0,
+    duration: float = 0,
     backend_config: str = "{}",
+    stop_condition: Callable[[], bool] | None = None,
 ) -> None:
     """Start Simulation Runtime and terminate after specified number of seconds.
 
@@ -216,7 +226,8 @@ def start_and_shutdown(
         # Setup thread that will set the f_stop event, triggering the termination of all
         # logic in the Simulation Runtime. It will also terminate the Backend.
         termination_th = threading.Thread(
-            target=terminate_simulation, args=(f_stop, duration)
+            target=terminate_simulation,
+            args=(f_stop, duration, stop_condition),
         )
         termination_th.start()
 
@@ -293,7 +304,8 @@ class TestFleetSimulationEngineRayBackend(TestCase):
         with self.assertRaises(ValueError):
             start_and_shutdown(duration=2)
 
-    def test_erroneous_client_app_attr(self) -> None:
+    @patch("flwr.server.superlink.fleet.vce.vce_api.time.sleep")
+    def test_erroneous_client_app_attr(self, mock_sleep: Mock) -> None:
         """Tests attempt to load a ClientApp that can't be found."""
         num_messages = 7
         num_nodes = 59
@@ -307,6 +319,7 @@ class TestFleetSimulationEngineRayBackend(TestCase):
                 state_factory=state_factory,
                 nodes_mapping=nodes_mapping,
             )
+        mock_sleep.assert_called_once_with(10)
 
     def test_erroneous_backend_config(self) -> None:
         """Backend Config should be a JSON stream."""
@@ -335,7 +348,7 @@ class TestFleetSimulationEngineRayBackend(TestCase):
 
     def test_start_and_shutdown(self) -> None:
         """Start Simulation Runtime Fleet and terminate it."""
-        start_and_shutdown(num_supernodes=50, duration=10)
+        start_and_shutdown(num_supernodes=50, duration=1)
 
     # pylint: disable=too-many-locals
     def test_start_and_shutdown_with_message_in_state(self) -> None:
@@ -358,7 +371,13 @@ class TestFleetSimulationEngineRayBackend(TestCase):
 
         # Run
         start_and_shutdown(
-            state_factory=state_factory, nodes_mapping=nodes_mapping, duration=10
+            state_factory=state_factory,
+            nodes_mapping=nodes_mapping,
+            duration=10,
+            stop_condition=lambda: len(
+                state_factory.state().get_message_res(set(expected_results))
+            )
+            == num_messages,
         )
 
         # Get all Message replies
