@@ -719,6 +719,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         run_id: int,
         federation_id: str,
         series_id: int | None,
+        description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
         insert_query = """
@@ -741,7 +742,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         {
                             "series_id": uint64_to_int64(candidate),
                             "federation_id": federation_id,
-                            "description": None,
+                            "description": description,
                             "created_at": timestamp,
                             "updated_at": timestamp,
                         },
