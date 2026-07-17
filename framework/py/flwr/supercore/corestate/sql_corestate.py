@@ -128,6 +128,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         return session_id
 
+    def delete_sessions_in_run(self, run_id: int) -> None:
+        """Delete all object push session bookkeeping for a run."""
+        self.query(
+            """
+            DELETE FROM object_push_sessions
+            WHERE run_id = :run_id
+            """,
+            {"run_id": uint64_to_int64(run_id)},
+        )
+
     def preregister_object_tree(
         self, object_tree: ObjectTree, session_id: str
     ) -> list[str]:
@@ -255,6 +265,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Store an object if it is pending for an active push session."""
         try:
             with self.session():
+                # Support legacy SuperNodes that do not send a session ID
+                if not session_id:
+                    rows = self.query(
+                        """
+                        SELECT session_id
+                        FROM object_push_session_pending
+                        WHERE object_id = :object_id
+                        """,
+                        {"object_id": object_id},
+                    )
+                    if not rows:
+                        return False
+                    session_id = rows[0]["session_id"]
+
                 # Atomically validate the session and claim its pending object
                 expires_at = self._claim_pending_object(run_id, session_id, object_id)
                 if expires_at is None:
@@ -695,6 +719,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         run_id: int,
         federation_id: str,
         series_id: int | None,
+        description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
         insert_query = """
@@ -717,7 +742,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         {
                             "series_id": uint64_to_int64(candidate),
                             "federation_id": federation_id,
-                            "description": None,
+                            "description": description,
                             "created_at": timestamp,
                             "updated_at": timestamp,
                         },

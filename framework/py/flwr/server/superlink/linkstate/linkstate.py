@@ -137,6 +137,12 @@ class LinkState(CoreState):  # pylint: disable=R0904
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
 
+    def cleanup_run(self, run_id: int) -> None:
+        """Clean up run-scoped messages and objects."""
+        self.delete_messages(self.get_message_ids_from_run_id(run_id))
+        self.object_store.delete_objects_in_run(run_id)
+        self.delete_sessions_in_run(run_id)
+
     @abc.abstractmethod
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up run-scoped messages and objects.
@@ -268,6 +274,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         flwr_aid: str | None,
         primary_task_type: str,
         series_id: int | None = None,
+        series_description: str | None = None,
     ) -> int:
         """Create a new run.
 
@@ -293,6 +300,10 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Optional run series ID. If `None`, a new run series is created for
             the federation. If set, the series must already exist and belong to
             the federation.
+        series_description : str | None (default: None)
+            Optional description for a newly created run series. Ignored when
+            `series_id` refers to an existing run series. `None` means no
+            description was provided; an empty string is an explicit description.
 
         Returns
         -------

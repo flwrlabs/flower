@@ -47,6 +47,13 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Start a run-scoped object push session."""
 
     @abstractmethod
+    def delete_sessions_in_run(self, run_id: int) -> None:
+        """Delete bookkeeping for all object push sessions in a run.
+
+        This does not delete any messages or objects associated with the sessions.
+        """
+
+    @abstractmethod
     def preregister_object_tree(
         self, object_tree: ObjectTree, session_id: str
     ) -> list[str]:
@@ -253,7 +260,7 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def store_message_and_object_tree(
-        self, message: Message, object_tree: ObjectTree
+        self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree.
 
@@ -263,6 +270,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             The Message to store.
         object_tree : ObjectTree
             The ObjectTree containing the IDs of objects to preregister.
+        session_id : str
+            The ID of the object push session.
 
         Returns
         -------
@@ -338,6 +347,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         run_id: int,
         federation_id: str,
         series_id: int | None,
+        description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID.
 
@@ -351,6 +361,10 @@ class CoreState(ABC):  # pylint: disable=R0904
             Caller-provided series ID. If `None`, a new series ID is generated
             and creation is attempted. If set, the matching series must already
             exist and belong to `federation_id`.
+        description : str | None (default: None)
+            Optional description for a newly created run series. Ignored when
+            `series_id` refers to an existing run series. `None` means no
+            description was provided; an empty string is an explicit description.
 
         Returns
         -------
