@@ -210,6 +210,20 @@ class InMemoryCoreState(
     ) -> bool:
         """Store an object if it is pending for an active push session."""
         with self._lock_object_push_sessions:
+            # Support legacy SuperNodes that do not send a session ID
+            if not session_id:
+                sessions = self._object_push_sessions.items()
+                session_id = next(
+                    (
+                        candidate_id
+                        for candidate_id, candidate in sessions
+                        if object_id in candidate.pending_object_ids
+                    ),
+                    "",
+                )
+                if not session_id:
+                    return False
+
             # Validate session ownership and pending-object membership
             session = self._object_push_sessions.get(session_id)
             if (
@@ -472,6 +486,7 @@ class InMemoryCoreState(
         run_id: int,
         federation_id: str,
         series_id: int | None,
+        description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
         with self.lock_run_series_store:
@@ -503,7 +518,7 @@ class InMemoryCoreState(
                 run_series = RunSeries(
                     series_id=new_series_id,
                     federation=federation_id,
-                    description="",
+                    description=description if description is not None else "",
                     created_at=timestamp,
                     updated_at=timestamp,
                 )
