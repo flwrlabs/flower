@@ -25,6 +25,10 @@ from flwr.app.message import Message
 from flwr.client.grpc_rere_client.connection import grpc_request_response
 from flwr.client.grpc_rere_client.grpc_adapter import GrpcAdapter
 from flwr.common.logger import log
+from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    StartAutomationFromTaskRequest,
+    StartAutomationFromTaskResponse,
+)
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
@@ -52,6 +56,9 @@ def grpc_adapter(  # pylint: disable=R0913,too-many-positional-arguments
         Callable[[int, str], bytes],
         Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
+        Callable[
+            [int, StartAutomationFromTaskRequest], StartAutomationFromTaskResponse
+        ],
     ]
 ]:
     """Primitives for request/response-based interaction with a server via GrpcAdapter.
@@ -88,6 +95,8 @@ def grpc_adapter(  # pylint: disable=R0913,too-many-positional-arguments
     pull_object : Callable[[int, str], bytes]
     push_object : Callable[[int, str, str, bytes], None]
     confirm_message_received : Callable[[int, str], None]
+    start_automation : Callable[[int, StartAutomationFromTaskRequest],
+        StartAutomationFromTaskResponse]
     """
     if authentication_keys is not None:
         log(ERROR, "SuperNode authentication is not supported for this transport type.")

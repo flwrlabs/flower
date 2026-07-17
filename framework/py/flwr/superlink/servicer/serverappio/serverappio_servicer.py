@@ -43,6 +43,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+    StartAutomationFromTaskRequest,
+    StartAutomationFromTaskResponse,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -65,6 +67,7 @@ from flwr.supercore.inflatable.inflatable_object import (
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supercore.servicer.appio import AppIoServicer
+from flwr.superlink.servicer.automation import start_automation_from_run
 
 SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE = (
     "Some ServerAppIo API endpoints are only available for Deployment Runtime runs."
@@ -308,6 +311,41 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushTaskOutputResponse()
+
+    def StartAutomation(
+        self,
+        request: StartAutomationFromTaskRequest,
+        context: grpc.ServicerContext,
+    ) -> StartAutomationFromTaskResponse:
+        """Start an automation using the authenticated AgentApp run template."""
+        task = get_authenticated_task()
+        if task.type not in (TaskType.AGENT_APP, TaskType.SERVER_APP):
+            context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                "Only AgentApp and ServerApp tasks can create automations.",
+            )
+
+        state = self.state_factory.state()
+        runs = state.get_run_info(run_ids=[task.run_id])
+        run = runs[0] if runs else None
+        if run is None:
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "The authenticated AgentApp run does not exist.",
+            )
+            raise RuntimeError("Unreachable code")
+        if run.primary_task_id != task.task_id or run.series_id == 0:
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "The authenticated AgentApp run cannot be used as an "
+                "automation template.",
+            )
+
+        try:
+            return start_automation_from_run(state, run, request)
+        except ValueError as exc:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+            raise RuntimeError("Unreachable code") from exc
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext

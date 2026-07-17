@@ -15,6 +15,7 @@
 """ClientAppIo API servicer."""
 
 
+from collections.abc import Callable
 from logging import DEBUG, ERROR
 
 import grpc
@@ -42,6 +43,8 @@ from flwr.proto.appio_pb2 import (
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+    StartAutomationFromTaskRequest,
+    StartAutomationFromTaskResponse,
 )
 from flwr.proto.message_pb2 import (
     ConfirmMessageReceivedRequest,
@@ -52,6 +55,7 @@ from flwr.proto.message_pb2 import (
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
+from flwr.supercore.constant import TaskType
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.servicer.appio import AppIoServicer
@@ -66,9 +70,17 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         self,
         state_factory: NodeStateFactory,
         objectstore_factory: ObjectStoreFactory,
+        start_automation_fn: (
+            Callable[
+                [int, StartAutomationFromTaskRequest],
+                StartAutomationFromTaskResponse,
+            ]
+            | None
+        ) = None,
     ) -> None:
         self.state_factory = state_factory
         self.objectstore_factory = objectstore_factory
+        self.start_automation_fn = start_automation_fn
 
     def state(self) -> NodeState:
         """Return the NodeState instance."""
@@ -181,6 +193,31 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
 
         return PushTaskOutputResponse()
+
+    def StartAutomation(
+        self,
+        request: StartAutomationFromTaskRequest,
+        context: grpc.ServicerContext,
+    ) -> StartAutomationFromTaskResponse:
+        """Forward an authenticated ClientApp automation to SuperLink."""
+        task = get_authenticated_task()
+        if task.type != TaskType.CLIENT_APP:
+            context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                "Only ClientApp tasks can use ClientAppIo.StartAutomation.",
+            )
+        start_automation_fn = self.start_automation_fn
+        if start_automation_fn is None:
+            context.abort(
+                grpc.StatusCode.UNAVAILABLE,
+                "The SuperLink automation connection is unavailable.",
+            )
+            raise RuntimeError("Unreachable code")
+        try:
+            return start_automation_fn(task.run_id, request)
+        except ValueError as exc:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+            raise RuntimeError("Unreachable code") from exc
 
     def PullMessages(
         self, request: PullAppMessagesRequest, context: grpc.ServicerContext

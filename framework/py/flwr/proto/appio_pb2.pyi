@@ -494,3 +494,59 @@ class CreateTaskResponse(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing.Literal["_task_id", b"_task_id"]) -> typing.Literal["task_id"] | None: ...
 
 global___CreateTaskResponse = CreateTaskResponse
+
+@typing.final
+class StartAutomationFromTaskRequest(google.protobuf.message.Message):
+    """StartAutomationFromTask messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_FIELD_NUMBER: builtins.int
+    START_AT_FIELD_NUMBER: builtins.int
+    FIXED_INTERVAL_FIELD_NUMBER: builtins.int
+    MAX_RUNS_FIELD_NUMBER: builtins.int
+    task: builtins.str
+    start_at: builtins.str
+    """RFC 3339 timestamp. If unset, start immediately."""
+    fixed_interval: builtins.int
+    """Fixed interval in seconds. If unset, run once."""
+    max_runs: builtins.int
+    def __init__(
+        self,
+        *,
+        task: builtins.str = ...,
+        start_at: builtins.str | None = ...,
+        fixed_interval: builtins.int | None = ...,
+        max_runs: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_max_runs", b"_max_runs", "_start_at", b"_start_at", "fixed_interval", b"fixed_interval", "max_runs", b"max_runs", "start_at", b"start_at"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_max_runs", b"_max_runs", "_start_at", b"_start_at", "fixed_interval", b"fixed_interval", "max_runs", b"max_runs", "start_at", b"start_at", "task", b"task"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_fixed_interval", b"_fixed_interval"]) -> typing.Literal["fixed_interval"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_max_runs", b"_max_runs"]) -> typing.Literal["max_runs"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_start_at", b"_start_at"]) -> typing.Literal["start_at"] | None: ...
+
+global___StartAutomationFromTaskRequest = StartAutomationFromTaskRequest
+
+@typing.final
+class StartAutomationFromTaskResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AUTOMATION_ID_FIELD_NUMBER: builtins.int
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    NEXT_RUN_AT_FIELD_NUMBER: builtins.int
+    automation_id: builtins.int
+    series_id: builtins.int
+    next_run_at: builtins.str
+    def __init__(
+        self,
+        *,
+        automation_id: builtins.int = ...,
+        series_id: builtins.int = ...,
+        next_run_at: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["automation_id", b"automation_id", "next_run_at", b"next_run_at", "series_id", b"series_id"]) -> None: ...
+
+global___StartAutomationFromTaskResponse = StartAutomationFromTaskResponse

@@ -53,6 +53,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
+    StartAutomationFromTaskRequest,
+    StartAutomationFromTaskResponse,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -64,6 +66,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
@@ -446,6 +449,114 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert task.run_id == self._auth_run_id
         assert task.type == TaskType.MODEL
         assert task.model_ref == "models/abc"
+
+    def test_start_automation_uses_authenticated_agentapp_run_template(self) -> None:
+        """StartAutomation should copy identity and FAB context from its run."""
+        run_id = self.state.create_run(
+            "fab-id",
+            "1.0.0",
+            "fab-hash",
+            {"agent.input": "Schedule a daily summary", "key": "value"},
+            NOOP_FEDERATION_ID,
+            None,
+            "account-id",
+            TaskType.AGENT_APP,
+        )
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        assert run.primary_task_id is not None
+        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+        request = StartAutomationFromTaskRequest(
+            task="Summarize the latest results",
+            start_at="2026-07-18T09:00:00+02:00",
+            fixed_interval=86400,
+            max_runs=3,
+        )
+
+        with patch(
+            "flwr.superlink.servicer.serverappio.serverappio_servicer."
+            "get_authenticated_task",
+            return_value=Task(
+                task_id=run.primary_task_id,
+                run_id=run_id,
+                type=TaskType.AGENT_APP,
+            ),
+        ):
+            response = servicer.StartAutomation(request, Mock())
+
+        assert isinstance(response, StartAutomationFromTaskResponse)
+        assert response.series_id == run.series_id
+        assert response.next_run_at == "2026-07-18T07:00:00Z"
+        automations = self.state.list_automations(
+            federation=NOOP_FEDERATION_ID,
+            order_by="updated_at",
+        )
+        assert len(automations) == 1
+        assert automations[0].automation_id == response.automation_id
+        assert automations[0].flwr_aid == "account-id"
+        assert automations[0].fixed_interval == 86400
+        assert automations[0].remaining_runs == 3
+        record = self.state.automation_store[response.automation_id]
+        assert record.fab_id == "fab-id"
+        assert record.fab_version == "1.0.0"
+        assert record.fab_hash == "fab-hash"
+        assert record.override_config == {
+            "agent.input": "Summarize the latest results",
+            "key": "value",
+        }
+
+    def test_start_automation_rejects_clientapp_task(self) -> None:
+        """ClientApp tasks must use ClientAppIo to create automations."""
+        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+        context = Mock()
+        context.abort.side_effect = RuntimeError("aborted")
+
+        with (
+            patch(
+                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "get_authenticated_task",
+                return_value=Task(
+                    task_id=1,
+                    run_id=self._auth_run_id,
+                    type=TaskType.CLIENT_APP,
+                ),
+            ),
+            self.assertRaisesRegex(RuntimeError, "aborted"),
+        ):
+            servicer.StartAutomation(
+                StartAutomationFromTaskRequest(task="Do work"), context
+            )
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Only AgentApp and ServerApp tasks can create automations.",
+        )
+
+    def test_start_automation_accepts_serverapp_task(self) -> None:
+        """ServerApp primary tasks should create automations directly."""
+        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        assert run.primary_task_id is not None
+        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+
+        with patch(
+            "flwr.superlink.servicer.serverappio.serverappio_servicer."
+            "get_authenticated_task",
+            return_value=Task(
+                task_id=run.primary_task_id,
+                run_id=run.run_id,
+                type=TaskType.SERVER_APP,
+            ),
+        ):
+            response = servicer.StartAutomation(
+                StartAutomationFromTaskRequest(task="Run server work"), Mock()
+            )
+
+        assert response.series_id == run.series_id
+        automations = self.state.list_automations(
+            federation=run.federation_id,
+            order_by="updated_at",
+        )
+        assert len(automations) == 1
+        assert automations[0].automation_id == response.automation_id
 
     def test_push_task_output_stores_simulation_runtime(self) -> None:
         """PushTaskOutput should persist Simulation Runtime usage."""

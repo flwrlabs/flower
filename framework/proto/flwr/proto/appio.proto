@@ -104,3 +104,18 @@ message CreateTaskRequest {
   optional string connector_ref = 4;
 }
 message CreateTaskResponse { optional uint64 task_id = 1; }
+
+// StartAutomationFromTask messages
+message StartAutomationFromTaskRequest {
+  string task = 1;
+  // RFC 3339 timestamp. If unset, start immediately.
+  optional string start_at = 2;
+  // Fixed interval in seconds. If unset, run once.
+  optional uint64 fixed_interval = 3;
+  optional uint32 max_runs = 4;
+}
+message StartAutomationFromTaskResponse {
+  uint64 automation_id = 1;
+  uint64 series_id = 2;
+  string next_run_at = 3;
+}

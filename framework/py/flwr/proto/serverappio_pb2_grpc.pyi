@@ -111,6 +111,12 @@ class ServerAppIoStub:
     ]
     """Create a task"""
 
+    StartAutomation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.StartAutomationFromTaskRequest,
+        flwr.proto.appio_pb2.StartAutomationFromTaskResponse,
+    ]
+    """Start an automation using the authenticated AgentApp run as its template"""
+
     PushTaskMessage: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushTaskMessageRequest,
         flwr.proto.appio_pb2.PushTaskMessageResponse,
@@ -239,6 +245,12 @@ class ServerAppIoAsyncStub:
         flwr.proto.appio_pb2.CreateTaskResponse,
     ]
     """Create a task"""
+
+    StartAutomation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.StartAutomationFromTaskRequest,
+        flwr.proto.appio_pb2.StartAutomationFromTaskResponse,
+    ]
+    """Start an automation using the authenticated AgentApp run as its template"""
 
     PushTaskMessage: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushTaskMessageRequest,
@@ -388,6 +400,14 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.CreateTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.CreateTaskResponse]]:
         """Create a task"""
+
+    @abc.abstractmethod
+    def StartAutomation(
+        self,
+        request: flwr.proto.appio_pb2.StartAutomationFromTaskRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.StartAutomationFromTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.StartAutomationFromTaskResponse]]:
+        """Start an automation using the authenticated AgentApp run as its template"""
 
     @abc.abstractmethod
     def PushTaskMessage(

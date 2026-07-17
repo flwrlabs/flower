@@ -24,6 +24,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from functools import partial
 from logging import ERROR, INFO, WARN
+from threading import Lock
 from typing import cast
 
 import grpc
@@ -48,6 +49,10 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.logger import log
+from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    StartAutomationFromTaskRequest,
+    StartAutomationFromTaskResponse,
+)
 from flwr.proto.clientappio_pb2_grpc import add_ClientAppIoServicer_to_server
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.address import parse_address, resolve_bind_address
@@ -86,6 +91,40 @@ from flwr.supernode.nodestate import NodeState, NodeStateFactory
 from flwr.supernode.servicer.clientappio import ClientAppIoServicer
 
 FAB_VERIFICATION_ERROR = Error(ErrorCode.INVALID_FAB, "The FAB could not be verified.")
+
+
+class _AutomationStarter:
+    """Thread-safe holder for the active SuperLink automation callable."""
+
+    def __init__(self) -> None:
+        self._fn: (
+            Callable[
+                [int, StartAutomationFromTaskRequest],
+                StartAutomationFromTaskResponse,
+            ]
+            | None
+        ) = None
+        self._lock = Lock()
+
+    def set(
+        self,
+        fn: Callable[
+            [int, StartAutomationFromTaskRequest], StartAutomationFromTaskResponse
+        ],
+    ) -> None:
+        """Set the callable for the active Fleet connection."""
+        with self._lock:
+            self._fn = fn
+
+    def __call__(
+        self, run_id: int, request: StartAutomationFromTaskRequest
+    ) -> StartAutomationFromTaskResponse:
+        """Forward an automation through the active Fleet connection."""
+        with self._lock:
+            fn = self._fn
+        if fn is None:
+            raise ValueError("The SuperLink automation connection is unavailable.")
+        return fn(run_id, request)
 
 
 # pylint: disable=import-outside-toplevel
@@ -207,12 +246,14 @@ def start_client_internal(
 
     # Launch ClientAppIo API server
     grpc_servers = []
+    automation_starter = _AutomationStarter()
     clientappio_server = run_clientappio_api_grpc(
         address=clientappio_api_address,
         state_factory=state_factory,
         objectstore_factory=object_store_factory,
         certificates=clientappio_certificates,
         superexec_auth_secret=superexec_auth_secret,
+        start_automation_fn=automation_starter,
     )
     grpc_servers.append(clientappio_server)
 
@@ -271,7 +312,9 @@ def start_client_internal(
             pull_object,
             push_object,
             confirm_message_received,
+            start_automation,
         ) = conn
+        automation_starter.set(start_automation)
         # Store node_id in state
         state.set_node_id(node_id)
         log(INFO, "SuperNode ID: %s", node_id)
@@ -605,6 +648,9 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
         Callable[[int, str], bytes],
         Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
+        Callable[
+            [int, StartAutomationFromTaskRequest], StartAutomationFromTaskResponse
+        ],
     ]
 ]:
     """Establish a connection to the Fleet API server at SuperLink."""
@@ -669,6 +715,10 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
     superexec_auth_secret: bytes | None,
+    start_automation_fn: (
+        Callable[[int, StartAutomationFromTaskRequest], StartAutomationFromTaskResponse]
+        | None
+    ) = None,
 ) -> grpc.Server:
     """Run ClientAppIo API gRPC server."""
     if certificates is None and superexec_auth_secret is not None:
@@ -681,6 +731,7 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
     clientappio_servicer: ClientAppIoServicer = ClientAppIoServicer(
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
+        start_automation_fn=start_automation_fn,
     )
     auth_interceptor = create_clientappio_token_auth_server_interceptor(
         state_provider=state_factory.state

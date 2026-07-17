@@ -70,6 +70,10 @@ service ClientAppIo {
   // Create a task
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
 
+  // Start an automation using the authenticated ClientApp run as its template
+  rpc StartAutomation(StartAutomationFromTaskRequest)
+      returns (StartAutomationFromTaskResponse) {}
+
   // Push task message
   rpc PushTaskMessage(PushTaskMessageRequest)
       returns (PushTaskMessageResponse) {}

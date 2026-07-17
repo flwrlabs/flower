@@ -30,6 +30,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
+    StartAutomationFromTaskRequest,
 )
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -51,12 +52,59 @@ from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
 _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
+_START_AUTOMATION_TOOL_NAME = "start_automation"
+
+
+def _make_start_automation_tool() -> JSONObject:
+    """Return the model-facing start-automation tool schema."""
+    return {
+        "type": "function",
+        "name": _START_AUTOMATION_TOOL_NAME,
+        "description": (
+            "Schedule a task only when the user explicitly asks for future or "
+            "recurring execution. The task must describe the work to perform "
+            "without the scheduling instruction."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": "The exact work to perform on each run.",
+                },
+                "start_at": {
+                    "type": "string",
+                    "description": (
+                        "RFC 3339 start time with timezone. Omit to start now."
+                    ),
+                },
+                "fixed_interval": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Seconds between runs. Omit for one execution.",
+                },
+                "max_runs": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": (
+                        "Maximum executions. Valid only with fixed_interval."
+                    ),
+                },
+            },
+            "required": ["task"],
+            "additionalProperties": False,
+        },
+    }
 
 
 class RuntimeAgentSession(AgentSession):
     """AgentSession bound to one AgentApp task."""
 
-    def __init__(self, responses: AgentResponses, connectors: AgentConnectors) -> None:
+    def __init__(
+        self,
+        responses: AgentResponses,
+        connectors: AgentConnectors,
+    ) -> None:
         self._responses = responses
         self._connectors = connectors
 
@@ -72,14 +120,21 @@ class RuntimeAgentSession(AgentSession):
 
 
 class RuntimeAgentConnectors(AgentConnectors):
-    """AgentConnectors implementation backed by connector tasks."""
+    """AgentConnectors implementation for built-in model tools."""
 
     def __init__(self, responses: RuntimeAgentResponses) -> None:
         self._responses = responses
 
     def tools(self, names: Sequence[str]) -> list[JSONObject]:
-        """Return model-facing tool schemas for built-in connectors."""
-        return [get_builtin_connector_tool(name) for name in names]
+        """Return model-facing schemas for built-in tools."""
+        return [
+            (
+                _make_start_automation_tool()
+                if name == _START_AUTOMATION_TOOL_NAME
+                else get_builtin_connector_tool(name)
+            )
+            for name in names
+        ]
 
     def call(self, tool_call: JSONObject) -> JSONObject:
         """Execute one model function_call and return a function_call_output item."""
@@ -91,10 +146,13 @@ class RuntimeAgentConnectors(AgentConnectors):
         call_id = cast(str, tool_call["call_id"])
         arguments_obj = cast(JSONObject, arguments)
 
+        if name == _START_AUTOMATION_TOOL_NAME:
+            return self._responses.call_automation_with_events(
+                call_id=call_id,
+                arguments=arguments_obj,
+            )
         return self._responses.call_connector_with_events(
-            name=name,
-            call_id=call_id,
-            arguments=arguments_obj,
+            name=name, call_id=call_id, arguments=arguments_obj
         )
 
 
@@ -241,6 +299,80 @@ class RuntimeAgentResponses(AgentResponses):
         self.append_and_push_run_events(connector_event("completed", output=output))
         self.append_context_items([output_item])
         return output_item
+
+    def call_automation_with_events(
+        self, *, call_id: str, arguments: JSONObject
+    ) -> JSONObject:
+        """Create an automation and emit/persist its activity events."""
+
+        def automation_event(
+            status: Literal["started", "completed", "failed"],
+            *,
+            output: JSONValue = None,
+            message: str | None = None,
+        ) -> JSONObject:
+            event: JSONObject = {
+                "type": f"response.tool_call.{status}",
+                "tool_call_id": call_id,
+                "tool_name": _START_AUTOMATION_TOOL_NAME,
+                "arguments": arguments,
+            }
+            if status == "completed":
+                event["output"] = output
+            elif status == "failed" and message is not None:
+                event["error"] = {
+                    "code": "automation_error",
+                    "message": message,
+                }
+            return event
+
+        self.append_and_push_run_events([automation_event("started")])
+        try:
+            output = self._start_automation(arguments)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            self.append_and_push_run_events(
+                [automation_event("failed", message=str(exc))]
+            )
+            raise
+
+        output_item: JSONObject = {
+            "type": "function_call_output",
+            "call_id": call_id,
+            "output": strict_json_dumps(output, compact=True),
+        }
+        self.append_and_push_run_events([automation_event("completed", output=output)])
+        self.append_context_items([output_item])
+        return output_item
+
+    def _start_automation(self, arguments: JSONObject) -> JSONObject:
+        """Create an automation through the task-authenticated AppIo endpoint."""
+        task = arguments.get("task")
+        if not isinstance(task, str) or not task.strip():
+            raise ValueError("Automation requires a non-empty string 'task'.")
+
+        request = StartAutomationFromTaskRequest(task=task)
+        start_at = arguments.get("start_at")
+        if start_at is not None:
+            if not isinstance(start_at, str):
+                raise ValueError("Automation 'start_at' must be a string.")
+            request.start_at = start_at
+        fixed_interval = arguments.get("fixed_interval")
+        if fixed_interval is not None:
+            if isinstance(fixed_interval, bool) or not isinstance(fixed_interval, int):
+                raise ValueError("Automation 'fixed_interval' must be an integer.")
+            request.fixed_interval = fixed_interval
+        max_runs = arguments.get("max_runs")
+        if max_runs is not None:
+            if isinstance(max_runs, bool) or not isinstance(max_runs, int):
+                raise ValueError("Automation 'max_runs' must be an integer.")
+            request.max_runs = max_runs
+
+        response = self._stub.StartAutomation(request)
+        return {
+            "automation_id": response.automation_id,
+            "series_id": response.series_id,
+            "next_run_at": response.next_run_at,
+        }
 
     def push_run_events(self, events: Sequence[JSONObject]) -> None:
         """Push structured run events for `StreamRunEvents` clients."""

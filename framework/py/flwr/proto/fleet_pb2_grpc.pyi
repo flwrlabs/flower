@@ -19,6 +19,7 @@ limitations under the License.
 
 import abc
 import collections.abc
+import flwr.proto.appio_pb2
 import flwr.proto.fab_pb2
 import flwr.proto.fleet_pb2
 import flwr.proto.heartbeat_pb2
@@ -88,6 +89,12 @@ class FleetStub:
         flwr.proto.run_pb2.GetRunRequest,
         flwr.proto.run_pb2.GetRunResponse,
     ]
+
+    StartAutomation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.fleet_pb2.StartAutomationFromNodeRequest,
+        flwr.proto.appio_pb2.StartAutomationFromTaskResponse,
+    ]
+    """Start an automation from an authenticated SuperNode run"""
 
     GetFab: grpc.UnaryUnaryMultiCallable[
         flwr.proto.fab_pb2.GetFabRequest,
@@ -165,6 +172,12 @@ class FleetAsyncStub:
         flwr.proto.run_pb2.GetRunRequest,
         flwr.proto.run_pb2.GetRunResponse,
     ]
+
+    StartAutomation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.fleet_pb2.StartAutomationFromNodeRequest,
+        flwr.proto.appio_pb2.StartAutomationFromTaskResponse,
+    ]
+    """Start an automation from an authenticated SuperNode run"""
 
     GetFab: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.fab_pb2.GetFabRequest,
@@ -258,6 +271,14 @@ class FleetServicer(metaclass=abc.ABCMeta):
         request: flwr.proto.run_pb2.GetRunRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.run_pb2.GetRunResponse, collections.abc.Awaitable[flwr.proto.run_pb2.GetRunResponse]]: ...
+
+    @abc.abstractmethod
+    def StartAutomation(
+        self,
+        request: flwr.proto.fleet_pb2.StartAutomationFromNodeRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.StartAutomationFromTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.StartAutomationFromTaskResponse]]:
+        """Start an automation from an authenticated SuperNode run"""
 
     @abc.abstractmethod
     def GetFab(

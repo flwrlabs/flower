@@ -31,6 +31,9 @@ from flwr.common.serde import (
     message_to_proto,
     run_to_proto,
 )
+from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    StartAutomationFromTaskResponse,
+)
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -44,6 +47,7 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     Reconnect,
     RegisterNodeFleetRequest,
     RegisterNodeFleetResponse,
+    StartAutomationFromNodeRequest,
     UnregisterNodeFleetRequest,
     UnregisterNodeFleetResponse,
 )
@@ -64,6 +68,7 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.utils import check_abort
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
 from flwr.supercore.run import InvalidRunStatusException, Run
+from flwr.superlink.servicer.automation import start_automation_from_run
 
 
 class InvalidHeartbeatIntervalError(Exception):
@@ -267,6 +272,21 @@ def get_fab(request: GetFabRequest, state: LinkState) -> GetFabResponse:
         return GetFabResponse(fab=fab_to_proto(fab))
 
     raise ValueError(f"Found no FAB with hash: {request.hash_str}")
+
+
+def start_automation(
+    request: StartAutomationFromNodeRequest, state: LinkState
+) -> StartAutomationFromTaskResponse:
+    """Start an automation for a run assigned to the requesting SuperNode."""
+    run = _validate_node_in_federation(state, request.node.node_id, request.run_id)
+    abort_msg = check_abort(
+        request.run_id,
+        [Status.PENDING, Status.STARTING, Status.FINISHED],
+        state,
+    )
+    if abort_msg:
+        raise InvalidRunStatusException(abort_msg)
+    return start_automation_from_run(state, run, request.automation)
 
 
 def push_object(request: PushObjectRequest, state: LinkState) -> PushObjectResponse:
