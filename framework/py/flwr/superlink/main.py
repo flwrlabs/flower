@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
 from logging import INFO
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
@@ -32,7 +33,12 @@ from flwr.supercore.constant import FLWR_IN_MEMORY_SQLITE_DB_URL
 from flwr.supercore.error import http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink import extensions
-from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
+from flwr.superlink.auth_plugin import (
+    ControlAuthnPlugin,
+    ControlAuthzPlugin,
+    NoOpControlAuthnPlugin,
+    NoOpControlAuthzPlugin,
+)
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.federation import NoOpFederationManager
 
@@ -175,5 +181,9 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
             operation_ids.add(op_id)
 
 
-# Uncomment this once the FastAPI app is configurable.
-# app = create_app(...)
+# Temporary: we need a way to provision the FastAPI server
+app = create_app(
+    linkstate_factory=_create_default_linkstate_factory(),
+    authn_plugin=NoOpControlAuthnPlugin(Path(), False),
+    authz_plugin=NoOpControlAuthzPlugin(Path(), False),
+)
