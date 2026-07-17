@@ -108,8 +108,10 @@ def test_clip_inputs_inplace() -> None:
 
 def test_clip_inputs_inplace_zero_norm() -> None:
     """Test clip_inputs_inplace does not raise on a zero-norm update."""
-    # Prepare: a client returning the global model unchanged yields a zero update
-    updates = [np.zeros((2, 2)), np.zeros(2)]
+    # Prepare: a client returning the global model unchanged yields a zero update.
+    # Include an integer-dtype array (e.g. a PyTorch num_batches_tracked buffer) so
+    # the in-place scaling does not break on integer arrays.
+    updates = [np.zeros((2, 2)), np.zeros(2), np.zeros(2, dtype=np.int64)]
     clipping_norm = 1.5
 
     # Execute: must not raise ZeroDivisionError
@@ -122,8 +124,9 @@ def test_clip_inputs_inplace_zero_norm() -> None:
 
 def test_adaptive_clip_inputs_inplace_zero_norm() -> None:
     """Test adaptive_clip_inputs_inplace does not raise on a zero-norm update."""
-    # Prepare
-    updates = [np.zeros((2, 2)), np.zeros(2)]
+    # Prepare: include an integer-dtype array (e.g. a PyTorch num_batches_tracked
+    # buffer) so the in-place scaling does not break on integer arrays.
+    updates = [np.zeros((2, 2)), np.zeros(2), np.zeros(2, dtype=np.int64)]
     clipping_norm = 1.5
 
     # Execute: must not raise ZeroDivisionError

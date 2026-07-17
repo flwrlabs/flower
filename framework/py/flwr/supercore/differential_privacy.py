@@ -55,7 +55,7 @@ def clip_inputs_inplace(input_arrays: NDArrays, clipping_norm: float) -> None:
     input_norm = get_norm(input_arrays)
     # A zero-norm update (e.g. a client returning the global model unchanged)
     # has nothing to clip; guard against division by zero.
-    scaling_factor = min(1, clipping_norm / input_norm) if input_norm > 0 else 1.0
+    scaling_factor = min(1, clipping_norm / input_norm) if input_norm > 0 else 1
     for array in input_arrays:
         array *= scaling_factor
 
@@ -92,7 +92,7 @@ def adaptive_clip_inputs_inplace(input_arrays: NDArrays, clipping_norm: float) -
     input_norm = get_norm(input_arrays)
     # A zero-norm update (e.g. a client returning the global model unchanged)
     # has nothing to clip; guard against division by zero.
-    scaling_factor = min(1, clipping_norm / input_norm) if input_norm > 0 else 1.0
+    scaling_factor = min(1, clipping_norm / input_norm) if input_norm > 0 else 1
     for array in input_arrays:
         array *= scaling_factor
     return scaling_factor < 1
