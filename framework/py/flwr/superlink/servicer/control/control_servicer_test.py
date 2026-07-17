@@ -21,7 +21,7 @@ import json
 import os
 import time
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import MagicMock, Mock, patch
@@ -40,10 +40,14 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
     ArchiveFederationResponse,
+    BeginConnectorOAuthRequest,
+    CompleteConnectorOAuthRequest,
     CreateFederationRequest,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DisconnectConnectorRequest,
     GetRunSeriesRequest,
+    ListConnectorsRequest,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -88,10 +92,12 @@ from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, EntitlementError, FlowerError
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
     CreateInvitationContext,
+    JSONObject,
     RegisterSupernodeContext,
     StartRunContext,
 )
@@ -108,6 +114,49 @@ from .control_handlers import (
     _validate_federation_membership_in_request,
 )
 from .control_servicer import ControlServicer
+
+
+class _OAuthProvider:
+    """Minimal OAuth provider for Control servicer tests."""
+
+    connector_ref = "slack"
+    display_name = "Slack"
+    description = "Connect Slack."
+
+    def __init__(self, fail_exchange: bool = False) -> None:
+        self.fail_exchange = fail_exchange
+        self.authorization_state: str | None = None
+        self.exchanged_codes: list[str] = []
+
+    def resolve_redirect_uri(self, requested_redirect_uri: str) -> str:
+        """Return the test callback URI."""
+        return requested_redirect_uri.rstrip("/") + "/oauth/callback"
+
+    def build_authorization_url(
+        self,
+        *,
+        redirect_uri: str,
+        state: str,
+        pkce_challenge: str | None,
+    ) -> str:
+        """Capture state and return a deterministic authorization URL."""
+        _ = redirect_uri, pkce_challenge
+        self.authorization_state = state
+        return f"https://oauth.example/authorize?state={state}"
+
+    def exchange_code(
+        self,
+        *,
+        code: str,
+        redirect_uri: str,
+        pkce_verifier: str | None,
+    ) -> tuple[JSONObject, JSONObject]:
+        """Return test credentials or simulate an exchange failure."""
+        _ = redirect_uri, pkce_verifier
+        self.exchanged_codes.append(code)
+        if self.fail_exchange:
+            raise RuntimeError(f"Provider rejected sensitive code {code}")
+        return {"access_token": "access-secret"}, {"workspace": "flower"}
 
 
 class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
@@ -175,6 +224,145 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             updated_at=updated_at,
             run_ids=run_ids or [],
         )
+
+    def _begin_connector_oauth(self) -> tuple[str, str]:
+        """Begin OAuth and return the persisted session ID and state."""
+        response = self.servicer.BeginConnectorOAuth(
+            BeginConnectorOAuthRequest(
+                connector_ref=" Slack ", redirect_uri="https://client.example/"
+            ),
+            Mock(),
+        )
+        session = self.state.get_connector_oauth_session(
+            oauth_session_id=response.oauth_session_id,
+            flwr_aid=self.aid,
+        )
+        assert session is not None
+        self.assertEqual(response.connector_ref, "slack")
+        self.assertEqual(session.redirect_uri, "https://client.example/oauth/callback")
+        self.assertTrue(session.pkce_verifier)
+        return session.oauth_session_id, session.state
+
+    def test_connector_oauth_flow(self) -> None:
+        """Begin and complete a single-use OAuth flow."""
+        provider = _OAuthProvider()
+        with patch.object(connector_registry, "OAUTH_CONNECTOR_PROVIDERS", (provider,)):
+            oauth_session_id, oauth_state = self._begin_connector_oauth()
+            request = CompleteConnectorOAuthRequest(
+                oauth_session_id=oauth_session_id,
+                code=" authorization-code ",
+                state=oauth_state,
+            )
+
+            response = self.servicer.CompleteConnectorOAuth(request, Mock())
+
+            self.assertEqual(response.connector_ref, "slack")
+            connector = self.state.get_connector(
+                flwr_aid=self.aid, connector_ref="slack"
+            )
+            assert connector is not None
+            self.assertEqual(
+                json.loads(connector.credentials_json),
+                {"access_token": "access-secret"},
+            )
+            self.assertEqual(provider.exchanged_codes, ["authorization-code"])
+
+            with self.assertRaises(FlowerError) as exc_info:
+                self.servicer.CompleteConnectorOAuth(request, Mock())
+            self.assertEqual(
+                exc_info.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST
+            )
+
+    def test_list_and_disconnect_connectors_are_account_scoped(self) -> None:
+        """List and disconnect only the authenticated account's connector."""
+        provider = _OAuthProvider()
+        for flwr_aid in (self.aid, "other-account"):
+            self.assertTrue(
+                self.state.upsert_connector(
+                    flwr_aid=flwr_aid,
+                    connector_ref="slack",
+                    credentials_json="{}",
+                    config_json="{}",
+                )
+            )
+
+        with patch.object(connector_registry, "OAUTH_CONNECTOR_PROVIDERS", (provider,)):
+            response = self.servicer.ListConnectors(ListConnectorsRequest(), Mock())
+            self.assertEqual(len(response.connectors), 1)
+            self.assertTrue(response.connectors[0].connected)
+
+            self.servicer.DisconnectConnector(
+                DisconnectConnectorRequest(connector_ref=" Slack "), Mock()
+            )
+
+        self.assertIsNone(
+            self.state.get_connector(flwr_aid=self.aid, connector_ref="slack")
+        )
+        self.assertIsNotNone(
+            self.state.get_connector(flwr_aid="other-account", connector_ref="slack")
+        )
+
+    def test_connector_oauth_rejects_invalid_or_expired_session(self) -> None:
+        """Reject invalid state and expired OAuth sessions before exchange."""
+        provider = _OAuthProvider()
+        with patch.object(connector_registry, "OAUTH_CONNECTOR_PROVIDERS", (provider,)):
+            oauth_session_id, _ = self._begin_connector_oauth()
+            with self.assertRaises(FlowerError) as invalid_state:
+                self.servicer.CompleteConnectorOAuth(
+                    CompleteConnectorOAuthRequest(
+                        oauth_session_id=oauth_session_id,
+                        code="authorization-code",
+                        state="wrong-state",
+                    ),
+                    Mock(),
+                )
+
+            expired = self.state.create_connector_oauth_session(
+                oauth_session_id="expired-session",
+                flwr_aid=self.aid,
+                connector_ref="slack",
+                state="expected-state",
+                redirect_uri="https://client.example/oauth/callback",
+                pkce_verifier=None,
+                expires_at=now() - timedelta(seconds=1),
+            )
+            assert expired is not None
+            with self.assertRaises(FlowerError) as expired_session:
+                self.servicer.CompleteConnectorOAuth(
+                    CompleteConnectorOAuthRequest(
+                        oauth_session_id=expired.oauth_session_id,
+                        code="authorization-code",
+                        state=expired.state,
+                    ),
+                    Mock(),
+                )
+
+        self.assertEqual(
+            invalid_state.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST
+        )
+        self.assertEqual(
+            expired_session.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST
+        )
+        self.assertEqual(provider.exchanged_codes, [])
+
+    def test_connector_oauth_provider_failure_is_sanitized(self) -> None:
+        """Hide authorization codes from provider failure errors."""
+        provider = _OAuthProvider(fail_exchange=True)
+        sensitive_code = "sensitive-authorization-code"
+        with patch.object(connector_registry, "OAUTH_CONNECTOR_PROVIDERS", (provider,)):
+            oauth_session_id, oauth_state = self._begin_connector_oauth()
+            with self.assertRaises(FlowerError) as exc_info:
+                self.servicer.CompleteConnectorOAuth(
+                    CompleteConnectorOAuthRequest(
+                        oauth_session_id=oauth_session_id,
+                        code=sensitive_code,
+                        state=oauth_state,
+                    ),
+                    Mock(),
+                )
+
+        self.assertEqual(exc_info.exception.code, ApiErrorCode.CONNECTOR_FAILURE)
+        self.assertNotIn(sensitive_code, exc_info.exception.message)
 
     def test_start_run(self) -> None:
         """Test StartRun method of ControlServicer."""
