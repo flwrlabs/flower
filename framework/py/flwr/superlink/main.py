@@ -177,5 +177,4 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
             operation_ids.add(op_id)
 
 
-# Temporary: we need a way to provision the FastAPI server
 app = create_app()
