@@ -242,14 +242,14 @@ class SecAggPlusWorkflow:
             raise ValueError("`max_weight` must be greater than 0.")
 
         # Check `quantization_range`
-        if self.quantization_range <= 0:
-            raise ValueError("`quantization_range` must be greater than 0.")
-
-        # Check `quantization_range`
         if not isinstance(self.quantization_range, int) or self.quantization_range <= 0:
             raise ValueError(
                 "`quantization_range` must be an integer and greater than 0."
             )
+
+        # Check `clipping_range`
+        if self.clipping_range <= 0:
+            raise ValueError("`clipping_range` must be greater than 0.")
 
         # Check `modulus_range`
         if (
