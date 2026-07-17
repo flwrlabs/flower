@@ -28,11 +28,11 @@ from flwr.cli.config_utils import load_and_validate
 from flwr.common.constant import FAB_CONFIG_FILE
 from flwr.supercore.constant import (
     APP_PUBLISH_ALLOWED_LICENSE_FILES,
+    FLWR_SUPERGRID_API_URL,
     MAX_FILE_BYTES,
     MAX_FILE_COUNT,
     MAX_TOTAL_BYTES,
     MIME_MAP,
-    FLWR_SUPERGRID_API_URL,
     SUPERGRID_ADDRESS,
     UTF8,
 )

@@ -57,9 +57,7 @@ FLWR_IN_MEMORY_SQLITE_DB_URL = "sqlite:///:memory:"
 # Constants for Hub
 APP_ID_PATTERN = r"^@[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
 APP_VERSION_PATTERN = r"^\d+\.\d+\.\d+$"
-FLWR_SUPERGRID_API_URL = os.getenv(
-    "FLWR_SUPERGRID_API_URL", "https://api.flower.ai/v1"
-)
+FLWR_SUPERGRID_API_URL = os.getenv("FLWR_SUPERGRID_API_URL", "https://api.flower.ai/v1")
 
 # Constants for Flower CLI update check
 FLWR_DISABLE_UPDATE_CHECK = "FLWR_DISABLE_UPDATE_CHECK"
