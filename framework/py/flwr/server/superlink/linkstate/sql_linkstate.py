@@ -976,7 +976,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         flwr_aid: str | None,
         primary_task_type: str,
         series_id: int | None = None,
-        series_description: str = "",
+        series_description: str | None = None,
     ) -> int:
         """Create a new run."""
         # Convert federation_config to JSON string for storage

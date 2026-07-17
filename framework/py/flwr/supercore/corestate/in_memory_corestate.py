@@ -472,7 +472,7 @@ class InMemoryCoreState(
         run_id: int,
         federation_id: str,
         series_id: int | None,
-        description: str = "",
+        description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
         with self.lock_run_series_store:
@@ -504,7 +504,7 @@ class InMemoryCoreState(
                 run_series = RunSeries(
                     series_id=new_series_id,
                     federation=federation_id,
-                    description=description,
+                    description=description if description is not None else "",
                     created_at=timestamp,
                     updated_at=timestamp,
                 )

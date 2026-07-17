@@ -639,7 +639,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         flwr_aid: str | None,
         primary_task_type: str,
         series_id: int | None = None,
-        series_description: str = "",
+        series_description: str | None = None,
     ) -> int:
         """Create a new run."""
         with self.lock_task_store, self.lock:
