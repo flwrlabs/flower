@@ -21,6 +21,7 @@ from .differential_privacy import (
     CLIENTS_DISCREPANCY_WARNING,
     KEY_CLIPPING_NORM,
     KEY_NORM_BIT,
+    adaptive_clip_inputs_inplace,
     add_gaussian_noise_inplace,
     clip_inputs_inplace,
     compute_adaptive_noise_params,
@@ -103,6 +104,35 @@ def test_clip_inputs_inplace() -> None:
     for updated, original_update in zip(updates, original_updates, strict=True):
         clip_norm = np.linalg.norm(original_update)
         assert np.all(updated <= clip_norm) and np.all(updated >= -clip_norm)
+
+
+def test_clip_inputs_inplace_zero_norm() -> None:
+    """Test clip_inputs_inplace does not raise on a zero-norm update."""
+    # Prepare: a client returning the global model unchanged yields a zero update
+    updates = [np.zeros((2, 2)), np.zeros(2)]
+    clipping_norm = 1.5
+
+    # Execute: must not raise ZeroDivisionError
+    clip_inputs_inplace(updates, clipping_norm)
+
+    # Assert: a zero update stays zero (nothing to clip)
+    for updated in updates:
+        assert np.all(updated == 0.0)
+
+
+def test_adaptive_clip_inputs_inplace_zero_norm() -> None:
+    """Test adaptive_clip_inputs_inplace does not raise on a zero-norm update."""
+    # Prepare
+    updates = [np.zeros((2, 2)), np.zeros(2)]
+    clipping_norm = 1.5
+
+    # Execute: must not raise ZeroDivisionError
+    norm_bit = adaptive_clip_inputs_inplace(updates, clipping_norm)
+
+    # Assert: a zero update is not clipped, so the norm bit is False
+    assert norm_bit is False
+    for updated in updates:
+        assert np.all(updated == 0.0)
 
 
 def test_compute_stdv() -> None:
