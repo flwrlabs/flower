@@ -366,6 +366,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         # Assert
         assert isinstance(response, PushMessagesResponse)
         assert grpc.StatusCode.OK == call.code()
+        assert response.session_id
 
         # Assert: check that response indicates all objects need pushing
         expected_object_ids = {message.object_id}  # message
@@ -619,7 +620,8 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         flower_error = _flower_error_from_rpc_error(e.exception)
         assert flower_error.code == ApiErrorCode.FLEET_GET_FAB_FAILED
 
-    def test_push_object_succesful(self) -> None:
+    @parameterized.expand([(True,), (False,)])  # type: ignore
+    def test_push_object_successful(self, include_session_id: bool) -> None:
         """Test `PushObject`."""
         # Prepare
         run_id = self._create_dummy_run()
@@ -628,7 +630,8 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         obj_b = obj.deflate()
 
         # Pre-register object
-        self.store.preregister(run_id, get_object_tree(obj))
+        session_id = self.state.start_session(run_id)
+        self.state.preregister_object_tree(get_object_tree(obj), session_id)
 
         # Execute
         req = PushObjectRequest(
@@ -636,6 +639,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
             run_id=run_id,
             object_id=obj.object_id,
             object_content=obj_b,
+            session_id=session_id if include_session_id else "",
         )
         res: PushObjectResponse = self._push_object(request=req)
 
@@ -656,6 +660,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         node_id = self._create_dummy_node()
         obj = ConfigRecord({"a": 123, "b": [4, 5, 6]})
         obj_b = obj.deflate()
+        session_id = self.state.start_session(run_id)
 
         # Push valid object but it hasn't been pre-registered
         req = PushObjectRequest(
@@ -663,6 +668,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
             run_id=run_id,
             object_id=obj.object_id,
             object_content=obj_b,
+            session_id=session_id,
         )
         res: PushObjectResponse = self._push_object(request=req)
 
@@ -672,7 +678,9 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         # Push valid object but its hash doesnt match the one passed in the request
         # Preregister under a different object-id
         fake_object_id = get_object_id(b"1234")
-        self.store.preregister(run_id, ObjectTree(object_id=fake_object_id))
+        self.state.preregister_object_tree(
+            ObjectTree(object_id=fake_object_id), session_id
+        )
 
         # Execute
         req = PushObjectRequest(
@@ -680,6 +688,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
             run_id=run_id,
             object_id=fake_object_id,
             object_content=obj_b,
+            session_id=session_id,
         )
         res = self._push_object(request=req)
 
@@ -790,7 +799,8 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         obj_b = obj.deflate()
 
         # Pre-register object
-        self.store.preregister(run_id, get_object_tree(obj))
+        session_id = self.state.start_session(run_id)
+        self.state.preregister_object_tree(get_object_tree(obj), session_id)
 
         # Get initial traffic
         run_before = self.state.get_run_info(run_ids=[run_id])[0]
@@ -802,6 +812,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
             run_id=run_id,
             object_id=obj.object_id,
             object_content=obj_b,
+            session_id=session_id,
         )
         res: PushObjectResponse = self._push_object(request=req)
 

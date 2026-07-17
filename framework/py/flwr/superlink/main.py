@@ -28,13 +28,10 @@ from fastapi.routing import APIRoute, iter_route_contexts
 from flwr import __version__
 from flwr.common import log
 from flwr.server.superlink.linkstate import LinkStateFactory
-from flwr.supercore.constant import FLWR_IN_MEMORY_SQLITE_DB_URL
 from flwr.supercore.error import http_error_translator
-from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink import extensions
 from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
-from flwr.superlink.federation import NoOpFederationManager
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
@@ -61,21 +58,11 @@ def _merge_lifespan_state(
         lifespan_state[key] = value
 
 
-def _create_default_linkstate_factory() -> LinkStateFactory:
-    """Create the default LinkStateFactory for direct uvicorn startup."""
-    objectstore_factory = ObjectStoreFactory(FLWR_IN_MEMORY_SQLITE_DB_URL)
-    return LinkStateFactory(
-        FLWR_IN_MEMORY_SQLITE_DB_URL,
-        NoOpFederationManager(),
-        objectstore_factory,
-    )
-
-
 def create_app(
     *,
-    linkstate_factory: LinkStateFactory,
-    authn_plugin: ControlAuthnPlugin,
-    authz_plugin: ControlAuthzPlugin,
+    linkstate_factory: LinkStateFactory | None = None,
+    authn_plugin: ControlAuthnPlugin | None = None,
+    authz_plugin: ControlAuthzPlugin | None = None,
     superlink_lifespan: SuperLinkLifespan | None = None,
     start_legacy_grpc: bool = False,
 ) -> FastAPI:
@@ -86,11 +73,9 @@ def create_app(
        It also passes the Control authentication and authorization plugins. When
        FastAPI starts the legacy gRPC APIs for compatibility, the CLI passes a
        `superlink_lifespan` initialized with the same factory.
-    2. Via `uvicorn flwr.superlink.main:app`: the module-level app uses an
-       in-memory SQLite LinkStateFactory and NoOp Control authentication
-       plugins. Direct callers of `create_app` must provide all dependencies.
+    2. Via `uvicorn flwr.superlink.main:app`: the module-level app starts without
+       a `LinkState`. Direct callers of `create_app` must provide all dependencies.
     """
-    account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
 
     @asynccontextmanager
     async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[dict[str, object]]:
@@ -107,9 +92,6 @@ def create_app(
                 # Temporary compatibility path: start the existing gRPC APIs from
                 # FastAPI lifespan
                 superlink_lifespan.startup()
-
-            fastapi_app.state.linkstate_factory = linkstate_factory
-            fastapi_app.state.account_access_dep = account_access_dep
 
             lifespan_state: dict[str, object] = {}
             async with AsyncExitStack() as stack:
@@ -133,6 +115,12 @@ def create_app(
         lifespan=lifespan,
         generate_unique_id_function=generate_unique_route_id,
     )
+    if linkstate_factory is not None:
+        fastapi_app.state.linkstate_factory = linkstate_factory
+    if authn_plugin is not None and authz_plugin is not None:
+        fastapi_app.state.account_access_dep = AccountAccessDependency(
+            authn_plugin, authz_plugin
+        )
 
     # Core APIs
     # fastapi_app.include_router(health.router)
@@ -175,5 +163,4 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
             operation_ids.add(op_id)
 
 
-# Uncomment this once the FastAPI app is configurable.
-# app = create_app(...)
+app = create_app()

@@ -324,6 +324,26 @@ class TestGrpcGrid(unittest.TestCase):
         # Assert
         self.assertIn(404, node_ids)
 
+    def test_missing_object_creates_message_with_error(self) -> None:
+        """Test that a missing object creates a message with an error."""
+        ins = self._prep_message(Message(RecordDict(), 123, "query"))
+        reply = Message(RecordDict(), reply_to=ins)
+        reply.metadata.__dict__["_message_id"] = reply.object_id
+        self.mock_stub.PullMessages.return_value = Mock(
+            messages_list=[message_to_proto(reply)],
+            message_object_trees=[get_object_tree(reply)],
+        )
+        self.mock_stub.PullObject.return_value = Mock(
+            object_found=False, object_available=False
+        )
+
+        messages = list(self.grid.pull_messages([ins.object_id]))
+
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].error.code, ErrorCode.MESSAGE_UNAVAILABLE)
+        self.assertEqual(messages[0].metadata.reply_to_message_id, ins.object_id)
+        self.mock_stub.ConfirmMessageReceived.assert_not_called()
+
     @parameterized.expand(  # type: ignore
         [
             (

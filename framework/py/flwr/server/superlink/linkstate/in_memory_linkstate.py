@@ -182,7 +182,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         return message_id
 
     def store_message_and_object_tree(
-        self, message: Message, object_tree: ObjectTree
+        self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree."""
         with self.lock:
@@ -194,9 +194,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if not stored:
                 return False, []
 
-            missing_objects = self.object_store.preregister(
-                message.metadata.run_id, object_tree
-            )
+            missing_objects = self.preregister_object_tree(object_tree, session_id)
             return True, missing_objects
 
     def _check_stored_messages(self, message_ids: set[str]) -> None:
@@ -447,9 +445,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         if not self.finish_task(primary_task_id, SubStatus.STOPPED, ""):
             return False
 
-        # Clean up messages and their objects related to the run
-        self.delete_messages(self.get_message_ids_from_run_id(run_id))
-        self.object_store.delete_objects_in_run(run_id)
+        self.cleanup_run(run_id)
         return True
 
     def num_message_ins(self) -> int:
@@ -643,6 +639,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         flwr_aid: str | None,
         primary_task_type: str,
         series_id: int | None = None,
+        series_description: str | None = None,
         connector_refs: Sequence[str] = (),
     ) -> int:
         """Create a new run."""
@@ -662,6 +659,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 run_id=run_id,
                 federation_id=federation_id,
                 series_id=series_id,
+                description=series_description,
             )
             if resolved_series_id is None:
                 log(ERROR, "Unexpected run series membership failure.")
