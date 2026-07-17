@@ -47,7 +47,6 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import (
-    BUILTIN_CONNECTOR_REFS,
     TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
     TASK_TYPES_REQUIRING_FAB_HASH,
@@ -56,6 +55,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.interceptors import get_authenticated_task
+from flwr.supercore.task_process.connector import registry as connector_registry
 
 
 # pylint: disable=invalid-name, unused-argument
@@ -255,7 +255,7 @@ def _validate_create_task_request(
 
     if (
         request.type == TaskType.CONNECTOR
-        and request.connector_ref not in BUILTIN_CONNECTOR_REFS
+        and not connector_registry.has_builtin_connector(request.connector_ref)
         and request.connector_ref
         not in state.get_run_connector_refs(run_id=requesting_task.run_id)
     ):

@@ -276,12 +276,8 @@ class InMemoryCoreState(
         with self.lock_connector_store:
             return self.connector_store.pop((flwr_aid, connector_ref), None) is not None
 
-    def bind_connectors_to_run(
-        self, run_id: int, connector_refs: Sequence[str]
-    ) -> bool:
+    def bind_connectors_to_run(self, run_id: int, connector_refs: list[str]) -> bool:
         """Associate connector references with a run."""
-        if run_id <= 0 or any(not connector_ref for connector_ref in connector_refs):
-            return False
         with self.lock_run_connector_store:
             self.run_connector_store.setdefault(run_id, set()).update(connector_refs)
         return True

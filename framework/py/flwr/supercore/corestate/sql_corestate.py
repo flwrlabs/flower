@@ -365,12 +365,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         return True
 
-    def bind_connectors_to_run(
-        self, run_id: int, connector_refs: Sequence[str]
-    ) -> bool:
+    def bind_connectors_to_run(self, run_id: int, connector_refs: list[str]) -> bool:
         """Associate connector references with a run."""
-        if run_id <= 0 or any(not connector_ref for connector_ref in connector_refs):
-            return False
         stored_run_id = uint64_to_int64(run_id)
         data = [
             {

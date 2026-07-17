@@ -403,14 +403,12 @@ def validate_run_connector_refs(
     state: LinkState,
 ) -> list[str]:
     """Validate and canonicalize OAuth connector references for a new run."""
-    validated_refs: list[str] = []
-    seen: set[str] = set()
-    for requested_ref in connector_refs:
-        connector_ref = requested_ref.strip().lower()
+    canonical_refs = list(
+        dict.fromkeys(requested_ref.strip().lower() for requested_ref in connector_refs)
+    )
+    for connector_ref in canonical_refs:
         if not connector_ref:
             _raise_invalid_connector_request("connector_ref is required")
-        if connector_ref in seen:
-            continue
         try:
             connector_registry.get_oauth_connector_provider(connector_ref)
         except ValueError:
@@ -429,9 +427,7 @@ def validate_run_connector_refs(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
                 f"Connector '{connector_ref}' is not connected for this account.",
             )
-        seen.add(connector_ref)
-        validated_refs.append(connector_ref)
-    return validated_refs
+    return canonical_refs
 
 
 def start_run(  # pylint: disable=too-many-locals, too-many-statements

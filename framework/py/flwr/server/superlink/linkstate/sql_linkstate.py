@@ -1071,7 +1071,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 )
                 self.bind_connectors_to_run(
                     run_id=run_id,
-                    connector_refs=connector_refs,
+                    connector_refs=list(connector_refs),
                 )
                 return run_id
 

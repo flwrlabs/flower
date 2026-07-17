@@ -391,25 +391,18 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
         """StartRun should bind canonical connected OAuth connector refs."""
-        provider = Mock(
-            connector_ref="notion",
-            display_name="Notion",
-            description="Notion workspace",
+        provider = _OAuthProvider()
+        self.state.upsert_connector(
+            flwr_aid=self.aid,
+            connector_ref="slack",
+            credentials_json="{}",
+            config_json="{}",
         )
-        self.assertTrue(
-            self.state.upsert_connector(
-                flwr_aid=self.aid,
-                connector_ref="notion",
-                credentials_json='{"token":"secret"}',
-                config_json="{}",
-            )
-        )
-        fab_content = b"test FAB content with connector refs"
         request = StartRunRequest(
             federation=NOOP_FEDERATION_ID,
-            connector_refs=[" Notion ", "notion"],
+            connector_refs=[" Slack ", "slack"],
         )
-        request.fab.content = fab_content
+        request.fab.content = b"test FAB content with connector refs"
 
         with (
             patch.object(
@@ -431,36 +424,31 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(
             list(self.state.get_run_connector_refs(run_id=response.run_id)),
-            ["notion"],
+            ["slack"],
         )
 
     @parameterized.expand(  # type: ignore
         [
-            ("unknown", "unknown", None),
+            ("unknown", "unknown", ApiErrorCode.CONNECTOR_NOT_FOUND),
             ("empty", "  ", ApiErrorCode.INVALID_CONNECTOR_REQUEST),
-            ("other_account", "notion", ApiErrorCode.CONNECTOR_NOT_FOUND),
+            ("other_account", "slack", ApiErrorCode.CONNECTOR_NOT_FOUND),
         ]
     )
     def test_start_run_rejects_unavailable_oauth_connector(
         self,
         _name: str,
         connector_ref: str,
-        expected_code: ApiErrorCode | None,
+        expected_code: ApiErrorCode,
     ) -> None:
         """StartRun should reject invalid, unknown, and other-account refs."""
-        provider = Mock(
-            connector_ref="notion",
-            display_name="Notion",
-            description="Notion workspace",
-        )
-        self.assertTrue(
+        provider = _OAuthProvider()
+        if connector_ref == "slack":
             self.state.upsert_connector(
                 flwr_aid="other-account",
-                connector_ref="notion",
-                credentials_json='{"token":"secret"}',
+                connector_ref="slack",
+                credentials_json="{}",
                 config_json="{}",
             )
-        )
         request = StartRunRequest(connector_refs=[connector_ref])
 
         with (
@@ -473,10 +461,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         ):
             self.servicer.StartRun(request, Mock())
 
-        self.assertEqual(
-            error.exception.code,
-            expected_code or ApiErrorCode.CONNECTOR_NOT_FOUND,
-        )
+        self.assertEqual(error.exception.code, expected_code)
         self.assertEqual(list(self.state.get_run_info()), [])
 
     def test_start_run_defaults_to_account_simulation_federation(self) -> None:

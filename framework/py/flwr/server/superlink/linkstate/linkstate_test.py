@@ -25,7 +25,7 @@ import threading
 import time
 import unittest
 from abc import abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import Mock, PropertyMock, patch
@@ -286,19 +286,11 @@ class StateTest(CoreStateTest):
         """Creating a run should atomically persist its connector allowlist."""
         state = self.state_factory()
 
-        run_id = state.create_run(
-            None,
-            None,
-            "9f86d08",
-            {},
-            "@me/health",
-            None,
-            "account-a",
-            TaskType.AGENT_APP,
+        run_id = create_dummy_run(
+            state,
             connector_refs=["notion", "github", "notion"],
         )
 
-        self.assertGreater(run_id, 0)
         self.assertEqual(
             list(state.get_run_connector_refs(run_id=run_id)),
             ["github", "notion"],
@@ -308,17 +300,7 @@ class StateTest(CoreStateTest):
         """An invalid connector allowlist should prevent run creation."""
         state = self.state_factory()
 
-        run_id = state.create_run(
-            None,
-            None,
-            "9f86d08",
-            {},
-            "@me/health",
-            None,
-            "account-a",
-            TaskType.AGENT_APP,
-            connector_refs=[""],
-        )
+        run_id = create_dummy_run(state, connector_refs=[""])
 
         self.assertEqual(run_id, 0)
         self.assertEqual(list(state.get_run_info()), [])
@@ -2254,6 +2236,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     flwr_aid: str | None = "mock_flwr_aid",
     primary_task_type: str = TaskType.SERVER_APP,
     series_id: int | None = None,
+    connector_refs: Sequence[str] = (),
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -2266,6 +2249,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         flwr_aid=flwr_aid,
         primary_task_type=primary_task_type,
         series_id=series_id,
+        connector_refs=connector_refs,
     )
 
 

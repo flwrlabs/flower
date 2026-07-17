@@ -256,9 +256,6 @@ TASK_TYPES_REQUIRING_MODEL_REF: frozenset[TaskType] = frozenset({TaskType.MODEL}
 TASK_TYPES_REQUIRING_CONNECTOR_REF: frozenset[TaskType] = frozenset(
     {TaskType.CONNECTOR}
 )
-BUILTIN_CONNECTOR_REFS: frozenset[str] = frozenset(
-    {"browser_use", "web_fetch", "web_search"}
-)
 
 
 class ActionType(StrEnum):
