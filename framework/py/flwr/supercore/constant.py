@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import os
+from datetime import timedelta
 from enum import StrEnum
 
 from flwr.common.constant import (
@@ -74,6 +75,10 @@ UVICORN_DEFAULT_PORT = 8000
 
 # SuperGrid constants
 SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "supergrid.flower.ai")
+
+# Control API constants
+OAUTH_SESSION_TTL = timedelta(minutes=10)
+RUN_SERIES_DESCRIPTION_MAX_LENGTH = 80
 
 # Specification for app publishing
 APP_PUBLISH_ALLOWED_LICENSE_FILES = ("LICENSE", "LICENSE.md")
