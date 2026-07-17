@@ -214,6 +214,28 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
             (TIMESTAMP_HEADER, timestamp),
         ]
 
+    def _make_metadata_with_malformed_public_key(self) -> list[Any]:
+        """Create metadata with a malformed (non-PEM) public key."""
+        timestamp = now().isoformat()
+        signature = sign_message(self.node_sk, timestamp.encode("ascii"))
+        return [
+            (PUBLIC_KEY_HEADER, b"not-a-valid-pem-public-key"),
+            (SIGNATURE_HEADER, signature),
+            (TIMESTAMP_HEADER, timestamp),
+        ]
+
+    def _make_metadata_with_malformed_timestamp(self) -> list[Any]:
+        """Create metadata with a malformed (non-ISO) timestamp."""
+        # Sign the malformed timestamp so it passes signature verification and
+        # reaches the timestamp parsing step.
+        timestamp = "not-a-valid-timestamp"
+        signature = sign_message(self.node_sk, timestamp.encode("ascii"))
+        return [
+            (PUBLIC_KEY_HEADER, self.node_pk_bytes),
+            (SIGNATURE_HEADER, signature),
+            (TIMESTAMP_HEADER, timestamp),
+        ]
+
     def _test_register_node(self, metadata: list[Any]) -> Any:
         """Test RegisterNode."""
         return self._register_node.with_call(
@@ -409,6 +431,26 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
         # Execute & Assert
         with self.assertRaises(grpc.RpcError) as cm:
             rpc(self, self._make_metadata_with_invalid_timestamp())
+        assert cm.exception.code() == grpc.StatusCode.UNAUTHENTICATED
+
+    @parameterized.expand(rpcs)  # type: ignore
+    def test_unsuccessful_rpc_with_malformed_public_key(
+        self, rpc: Callable[[Any, list[Any]], Any]
+    ) -> None:
+        """Test that malformed public key bytes are rejected, not crashed on."""
+        # Execute & Assert
+        with self.assertRaises(grpc.RpcError) as cm:
+            rpc(self, self._make_metadata_with_malformed_public_key())
+        assert cm.exception.code() == grpc.StatusCode.UNAUTHENTICATED
+
+    @parameterized.expand(rpcs)  # type: ignore
+    def test_unsuccessful_rpc_with_malformed_timestamp(
+        self, rpc: Callable[[Any, list[Any]], Any]
+    ) -> None:
+        """Test that a malformed (non-ISO) timestamp is rejected, not crashed on."""
+        # Execute & Assert
+        with self.assertRaises(grpc.RpcError) as cm:
+            rpc(self, self._make_metadata_with_malformed_timestamp())
         assert cm.exception.code() == grpc.StatusCode.UNAUTHENTICATED
 
 

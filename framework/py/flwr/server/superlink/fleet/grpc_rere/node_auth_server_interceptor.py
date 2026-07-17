@@ -20,6 +20,7 @@ from collections.abc import Callable
 from typing import Any
 
 import grpc
+from cryptography.exceptions import UnsupportedAlgorithm
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common.constant import (
@@ -89,13 +90,22 @@ class NodeAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             return _unary_unary_rpc_terminator("Missing authentication metadata")
 
         # Verify the signature
-        node_pk = bytes_to_public_key(node_pk_bytes)
+        try:
+            node_pk = bytes_to_public_key(node_pk_bytes)
+        except (ValueError, UnsupportedAlgorithm):
+            # Malformed public key bytes from an unauthenticated peer
+            return _unary_unary_rpc_terminator("Invalid public key")
         if not verify_signature(node_pk, timestamp_iso.encode("ascii"), signature):
             return _unary_unary_rpc_terminator("Invalid signature")
 
         # Verify the timestamp
         current = now()
-        time_diff = current - datetime.datetime.fromisoformat(timestamp_iso)
+        try:
+            timestamp = datetime.datetime.fromisoformat(timestamp_iso)
+        except ValueError:
+            # Malformed (non-ISO) timestamp from an unauthenticated peer
+            return _unary_unary_rpc_terminator("Invalid timestamp")
+        time_diff = current - timestamp
         # Abort the RPC call if the timestamp is too old or in the future
         if not MIN_TIMESTAMP_DIFF < time_diff.total_seconds() < MAX_TIMESTAMP_DIFF:
             return _unary_unary_rpc_terminator("Invalid timestamp")
