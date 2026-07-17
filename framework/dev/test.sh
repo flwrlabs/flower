@@ -58,7 +58,7 @@ python -m mypy py
 echo "- mypy: done"
 
 echo "- pylint: start"
-python -m pylint --jobs=0 --ignore=py/flwr/proto py/flwr
+python -m pylint --ignore=py/flwr/proto py/flwr
 echo "- pylint: done"
 
 echo "- pytest: start"
