@@ -2317,6 +2317,17 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state.initialize()
         return state
 
+    def test_run_series_distinguishes_missing_and_empty_descriptions(self) -> None:
+        """Missing and explicitly empty descriptions remain distinct in SQL."""
+        state = self.state_factory()
+        self.assertIsNotNone(state.store_run_in_series(1, "@me/fed-a", series_id=None))
+        self.assertIsNotNone(
+            state.store_run_in_series(2, "@me/fed-a", series_id=None, description="")
+        )
+
+        rows = state.query("SELECT description FROM run_series")
+        self.assertCountEqual([row["description"] for row in rows], [None, ""])
+
     @parameterized.expand(
         [  # type: ignore
             ("claim", "_claim_message_ins_rows", (1, 3)),
