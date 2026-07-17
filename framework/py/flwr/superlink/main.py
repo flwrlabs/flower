@@ -90,6 +90,7 @@ def create_app(
        in-memory SQLite LinkStateFactory and NoOp Control authentication
        plugins. Direct callers of `create_app` must provide all dependencies.
     """
+    _ = linkstate_factory
     if authn_plugin is not None and authz_plugin is not None:
         _ = AccountAccessDependency(authn_plugin, authz_plugin)
 
