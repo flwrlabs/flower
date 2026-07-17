@@ -210,6 +210,20 @@ class InMemoryCoreState(
     ) -> bool:
         """Store an object if it is pending for an active push session."""
         with self._lock_object_push_sessions:
+            # Support legacy SuperNodes that do not send a session ID
+            if not session_id:
+                sessions = self._object_push_sessions.items()
+                session_id = next(
+                    (
+                        candidate_id
+                        for candidate_id, candidate in sessions
+                        if object_id in candidate.pending_object_ids
+                    ),
+                    "",
+                )
+                if not session_id:
+                    return False
+
             # Validate session ownership and pending-object membership
             session = self._object_push_sessions.get(session_id)
             if (
