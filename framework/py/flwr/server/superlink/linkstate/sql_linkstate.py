@@ -976,6 +976,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         flwr_aid: str | None,
         primary_task_type: str,
         series_id: int | None = None,
+        series_description: str | None = None,
     ) -> int:
         """Create a new run."""
         # Convert federation_config to JSON string for storage
@@ -1016,6 +1017,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     run_id=run_id,
                     federation_id=federation_id,
                     series_id=series_id,
+                    description=series_description,
                 )
                 if resolved_series_id is None:
                     log(ERROR, "Unexpected run series membership failure.")
