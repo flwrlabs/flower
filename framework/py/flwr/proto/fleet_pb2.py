@@ -27,10 +27,9 @@ from flwr.proto import node_pb2 as flwr_dot_proto_dot_node__pb2
 from flwr.proto import run_pb2 as flwr_dot_proto_dot_run__pb2
 from flwr.proto import fab_pb2 as flwr_dot_proto_dot_fab__pb2
 from flwr.proto import message_pb2 as flwr_dot_proto_dot_message__pb2
-from flwr.proto import appio_pb2 as flwr_dot_proto_dot_appio__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x66lwr/proto/fleet.proto\x12\nflwr.proto\x1a\x1a\x66lwr/proto/heartbeat.proto\x1a\x15\x66lwr/proto/node.proto\x1a\x14\x66lwr/proto/run.proto\x1a\x14\x66lwr/proto/fab.proto\x1a\x18\x66lwr/proto/message.proto\x1a\x16\x66lwr/proto/appio.proto\".\n\x18RegisterNodeFleetRequest\x12\x12\n\npublic_key\x18\x01 \x01(\x0c\",\n\x19RegisterNodeFleetResponse\x12\x0f\n\x07node_id\x18\x01 \x01(\x04\"E\n\x13\x41\x63tivateNodeRequest\x12\x12\n\npublic_key\x18\x01 \x01(\x0c\x12\x1a\n\x12heartbeat_interval\x18\x02 \x01(\x01\"\'\n\x14\x41\x63tivateNodeResponse\x12\x0f\n\x07node_id\x18\x01 \x01(\x04\"(\n\x15\x44\x65\x61\x63tivateNodeRequest\x12\x0f\n\x07node_id\x18\x01 \x01(\x04\"\x18\n\x16\x44\x65\x61\x63tivateNodeResponse\"-\n\x1aUnregisterNodeFleetRequest\x12\x0f\n\x07node_id\x18\x01 \x01(\x04\"\x1d\n\x1bUnregisterNodeFleetResponse\"J\n\x13PullMessagesRequest\x12\x1e\n\x04node\x18\x01 \x01(\x0b\x32\x10.flwr.proto.Node\x12\x13\n\x0bmessage_ids\x18\x02 \x03(\t\"\xa2\x01\n\x14PullMessagesResponse\x12(\n\treconnect\x18\x01 \x01(\x0b\x32\x15.flwr.proto.Reconnect\x12*\n\rmessages_list\x18\x02 \x03(\x0b\x32\x13.flwr.proto.Message\x12\x34\n\x14message_object_trees\x18\x03 \x03(\x0b\x32\x16.flwr.proto.ObjectTree\"\xb7\x01\n\x13PushMessagesRequest\x12\x1e\n\x04node\x18\x01 \x01(\x0b\x32\x10.flwr.proto.Node\x12*\n\rmessages_list\x18\x02 \x03(\x0b\x32\x13.flwr.proto.Message\x12\x34\n\x14message_object_trees\x18\x03 \x03(\x0b\x32\x16.flwr.proto.ObjectTree\x12\x1e\n\x16\x63lientapp_runtime_list\x18\x04 \x03(\x01\"\xdd\x01\n\x14PushMessagesResponse\x12(\n\treconnect\x18\x01 \x01(\x0b\x32\x15.flwr.proto.Reconnect\x12>\n\x07results\x18\x02 \x03(\x0b\x32-.flwr.proto.PushMessagesResponse.ResultsEntry\x12\x17\n\x0fobjects_to_push\x18\x03 \x03(\t\x12\x12\n\nsession_id\x18\x04 \x01(\t\x1a.\n\x0cResultsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\r:\x02\x38\x01\"\x1e\n\tReconnect\x12\x11\n\treconnect\x18\x01 \x01(\x04\"\x90\x01\n\x1eStartAutomationFromNodeRequest\x12\x1e\n\x04node\x18\x01 \x01(\x0b\x32\x10.flwr.proto.Node\x12\x0e\n\x06run_id\x18\x02 \x01(\x04\x12>\n\nautomation\x18\x03 \x01(\x0b\x32*.flwr.proto.StartAutomationFromTaskRequest2\x8e\t\n\x05\x46leet\x12]\n\x0cRegisterNode\x12$.flwr.proto.RegisterNodeFleetRequest\x1a%.flwr.proto.RegisterNodeFleetResponse\"\x00\x12S\n\x0c\x41\x63tivateNode\x12\x1f.flwr.proto.ActivateNodeRequest\x1a .flwr.proto.ActivateNodeResponse\"\x00\x12Y\n\x0e\x44\x65\x61\x63tivateNode\x12!.flwr.proto.DeactivateNodeRequest\x1a\".flwr.proto.DeactivateNodeResponse\"\x00\x12\x63\n\x0eUnregisterNode\x12&.flwr.proto.UnregisterNodeFleetRequest\x1a\'.flwr.proto.UnregisterNodeFleetResponse\"\x00\x12\x62\n\x11SendNodeHeartbeat\x12$.flwr.proto.SendNodeHeartbeatRequest\x1a%.flwr.proto.SendNodeHeartbeatResponse\"\x00\x12S\n\x0cPullMessages\x12\x1f.flwr.proto.PullMessagesRequest\x1a .flwr.proto.PullMessagesResponse\"\x00\x12S\n\x0cPushMessages\x12\x1f.flwr.proto.PushMessagesRequest\x1a .flwr.proto.PushMessagesResponse\"\x00\x12\x41\n\x06GetRun\x12\x19.flwr.proto.GetRunRequest\x1a\x1a.flwr.proto.GetRunResponse\"\x00\x12l\n\x0fStartAutomation\x12*.flwr.proto.StartAutomationFromNodeRequest\x1a+.flwr.proto.StartAutomationFromTaskResponse\"\x00\x12\x41\n\x06GetFab\x12\x19.flwr.proto.GetFabRequest\x1a\x1a.flwr.proto.GetFabResponse\"\x00\x12M\n\nPushObject\x12\x1d.flwr.proto.PushObjectRequest\x1a\x1e.flwr.proto.PushObjectResponse\"\x00\x12M\n\nPullObject\x12\x1d.flwr.proto.PullObjectRequest\x1a\x1e.flwr.proto.PullObjectResponse\"\x00\x12q\n\x16\x43onfirmMessageReceived\x12).flwr.proto.ConfirmMessageReceivedRequest\x1a*.flwr.proto.ConfirmMessageReceivedResponse\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x66lwr/proto/fleet.proto\x12\nflwr.proto\x1a\x1a\x66lwr/proto/heartbeat.proto\x1a\x15\x66lwr/proto/node.proto\x1a\x14\x66lwr/proto/run.proto\x1a\x14\x66lwr/proto/fab.proto\x1a\x18\x66lwr/proto/message.proto\".\n\x18RegisterNodeFleetRequest\x12\x12\n\npublic_key\x18\x01 \x01(\x0c\",\n\x19RegisterNodeFleetResponse\x12\x0f\n\x07node_id\x18\x01 \x01(\x04\"E\n\x13\x41\x63tivateNodeRequest\x12\x12\n\npublic_key\x18\x01 \x01(\x0c\x12\x1a\n\x12heartbeat_interval\x18\x02 \x01(\x01\"\'\n\x14\x41\x63tivateNodeResponse\x12\x0f\n\x07node_id\x18\x01 \x01(\x04\"(\n\x15\x44\x65\x61\x63tivateNodeRequest\x12\x0f\n\x07node_id\x18\x01 \x01(\x04\"\x18\n\x16\x44\x65\x61\x63tivateNodeResponse\"-\n\x1aUnregisterNodeFleetRequest\x12\x0f\n\x07node_id\x18\x01 \x01(\x04\"\x1d\n\x1bUnregisterNodeFleetResponse\"J\n\x13PullMessagesRequest\x12\x1e\n\x04node\x18\x01 \x01(\x0b\x32\x10.flwr.proto.Node\x12\x13\n\x0bmessage_ids\x18\x02 \x03(\t\"\xa2\x01\n\x14PullMessagesResponse\x12(\n\treconnect\x18\x01 \x01(\x0b\x32\x15.flwr.proto.Reconnect\x12*\n\rmessages_list\x18\x02 \x03(\x0b\x32\x13.flwr.proto.Message\x12\x34\n\x14message_object_trees\x18\x03 \x03(\x0b\x32\x16.flwr.proto.ObjectTree\"\xb7\x01\n\x13PushMessagesRequest\x12\x1e\n\x04node\x18\x01 \x01(\x0b\x32\x10.flwr.proto.Node\x12*\n\rmessages_list\x18\x02 \x03(\x0b\x32\x13.flwr.proto.Message\x12\x34\n\x14message_object_trees\x18\x03 \x03(\x0b\x32\x16.flwr.proto.ObjectTree\x12\x1e\n\x16\x63lientapp_runtime_list\x18\x04 \x03(\x01\"\xdd\x01\n\x14PushMessagesResponse\x12(\n\treconnect\x18\x01 \x01(\x0b\x32\x15.flwr.proto.Reconnect\x12>\n\x07results\x18\x02 \x03(\x0b\x32-.flwr.proto.PushMessagesResponse.ResultsEntry\x12\x17\n\x0fobjects_to_push\x18\x03 \x03(\t\x12\x12\n\nsession_id\x18\x04 \x01(\t\x1a.\n\x0cResultsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\r:\x02\x38\x01\"\x1e\n\tReconnect\x12\x11\n\treconnect\x18\x01 \x01(\x04\x32\xa0\x08\n\x05\x46leet\x12]\n\x0cRegisterNode\x12$.flwr.proto.RegisterNodeFleetRequest\x1a%.flwr.proto.RegisterNodeFleetResponse\"\x00\x12S\n\x0c\x41\x63tivateNode\x12\x1f.flwr.proto.ActivateNodeRequest\x1a .flwr.proto.ActivateNodeResponse\"\x00\x12Y\n\x0e\x44\x65\x61\x63tivateNode\x12!.flwr.proto.DeactivateNodeRequest\x1a\".flwr.proto.DeactivateNodeResponse\"\x00\x12\x63\n\x0eUnregisterNode\x12&.flwr.proto.UnregisterNodeFleetRequest\x1a\'.flwr.proto.UnregisterNodeFleetResponse\"\x00\x12\x62\n\x11SendNodeHeartbeat\x12$.flwr.proto.SendNodeHeartbeatRequest\x1a%.flwr.proto.SendNodeHeartbeatResponse\"\x00\x12S\n\x0cPullMessages\x12\x1f.flwr.proto.PullMessagesRequest\x1a .flwr.proto.PullMessagesResponse\"\x00\x12S\n\x0cPushMessages\x12\x1f.flwr.proto.PushMessagesRequest\x1a .flwr.proto.PushMessagesResponse\"\x00\x12\x41\n\x06GetRun\x12\x19.flwr.proto.GetRunRequest\x1a\x1a.flwr.proto.GetRunResponse\"\x00\x12\x41\n\x06GetFab\x12\x19.flwr.proto.GetFabRequest\x1a\x1a.flwr.proto.GetFabResponse\"\x00\x12M\n\nPushObject\x12\x1d.flwr.proto.PushObjectRequest\x1a\x1e.flwr.proto.PushObjectResponse\"\x00\x12M\n\nPullObject\x12\x1d.flwr.proto.PullObjectRequest\x1a\x1e.flwr.proto.PullObjectResponse\"\x00\x12q\n\x16\x43onfirmMessageReceived\x12).flwr.proto.ConfirmMessageReceivedRequest\x1a*.flwr.proto.ConfirmMessageReceivedResponse\"\x00\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -39,36 +38,34 @@ if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_PUSHMESSAGESRESPONSE_RESULTSENTRY']._loaded_options = None
   _globals['_PUSHMESSAGESRESPONSE_RESULTSENTRY']._serialized_options = b'8\001'
-  _globals['_REGISTERNODEFLEETREQUEST']._serialized_start=183
-  _globals['_REGISTERNODEFLEETREQUEST']._serialized_end=229
-  _globals['_REGISTERNODEFLEETRESPONSE']._serialized_start=231
-  _globals['_REGISTERNODEFLEETRESPONSE']._serialized_end=275
-  _globals['_ACTIVATENODEREQUEST']._serialized_start=277
-  _globals['_ACTIVATENODEREQUEST']._serialized_end=346
-  _globals['_ACTIVATENODERESPONSE']._serialized_start=348
-  _globals['_ACTIVATENODERESPONSE']._serialized_end=387
-  _globals['_DEACTIVATENODEREQUEST']._serialized_start=389
-  _globals['_DEACTIVATENODEREQUEST']._serialized_end=429
-  _globals['_DEACTIVATENODERESPONSE']._serialized_start=431
-  _globals['_DEACTIVATENODERESPONSE']._serialized_end=455
-  _globals['_UNREGISTERNODEFLEETREQUEST']._serialized_start=457
-  _globals['_UNREGISTERNODEFLEETREQUEST']._serialized_end=502
-  _globals['_UNREGISTERNODEFLEETRESPONSE']._serialized_start=504
-  _globals['_UNREGISTERNODEFLEETRESPONSE']._serialized_end=533
-  _globals['_PULLMESSAGESREQUEST']._serialized_start=535
-  _globals['_PULLMESSAGESREQUEST']._serialized_end=609
-  _globals['_PULLMESSAGESRESPONSE']._serialized_start=612
-  _globals['_PULLMESSAGESRESPONSE']._serialized_end=774
-  _globals['_PUSHMESSAGESREQUEST']._serialized_start=777
-  _globals['_PUSHMESSAGESREQUEST']._serialized_end=960
-  _globals['_PUSHMESSAGESRESPONSE']._serialized_start=963
-  _globals['_PUSHMESSAGESRESPONSE']._serialized_end=1184
-  _globals['_PUSHMESSAGESRESPONSE_RESULTSENTRY']._serialized_start=1138
-  _globals['_PUSHMESSAGESRESPONSE_RESULTSENTRY']._serialized_end=1184
-  _globals['_RECONNECT']._serialized_start=1186
-  _globals['_RECONNECT']._serialized_end=1216
-  _globals['_STARTAUTOMATIONFROMNODEREQUEST']._serialized_start=1219
-  _globals['_STARTAUTOMATIONFROMNODEREQUEST']._serialized_end=1363
-  _globals['_FLEET']._serialized_start=1366
-  _globals['_FLEET']._serialized_end=2532
+  _globals['_REGISTERNODEFLEETREQUEST']._serialized_start=159
+  _globals['_REGISTERNODEFLEETREQUEST']._serialized_end=205
+  _globals['_REGISTERNODEFLEETRESPONSE']._serialized_start=207
+  _globals['_REGISTERNODEFLEETRESPONSE']._serialized_end=251
+  _globals['_ACTIVATENODEREQUEST']._serialized_start=253
+  _globals['_ACTIVATENODEREQUEST']._serialized_end=322
+  _globals['_ACTIVATENODERESPONSE']._serialized_start=324
+  _globals['_ACTIVATENODERESPONSE']._serialized_end=363
+  _globals['_DEACTIVATENODEREQUEST']._serialized_start=365
+  _globals['_DEACTIVATENODEREQUEST']._serialized_end=405
+  _globals['_DEACTIVATENODERESPONSE']._serialized_start=407
+  _globals['_DEACTIVATENODERESPONSE']._serialized_end=431
+  _globals['_UNREGISTERNODEFLEETREQUEST']._serialized_start=433
+  _globals['_UNREGISTERNODEFLEETREQUEST']._serialized_end=478
+  _globals['_UNREGISTERNODEFLEETRESPONSE']._serialized_start=480
+  _globals['_UNREGISTERNODEFLEETRESPONSE']._serialized_end=509
+  _globals['_PULLMESSAGESREQUEST']._serialized_start=511
+  _globals['_PULLMESSAGESREQUEST']._serialized_end=585
+  _globals['_PULLMESSAGESRESPONSE']._serialized_start=588
+  _globals['_PULLMESSAGESRESPONSE']._serialized_end=750
+  _globals['_PUSHMESSAGESREQUEST']._serialized_start=753
+  _globals['_PUSHMESSAGESREQUEST']._serialized_end=936
+  _globals['_PUSHMESSAGESRESPONSE']._serialized_start=939
+  _globals['_PUSHMESSAGESRESPONSE']._serialized_end=1160
+  _globals['_PUSHMESSAGESRESPONSE_RESULTSENTRY']._serialized_start=1114
+  _globals['_PUSHMESSAGESRESPONSE_RESULTSENTRY']._serialized_end=1160
+  _globals['_RECONNECT']._serialized_start=1162
+  _globals['_RECONNECT']._serialized_end=1192
+  _globals['_FLEET']._serialized_start=1195
+  _globals['_FLEET']._serialized_end=2251
 # @@protoc_insertion_point(module_scope)

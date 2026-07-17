@@ -19,7 +19,6 @@ limitations under the License.
 
 import builtins
 import collections.abc
-import flwr.proto.appio_pb2
 import flwr.proto.message_pb2
 import flwr.proto.node_pb2
 import google.protobuf.descriptor
@@ -287,27 +286,3 @@ class Reconnect(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["reconnect", b"reconnect"]) -> None: ...
 
 global___Reconnect = Reconnect
-
-@typing.final
-class StartAutomationFromNodeRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    NODE_FIELD_NUMBER: builtins.int
-    RUN_ID_FIELD_NUMBER: builtins.int
-    AUTOMATION_FIELD_NUMBER: builtins.int
-    run_id: builtins.int
-    @property
-    def node(self) -> flwr.proto.node_pb2.Node: ...
-    @property
-    def automation(self) -> flwr.proto.appio_pb2.StartAutomationFromTaskRequest: ...
-    def __init__(
-        self,
-        *,
-        node: flwr.proto.node_pb2.Node | None = ...,
-        run_id: builtins.int = ...,
-        automation: flwr.proto.appio_pb2.StartAutomationFromTaskRequest | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["automation", b"automation", "node", b"node"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["automation", b"automation", "node", b"node", "run_id", b"run_id"]) -> None: ...
-
-global___StartAutomationFromNodeRequest = StartAutomationFromNodeRequest

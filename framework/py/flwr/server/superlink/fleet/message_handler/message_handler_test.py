@@ -15,54 +15,20 @@
 """Fleet API message handler tests."""
 
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from flwr.app import Metadata, RecordDict
 from flwr.app.message import make_message
 from flwr.common.serde import message_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    StartAutomationFromTaskRequest,
-    StartAutomationFromTaskResponse,
-)
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PullMessagesRequest,
     PushMessagesRequest,
-    StartAutomationFromNodeRequest,
 )
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.date import now
 
-from .message_handler import pull_messages, push_messages, start_automation
-
-
-def test_start_automation_uses_authoritative_run() -> None:
-    """Test that Fleet forwards an authorized run to the shared builder."""
-    automation = StartAutomationFromTaskRequest(task="Run a daily report")
-    request = StartAutomationFromNodeRequest(
-        node=Node(node_id=1234), run_id=5678, automation=automation
-    )
-    state = MagicMock()
-    run = MagicMock()
-    expected = StartAutomationFromTaskResponse(automation_id=1, series_id=2)
-
-    with (
-        patch(
-            f"{start_automation.__module__}._validate_node_in_federation",
-            return_value=run,
-        ) as validate,
-        patch(f"{start_automation.__module__}.check_abort", return_value="") as abort,
-        patch(
-            f"{start_automation.__module__}.start_automation_from_run",
-            return_value=expected,
-        ) as build,
-    ):
-        response = start_automation(request, state)
-
-    assert response == expected
-    validate.assert_called_once_with(state, 1234, 5678)
-    abort.assert_called_once()
-    build.assert_called_once_with(state, run, automation)
+from .message_handler import pull_messages, push_messages
 
 
 def test_pull_messages() -> None:

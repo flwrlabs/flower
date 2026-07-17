@@ -22,7 +22,6 @@ import "flwr/proto/node.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/fab.proto";
 import "flwr/proto/message.proto";
-import "flwr/proto/appio.proto";
 
 service Fleet {
   // Register Node
@@ -53,10 +52,6 @@ service Fleet {
   rpc PushMessages(PushMessagesRequest) returns (PushMessagesResponse) {}
 
   rpc GetRun(GetRunRequest) returns (GetRunResponse) {}
-
-  // Start an automation from an authenticated SuperNode run
-  rpc StartAutomation(StartAutomationFromNodeRequest)
-      returns (StartAutomationFromTaskResponse) {}
 
   // Get FAB
   rpc GetFab(GetFabRequest) returns (GetFabResponse) {}
@@ -117,9 +112,3 @@ message PushMessagesResponse {
 }
 
 message Reconnect { uint64 reconnect = 1; }
-
-message StartAutomationFromNodeRequest {
-  Node node = 1;
-  uint64 run_id = 2;
-  StartAutomationFromTaskRequest automation = 3;
-}

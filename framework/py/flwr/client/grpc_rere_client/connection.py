@@ -32,10 +32,6 @@ from flwr.common.serde import (
     message_to_proto,
     run_from_proto,
 )
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    StartAutomationFromTaskRequest,
-    StartAutomationFromTaskResponse,
-)
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -46,7 +42,6 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PushMessagesRequest,
     PushMessagesResponse,
     RegisterNodeFleetRequest,
-    StartAutomationFromNodeRequest,
     UnregisterNodeFleetRequest,
 )
 from flwr.proto.fleet_pb2_grpc import FleetStub  # pylint: disable=E0611
@@ -99,9 +94,6 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         Callable[[int, str], bytes],
         Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
-        Callable[
-            [int, StartAutomationFromTaskRequest], StartAutomationFromTaskResponse
-        ],
     ]
 ]:
     """Primitives for request/response-based interaction with a server.
@@ -331,18 +323,6 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
 
         return fab_from_proto(get_fab_response.fab)
 
-    def start_automation(
-        run_id: int, request: StartAutomationFromTaskRequest
-    ) -> StartAutomationFromTaskResponse:
-        response: StartAutomationFromTaskResponse = stub.StartAutomation(
-            StartAutomationFromNodeRequest(
-                node=node,
-                run_id=run_id,
-                automation=request,
-            )
-        )
-        return response
-
     def pull_object(run_id: int, object_id: str) -> bytes:
         """Pull the object from the SuperLink."""
         # Check Node
@@ -399,7 +379,6 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             pull_object,
             push_object,
             confirm_message_received,
-            start_automation,
         )
     except Exception as exc:  # pylint: disable=broad-except
         log(ERROR, exc)

@@ -38,8 +38,6 @@ from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
     PushTaskOutputResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
-    StartAutomationFromTaskRequest,
-    StartAutomationFromTaskResponse,
 )
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint:disable=E0611
 from flwr.proto.message_pb2 import (  # pylint:disable=E0611
@@ -49,8 +47,6 @@ from flwr.proto.message_pb2 import (  # pylint:disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
-from flwr.proto.task_pb2 import Task  # pylint:disable=E0611
-from flwr.supercore.constant import TaskType
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -78,32 +74,6 @@ class TestClientAppIoServicer(unittest.TestCase):
         mock_state_factory = Mock()
         mock_state_factory.state.return_value = self.mock_state
         self.servicer = ClientAppIoServicer(mock_state_factory, Mock())
-
-    def test_start_automation_forwards_authenticated_run(self) -> None:
-        """ClientAppIo should forward automation creation to SuperLink."""
-        response = StartAutomationFromTaskResponse(
-            automation_id=7,
-            series_id=11,
-            next_run_at="2026-07-18T09:00:00Z",
-        )
-        start_automation_fn = Mock(return_value=response)
-        servicer = ClientAppIoServicer(
-            Mock(), Mock(), start_automation_fn=start_automation_fn
-        )
-        request = StartAutomationFromTaskRequest(
-            task="Summarize results",
-            fixed_interval=86400,
-        )
-
-        with patch(
-            "flwr.supernode.servicer.clientappio.clientappio_servicer."
-            "get_authenticated_task",
-            return_value=Task(task_id=3, run_id=5, type=TaskType.CLIENT_APP),
-        ):
-            actual = servicer.StartAutomation(request, Mock())
-
-        self.assertEqual(actual, response)
-        start_automation_fn.assert_called_once_with(5, request)
 
     def test_pull_task_input(self) -> None:
         """Test pulling messages from SuperNode."""

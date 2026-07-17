@@ -32,9 +32,6 @@ from flwr.common.constant import (
     GRPC_ADAPTER_METADATA_MESSAGE_QUALNAME_KEY,
     GRPC_ADAPTER_METADATA_SHOULD_EXIT_KEY,
 )
-from flwr.proto.appio_pb2 import (
-    StartAutomationFromTaskResponse,  # pylint: disable=E0611
-)
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -47,7 +44,6 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PushMessagesResponse,
     RegisterNodeFleetRequest,
     RegisterNodeFleetResponse,
-    StartAutomationFromNodeRequest,
     UnregisterNodeFleetRequest,
     UnregisterNodeFleetResponse,
 )
@@ -183,14 +179,6 @@ class GrpcAdapter:
     ) -> GetFabResponse:
         """."""
         return self._send_and_receive(request, GetFabResponse, **kwargs)
-
-    def StartAutomation(  # pylint: disable=C0103
-        self, request: StartAutomationFromNodeRequest, **kwargs: Any
-    ) -> StartAutomationFromTaskResponse:
-        """Start an automation through the Fleet adapter."""
-        return self._send_and_receive(
-            request, StartAutomationFromTaskResponse, **kwargs
-        )
 
     def PushObject(  # pylint: disable=C0103
         self, request: PushObjectRequest, **kwargs: Any

@@ -62,13 +62,17 @@ _RUNTIME_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
 
 def _build_runtime_method_auth_policy(
     service_name: str,
+    excluded_methods: frozenset[str] = frozenset(),
 ) -> dict[str, MethodTokenPolicy]:
     """Build the token policy map for an AppIo service."""
     return {
         f"/flwr.proto.{service_name}/{method}": policy
         for method, policy in _RUNTIME_METHOD_AUTH_POLICY.items()
+        if method not in excluded_methods
     }
 
 
 SERVERAPPIO_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy("ServerAppIo")
-CLIENTAPPIO_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy("ClientAppIo")
+CLIENTAPPIO_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy(
+    "ClientAppIo", excluded_methods=frozenset({"StartAutomation"})
+)

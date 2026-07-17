@@ -297,9 +297,4 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_403_FORBIDDEN,
         public_message="Failed to get FAB.",
     ),
-    ApiErrorCode.FLEET_START_AUTOMATION_FAILED: ApiErrorSpec(
-        status_code=StatusCode.PERMISSION_DENIED,
-        http_status_code=status.HTTP_403_FORBIDDEN,
-        public_message="Failed to start automation.",
-    ),
 }

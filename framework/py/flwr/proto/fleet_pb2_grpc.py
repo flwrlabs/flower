@@ -3,7 +3,6 @@
 import grpc
 import warnings
 
-from flwr.proto import appio_pb2 as flwr_dot_proto_dot_appio__pb2
 from flwr.proto import fab_pb2 as flwr_dot_proto_dot_fab__pb2
 from flwr.proto import fleet_pb2 as flwr_dot_proto_dot_fleet__pb2
 from flwr.proto import heartbeat_pb2 as flwr_dot_proto_dot_heartbeat__pb2
@@ -78,11 +77,6 @@ class FleetStub(object):
                 '/flwr.proto.Fleet/GetRun',
                 request_serializer=flwr_dot_proto_dot_run__pb2.GetRunRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_run__pb2.GetRunResponse.FromString,
-                _registered_method=True)
-        self.StartAutomation = channel.unary_unary(
-                '/flwr.proto.Fleet/StartAutomation',
-                request_serializer=flwr_dot_proto_dot_fleet__pb2.StartAutomationFromNodeRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.StartAutomationFromTaskResponse.FromString,
                 _registered_method=True)
         self.GetFab = channel.unary_unary(
                 '/flwr.proto.Fleet/GetFab',
@@ -167,13 +161,6 @@ class FleetServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def StartAutomation(self, request, context):
-        """Start an automation from an authenticated SuperNode run
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def GetFab(self, request, context):
         """Get FAB
         """
@@ -244,11 +231,6 @@ def add_FleetServicer_to_server(servicer, server):
                     servicer.GetRun,
                     request_deserializer=flwr_dot_proto_dot_run__pb2.GetRunRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_run__pb2.GetRunResponse.SerializeToString,
-            ),
-            'StartAutomation': grpc.unary_unary_rpc_method_handler(
-                    servicer.StartAutomation,
-                    request_deserializer=flwr_dot_proto_dot_fleet__pb2.StartAutomationFromNodeRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.StartAutomationFromTaskResponse.SerializeToString,
             ),
             'GetFab': grpc.unary_unary_rpc_method_handler(
                     servicer.GetFab,
@@ -487,33 +469,6 @@ class Fleet(object):
             '/flwr.proto.Fleet/GetRun',
             flwr_dot_proto_dot_run__pb2.GetRunRequest.SerializeToString,
             flwr_dot_proto_dot_run__pb2.GetRunResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def StartAutomation(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.Fleet/StartAutomation',
-            flwr_dot_proto_dot_fleet__pb2.StartAutomationFromNodeRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.StartAutomationFromTaskResponse.FromString,
             options,
             channel_credentials,
             insecure,

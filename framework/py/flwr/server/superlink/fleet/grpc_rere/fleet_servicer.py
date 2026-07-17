@@ -23,9 +23,6 @@ from google.protobuf.json_format import MessageToDict
 
 from flwr.common.logger import log
 from flwr.proto import fleet_pb2_grpc  # pylint: disable=E0611
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    StartAutomationFromTaskResponse,
-)
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -38,7 +35,6 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PushMessagesResponse,
     RegisterNodeFleetRequest,
     RegisterNodeFleetResponse,
-    StartAutomationFromNodeRequest,
     UnregisterNodeFleetRequest,
     UnregisterNodeFleetResponse,
 )
@@ -286,29 +282,6 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
             ) from e
 
         return res
-
-    def StartAutomation(
-        self,
-        request: StartAutomationFromNodeRequest,
-        context: grpc.ServicerContext,
-    ) -> StartAutomationFromTaskResponse:
-        """Start an automation from a SuperNode run."""
-        del context
-        error_context = f"SuperNode {request.node.node_id}, run_id={request.run_id}"
-        try:
-            return message_handler.start_automation(
-                request=request, state=self.state_factory.state()
-            )
-        except InvalidRunStatusException as exc:
-            raise FlowerError(
-                ApiErrorCode.FLEET_RUN_STATUS_NOT_ALLOWED,
-                f"{error_context}, exception: {exc.message}",
-            ) from exc
-        except ValueError as exc:
-            raise FlowerError(
-                ApiErrorCode.FLEET_START_AUTOMATION_FAILED,
-                f"{error_context}, exception: {exc}",
-            ) from exc
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext
