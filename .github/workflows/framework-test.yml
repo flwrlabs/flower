@@ -109,7 +109,28 @@ jobs:
         if: ${{ matrix.task == 'pytest' && needs.changes.outputs.framework == 'true' }}
         run: |
           cd framework
-          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest --cov=py/flwr --durations=25 --durations-min=0.5
+          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest \
+            --cov=py/flwr \
+            --cov-report= \
+            --durations=25 \
+            --durations-min=0.5 \
+            -n 4 \
+            --dist=loadfile \
+            --ignore=py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
+            --ignore=py/flwr/server/superlink/fleet/vce/vce_api_test.py \
+            --ignore=py/flwr/simulation/ray_transport/ray_client_proxy_test.py \
+            --ignore=py/flwr/server/superlink/fleet/grpc_rere \
+            --ignore=py/flwr/supercore/servicer/appio/appio_servicer_test.py
+          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest \
+            --cov=py/flwr \
+            --cov-append \
+            --durations=25 \
+            --durations-min=0.5 \
+            py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
+            py/flwr/server/superlink/fleet/vce/vce_api_test.py \
+            py/flwr/simulation/ray_transport/ray_client_proxy_test.py \
+            py/flwr/server/superlink/fleet/grpc_rere \
+            py/flwr/supercore/servicer/appio/appio_servicer_test.py
       - name: Check benchmarks and examples
         if: ${{ matrix.task == 'pytest' && needs.changes.outputs.ex_bench == 'true' }}
         run: |
