@@ -265,6 +265,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Store an object if it is pending for an active push session."""
         try:
             with self.session():
+                # Support legacy SuperNodes that do not send a session ID
+                if not session_id:
+                    rows = self.query(
+                        """
+                        SELECT session_id
+                        FROM object_push_session_pending
+                        WHERE object_id = :object_id
+                        """,
+                        {"object_id": object_id},
+                    )
+                    if not rows:
+                        return False
+                    session_id = rows[0]["session_id"]
+
                 # Atomically validate the session and claim its pending object
                 expires_at = self._claim_pending_object(run_id, session_id, object_id)
                 if expires_at is None:
