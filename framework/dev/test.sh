@@ -62,13 +62,20 @@ python -m pylint --ignore=py/flwr/proto py/flwr
 echo "- pylint: done"
 
 echo "- pytest: start"
-if $RUN_PYTEST; then
+case "$RUN_PYTEST" in
+true)
     # Ray's uv runtime-env hook can stall under `uv run` during pytest.
     RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 python -m pytest --cov=py/flwr
     echo "- pytest: done"
-else
+    ;;
+false)
     echo "- pytest: skipped"
-fi
+    ;;
+*)
+    echo "RUN_PYTEST must be 'true' or 'false' (got '$RUN_PYTEST')" >&2
+    exit 1
+    ;;
+esac
 
 echo "- All Python checks passed"
 
