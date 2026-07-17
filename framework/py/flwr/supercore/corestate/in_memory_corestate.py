@@ -284,8 +284,6 @@ class InMemoryCoreState(
 
     def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
         """Return connector references associated with a run."""
-        if run_id <= 0:
-            return []
         with self.lock_run_connector_store:
             return sorted(self.run_connector_store.get(run_id, set()))
 

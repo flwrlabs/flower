@@ -388,8 +388,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
         """Return connector references associated with a run."""
-        if run_id <= 0:
-            return []
         rows = self.query(
             """
             SELECT connector_ref
