@@ -21,7 +21,6 @@ import random
 import threading
 import time
 from collections.abc import Callable, Iterable, Iterator
-from queue import Queue
 from typing import TypeVar
 
 from flwr.app.message import (
@@ -34,7 +33,6 @@ from flwr.app.message import (
 )
 from flwr.app.message.arraychunk import ArrayChunk
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
-from flwr.supercore.exit import add_exit_handler
 
 from ..constant import (
     FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS,
@@ -68,34 +66,6 @@ inflatable_class_registry: dict[str, type[InflatableObject]] = {
 }
 
 T = TypeVar("T", bound=InflatableObject)
-
-
-# Allow thread pool executors to be shut down gracefully
-_thread_pool_executors: set[concurrent.futures.ThreadPoolExecutor] = set()
-_lock = threading.Lock()
-
-
-def _shutdown_thread_pool_executors() -> None:
-    """Shutdown all thread pool executors gracefully."""
-    with _lock:
-        for executor in _thread_pool_executors:
-            executor.shutdown(wait=False, cancel_futures=True)
-        _thread_pool_executors.clear()
-
-
-def _track_executor(executor: concurrent.futures.ThreadPoolExecutor) -> None:
-    """Track a thread pool executor for graceful shutdown."""
-    with _lock:
-        _thread_pool_executors.add(executor)
-
-
-def _untrack_executor(executor: concurrent.futures.ThreadPoolExecutor) -> None:
-    """Untrack a thread pool executor."""
-    with _lock:
-        _thread_pool_executors.discard(executor)
-
-
-add_exit_handler(_shutdown_thread_pool_executors)
 
 
 class ObjectUnavailableError(Exception):
@@ -203,7 +173,6 @@ def push_object_contents_from_iterable(
         The maximum number of concurrent pushes to perform.
     """
     error_event = threading.Event()
-    err_queue: Queue[Exception] = Queue()
 
     def push(args: tuple[str, bytes]) -> None:
         """Push a single object."""
@@ -213,28 +182,20 @@ def push_object_contents_from_iterable(
         # Push the object using the provided function
         try:
             push_object_fn(obj_id, obj_content)
-        except Exception as err:  # pylint: disable=broad-except
+        except BaseException:  # pylint: disable=broad-except
             # Unexpected error during pushing
             error_event.set()
-            err_queue.put(err)
+            raise
 
     # Push all object contents concurrently
     num_workers = get_num_workers(max_concurrent_pushes)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
-        # Ensure that the thread pool executors are tracked for graceful shutdown
-        _track_executor(executor)
-
-        # Submit push tasks for each object content
-        executor.map(push, object_contents)  # Non-blocking map
-
-        # The context manager will block until all submitted tasks have completed
-
-    # Remove the executor from the list of tracked executors
-    _untrack_executor(executor)
-
-    # If an error occurred during pushing, raise it
-    if not err_queue.empty():
-        raise err_queue.get()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=num_workers)
+    try:
+        futures = [executor.submit(push, args) for args in object_contents]
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 def pull_objects(  # pylint: disable=too-many-arguments,too-many-locals
@@ -284,13 +245,8 @@ def pull_objects(  # pylint: disable=too-many-arguments,too-many-locals
 
     results: dict[str, bytes] = {}
     results_lock = threading.Lock()
-    err_queue: Queue[Exception] = Queue()
     early_stop = threading.Event()
     start = time.monotonic()
-
-    def stop_on_error(err: Exception) -> None:
-        early_stop.set()
-        err_queue.put(err)
 
     def pull_with_retries(object_id: str) -> None:
         """Attempt to pull a single object with retry and backoff."""
@@ -303,7 +259,6 @@ def pull_objects(  # pylint: disable=too-many-arguments,too-many-locals
                 with results_lock:
                     results[object_id] = object_content
                 return
-
             except ObjectUnavailableError:
                 tries += 1
                 if (
@@ -312,41 +267,28 @@ def pull_objects(  # pylint: disable=too-many-arguments,too-many-locals
                 ):
                     # Stop all work if one object exhausts retries
                     reason = "timeout or retry limit reached"
-                    stop_on_error(ObjectPullError(object_id, reason))
-                    return
+                    early_stop.set()
+                    raise ObjectPullError(object_id, reason) from None
 
                 # Apply exponential backoff with ±20% jitter
                 sleep_time = delay * (1 + random.uniform(-0.2, 0.2))
                 early_stop.wait(sleep_time)
                 delay = min(delay * 2, backoff_cap)
-
-            except ObjectPullError as err:
-                # Permanent failure: the object cannot be pulled
-                stop_on_error(err)
-                return
-
-            except Exception as err:  # pylint: disable=broad-except
-                # Permanent failure: unexpected error
-                stop_on_error(err)
-                return
+            except (ObjectPullError, BaseException):
+                # Permanent failure: the object cannot be pulled or unexpected error
+                early_stop.set()
+                raise
 
     # Submit all pull tasks concurrently
     num_workers = get_num_workers(max_concurrent_pulls)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
-        # Ensure that the thread pool executors are tracked for graceful shutdown
-        _track_executor(executor)
-
-        # Submit pull tasks for each object ID
-        executor.map(pull_with_retries, object_ids)  # Non-blocking map
-
-        # The context manager will block until all submitted tasks have completed
-
-    # Remove the executor from the list of tracked executors
-    _untrack_executor(executor)
-
-    # If an error occurred during pulling, raise it
-    if not err_queue.empty():
-        raise err_queue.get()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=num_workers)
+    try:
+        futures = [executor.submit(pull_with_retries, obj_id) for obj_id in object_ids]
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
+    finally:
+        early_stop.set()
+        executor.shutdown(wait=False, cancel_futures=True)
 
     return results
 
