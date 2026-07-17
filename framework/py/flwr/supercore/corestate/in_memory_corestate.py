@@ -165,6 +165,17 @@ class InMemoryCoreState(
             )
         return session_id
 
+    def delete_sessions_in_run(self, run_id: int) -> None:
+        """Delete all object push session bookkeeping for a run."""
+        with self._lock_object_push_sessions:
+            session_ids = [
+                session_id
+                for session_id, session in self._object_push_sessions.items()
+                if session.run_id == run_id
+            ]
+            for session_id in session_ids:
+                self._cleanup_push_session(session_id, cleanup_messages=False)
+
     def preregister_object_tree(
         self, object_tree: ObjectTree, session_id: str
     ) -> list[str]:
@@ -189,6 +200,84 @@ class InMemoryCoreState(
             session.pending_object_ids.update(missing_objects)
             self._object_push_session_by_root[object_tree.object_id] = session_id
             return missing_objects
+
+    def store_object(
+        self,
+        run_id: int,
+        session_id: str,
+        object_id: str,
+        object_content: bytes,
+    ) -> bool:
+        """Store an object if it is pending for an active push session."""
+        with self._lock_object_push_sessions:
+            # Support legacy SuperNodes that do not send a session ID
+            if not session_id:
+                sessions = self._object_push_sessions.items()
+                session_id = next(
+                    (
+                        candidate_id
+                        for candidate_id, candidate in sessions
+                        if object_id in candidate.pending_object_ids
+                    ),
+                    "",
+                )
+                if not session_id:
+                    return False
+
+            # Validate session ownership and pending-object membership
+            session = self._object_push_sessions.get(session_id)
+            if (
+                session is None
+                or session.run_id != run_id
+                or object_id not in session.pending_object_ids
+            ):
+                return False
+
+            # Reject expired sessions and clean up their messages and objects
+            if session.expires_at <= now():
+                self._cleanup_push_session(session_id, cleanup_messages=True)
+                return False
+
+            # Store the object, mark it complete, and refresh the session TTL
+            try:
+                self.object_store.put(object_id, object_content)
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to store object %s: %s", object_id, err)
+                return False
+            session.pending_object_ids.remove(object_id)
+            session.expires_at = now() + timedelta(
+                seconds=OBJECT_PUSH_SESSION_TTL_SECONDS
+            )
+
+            # Remove session bookkeeping once every pending object is stored
+            if not session.pending_object_ids:
+                self._cleanup_push_session(session_id, cleanup_messages=False)
+            return True
+
+    def get_object(self, run_id: int, object_id: str) -> bytes | None:
+        """Get an object and clean up expired push sessions when needed."""
+        with self._lock_object_push_sessions:
+            # Return immediately unless the object is known but unavailable
+            content = self.object_store.get(object_id)
+            if content != b"":
+                return content
+
+            # Find expired sessions in this run that are waiting for the object
+            current = now()
+            expired_session_ids = [
+                session_id
+                for session_id, session in self._object_push_sessions.items()
+                if session.run_id == run_id
+                and object_id in session.pending_object_ids
+                and session.expires_at <= current
+            ]
+            if not expired_session_ids:
+                return content
+
+            # Clean up every expired session, then return the resulting object state
+            for session_id in expired_session_ids:
+                self._cleanup_push_session(session_id, cleanup_messages=True)
+            return self.object_store.get(object_id)
 
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
         """Remove an object push session and optionally its messages."""
@@ -397,6 +486,7 @@ class InMemoryCoreState(
         run_id: int,
         federation_id: str,
         series_id: int | None,
+        description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
         with self.lock_run_series_store:
@@ -428,7 +518,7 @@ class InMemoryCoreState(
                 run_series = RunSeries(
                     series_id=new_series_id,
                     federation=federation_id,
-                    description="",
+                    description=description if description is not None else "",
                     created_at=timestamp,
                     updated_at=timestamp,
                 )

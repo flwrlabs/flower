@@ -303,6 +303,32 @@ class StateTest(CoreStateTest):
         self.assertEqual(state.num_message_ins(), 0)
         self.assertEqual(state.num_message_res(), 0)
 
+    def test_cleanup_run(self) -> None:
+        """Test cleanup of run-scoped messages and objects."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        session_id = state.start_session(run_id)
+        stored, _ = state.store_message_and_object_tree(
+            msg, get_object_tree(msg), session_id
+        )
+        assert stored
+
+        state.cleanup_run(run_id)
+
+        self.assertEqual(state.num_message_ins(), 0)
+        self.assertFalse(msg.metadata.message_id in state.object_store)
+        self.assertFalse(
+            state.store_object(run_id, session_id, msg.metadata.message_id, b"content")
+        )
+
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""
         # Prepare
@@ -727,10 +753,11 @@ class StateTest(CoreStateTest):
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
             )
         )
+        session_id = state.start_session(run_id)
 
         # Execute
         stored, missing_objects = state.store_message_and_object_tree(
-            msg, get_object_tree(msg)
+            msg, get_object_tree(msg), session_id
         )
 
         # Assert
@@ -750,7 +777,7 @@ class StateTest(CoreStateTest):
             )
         )
         stored, missing_objects = state.store_message_and_object_tree(
-            invalid_msg, get_object_tree(invalid_msg)
+            invalid_msg, get_object_tree(invalid_msg), session_id
         )
         assert not stored
         assert missing_objects == []
@@ -773,10 +800,11 @@ class StateTest(CoreStateTest):
         res_msg = Message(RecordDict(), reply_to=ins_msg)
         # pylint: disable-next=W0212
         res_msg.metadata._message_id = res_msg.object_id  # type: ignore
+        session_id = state.start_session(run_id)
 
         # Execute
         stored, missing_objects = state.store_message_and_object_tree(
-            res_msg, get_object_tree(res_msg)
+            res_msg, get_object_tree(res_msg), session_id
         )
 
         # Assert
@@ -2288,6 +2316,17 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         )
         state.initialize()
         return state
+
+    def test_run_series_distinguishes_missing_and_empty_descriptions(self) -> None:
+        """Missing and explicitly empty descriptions remain distinct in SQL."""
+        state = self.state_factory()
+        self.assertIsNotNone(state.store_run_in_series(1, "@me/fed-a", series_id=None))
+        self.assertIsNotNone(
+            state.store_run_in_series(2, "@me/fed-a", series_id=None, description="")
+        )
+
+        rows = state.query("SELECT description FROM run_series")
+        self.assertCountEqual([row["description"] for row in rows], [None, ""])
 
     @parameterized.expand(
         [  # type: ignore

@@ -128,6 +128,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         return session_id
 
+    def delete_sessions_in_run(self, run_id: int) -> None:
+        """Delete all object push session bookkeeping for a run."""
+        self.query(
+            """
+            DELETE FROM object_push_sessions
+            WHERE run_id = :run_id
+            """,
+            {"run_id": uint64_to_int64(run_id)},
+        )
+
     def preregister_object_tree(
         self, object_tree: ObjectTree, session_id: str
     ) -> list[str]:
@@ -206,6 +216,137 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 {"session_id": session_id},
             )
             return missing_objects
+
+    def _claim_pending_object(
+        self,
+        run_id: int,
+        session_id: str,
+        object_id: str,
+    ) -> datetime | None:
+        """Claim a pending object and return the push session expiry."""
+        rows = self.query(
+            """
+            DELETE FROM object_push_session_pending AS pending
+            WHERE pending.session_id = :session_id
+              AND pending.object_id = :object_id
+              AND EXISTS (
+                  SELECT 1
+                  FROM object_push_sessions AS session
+                  WHERE session.session_id = :session_id
+                    AND session.run_id = :run_id
+              )
+            RETURNING (
+                SELECT expires_at
+                FROM object_push_sessions
+                WHERE session_id = :session_id
+            ) AS expires_at
+            """,
+            {
+                "session_id": session_id,
+                "object_id": object_id,
+                "run_id": uint64_to_int64(run_id),
+            },
+        )
+        if not rows:
+            return None
+
+        expires_at = rows[0]["expires_at"]
+        if isinstance(expires_at, str):  # SQLite returns string for TIMESTAMP column
+            return datetime.fromisoformat(expires_at)
+        return cast(datetime, expires_at)
+
+    def store_object(
+        self,
+        run_id: int,
+        session_id: str,
+        object_id: str,
+        object_content: bytes,
+    ) -> bool:
+        """Store an object if it is pending for an active push session."""
+        try:
+            with self.session():
+                # Support legacy SuperNodes that do not send a session ID
+                if not session_id:
+                    rows = self.query(
+                        """
+                        SELECT session_id
+                        FROM object_push_session_pending
+                        WHERE object_id = :object_id
+                        """,
+                        {"object_id": object_id},
+                    )
+                    if not rows:
+                        return False
+                    session_id = rows[0]["session_id"]
+
+                # Atomically validate the session and claim its pending object
+                expires_at = self._claim_pending_object(run_id, session_id, object_id)
+                if expires_at is None:
+                    return False
+
+                # Reject expired sessions and clean up their messages and objects
+                if expires_at <= now():
+                    self._cleanup_push_session(session_id, cleanup_messages=True)
+                    return False
+
+                # Store the object, decrement pending work, and refresh the session TTL
+                self.object_store.put(object_id, object_content)
+                rows = self.query(
+                    """
+                    UPDATE object_push_sessions
+                    SET pending_count = pending_count - 1,
+                        expires_at = :expires_at
+                    WHERE session_id = :session_id
+                    RETURNING pending_count
+                    """,
+                    {
+                        "session_id": session_id,
+                        "expires_at": now()
+                        + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS),
+                    },
+                )
+                pending_count = rows[0]["pending_count"]
+
+                # Remove session bookkeeping once every pending object is stored
+                if pending_count == 0:
+                    self._cleanup_push_session(session_id, cleanup_messages=False)
+                return True
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            log(ERROR, "Failed to store object %s: %s", object_id, err)
+            return False
+
+    def get_object(self, run_id: int, object_id: str) -> bytes | None:
+        """Get an object and clean up expired push sessions when needed."""
+        with self.session():
+            # Return immediately unless the object is known but unavailable
+            content = self.object_store.get(object_id)
+            if content != b"":
+                return content
+
+            # Find expired sessions in this run that are waiting for the object
+            rows = self.query(
+                """
+                SELECT session.session_id
+                FROM object_push_session_pending AS pending
+                INNER JOIN object_push_sessions AS session
+                    ON pending.session_id = session.session_id
+                WHERE pending.object_id = :object_id
+                  AND session.run_id = :run_id
+                  AND session.expires_at <= :current
+                """,
+                {
+                    "object_id": object_id,
+                    "run_id": uint64_to_int64(run_id),
+                    "current": now(),
+                },
+            )
+            if not rows:
+                return content
+
+            # Clean up every expired session, then return the resulting object state
+            for row in rows:
+                self._cleanup_push_session(row["session_id"], cleanup_messages=True)
+            return self.object_store.get(object_id)
 
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
         """Remove an object push session and optionally its messages."""
@@ -578,6 +719,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         run_id: int,
         federation_id: str,
         series_id: int | None,
+        description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
         insert_query = """
@@ -600,7 +742,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         {
                             "series_id": uint64_to_int64(candidate),
                             "federation_id": federation_id,
-                            "description": None,
+                            "description": description,
                             "created_at": timestamp,
                             "updated_at": timestamp,
                         },

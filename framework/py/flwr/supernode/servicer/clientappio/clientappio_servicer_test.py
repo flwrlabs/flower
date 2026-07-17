@@ -329,6 +329,7 @@ class TestClientAppIoServicer(unittest.TestCase):
             True,
             ["object-id"],
         )
+        self.mock_state.start_session.return_value = "session-id"
 
         with patch(
             "flwr.supernode.servicer.clientappio.clientappio_servicer."
@@ -340,8 +341,57 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_state.record_message_processing_end.assert_called_once_with(
             message_id=message.metadata.reply_to_message_id
         )
+        self.mock_state.start_session.assert_called_once_with(message.metadata.run_id)
         self.mock_state.store_message_and_object_tree.assert_called_once()
+        stored_message, stored_tree, session_id = (
+            self.mock_state.store_message_and_object_tree.call_args.args
+        )
+        self.assertEqual(
+            stored_message.metadata.message_id, message.metadata.message_id
+        )
+        self.assertEqual(stored_tree, object_tree)
+        self.assertEqual(session_id, "session-id")
         self.assertEqual(list(response.objects_to_push), ["object-id"])
+        self.assertEqual(response.session_id, "session-id")
+
+    def test_push_object_uses_state(self) -> None:
+        """PushObject should delegate session validation and storage to state."""
+        request = PushObjectRequest(
+            run_id=456,
+            session_id="session-id",
+            object_id="object-id",
+            object_content=b"content",
+        )
+        self.mock_state.store_object.return_value = True
+
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(run_id=123),
+        ):
+            response = self.servicer.PushObject(request, Mock())
+
+        self.mock_state.store_object.assert_called_once_with(
+            123, "session-id", "object-id", b"content"
+        )
+        self.assertTrue(response.stored)
+
+    def test_pull_object_uses_state(self) -> None:
+        """PullObject should delegate retrieval and expiry cleanup to state."""
+        request = PullObjectRequest(run_id=456, object_id="object-id")
+        self.mock_state.get_object.return_value = b"content"
+
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(run_id=123),
+        ):
+            response = self.servicer.PullObject(request, Mock())
+
+        self.mock_state.get_object.assert_called_once_with(123, "object-id")
+        self.assertTrue(response.object_found)
+        self.assertTrue(response.object_available)
+        self.assertEqual(response.object_content, b"content")
 
     def test_get_nodes_unimplemented(self) -> None:
         """GetNodes should be unavailable on ClientAppIo."""

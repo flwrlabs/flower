@@ -99,18 +99,28 @@ add_exit_handler(_shutdown_thread_pool_executors)
 
 
 class ObjectUnavailableError(Exception):
-    """Exception raised when an object has been pre-registered but is not yet
-    available."""
+    """Signal that an object is not yet available and pulling should be retried."""
 
     def __init__(self, object_id: str):
         super().__init__(f"Object with ID '{object_id}' is not yet available.")
 
 
-class ObjectIdNotPreregisteredError(Exception):
-    """Exception raised when an object ID is not pre-registered."""
+class ObjectPullError(Exception):
+    """Exception raised when an object could not be pulled."""
 
-    def __init__(self, object_id: str):
-        super().__init__(f"Object with ID '{object_id}' could not be found.")
+    def __init__(self, object_id: str, reason: str):
+        super().__init__(f"Failed to pull object with ID '{object_id}': {reason}")
+
+
+class ObjectPushError(Exception):
+    """Exception raised when an object could not be pushed."""
+
+    def __init__(self, object_id: str, run_id: int, session_id: str):
+        super().__init__(
+            f"Failed to push object with ID '{object_id}' for run {run_id} using "
+            f"session '{session_id}'. The push session may have expired or been "
+            "replaced."
+        )
 
 
 def get_num_workers(max_concurrent: int) -> int:
@@ -137,8 +147,8 @@ def push_objects(
         `InflatableObject` instances.
     push_object_fn : Callable[[str, bytes], None]
         A function that takes an object ID and its content as bytes, and pushes
-        it to the servicer. This function should raise `ObjectIdNotPreregisteredError`
-        if the object ID is not pre-registered.
+        it to the servicer. This function should raise `ObjectPushError` if the
+        servicer fails to store the object.
     object_ids_to_push : Optional[set[str]] (default: None)
         A set of object IDs to push. If not provided, all objects will be pushed.
     keep_objects : bool (default: False)
@@ -187,8 +197,8 @@ def push_object_contents_from_iterable(
         `object_id` is the object ID, and `object_content` is the object content.
     push_object_fn : Callable[[str, bytes], None]
         A function that takes an object ID and its content as bytes, and pushes
-        it to the servicer. This function should raise `ObjectIdNotPreregisteredError`
-        if the object ID is not pre-registered.
+        it to the servicer. This function should raise `ObjectPushError` if the
+        servicer fails to store the object.
     max_concurrent_pushes : int (default: FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES)
         The maximum number of concurrent pushes to perform.
     """
@@ -245,9 +255,8 @@ def pull_objects(  # pylint: disable=too-many-arguments,too-many-locals
         A list of object IDs to pull.
     pull_object_fn : Callable[[str], bytes]
         A function that takes an object ID and returns the object content as bytes.
-        The function should raise `ObjectUnavailableError` if the object is not yet
-        available, or `ObjectIdNotPreregisteredError` if the object ID is not
-        pre-registered.
+        The function should raise `ObjectUnavailableError` to trigger a retry if the
+        object is not yet available, or `ObjectPullError` if it cannot be pulled.
     max_concurrent_pulls : int (default: FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS)
         The maximum number of concurrent pulls to perform.
     max_time : Optional[float] (default: PULL_MAX_TIME)
@@ -295,14 +304,15 @@ def pull_objects(  # pylint: disable=too-many-arguments,too-many-locals
                     results[object_id] = object_content
                 return
 
-            except ObjectUnavailableError as err:
+            except ObjectUnavailableError:
                 tries += 1
                 if (
                     tries >= max_tries_per_object
                     or time.monotonic() - start >= max_time
                 ):
                     # Stop all work if one object exhausts retries
-                    stop_on_error(err)
+                    reason = "timeout or retry limit reached"
+                    stop_on_error(ObjectPullError(object_id, reason))
                     return
 
                 # Apply exponential backoff with ±20% jitter
@@ -310,8 +320,8 @@ def pull_objects(  # pylint: disable=too-many-arguments,too-many-locals
                 early_stop.wait(sleep_time)
                 delay = min(delay * 2, backoff_cap)
 
-            except ObjectIdNotPreregisteredError as err:
-                # Permanent failure: object ID is invalid
+            except ObjectPullError as err:
+                # Permanent failure: the object cannot be pulled
                 stop_on_error(err)
                 return
 

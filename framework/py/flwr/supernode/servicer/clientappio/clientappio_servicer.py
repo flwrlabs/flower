@@ -52,9 +52,8 @@ from flwr.proto.message_pb2 import (
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
-from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.interceptors import get_authenticated_task
-from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
+from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.servicer.appio import AppIoServicer
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 
@@ -253,11 +252,14 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         )
 
         # Save the message to the state and preregister its objects
+        session_id = state.start_session(run_id)
         _, objects_to_push = state.store_message_and_object_tree(
-            message, request.message_object_trees[0]
+            message, request.message_object_trees[0], session_id
         )
 
-        return PushAppMessagesResponse(objects_to_push=objects_to_push)
+        return PushAppMessagesResponse(
+            objects_to_push=objects_to_push, session_id=session_id
+        )
 
     def GetNodes(
         self, request: GetNodesRequest, context: grpc.ServicerContext
@@ -276,19 +278,17 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         """Push an object to the ObjectStore."""
         log(DEBUG, "ClientAppIoServicer.PushObject")
 
-        # Init state and store
-        store = self.objectstore_factory.store()
+        # Init state
+        state = self.state_factory.state()
+        run_id = get_authenticated_task().run_id
 
-        # Insert in store
-        stored = False
-        try:
-            store.put(request.object_id, request.object_content)
-            stored = True
-        except (NoObjectInStoreError, ValueError) as e:
-            log(ERROR, str(e))
-        except UnexpectedObjectContentError as e:
-            # Object content is not valid
-            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
+        # Insert in state
+        stored = state.store_object(
+            run_id,
+            request.session_id,
+            request.object_id,
+            request.object_content,
+        )
 
         return PushObjectResponse(stored=stored)
 
@@ -298,11 +298,12 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         """Pull an object from the ObjectStore."""
         log(DEBUG, "ClientAppIoServicer.PullObject")
 
-        # Init state and store
-        store = self.objectstore_factory.store()
+        # Init state
+        state = self.state_factory.state()
+        run_id = get_authenticated_task().run_id
 
-        # Fetch from store
-        content = store.get(request.object_id)
+        # Fetch from state
+        content = state.get_object(run_id, request.object_id)
         if content is not None:
             object_available = content != b""
             return PullObjectResponse(
