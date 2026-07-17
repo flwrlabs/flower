@@ -90,7 +90,8 @@ def create_app(
        in-memory SQLite LinkStateFactory and NoOp Control authentication
        plugins. Direct callers of `create_app` must provide all dependencies.
     """
-    _ = AccountAccessDependency(authn_plugin, authz_plugin)
+    if authn_plugin is not None and authz_plugin is not None:
+        _ = AccountAccessDependency(authn_plugin, authz_plugin)
 
     @asynccontextmanager
     async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[dict[str, object]]:
