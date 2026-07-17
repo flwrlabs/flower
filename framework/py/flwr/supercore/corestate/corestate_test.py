@@ -140,6 +140,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             ["calendar", "notion"],
         )
 
+        self.assertFalse(
+            state.bind_connectors_to_run(run_id=43, connector_refs="notion")
+        )
+        self.assertEqual(list(state.get_run_connector_refs(run_id=43)), [])
+
     def test_connector_oauth_session_lifecycle(self) -> None:
         """An OAuth session can be created, retrieved, and completed once."""
         state = self.state_factory()

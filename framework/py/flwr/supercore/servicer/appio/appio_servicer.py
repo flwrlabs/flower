@@ -20,6 +20,7 @@ from logging import DEBUG, ERROR
 
 import grpc
 
+from flwr.app import Message
 from flwr.common.constant import Status
 from flwr.common.logger import log
 from flwr.common.serde import message_from_proto, message_to_proto
@@ -55,6 +56,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.interceptors import get_authenticated_task
+from flwr.supercore.json_message.connector_message import ConnectorRequest
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 
@@ -107,15 +109,19 @@ class AppIoServicer(ABC):
         run_id = task.run_id
 
         state = self.state()
-        _validate_create_task_request(request, task, state, context)
+        connector_ref = (
+            request.connector_ref if request.HasField("connector_ref") else None
+        )
+        if request.type == TaskType.CONNECTOR and connector_ref is not None:
+            connector_ref = connector_ref.strip().lower()
+
+        _validate_create_task_request(request, task, connector_ref, state, context)
         created_task_id = state.create_task(
             task_type=request.type,
             run_id=run_id,
             fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
             model_ref=request.model_ref if request.HasField("model_ref") else None,
-            connector_ref=(
-                request.connector_ref if request.HasField("connector_ref") else None
-            ),
+            connector_ref=connector_ref,
             requesting_task_id=task.task_id,
         )
         if created_task_id is None:
@@ -141,6 +147,7 @@ class AppIoServicer(ABC):
         message = message_from_proto(request.message)
 
         state = self.state()
+        _validate_connector_request_message(message, state, context)
         stored = state.store_task_message(message)
         if not stored:
             context.abort(
@@ -219,6 +226,7 @@ class AppIoServicer(ABC):
 def _validate_create_task_request(
     request: CreateTaskRequest,
     requesting_task: Task,
+    connector_ref: str | None,
     state: CoreState,
     context: grpc.ServicerContext,
 ) -> None:
@@ -247,19 +255,55 @@ def _validate_create_task_request(
             f"Task type '{request.type}' requires model_ref.",
         )
 
-    if request.type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not request.connector_ref:
+    if request.type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not connector_ref:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires connector_ref.",
         )
 
-    if (
-        request.type == TaskType.CONNECTOR
-        and not connector_registry.has_builtin_connector(request.connector_ref)
-        and request.connector_ref
-        not in state.get_run_connector_refs(run_id=requesting_task.run_id)
-    ):
+    if request.type != TaskType.CONNECTOR or connector_ref is None:
+        return
+
+    if connector_registry.has_builtin_connector(connector_ref):
+        return
+
+    try:
+        connector_registry.get_oauth_connector_provider(connector_ref)
+    except ValueError as err:
+        context.abort(grpc.StatusCode.NOT_FOUND, str(err))
+
+    if connector_ref not in state.get_run_connector_refs(run_id=requesting_task.run_id):
         context.abort(
             grpc.StatusCode.PERMISSION_DENIED,
             "Connector is not available to this run.",
+        )
+
+
+def _validate_connector_request_message(
+    message: Message,
+    state: CoreState,
+    context: grpc.ServicerContext,
+) -> None:
+    """Ensure a connector task can only invoke its authorized connector."""
+    dst_task_id = message.metadata.dst_task_id
+    if dst_task_id is None:
+        return
+
+    tasks = state.get_tasks(task_ids=[dst_task_id], limit=1)
+    if not tasks or tasks[0].type != TaskType.CONNECTOR:
+        return
+
+    try:
+        connector_request = ConnectorRequest.from_message(message)
+    except ValueError as err:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Invalid connector request: {err}",
+        )
+        return
+
+    if connector_request.payload["name"] != tasks[0].connector_ref:
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Connector request does not match the connector task.",
         )

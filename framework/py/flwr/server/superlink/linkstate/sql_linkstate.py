@@ -980,7 +980,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         connector_refs: Sequence[str] = (),
     ) -> int:
         """Create a new run."""
-        if any(not connector_ref for connector_ref in connector_refs):
+        if isinstance(connector_refs, str) or any(
+            not connector_ref for connector_ref in connector_refs
+        ):
             return 0
         # Convert federation_config to JSON string for storage
         fed_config_json = None
@@ -1069,7 +1071,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 )
                 self.bind_connectors_to_run(
                     run_id=run_id,
-                    connector_refs=list(connector_refs),
+                    connector_refs=connector_refs,
                 )
                 return run_id
 

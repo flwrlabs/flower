@@ -305,6 +305,15 @@ class StateTest(CoreStateTest):
         self.assertEqual(run_id, 0)
         self.assertEqual(list(state.get_run_info()), [])
 
+    def test_create_run_rejects_string_connector_refs(self) -> None:
+        """A string should not be interpreted as a sequence of connector refs."""
+        state = self.state_factory()
+
+        run_id = create_dummy_run(state, connector_refs="notion")
+
+        self.assertEqual(run_id, 0)
+        self.assertEqual(list(state.get_run_info()), [])
+
     def test_store_messages_rejects_stopped_run(self) -> None:
         """Messages cannot be stored after a run is stopped."""
         state = self.state_factory()

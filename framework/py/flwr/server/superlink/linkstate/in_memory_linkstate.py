@@ -643,7 +643,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         connector_refs: Sequence[str] = (),
     ) -> int:
         """Create a new run."""
-        if any(not connector_ref for connector_ref in connector_refs):
+        if isinstance(connector_refs, str) or any(
+            not connector_ref for connector_ref in connector_refs
+        ):
             return 0
         with self.lock_task_store, self.lock:
             run_id = generate_rand_int_from_bytes(
@@ -716,7 +718,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             )
             self.bind_connectors_to_run(
                 run_id=run_id,
-                connector_refs=list(connector_refs),
+                connector_refs=connector_refs,
             )
 
             return run_id
