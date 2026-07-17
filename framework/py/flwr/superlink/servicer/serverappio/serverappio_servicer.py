@@ -326,20 +326,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             )
 
         state = self.state_factory.state()
-        runs = state.get_run_info(run_ids=[task.run_id])
-        run = runs[0] if runs else None
-        if run is None:
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                "The authenticated AgentApp run does not exist.",
-            )
-            raise RuntimeError("Unreachable code")
-        if run.primary_task_id != task.task_id or run.series_id == 0:
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                "The authenticated AgentApp run cannot be used as an "
-                "automation template.",
-            )
+        run = state.get_run_info(run_ids=[task.run_id])[0]
 
         try:
             return start_automation_from_run(state, run, request)

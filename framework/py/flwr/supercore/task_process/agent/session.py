@@ -22,6 +22,8 @@ import time
 from collections.abc import Sequence
 from typing import Literal, cast
 
+from google.protobuf.json_format import ParseDict
+
 from flwr.agentapp import AgentConnectors, AgentResponses, AgentSession
 from flwr.app import Context, Message
 from flwr.common.serde import message_from_proto, message_to_proto
@@ -328,7 +330,13 @@ class RuntimeAgentResponses(AgentResponses):
 
         self.append_and_push_run_events([automation_event("started")])
         try:
-            output = self._start_automation(arguments)
+            request = ParseDict(arguments, StartAutomationFromTaskRequest())
+            response = self._stub.StartAutomation(request)
+            output: JSONObject = {
+                "automation_id": response.automation_id,
+                "series_id": response.series_id,
+                "next_run_at": response.next_run_at,
+            }
         except Exception as exc:  # pylint: disable=broad-exception-caught
             self.append_and_push_run_events(
                 [automation_event("failed", message=str(exc))]
@@ -343,36 +351,6 @@ class RuntimeAgentResponses(AgentResponses):
         self.append_and_push_run_events([automation_event("completed", output=output)])
         self.append_context_items([output_item])
         return output_item
-
-    def _start_automation(self, arguments: JSONObject) -> JSONObject:
-        """Create an automation through the task-authenticated AppIo endpoint."""
-        task = arguments.get("task")
-        if not isinstance(task, str) or not task.strip():
-            raise ValueError("Automation requires a non-empty string 'task'.")
-
-        request = StartAutomationFromTaskRequest(task=task)
-        start_at = arguments.get("start_at")
-        if start_at is not None:
-            if not isinstance(start_at, str):
-                raise ValueError("Automation 'start_at' must be a string.")
-            request.start_at = start_at
-        fixed_interval = arguments.get("fixed_interval")
-        if fixed_interval is not None:
-            if isinstance(fixed_interval, bool) or not isinstance(fixed_interval, int):
-                raise ValueError("Automation 'fixed_interval' must be an integer.")
-            request.fixed_interval = fixed_interval
-        max_runs = arguments.get("max_runs")
-        if max_runs is not None:
-            if isinstance(max_runs, bool) or not isinstance(max_runs, int):
-                raise ValueError("Automation 'max_runs' must be an integer.")
-            request.max_runs = max_runs
-
-        response = self._stub.StartAutomation(request)
-        return {
-            "automation_id": response.automation_id,
-            "series_id": response.series_id,
-            "next_run_at": response.next_run_at,
-        }
 
     def push_run_events(self, events: Sequence[JSONObject]) -> None:
         """Push structured run events for `StreamRunEvents` clients."""
