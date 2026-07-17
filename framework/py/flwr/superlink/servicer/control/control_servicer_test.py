@@ -102,6 +102,7 @@ from flwr.superlink.servicer.control.control_account_auth_interceptor import (
 )
 
 from .control_handlers import (
+    _derive_run_series_description,
     _format_verification,
     _validate_federation_and_node_in_request,
     _validate_federation_membership_in_request,
@@ -111,6 +112,22 @@ from .control_servicer import ControlServicer
 
 class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     """Test the Control API servicer."""
+
+    def test_derive_run_series_description(self) -> None:
+        """Test normalizing, clipping, and omitting agent input."""
+        self.assertEqual(
+            _derive_run_series_description(
+                {"agent.input": "  Hello\n  from\tthe agent  "}
+            ),
+            "Hello from the agent",
+        )
+        self.assertEqual(
+            _derive_run_series_description({"agent.input": "a" * 81}),
+            f"{'a' * 79}…",
+        )
+        self.assertEqual(_derive_run_series_description({"agent.input": 42}), "")
+        self.assertEqual(_derive_run_series_description({"agent.input": " \n\t "}), "")
+        self.assertEqual(_derive_run_series_description({}), "")
 
     def setUp(self) -> None:
         """Set up test fixtures."""
@@ -314,7 +331,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.fab.content = fab_content
         request.federation = NOOP_FEDERATION_ID
-        for key, value in user_config_to_proto({"agent.input": "Hello"}).items():
+        agent_input = "  Hello\n  from\tthe agent  "
+        for key, value in user_config_to_proto({"agent.input": agent_input}).items():
             request.override_config[key].CopyFrom(value)
 
         with (
@@ -334,7 +352,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 "tool": {
                     "flwr": {
                         "app": {
-                            "config": {"agent": {"input": ""}},
+                            "config": {"agent": {"input": "Default input"}},
                             "components": {"agentapp": "agent:app"},
                         }
                     }
@@ -345,12 +363,14 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         runs = self.state.get_run_info(run_ids=[response.run_id])
         tasks = self.state.get_tasks()
+        series = self.state.get_run_series(series_ids=[response.series_id])
 
         self.assertEqual(len(runs), 1)
         self.assertEqual(runs[0].fab_id, "flwr/agent")
         self.assertEqual(runs[0].fab_version, "0.1.0")
         self.assertEqual(runs[0].primary_task_type, TaskType.AGENT_APP)
-        self.assertEqual(runs[0].override_config["agent.input"], "Hello")
+        self.assertEqual(runs[0].override_config["agent.input"], agent_input)
+        self.assertEqual(series[0].description, "Hello from the agent")
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
