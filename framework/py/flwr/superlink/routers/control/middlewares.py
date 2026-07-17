@@ -17,13 +17,13 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Awaitable, Callable, Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable
 from typing import Any, cast, get_type_hints
 
 from fastapi import Request
 from fastapi.responses import Response, StreamingResponse
 from fastapi.routing import APIRoute
-from google.protobuf.message import DecodeError, Message
+from google.protobuf.message import Message
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
@@ -35,8 +35,6 @@ from flwr.supercore.protobuf.constants import (
 )
 from flwr.supercore.protobuf.framing import frame_message
 from flwr.superlink.dependencies.account import AccountAccessDependency
-
-RouteKey = tuple[str, str]
 
 
 class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
@@ -70,52 +68,6 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         response.headers.raw.extend(authentication_response.headers.raw)
         return response
-
-
-class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
-    """Deserialize configured protobuf request bodies before handlers run."""
-
-    def __init__(
-        self,
-        app: ASGIApp,
-        request_types: Mapping[RouteKey, type[Message]],
-    ) -> None:
-        super().__init__(app)
-        self._request_types = request_types
-
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint  # type: ignore[type-arg]
-    ) -> Response:
-        """Parse the protobuf request body and make it available to dependencies."""
-        request_type = self._request_types.get((request.method, request.url.path))
-        if request_type is not None:
-            self._check_request_media_type(request)
-            request.state.protobuf_request = self._parse_request(
-                await request.body(), request_type
-            )
-        return await call_next(request)
-
-    @staticmethod
-    def _check_request_media_type(request: Request) -> None:  # type: ignore[type-arg]
-        content_type = request.headers.get("content-type", "")
-        media_type = content_type.partition(";")[0].strip().lower()
-        if media_type != PROTOBUF_MEDIA_TYPE:
-            raise FlowerError(
-                ApiErrorCode.UNSUPPORTED_CONTENT_TYPE,
-                f"Unsupported Content-Type: {content_type!r}",
-            )
-
-    @staticmethod
-    def _parse_request(body: bytes, request_type: type[Message]) -> Message:
-        message = request_type()
-        try:
-            message.ParseFromString(body)
-        except DecodeError as exc:
-            raise FlowerError(
-                ApiErrorCode.INVALID_PROTOBUF_PAYLOAD,
-                f"Invalid protobuf payload: {exc!r}",
-            ) from exc
-        return message
 
 
 class ProtobufRoute(APIRoute):

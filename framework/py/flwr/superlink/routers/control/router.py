@@ -14,10 +14,9 @@
 # ==============================================================================
 """Control API router."""
 
-from typing import Annotated, cast
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, FastAPI, Request
-from google.protobuf.message import Message
+from fastapi import APIRouter, Depends, FastAPI
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -70,14 +69,17 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import http_error_translator
+from flwr.supercore.protobuf.routing import (
+    PROTOBUF_REQUEST_TYPES,
+    ProtobufTranslationMiddleware,
+    get_protobuf_request,
+)
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.dependencies.account import get_account, get_authn_plugin
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
     ProtobufRoute,
-    ProtobufTranslationMiddleware,
-    RouteKey,
 )
 from flwr.superlink.servicer.control import control_handlers
 
@@ -87,37 +89,6 @@ LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
 AuthnPluginDependency = Annotated[ControlAuthnPlugin, Depends(get_authn_plugin)]
 
-PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
-    ("POST", "/control/start-run"): StartRunRequest,
-    ("POST", "/control/list-runs"): ListRunsRequest,
-    ("POST", "/control/list-run-series"): ListRunSeriesRequest,
-    ("POST", "/control/get-run-series"): GetRunSeriesRequest,
-    ("POST", "/control/stop-run"): StopRunRequest,
-    ("POST", "/control/get-login-details"): GetLoginDetailsRequest,
-    ("POST", "/control/get-auth-tokens"): GetAuthTokensRequest,
-    ("POST", "/control/register-node"): RegisterNodeRequest,
-    ("POST", "/control/unregister-node"): UnregisterNodeRequest,
-    ("POST", "/control/list-nodes"): ListNodesRequest,
-    ("POST", "/control/list-federations"): ListFederationsRequest,
-    ("POST", "/control/show-federation"): ShowFederationRequest,
-    ("POST", "/control/create-federation"): CreateFederationRequest,
-    ("POST", "/control/archive-federation"): ArchiveFederationRequest,
-    ("POST", "/control/add-node-to-federation"): AddNodeToFederationRequest,
-    ("POST", "/control/remove-node-from-federation"): RemoveNodeFromFederationRequest,
-    (
-        "POST",
-        "/control/remove-account-from-federation",
-    ): RemoveAccountFromFederationRequest,
-    ("POST", "/control/create-invitation"): CreateInvitationRequest,
-    ("POST", "/control/list-invitations"): ListInvitationsRequest,
-    ("POST", "/control/accept-invitation"): AcceptInvitationRequest,
-    ("POST", "/control/reject-invitation"): RejectInvitationRequest,
-    ("POST", "/control/revoke-invitation"): RevokeInvitationRequest,
-    (
-        "POST",
-        "/control/configure-simulation-federation",
-    ): ConfigureSimulationFederationRequest,
-}
 UNAUTHENTICATED_PATHS = {
     "/control/get-login-details",
     "/control/get-auth-tokens",
@@ -137,11 +108,6 @@ def configure_middlewares(app: FastAPI) -> None:
     )
     # Register last so it is outermost and translates errors from every Control layer.
     app.middleware("http")(http_error_translator)
-
-
-def get_protobuf_request(request: Request) -> Message:  # type: ignore[type-arg]
-    """Return the protobuf request parsed by ``ProtobufTranslationMiddleware``."""
-    return cast(Message, request.state.protobuf_request)
 
 
 @router.post("/start-run")
