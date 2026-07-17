@@ -24,6 +24,7 @@ from logging import ERROR, INFO
 import requests
 
 from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
+from flwr.app.user_config import UserConfig
 from flwr.cli.utils import validate_federation_name
 from flwr.common.config import (
     flatten_dict,
@@ -129,6 +130,20 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 
+_RUN_SERIES_DESCRIPTION_MAX_LENGTH = 80
+
+
+def _derive_run_series_description(run_config: UserConfig) -> str:
+    """Derive a concise run series description from the agent input."""
+    agent_input = run_config.get("agent.input")
+    if not isinstance(agent_input, str):
+        return ""
+
+    description = " ".join(agent_input.split())
+    if len(description) <= _RUN_SERIES_DESCRIPTION_MAX_LENGTH:
+        return description
+    return f"{description[: _RUN_SERIES_DESCRIPTION_MAX_LENGTH - 1]}…"
+
 
 def start_run(  # pylint: disable=too-many-locals, too-many-statements
     request: StartRunRequest,
@@ -189,7 +204,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
         # Validate user config overrides matches keys in run config in FAB
         fab_config = get_fab_config(fab_file)
         run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
-        _ = fuse_dicts(run_config, override_config)
+        fused_run_config = fuse_dicts(run_config, override_config)
 
         # Derive primary task type from the submitted FAB. AgentApp-only FABs can
         # be bundled locally and submitted through the regular `flwr run` path.
@@ -227,6 +242,12 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
                 f"FAB ({fab.hash_str}) hash from request doesn't match contents"
             )
         fab_id, fab_version = get_metadata_from_config(fab_config)
+        series_id = request.series_id if request.HasField("series_id") else None
+        series_description: str | None = None
+        if primary_task_type == TaskType.AGENT_APP and series_id is None:
+            series_description = (
+                _derive_run_series_description(fused_run_config) or None
+            )
 
         run_id = state.create_run(
             fab_id,
@@ -237,7 +258,8 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
             resolved_federation_config,
             flwr_aid,
             primary_task_type,
-            request.series_id if request.HasField("series_id") else None,
+            series_id=series_id,
+            series_description=series_description,
         )
 
         if run_id == 0:
