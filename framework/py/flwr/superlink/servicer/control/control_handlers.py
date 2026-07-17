@@ -243,9 +243,11 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
             )
         fab_id, fab_version = get_metadata_from_config(fab_config)
         series_id = request.series_id if request.HasField("series_id") else None
-        series_description = ""
+        series_description: str | None = None
         if primary_task_type == TaskType.AGENT_APP and series_id is None:
-            series_description = _derive_run_series_description(fused_run_config)
+            series_description = (
+                _derive_run_series_description(fused_run_config) or None
+            )
 
         run_id = state.create_run(
             fab_id,
