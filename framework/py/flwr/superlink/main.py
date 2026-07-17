@@ -73,9 +73,8 @@ def create_app(
        It also passes the Control authentication and authorization plugins. When
        FastAPI starts the legacy gRPC APIs for compatibility, the CLI passes a
        `superlink_lifespan` initialized with the same factory.
-    2. Via `uvicorn flwr.superlink.main:app`: the module-level app uses an
-       in-memory SQLite LinkStateFactory and NoOp Control authentication
-       plugins. Direct callers of `create_app` must provide all dependencies.
+    2. Via `uvicorn flwr.superlink.main:app`: the module-level app starts without
+       a `LinkState`. Direct callers of `create_app` must provide all dependencies.
     """
 
     @asynccontextmanager
