@@ -8,6 +8,8 @@ echo "=== test.sh ==="
 # Default value (true)
 RUN_FULL_TEST=${1:-true}
 echo "RUN_FULL_TEST: $RUN_FULL_TEST"
+RUN_PYTEST=${RUN_PYTEST:-true}
+echo "RUN_PYTEST: $RUN_PYTEST"
 
 echo "- Start Python checks"
 
@@ -60,9 +62,13 @@ python -m pylint --ignore=py/flwr/proto py/flwr
 echo "- pylint: done"
 
 echo "- pytest: start"
-# Ray's uv runtime-env hook can stall under `uv run` during pytest.
-RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 python -m pytest --cov=py/flwr
-echo "- pytest: done"
+if $RUN_PYTEST; then
+    # Ray's uv runtime-env hook can stall under `uv run` during pytest.
+    RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 python -m pytest --cov=py/flwr
+    echo "- pytest: done"
+else
+    echo "- pytest: skipped"
+fi
 
 echo "- All Python checks passed"
 

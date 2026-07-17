@@ -43,6 +43,46 @@ jobs:
               - 'dev/test.sh'
               - '.github/workflows/framework-test.yml'
 
+  quality:
+    runs-on: ubuntu-22.04
+    needs: changes
+    if: ${{ needs.changes.outputs.framework == 'true' }}
+    strategy:
+      matrix:
+        python: ['3.11', '3.12', '3.13']
+
+    name: Quality (Python ${{ matrix.python }})
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Bootstrap
+        uses: ./.github/actions/bootstrap
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Prepare framework
+        run: ./framework/dev/prepare-framework.sh
+      - name: Install dependencies
+        run: |
+          cd framework
+          uv sync --python=${{ matrix.python }} --locked --all-extras --all-groups
+      - name: Check if protos need recompilation
+        run: |
+          cd framework
+          uv run --no-sync ./dev/check-protos.sh
+      - name: Check if migrations are up to date
+        if: ${{ matrix.python == '3.11' }}
+        run: |
+          cd framework
+          uv run --no-sync ./dev/check-migrations.sh
+      - name: Lint and static checks
+        env:
+          RUN_PYTEST: 'false'
+        run: |
+          cd framework
+          uv run --no-sync ./dev/test.sh
+
   test_core:
     runs-on: ubuntu-22.04
     needs: changes
@@ -53,7 +93,7 @@ jobs:
         # In case of a mismatch, the job has to download Python to install it.
         python: ['3.11', '3.12', '3.13']
 
-    name: Python ${{ matrix.python }}
+    name: Pytest (Python ${{ matrix.python }})
 
     steps:
       - uses: actions/checkout@v5
@@ -72,21 +112,11 @@ jobs:
         run: |
           cd framework
           uv sync --python=${{ matrix.python }} --locked --all-extras --all-groups
-      - name: Check if protos need recompilation
+      - name: Test
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: |
           cd framework
-          uv run --no-sync ./dev/check-protos.sh
-      - name: Check if migrations are up to date
-        if: ${{ needs.changes.outputs.framework == 'true' && matrix.python == '3.11' }}
-        run: |
-          cd framework
-          uv run --no-sync ./dev/check-migrations.sh
-      - name: Lint + Test (isort/black/mypy/pylint/flake8/pytest)
-        if: ${{ needs.changes.outputs.framework == 'true' }}
-        run: |
-          cd framework
-          uv run --no-sync ./dev/test.sh
+          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest --cov=py/flwr
       - name: Check benchmarks and examples
         if: ${{ needs.changes.outputs.ex_bench == 'true' }}
         run: |
