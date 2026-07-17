@@ -261,6 +261,19 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         put_object.assert_not_called()
         cleanup_session.assert_not_called()
 
+    def test_store_object_resolves_empty_session_id(self) -> None:
+        """An empty session ID resolves through pending object membership."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        session_id = state.start_session(run_id)
+        state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        with patch.object(state.object_store, "put") as put_object:
+            self.assertTrue(state.store_object(run_id, "", object_id, b"content"))
+
+        put_object.assert_called_once_with(object_id, b"content")
+
     def test_store_object_cleans_up_expired_session(self) -> None:
         """An object cannot be stored after its push session expires."""
         state = self.state_factory()
@@ -412,12 +425,26 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
 
         series_id = state.store_run_in_series(
-            run_id=123, federation_id="@me/fed-a", series_id=None
+            run_id=123,
+            federation_id="@me/fed-a",
+            series_id=None,
+            description="Initial description",
         )
 
         self.assertIsNotNone(series_id)
         assert series_id is not None
         self.assertGreater(series_id, 0)
+        self.assertEqual(
+            state.store_run_in_series(
+                run_id=456,
+                federation_id="@me/fed-a",
+                series_id=series_id,
+                description="Replacement description",
+            ),
+            series_id,
+        )
+        run_series = state.get_run_series(series_ids=[series_id])
+        self.assertEqual(run_series[0].description, "Initial description")
 
     def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
         """Unknown caller-provided run series IDs return None."""
