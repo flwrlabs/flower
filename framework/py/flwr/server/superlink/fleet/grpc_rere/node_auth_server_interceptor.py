@@ -105,6 +105,10 @@ class NodeAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         except ValueError:
             # Malformed (non-ISO) timestamp from an unauthenticated peer
             return _unary_unary_rpc_terminator("Invalid timestamp")
+        if timestamp.tzinfo is None:
+            # Offset-naive timestamp from an unauthenticated peer cannot be compared
+            # to the timezone-aware current time; reject instead of raising TypeError.
+            return _unary_unary_rpc_terminator("Invalid timestamp")
         time_diff = current - timestamp
         # Abort the RPC call if the timestamp is too old or in the future
         if not MIN_TIMESTAMP_DIFF < time_diff.total_seconds() < MAX_TIMESTAMP_DIFF:

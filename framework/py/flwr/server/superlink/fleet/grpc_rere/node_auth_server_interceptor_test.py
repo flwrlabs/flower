@@ -236,6 +236,19 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
             (TIMESTAMP_HEADER, timestamp),
         ]
 
+    def _make_metadata_with_offset_naive_timestamp(self) -> list[Any]:
+        """Create metadata with an ISO but offset-naive timestamp."""
+        # An offset-naive timestamp parses with fromisoformat but cannot be
+        # subtracted from the timezone-aware current time; sign it so it reaches
+        # the timestamp comparison step.
+        timestamp = now().replace(tzinfo=None).isoformat()
+        signature = sign_message(self.node_sk, timestamp.encode("ascii"))
+        return [
+            (PUBLIC_KEY_HEADER, self.node_pk_bytes),
+            (SIGNATURE_HEADER, signature),
+            (TIMESTAMP_HEADER, timestamp),
+        ]
+
     def _test_register_node(self, metadata: list[Any]) -> Any:
         """Test RegisterNode."""
         return self._register_node.with_call(
@@ -451,6 +464,16 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
         # Execute & Assert
         with self.assertRaises(grpc.RpcError) as cm:
             rpc(self, self._make_metadata_with_malformed_timestamp())
+        assert cm.exception.code() == grpc.StatusCode.UNAUTHENTICATED
+
+    @parameterized.expand(rpcs)  # type: ignore
+    def test_unsuccessful_rpc_with_offset_naive_timestamp(
+        self, rpc: Callable[[Any, list[Any]], Any]
+    ) -> None:
+        """Test that an offset-naive timestamp is rejected, not crashed on."""
+        # Execute & Assert
+        with self.assertRaises(grpc.RpcError) as cm:
+            rpc(self, self._make_metadata_with_offset_naive_timestamp())
         assert cm.exception.code() == grpc.StatusCode.UNAUTHENTICATED
 
 
