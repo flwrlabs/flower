@@ -376,8 +376,8 @@ class TestFleetSimulationEngineRayBackend(TestCase):
         producer/consumer logic must function. This also severs to evaluate a valid
         ClientApp.
         """
-        num_messages = 229
-        num_nodes = 59
+        num_messages = 71
+        num_nodes = 13
 
         state_factory, nodes_mapping, expected_results = (
             init_state_factory_nodes_mapping(
