@@ -22,6 +22,9 @@ from flwr.proto.appio_pb2 import RecordTaskUsageRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
 from flwr.supercore.typing import JSONObject
 
+MODEL_INFERENCE_USAGE_TYPE = "model_inference"
+WEB_SEARCH_USAGE_TYPE = "web_search"
+
 
 class _TaskUsageStub(Protocol):
     """AppIo stub surface needed to record task usage."""
@@ -44,6 +47,7 @@ class TaskUsageRecorder:
             RecordTaskUsageRequest(
                 task_usage=TaskUsage(
                     usage_type=usage.usage_type,
+                    provider=usage.provider,
                     input_tokens=usage.input_tokens,
                     output_tokens=usage.output_tokens,
                     total_tokens=usage.total_tokens,
@@ -53,14 +57,14 @@ class TaskUsageRecorder:
 
 
 def task_usage_from_open_response(
-    response: JSONObject, *, usage_type: str
+    response: JSONObject, *, provider: str
 ) -> TaskUsage | None:
     """Extract Open Responses-compatible token usage from a response."""
     raw_usage = response.get("usage")
     if not isinstance(raw_usage, dict):
         return None
 
-    usage = TaskUsage(usage_type=usage_type)
+    usage = TaskUsage(usage_type=MODEL_INFERENCE_USAGE_TYPE, provider=provider)
     has_tokens = False
     for response_field, proto_field in (
         ("input_tokens", "input_tokens"),

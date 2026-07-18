@@ -823,10 +823,18 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
                 input_tokens=10,
                 output_tokens=20,
                 total_tokens=30,
-                usage_type="token",
+                usage_type="model_inference",
+                provider="openai/gpt-test",
             ),
         )
-        state.add_task_usage(task_id, TaskUsage(input_tokens=999, usage_type="token"))
+        state.add_task_usage(
+            task_id,
+            TaskUsage(
+                input_tokens=999,
+                usage_type="model_inference",
+                provider="openai/gpt-test",
+            ),
+        )
 
         usages = state.get_task_usage(task_ids=[task_id])
 
@@ -835,7 +843,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(usage.input_tokens, 10)
         self.assertEqual(usage.output_tokens, 20)
         self.assertEqual(usage.total_tokens, 30)
-        self.assertEqual(usage.usage_type, "token")
+        self.assertEqual(usage.usage_type, "model_inference")
+        self.assertEqual(usage.provider, "openai/gpt-test")
         self.assertEqual(usages[1].input_tokens, 999)
 
     def test_add_and_get_task_log(self) -> None:
