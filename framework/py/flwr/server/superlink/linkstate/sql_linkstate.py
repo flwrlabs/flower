@@ -51,6 +51,7 @@ from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
+from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import (
     build_sql_in_params,
     int64_to_uint64,
@@ -977,6 +978,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         primary_task_type: str,
         series_id: int | None = None,
         series_description: str | None = None,
+        initial_context_item: JSONObject | None = None,
     ) -> int:
         """Create a new run."""
         # Convert federation_config to JSON string for storage
@@ -1025,6 +1027,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 self._refresh_run_series_context(
                     run_id=run_id,
                     series_id=resolved_series_id,
+                    initial_context_item=initial_context_item,
                 )
                 self.query(
                     run_insert_query,

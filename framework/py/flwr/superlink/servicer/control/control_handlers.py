@@ -133,6 +133,7 @@ from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
     CreateInvitationContext,
+    JSONObject,
     RegisterSupernodeContext,
     StartRunContext,
 )
@@ -503,6 +504,18 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
             series_description = (
                 _derive_run_series_description(fused_run_config) or None
             )
+        initial_context_item: JSONObject | None = None
+        agent_input = fused_run_config.get("agent.input")
+        if (
+            primary_task_type == TaskType.AGENT_APP
+            and isinstance(agent_input, str)
+            and agent_input
+        ):
+            initial_context_item = {
+                "type": "message",
+                "role": "user",
+                "content": agent_input,
+            }
 
         run_id = state.create_run(
             fab_id,
@@ -515,6 +528,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
             primary_task_type,
             series_id=series_id,
             series_description=series_description,
+            initial_context_item=initial_context_item,
         )
 
         if run_id == 0:

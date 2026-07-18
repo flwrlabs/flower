@@ -552,6 +552,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         runs = self.state.get_run_info(run_ids=[response.run_id])
         tasks = self.state.get_tasks()
         series = self.state.get_run_series(series_ids=[response.series_id])
+        context = self.state.get_run_series_context(response.series_id)
 
         self.assertEqual(len(runs), 1)
         self.assertEqual(runs[0].fab_id, "flwr/agent")
@@ -559,6 +560,17 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(runs[0].primary_task_type, TaskType.AGENT_APP)
         self.assertEqual(runs[0].override_config["agent.input"], agent_input)
         self.assertEqual(series[0].description, "Hello from the agent")
+        assert context is not None
+        self.assertEqual(
+            [json.loads(item) for item in context.state["items"]["json"]],
+            [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": agent_input,
+                }
+            ],
+        )
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, TaskType.AGENT_APP)

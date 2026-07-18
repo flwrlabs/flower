@@ -47,6 +47,7 @@ from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.typing import JSONObject
 from flwr.superlink.federation import FederationManager
 
 from .utils import (
@@ -640,6 +641,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         primary_task_type: str,
         series_id: int | None = None,
         series_description: str | None = None,
+        initial_context_item: JSONObject | None = None,
     ) -> int:
         """Create a new run."""
         with self.lock_task_store, self.lock:
@@ -664,6 +666,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             self._refresh_run_series_context(
                 run_id=run_id,
                 series_id=resolved_series_id,
+                initial_context_item=initial_context_item,
             )
             run_record = RunRecord(
                 run=Run(

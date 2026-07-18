@@ -27,6 +27,15 @@ ITEMS_KEY = "items"
 JSON_KEY = "json"
 
 
+def is_last_item(context: Context, item: JSONObject) -> bool:
+    """Return whether an item is last in ``context.state``."""
+    record = context.state.get(ITEMS_KEY)
+    if record is None:
+        return False
+    items = cast(list[str], record[JSON_KEY])
+    return bool(items) and strict_json_dumps(item, compact=True) == items[-1]
+
+
 def append_items(context: Context, new_items: list[JSONObject]) -> None:
     """Append OpenResponses items to ``context.state``."""
     # Initialize the items storage if it doesn't exist yet
