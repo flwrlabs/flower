@@ -33,6 +33,7 @@ from flwr.clientapp.client_app import LoadClientAppError
 from flwr.common import Config, GetPropertiesIns, MessageTypeLegacy, Scalar
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.compat.common.recorddict_compat import getpropertiesins_to_recorddict
+from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.server.superlink.fleet.vce.vce_api import (
     NodeToPartitionMapping,
@@ -42,7 +43,7 @@ from flwr.server.superlink.fleet.vce.vce_api import (
 )
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkStateFactory
 from flwr.server.superlink.linkstate.in_memory_linkstate import RunRecord
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, TaskType
 from flwr.supercore.date import now
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run, RunStatus
@@ -131,6 +132,7 @@ def register_messages_into_state(
 ) -> dict[str, float]:
     """Register `num_messages` into the state factory."""
     state: InMemoryLinkState = state_factory.state()  # type: ignore
+    primary_task_id = 4321
     state.run_ids[run_id] = RunRecord(
         Run(
             run_id=run_id,
@@ -148,12 +150,20 @@ def register_messages_into_state(
                 details="",
             ),
             flwr_aid="user123",
-            federation_id="@me/fed",
-            primary_task_id=None,
+            federation_id=NOOP_FEDERATION_ID,
+            primary_task_id=primary_task_id,
             bytes_sent=0,
             bytes_recv=0,
             clientapp_runtime=0.0,
         ),
+    )
+    state.task_store[primary_task_id] = Task(
+        task_id=primary_task_id,
+        type=TaskType.SERVER_APP,
+        run_id=run_id,
+        status=TaskStatus(status=Status.PENDING, sub_status="", details=""),
+        pending_at=now().isoformat(),
+        fab_hash="hash",
     )
     # Artificially add Messages to state so they can be processed
     # by the Simulation Runtime logic
@@ -172,7 +182,7 @@ def register_messages_into_state(
                 run_id=run_id,
                 message_id="",
                 group_id="",
-                src_node_id=0,
+                src_node_id=SUPERLINK_NODE_ID,
                 dst_node_id=dst_node_id,  # indicate destination node
                 reply_to_message_id="",
                 created_at=now().timestamp(),
@@ -180,9 +190,10 @@ def register_messages_into_state(
                 message_type=MessageTypeLegacy.GET_PROPERTIES,
             ),
         )
+        message.metadata.__dict__["_message_id"] = message.object_id
 
         # Insert in state
-        message_id = state.store_message_res(message)
+        message_id = state.store_message_ins(message)
         if message_id:
             # Add message_id to set
             message_ids.add(message_id)
