@@ -21,6 +21,7 @@ from typing import Any
 
 import grpc
 from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.hazmat.primitives.asymmetric import ec
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common.constant import (
@@ -94,6 +95,10 @@ class NodeAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             node_pk = bytes_to_public_key(node_pk_bytes)
         except (ValueError, UnsupportedAlgorithm):
             # Malformed public key bytes from an unauthenticated peer
+            return _unary_unary_rpc_terminator("Invalid public key")
+        if not isinstance(node_pk, ec.EllipticCurvePublicKey):
+            # A well-formed PEM key of the wrong type (e.g. RSA) loads successfully, so
+            # verify_signature would raise TypeError instead of returning False.
             return _unary_unary_rpc_terminator("Invalid public key")
         if not verify_signature(node_pk, timestamp_iso.encode("ascii"), signature):
             return _unary_unary_rpc_terminator("Invalid signature")
