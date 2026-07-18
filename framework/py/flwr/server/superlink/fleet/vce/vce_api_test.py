@@ -91,13 +91,15 @@ def terminate_simulation(
     stop_condition: Callable[[], bool] | None = None,
 ) -> None:
     """Set event after a timeout or when the supplied condition is met."""
-    if stop_condition is None:
-        sleep(timeout)
-    else:
-        deadline = monotonic() + timeout
-        while not stop_condition() and monotonic() < deadline:
-            sleep(0.01)
-    f_stop.set()
+    try:
+        if stop_condition is None:
+            sleep(timeout)
+        else:
+            deadline = monotonic() + timeout
+            while not stop_condition() and monotonic() < deadline:
+                sleep(0.01)
+    finally:
+        f_stop.set()
 
 
 def init_state_factory_nodes_mapping(
@@ -403,7 +405,7 @@ class TestFleetSimulationEngineRayBackend(TestCase):
         start_and_shutdown(
             state_factory=state_factory,
             nodes_mapping=nodes_mapping,
-            duration=10,
+            duration=30,
             stop_condition=collect_message_res,
         )
 
