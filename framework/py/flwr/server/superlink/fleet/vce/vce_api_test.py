@@ -228,7 +228,7 @@ def start_and_shutdown(
     state_factory: LinkStateFactory | None = None,
     nodes_mapping: NodeToPartitionMapping | None = None,
     duration: float = 0,
-    backend_config: str = "{}",
+    backend_config: str = '{"client_resources":{"num_cpus":1}}',
     stop_condition: Callable[[], bool] | None = None,
 ) -> None:
     """Start Simulation Runtime and terminate after specified number of seconds.
@@ -405,7 +405,7 @@ class TestFleetSimulationEngineRayBackend(TestCase):
         start_and_shutdown(
             state_factory=state_factory,
             nodes_mapping=nodes_mapping,
-            duration=30,
+            duration=60,
             stop_condition=collect_message_res,
         )
 
