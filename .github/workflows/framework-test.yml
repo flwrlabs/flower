@@ -75,14 +75,6 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Cache mypy
-        if: ${{ matrix.task == 'quality' && needs.changes.outputs.framework == 'true' }}
-        uses: actions/cache@v4
-        with:
-          path: framework/.mypy_cache
-          key: mypy-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('framework/pyproject.toml', 'framework/uv.lock') }}-${{ github.sha }}
-          restore-keys: |
-            mypy-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('framework/pyproject.toml', 'framework/uv.lock') }}-
       - name: Bootstrap
         if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
         uses: ./.github/actions/bootstrap
@@ -91,6 +83,14 @@ jobs:
       - name: Prepare framework
         if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
         run: ./framework/dev/prepare-framework.sh
+      - name: Cache mypy
+        if: ${{ matrix.task == 'quality' && needs.changes.outputs.framework == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: framework/.mypy_cache
+          key: mypy-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('framework/pyproject.toml', 'framework/uv.lock') }}-${{ github.sha }}
+          restore-keys: |
+            mypy-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('framework/pyproject.toml', 'framework/uv.lock') }}-
       - name: Install dependencies
         if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
         run: |
