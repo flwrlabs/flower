@@ -248,6 +248,7 @@ erDiagram
     TIMESTAMP created_at
     BIGINT input_tokens "nullable"
     BIGINT output_tokens "nullable"
+    VARCHAR provider
     TIMESTAMP reported_at "nullable"
     BIGINT run_id
     BIGINT total_tokens "nullable"
