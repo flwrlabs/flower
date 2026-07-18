@@ -415,7 +415,8 @@ class TestAppIoServicer(unittest.TestCase):
     ) -> None:
         """RecordTaskUsage should store usage for model and connector tasks."""
         usage = TaskUsage(
-            usage_type="token",
+            usage_type="model_inference",
+            provider="openai/gpt-test",
             input_tokens=10,
             output_tokens=20,
             total_tokens=30,

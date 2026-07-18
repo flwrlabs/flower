@@ -1229,11 +1229,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 """
                 INSERT INTO task_usage (
                     run_id, task_id, input_tokens, output_tokens, total_tokens,
-                    usage_type, created_at, reported_at
+                    usage_type, provider, created_at, reported_at
                 )
                 SELECT
                     run_id, task_id, :input_tokens, :output_tokens,
-                    :total_tokens, :usage_type, :created_at, :reported_at
+                    :total_tokens, :usage_type, :provider, :created_at, :reported_at
                 FROM task
                 WHERE task_id = :task_id
                 """,
@@ -1269,7 +1269,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
         query = f"""
-            SELECT input_tokens, output_tokens, total_tokens, usage_type
+            SELECT input_tokens, output_tokens, total_tokens, usage_type, provider
             FROM task_usage
             {where_clause}
             ORDER BY id ASC
@@ -1764,6 +1764,7 @@ def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:
         "output_tokens": usage.output_tokens,
         "total_tokens": usage.total_tokens,
         "usage_type": usage.usage_type,
+        "provider": usage.provider,
         "created_at": now(),
         "reported_at": None,
     }
@@ -1773,6 +1774,7 @@ def _task_usage_from_row(row: dict[str, Any]) -> TaskUsage:
     """Convert a task_usage row to a TaskUsage proto."""
     return TaskUsage(
         usage_type=row["usage_type"],
+        provider=row["provider"],
         input_tokens=row["input_tokens"],
         output_tokens=row["output_tokens"],
         total_tokens=row["total_tokens"],
