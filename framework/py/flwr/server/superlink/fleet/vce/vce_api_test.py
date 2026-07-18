@@ -132,6 +132,9 @@ def register_messages_into_state(
 ) -> dict[str, float]:
     """Register `num_messages` into the state factory."""
     state: InMemoryLinkState = state_factory.state()  # type: ignore
+
+    # LinkState derives a run's lifecycle status from its primary task, so both
+    # records are required before instruction Messages can be stored.
     primary_task_id = 4321
     state.run_ids[run_id] = RunRecord(
         Run(
@@ -190,6 +193,7 @@ def register_messages_into_state(
                 message_type=MessageTypeLegacy.GET_PROPERTIES,
             ),
         )
+        # LinkState expects the caller to assign the content-derived Message ID.
         message.metadata.__dict__["_message_id"] = message.object_id
 
         # Insert in state
@@ -379,25 +383,37 @@ class TestFleetSimulationEngineRayBackend(TestCase):
                 num_messages=num_messages,
             )
         )
+        message_ids = set(expected_results)
+        assert len(message_ids) == num_messages
+        message_res_by_id: dict[str, Message] = {}
+
+        def collect_message_res() -> bool:
+            """Collect new replies and report whether all replies have arrived.
+
+            LinkState marks replies as delivered when they are read, so retain each
+            batch across polls instead of expecting one poll to return every reply.
+            """
+            for message_res in state_factory.state().get_message_res(set(message_ids)):
+                message_res_by_id[message_res.metadata.reply_to_message_id] = (
+                    message_res
+                )
+            return len(message_res_by_id) == num_messages
 
         # Run
         start_and_shutdown(
             state_factory=state_factory,
             nodes_mapping=nodes_mapping,
             duration=10,
-            stop_condition=lambda: len(
-                state_factory.state().get_message_res(set(expected_results))
-            )
-            == num_messages,
+            stop_condition=collect_message_res,
         )
 
-        # Get all Message replies
-        state = state_factory.state()
-        message_ids = set(expected_results.keys())
-        message_res_list = state.get_message_res(message_ids=message_ids)
+        # Collect replies one final time that might have arrived while the
+        # Simulation Runtime was shutting down (if at all)
+        collect_message_res()
+        assert set(message_res_by_id) == message_ids
 
         # Check results by first converting to Message
-        for message_res in message_res_list:
+        for message_res in message_res_by_id.values():
 
             # Verify message content is as expected
             content = message_res.content
