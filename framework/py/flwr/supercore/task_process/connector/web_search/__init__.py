@@ -18,7 +18,7 @@
 import os
 
 from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
-from flwr.supercore.task_process.usage import TaskUsageRecorder
+from flwr.supercore.task_process.usage import WEB_SEARCH_USAGE_TYPE, TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 
 from .brave import BraveWebSearchProvider
@@ -74,7 +74,9 @@ def search(query: str, *, usage_recorder: TaskUsageRecorder) -> JSONObject:
         )
 
     output = provider.search(query)
-    usage_recorder.record(TaskUsage(usage_type=f"{provider.name}_web_search"))
+    usage_recorder.record(
+        TaskUsage(usage_type=WEB_SEARCH_USAGE_TYPE, provider=provider.name)
+    )
     return output
 
 
