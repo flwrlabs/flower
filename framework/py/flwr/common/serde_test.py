@@ -242,7 +242,9 @@ class RecordMaker:
         types = (float, int)
         return MetricRecord(
             metric_dict={
-                self.get_str(): self.get_value(self.rng.choice(types))
+                self.get_str(): cast(
+                    int | float, self.get_value(self.rng.choice(types))
+                )
                 for _ in range(num_entries)
             },
             keep_input=False,
@@ -254,7 +256,10 @@ class RecordMaker:
         types = (str, int, float, bytes, bool)
         return ConfigRecord(
             config_dict={
-                self.get_str(): self.get_value(self.rng.choice(types))
+                self.get_str(): cast(
+                    bool | bytes | float | int | str,
+                    self.get_value(self.rng.choice(types)),
+                )
                 for _ in range(num_entries)
             },
             keep_input=False,

@@ -45,7 +45,7 @@ class AccountAccessDependency:
 
     def __call__(
         self,
-        request: Request,  # type: ignore[type-arg]
+        request: Request,
         response: Response,
     ) -> AccountInfo:
         """Return the authenticated and authorized account for a request."""
@@ -104,7 +104,7 @@ class AccountAccessDependency:
 
 
 def get_account(
-    request: Request,  # type: ignore[type-arg]
+    request: Request,
     response: Response,
 ) -> AccountInfo:
     """Return the authenticated account for the current request.
@@ -123,7 +123,7 @@ def get_account(
 
 
 def get_authn_plugin(
-    request: Request,  # type: ignore[type-arg]
+    request: Request,
 ) -> ControlAuthnPlugin:
     """Return the configured Control authentication plugin."""
     account_access = getattr(request.app.state, "account_access_dep", None)

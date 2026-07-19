@@ -360,12 +360,10 @@ def get_filtered_fab_paths(
     # or all files if no user patterns are defined.
     candidate_paths = normalized_paths
     if user_include_spec:
-        candidate_paths = list(
-            user_include_spec.match_files(candidate_paths)  # type: ignore
-        )
+        candidate_paths = list(user_include_spec.match_files(candidate_paths))
     if user_exclude_spec:
         candidate_paths = list(
-            user_exclude_spec.match_files(candidate_paths, negate=True)  # type: ignore
+            user_exclude_spec.match_files(candidate_paths, negate=True)
         )
 
     # Apply built-in constraints and validate against user patterns
@@ -402,7 +400,7 @@ def _raise_on_unresolved_patterns(
 
 def _raise_on_built_in_pattern_conflicts(
     candidate_paths: list[str],
-    built_in_include_spec: pathspec.PathSpec,
+    built_in_include_spec: pathspec.PathSpec[pathspec.pattern.Pattern],
 ) -> None:
     """Raise ValueError for user-defined rules and built-in rules conflicts."""
     # Only count files whose type is not supported by built-in include patterns
