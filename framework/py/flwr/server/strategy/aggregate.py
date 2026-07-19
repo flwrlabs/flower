@@ -30,6 +30,14 @@ def aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
     # Calculate the total number of examples used during training
     num_examples_total = sum(num_examples for (_, num_examples) in results)
 
+    # Guard against a zero total: dividing by it yields NaN weights that would be
+    # silently returned as the new global model.
+    if num_examples_total == 0:
+        raise ValueError(
+            "aggregate() requires the total number of examples to be greater than "
+            "zero, but every result reported num_examples=0"
+        )
+
     # Create a list of weights, each multiplied by the related number of examples
     weighted_weights = [
         [layer * num_examples for layer in weights] for weights, num_examples in results

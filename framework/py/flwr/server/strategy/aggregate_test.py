@@ -16,6 +16,7 @@
 
 
 import numpy as np
+import pytest
 
 from .aggregate import (
     _aggregate_n_closest_weights,
@@ -24,6 +25,16 @@ from .aggregate import (
     aggregate,
     weighted_loss_avg,
 )
+
+
+def test_aggregate_zero_num_examples_total() -> None:
+    """Test aggregate raises when every result reports zero examples."""
+    # Prepare: a round in which no client trained on any example
+    results = [([np.array([1.0, 2.0])], 0), ([np.array([3.0, 4.0])], 0)]
+
+    # Execute & Assert: must raise rather than return NaN weights
+    with pytest.raises(ValueError):
+        aggregate(results)
 
 
 def test_aggregate() -> None:
