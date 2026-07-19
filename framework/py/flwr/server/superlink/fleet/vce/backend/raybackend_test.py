@@ -185,7 +185,7 @@ class TestRayBackend(TestCase):
         with patch(
             "flwr.simulation.ray_transport.ray_actor.ray.nodes",
             return_value=[
-                {"Resources": {}},  # Head node initialized with no CPU
+                {"Resources": {"CPU": 0}},  # Head node initialized with zero CPU
                 {"Resources": {"CPU": 8}},  # Worker node with 8 CPUs
             ],
         ):
