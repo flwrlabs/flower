@@ -117,7 +117,7 @@ jobs:
         if: ${{ matrix.task == 'pytest' && needs.changes.outputs.framework == 'true' }}
         run: |
           cd framework
-          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest --cov=py/flwr
+          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest --cov=py/flwr --durations=25 --durations-min=0.5
       - name: Check benchmarks and examples
         if: ${{ matrix.task == 'pytest' && needs.changes.outputs.ex_bench == 'true' }}
         run: |
