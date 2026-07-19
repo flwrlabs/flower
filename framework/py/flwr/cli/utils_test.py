@@ -17,6 +17,8 @@
 
 import hashlib
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -189,6 +191,34 @@ def test_load_gitignore_patterns_with_pathspec() -> None:
 
     # Should not match normal files
     assert spec.match_file("good.py") is False
+
+
+def test_cli_modules_import_with_non_generic_pathspec(tmp_path: Path) -> None:
+    """Test CLI modules import with a pre-1.0 pathspec implementation."""
+    pathspec_package = tmp_path / "pathspec"
+    pathspec_package.mkdir()
+    (pathspec_package / "__init__.py").write_text(
+        "from . import pattern\n\n\nclass PathSpec:\n    pass\n",
+        encoding="utf-8",
+    )
+    (pathspec_package / "pattern.py").write_text(
+        "class Pattern:\n    pass\n",
+        encoding="utf-8",
+    )
+
+    source_root = Path(__file__).parents[2]
+    pythonpath = os.pathsep.join(
+        filter(None, [str(tmp_path), str(source_root), os.environ.get("PYTHONPATH")])
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", "import flwr.cli.build, flwr.cli.utils"],
+        env={**os.environ, "PYTHONPATH": pythonpath},
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_wait_for_control_api_channel_retries_until_ready() -> None:
