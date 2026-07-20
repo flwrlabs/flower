@@ -34,8 +34,8 @@ def aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
     # silently returned as the new global model.
     if num_examples_total == 0:
         raise ValueError(
-            "aggregate() requires the total number of examples to be greater than "
-            "zero, but every result reported num_examples=0"
+            "aggregate() requires the total number of examples across all results "
+            "to be greater than zero"
         )
 
     # Create a list of weights, each multiplied by the related number of examples
