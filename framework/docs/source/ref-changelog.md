@@ -1,5 +1,61 @@
 # Changelog
 
+## v1.33.0 (2026-07-20)
+
+### Thanks to our contributors
+
+We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
+
+`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Micah Sheller`, `Mohammad Naseri`, `Patrick Foley`, `Taner Topal` <!---TOKEN_v1.33.0-->
+
+### What's new?
+
+- **Align federation terminology** ([#7519](https://github.com/flwrlabs/flower/pull/7519), [#7529](https://github.com/flwrlabs/flower/pull/7529))
+
+  Standardizes federation terminology across CLI JSON output and framework state by distinguishing federation IDs, which use the qualified form `@<account-name>/<federation-name>`, from federation names, which contain only the name, including renaming the database column from `federation` to `federation_id`.
+
+- **Unify API error handling with `FlowerError`** ([#7508](https://github.com/flwrlabs/flower/pull/7508), [#7524](https://github.com/flwrlabs/flower/pull/7524), [#7525](https://github.com/flwrlabs/flower/pull/7525), [#7526](https://github.com/flwrlabs/flower/pull/7526), [#7527](https://github.com/flwrlabs/flower/pull/7527), [#7532](https://github.com/flwrlabs/flower/pull/7532), [#7546](https://github.com/flwrlabs/flower/pull/7546), [#7547](https://github.com/flwrlabs/flower/pull/7547), [#7548](https://github.com/flwrlabs/flower/pull/7548), [#7549](https://github.com/flwrlabs/flower/pull/7549), [#7594](https://github.com/flwrlabs/flower/pull/7594), [#7604](https://github.com/flwrlabs/flower/pull/7604))
+
+  Uses `FlowerError` catalogs and transport translators across the Control and Fleet APIs, translating `FlowerError` instances into gRPC errors or HTTP exceptions with the appropriate status codes, showing API error codes in the CLI, and avoiding duplicated error text.
+
+- **Build FastAPI-based Control API infrastructure** ([#7453](https://github.com/flwrlabs/flower/pull/7453), [#7480](https://github.com/flwrlabs/flower/pull/7480), [#7495](https://github.com/flwrlabs/flower/pull/7495), [#7497](https://github.com/flwrlabs/flower/pull/7497), [#7499](https://github.com/flwrlabs/flower/pull/7499), [#7501](https://github.com/flwrlabs/flower/pull/7501), [#7502](https://github.com/flwrlabs/flower/pull/7502), [#7539](https://github.com/flwrlabs/flower/pull/7539), [#7542](https://github.com/flwrlabs/flower/pull/7542), [#7544](https://github.com/flwrlabs/flower/pull/7544), [#7556](https://github.com/flwrlabs/flower/pull/7556), [#7557](https://github.com/flwrlabs/flower/pull/7557), [#7559](https://github.com/flwrlabs/flower/pull/7559), [#7561](https://github.com/flwrlabs/flower/pull/7561), [#7576](https://github.com/flwrlabs/flower/pull/7576), [#7577](https://github.com/flwrlabs/flower/pull/7577), [#7578](https://github.com/flwrlabs/flower/pull/7578), [#7579](https://github.com/flwrlabs/flower/pull/7579), [#7583](https://github.com/flwrlabs/flower/pull/7583), [#7596](https://github.com/flwrlabs/flower/pull/7596), [#7601](https://github.com/flwrlabs/flower/pull/7601), [#7624](https://github.com/flwrlabs/flower/pull/7624))
+
+  Introduces a FastAPI scaffold for SuperLink and SuperNode, moves Control API routing to shared protobuf routers and dependencies, integrates lifecycle and extension hooks, and uses `FlowerError` in handlers.
+
+- **Introduce push sessions for object transfer** ([#7550](https://github.com/flwrlabs/flower/pull/7550), [#7564](https://github.com/flwrlabs/flower/pull/7564), [#7582](https://github.com/flwrlabs/flower/pull/7582), [#7602](https://github.com/flwrlabs/flower/pull/7602), [#7606](https://github.com/flwrlabs/flower/pull/7606), [#7607](https://github.com/flwrlabs/flower/pull/7607), [#7612](https://github.com/flwrlabs/flower/pull/7612), [#7613](https://github.com/flwrlabs/flower/pull/7613), [#7615](https://github.com/flwrlabs/flower/pull/7615), [#7616](https://github.com/flwrlabs/flower/pull/7616), [#7625](https://github.com/flwrlabs/flower/pull/7625))
+
+  Adds session-aware object storage and protocol support, enabling earlier and faster detection of sender failures, cleaning up sessions with their runs, preserving backward compatibility, and improving sender and receiver cleanup and transfer error handling.
+
+- **Improve object-store reliability for high availability** ([#7365](https://github.com/flwrlabs/flower/pull/7365), [#7568](https://github.com/flwrlabs/flower/pull/7568))
+
+  Makes message storage idempotent and serializes SQL `ObjectStore` mutations to support safer concurrent operation.
+
+- **Track task usage of `AgentApp`** ([#7517](https://github.com/flwrlabs/flower/pull/7517), [#7521](https://github.com/flwrlabs/flower/pull/7521), [#7523](https://github.com/flwrlabs/flower/pull/7523), [#7537](https://github.com/flwrlabs/flower/pull/7537), [#7552](https://github.com/flwrlabs/flower/pull/7552), [#7640](https://github.com/flwrlabs/flower/pull/7640))
+
+  Adds more accurate, fine-grained usage tracking for Agent runs through persisted task-usage data in the database, protobuf, `CoreState`, and `AgentApp` API, and simplifies web-search connector initialization with a `Protocol`-based provider interface.
+
+- **Prepare OAuth connector infrastructure** ([#7571](https://github.com/flwrlabs/flower/pull/7571), [#7573](https://github.com/flwrlabs/flower/pull/7573), [#7591](https://github.com/flwrlabs/flower/pull/7591), [#7597](https://github.com/flwrlabs/flower/pull/7597))
+
+  Adds OAuth connector tables, `CoreState` methods, RPC services, and an initial Control API implementation, laying the foundations for future OAuth connector support.
+
+- **Prepare `AgentApp` automation and connector capabilities** ([#7540](https://github.com/flwrlabs/flower/pull/7540), [#7555](https://github.com/flwrlabs/flower/pull/7555), [#7558](https://github.com/flwrlabs/flower/pull/7558), [#7565](https://github.com/flwrlabs/flower/pull/7565), [#7587](https://github.com/flwrlabs/flower/pull/7587), [#7598](https://github.com/flwrlabs/flower/pull/7598), [#7608](https://github.com/flwrlabs/flower/pull/7608), [#7621](https://github.com/flwrlabs/flower/pull/7621))
+
+  Introduces the initial persisted `Automation` data model, protobuf definitions, and `CoreState` methods, exposes connector operations through `AgentApp`, emits and stores connector activity events, enables web fetching in Kubernetes environments, and populates series descriptions from input.
+
+- **General improvements** ([#7489](https://github.com/flwrlabs/flower/pull/7489), [#7500](https://github.com/flwrlabs/flower/pull/7500), [#7512](https://github.com/flwrlabs/flower/pull/7512), [#7515](https://github.com/flwrlabs/flower/pull/7515), [#7518](https://github.com/flwrlabs/flower/pull/7518), [#7530](https://github.com/flwrlabs/flower/pull/7530), [#7531](https://github.com/flwrlabs/flower/pull/7531), [#7533](https://github.com/flwrlabs/flower/pull/7533), [#7534](https://github.com/flwrlabs/flower/pull/7534), [#7536](https://github.com/flwrlabs/flower/pull/7536), [#7541](https://github.com/flwrlabs/flower/pull/7541), [#7553](https://github.com/flwrlabs/flower/pull/7553), [#7563](https://github.com/flwrlabs/flower/pull/7563), [#7569](https://github.com/flwrlabs/flower/pull/7569), [#7572](https://github.com/flwrlabs/flower/pull/7572), [#7589](https://github.com/flwrlabs/flower/pull/7589), [#7593](https://github.com/flwrlabs/flower/pull/7593), [#7595](https://github.com/flwrlabs/flower/pull/7595), [#7611](https://github.com/flwrlabs/flower/pull/7611), [#7619](https://github.com/flwrlabs/flower/pull/7619), [#7626](https://github.com/flwrlabs/flower/pull/7626), [#7629](https://github.com/flwrlabs/flower/pull/7629), [#7639](https://github.com/flwrlabs/flower/pull/7639), [#7643](https://github.com/flwrlabs/flower/pull/7643), [#7647](https://github.com/flwrlabs/flower/pull/7647), [#7648](https://github.com/flwrlabs/flower/pull/7648))
+
+  As always, many parts of the Flower framework and quality infrastructure were improved and updated.
+
+### Incompatible changes
+
+- **Remove legacy TensorBoard utilities** ([#7554](https://github.com/flwrlabs/flower/pull/7554))
+
+  Removes the legacy TensorBoard utilities from the framework.
+
+- **Remove REST transport support** ([#7520](https://github.com/flwrlabs/flower/pull/7520), [#7560](https://github.com/flwrlabs/flower/pull/7560), [#7580](https://github.com/flwrlabs/flower/pull/7580))
+
+  Removes the experimental REST implementation for `FleetAPI`, the client-side REST transport, and the `rest` extra.
+
 ## v1.32.1 (2026-07-01)
 
 ### Thanks to our contributors
