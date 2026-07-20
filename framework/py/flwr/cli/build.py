@@ -15,6 +15,8 @@
 """Flower command line interface `build` command."""
 
 
+from __future__ import annotations
+
 import hashlib
 import zipfile
 from collections.abc import Mapping
