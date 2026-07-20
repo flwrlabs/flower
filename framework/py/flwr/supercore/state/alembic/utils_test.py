@@ -57,12 +57,11 @@ from flwr.supercore.state.alembic.utils import (
 )
 
 
-class TestMigrationGraph(unittest.TestCase):
-    """Test the structure of the Flower migration graph."""
+class TestCoreMigrationGraph(unittest.TestCase):
+    """Test the structure of the built-in Flower migration graph."""
 
-    def test_flwr_migrations_have_single_head(self) -> None:
-        """Ensure Flower migrations form a graph with exactly one head."""
-        script = ScriptDirectory(str(ALEMBIC_DIR))
+    def test_core_migrations_have_single_head(self) -> None:
+        """Ensure built-in Flower migrations form a graph with exactly one head."""
 
         heads = script.get_heads()
 
