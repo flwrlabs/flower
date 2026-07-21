@@ -20,44 +20,27 @@ FROM $DISTRO:$DISTRO_VERSION AS python
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies required to compile Python.
+# Install the certificate bundle required to download the managed Python build.
 RUN apt-get update \
     && apt-get -y --no-install-recommends install \
-    clang-format git unzip ca-certificates openssh-client liblzma-dev \
-    build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev wget \
-    libsqlite3-dev curl llvm libncursesw5-dev xz-utils tk-dev libxml2-dev \
-    libxmlsec1-dev libffi-dev \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PyEnv and Python.
+# Install Python from uv's managed, prebuilt CPython distributions.
+COPY --from=ghcr.io/astral-sh/uv:0.11.30@sha256:93b61e21202b1dab861092748e46bbd6e0e41dd84f59b9174efd2353186e1b47 /uv /uvx /bin/
+
 ARG PYTHON_VERSION=3.13
-ENV PYENV_ROOT=/root/.pyenv
-ENV PATH=$PYENV_ROOT/bin:$PATH
-# https://github.com/hadolint/hadolint/wiki/DL4006
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN curl -fsSL https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
-
-# hadolint ignore=DL3003
-RUN git clone https://github.com/pyenv/pyenv.git \
-    && cd pyenv/plugins/python-build || exit \
-    && ./install.sh
-
-# Issue: python-build only accepts the exact Python version e.g. 3.13.1 but
-# we want to allow more general versions like 3.13.
-# Solution: first use pyenv to get the exact version and then pass it to python-build.
-RUN LATEST=$(pyenv latest -k ${PYTHON_VERSION}) \
-    && python-build "${LATEST}" /usr/local/bin/python
-
-ENV PATH=/usr/local/bin/python/bin:$PATH
+ENV UV_PYTHON_INSTALL_DIR=/usr/local/bin/python \
+    UV_PYTHON_BIN_DIR=/usr/local/bin/python/bin \
+    UV_PYTHON_INSTALL_BIN=1 \
+    PATH=/usr/local/bin/python/bin:$PATH
+RUN uv python install --managed-python --default --no-cache "${PYTHON_VERSION}"
 
 ARG PIP_VERSION
 ARG SETUPTOOLS_VERSION
-# Keep the versions of pip and setuptools in sync with those installed in the
-# virtual environment.
-RUN pip install -U --no-cache-dir pip==${PIP_VERSION} setuptools==${SETUPTOOLS_VERSION} \
-    # Use a virtual environment so packages have the same location regardless
-    # of whether the subsequent image build runs as root or app.
-    && python -m venv /python/venv \
+# Use a virtual environment so packages have the same location regardless of
+# whether the subsequent image build runs as root or app.
+RUN python -m venv /python/venv \
     && /python/venv/bin/python -m pip install -U --no-cache-dir \
     pip==${PIP_VERSION} \
     setuptools==${SETUPTOOLS_VERSION}

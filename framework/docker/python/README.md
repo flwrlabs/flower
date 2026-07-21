@@ -5,7 +5,7 @@ container images.
 
 The Ubuntu foundation image:
 
-- compiles the requested Python version with PyEnv;
+- installs the requested Python version from uv's prebuilt CPython distributions;
 - installs pinned pip and setuptools versions;
 - creates the shared Python virtual environment; and
 - includes the runtime libraries and non-root app user needed by downstream
