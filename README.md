@@ -1,6 +1,5 @@
 # Flower: A Friendly Federated AI Framework
 
-
 <p align="center">
   <a href="https://flower.ai/">
     <img src="https://flower.ai/static/images/icon/icon.png" width="140px" alt="Flower Website" />
