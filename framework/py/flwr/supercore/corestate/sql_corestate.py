@@ -513,19 +513,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if isinstance(connector_refs, str):
             return False
         stored_run_id = uint64_to_int64(run_id)
+        bound_refs = set(self.get_run_connector_refs(run_id))
         data = [
             {
                 "run_id": stored_run_id,
                 "connector_ref": connector_ref,
             }
             for connector_ref in dict.fromkeys(connector_refs)
+            if connector_ref not in bound_refs
         ]
         if data:
             self.query(
                 """
                 INSERT INTO run_connector (run_id, connector_ref)
                 VALUES (:run_id, :connector_ref)
-                ON CONFLICT(run_id, connector_ref) DO NOTHING
                 """,
                 data,
             )

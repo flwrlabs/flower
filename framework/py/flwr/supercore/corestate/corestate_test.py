@@ -134,6 +134,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             run_id=42,
             connector_refs=["notion", "calendar", "notion"],
         )
+        state.bind_connectors_to_run(run_id=42, connector_refs=["notion"])
 
         self.assertEqual(
             list(state.get_run_connector_refs(run_id=42)),
