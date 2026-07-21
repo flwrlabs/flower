@@ -35,15 +35,15 @@ ENV PYENV_ROOT=/root/.pyenv
 ENV PATH=$PYENV_ROOT/bin:$PATH
 # https://github.com/hadolint/hadolint/wiki/DL4006
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN curl -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
+RUN curl -fsSL https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
 
 # hadolint ignore=DL3003
 RUN git clone https://github.com/pyenv/pyenv.git \
     && cd pyenv/plugins/python-build || exit \
     && ./install.sh
 
-# Issue: python-build only accepts the exact Python version e.g. 3.11.1 but
-# we want to allow more general versions like 3.11.
+# Issue: python-build only accepts the exact Python version e.g. 3.13.1 but
+# we want to allow more general versions like 3.13.
 # Solution: first use pyenv to get the exact version and then pass it to python-build.
 RUN LATEST=$(pyenv latest -k ${PYTHON_VERSION}) \
     && python-build "${LATEST}" /usr/local/bin/python
@@ -58,7 +58,7 @@ RUN pip install -U --no-cache-dir pip==${PIP_VERSION} setuptools==${SETUPTOOLS_V
     # Use a virtual environment so packages have the same location regardless
     # of whether the subsequent image build runs as root or app.
     && python -m venv /python/venv \
-    && pip install -U --no-cache-dir \
+    && /python/venv/bin/python -m pip install -U --no-cache-dir \
     pip==${PIP_VERSION} \
     setuptools==${SETUPTOOLS_VERSION}
 
