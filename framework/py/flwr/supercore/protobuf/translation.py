@@ -109,7 +109,10 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         response = await call_next(request)
         if not hasattr(request.state, "protobuf_response"):
-            return response
+            raise FlowerError(
+                ApiErrorCode.INVALID_PROTOBUF_RESPONSE,
+                "Protobuf response missing from request state after handler completed.",
+            )
 
         result = request.state.protobuf_response
         protobuf_response = self._response_for(result)
@@ -173,4 +176,11 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
 
 def get_protobuf_request(request: Request) -> Message:
     """Return the protobuf request parsed by ``ProtobufTranslationMiddleware``."""
-    return cast(Message, request.state.protobuf_request)
+    protobuf_request = getattr(request.state, "protobuf_request", None)
+    if not isinstance(protobuf_request, Message):
+        raise FlowerError(
+            ApiErrorCode.INVALID_PROTOBUF_REQUEST,
+            "Invalid protobuf request in request state: expected a protobuf "
+            f"Message, got {type(protobuf_request).__name__}.",
+        )
+    return protobuf_request

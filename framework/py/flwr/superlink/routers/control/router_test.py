@@ -18,6 +18,7 @@
 from datetime import datetime
 from unittest.mock import Mock
 
+from fastapi import FastAPI, Request, Response
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
@@ -31,9 +32,13 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.error import ApiErrorCode
+from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
-from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_TYPES
+from flwr.supercore.protobuf.translation import (
+    PROTOBUF_REQUEST_TYPES,
+    ProtobufTranslationMiddleware,
+    get_protobuf_request,
+)
 from flwr.supercore.run import Run
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.main import create_app
@@ -51,6 +56,46 @@ def test_all_control_routes_have_protobuf_request_types() -> None:
     }
 
     assert route_keys == set(PROTOBUF_REQUEST_TYPES)
+
+
+def test_protobuf_request_without_handler_response_returns_internal_error() -> None:
+    """A configured protobuf route must store its handler response in request state."""
+    app = FastAPI()
+
+    # See this route doesn't return a protobuf object
+    @app.post("/control/list-runs")
+    def list_runs() -> Response:
+        return Response()
+
+    app.add_middleware(ProtobufTranslationMiddleware)
+    app.middleware("http")(http_error_translator)
+
+    response = TestClient(app).post(
+        "/control/list-runs",
+        content=ListRunsRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 500
+    assert response.json()["code"] == ApiErrorCode.INVALID_PROTOBUF_RESPONSE
+
+
+def test_non_protobuf_request_in_state_returns_internal_error() -> None:
+    """The protobuf request dependency rejects a non-protobuf state value."""
+    app = FastAPI()
+
+    @app.post("/control/list-runs")
+    def list_runs(request: Request) -> Response:
+        request.state.protobuf_request = object()
+        _ = get_protobuf_request(request)
+        return Response()
+
+    app.middleware("http")(http_error_translator)
+
+    response = TestClient(app).post("/control/list-runs")
+
+    assert response.status_code == 500
+    assert response.json()["code"] == ApiErrorCode.INVALID_PROTOBUF_REQUEST
 
 
 def test_list_runs_returns_runs_from_linkstate() -> None:

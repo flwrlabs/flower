@@ -28,7 +28,6 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 
 from flwr.supercore.constant import UNAUTHENTICATED_PATHS
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_TYPES
 from flwr.superlink.dependencies.account import AccountAccessDependency
 
 _HTTP_REQUEST_PARAMETER = "_protobuf_http_request"
@@ -41,9 +40,8 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Authenticate the request and preserve any refreshed token headers."""
-        route_key = (request.method, request.url.path)
         if (
-            route_key not in PROTOBUF_REQUEST_TYPES
+            not request.url.path.startswith("/control")
             or request.url.path in UNAUTHENTICATED_PATHS
         ):
             return await call_next(request)
