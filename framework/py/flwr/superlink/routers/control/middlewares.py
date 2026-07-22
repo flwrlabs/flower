@@ -23,23 +23,24 @@ from starlette.types import ASGIApp
 
 from flwr.supercore.constant import UNAUTHENTICATED_PATHS
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.license_plugin import LicensePlugin
+from flwr.superlink.config_loader import _get_license_plugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
 
 
 class ControlLicenseMiddleware(BaseHTTPMiddleware):
-    """Check the license before Control API handlers run."""
+    """Check Control API licenses when a license plugin is available."""
 
-    def __init__(self, app: ASGIApp, license_plugin: LicensePlugin) -> None:
+    def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
-        self._license_plugin = license_plugin
+        self._license_plugin = _get_license_plugin()
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        """Reject Control API requests when the configured license is invalid."""
-        if request.url.path != "/control" and not request.url.path.startswith(
-            "/control/"
+        """Skip checks without a plugin and reject requests with an invalid license."""
+        if self._license_plugin is None or (
+            request.url.path != "/control"
+            and not request.url.path.startswith("/control/")
         ):
             return await call_next(request)
 

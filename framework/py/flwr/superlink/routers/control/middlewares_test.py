@@ -27,14 +27,14 @@ from flwr.supercore.license_plugin import LicensePlugin
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.superlink import main as superlink_main
 
-from .middlewares import ControlAuthenticationMiddleware, ControlLicenseMiddleware
+from . import middlewares
 
 
 def _create_app(
     monkeypatch: MonkeyPatch, license_plugin: LicensePlugin | None
 ) -> tuple[FastAPI, TestClient]:
     """Create an app containing the complete Control API middleware stack."""
-    monkeypatch.setattr(superlink_main, "_get_license_plugin", lambda: license_plugin)
+    monkeypatch.setattr(middlewares, "_get_license_plugin", lambda: license_plugin)
     app = superlink_main.create_app()
 
     @app.get("/control/get-login-details")
@@ -50,13 +50,13 @@ def _create_app(
     return app, TestClient(app)
 
 
-def test_license_middleware_is_not_added_without_ee_plugin(
+def test_license_middleware_passes_through_without_ee_plugin(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    """Control requests remain unlicensed when the EE plugin is absent."""
+    """Control requests pass through when the EE plugin is absent."""
     app, client = _create_app(monkeypatch, None)
 
-    assert "ControlLicenseMiddleware" not in {
+    assert middlewares.ControlLicenseMiddleware.__name__ in {
         cast(type[object], middleware.cls).__name__
         for middleware in app.user_middleware
     }
@@ -115,7 +115,9 @@ def test_license_middleware_order(monkeypatch: MonkeyPatch) -> None:
     ]
 
     assert (
-        middleware_class_names.index(ControlAuthenticationMiddleware.__name__)
-        < middleware_class_names.index(ControlLicenseMiddleware.__name__)
+        middleware_class_names.index(
+            middlewares.ControlAuthenticationMiddleware.__name__
+        )
+        < middleware_class_names.index(middlewares.ControlLicenseMiddleware.__name__)
         < middleware_class_names.index(ProtobufTranslationMiddleware.__name__)
     )

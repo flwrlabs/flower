@@ -21,7 +21,7 @@ import os
 from collections.abc import AsyncIterator, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
 from logging import INFO
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
@@ -29,7 +29,6 @@ from fastapi.routing import APIRoute, iter_route_contexts
 from flwr.common import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import http_error_translator
-from flwr.supercore.license_plugin import LicensePlugin
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.version import package_version
 from flwr.superlink import extensions
@@ -40,12 +39,11 @@ from flwr.superlink.config_loader import (
     load_control_auth_plugins,
 )
 from flwr.superlink.dependencies.account import AccountAccessDependency
+from flwr.superlink.routers.control import router as control_router
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
     ControlLicenseMiddleware,
 )
-from flwr.superlink.routers.control import router as control_router
-from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
@@ -54,19 +52,6 @@ if TYPE_CHECKING:
 def generate_unique_route_id(route: APIRoute) -> str:
     """Generate stable route IDs from route handler names."""
     return route.name
-
-
-def _get_license_plugin() -> LicensePlugin | None:
-    """Return the license plugin when Flower Enterprise is installed."""
-    try:
-        # pylint: disable-next=import-outside-toplevel
-        from flwr.ee import get_license_plugin
-    except ModuleNotFoundError as exc:
-        if exc.name != "flwr.ee":
-            raise
-        return None
-
-    return cast(LicensePlugin | None, get_license_plugin())
 
 
 def _merge_lifespan_state(
@@ -162,12 +147,7 @@ def create_app(
     # SuperLink APIs
     fastapi_app.include_router(control_router)
     fastapi_app.add_middleware(ProtobufTranslationMiddleware)
-    license_plugin = _get_license_plugin()
-    if license_plugin is not None:
-        fastapi_app.add_middleware(
-            ControlLicenseMiddleware,
-            license_plugin=license_plugin,
-        )
+    fastapi_app.add_middleware(ControlLicenseMiddleware)
     fastapi_app.add_middleware(ControlAuthenticationMiddleware)
     # Register last so it is outermost and translates errors from every Control layer.
     fastapi_app.middleware("http")(http_error_translator)
