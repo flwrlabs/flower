@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the Control API middleware."""
+"""Tests for the Control API middlewares."""
 
 
 from typing import cast
@@ -33,7 +33,7 @@ from .middlewares import ControlAuthenticationMiddleware, ControlLicenseMiddlewa
 def _create_app(
     monkeypatch: MonkeyPatch, license_plugin: LicensePlugin | None
 ) -> tuple[FastAPI, TestClient]:
-    """Create a test app with the requested optional license plugin."""
+    """Create an app containing the complete Control API middleware stack."""
     monkeypatch.setattr(superlink_main, "_get_license_plugin", lambda: license_plugin)
     app = superlink_main.create_app()
 
@@ -107,7 +107,7 @@ def test_license_middleware_skips_non_control_routes(
 
 
 def test_license_middleware_order(monkeypatch: MonkeyPatch) -> None:
-    """Authenticate, check the license, then translate the protobuf request."""
+    """Run authentication, license checking, and protobuf translation in order."""
     app, _ = _create_app(monkeypatch, Mock(spec=LicensePlugin))
     middleware_class_names = [
         cast(type[object], middleware.cls).__name__
