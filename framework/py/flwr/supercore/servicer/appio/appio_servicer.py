@@ -109,7 +109,7 @@ class AppIoServicer(ABC):
         run_id = task.run_id
 
         state = self.state()
-        connector_ref = request.connector_ref.strip().lower() or None
+        connector_ref = request.connector_ref or None
 
         _validate_create_task_request(request, task, connector_ref, state, context)
         created_task_id = state.create_task(
