@@ -66,6 +66,8 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Write events before and after a Control handler call."""
+        # Event logging is optional and only applies after the translation middleware
+        # has parsed a recognized Control API protobuf request.
         event_log_plugin = cast(
             _FastAPIEventLogWriterPlugin | None,
             getattr(request.app.state, "control_event_log_plugin", None),
@@ -74,6 +76,8 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
         if event_log_plugin is None or not isinstance(protobuf_request, Message):
             return await call_next(request)
 
+        # Authentication runs before event logging and stores the account, except for
+        # unauthenticated Control routes where the actor remains unknown.
         account_info = getattr(request.state, "account", None)
         if not isinstance(account_info, AccountInfo):
             account_info = None
@@ -103,23 +107,33 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
                 )
             )
 
+        # Record the request before invoking the Control handler. Plugin work is
+        # synchronous and may perform I/O, so keep it off the event loop.
         await run_in_threadpool(write_before_event)
         try:
             response = await call_next(request)
         except BaseException as exc:
+            # Match the interceptor by recording handler failures before propagating
+            # them to the outer error-translation middleware.
             await run_in_threadpool(write_after_event, exc)
             raise
 
         result = getattr(request.state, "protobuf_response", None)
-        if isinstance(result, AsyncIterable):
+        # A protobuf Message is a unary response and must be checked before the
+        # iterable protocols, following ProtobufTranslationMiddleware's dispatch.
+        if isinstance(result, Message):
+            await run_in_threadpool(write_after_event, result)
+        elif isinstance(result, AsyncIterable):
+            # The HTTP protobuf translation layer only supports synchronous streams.
             error = FlowerError(
                 ApiErrorCode.INVALID_HANDLER_RESPONSE,
                 "Async Control streaming handlers are not supported.",
             )
             await run_in_threadpool(write_after_event, error)
             raise error
-
-        if isinstance(result, Iterable):
+        elif isinstance(result, Iterable):
+            # Defer the after-event until the client has consumed the synchronous
+            # response stream, just like the event-log interceptor's stream wrapper.
 
             def response_wrapper() -> Iterator[Message]:
                 final_result: Message | BaseException | None = None
@@ -131,6 +145,7 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
                     final_result = exc
                     raise
                 finally:
+                    # Record either the final yielded message or the stream failure.
                     write_after_event(final_result)
 
             request.state.protobuf_response = response_wrapper()

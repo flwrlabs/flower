@@ -15,11 +15,13 @@
 """Tests for the Control API middlewares."""
 
 
+import asyncio
 from collections.abc import Iterator
 from typing import cast
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
-from fastapi import FastAPI, Request
+import pytest
+from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient
 from google.protobuf.message import Message
 from httpx import Response as HTTPResponse
@@ -39,6 +41,13 @@ from flwr.superlink import main as superlink_main
 from flwr.superlink.servicer.control import control_handlers
 
 from . import middlewares
+
+
+class _IterableMessage(MagicMock):
+    """Protobuf message that also satisfies the iterable protocol."""
+
+    def __iter__(self) -> Iterator[Message]:
+        return iter(())
 
 
 def _create_app(
@@ -186,6 +195,34 @@ def test_event_log_middleware_writes_before_and_after_events(
     assert event_log_plugin.write_log.call_count == 2
 
 
+def test_event_log_middleware_treats_iterable_message_as_unary() -> None:
+    """An iterable protobuf message is logged immediately as a unary response."""
+    event_log_plugin = _create_event_log_plugin()
+    app = FastAPI()
+    app.state.control_event_log_plugin = event_log_plugin
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/control/get-login-details",
+            "headers": [],
+            "app": app,
+        }
+    )
+    request.state.protobuf_request = GetLoginDetailsRequest()
+    expected_response = _IterableMessage(spec=Message)
+
+    async def call_next(_: Request) -> Response:
+        request.state.protobuf_response = expected_response
+        return Response()
+
+    asyncio.run(middlewares.ControlEventLogMiddleware(app).dispatch(request, call_next))
+
+    after_result = event_log_plugin.compose_log_after_event.call_args.kwargs["response"]
+    assert after_result is expected_response
+    assert event_log_plugin.write_log.call_count == 2
+
+
 def test_event_log_middleware_writes_handler_failure(
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -231,4 +268,27 @@ def test_event_log_middleware_writes_after_stream_consumption(
     assert response.status_code == 200
     after_result = event_log_plugin.compose_log_after_event.call_args.kwargs["response"]
     assert after_result == final_response
+    assert event_log_plugin.write_log.call_count == 2
+
+
+def test_event_log_middleware_writes_stream_failure(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Write the stream exception as the after-event response."""
+    event_log_plugin = _create_event_log_plugin()
+
+    def stream(_: Message, __: object) -> Iterator[GetLoginDetailsResponse]:
+        yield GetLoginDetailsResponse(authn_type="first")
+        raise RuntimeError("stream failed")
+
+    monkeypatch.setattr(control_handlers, "get_login_details", stream)
+    _, client = _create_app(
+        monkeypatch, None, cast(EventLogWriterPlugin, event_log_plugin)
+    )
+
+    with pytest.raises(RuntimeError, match="stream failed"):
+        _post_get_login_details(client)
+
+    after_result = event_log_plugin.compose_log_after_event.call_args.kwargs["response"]
+    assert isinstance(after_result, RuntimeError)
     assert event_log_plugin.write_log.call_count == 2
