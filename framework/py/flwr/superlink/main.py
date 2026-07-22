@@ -184,4 +184,10 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
             operation_ids.add(op_id)
 
 
-app = create_app()
+def __getattr__(name: str) -> FastAPI:
+    """Create the module-level FastAPI app lazily."""
+    if name == "app":
+        fastapi_app = create_app()
+        globals()[name] = fastapi_app
+        return fastapi_app
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
