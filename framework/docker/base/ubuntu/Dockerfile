@@ -16,7 +16,14 @@
 # hadolint global ignore=DL3008
 ARG DISTRO=ubuntu
 ARG DISTRO_VERSION=24.04
-FROM $DISTRO:$DISTRO_VERSION AS python
+ARG PYTHON_FOUNDATION_IMAGE=flower-python-foundation:local
+ARG PYTHON_BUILD_STAGE=foundation
+FROM ${PYTHON_FOUNDATION_IMAGE} AS foundation
+
+# Keep the legacy stage available for local builds and older callers that do
+# not provide a foundation image. CI supplies a locally built foundation image
+# for every Ubuntu architecture and Python version.
+FROM $DISTRO:$DISTRO_VERSION AS legacy
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -30,7 +37,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PyEnv and Python
-ARG PYTHON_VERSION=3.11
+ARG PYTHON_VERSION=3.13
 ENV PYENV_ROOT=/root/.pyenv
 ENV PATH=$PYENV_ROOT/bin:$PATH
 # https://github.com/hadolint/hadolint/wiki/DL4006
@@ -60,6 +67,15 @@ RUN pip install -U --no-cache-dir pip==${PIP_VERSION} setuptools==${SETUPTOOLS_V
     && python -m venv /python/venv
 ENV PATH=/python/venv/bin:$PATH
 
+# Select the CI-built foundation or the legacy stage for local compatibility.
+FROM ${PYTHON_BUILD_STAGE} AS python
+
+USER root
+
+ARG PIP_VERSION
+ARG SETUPTOOLS_VERSION
+# Keep the version of pip and setuptools in sync with the versions used by
+# Flower's Docker build matrix.
 RUN pip install -U --no-cache-dir \
     pip==${PIP_VERSION} \
     setuptools==${SETUPTOOLS_VERSION}

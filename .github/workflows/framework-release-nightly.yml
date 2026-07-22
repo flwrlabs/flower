@@ -81,6 +81,7 @@ jobs:
       # Keep base image repository aligned with BASE_REPOSITORY for nightly builds.
       image-repository: ${{ format('{0}/{1}/base', vars.DOCKER_IMAGE_REGISTRY, vars.DOCKER_IMAGE_NAMESPACE) }}
       file-dir: ${{ matrix.images.file_dir }}
+      build-python-foundation: ${{ matrix.images.file_dir == 'framework/docker/base/ubuntu' }}
       build-args: |
         PIP_VERSION=${{ needs.release-nightly.outputs.pip-version }}
         SETUPTOOLS_VERSION=${{ needs.release-nightly.outputs.setuptools-version }}

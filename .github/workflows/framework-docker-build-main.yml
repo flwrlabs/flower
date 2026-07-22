@@ -116,6 +116,7 @@ jobs:
       dockerfile: ${{ matrix.images.file_dir }}/Dockerfile
       prepare-framework: true
       patch-base-dockerfiles: true
+      build-python-foundation: ${{ matrix.images.file_dir == 'framework/docker/base/ubuntu' }}
       flower-repo-ref: ${{ inputs.flower-repo-ref || 'main' }}
       build-args: |
         PIP_VERSION=${{ needs.prepare-docker-build-matrix.outputs.pip-version }}

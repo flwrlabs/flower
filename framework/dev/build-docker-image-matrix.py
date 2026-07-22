@@ -101,6 +101,13 @@ def remove_patch_version(version: str) -> str:
     return ".".join(version.split(".")[0:2])
 
 
+def python_build_stage_for(variant: Variant, _python_version: str) -> str:
+    """Select the local foundation for Ubuntu CPU runtimes."""
+    if variant == UBUNTU_VARIANT:
+        return "foundation"
+    return "legacy"
+
+
 @dataclass
 class BaseImageBuilder:
     file_dir_fn: Callable[[Any], str]
@@ -230,6 +237,7 @@ def build_stable_matrix(flwr_version: str) -> List[BaseImage]:
 FLWR_VERSION={flwr_version}
 DISTRO={distro_name}
 DISTRO_VERSION={distro_version}
+PYTHON_BUILD_STAGE={python_build_stage}
 """
 
     cpu_build_args_variants = [
@@ -252,6 +260,9 @@ DISTRO_VERSION={distro_version}
                 flwr_version=args.flwr_version,
                 distro_name=args.variant.distro.name,
                 distro_version=args.variant.distro.version,
+                python_build_stage=python_build_stage_for(
+                    args.variant, args.python_version
+                ),
             ),
             build_args=build_args_variant,
         )
@@ -277,6 +288,9 @@ DISTRO_VERSION={distro_version}
                 flwr_version=args.flwr_version,
                 distro_name=args.variant.distro.name,
                 distro_version=args.variant.distro.version,
+                python_build_stage=python_build_stage_for(
+                    args.variant, args.python_version
+                ),
                 cuda_version=args.variant.extras.version,
             ),
             build_args=build_args_variant,

@@ -20,6 +20,13 @@ set -euo pipefail
 # Start from build args supplied by the workflow input (can be empty).
 build_args="${INPUT_BUILD_ARGS:-}"
 
+# When requested, the reusable Docker workflow builds the Python foundation
+# locally on the architecture runner and supplies its local image reference to
+# the base-image build.
+if [[ -n "${PYTHON_FOUNDATION_IMAGE:-}" ]]; then
+  build_args+=$'\n'"PYTHON_FOUNDATION_IMAGE=${PYTHON_FOUNDATION_IMAGE}"
+fi
+
 # If requested, replace the __FLWR_WHEEL__ placeholder with the local wheel name
 # produced under framework/dist/.
 if [[ "${BUILD_LOCAL_WHEEL:-false}" == "true" ]]; then

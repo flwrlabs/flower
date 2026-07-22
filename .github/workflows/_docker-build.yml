@@ -50,6 +50,11 @@ on:
         required: false
         type: boolean
         default: false
+      build-python-foundation:
+        description: "Build the Python foundation locally on each architecture runner before the image build."
+        required: false
+        type: boolean
+        default: false
       flower-repo-ref:
         description: "Flower repository ref used by repository-specific preparation."
         required: false
@@ -121,6 +126,7 @@ jobs:
         env:
           INPUT_BUILD_ARGS: ${{ inputs.build-args }}
           BUILD_LOCAL_WHEEL: ${{ inputs.build-local-wheel }}
+          PYTHON_FOUNDATION_IMAGE: ${{ inputs.build-python-foundation && format('flower-python-foundation:{0}', matrix.platform.name) || '' }}
         run: ./framework/dev/release/resolve-docker-build-args.sh
 
       - name: Create build id
@@ -145,6 +151,20 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Build local Python foundation
+        if: ${{ inputs.build-python-foundation }}
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: framework/docker/python/ubuntu/Dockerfile
+          target: foundation
+          platforms: ${{ matrix.platform.docker }}
+          pull: true
+          load: true
+          tags: flower-python-foundation:${{ matrix.platform.name }}
+          build-args: |
+            ${{ steps.resolved-build-args.outputs.build-args }}
 
       - name: Validate Docker registry credentials
         env:
@@ -176,7 +196,7 @@ jobs:
           attempt_limit: 60 # 60 attempts * (9 secs delay + 1 sec retry) = ~10 mins
           attempt_delay: 9000 # 9 secs
           with: |
-            pull: true
+            pull: ${{ !inputs.build-python-foundation }}
             sbom: true
             platforms: ${{ matrix.platform.docker }}
             context: ${{ toJSON(inputs.context || format('{0}:{1}', '{{defaultContext}}', inputs.file-dir)) }}
