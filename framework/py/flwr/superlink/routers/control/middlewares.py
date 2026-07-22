@@ -28,7 +28,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 
 from flwr.supercore.constant import UNAUTHENTICATED_PATHS
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.protobuf.routing import PROTOBUF_REQUEST_TYPES
+from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_TYPES
 from flwr.superlink.dependencies.account import AccountAccessDependency
 
 _HTTP_REQUEST_PARAMETER = "_protobuf_http_request"

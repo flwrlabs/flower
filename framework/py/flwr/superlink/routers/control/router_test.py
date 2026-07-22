@@ -33,7 +33,7 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
-from flwr.supercore.protobuf.routing import PROTOBUF_REQUEST_TYPES
+from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_TYPES
 from flwr.supercore.run import Run
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.main import create_app

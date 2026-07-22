@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""FastAPI request translation helpers for protobuf RPC APIs."""
+"""FastAPI translation helpers for protobuf RPC APIs."""
 
 from __future__ import annotations
 
@@ -104,6 +104,9 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             request.state.protobuf_request = self._parse_request(
                 await request.body(), request_type
             )
+        else:
+            # Continue for unrecognized requests
+            return await call_next(request)
         response = await call_next(request)
         if not hasattr(request.state, "protobuf_response"):
             return response

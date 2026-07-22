@@ -29,7 +29,7 @@ from flwr import __version__
 from flwr.common import log
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.error import http_error_translator
-from flwr.supercore.protobuf.routing import ProtobufTranslationMiddleware
+from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.superlink import extensions
 from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
