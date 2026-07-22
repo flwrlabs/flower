@@ -117,7 +117,9 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         if not hasattr(request.state, "protobuf_response"):
             return response
 
-        protobuf_response = self._response_for(request.state.protobuf_response)
+        result = request.state.protobuf_response
+        protobuf_response = self._response_for(result)
+        del request.state.protobuf_response
         # Preserve metadata set by inner middleware, but not placeholder body headers.
         protobuf_response.status_code = response.status_code
         protobuf_response.headers.raw.extend(
