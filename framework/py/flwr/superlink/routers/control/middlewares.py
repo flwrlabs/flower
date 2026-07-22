@@ -16,7 +16,7 @@
 
 
 from collections.abc import AsyncIterable, Iterable, Iterator
-from typing import Protocol, cast
+from typing import cast
 
 from fastapi import Request
 from fastapi.responses import Response
@@ -25,38 +25,12 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
 
+from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import UNAUTHENTICATED_PATHS
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.event_log.typing import LogEntry
 from flwr.superlink.config_loader import get_license_plugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
-
-
-class _FastAPIEventLogWriterPlugin(Protocol):
-    """Write Control API event logs from FastAPI requests."""
-
-    def compose_log_before_event(
-        self,
-        request: Message,
-        context: Request,
-        account_info: AccountInfo | None,
-        method_name: str,
-    ) -> LogEntry:
-        """Compose a before-event log entry."""
-
-    def compose_log_after_event(  # pylint: disable=too-many-arguments,R0917
-        self,
-        request: Message,
-        context: Request,
-        account_info: AccountInfo | None,
-        method_name: str,
-        response: Message | BaseException | None,
-    ) -> LogEntry:
-        """Compose an after-event log entry."""
-
-    def write_log(self, log_entry: LogEntry) -> None:
-        """Write an event log entry."""
 
 
 class ControlEventLogMiddleware(BaseHTTPMiddleware):
@@ -68,9 +42,8 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
         """Write events before and after a Control handler call."""
         # Event logging is optional and only applies after the translation middleware
         # has parsed a recognized Control API protobuf request.
-        event_log_plugin = cast(
-            _FastAPIEventLogWriterPlugin | None,
-            getattr(request.app.state, "control_event_log_plugin", None),
+        event_log_plugin: EventLogWriterPlugin | None = getattr(
+            request.app.state, "control_event_log_plugin", None
         )
         protobuf_request = getattr(request.state, "protobuf_request", None)
         if event_log_plugin is None or not isinstance(protobuf_request, Message):
