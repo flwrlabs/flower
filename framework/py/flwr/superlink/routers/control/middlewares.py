@@ -15,7 +15,6 @@
 """Middleware for the Control API."""
 
 
-
 from fastapi import Request
 from fastapi.responses import Response
 from google.protobuf.message import Message
