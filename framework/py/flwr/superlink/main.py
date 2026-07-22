@@ -28,6 +28,7 @@ from fastapi.routing import APIRoute, iter_route_contexts
 from flwr.common import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import http_error_translator
+from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.version import package_version
 from flwr.superlink import extensions
 from flwr.superlink.cli.flower_superlink import (
@@ -38,6 +39,7 @@ from flwr.superlink.cli.flower_superlink import (
 )
 from flwr.superlink.config_loader import load_control_auth_plugins
 from flwr.superlink.dependencies.account import AccountAccessDependency
+from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
 
 
 def generate_unique_route_id(route: APIRoute) -> str:
@@ -129,16 +131,17 @@ def create_app(config: SuperLinkLifespanConfig | None = None) -> FastAPI:
     # fastapi_app.include_router(health.router)
 
     # SuperLink APIs
-    # fastapi_app.include_router(control.router)
+    # fastapi_app.include_router(control_router)
+    fastapi_app.add_middleware(ProtobufTranslationMiddleware)
+    fastapi_app.add_middleware(ControlAuthenticationMiddleware)
+    # Register last so it is outermost and translates errors from every Control layer.
+    fastapi_app.middleware("http")(http_error_translator)
     # fastapi_app.include_router(runtime.router)
 
     # Extension hooks
     extensions.configure_app(fastapi_app)
 
     validate_unique_route_operation_ids(fastapi_app)
-
-    # Apply the FlowerError translation layer last to make it outermost
-    fastapi_app.middleware("http")(http_error_translator)
 
     return fastapi_app
 
