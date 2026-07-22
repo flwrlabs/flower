@@ -56,6 +56,7 @@ def _create_app(
     event_log_plugin: EventLogWriterPlugin | None = None,
 ) -> tuple[FastAPI, TestClient]:
     """Create an app containing the complete Control API middleware stack."""
+    monkeypatch.delenv("FLWR_ENABLE_EVENT_LOG", raising=False)
     monkeypatch.setattr(middlewares, "get_license_plugin", lambda: license_plugin)
     app = superlink_main.create_app()
     app.state.control_event_log_plugin = event_log_plugin
@@ -165,6 +166,39 @@ def test_license_middleware_order(monkeypatch: MonkeyPatch) -> None:
         < middleware_class_names.index(ProtobufTranslationMiddleware.__name__)
         < middleware_class_names.index(middlewares.ControlEventLogMiddleware.__name__)
     )
+
+
+@pytest.mark.parametrize("env_value", [None, "0"])
+def test_create_app_disables_event_log_without_enabled_env_var(
+    monkeypatch: MonkeyPatch, env_value: str | None
+) -> None:
+    """Direct FastAPI startup disables event logging unless explicitly enabled."""
+    load_plugin = Mock()
+    monkeypatch.setattr(superlink_main, "load_control_event_log_plugin", load_plugin)
+    if env_value is None:
+        monkeypatch.delenv("FLWR_ENABLE_EVENT_LOG", raising=False)
+    else:
+        monkeypatch.setenv("FLWR_ENABLE_EVENT_LOG", env_value)
+
+    app = superlink_main.create_app()
+
+    assert app.state.control_event_log_plugin is None
+    load_plugin.assert_not_called()
+
+
+def test_create_app_loads_event_log_with_enabled_env_var(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Direct FastAPI startup mirrors the CLI event-log flag when enabled."""
+    expected_plugin = _create_event_log_plugin()
+    load_plugin = Mock(return_value=expected_plugin)
+    monkeypatch.setattr(superlink_main, "load_control_event_log_plugin", load_plugin)
+    monkeypatch.setenv("FLWR_ENABLE_EVENT_LOG", "1")
+
+    app = superlink_main.create_app()
+
+    assert app.state.control_event_log_plugin is expected_plugin
+    load_plugin.assert_called_once_with()
 
 
 def test_event_log_middleware_writes_before_and_after_events(
