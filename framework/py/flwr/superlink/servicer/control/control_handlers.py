@@ -410,8 +410,6 @@ def validate_run_connector_refs(
         dict.fromkeys(requested_ref.strip().lower() for requested_ref in connector_refs)
     )
     for connector_ref in canonical_refs:
-        if not connector_ref:
-            raise InvalidConnectorRequestError("connector_ref is required")
         try:
             connector_registry.get_oauth_connector_provider(connector_ref)
         except ValueError:
