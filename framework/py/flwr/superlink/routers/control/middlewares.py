@@ -15,8 +15,6 @@
 """Middleware for the Control API."""
 
 
-from collections.abc import AsyncIterable, Iterable, Iterator
-from typing import cast
 
 from fastapi import Request
 from fastapi.responses import Response
@@ -96,34 +94,9 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
         # iterable protocols, following ProtobufTranslationMiddleware's dispatch.
         if isinstance(result, Message):
             await run_in_threadpool(write_after_event, result)
-        elif isinstance(result, AsyncIterable):
-            # The HTTP protobuf translation layer only supports synchronous streams.
-            error = FlowerError(
-                ApiErrorCode.INVALID_HANDLER_RESPONSE,
-                "Async Control streaming handlers are not supported.",
-            )
-            await run_in_threadpool(write_after_event, error)
-            raise error
-        elif isinstance(result, Iterable):
-            # Defer the after-event until the client has consumed the synchronous
-            # response stream, just like the event-log interceptor's stream wrapper.
-
-            def response_wrapper() -> Iterator[Message]:
-                final_result: Message | BaseException | None = None
-                try:
-                    # pylint: disable=use-yield-from
-                    for final_result in cast(Iterable[Message], result):
-                        yield final_result
-                except BaseException as exc:
-                    final_result = exc
-                    raise
-                finally:
-                    # Record either the final yielded message or the stream failure.
-                    write_after_event(final_result)
-
-            request.state.protobuf_response = response_wrapper()
         else:
-            await run_in_threadpool(write_after_event, cast(Message | None, result))
+            # Not yet implemented
+            pass
 
         return response
 
