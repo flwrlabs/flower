@@ -70,6 +70,7 @@ def _build_runtime_method_auth_policy(
 
 
 SERVERAPPIO_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy("ServerAppIo")
+# GetConnector is ServerAppIo-only, so keep it out of the shared runtime policy.
 SERVERAPPIO_METHOD_AUTH_POLICY["/flwr.proto.ServerAppIo/GetConnector"] = (
     MethodTokenPolicy.token_required()
 )

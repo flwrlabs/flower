@@ -32,6 +32,7 @@ _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
 }
+# Concrete OAuth connector implementations populate this static registry.
 _CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {}
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.make_web_search_tool,

@@ -97,6 +97,8 @@ def handle_task(
         if response is not None:
             _push_connector_response(response)
 
+    # Raise outside the except block so the secret-bearing exception is not retained
+    # as context on the sanitized error.
     if credential_failure:
         raise RuntimeError("Credential-backed connector execution failed.")
 

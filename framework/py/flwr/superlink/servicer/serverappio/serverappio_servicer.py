@@ -242,6 +242,8 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         self, request: GetConnectorRequest, context: grpc.ServicerContext
     ) -> GetConnectorResponse:
         """Return credentials authorized for the authenticated connector task."""
+        log(DEBUG, "ServerAppIoServicer.GetConnector")
+
         task = get_authenticated_task()
         if (
             task.type != TaskType.CONNECTOR
