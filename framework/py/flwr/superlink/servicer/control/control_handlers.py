@@ -409,6 +409,8 @@ def validate_run_connector_refs(
     canonical_refs = list(
         dict.fromkeys(requested_ref.strip().lower() for requested_ref in connector_refs)
     )
+    if "" in canonical_refs:
+        raise InvalidConnectorRequestError("connector_ref is required")
     for connector_ref in canonical_refs:
         try:
             connector_registry.get_oauth_connector_provider(connector_ref)
