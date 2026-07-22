@@ -108,6 +108,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             # Continue for unrecognized requests
             return await call_next(request)
         response = await call_next(request)
+
         if not hasattr(request.state, "protobuf_response"):
             raise FlowerError(
                 ApiErrorCode.INVALID_PROTOBUF_RESPONSE,
