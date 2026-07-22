@@ -40,7 +40,10 @@ from flwr.superlink.config_loader import (
 )
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.routers.control import router as control_router
-from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
+from flwr.superlink.routers.control.middlewares import (
+    ControlAuthenticationMiddleware,
+    ControlLicenseMiddleware,
+)
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
@@ -144,6 +147,7 @@ def create_app(
     # SuperLink APIs
     fastapi_app.include_router(control_router)
     fastapi_app.add_middleware(ProtobufTranslationMiddleware)
+    fastapi_app.add_middleware(ControlLicenseMiddleware)
     fastapi_app.add_middleware(ControlAuthenticationMiddleware)
     # Register last so it is outermost and translates errors from every Control layer.
     fastapi_app.middleware("http")(http_error_translator)
