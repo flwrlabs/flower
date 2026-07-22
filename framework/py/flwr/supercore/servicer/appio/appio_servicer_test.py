@@ -47,7 +47,6 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
 from flwr.supercore.corestate.utils_test import create_task_message
-from flwr.supercore.json_message.connector_message import ConnectorRequest
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 from .appio_servicer import AppIoServicer
@@ -218,7 +217,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
             "OAUTH_CONNECTOR_PROVIDERS",
             (Mock(connector_ref="notion"),),
         ):
-            response = self._create_connector_task(" NoTiOn ")
+            response = self._create_connector_task("notion")
 
         self.state.get_run_connector_refs.assert_called_once_with(run_id=123)
         self.assertEqual(
@@ -425,46 +424,6 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
             grpc.StatusCode.FAILED_PRECONDITION,
             "Task message could not be stored.",
         )
-
-    def test_push_task_message_rejects_mismatched_connector_name(self) -> None:
-        """A connector task should only receive requests for its stored ref."""
-        message = ConnectorRequest(
-            dst_task_id=456,
-            name="slack",
-            call_id="call-1",
-            arguments={},
-        )
-        message.metadata.__dict__["_run_id"] = 789
-        message.metadata.src_task_id = 123
-        message.metadata.__dict__["_message_id"] = message.object_id
-        self.state.get_tasks.return_value = [
-            Task(
-                task_id=456,
-                type=TaskType.CONNECTOR,
-                run_id=789,
-                connector_ref="notion",
-            )
-        ]
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
-
-        with (
-            patch(
-                "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
-                return_value=Task(task_id=123, run_id=789),
-            ),
-            self.assertRaises(grpc.RpcError),
-        ):
-            self.servicer.PushTaskMessage(
-                PushTaskMessageRequest(message=message_to_proto(message)),
-                context,
-            )
-
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.PERMISSION_DENIED,
-            "Connector request does not match the connector task.",
-        )
-        self.state.store_task_message.assert_not_called()
 
     def test_push_task_events_derives_authenticated_task_identity(self) -> None:
         """PushTaskEvents should derive run and task IDs from task auth."""

@@ -20,7 +20,6 @@ from logging import DEBUG, ERROR
 
 import grpc
 
-from flwr.app import Message
 from flwr.common.constant import Status
 from flwr.common.logger import log
 from flwr.common.serde import message_from_proto, message_to_proto
@@ -56,7 +55,6 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.interceptors import get_authenticated_task
-from flwr.supercore.json_message.connector_message import ConnectorRequest
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 
@@ -142,9 +140,7 @@ class AppIoServicer(ABC):
 
         message = message_from_proto(request.message)
 
-        state = self.state()
-        _validate_connector_request_message(message, state, context)
-        stored = state.store_task_message(message)
+        stored = self.state().store_task_message(message)
         if not stored:
             context.abort(
                 grpc.StatusCode.FAILED_PRECONDITION,
@@ -274,33 +270,3 @@ def _validate_create_task_request(
                 grpc.StatusCode.PERMISSION_DENIED,
                 "Connector is not available to this run.",
             )
-
-
-def _validate_connector_request_message(
-    message: Message,
-    state: CoreState,
-    context: grpc.ServicerContext,
-) -> None:
-    """Ensure a connector task can only invoke its authorized connector."""
-    dst_task_id = message.metadata.dst_task_id
-    if dst_task_id is None:
-        return
-
-    tasks = state.get_tasks(task_ids=[dst_task_id], limit=1)
-    if not tasks or tasks[0].type != TaskType.CONNECTOR:
-        return
-
-    try:
-        connector_request = ConnectorRequest.from_message(message)
-    except ValueError as err:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Invalid connector request: {err}",
-        )
-        return
-
-    if connector_request.payload["name"] != tasks[0].connector_ref:
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
-            "Connector request does not match the connector task.",
-        )
