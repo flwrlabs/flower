@@ -83,6 +83,14 @@ jobs:
       - name: Prepare framework
         if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
         run: ./framework/dev/prepare-framework.sh
+      - name: Cache mypy
+        if: ${{ matrix.task == 'quality' && needs.changes.outputs.framework == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: framework/.mypy_cache
+          key: mypy-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('framework/pyproject.toml', 'framework/uv.lock') }}-${{ github.sha }}
+          restore-keys: |
+            mypy-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('framework/pyproject.toml', 'framework/uv.lock') }}-
       - name: Install dependencies
         if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
         run: |
@@ -109,7 +117,7 @@ jobs:
         if: ${{ matrix.task == 'pytest' && needs.changes.outputs.framework == 'true' }}
         run: |
           cd framework
-          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest --cov=py/flwr
+          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest --cov=py/flwr --durations=25 --durations-min=0.5
       - name: Check benchmarks and examples
         if: ${{ matrix.task == 'pytest' && needs.changes.outputs.ex_bench == 'true' }}
         run: |

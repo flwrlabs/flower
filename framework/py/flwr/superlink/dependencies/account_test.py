@@ -25,7 +25,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from .account import AccountAccessDependency, get_account, get_authn_plugin
 
 
-def _make_request() -> Request:  # type: ignore[type-arg]
+def _make_request() -> Request:
     """Return a minimal request with authentication metadata."""
     return Request(
         {
@@ -41,7 +41,7 @@ def _make_request() -> Request:  # type: ignore[type-arg]
     )
 
 
-def _make_app_request(app: FastAPI) -> Request:  # type: ignore[type-arg]
+def _make_app_request(app: FastAPI) -> Request:
     """Return a minimal request bound to an application."""
     request = _make_request()
     request.scope["app"] = app
@@ -174,14 +174,14 @@ def test_get_authn_plugin_raises_when_plugin_is_missing() -> None:
     )
 
 
-def test_get_account_raises_when_dependency_is_missing() -> None:
-    """get_account should fail clearly when the app is not configured."""
+def test_get_account_raises_when_authentication_middleware_did_not_run() -> None:
+    """get_account should require the account saved by the middleware."""
     with pytest.raises(FlowerError) as exc_info:
-        get_account(_make_app_request(FastAPI()), Response())
+        get_account(_make_app_request(FastAPI()))
 
     assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED
     assert (
         exc_info.value.message
-        == "SuperLink account authentication is not initialized: expected "
-        "AccountAccessDependency, got NoneType."
+        == "SuperLink account authentication is not initialized: expected an "
+        "authenticated account, got NoneType."
     )
