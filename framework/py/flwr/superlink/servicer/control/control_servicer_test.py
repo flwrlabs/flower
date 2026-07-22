@@ -447,7 +447,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     @parameterized.expand(  # type: ignore
         [
             ("unknown", "unknown", ApiErrorCode.CONNECTOR_NOT_FOUND),
-            ("empty", "  ", ApiErrorCode.INVALID_CONNECTOR_REQUEST),
+            ("empty", "  ", ApiErrorCode.CONNECTOR_NOT_FOUND),
             ("other_account", "slack", ApiErrorCode.CONNECTOR_NOT_FOUND),
         ]
     )
