@@ -257,22 +257,23 @@ def _validate_create_task_request(
             f"Task type '{request.type}' requires connector_ref.",
         )
 
-    if request.type != TaskType.CONNECTOR or connector_ref is None:
-        return
+    # Check if the connector ref is valid
+    if request.type == TaskType.CONNECTOR and connector_ref:
 
-    if connector_registry.has_builtin_connector(connector_ref):
-        return
+        if connector_registry.has_builtin_connector(connector_ref):
+            return
 
-    try:
-        connector_registry.get_oauth_connector_provider(connector_ref)
-    except ValueError as err:
-        context.abort(grpc.StatusCode.NOT_FOUND, str(err))
+        try:
+            connector_registry.get_oauth_connector_provider(connector_ref)
+        except ValueError as err:
+            context.abort(grpc.StatusCode.NOT_FOUND, str(err))
 
-    if connector_ref not in state.get_run_connector_refs(run_id=requesting_task.run_id):
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
-            "Connector is not available to this run.",
-        )
+        available_refs = state.get_run_connector_refs(run_id=requesting_task.run_id)
+        if connector_ref not in available_refs:
+            context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                "Connector is not available to this run.",
+            )
 
 
 def _validate_connector_request_message(
