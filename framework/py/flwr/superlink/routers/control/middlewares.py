@@ -38,7 +38,7 @@ class ControlLicenseMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Skip checks without a plugin and reject requests with an invalid license."""
-        if self._license_plugin is None or not request.url.path.startswith("/control/")
+        if self._license_plugin is None or not request.url.path.startswith("/control/"):
             return await call_next(request)
 
         if not await run_in_threadpool(self._license_plugin.check_license):
