@@ -42,6 +42,7 @@ from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.routers.control import router as control_router
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
+    ControlEventLogMiddleware,
     ControlLicenseMiddleware,
 )
 
@@ -140,12 +141,16 @@ def create_app(
     fastapi_app.state.account_access_dep = AccountAccessDependency(
         authn_plugin, authz_plugin
     )
+    fastapi_app.state.control_event_log_plugin = (
+        config.event_log_plugin if config else None
+    )
 
     # Core APIs
     # fastapi_app.include_router(health.router)
 
     # SuperLink APIs
     fastapi_app.include_router(control_router)
+    fastapi_app.add_middleware(ControlEventLogMiddleware)
     fastapi_app.add_middleware(ProtobufTranslationMiddleware)
     fastapi_app.add_middleware(ControlLicenseMiddleware)
     fastapi_app.add_middleware(ControlAuthenticationMiddleware)

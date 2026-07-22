@@ -15,27 +15,41 @@
 """Tests for the Control API middlewares."""
 
 
+from collections.abc import Iterator
 from typing import cast
 from unittest.mock import Mock
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from google.protobuf.message import Message
+from httpx import Response as HTTPResponse
 from pytest import MonkeyPatch
 
+from flwr.common.event_log_plugin import EventLogWriterPlugin
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    GetLoginDetailsRequest,
+    GetLoginDetailsResponse,
+)
 from flwr.supercore.error import ApiErrorCode
+from flwr.supercore.event_log.typing import LogEntry
 from flwr.supercore.license_plugin import LicensePlugin
+from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.superlink import main as superlink_main
+from flwr.superlink.servicer.control import control_handlers
 
 from . import middlewares
 
 
 def _create_app(
-    monkeypatch: MonkeyPatch, license_plugin: LicensePlugin | None
+    monkeypatch: MonkeyPatch,
+    license_plugin: LicensePlugin | None,
+    event_log_plugin: EventLogWriterPlugin | None = None,
 ) -> tuple[FastAPI, TestClient]:
     """Create an app containing the complete Control API middleware stack."""
     monkeypatch.setattr(middlewares, "get_license_plugin", lambda: license_plugin)
     app = superlink_main.create_app()
+    app.state.control_event_log_plugin = event_log_plugin
 
     @app.get("/control/get-login-details")
     def control_route() -> dict[str, bool]:
@@ -48,6 +62,26 @@ def _create_app(
         return {"ok": True}
 
     return app, TestClient(app)
+
+
+def _create_event_log_plugin() -> Mock:
+    """Create a mock event-log plugin returning writable entries."""
+    plugin = Mock(spec=EventLogWriterPlugin)
+    plugin.compose_log_before_event.return_value = Mock(spec=LogEntry)
+    plugin.compose_log_after_event.return_value = Mock(spec=LogEntry)
+    return plugin
+
+
+def _post_get_login_details(client: TestClient) -> HTTPResponse:
+    """Send a protobuf request to the unauthenticated Control endpoint."""
+    return cast(
+        HTTPResponse,
+        client.post(
+            "/control/get-login-details",
+            content=GetLoginDetailsRequest().SerializeToString(),
+            headers={"content-type": PROTOBUF_MEDIA_TYPE},
+        ),
+    )
 
 
 def test_license_middleware_passes_through_without_ee_plugin(
@@ -107,7 +141,7 @@ def test_license_middleware_skips_non_control_routes(
 
 
 def test_license_middleware_order(monkeypatch: MonkeyPatch) -> None:
-    """Run authentication, license checking, and protobuf translation in order."""
+    """Run the Control API middleware in interceptor-equivalent order."""
     app, _ = _create_app(monkeypatch, Mock(spec=LicensePlugin))
     middleware_class_names = [
         cast(type[object], middleware.cls).__name__
@@ -120,4 +154,81 @@ def test_license_middleware_order(monkeypatch: MonkeyPatch) -> None:
         )
         < middleware_class_names.index(middlewares.ControlLicenseMiddleware.__name__)
         < middleware_class_names.index(ProtobufTranslationMiddleware.__name__)
+        < middleware_class_names.index(middlewares.ControlEventLogMiddleware.__name__)
     )
+
+
+def test_event_log_middleware_writes_before_and_after_events(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Write an event before and after a successful unary Control call."""
+    event_log_plugin = _create_event_log_plugin()
+    expected_response = GetLoginDetailsResponse(authn_type="noop")
+    monkeypatch.setattr(
+        control_handlers,
+        "get_login_details",
+        lambda _request, _plugin: expected_response,
+    )
+    _, client = _create_app(
+        monkeypatch, None, cast(EventLogWriterPlugin, event_log_plugin)
+    )
+
+    response = _post_get_login_details(client)
+
+    assert response.status_code == 200
+    before_kwargs = event_log_plugin.compose_log_before_event.call_args.kwargs
+    assert before_kwargs["request"] == GetLoginDetailsRequest()
+    assert isinstance(before_kwargs["context"], Request)
+    assert before_kwargs["account_info"] is None
+    assert before_kwargs["method_name"] == "/control/get-login-details"
+    after_kwargs = event_log_plugin.compose_log_after_event.call_args.kwargs
+    assert after_kwargs["response"] == expected_response
+    assert event_log_plugin.write_log.call_count == 2
+
+
+def test_event_log_middleware_writes_handler_failure(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Write the handler exception as the after-event response."""
+    event_log_plugin = _create_event_log_plugin()
+
+    def fail(_: Message, __: object) -> GetLoginDetailsResponse:
+        raise RuntimeError("handler failed")
+
+    monkeypatch.setattr(control_handlers, "get_login_details", fail)
+    _, client = _create_app(
+        monkeypatch, None, cast(EventLogWriterPlugin, event_log_plugin)
+    )
+
+    response = _post_get_login_details(client)
+
+    assert response.status_code == 500
+    after_result = event_log_plugin.compose_log_after_event.call_args.kwargs["response"]
+    assert isinstance(after_result, RuntimeError)
+    assert str(after_result) == "handler failed"
+    assert event_log_plugin.write_log.call_count == 2
+
+
+def test_event_log_middleware_writes_after_stream_consumption(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Write the final stream response only after the stream is consumed."""
+    event_log_plugin = _create_event_log_plugin()
+    first_response = GetLoginDetailsResponse(authn_type="first")
+    final_response = GetLoginDetailsResponse(authn_type="final")
+
+    def stream(_: Message, __: object) -> Iterator[GetLoginDetailsResponse]:
+        yield first_response
+        yield final_response
+
+    monkeypatch.setattr(control_handlers, "get_login_details", stream)
+    _, client = _create_app(
+        monkeypatch, None, cast(EventLogWriterPlugin, event_log_plugin)
+    )
+
+    response = _post_get_login_details(client)
+
+    assert response.status_code == 200
+    after_result = event_log_plugin.compose_log_after_event.call_args.kwargs["response"]
+    assert after_result == final_response
+    assert event_log_plugin.write_log.call_count == 2

@@ -15,16 +15,129 @@
 """Middleware for the Control API."""
 
 
+from collections.abc import AsyncIterable, Iterable, Iterator
+from typing import Protocol, cast
+
 from fastapi import Request
 from fastapi.responses import Response
+from google.protobuf.message import Message
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
 
+from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import UNAUTHENTICATED_PATHS
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.event_log.typing import LogEntry
 from flwr.superlink.config_loader import get_license_plugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
+
+
+class _FastAPIEventLogWriterPlugin(Protocol):
+    """Write Control API event logs from FastAPI requests."""
+
+    def compose_log_before_event(
+        self,
+        request: Message,
+        context: Request,
+        account_info: AccountInfo | None,
+        method_name: str,
+    ) -> LogEntry:
+        """Compose a before-event log entry."""
+
+    def compose_log_after_event(  # pylint: disable=too-many-arguments,R0917
+        self,
+        request: Message,
+        context: Request,
+        account_info: AccountInfo | None,
+        method_name: str,
+        response: Message | BaseException | None,
+    ) -> LogEntry:
+        """Compose an after-event log entry."""
+
+    def write_log(self, log_entry: LogEntry) -> None:
+        """Write an event log entry."""
+
+
+class ControlEventLogMiddleware(BaseHTTPMiddleware):
+    """Write event logs around Control API handler calls."""
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        """Write events before and after a Control handler call."""
+        event_log_plugin = cast(
+            _FastAPIEventLogWriterPlugin | None,
+            getattr(request.app.state, "control_event_log_plugin", None),
+        )
+        protobuf_request = getattr(request.state, "protobuf_request", None)
+        if event_log_plugin is None or not isinstance(protobuf_request, Message):
+            return await call_next(request)
+
+        account_info = getattr(request.state, "account", None)
+        if not isinstance(account_info, AccountInfo):
+            account_info = None
+
+        def write_before_event() -> None:
+            """Compose and write the event preceding handler execution."""
+            event_log_plugin.write_log(
+                event_log_plugin.compose_log_before_event(
+                    request=protobuf_request,
+                    context=request,
+                    account_info=account_info,
+                    method_name=request.url.path,
+                )
+            )
+
+        def write_after_event(
+            result: Message | BaseException | None,
+        ) -> None:
+            """Compose and write the event following handler execution."""
+            event_log_plugin.write_log(
+                event_log_plugin.compose_log_after_event(
+                    request=protobuf_request,
+                    context=request,
+                    account_info=account_info,
+                    method_name=request.url.path,
+                    response=result,
+                )
+            )
+
+        await run_in_threadpool(write_before_event)
+        try:
+            response = await call_next(request)
+        except BaseException as exc:
+            await run_in_threadpool(write_after_event, exc)
+            raise
+
+        result = getattr(request.state, "protobuf_response", None)
+        if isinstance(result, AsyncIterable):
+            error = FlowerError(
+                ApiErrorCode.INVALID_HANDLER_RESPONSE,
+                "Async Control streaming handlers are not supported.",
+            )
+            await run_in_threadpool(write_after_event, error)
+            raise error
+
+        if isinstance(result, Iterable):
+
+            def response_wrapper() -> Iterator[Message]:
+                final_result: Message | BaseException | None = None
+                try:
+                    # pylint: disable=use-yield-from
+                    for final_result in cast(Iterable[Message], result):
+                        yield final_result
+                except BaseException as exc:
+                    final_result = exc
+                    raise
+                finally:
+                    write_after_event(final_result)
+
+            request.state.protobuf_response = response_wrapper()
+        else:
+            await run_in_threadpool(write_after_event, cast(Message | None, result))
+
+        return response
 
 
 class ControlLicenseMiddleware(BaseHTTPMiddleware):
