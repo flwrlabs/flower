@@ -41,6 +41,7 @@ from .flower_superlink import (
 )
 
 app_module = importlib.import_module("flwr.superlink.cli.flower_superlink")
+config_loader_module = importlib.import_module("flwr.superlink.config_loader")
 
 
 def test_parse_superlink_log_rotation_args_defaults() -> None:
@@ -268,7 +269,7 @@ def test_flower_superlink_legacy_factory_error_exits_invalid_args(
     monkeypatch.setattr(app_module, "_parse_superlink_lifespan_config", lambda: config)
     monkeypatch.setattr(
         app_module,
-        "_get_objectstore_linkstate_factories",
+        "get_objectstore_linkstate_factories",
         _raise_value_error,
     )
     monkeypatch.setattr(app_module, "flwr_exit", _capture_exit)
@@ -389,13 +390,14 @@ def test_get_objectstore_linkstate_factories_uses_defaults(
     def _unexpected(*_args: object, **_kwargs: object) -> object:
         raise AssertionError("EE resolver should not be called for default databases")
 
-    monkeypatch.setattr(app_module, "get_ee_objectstore_factory", _unexpected)
-    monkeypatch.setattr(app_module, "get_ee_linkstate_factory", _unexpected)
+    monkeypatch.setattr(config_loader_module, "get_ee_objectstore_factory", _unexpected)
+    monkeypatch.setattr(config_loader_module, "get_ee_linkstate_factory", _unexpected)
 
     federation_manager = NoOpFederationManager()
     objectstore_factory, state_factory = (
-        # pylint: disable-next=protected-access
-        app_module._get_objectstore_linkstate_factories(database, federation_manager)
+        config_loader_module.get_objectstore_linkstate_factories(
+            database, federation_manager
+        )
     )
 
     assert isinstance(objectstore_factory, ObjectStoreFactory)
@@ -412,10 +414,12 @@ def test_get_objectstore_linkstate_factories_non_sqlite_without_ee_raises(
     def _not_implemented(_database: str) -> object:
         raise NotImplementedError()
 
-    monkeypatch.setattr(app_module, "get_ee_objectstore_factory", _not_implemented)
+    monkeypatch.setattr(
+        config_loader_module, "get_ee_objectstore_factory", _not_implemented
+    )
 
     with pytest.raises(ValueError, match="Unsupported value for `--database`"):
-        app_module._get_objectstore_linkstate_factories(  # pylint: disable=protected-access
+        config_loader_module.get_objectstore_linkstate_factories(
             "dummysql://user:pw@localhost/flwr", NoOpFederationManager()
         )
 
@@ -443,12 +447,15 @@ def test_get_objectstore_linkstate_factories_non_sqlite_uses_ee_resolver(
         captured.append(("linkstate", database, manager, objectstore_factory))
         return expected_state_factory
 
-    monkeypatch.setattr(app_module, "get_ee_objectstore_factory", _objectstore_resolver)
-    monkeypatch.setattr(app_module, "get_ee_linkstate_factory", _linkstate_resolver)
+    monkeypatch.setattr(
+        config_loader_module, "get_ee_objectstore_factory", _objectstore_resolver
+    )
+    monkeypatch.setattr(
+        config_loader_module, "get_ee_linkstate_factory", _linkstate_resolver
+    )
 
     objectstore_factory, state_factory = (
-        # pylint: disable-next=protected-access
-        app_module._get_objectstore_linkstate_factories(
+        config_loader_module.get_objectstore_linkstate_factories(
             "dummysql://db.example/flwr", federation_manager
         )
     )

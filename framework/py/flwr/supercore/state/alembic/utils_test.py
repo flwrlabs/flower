@@ -57,6 +57,22 @@ from flwr.supercore.state.alembic.utils import (
 )
 
 
+class TestMigrationGraph(unittest.TestCase):
+    """Test the structure of the Flower migration graph."""
+
+    def test_flwr_migrations_have_single_head(self) -> None:
+        """Ensure Flower migrations form a graph with exactly one head."""
+        script = ScriptDirectory(str(ALEMBIC_DIR))
+
+        heads = script.get_heads()
+
+        self.assertEqual(
+            len(heads),
+            1,
+            f"Expected exactly one Flower migration head, found: {heads}",
+        )
+
+
 class TestAlembicRun(unittest.TestCase):
     """Test Alembic migration helper utilities."""
 
