@@ -417,13 +417,8 @@ def validate_run_connector_refs(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
                 f"OAuth provider for connector '{connector_ref}' was not found.",
             ) from None
-        if (
-            state.get_connector(
-                flwr_aid=account.flwr_aid,
-                connector_ref=connector_ref,
-            )
-            is None
-        ):
+        connector = state.get_connector(account.flwr_aid, connector_ref)
+        if connector is None:
             raise FlowerError(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
                 f"Connector '{connector_ref}' is not connected for this account.",
