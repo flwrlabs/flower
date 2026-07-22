@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
 from logging import INFO
@@ -24,9 +25,10 @@ from logging import INFO
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
 
-from flwr import __version__
 from flwr.common import log
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import http_error_translator
+from flwr.supercore.version import package_version
 from flwr.superlink import extensions
 from flwr.superlink.cli.flower_superlink import (
     SuperLinkLifespan,
@@ -58,12 +60,20 @@ def _merge_lifespan_state(
         lifespan_state[key] = value
 
 
-def create_app(config: SuperLinkLifespanConfig) -> FastAPI:
+def create_app(config: SuperLinkLifespanConfig | None = None) -> FastAPI:
     """Create the SuperLink FastAPI app and its shared lifespan resources."""
-    start_legacy_grpc = not config.disable_grpc_api
-    federation_manager = get_federation_manager(is_simulation=config.simulation)
+    if not config:
+        is_simulation = False
+        database = os.getenv("FLWR_DATABASE", FLWR_IN_MEMORY_DB_NAME)
+        start_legacy_grpc = False
+    else:
+        is_simulation = config.simulation
+        database = config.database
+        start_legacy_grpc = not config.disable_grpc_api
+
+    federation_manager = get_federation_manager(is_simulation=is_simulation)
     _, linkstate_factory = _get_objectstore_linkstate_factories(
-        config.database, federation_manager
+        database, federation_manager
     )
     # Force initialization before exposing LinkState through FastAPI dependencies
     linkstate_factory.state()
@@ -96,7 +106,7 @@ def create_app(config: SuperLinkLifespanConfig) -> FastAPI:
 
     fastapi_app = FastAPI(
         title="SuperLink API",
-        version=__version__,
+        version=package_version,
         docs_url="/docs",
         redoc_url=None,
         lifespan=lifespan,
@@ -147,3 +157,6 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
                     "Please ensure all route handler function names are unique."
                 )
             operation_ids.add(op_id)
+
+
+app = create_app()
