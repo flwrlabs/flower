@@ -406,6 +406,81 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(run_context.run_id, response.run_id)
         self.assertEqual(run_context.series_id, response.series_id)
 
+    def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
+        """StartRun should bind canonical connected OAuth connector refs."""
+        provider = _OAuthProvider()
+        self.state.upsert_connector(
+            flwr_aid=self.aid,
+            connector_ref="slack",
+            credentials_json="{}",
+            config_json="{}",
+        )
+        request = StartRunRequest(
+            federation=NOOP_FEDERATION_ID,
+            connector_refs=[" Slack ", "slack"],
+        )
+        request.fab.content = b"test FAB content with connector refs"
+
+        with (
+            patch.object(
+                connector_registry,
+                "OAUTH_CONNECTOR_PROVIDERS",
+                (provider,),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers."
+                "get_metadata_from_config",
+                return_value=("flwr/demo", "1.0.0"),
+            ),
+        ):
+            response = self.servicer.StartRun(request, Mock())
+
+        self.assertEqual(
+            list(self.state.get_run_connector_refs(run_id=response.run_id)),
+            ["slack"],
+        )
+
+    @parameterized.expand(  # type: ignore
+        [
+            ("unknown", "unknown", ApiErrorCode.CONNECTOR_NOT_FOUND),
+            ("empty", "  ", ApiErrorCode.INVALID_CONNECTOR_REQUEST),
+            ("other_account", "slack", ApiErrorCode.CONNECTOR_NOT_FOUND),
+        ]
+    )
+    def test_start_run_rejects_unavailable_oauth_connector(
+        self,
+        _name: str,
+        connector_ref: str,
+        expected_code: ApiErrorCode,
+    ) -> None:
+        """StartRun should reject invalid, unknown, and other-account refs."""
+        provider = _OAuthProvider()
+        if connector_ref == "slack":
+            self.state.upsert_connector(
+                flwr_aid="other-account",
+                connector_ref="slack",
+                credentials_json="{}",
+                config_json="{}",
+            )
+        request = StartRunRequest(connector_refs=[connector_ref])
+
+        with (
+            patch.object(
+                connector_registry,
+                "OAUTH_CONNECTOR_PROVIDERS",
+                (provider,),
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            self.servicer.StartRun(request, Mock())
+
+        self.assertEqual(error.exception.code, expected_code)
+        self.assertEqual(list(self.state.get_run_info()), [])
+
     def test_start_run_defaults_to_account_simulation_federation(self) -> None:
         """Test StartRun uses the account default simulation federation."""
         self.account_info.account_name = "test_account"

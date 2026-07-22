@@ -400,6 +400,34 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
     return CompleteConnectorOAuthResponse(connector_ref=connector_ref)
 
 
+def validate_run_connector_refs(
+    connector_refs: Sequence[str],
+    account: AccountInfo,
+    state: LinkState,
+) -> list[str]:
+    """Validate and canonicalize OAuth connector references for a new run."""
+    canonical_refs = list(
+        dict.fromkeys(requested_ref.strip().lower() for requested_ref in connector_refs)
+    )
+    if "" in canonical_refs:
+        raise InvalidConnectorRequestError("connector_ref is required")
+    for connector_ref in canonical_refs:
+        try:
+            connector_registry.get_oauth_connector_provider(connector_ref)
+        except ValueError:
+            raise FlowerError(
+                ApiErrorCode.CONNECTOR_NOT_FOUND,
+                f"OAuth provider for connector '{connector_ref}' was not found.",
+            ) from None
+        connector = state.get_connector(account.flwr_aid, connector_ref)
+        if connector is None:
+            raise FlowerError(
+                ApiErrorCode.CONNECTOR_NOT_FOUND,
+                f"Connector '{connector_ref}' is not connected for this account.",
+            )
+    return canonical_refs
+
+
 def start_run(  # pylint: disable=too-many-locals, too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
@@ -433,6 +461,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     flwr_aid = account.flwr_aid
     account_name = account.account_name
     override_config = user_config_from_proto(request.override_config)
+    connector_refs = validate_run_connector_refs(request.connector_refs, account, state)
 
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
 
@@ -515,6 +544,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
             primary_task_type,
             series_id=series_id,
             series_description=series_description,
+            connector_refs=connector_refs,
         )
 
         if run_id == 0:
