@@ -23,7 +23,7 @@ from starlette.types import ASGIApp
 
 from flwr.supercore.constant import UNAUTHENTICATED_PATHS
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.superlink.config_loader import _get_license_plugin
+from flwr.superlink.config_loader import get_license_plugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
 
 
@@ -32,7 +32,7 @@ class ControlLicenseMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
-        self._license_plugin = _get_license_plugin()
+        self._license_plugin = get_license_plugin()
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint

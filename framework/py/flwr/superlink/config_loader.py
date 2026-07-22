@@ -113,17 +113,15 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     runtime_dependency_install: bool
 
 
-def _get_license_plugin() -> LicensePlugin | None:
+def get_license_plugin() -> LicensePlugin | None:
     """Return the license plugin when Flower Enterprise is installed."""
     try:
         # pylint: disable-next=import-outside-toplevel
-        from flwr.ee import get_license_plugin
-    except ModuleNotFoundError as exc:
-        if exc.name != "flwr.ee":
-            raise
+        from flwr.ee import get_license_plugin as get_ee_license_plugin
+    except ImportError:
         return None
 
-    return cast(LicensePlugin | None, get_license_plugin())
+    return cast(LicensePlugin | None, get_ee_license_plugin())
 
 
 def get_federation_manager(is_simulation: bool = False) -> FederationManager:

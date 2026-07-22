@@ -34,7 +34,7 @@ def _create_app(
     monkeypatch: MonkeyPatch, license_plugin: LicensePlugin | None
 ) -> tuple[FastAPI, TestClient]:
     """Create an app containing the complete Control API middleware stack."""
-    monkeypatch.setattr(middlewares, "_get_license_plugin", lambda: license_plugin)
+    monkeypatch.setattr(middlewares, "get_license_plugin", lambda: license_plugin)
     app = superlink_main.create_app()
 
     @app.get("/control/get-login-details")
