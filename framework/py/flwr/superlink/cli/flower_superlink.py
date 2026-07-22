@@ -698,40 +698,14 @@ def _format_address(address: str) -> tuple[str, str, int]:
 
 
 def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
-    """Run the experimental FastAPI-owned SuperLink service.
-
-    In this mode, FastAPI owns process startup and starts the current
-    gRPC APIs from its lifespan as legacy compatibility adapters. Later, the
-    REST routers should call shared SuperLink services directly and this runtime
-    should no longer bind gRPC ports.
-    """
+    """Run the experimental FastAPI-owned SuperLink service."""
     start_legacy_grpc = not lifespan_config.disable_grpc_api
 
-    superlink_lifespan = None
-    federation_manager = get_federation_manager(
-        is_simulation=lifespan_config.simulation
-    )
-    _, linkstate_factory = _get_objectstore_linkstate_factories(
-        lifespan_config.database, federation_manager
-    )
-    # Force initialization before exposing LinkState through FastAPI dependencies
-    linkstate_factory.state()
-    if start_legacy_grpc:
-        superlink_lifespan = SuperLinkLifespan(
-            lifespan_config,
-            state_factory=linkstate_factory,
-        )
     from flwr.superlink.main import (  # pylint: disable=import-outside-toplevel
         create_app,
     )
 
-    fastapi_app = create_app(
-        authn_plugin=lifespan_config.authn_plugin,
-        authz_plugin=lifespan_config.authz_plugin,
-        superlink_lifespan=superlink_lifespan,
-        linkstate_factory=linkstate_factory,
-        start_legacy_grpc=start_legacy_grpc,
-    )
+    fastapi_app = create_app(lifespan_config)
 
     if start_legacy_grpc:
         log(

@@ -20,21 +20,21 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
 from logging import INFO
-from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
 
 from flwr import __version__
 from flwr.common import log
-from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.error import http_error_translator
 from flwr.superlink import extensions
-from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
+from flwr.superlink.cli.flower_superlink import (
+    SuperLinkLifespan,
+    SuperLinkLifespanConfig,
+    _get_objectstore_linkstate_factories,
+    get_federation_manager,
+)
 from flwr.superlink.dependencies.account import AccountAccessDependency
-
-if TYPE_CHECKING:
-    from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
 
 
 def generate_unique_route_id(route: APIRoute) -> str:
@@ -58,24 +58,16 @@ def _merge_lifespan_state(
         lifespan_state[key] = value
 
 
-def create_app(
-    *,
-    linkstate_factory: LinkStateFactory | None = None,
-    authn_plugin: ControlAuthnPlugin | None = None,
-    authz_plugin: ControlAuthzPlugin | None = None,
-    superlink_lifespan: SuperLinkLifespan | None = None,
-    start_legacy_grpc: bool = False,
-) -> FastAPI:
-    """Create the SuperLink FastAPI app.
-
-    This FastAPI app can be started in two ways:
-    1. Via `flower-superlink`: the CLI always passes a `linkstate_factory`.
-       It also passes the Control authentication and authorization plugins. When
-       FastAPI starts the legacy gRPC APIs for compatibility, the CLI passes a
-       `superlink_lifespan` initialized with the same factory.
-    2. Via `uvicorn flwr.superlink.main:app`: the module-level app starts without
-       a `LinkState`. Direct callers of `create_app` must provide all dependencies.
-    """
+def create_app(config: SuperLinkLifespanConfig) -> FastAPI:
+    """Create the SuperLink FastAPI app and its shared lifespan resources."""
+    start_legacy_grpc = not config.disable_grpc_api
+    federation_manager = get_federation_manager(is_simulation=config.simulation)
+    _, linkstate_factory = _get_objectstore_linkstate_factories(
+        config.database, federation_manager
+    )
+    # Force initialization before exposing LinkState through FastAPI dependencies
+    linkstate_factory.state()
+    superlink_lifespan = SuperLinkLifespan(config, linkstate_factory)
 
     @asynccontextmanager
     async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[dict[str, object]]:
@@ -83,12 +75,7 @@ def create_app(
         log(INFO, "FastAPI lifespan: startup")
 
         try:
-            if superlink_lifespan is not None:
-                # Store the SuperLinkLifespan where future REST routers can access
-                # shared state through FastAPI dependencies
-                fastapi_app.state.superlink_lifespan = superlink_lifespan
-
-            if superlink_lifespan is not None and start_legacy_grpc:
+            if start_legacy_grpc:
                 # Temporary compatibility path: start the existing gRPC APIs from
                 # FastAPI lifespan
                 superlink_lifespan.startup()
@@ -102,7 +89,7 @@ def create_app(
                     _merge_lifespan_state(lifespan_state, extension_state)
                 yield lifespan_state
         finally:
-            if superlink_lifespan is not None and start_legacy_grpc:
+            if start_legacy_grpc:
                 superlink_lifespan.shutdown()
 
             log(INFO, "FastAPI lifespan: shutdown")
@@ -115,12 +102,11 @@ def create_app(
         lifespan=lifespan,
         generate_unique_id_function=generate_unique_route_id,
     )
-    if linkstate_factory is not None:
-        fastapi_app.state.linkstate_factory = linkstate_factory
-    if authn_plugin is not None and authz_plugin is not None:
-        fastapi_app.state.account_access_dep = AccountAccessDependency(
-            authn_plugin, authz_plugin
-        )
+    fastapi_app.state.superlink_lifespan = superlink_lifespan
+    fastapi_app.state.linkstate_factory = linkstate_factory
+    fastapi_app.state.account_access_dep = AccountAccessDependency(
+        config.authn_plugin, config.authz_plugin
+    )
 
     # Core APIs
     # fastapi_app.include_router(health.router)
@@ -161,6 +147,3 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
                     "Please ensure all route handler function names are unique."
                 )
             operation_ids.add(op_id)
-
-
-app = create_app()
