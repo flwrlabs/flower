@@ -16,13 +16,8 @@
 # hadolint global ignore=DL3008
 ARG DISTRO=ubuntu
 ARG DISTRO_VERSION=24.04
-ARG PYTHON_FOUNDATION_IMAGE=flower-python-foundation:local
-ARG PYTHON_BUILD_STAGE=foundation
-FROM ${PYTHON_FOUNDATION_IMAGE} AS foundation
-
-# Keep the legacy stage available for local builds and older callers that do
-# not provide a foundation image. CI supplies a locally built foundation image
-# for every Ubuntu architecture and Python version.
+ARG PYTHON_FOUNDATION_IMAGE=legacy
+ARG PYTHON_BUILD_STAGE=legacy
 FROM $DISTRO:$DISTRO_VERSION AS legacy
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -66,6 +61,10 @@ RUN pip install -U --no-cache-dir pip==${PIP_VERSION} setuptools==${SETUPTOOLS_V
     # regardless of whether the subsequent image build is run with the app or the root user
     && python -m venv /python/venv
 ENV PATH=/python/venv/bin:$PATH
+
+# Keep the legacy stage as the default for direct/local builds. CI overrides
+# this with a locally built foundation image for each matrix version.
+FROM ${PYTHON_FOUNDATION_IMAGE} AS foundation
 
 # Select the CI-built foundation or the legacy stage for local compatibility.
 FROM ${PYTHON_BUILD_STAGE} AS python
