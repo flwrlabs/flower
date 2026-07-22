@@ -68,11 +68,11 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import get_protobuf_request
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.dependencies.account import get_account, get_authn_plugin
 from flwr.superlink.dependencies.linkstate import get_linkstate
-from flwr.superlink.routers.control.middlewares import ProtobufRoute
 from flwr.superlink.servicer.control import control_handlers
 
 router = APIRouter(prefix="/control", tags=["control"], route_class=ProtobufRoute)
