@@ -20,6 +20,7 @@ from typing import cast
 from unittest.mock import Mock
 
 from fastapi import FastAPI
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -35,7 +36,10 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
-from flwr.supercore.protobuf.routing import ProtobufTranslationMiddleware
+from flwr.supercore.protobuf.routing import (
+    PROTOBUF_REQUEST_TYPES,
+    ProtobufTranslationMiddleware,
+)
 from flwr.supercore.run import Run
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
@@ -53,6 +57,18 @@ def test_configure_middlewares_registers_required_outer_layers() -> None:
     assert cast(object, error_middleware.cls) is BaseHTTPMiddleware
     assert error_middleware.kwargs["dispatch"] is http_error_translator
     assert cast(object, protobuf_middleware.cls) is ProtobufTranslationMiddleware
+
+
+def test_all_control_routes_have_protobuf_request_types() -> None:
+    """Every Control route has exactly one protobuf request type mapping."""
+    route_keys = {
+        (method, route.path)
+        for route in router.routes
+        if isinstance(route, APIRoute)
+        for method in (route.methods or set())
+    }
+
+    assert route_keys == set(PROTOBUF_REQUEST_TYPES)
 
 
 def test_list_runs_returns_runs_from_linkstate() -> None:
