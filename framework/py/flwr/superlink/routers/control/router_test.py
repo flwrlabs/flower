@@ -16,14 +16,11 @@
 
 
 from datetime import datetime
-from typing import cast
 from unittest.mock import Mock
 
-from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from flwr.common.constant import NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -34,29 +31,14 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.error import ApiErrorCode
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
-from flwr.supercore.protobuf.routing import (
-    PROTOBUF_REQUEST_TYPES,
-    ProtobufTranslationMiddleware,
-)
+from flwr.supercore.protobuf.routing import PROTOBUF_REQUEST_TYPES
 from flwr.supercore.run import Run
-from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
-from flwr.superlink.routers.control.router import configure_middlewares, router
+from flwr.superlink.main import create_app
+from flwr.superlink.routers.control.router import router
 from flwr.superlink.servicer.control import control_handlers
-
-
-def test_configure_middlewares_registers_required_outer_layers() -> None:
-    """Error and protobuf translation are the two outermost middleware layers."""
-    app = FastAPI()
-
-    configure_middlewares(app)
-
-    error_middleware, protobuf_middleware = app.user_middleware[:2]
-    assert cast(object, error_middleware.cls) is BaseHTTPMiddleware
-    assert error_middleware.kwargs["dispatch"] is http_error_translator
-    assert cast(object, protobuf_middleware.cls) is ProtobufTranslationMiddleware
 
 
 def test_all_control_routes_have_protobuf_request_types() -> None:
@@ -82,10 +64,7 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     linkstate.get_run_info.return_value = [run]
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
     authz_plugin.authorize.return_value = True
-    app = FastAPI()
-    app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
-    app.include_router(router)
-    configure_middlewares(app)
+    app = create_app(authn_plugin=authn_plugin, authz_plugin=authz_plugin)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     client = TestClient(app)
 
@@ -123,10 +102,7 @@ def test_list_runs_preserves_refreshed_authentication_tokens() -> None:
     )
     authz_plugin.authorize.return_value = True
     linkstate.get_run_info.return_value = []
-    app = FastAPI()
-    app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
-    app.include_router(router)
-    configure_middlewares(app)
+    app = create_app(authn_plugin=authn_plugin, authz_plugin=authz_plugin)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     response = TestClient(app).post(
         "/control/list-runs",
@@ -147,10 +123,7 @@ def test_list_runs_rejects_non_protobuf_payload() -> None:
     account = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
     authz_plugin.authorize.return_value = True
-    app = FastAPI()
-    app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
-    app.include_router(router)
-    configure_middlewares(app)
+    app = create_app(authn_plugin=authn_plugin, authz_plugin=authz_plugin)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     response = TestClient(app).post(
         "/control/list-runs",
@@ -174,10 +147,7 @@ def test_get_login_details_does_not_require_authentication(
         "get_login_details",
         lambda _request, _plugin: expected,
     )
-    app = FastAPI()
-    app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
-    app.include_router(router)
-    configure_middlewares(app)
+    app = create_app(authn_plugin=authn_plugin, authz_plugin=authz_plugin)
     response = TestClient(app).post(
         "/control/get-login-details",
         content=GetLoginDetailsRequest().SerializeToString(),

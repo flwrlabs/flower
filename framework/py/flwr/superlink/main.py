@@ -28,10 +28,12 @@ from fastapi.routing import APIRoute, iter_route_contexts
 from flwr import __version__
 from flwr.common import log
 from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore.error import http_error_translator
+from flwr.supercore.protobuf.routing import ProtobufTranslationMiddleware
 from flwr.superlink import extensions
 from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
-from flwr.superlink.routers.control.router import configure_middlewares
+from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
 from flwr.superlink.routers.control.router import router as control_router
 
 if TYPE_CHECKING:
@@ -128,7 +130,10 @@ def create_app(
 
     # SuperLink APIs
     fastapi_app.include_router(control_router)
-    configure_middlewares(fastapi_app)
+    fastapi_app.add_middleware(ProtobufTranslationMiddleware)
+    fastapi_app.add_middleware(ControlAuthenticationMiddleware)
+    # Register last so it is outermost and translates errors from every Control layer.
+    fastapi_app.middleware("http")(http_error_translator)
     # fastapi_app.include_router(runtime.router)
 
     # Extension hooks

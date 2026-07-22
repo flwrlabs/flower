@@ -25,9 +25,10 @@ from fastapi.responses import Response
 from fastapi.routing import APIRoute
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.types import ASGIApp
 
+from flwr.supercore.constant import UNAUTHENTICATED_PATHS
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.protobuf.routing import PROTOBUF_REQUEST_TYPES
 from flwr.superlink.dependencies.account import AccountAccessDependency
 
 _HTTP_REQUEST_PARAMETER = "_protobuf_http_request"
@@ -36,15 +37,15 @@ _HTTP_REQUEST_PARAMETER = "_protobuf_http_request"
 class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
     """Authenticate configured Control API routes before their handlers run."""
 
-    def __init__(self, app: ASGIApp, authenticated_paths: set[str]) -> None:
-        super().__init__(app)
-        self._authenticated_paths = authenticated_paths
-
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Authenticate the request and preserve any refreshed token headers."""
-        if request.url.path not in self._authenticated_paths:
+        route_key = (request.method, request.url.path)
+        if (
+            route_key not in PROTOBUF_REQUEST_TYPES
+            or request.url.path in UNAUTHENTICATED_PATHS
+        ):
             return await call_next(request)
 
         account_access = getattr(request.app.state, "account_access_dep", None)
@@ -60,9 +61,7 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
         # response only collects refreshed token headers, so it must not affect
         # the protobuf response returned by the endpoint.
         authentication_response.headers.raw.clear()
-        request.state.account = await run_in_threadpool(
-            account_access, request, authentication_response
-        )
+        request.state.account = account_access(request, authentication_response)
         response = await call_next(request)
         response.headers.raw.extend(authentication_response.headers.raw)
         return response

@@ -16,7 +16,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, FastAPI
+from fastapi import APIRouter, Depends
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -68,19 +68,11 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.error import http_error_translator
-from flwr.supercore.protobuf.routing import (
-    PROTOBUF_REQUEST_TYPES,
-    ProtobufTranslationMiddleware,
-    get_protobuf_request,
-)
+from flwr.supercore.protobuf.routing import get_protobuf_request
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.dependencies.account import get_account, get_authn_plugin
 from flwr.superlink.dependencies.linkstate import get_linkstate
-from flwr.superlink.routers.control.middlewares import (
-    ControlAuthenticationMiddleware,
-    ProtobufRoute,
-)
+from flwr.superlink.routers.control.middlewares import ProtobufRoute
 from flwr.superlink.servicer.control import control_handlers
 
 router = APIRouter(prefix="/control", tags=["control"], route_class=ProtobufRoute)
@@ -88,28 +80,6 @@ router = APIRouter(prefix="/control", tags=["control"], route_class=ProtobufRout
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
 AuthnPluginDependency = Annotated[ControlAuthnPlugin, Depends(get_authn_plugin)]
-
-UNAUTHENTICATED_PATHS = {
-    "/control/get-login-details",
-    "/control/get-auth-tokens",
-}
-
-
-def configure_middlewares(app: FastAPI) -> None:
-    """Add the Control API authentication, protobuf, and error layers."""
-    authenticated_paths = {
-        path for _, path in PROTOBUF_REQUEST_TYPES if path not in UNAUTHENTICATED_PATHS
-    }
-    app.add_middleware(
-        ControlAuthenticationMiddleware, authenticated_paths=authenticated_paths
-    )
-    # Keep protobuf translation outside response-side middleware so those layers
-    # can inspect or modify the handler result before it is serialized.
-    app.add_middleware(
-        ProtobufTranslationMiddleware, request_types=PROTOBUF_REQUEST_TYPES
-    )
-    # Register last so it is outermost and translates errors from every Control layer.
-    app.middleware("http")(http_error_translator)
 
 
 @router.post("/start-run")

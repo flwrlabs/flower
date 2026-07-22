@@ -16,14 +16,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from typing import cast
 
 from fastapi import Request
 from fastapi.responses import Response, StreamingResponse
 from google.protobuf.message import DecodeError, Message
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.types import ASGIApp
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -95,19 +94,11 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
 class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
     """Translate protobuf requests and handler results at the HTTP boundary."""
 
-    def __init__(
-        self,
-        app: ASGIApp,
-        request_types: Mapping[RouteKey, type[Message]],
-    ) -> None:
-        super().__init__(app)
-        self._request_types = request_types
-
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Parse the protobuf request and serialize the protobuf handler result."""
-        request_type = self._request_types.get((request.method, request.url.path))
+        request_type = PROTOBUF_REQUEST_TYPES.get((request.method, request.url.path))
         if request_type is not None:
             self._check_request_media_type(request)
             request.state.protobuf_request = self._parse_request(
