@@ -16,11 +16,13 @@
 
 
 from datetime import datetime
+from typing import cast
 from unittest.mock import Mock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from flwr.common.constant import NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -31,13 +33,26 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.error import ApiErrorCode
+from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
+from flwr.supercore.protobuf.routing import ProtobufTranslationMiddleware
 from flwr.supercore.run import Run
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.routers.control.router import configure_middlewares, router
 from flwr.superlink.servicer.control import control_handlers
+
+
+def test_configure_middlewares_registers_required_outer_layers() -> None:
+    """Error and protobuf translation are the two outermost middleware layers."""
+    app = FastAPI()
+
+    configure_middlewares(app)
+
+    error_middleware, protobuf_middleware = app.user_middleware[:2]
+    assert cast(object, error_middleware.cls) is BaseHTTPMiddleware
+    assert error_middleware.kwargs["dispatch"] is http_error_translator
+    assert cast(object, protobuf_middleware.cls) is ProtobufTranslationMiddleware
 
 
 def test_list_runs_returns_runs_from_linkstate() -> None:
