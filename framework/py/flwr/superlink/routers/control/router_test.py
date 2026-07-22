@@ -40,10 +40,26 @@ from flwr.supercore.protobuf.translation import (
     get_protobuf_request,
 )
 from flwr.supercore.run import Run
+from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
-from flwr.superlink.main import create_app
+from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
 from flwr.superlink.routers.control.router import router
 from flwr.superlink.servicer.control import control_handlers
+
+
+def _create_app(
+    authn_plugin: Mock | None = None, authz_plugin: Mock | None = None
+) -> FastAPI:
+    """Create a minimal app containing the Control API stack."""
+    authn_plugin = authn_plugin or Mock()
+    authz_plugin = authz_plugin or Mock()
+    app = FastAPI()
+    app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
+    app.include_router(router)
+    app.add_middleware(ProtobufTranslationMiddleware)
+    app.add_middleware(ControlAuthenticationMiddleware)
+    app.middleware("http")(http_error_translator)
+    return app
 
 
 def test_all_control_routes_have_protobuf_request_types() -> None:
@@ -109,8 +125,7 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     linkstate.get_run_info.return_value = [run]
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
     authz_plugin.authorize.return_value = True
-    app = create_app(authn_plugin=authn_plugin, authz_plugin=authz_plugin)
-    app.include_router(router)
+    app = _create_app(authn_plugin, authz_plugin)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     client = TestClient(app)
 
@@ -148,8 +163,7 @@ def test_list_runs_preserves_refreshed_authentication_tokens() -> None:
     )
     authz_plugin.authorize.return_value = True
     linkstate.get_run_info.return_value = []
-    app = create_app(authn_plugin=authn_plugin, authz_plugin=authz_plugin)
-    app.include_router(router)
+    app = _create_app(authn_plugin, authz_plugin)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     response = TestClient(app).post(
         "/control/list-runs",
@@ -170,8 +184,7 @@ def test_list_runs_rejects_non_protobuf_payload() -> None:
     account = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
     authz_plugin.authorize.return_value = True
-    app = create_app(authn_plugin=authn_plugin, authz_plugin=authz_plugin)
-    app.include_router(router)
+    app = _create_app(authn_plugin, authz_plugin)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     response = TestClient(app).post(
         "/control/list-runs",
@@ -188,15 +201,13 @@ def test_get_login_details_does_not_require_authentication(
 ) -> None:
     """The login bootstrap endpoint remains available before authentication."""
     authn_plugin = Mock()
-    authz_plugin = Mock()
     expected = GetLoginDetailsResponse(authn_type="noop")
     monkeypatch.setattr(
         control_handlers,
         "get_login_details",
         lambda _request, _plugin: expected,
     )
-    app = create_app(authn_plugin=authn_plugin, authz_plugin=authz_plugin)
-    app.include_router(router)
+    app = _create_app(authn_plugin=authn_plugin)
     response = TestClient(app).post(
         "/control/get-login-details",
         content=GetLoginDetailsRequest().SerializeToString(),
