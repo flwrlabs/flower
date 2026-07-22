@@ -70,12 +70,12 @@ def _create_app_with_linkstate_factory(
     with (
         patch("flwr.superlink.main.get_federation_manager"),
         patch(
-            "flwr.superlink.main._get_objectstore_linkstate_factories",
+            "flwr.superlink.main.get_objectstore_linkstate_factories",
             return_value=(Mock(), linkstate_factory),
         ),
-        patch("flwr.superlink.main.SuperLinkLifespan"),
     ):
-        return create_app(cast(Any, config))
+        lifespan_class = cast(Any, Mock()) if start_legacy_grpc else None
+        return create_app(cast(Any, config), lifespan_class)
 
 
 @pytest.mark.parametrize("start_legacy_grpc", [False, True])

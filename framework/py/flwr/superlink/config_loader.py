@@ -17,6 +17,7 @@
 
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from logging import WARN
 from pathlib import Path
 from typing import TypeVar, cast
@@ -29,18 +30,29 @@ from flwr.common.constant import (
     AuthnType,
     AuthzType,
 )
+from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.common.logger import log
+from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import (
     ControlAuthnPlugin,
     ControlAuthzPlugin,
     NoOpControlAuthnPlugin,
     NoOpControlAuthzPlugin,
 )
+from flwr.superlink.federation import FederationManager, NoOpFederationManager
 
 P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
 
 try:
-    from flwr.ee import get_control_authn_ee_plugins, get_control_authz_ee_plugins
+    from flwr.ee import (
+        get_control_authn_ee_plugins,
+        get_control_authz_ee_plugins,
+        get_ee_federation_manager,
+        get_ee_linkstate_factory,
+        get_ee_objectstore_factory,
+    )
 except ImportError:
 
     def get_control_authn_ee_plugins() -> dict[str, type[ControlAuthnPlugin]]:
@@ -50,6 +62,93 @@ except ImportError:
     def get_control_authz_ee_plugins() -> dict[str, type[ControlAuthzPlugin]]:
         """Return all Control API authorization plugins for EE."""
         return {}
+
+    def get_ee_federation_manager() -> FederationManager:
+        """Return the EE FederationManager."""
+        raise NotImplementedError("No federation manager is currently supported.")
+
+    def get_ee_objectstore_factory(database: str) -> ObjectStoreFactory:
+        """Return an EE ObjectStoreFactory for supported non-SQLite database URLs."""
+        raise NotImplementedError("No additional state backends are supported.")
+
+    def get_ee_linkstate_factory(
+        database: str,
+        federation_manager: FederationManager,
+        objectstore_factory: ObjectStoreFactory,
+    ) -> LinkStateFactory:
+        """Return an EE LinkStateFactory for supported non-SQLite database URLs."""
+        raise NotImplementedError("No additional state backends are supported.")
+
+
+@dataclass
+class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
+    """Configuration needed to start the SuperLink lifespan."""
+
+    serverappio_address: str
+    control_address: str
+    health_server_address: str | None
+    enable_http_api: bool
+    disable_grpc_api: bool
+    host: str
+    port: int
+    insecure: bool
+    certificates: tuple[bytes, bytes, bytes] | None
+    appio_certificates: tuple[bytes, bytes, bytes] | None
+    superexec_auth_secret: bytes | None
+    authn_plugin: ControlAuthnPlugin
+    authz_plugin: ControlAuthzPlugin
+    event_log_plugin: EventLogWriterPlugin | None
+    enable_event_log: bool
+    artifact_provider: ArtifactProvider | None
+    enable_supernode_auth: bool
+    fleet_api_type: str
+    fleet_api_address: str | None
+    simulation: bool
+    ssl_keyfile: str | None
+    ssl_certfile: str | None
+    database: str
+    isolation: str
+    appio_ssl_ca_certfile: str | None
+    runtime_dependency_install: bool
+
+
+def get_federation_manager(is_simulation: bool = False) -> FederationManager:
+    """Return the FederationManager."""
+    try:
+        federation_manager: FederationManager = get_ee_federation_manager()
+        return federation_manager
+    except NotImplementedError:
+        return NoOpFederationManager(simulation=is_simulation)
+
+
+def _is_non_sqlite_database_url(database: str) -> bool:
+    """Return whether the database argument is a non-SQLite URL."""
+    normalized = database.strip().lower()
+    return "://" in normalized and not normalized.startswith("sqlite://")
+
+
+def get_objectstore_linkstate_factories(
+    database: str,
+    federation_manager: FederationManager,
+) -> tuple[ObjectStoreFactory, LinkStateFactory]:
+    """Return ObjectStore and LinkState factories for the selected DB backend."""
+    if _is_non_sqlite_database_url(database):
+        try:
+            objectstore_factory = get_ee_objectstore_factory(database)
+            state_factory = get_ee_linkstate_factory(
+                database, federation_manager, objectstore_factory
+            )
+            return objectstore_factory, state_factory
+        except NotImplementedError as exc:
+            raise ValueError(
+                "Unsupported value for `--database`. The Flower framework supports "
+                "`:flwr-in-memory:`, `:memory:`, SQLite file paths, and `sqlite://` "
+                "URLs (including `sqlite:///:memory:`)."
+            ) from exc
+
+    objectstore_factory = ObjectStoreFactory(database)
+    state_factory = LinkStateFactory(database, federation_manager, objectstore_factory)
+    return objectstore_factory, state_factory
 
 
 def get_control_authn_plugins() -> dict[str, type[ControlAuthnPlugin]]:

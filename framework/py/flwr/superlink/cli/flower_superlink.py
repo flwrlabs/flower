@@ -22,7 +22,6 @@ import subprocess
 import sys
 import threading
 from collections.abc import Sequence
-from dataclasses import dataclass
 from logging import INFO, WARN
 from time import sleep
 from typing import cast
@@ -88,9 +87,12 @@ from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import get_popen_detach_kwargs
 from flwr.supercore.version import package_version
 from flwr.superlink.artifact_provider import ArtifactProvider
-from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
-from flwr.superlink.config_loader import load_control_auth_plugins
-from flwr.superlink.federation import FederationManager, NoOpFederationManager
+from flwr.superlink.config_loader import (
+    SuperLinkLifespanConfig,
+    get_federation_manager,
+    get_objectstore_linkstate_factories,
+    load_control_auth_plugins,
+)
 from flwr.superlink.servicer.control import run_control_api_grpc
 from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
 
@@ -99,9 +101,6 @@ try:
         add_ee_args_superlink,
         get_control_event_log_writer_plugins,
         get_ee_artifact_provider,
-        get_ee_federation_manager,
-        get_ee_linkstate_factory,
-        get_ee_objectstore_factory,
         get_fleet_event_log_writer_plugins,
     )
 except ImportError:
@@ -125,93 +124,6 @@ except ImportError:
         raise NotImplementedError(
             "No event log writer plugins are currently supported."
         )
-
-    def get_ee_federation_manager() -> FederationManager:
-        """Return the EE FederationManager."""
-        raise NotImplementedError("No federation manager is currently supported.")
-
-    def get_ee_objectstore_factory(database: str) -> ObjectStoreFactory:
-        """Return an EE ObjectStoreFactory for supported non-SQLite database URLs."""
-        raise NotImplementedError("No additional state backends are supported.")
-
-    def get_ee_linkstate_factory(
-        database: str,
-        federation_manager: FederationManager,
-        objectstore_factory: ObjectStoreFactory,
-    ) -> LinkStateFactory:
-        """Return an EE LinkStateFactory for supported non-SQLite database URLs."""
-        raise NotImplementedError("No additional state backends are supported.")
-
-
-def get_federation_manager(is_simulation: bool = False) -> FederationManager:
-    """Return the FederationManager."""
-    try:
-        federation_manager: FederationManager = get_ee_federation_manager()
-        return federation_manager
-    except NotImplementedError:
-        return NoOpFederationManager(simulation=is_simulation)
-
-
-def _is_non_sqlite_database_url(database: str) -> bool:
-    """Return whether the database argument is a non-SQLite URL."""
-    normalized = database.strip().lower()
-    return "://" in normalized and not normalized.startswith("sqlite://")
-
-
-def _get_objectstore_linkstate_factories(
-    database: str,
-    federation_manager: FederationManager,
-) -> tuple[ObjectStoreFactory, LinkStateFactory]:
-    """Return ObjectStore and LinkState factories for the selected DB backend."""
-    if _is_non_sqlite_database_url(database):
-        try:
-            objectstore_factory = get_ee_objectstore_factory(database)
-            state_factory = get_ee_linkstate_factory(
-                database, federation_manager, objectstore_factory
-            )
-            return objectstore_factory, state_factory
-        except NotImplementedError as exc:
-            raise ValueError(
-                "Unsupported value for `--database`. The Flower framework supports "
-                "`:flwr-in-memory:`, `:memory:`, SQLite file paths, and `sqlite://` "
-                "URLs (including `sqlite:///:memory:`)."
-            ) from exc
-
-    objectstore_factory = ObjectStoreFactory(database)
-    state_factory = LinkStateFactory(database, federation_manager, objectstore_factory)
-    return objectstore_factory, state_factory
-
-
-@dataclass
-class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
-    """Configuration needed to start the SuperLink lifespan."""
-
-    serverappio_address: str
-    control_address: str
-    health_server_address: str | None
-    enable_http_api: bool
-    disable_grpc_api: bool
-    host: str
-    port: int
-    insecure: bool
-    certificates: tuple[bytes, bytes, bytes] | None
-    appio_certificates: tuple[bytes, bytes, bytes] | None
-    superexec_auth_secret: bytes | None
-    authn_plugin: ControlAuthnPlugin
-    authz_plugin: ControlAuthzPlugin
-    event_log_plugin: EventLogWriterPlugin | None
-    enable_event_log: bool
-    artifact_provider: ArtifactProvider | None
-    enable_supernode_auth: bool
-    fleet_api_type: str
-    fleet_api_address: str | None
-    simulation: bool
-    ssl_keyfile: str | None
-    ssl_certfile: str | None
-    database: str
-    isolation: str
-    appio_ssl_ca_certfile: str | None
-    runtime_dependency_install: bool
 
 
 class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
@@ -630,7 +542,7 @@ def flower_superlink() -> None:
     superlink_lifespan: SuperLinkLifespan | None = None
     try:
         federation_manager = get_federation_manager(is_simulation=config.simulation)
-        _, state_factory = _get_objectstore_linkstate_factories(
+        _, state_factory = get_objectstore_linkstate_factories(
             config.database, federation_manager
         )
         superlink_lifespan = SuperLinkLifespan(config, state_factory)
@@ -670,7 +582,7 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
         create_app,
     )
 
-    fastapi_app = create_app(lifespan_config)
+    fastapi_app = create_app(lifespan_config, SuperLinkLifespan)
 
     if start_legacy_grpc:
         log(

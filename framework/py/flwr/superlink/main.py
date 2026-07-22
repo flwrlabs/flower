@@ -21,6 +21,7 @@ import os
 from collections.abc import AsyncIterator, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
 from logging import INFO
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
@@ -31,16 +32,18 @@ from flwr.supercore.error import http_error_translator
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.version import package_version
 from flwr.superlink import extensions
-from flwr.superlink.cli.flower_superlink import (
-    SuperLinkLifespan,
+from flwr.superlink.config_loader import (
     SuperLinkLifespanConfig,
-    _get_objectstore_linkstate_factories,
     get_federation_manager,
+    get_objectstore_linkstate_factories,
+    load_control_auth_plugins,
 )
-from flwr.superlink.config_loader import load_control_auth_plugins
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.routers.control import router as control_router
 from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
+
+if TYPE_CHECKING:
+    from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
 
 
 def generate_unique_route_id(route: APIRoute) -> str:
@@ -64,7 +67,10 @@ def _merge_lifespan_state(
         lifespan_state[key] = value
 
 
-def create_app(config: SuperLinkLifespanConfig | None = None) -> FastAPI:
+def create_app(
+    config: SuperLinkLifespanConfig | None = None,
+    superlink_lifespan_class: type[SuperLinkLifespan] | None = None,
+) -> FastAPI:
     """Create the SuperLink FastAPI app and its shared lifespan resources."""
     if config is None:
         is_simulation = False
@@ -78,7 +84,7 @@ def create_app(config: SuperLinkLifespanConfig | None = None) -> FastAPI:
         authn_plugin, authz_plugin = config.authn_plugin, config.authz_plugin
 
     federation_manager = get_federation_manager(is_simulation=is_simulation)
-    _, linkstate_factory = _get_objectstore_linkstate_factories(
+    _, linkstate_factory = get_objectstore_linkstate_factories(
         database, federation_manager
     )
     # Force initialization before exposing LinkState through FastAPI dependencies
@@ -87,7 +93,11 @@ def create_app(config: SuperLinkLifespanConfig | None = None) -> FastAPI:
     # Instantiate SuperLink lifespan for legacy gRPC server if required
     superlink_lifespan = None
     if config and not config.disable_grpc_api:
-        superlink_lifespan = SuperLinkLifespan(config, linkstate_factory)
+        if superlink_lifespan_class is None:
+            raise RuntimeError(
+                "A SuperLink lifespan class is required when legacy gRPC is enabled."
+            )
+        superlink_lifespan = superlink_lifespan_class(config, linkstate_factory)
 
     @asynccontextmanager
     async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[dict[str, object]]:
