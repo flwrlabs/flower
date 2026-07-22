@@ -32,7 +32,7 @@ from flwr.supercore.typing import JSONObject, JSONValue
 
 DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1/responses"
 DEFAULT_MODEL_API_TIMEOUT = 180.0
-_DEFAULT_USAGE_TYPE = "token"
+_DEFAULT_PROVIDER = "unknown"
 _STREAM_CONTENT_TYPE = "text/event-stream"
 _TERMINAL_SUCCESS_EVENTS = frozenset({"response.completed", "response.incomplete"})
 _TERMINAL_FAILURE_EVENTS = frozenset({"error", "response.failed"})
@@ -113,7 +113,7 @@ def invoke_model_provider(
         request=payload,
         on_stream_event=on_stream_event,
         usage_recorder=usage_recorder,
-        usage_type=_usage_type_from_request(payload),
+        provider=_provider_from_request(payload),
     )
 
 
@@ -125,7 +125,7 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
     request: JSONObject,
     on_stream_event: Callable[[JSONObject], None] | None,
     usage_recorder: TaskUsageRecorder,
-    usage_type: str,
+    provider: str,
 ) -> JSONObject:
     """Run a normal or streaming provider request.
 
@@ -170,7 +170,7 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
                 message="Model provider returned invalid JSON",
             ) from exc
         response_payload = _ensure_json_object(payload)
-        _record_model_usage(response_payload, usage_recorder, usage_type)
+        _record_model_usage(response_payload, usage_recorder, provider)
         return response_payload
 
     # Streaming parsing only works for Server-Sent Event responses.
@@ -215,11 +215,9 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
         if is_failure_event:
             raw_response = event.get("response")
             if isinstance(raw_response, dict):
-                _record_model_usage(
-                    cast(JSONObject, raw_response), usage_recorder, usage_type
-                )
+                _record_model_usage(raw_response, usage_recorder, provider)
             else:
-                _record_model_usage(event, usage_recorder, usage_type)
+                _record_model_usage(event, usage_recorder, provider)
             raise ModelProviderError(
                 status_code=response.status_code,
                 detail=event,
@@ -229,10 +227,10 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
         if isinstance(event_type, str) and event_type in _TERMINAL_SUCCESS_EVENTS:
             raw_response = event.get("response")
             if isinstance(raw_response, dict):
-                final_response = cast(JSONObject, raw_response)
-                _record_model_usage(final_response, usage_recorder, usage_type)
+                final_response = raw_response
+                _record_model_usage(final_response, usage_recorder, provider)
                 return final_response
-            _record_model_usage(event, usage_recorder, usage_type)
+            _record_model_usage(event, usage_recorder, provider)
             return event
 
     raise ModelProviderError(
@@ -253,19 +251,19 @@ def _ensure_json_object(payload: object) -> JSONObject:
 
 
 def _record_model_usage(
-    response: JSONObject, usage_recorder: TaskUsageRecorder, usage_type: str
+    response: JSONObject, usage_recorder: TaskUsageRecorder, provider: str
 ) -> None:
-    usage = task_usage_from_open_response(response, usage_type=usage_type)
+    usage = task_usage_from_open_response(response, provider=provider)
     if usage is not None:
         usage_recorder.record(usage)
 
 
-def _usage_type_from_request(request: JSONObject) -> str:
-    """Return the task usage type for a model provider request."""
+def _provider_from_request(request: JSONObject) -> str:
+    """Return the provider identifier for a model provider request."""
     model = request.get("model")
     if isinstance(model, str) and model:
         return model
-    return _DEFAULT_USAGE_TYPE
+    return _DEFAULT_PROVIDER
 
 
 def _iter_sse_events(response: requests.Response) -> Iterator[tuple[str | None, str]]:

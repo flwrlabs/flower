@@ -15,8 +15,6 @@
 """Utility functions for model quantization."""
 
 
-from typing import cast
-
 import numpy as np
 
 from flwr.common import NDArrayFloat, NDArrayInt
@@ -41,11 +39,9 @@ def quantize(
     quantizer = target_range / (2 * clipping_range)
     for arr in parameters:
         # Stochastic quantization
-        pre_quantized = cast(
-            NDArrayFloat,
-            (np.clip(arr, -clipping_range, clipping_range) + clipping_range)
-            * quantizer,
-        )
+        pre_quantized = (
+            np.clip(arr, -clipping_range, clipping_range) + clipping_range
+        ) * quantizer
         quantized = _stochastic_round(pre_quantized)
         quantized_list.append(quantized)
     return quantized_list
@@ -63,6 +59,6 @@ def dequantize(
     shift = -clipping_range
     for arr in quantized_parameters:
         recon_arr = arr.view(np.ndarray).astype(float)
-        recon_arr = cast(NDArrayFloat, recon_arr * quantizer + shift)
+        recon_arr = recon_arr * quantizer + shift
         reverse_quantized_list.append(recon_arr)
     return reverse_quantized_list

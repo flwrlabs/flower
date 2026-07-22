@@ -257,7 +257,7 @@ class ObjectStoreTest(unittest.TestCase):
         self.assertEqual(retrieved_tree_traversed, obj_tree_traversed)
 
     @parameterized.expand([(""), ("invalid")])  # type: ignore
-    def test_preregister_with_invalid_object_id(self, invalid_object_id) -> None:
+    def test_preregister_with_invalid_object_id(self, invalid_object_id: str) -> None:
         """Test preregistering with object_id that is not a valid SHA256."""
         # Prepare
         object_store = self.object_store_factory()

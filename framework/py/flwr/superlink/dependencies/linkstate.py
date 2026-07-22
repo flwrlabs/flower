@@ -25,7 +25,7 @@ from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.error import ApiErrorCode, FlowerError
 
 
-def get_linkstate(request: Request) -> LinkState:  # type: ignore[type-arg]
+def get_linkstate(request: Request) -> LinkState:
     """Return the SuperLink LinkState for the current request."""
     linkstate_factory = cast(
         LinkStateFactory | None,

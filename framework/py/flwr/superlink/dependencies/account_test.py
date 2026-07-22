@@ -25,7 +25,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from .account import AccountAccessDependency, get_account, get_authn_plugin
 
 
-def _make_request() -> Request:  # type: ignore[type-arg]
+def _make_request() -> Request:
     """Return a minimal request with authentication metadata."""
     return Request(
         {
@@ -41,7 +41,7 @@ def _make_request() -> Request:  # type: ignore[type-arg]
     )
 
 
-def _make_app_request(app: FastAPI) -> Request:  # type: ignore[type-arg]
+def _make_app_request(app: FastAPI) -> Request:
     """Return a minimal request bound to an application."""
     request = _make_request()
     request.scope["app"] = app

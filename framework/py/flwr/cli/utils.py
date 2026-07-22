@@ -15,6 +15,8 @@
 """Flower command line interface utils."""
 
 
+from __future__ import annotations
+
 import hashlib
 import os
 import sys
@@ -467,7 +469,9 @@ def flwr_cli_grpc_exc_handler(
         raise click.ClickException(details) from None
 
 
-def build_pathspec(patterns: Iterable[str]) -> pathspec.PathSpec:
+def build_pathspec(
+    patterns: Iterable[str],
+) -> pathspec.PathSpec[pathspec.pattern.Pattern]:
     """Build a PathSpec from a list of GitIgnore-style patterns.
 
     Parameters
