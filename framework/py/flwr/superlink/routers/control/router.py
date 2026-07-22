@@ -101,10 +101,12 @@ def configure_middlewares(app: FastAPI) -> None:
         path for _, path in PROTOBUF_REQUEST_TYPES if path not in UNAUTHENTICATED_PATHS
     }
     app.add_middleware(
-        ProtobufTranslationMiddleware, request_types=PROTOBUF_REQUEST_TYPES
-    )
-    app.add_middleware(
         ControlAuthenticationMiddleware, authenticated_paths=authenticated_paths
+    )
+    # Keep protobuf translation outside response-side middleware so those layers
+    # can inspect or modify the handler result before it is serialized.
+    app.add_middleware(
+        ProtobufTranslationMiddleware, request_types=PROTOBUF_REQUEST_TYPES
     )
     # Register last so it is outermost and translates errors from every Control layer.
     app.middleware("http")(http_error_translator)

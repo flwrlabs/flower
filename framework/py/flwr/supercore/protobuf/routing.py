@@ -16,11 +16,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import cast
 
 from fastapi import Request
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from google.protobuf.message import DecodeError, Message
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
@@ -51,7 +51,11 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UnregisterNodeRequest,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
+from flwr.supercore.protobuf.constants import (
+    PROTOBUF_MEDIA_TYPE,
+    PROTOBUF_STREAM_MEDIA_TYPE,
+)
+from flwr.supercore.protobuf.framing import frame_message
 
 RouteKey = tuple[str, str]
 
@@ -89,7 +93,7 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
 
 
 class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
-    """Deserialize configured protobuf request bodies before handlers run."""
+    """Translate protobuf requests and handler results at the HTTP boundary."""
 
     def __init__(
         self,
@@ -100,19 +104,31 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         self._request_types = request_types
 
     async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint  # type: ignore[type-arg]
+        self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        """Parse the protobuf request body and make it available to dependencies."""
+        """Parse the protobuf request and serialize the protobuf handler result."""
         request_type = self._request_types.get((request.method, request.url.path))
         if request_type is not None:
             self._check_request_media_type(request)
             request.state.protobuf_request = self._parse_request(
                 await request.body(), request_type
             )
-        return await call_next(request)
+        response = await call_next(request)
+        if not hasattr(request.state, "protobuf_response"):
+            return response
+
+        protobuf_response = self._response_for(request.state.protobuf_response)
+        # Preserve metadata set by inner middleware, but not placeholder body headers.
+        protobuf_response.status_code = response.status_code
+        protobuf_response.headers.raw.extend(
+            header
+            for header in response.headers.raw
+            if header[0] not in (b"content-length", b"content-type")
+        )
+        return protobuf_response
 
     @staticmethod
-    def _check_request_media_type(request: Request) -> None:  # type: ignore[type-arg]
+    def _check_request_media_type(request: Request) -> None:
         content_type = request.headers.get("content-type", "")
         media_type = content_type.partition(";")[0].strip().lower()
         if media_type != PROTOBUF_MEDIA_TYPE:
@@ -133,7 +149,32 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             ) from exc
         return message
 
+    @staticmethod
+    def _response_for(result: object) -> Response:
+        """Return the HTTP response matching a protobuf handler result."""
+        # ``Message`` is also the most specific contract and must be checked
+        # first. Unary responses are not framed; framing is reserved for streams.
+        if isinstance(result, Message):
+            return Response(
+                content=result.SerializeToString(), media_type=PROTOBUF_MEDIA_TYPE
+            )
 
-def get_protobuf_request(request: Request) -> Message:  # type: ignore[type-arg]
+        # Synchronous generators and other iterables are streamed lazily too.
+        # Starlette advances a synchronous iterator outside the event loop.
+        if isinstance(result, Iterable):
+            return StreamingResponse(
+                (frame_message(message) for message in cast(Iterable[Message], result)),
+                media_type=PROTOBUF_STREAM_MEDIA_TYPE,
+            )
+
+        raise FlowerError(
+            ApiErrorCode.INVALID_HANDLER_RESPONSE,
+            "Invalid response returned from Control handler: expected a protobuf "
+            "Message or Iterable[Message], got "
+            f"{result!r} ({type(result).__name__})",
+        )
+
+
+def get_protobuf_request(request: Request) -> Message:
     """Return the protobuf request parsed by ``ProtobufTranslationMiddleware``."""
     return cast(Message, request.state.protobuf_request)
