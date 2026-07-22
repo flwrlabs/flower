@@ -21,24 +21,20 @@ import os
 import subprocess
 import sys
 import threading
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from logging import INFO, WARN
-from pathlib import Path
 from time import sleep
-from typing import TypeVar, cast
+from typing import cast
 
 import grpc
 import uvicorn
-import yaml
 
 from flwr.common.args import (
     add_args_runtime_dependency_install,
     try_obtain_server_certificates,
 )
 from flwr.common.constant import (
-    AUTHN_TYPE_YAML_KEY,
-    AUTHZ_TYPE_YAML_KEY,
     CONTROL_API_DEFAULT_SERVER_ADDRESS,
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
@@ -47,8 +43,6 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
-    AuthnType,
-    AuthzType,
     EventLogWriterType,
     ExecPluginType,
 )
@@ -94,24 +88,15 @@ from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import get_popen_detach_kwargs
 from flwr.supercore.version import package_version
 from flwr.superlink.artifact_provider import ArtifactProvider
-from flwr.superlink.auth_plugin import (
-    ControlAuthnPlugin,
-    ControlAuthzPlugin,
-    NoOpControlAuthnPlugin,
-    NoOpControlAuthzPlugin,
-)
+from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
+from flwr.superlink.config_loader import load_control_auth_plugins
 from flwr.superlink.federation import FederationManager, NoOpFederationManager
 from flwr.superlink.servicer.control import run_control_api_grpc
 from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
 
-P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
-
-
 try:
     from flwr.ee import (
         add_ee_args_superlink,
-        get_control_authn_ee_plugins,
-        get_control_authz_ee_plugins,
         get_control_event_log_writer_plugins,
         get_ee_artifact_provider,
         get_ee_federation_manager,
@@ -141,14 +126,6 @@ except ImportError:
             "No event log writer plugins are currently supported."
         )
 
-    def get_control_authn_ee_plugins() -> dict[str, type[ControlAuthnPlugin]]:
-        """Return all Control API authentication plugins for EE."""
-        return {}
-
-    def get_control_authz_ee_plugins() -> dict[str, type[ControlAuthzPlugin]]:
-        """Return all Control API authorization plugins for EE."""
-        return {}
-
     def get_ee_federation_manager() -> FederationManager:
         """Return the EE FederationManager."""
         raise NotImplementedError("No federation manager is currently supported.")
@@ -164,18 +141,6 @@ except ImportError:
     ) -> LinkStateFactory:
         """Return an EE LinkStateFactory for supported non-SQLite database URLs."""
         raise NotImplementedError("No additional state backends are supported.")
-
-
-def get_control_authn_plugins() -> dict[str, type[ControlAuthnPlugin]]:
-    """Return all Control API authentication plugins."""
-    ee_dict: dict[str, type[ControlAuthnPlugin]] = get_control_authn_ee_plugins()
-    return ee_dict | {AuthnType.NOOP: NoOpControlAuthnPlugin}
-
-
-def get_control_authz_plugins() -> dict[str, type[ControlAuthzPlugin]]:
-    """Return all Control API authorization plugins."""
-    ee_dict: dict[str, type[ControlAuthzPlugin]] = get_control_authz_ee_plugins()
-    return ee_dict | {AuthzType.NOOP: NoOpControlAuthzPlugin}
 
 
 def get_federation_manager(is_simulation: bool = False) -> FederationManager:
@@ -540,7 +505,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         )
         args.account_auth_config = cfg_path
     cfg_path = getattr(args, "account_auth_config", None)
-    authn_plugin, authz_plugin = _load_control_auth_plugins(cfg_path, verify_tls_cert)
+    authn_plugin, authz_plugin = load_control_auth_plugins(cfg_path, verify_tls_cert)
     if cfg_path is not None:
         # Enable event logging if the args.enable_event_log is True
         if args.enable_event_log:
@@ -791,66 +756,6 @@ def _get_superexec_command(
 def _runtime_dependency_install_default() -> bool:
     """Return default runtime dependency installation setting."""
     return os.getenv(FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION) != "1"
-
-
-def _load_control_auth_plugins(
-    config_path: str | None, verify_tls_cert: bool
-) -> tuple[ControlAuthnPlugin, ControlAuthzPlugin]:
-    """Obtain Control API authentication and authorization plugins."""
-    # Load NoOp plugins if no config path is provided
-    if config_path is None:
-        config_path = ""
-        config = {
-            "authentication": {AUTHN_TYPE_YAML_KEY: AuthnType.NOOP},
-            "authorization": {AUTHZ_TYPE_YAML_KEY: AuthzType.NOOP},
-        }
-    # Load YAML file
-    else:
-        with Path(config_path).expanduser().open("r", encoding="utf-8") as file:
-            config = yaml.safe_load(file)
-
-    def _load_plugin(
-        section: str, yaml_key: str, loader: Callable[[], dict[str, type[P]]]
-    ) -> P:
-        section_cfg = config.get(section, {})
-        auth_plugin_name = section_cfg.get(yaml_key, "")
-        try:
-            plugins: dict[str, type[P]] = loader()
-            plugin_cls: type[P] = plugins[auth_plugin_name]
-            return plugin_cls(Path(cast(str, config_path)), verify_tls_cert)
-        except KeyError:
-            if auth_plugin_name:
-                sys.exit(
-                    f"{yaml_key}: {auth_plugin_name} is not supported. "
-                    f"Please provide a valid {section} type in the configuration."
-                )
-            sys.exit(f"No {section} type is provided in the configuration.")
-
-    # Warn deprecated auth_type key
-    if authn_type := config["authentication"].pop("auth_type", None):
-        log(
-            WARN,
-            "The `auth_type` key in the authentication configuration is deprecated. "
-            "Use `%s` instead.",
-            AUTHN_TYPE_YAML_KEY,
-        )
-        config["authentication"][AUTHN_TYPE_YAML_KEY] = authn_type
-
-    # Load authentication plugin
-    authn_plugin = _load_plugin(
-        section="authentication",
-        yaml_key=AUTHN_TYPE_YAML_KEY,
-        loader=get_control_authn_plugins,
-    )
-
-    # Load authorization plugin
-    authz_plugin = _load_plugin(
-        section="authorization",
-        yaml_key=AUTHZ_TYPE_YAML_KEY,
-        loader=get_control_authz_plugins,
-    )
-
-    return authn_plugin, authz_plugin
 
 
 def _try_obtain_control_event_log_writer_plugin() -> EventLogWriterPlugin | None:

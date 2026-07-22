@@ -98,6 +98,30 @@ def test_get_linkstate_returns_linkstate_after_startup(
     assert linkstate is expected_linkstate
 
 
+def test_create_app_without_config_loads_auth_plugins_from_env() -> None:
+    """The module-level app should load account auth from its environment."""
+    state_factory = Mock(spec=LinkStateFactory)
+    authn_plugin, authz_plugin = Mock(), Mock()
+    with (
+        patch.dict("os.environ", {"FLWR_ACCOUNT_AUTH_CONFIG": "/path/to/auth.yaml"}),
+        patch("flwr.superlink.main.get_federation_manager"),
+        patch(
+            "flwr.superlink.main._get_objectstore_linkstate_factories",
+            return_value=(Mock(), state_factory),
+        ),
+        patch("flwr.superlink.main.SuperLinkLifespan"),
+        patch(
+            "flwr.superlink.main.load_control_auth_plugins",
+            return_value=(authn_plugin, authz_plugin),
+        ) as load_auth_plugins,
+    ):
+        create_app()
+
+    load_auth_plugins.assert_called_once_with(
+        "/path/to/auth.yaml", verify_tls_cert=True
+    )
+
+
 @pytest.mark.parametrize(
     "set_linkstate_factory",
     [False, True],

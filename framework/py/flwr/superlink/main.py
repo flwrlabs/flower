@@ -36,6 +36,7 @@ from flwr.superlink.cli.flower_superlink import (
     _get_objectstore_linkstate_factories,
     get_federation_manager,
 )
+from flwr.superlink.config_loader import load_control_auth_plugins
 from flwr.superlink.dependencies.account import AccountAccessDependency
 
 
@@ -62,14 +63,16 @@ def _merge_lifespan_state(
 
 def create_app(config: SuperLinkLifespanConfig | None = None) -> FastAPI:
     """Create the SuperLink FastAPI app and its shared lifespan resources."""
-    if not config:
+    if config is None:
         is_simulation = False
         database = os.getenv("FLWR_DATABASE", FLWR_IN_MEMORY_DB_NAME)
-        start_legacy_grpc = False
+        authn_plugin, authz_plugin = load_control_auth_plugins(
+            os.getenv("FLWR_ACCOUNT_AUTH_CONFIG"), verify_tls_cert=True
+        )
     else:
         is_simulation = config.simulation
         database = config.database
-        start_legacy_grpc = not config.disable_grpc_api
+        authn_plugin, authz_plugin = config.authn_plugin, config.authz_plugin
 
     federation_manager = get_federation_manager(is_simulation=is_simulation)
     _, linkstate_factory = _get_objectstore_linkstate_factories(
@@ -77,7 +80,11 @@ def create_app(config: SuperLinkLifespanConfig | None = None) -> FastAPI:
     )
     # Force initialization before exposing LinkState through FastAPI dependencies
     linkstate_factory.state()
-    superlink_lifespan = SuperLinkLifespan(config, linkstate_factory)
+
+    # Instantiate SuperLink lifespan for legacy gRPC server if required
+    superlink_lifespan = None
+    if config and not config.disable_grpc_api:
+        superlink_lifespan = SuperLinkLifespan(config, linkstate_factory)
 
     @asynccontextmanager
     async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[dict[str, object]]:
@@ -85,7 +92,7 @@ def create_app(config: SuperLinkLifespanConfig | None = None) -> FastAPI:
         log(INFO, "FastAPI lifespan: startup")
 
         try:
-            if start_legacy_grpc:
+            if superlink_lifespan:
                 # Temporary compatibility path: start the existing gRPC APIs from
                 # FastAPI lifespan
                 superlink_lifespan.startup()
@@ -99,7 +106,7 @@ def create_app(config: SuperLinkLifespanConfig | None = None) -> FastAPI:
                     _merge_lifespan_state(lifespan_state, extension_state)
                 yield lifespan_state
         finally:
-            if start_legacy_grpc:
+            if superlink_lifespan:
                 superlink_lifespan.shutdown()
 
             log(INFO, "FastAPI lifespan: shutdown")
@@ -115,7 +122,7 @@ def create_app(config: SuperLinkLifespanConfig | None = None) -> FastAPI:
     fastapi_app.state.superlink_lifespan = superlink_lifespan
     fastapi_app.state.linkstate_factory = linkstate_factory
     fastapi_app.state.account_access_dep = AccountAccessDependency(
-        config.authn_plugin, config.authz_plugin
+        authn_plugin, authz_plugin
     )
 
     # Core APIs
