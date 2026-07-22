@@ -110,6 +110,7 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
     authz_plugin.authorize.return_value = True
     app = create_app(authn_plugin=authn_plugin, authz_plugin=authz_plugin)
+    app.include_router(router)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     client = TestClient(app)
 
@@ -148,6 +149,7 @@ def test_list_runs_preserves_refreshed_authentication_tokens() -> None:
     authz_plugin.authorize.return_value = True
     linkstate.get_run_info.return_value = []
     app = create_app(authn_plugin=authn_plugin, authz_plugin=authz_plugin)
+    app.include_router(router)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     response = TestClient(app).post(
         "/control/list-runs",
@@ -169,6 +171,7 @@ def test_list_runs_rejects_non_protobuf_payload() -> None:
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
     authz_plugin.authorize.return_value = True
     app = create_app(authn_plugin=authn_plugin, authz_plugin=authz_plugin)
+    app.include_router(router)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     response = TestClient(app).post(
         "/control/list-runs",
@@ -193,6 +196,7 @@ def test_get_login_details_does_not_require_authentication(
         lambda _request, _plugin: expected,
     )
     app = create_app(authn_plugin=authn_plugin, authz_plugin=authz_plugin)
+    app.include_router(router)
     response = TestClient(app).post(
         "/control/get-login-details",
         content=GetLoginDetailsRequest().SerializeToString(),
