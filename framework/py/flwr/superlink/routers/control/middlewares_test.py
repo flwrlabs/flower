@@ -39,17 +39,6 @@ from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.superlink import main as superlink_main
 from flwr.superlink.servicer.control import control_handlers
-from typing import cast
-from unittest.mock import Mock
-
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from pytest import MonkeyPatch
-
-from flwr.supercore.error import ApiErrorCode
-from flwr.supercore.license_plugin import LicensePlugin
-from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
-from flwr.superlink import main as superlink_main
 
 from . import middlewares
 
@@ -303,4 +292,3 @@ def test_event_log_middleware_writes_stream_failure(
     after_result = event_log_plugin.compose_log_after_event.call_args.kwargs["response"]
     assert isinstance(after_result, RuntimeError)
     assert event_log_plugin.write_log.call_count == 2
-    )
