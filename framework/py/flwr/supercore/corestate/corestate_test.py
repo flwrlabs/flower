@@ -18,9 +18,9 @@
 # pylint: disable=too-many-lines
 import unittest
 from contextlib import ExitStack
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from parameterized import parameterized
 
@@ -38,7 +38,11 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
-from flwr.supercore.constant import AutomationStatus, TaskType
+from flwr.supercore.constant import (
+    OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AutomationStatus,
+    TaskType,
+)
 from flwr.supercore.date import now
 from flwr.supercore.typing import ConnectorRecord
 
@@ -126,27 +130,21 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Run connector bindings should be deterministic and idempotent."""
         state = self.state_factory()
 
-        self.assertFalse(
-            state.bind_connectors_to_run(run_id=0, connector_refs=["calendar"])
+        state.bind_connectors_to_run(
+            run_id=42,
+            connector_refs=["notion", "calendar", "notion"],
         )
-        self.assertFalse(state.bind_connectors_to_run(run_id=42, connector_refs=[""]))
-        self.assertTrue(
-            state.bind_connectors_to_run(
-                run_id=42,
-                connector_refs=["notion", "calendar", "notion"],
-            )
-        )
-        self.assertTrue(
-            state.bind_connectors_to_run(run_id=42, connector_refs=["drive"])
-        )
-        self.assertTrue(state.bind_connectors_to_run(run_id=7, connector_refs=[]))
+        state.bind_connectors_to_run(run_id=42, connector_refs=["notion"])
 
         self.assertEqual(
             list(state.get_run_connector_refs(run_id=42)),
-            ["calendar", "drive", "notion"],
+            ["calendar", "notion"],
         )
-        self.assertEqual(list(state.get_run_connector_refs(run_id=7)), [])
-        self.assertEqual(list(state.get_run_connector_refs(run_id=0)), [])
+
+        self.assertFalse(
+            state.bind_connectors_to_run(run_id=43, connector_refs="notion")
+        )
+        self.assertEqual(list(state.get_run_connector_refs(run_id=43)), [])
 
     def test_connector_oauth_session_lifecycle(self) -> None:
         """An OAuth session can be created, retrieved, and completed once."""
@@ -231,17 +229,242 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(missing_objects, [object_id])
         self.assertEqual(replacement_missing_objects, [object_id])
 
+    def test_delete_sessions_in_run(self) -> None:
+        """Deleting sessions for a run preserves sessions belonging to other runs."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        other_run_id = self.other_task_run_id(state)
+        session_ids = [state.start_session(run_id) for _ in range(2)]
+        other_session_id = state.start_session(other_run_id)
+        object_ids = ["a" * 64, "b" * 64, "c" * 64]
+        for session_id, object_id in zip(
+            [*session_ids, other_session_id], object_ids, strict=True
+        ):
+            state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        state.delete_sessions_in_run(run_id)
+
+        for session_id in session_ids:
+            with self.assertRaisesRegex(ValueError, "Unknown object push session"):
+                state.preregister_object_tree(
+                    ObjectTree(object_id="d" * 64), session_id
+                )
+        self.assertEqual(
+            state.preregister_object_tree(
+                ObjectTree(object_id="e" * 64), other_session_id
+            ),
+            ["e" * 64],
+        )
+
+    def test_store_object_rejects_invalid_session_membership(self) -> None:
+        """Objects must be pending in a session belonging to the run."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        session_id = state.start_session(run_id)
+        state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        with (
+            patch.object(state.object_store, "put") as put_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            self.assertFalse(
+                state.store_object(run_id + 1, session_id, object_id, b"content")
+            )
+            self.assertFalse(
+                state.store_object(run_id, "unknown-session", object_id, b"content")
+            )
+            self.assertFalse(
+                state.store_object(run_id, session_id, "unknown-object-id", b"content")
+            )
+
+        put_object.assert_not_called()
+        cleanup_session.assert_not_called()
+
+    def test_store_object_resolves_empty_session_id(self) -> None:
+        """An empty session ID resolves through pending object membership."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        session_id = state.start_session(run_id)
+        state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        with patch.object(state.object_store, "put") as put_object:
+            self.assertTrue(state.store_object(run_id, "", object_id, b"content"))
+
+        put_object.assert_called_once_with(object_id, b"content")
+
+    def test_store_object_cleans_up_expired_session(self) -> None:
+        """An object cannot be stored after its push session expires."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = created_at
+            session_id = state.start_session(run_id)
+            state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        expired_at = created_at + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1)
+        with (
+            patch("flwr.supercore.date.datetime.datetime") as mock_datetime,
+            patch.object(state.object_store, "put") as put_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            mock_datetime.now.return_value = expired_at
+            stored = state.store_object(run_id, session_id, object_id, b"content")
+
+        self.assertFalse(stored)
+        put_object.assert_not_called()
+        cleanup_session.assert_called_once_with(session_id, cleanup_messages=True)
+
+    def test_store_object_refreshes_session_and_cleans_up_on_completion(self) -> None:
+        """A successful store refreshes TTL and cleans up an empty session."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        parent_id = "a" * 64
+        child_id = "b" * 64
+        created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        object_tree = ObjectTree(
+            object_id=parent_id,
+            children=[ObjectTree(object_id=child_id)],
+        )
+        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = created_at
+            session_id = state.start_session(run_id)
+            state.preregister_object_tree(object_tree, session_id)
+
+        first_store_at = created_at + timedelta(
+            seconds=OBJECT_PUSH_SESSION_TTL_SECONDS - 1
+        )
+        second_store_at = created_at + timedelta(
+            seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1
+        )
+        with (
+            patch.object(state.object_store, "put") as put_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+                mock_datetime.now.return_value = first_store_at
+                self.assertTrue(
+                    state.store_object(run_id, session_id, child_id, b"child")
+                )
+            cleanup_session.assert_not_called()
+
+            with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+                mock_datetime.now.return_value = second_store_at
+                self.assertTrue(
+                    state.store_object(run_id, session_id, parent_id, b"parent")
+                )
+
+        self.assertEqual(put_object.call_count, 2)
+        cleanup_session.assert_called_once_with(session_id, cleanup_messages=False)
+
+    def test_store_object_preserves_pending_claim_when_object_store_fails(self) -> None:
+        """An ObjectStore error returns False without consuming the pending claim."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        session_id = state.start_session(run_id)
+        state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        with patch.object(
+            state.object_store,
+            "put",
+            side_effect=[RuntimeError("write failed"), None],
+        ) as put_object:
+            self.assertFalse(
+                state.store_object(run_id, session_id, object_id, b"content")
+            )
+            self.assertTrue(
+                state.store_object(run_id, session_id, object_id, b"content")
+            )
+
+        self.assertEqual(put_object.call_count, 2)
+
+    def test_get_object_returns_object_store_result_without_cleanup(self) -> None:
+        """Available, unknown, and unowned unavailable objects are returned directly."""
+        state = self.state_factory()
+        with (
+            patch.object(
+                state.object_store,
+                "get",
+                side_effect=[b"content", None, b""],
+            ) as load_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            self.assertEqual(state.get_object(1, "available"), b"content")
+            self.assertIsNone(state.get_object(1, "unknown"))
+            self.assertEqual(state.get_object(1, "unavailable"), b"")
+
+        self.assertEqual(load_object.call_count, 3)
+        cleanup_session.assert_not_called()
+
+    def test_get_object_cleans_up_expired_sessions_and_reloads(self) -> None:
+        """An unavailable object triggers cleanup for all expired sessions."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = created_at
+            session_ids = []
+            for root_object_id in ("b" * 64, "c" * 64):
+                session_id = state.start_session(run_id)
+                session_ids.append(session_id)
+                state.preregister_object_tree(
+                    ObjectTree(
+                        object_id=root_object_id,
+                        children=[ObjectTree(object_id=object_id)],
+                    ),
+                    session_id,
+                )
+
+        expired_at = created_at + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1)
+        with (
+            patch("flwr.supercore.date.datetime.datetime") as mock_datetime,
+            patch.object(
+                state,
+                "_cleanup_push_session",
+                wraps=state._cleanup_push_session,  # pylint: disable=W0212
+            ) as cleanup_session,
+        ):
+            mock_datetime.now.return_value = expired_at
+            self.assertIsNone(state.get_object(run_id, "unknown-object-id"))
+            cleanup_session.assert_not_called()
+            self.assertIsNone(state.get_object(run_id, object_id))
+
+        cleanup_session.assert_has_calls(
+            [call(session_id, cleanup_messages=True) for session_id in session_ids],
+            any_order=True,
+        )
+        self.assertEqual(cleanup_session.call_count, 2)
+
     def test_store_run_in_series_creates_id(self) -> None:
         """Storing a run in a run series should create a nonzero ID."""
         state = self.state_factory()
 
         series_id = state.store_run_in_series(
-            run_id=123, federation_id="@me/fed-a", series_id=None
+            run_id=123,
+            federation_id="@me/fed-a",
+            series_id=None,
+            description="Initial description",
         )
 
         self.assertIsNotNone(series_id)
         assert series_id is not None
         self.assertGreater(series_id, 0)
+        self.assertEqual(
+            state.store_run_in_series(
+                run_id=456,
+                federation_id="@me/fed-a",
+                series_id=series_id,
+                description="Replacement description",
+            ),
+            series_id,
+        )
+        run_series = state.get_run_series(series_ids=[series_id])
+        self.assertEqual(run_series[0].description, "Initial description")
 
     def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
         """Unknown caller-provided run series IDs return None."""
@@ -620,10 +843,18 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
                 input_tokens=10,
                 output_tokens=20,
                 total_tokens=30,
-                usage_type="token",
+                usage_type="model_inference",
+                provider="openai/gpt-test",
             ),
         )
-        state.add_task_usage(task_id, TaskUsage(input_tokens=999, usage_type="token"))
+        state.add_task_usage(
+            task_id,
+            TaskUsage(
+                input_tokens=999,
+                usage_type="model_inference",
+                provider="openai/gpt-test",
+            ),
+        )
 
         usages = state.get_task_usage(task_ids=[task_id])
 
@@ -632,7 +863,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(usage.input_tokens, 10)
         self.assertEqual(usage.output_tokens, 20)
         self.assertEqual(usage.total_tokens, 30)
-        self.assertEqual(usage.usage_type, "token")
+        self.assertEqual(usage.usage_type, "model_inference")
+        self.assertEqual(usage.provider, "openai/gpt-test")
         self.assertEqual(usages[1].input_tokens, 999)
 
     def test_add_and_get_task_log(self) -> None:

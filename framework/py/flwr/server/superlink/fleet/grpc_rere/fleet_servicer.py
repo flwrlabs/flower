@@ -54,7 +54,6 @@ from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=
 from flwr.server.superlink.fleet.message_handler import message_handler
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import InvalidRunStatusException
 
@@ -223,7 +222,6 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
             res = message_handler.push_messages(
                 request=request,
                 state=self.state_factory.state(),
-                store=self.objectstore_factory.store(),
             )
         except InvalidRunStatusException as e:
             raise FlowerError(
@@ -244,7 +242,6 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
             res = message_handler.get_run(
                 request=request,
                 state=self.state_factory.state(),
-                store=self.objectstore_factory.store(),
             )
         except InvalidRunStatusException as e:
             raise FlowerError(
@@ -272,7 +269,6 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
             res = message_handler.get_fab(
                 request=request,
                 state=self.state_factory.state(),
-                store=self.objectstore_factory.store(),
             )
         except InvalidRunStatusException as e:
             raise FlowerError(
@@ -306,7 +302,6 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
             res = message_handler.push_object(
                 request=request,
                 state=self.state_factory.state(),
-                store=self.objectstore_factory.store(),
             )
         except InvalidRunStatusException as e:
             raise FlowerError(
@@ -314,14 +309,6 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
                 f"{error_context}, exception: {e.message}",
                 public_details=f"Object_id: {request.object_id}",
             ) from e
-        except UnexpectedObjectContentError as e:
-            # Object content is not valid
-            raise FlowerError(
-                ApiErrorCode.FLEET_OBJECT_CONTENT_INVALID,
-                f"{error_context}, exception: {str(e)}",
-                public_details=f"Object_id: {request.object_id}",
-            ) from e
-
         return res
 
     def PullObject(
@@ -343,7 +330,6 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
             res = message_handler.pull_object(
                 request=request,
                 state=self.state_factory.state(),
-                store=self.objectstore_factory.store(),
             )
         except InvalidRunStatusException as e:
             raise FlowerError(

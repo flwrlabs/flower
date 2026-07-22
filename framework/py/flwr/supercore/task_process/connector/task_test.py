@@ -21,7 +21,10 @@ from unittest.mock import Mock, patch
 import pytest
 
 from flwr.common.serde import message_from_proto
-from flwr.proto.appio_pb2 import GetConnectorRequest, GetConnectorResponse
+from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetConnectorRequest,
+    GetConnectorResponse,
+)
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,

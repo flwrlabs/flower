@@ -552,6 +552,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert isinstance(response, PushAppMessagesResponse)
         assert grpc.StatusCode.OK == call.code()
         assert list(response.message_ids) == [message_1.metadata.message_id, ""]
+        assert response.session_id
         assert set(response.objects_to_push) == {
             message_1.metadata.message_id,
             shared_child_id,
@@ -711,12 +712,13 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
     def test_push_object_succesful(self) -> None:
         """Test `PushObject`."""
         # Prepare
-        run_id = self._create_dummy_run()
+        run_id = self._auth_run_id
         obj = ConfigRecord({"a": 123, "b": [4, 5, 6]})
         obj_b = obj.deflate()
 
         # Pre-register object
-        self.store.preregister(run_id, get_object_tree(obj))
+        session_id = self.state.start_session(run_id)
+        self.state.preregister_object_tree(get_object_tree(obj), session_id)
 
         # Execute
         req = PushObjectRequest(
@@ -724,6 +726,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             run_id=run_id,
             object_id=obj.object_id,
             object_content=obj_b,
+            session_id=session_id,
         )
         res: PushObjectResponse = self._push_object(request=req)
 
@@ -732,10 +735,9 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
     def test_push_object_fails(self) -> None:
         """Test `PushObject` in unsupported scenarios."""
-        run_id = self._create_dummy_run(running=False)
+        run_id = self._auth_run_id
 
-        # Run is running but node ID isn't recognized
-        self._transition_run_status(run_id, 2)
+        # Node ID isn't recognized
         req = PushObjectRequest(node=Node(node_id=123), run_id=run_id)
         with self.assertRaises(grpc.RpcError) as e:
             self._push_object(request=req)
@@ -744,6 +746,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Prepare
         obj = ConfigRecord({"a": 123, "b": [4, 5, 6]})
         obj_b = obj.deflate()
+        session_id = self.state.start_session(run_id)
 
         # Push valid object but it hasn't been pre-registered
         req = PushObjectRequest(
@@ -751,6 +754,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             run_id=run_id,
             object_id=obj.object_id,
             object_content=obj_b,
+            session_id=session_id,
         )
         res: PushObjectResponse = self._push_object(request=req)
 
@@ -760,7 +764,9 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Push valid object but its hash doesnt match the one passed in the request
         # Preregister under a different object-id
         fake_object_id = get_object_id(b"1234")
-        self.store.preregister(run_id, ObjectTree(object_id=fake_object_id))
+        self.state.preregister_object_tree(
+            ObjectTree(object_id=fake_object_id), session_id
+        )
 
         # Execute
         req = PushObjectRequest(
@@ -768,6 +774,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             run_id=run_id,
             object_id=fake_object_id,
             object_content=obj_b,
+            session_id=session_id,
         )
         res = self._push_object(request=req)
 

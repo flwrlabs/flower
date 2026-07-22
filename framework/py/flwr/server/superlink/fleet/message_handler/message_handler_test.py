@@ -112,11 +112,11 @@ def test_push_messages() -> None:
         message_object_trees=[object_tree],
     )
     state = MagicMock()
+    state.start_session.return_value = "session-id"
     state.store_message_and_object_tree.return_value = (True, ["object-id"])
-    store = MagicMock()
 
     # Execute
-    push_messages(request=request, state=state, store=store)
+    response = push_messages(request=request, state=state)
 
     # Assert
     state.create_node.assert_not_called()
@@ -124,7 +124,10 @@ def test_push_messages() -> None:
     state.store_message_ins.assert_not_called()
     state.get_message_ins.assert_not_called()
     state.store_message_res.assert_not_called()
+    state.start_session.assert_called_once_with(123)
     state.store_message_and_object_tree.assert_called_once()
     assert state.store_message_and_object_tree.call_args.args[1] == object_tree
+    assert state.store_message_and_object_tree.call_args.args[2] == "session-id"
+    assert response.session_id == "session-id"
     state.get_message_res.assert_not_called()
     state.store_traffic.assert_called_once()

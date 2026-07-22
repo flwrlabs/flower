@@ -85,7 +85,7 @@ def handle_task(
             ),
             "error": None,
         }
-    except Exception as ex:
+    except Exception as ex:  # pylint: disable=broad-exception-caught
         if uses_credentials:
             response = _make_error_response(None)
             credential_failure = True

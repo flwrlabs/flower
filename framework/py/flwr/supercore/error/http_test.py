@@ -48,7 +48,7 @@ def test_http_error_translator_mapped_flower_error() -> None:
 
     spec = API_ERROR_MAP[ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT]
     assert response.status_code == spec.http_status_code
-    assert json.loads(response.body) == {
+    assert json.loads(bytes(response.body)) == {
         "code": ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
         "public_message": spec.public_message,
         "public_details": None,
@@ -60,7 +60,7 @@ def test_http_error_translator_unmapped_flower_error() -> None:
     response = _run_translator(FlowerError(999, "internal diagnostic message"))
 
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert json.loads(response.body) == {
+    assert json.loads(bytes(response.body)) == {
         "code": 999,
         "public_message": INTERNAL_SERVER_ERROR_MESSAGE,
         "public_details": None,
@@ -82,7 +82,7 @@ def test_http_error_translator_entitlement_error_preserves_error_message() -> No
 
     spec = API_ERROR_MAP[ApiErrorCode.ENTITLEMENT_ERROR]
     assert response.status_code == spec.http_status_code
-    assert json.loads(response.body) == {
+    assert json.loads(bytes(response.body)) == {
         "code": ApiErrorCode.ENTITLEMENT_ERROR,
         "public_message": spec.public_message,
         "public_details": error_message,
@@ -100,7 +100,9 @@ def test_http_error_translator_http_exception() -> None:
     response = _run_translator(http_error)
 
     assert response.status_code == status.HTTP_418_IM_A_TEAPOT
-    assert json.loads(response.body) == {"detail": {"message": "short and stout"}}
+    assert json.loads(bytes(response.body)) == {
+        "detail": {"message": "short and stout"}
+    }
 
 
 def test_http_error_translator_unexpected_error() -> None:

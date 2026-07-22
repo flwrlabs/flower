@@ -27,7 +27,7 @@ import typer
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from flwr.supercore.constant import PLATFORM_API_URL, SUPERGRID_ADDRESS
+from flwr.supercore.constant import FLWR_SUPERGRID_API_URL, SUPERGRID_ADDRESS
 from flwr.supercore.date import now
 from flwr.supercore.primitives.asymmetric_ed25519 import (
     create_message_to_sign,
@@ -73,7 +73,7 @@ def review(
 
     # Download FAB
     typer.secho("Downloading FAB... ", fg=typer.colors.BLUE)
-    url = f"{PLATFORM_API_URL}/hub/fetch-fab"
+    url = f"{FLWR_SUPERGRID_API_URL}/hub/fetch-fab"
     try:
         presigned_url, _, note = request_download_link(
             app_id, app_version, url, "fab_url"
@@ -189,7 +189,7 @@ def _submit_review(
 ) -> None:
     """Submit review to Flower Hub."""
     signature_b64 = base64.urlsafe_b64encode(signature).rstrip(b"=").decode("ascii")
-    url = f"{PLATFORM_API_URL}/hub/apps/signature"
+    url = f"{FLWR_SUPERGRID_API_URL}/hub/apps/signature"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     payload = {
         "app_id": app_id,

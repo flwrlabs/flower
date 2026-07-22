@@ -102,17 +102,16 @@ class InMemoryNodeState(
             return msg_id
 
     def store_message_and_object_tree(
-        self, message: Message, object_tree: ObjectTree
+        self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree."""
-        with self.lock_msg_store:
+        # Always acquire the push-session lock before the message-store lock
+        with self._lock_object_push_sessions, self.lock_msg_store:
             stored = self.store_message(message) is not None
             if not stored:
                 return False, []
 
-            missing_objects = self.object_store.preregister(
-                message.metadata.run_id, object_tree
-            )
+            missing_objects = self.preregister_object_tree(object_tree, session_id)
             return True, missing_objects
 
     def get_messages(

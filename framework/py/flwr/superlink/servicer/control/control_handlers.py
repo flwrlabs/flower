@@ -21,13 +21,13 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import datetime
 from logging import ERROR, INFO
-from typing import NoReturn
 
 import requests
 
 from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
+from flwr.app.user_config import UserConfig
 from flwr.cli.utils import validate_federation_name
 from flwr.common.config import (
     flatten_dict,
@@ -115,8 +115,10 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
+    FLWR_SUPERGRID_API_URL,
     NOOP_FEDERATION_ID,
-    PLATFORM_API_URL,
+    OAUTH_SESSION_TTL,
+    RUN_SERIES_DESCRIPTION_MAX_LENGTH,
     ActionType,
     RunTime,
     TaskType,
@@ -144,7 +146,24 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 
-OAUTH_SESSION_TTL = timedelta(minutes=10)
+
+class InvalidConnectorRequestError(FlowerError):
+    """Exception raised when a connector request is invalid."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            ApiErrorCode.INVALID_CONNECTOR_REQUEST,
+            f"Invalid connector request: {reason}.",
+        )
+
+
+class ConnectorFailureError(FlowerError):
+    """Exception raised when a connector operation fails."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            ApiErrorCode.CONNECTOR_FAILURE, f"Connector failure: {reason}."
+        )
 
 
 def list_connectors(
@@ -186,7 +205,7 @@ def disconnect_connector(
     log(INFO, "ControlServicer.DisconnectConnector")
     connector_ref = request.connector_ref.strip().lower()
     if not connector_ref:
-        _raise_invalid_connector_request("connector_ref is required")
+        raise InvalidConnectorRequestError("connector_ref is required")
     try:
         connector_registry.get_oauth_connector_provider(connector_ref)
     except ValueError:
@@ -215,10 +234,10 @@ def begin_connector_oauth(
     log(INFO, "ControlServicer.BeginConnectorOAuth")
     connector_ref = request.connector_ref.strip().lower()
     if not connector_ref:
-        _raise_invalid_connector_request("connector_ref is required")
+        raise InvalidConnectorRequestError("connector_ref is required")
     redirect_uri = request.redirect_uri.strip()
     if not redirect_uri:
-        _raise_invalid_connector_request("redirect_uri is required")
+        raise InvalidConnectorRequestError("redirect_uri is required")
     try:
         provider = connector_registry.get_oauth_connector_provider(connector_ref)
     except ValueError:
@@ -228,18 +247,18 @@ def begin_connector_oauth(
         ) from None
     try:
         redirect_uri = provider.resolve_redirect_uri(redirect_uri)
-    except ValueError:
-        _raise_invalid_connector_request(
+    except ValueError as err:
+        raise InvalidConnectorRequestError(
             "redirect_uri is not allowed for this connector"
-        )
+        ) from err
     # Provider implementations can raise arbitrary exceptions; sanitize them.
     except Exception as err:  # pylint: disable=broad-exception-caught
-        _raise_connector_failure(
+        raise ConnectorFailureError(
             f"Connector '{connector_ref}' failed to resolve redirect URI "
             f"({type(err).__name__})"
-        )
+        ) from None
     if not redirect_uri:
-        _raise_connector_failure(
+        raise ConnectorFailureError(
             f"Connector '{connector_ref}' failed to resolve redirect URI "
             "(empty response)"
         )
@@ -258,12 +277,12 @@ def begin_connector_oauth(
         )
     # Provider implementations can raise arbitrary exceptions; sanitize them.
     except Exception as err:  # pylint: disable=broad-exception-caught
-        _raise_connector_failure(
+        raise ConnectorFailureError(
             f"Connector '{connector_ref}' failed to build authorization URL "
             f"({type(err).__name__})"
-        )
+        ) from None
     if not authorization_url:
-        _raise_connector_failure(
+        raise ConnectorFailureError(
             f"Connector '{connector_ref}' failed to build authorization URL "
             "(empty response)"
         )
@@ -278,7 +297,7 @@ def begin_connector_oauth(
         expires_at=expires_at,
     )
     if session is None:
-        _raise_connector_failure("OAuth session could not be created")
+        raise ConnectorFailureError("OAuth session could not be created")
 
     return BeginConnectorOAuthResponse(
         oauth_session_id=session.oauth_session_id,
@@ -297,12 +316,12 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
     log(INFO, "ControlServicer.CompleteConnectorOAuth")
     oauth_session_id = request.oauth_session_id.strip()
     if not oauth_session_id:
-        _raise_invalid_connector_request("oauth_session_id is required")
+        raise InvalidConnectorRequestError("oauth_session_id is required")
     authorization_code = request.code.strip()
     if not authorization_code:
-        _raise_invalid_connector_request("code is required")
+        raise InvalidConnectorRequestError("code is required")
     if not request.state:
-        _raise_invalid_connector_request("state is required")
+        raise InvalidConnectorRequestError("state is required")
 
     session = state.get_connector_oauth_session(
         oauth_session_id=oauth_session_id, flwr_aid=account.flwr_aid
@@ -316,9 +335,9 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
     try:
         expires_at = datetime.fromisoformat(session.expires_at)
     except ValueError:
-        _raise_connector_failure("OAuth session expiry is invalid")
+        raise ConnectorFailureError("OAuth session expiry is invalid") from None
     if expires_at.utcoffset() is None:
-        _raise_connector_failure("OAuth session expiry is timezone-naive")
+        raise ConnectorFailureError("OAuth session expiry is timezone-naive")
     if (
         session.completed_at is not None
         or expires_at <= now()
@@ -326,7 +345,7 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
             request.state.encode("utf-8"), session.state.encode("utf-8")
         )
     ):
-        _raise_invalid_connector_request(
+        raise InvalidConnectorRequestError(
             f"OAuth session '{session.oauth_session_id}' is invalid or no longer "
             "pending"
         )
@@ -344,7 +363,7 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
         flwr_aid=account.flwr_aid,
     )
     if not claimed:
-        _raise_invalid_connector_request(
+        raise InvalidConnectorRequestError(
             f"OAuth session '{session.oauth_session_id}' is invalid or no longer "
             "pending"
         )
@@ -357,18 +376,18 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
         )
     # Provider implementations can raise arbitrary exceptions; sanitize them.
     except Exception as err:  # pylint: disable=broad-exception-caught
-        _raise_connector_failure(
+        raise ConnectorFailureError(
             f"Connector '{connector_ref}' failed to exchange authorization code "
             f"({type(err).__name__})"
-        )
+        ) from None
     try:
         credentials_json = strict_json_dumps(credentials, compact=True)
         config_json = strict_json_dumps(config, compact=True)
     except (TypeError, ValueError) as err:
-        _raise_connector_failure(
+        raise ConnectorFailureError(
             f"Connector '{connector_ref}' failed to serialize exchanged "
             f"credentials ({type(err).__name__})"
-        )
+        ) from None
 
     stored = state.upsert_connector(
         flwr_aid=account.flwr_aid,
@@ -377,24 +396,8 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
         config_json=config_json,
     )
     if not stored:
-        _raise_connector_failure("Connector credentials could not be stored")
+        raise ConnectorFailureError("Connector credentials could not be stored")
     return CompleteConnectorOAuthResponse(connector_ref=connector_ref)
-
-
-def _raise_invalid_connector_request(reason: str) -> NoReturn:
-    """Raise a sanitized invalid connector request error."""
-    raise FlowerError(
-        ApiErrorCode.INVALID_CONNECTOR_REQUEST,
-        f"Invalid connector request: {reason}.",
-    )
-
-
-def _raise_connector_failure(reason: str) -> NoReturn:
-    """Raise a sanitized connector failure."""
-    raise FlowerError(
-        ApiErrorCode.CONNECTOR_FAILURE,
-        f"Connector failure: {reason}.",
-    ) from None
 
 
 def validate_run_connector_refs(
@@ -403,14 +406,12 @@ def validate_run_connector_refs(
     state: LinkState,
 ) -> list[str]:
     """Validate and canonicalize OAuth connector references for a new run."""
-    validated_refs: list[str] = []
-    seen: set[str] = set()
-    for requested_ref in connector_refs:
-        connector_ref = requested_ref.strip().lower()
-        if not connector_ref:
-            _raise_invalid_connector_request("connector_ref is required")
-        if connector_ref in seen:
-            continue
+    canonical_refs = list(
+        dict.fromkeys(requested_ref.strip().lower() for requested_ref in connector_refs)
+    )
+    if "" in canonical_refs:
+        raise InvalidConnectorRequestError("connector_ref is required")
+    for connector_ref in canonical_refs:
         try:
             connector_registry.get_oauth_connector_provider(connector_ref)
         except ValueError:
@@ -418,20 +419,13 @@ def validate_run_connector_refs(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
                 f"OAuth provider for connector '{connector_ref}' was not found.",
             ) from None
-        if (
-            state.get_connector(
-                flwr_aid=account.flwr_aid,
-                connector_ref=connector_ref,
-            )
-            is None
-        ):
+        connector = state.get_connector(account.flwr_aid, connector_ref)
+        if connector is None:
             raise FlowerError(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
                 f"Connector '{connector_ref}' is not connected for this account.",
             )
-        seen.add(connector_ref)
-        validated_refs.append(connector_ref)
-    return validated_refs
+    return canonical_refs
 
 
 def start_run(  # pylint: disable=too-many-locals, too-many-statements
@@ -494,7 +488,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
         # Validate user config overrides matches keys in run config in FAB
         fab_config = get_fab_config(fab_file)
         run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
-        _ = fuse_dicts(run_config, override_config)
+        fused_run_config = fuse_dicts(run_config, override_config)
 
         # Derive primary task type from the submitted FAB. AgentApp-only FABs can
         # be bundled locally and submitted through the regular `flwr run` path.
@@ -532,6 +526,12 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
                 f"FAB ({fab.hash_str}) hash from request doesn't match contents"
             )
         fab_id, fab_version = get_metadata_from_config(fab_config)
+        series_id = request.series_id if request.HasField("series_id") else None
+        series_description: str | None = None
+        if primary_task_type == TaskType.AGENT_APP and series_id is None:
+            series_description = (
+                _derive_run_series_description(fused_run_config) or None
+            )
 
         run_id = state.create_run(
             fab_id,
@@ -542,7 +542,8 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
             resolved_federation_config,
             flwr_aid,
             primary_task_type,
-            request.series_id if request.HasField("series_id") else None,
+            series_id=series_id,
+            series_description=series_description,
             connector_refs=connector_refs,
         )
 
@@ -613,7 +614,7 @@ def list_runs(
             state, flwr_aid, runs[0].federation_id
         )
 
-    # Clear objects of finished runs
+    # Clean up resources of finished runs
     # Resolve only non-caller run owners; caller-owned runs use `account_name`.
     account_names = resolve_account_ids(
         {run.flwr_aid for run in runs if run.flwr_aid != flwr_aid}
@@ -622,7 +623,7 @@ def list_runs(
     for run in runs:
         run.account_name = account_names[run.flwr_aid]
         if run.status.status == Status.FINISHED:
-            state.object_store.delete_objects_in_run(run.run_id)
+            state.cleanup_run(run.run_id)
 
     # Construct and return response
     return ListRunsResponse(
@@ -1262,6 +1263,18 @@ def _resolve_federation_id(
     return federation_id
 
 
+def _derive_run_series_description(run_config: UserConfig) -> str:
+    """Derive a concise RunSeries description from the agent input."""
+    agent_input = run_config.get("agent.input")
+    if not isinstance(agent_input, str):
+        return ""
+
+    description = " ".join(agent_input.split())
+    if len(description) <= RUN_SERIES_DESCRIPTION_MAX_LENGTH:
+        return description
+    return f"{description[: RUN_SERIES_DESCRIPTION_MAX_LENGTH - 1]}…"
+
+
 class FederationNotSpecified(FlowerError):
     """Exception raised when a federation is not specified in a request that requires
     one."""
@@ -1383,7 +1396,7 @@ def _get_remote_fab(
         ) from e
 
     # Request download link and verification information
-    url = f"{PLATFORM_API_URL}/hub/fetch-fab"
+    url = f"{FLWR_SUPERGRID_API_URL}/hub/fetch-fab"
     try:
         presigned_url, verifications, note = request_download_link(
             app_id, app_version, url, "fab_url"

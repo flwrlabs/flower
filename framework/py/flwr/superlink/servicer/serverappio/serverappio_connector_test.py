@@ -20,7 +20,10 @@ from unittest.mock import Mock, patch
 import grpc
 from parameterized import parameterized
 
-from flwr.proto.appio_pb2 import GetConnectorRequest, GetConnectorResponse
+from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetConnectorRequest,
+    GetConnectorResponse,
+)
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, TaskType
 from flwr.supercore.object_store import ObjectStoreFactory

@@ -202,7 +202,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         message_id = self.mock_receive.return_value[0].metadata.message_id
         self.mock_state.get_run.return_value = Mock(fab_hash=fab_hash)
         self.mock_state.create_task.return_value = task_id
-        self.mock_pull_object.side_effect = RuntimeError("boom")
+        self.mock_pull_object.side_effect = RuntimeError("error")
 
         res = _pull_and_store_message(
             state=self.mock_state,
@@ -216,7 +216,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             trusted_entities={},
         )
 
-        assert res == self.run_id
+        assert res is None
         self.mock_state.create_task.assert_called_once_with(
             task_type=TaskType.CLIENT_APP,
             run_id=self.run_id,
@@ -229,7 +229,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.finish_task.assert_called_once_with(
             task_id,
             sub_status=SubStatus.FAILED,
-            details="Pulling message objects failed.",
+            details="Pulling message objects failed: error",
         )
         self.mock_confirm_message_received.assert_not_called()
 

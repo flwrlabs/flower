@@ -108,6 +108,7 @@ from flwr.superlink.servicer.control.control_account_auth_interceptor import (
 )
 
 from .control_handlers import (
+    _derive_run_series_description,
     _format_verification,
     _validate_federation_and_node_in_request,
     _validate_federation_membership_in_request,
@@ -160,6 +161,22 @@ class _OAuthProvider:
 
 class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     """Test the Control API servicer."""
+
+    def test_derive_run_series_description(self) -> None:
+        """Test normalizing, clipping, and omitting agent input."""
+        self.assertEqual(
+            _derive_run_series_description(
+                {"agent.input": "  Hello\n  from\tthe agent  "}
+            ),
+            "Hello from the agent",
+        )
+        self.assertEqual(
+            _derive_run_series_description({"agent.input": "a" * 81}),
+            f"{'a' * 79}…",
+        )
+        self.assertEqual(_derive_run_series_description({"agent.input": 42}), "")
+        self.assertEqual(_derive_run_series_description({"agent.input": " \n\t "}), "")
+        self.assertEqual(_derive_run_series_description({}), "")
 
     def setUp(self) -> None:
         """Set up test fixtures."""
@@ -391,25 +408,18 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
         """StartRun should bind canonical connected OAuth connector refs."""
-        provider = Mock(
-            connector_ref="notion",
-            display_name="Notion",
-            description="Notion workspace",
+        provider = _OAuthProvider()
+        self.state.upsert_connector(
+            flwr_aid=self.aid,
+            connector_ref="slack",
+            credentials_json="{}",
+            config_json="{}",
         )
-        self.assertTrue(
-            self.state.upsert_connector(
-                flwr_aid=self.aid,
-                connector_ref="notion",
-                credentials_json='{"token":"secret"}',
-                config_json="{}",
-            )
-        )
-        fab_content = b"test FAB content with connector refs"
         request = StartRunRequest(
             federation=NOOP_FEDERATION_ID,
-            connector_refs=[" Notion ", "notion"],
+            connector_refs=[" Slack ", "slack"],
         )
-        request.fab.content = fab_content
+        request.fab.content = b"test FAB content with connector refs"
 
         with (
             patch.object(
@@ -431,36 +441,31 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(
             list(self.state.get_run_connector_refs(run_id=response.run_id)),
-            ["notion"],
+            ["slack"],
         )
 
     @parameterized.expand(  # type: ignore
         [
-            ("unknown", "unknown", None),
+            ("unknown", "unknown", ApiErrorCode.CONNECTOR_NOT_FOUND),
             ("empty", "  ", ApiErrorCode.INVALID_CONNECTOR_REQUEST),
-            ("other_account", "notion", ApiErrorCode.CONNECTOR_NOT_FOUND),
+            ("other_account", "slack", ApiErrorCode.CONNECTOR_NOT_FOUND),
         ]
     )
     def test_start_run_rejects_unavailable_oauth_connector(
         self,
         _name: str,
         connector_ref: str,
-        expected_code: ApiErrorCode | None,
+        expected_code: ApiErrorCode,
     ) -> None:
         """StartRun should reject invalid, unknown, and other-account refs."""
-        provider = Mock(
-            connector_ref="notion",
-            display_name="Notion",
-            description="Notion workspace",
-        )
-        self.assertTrue(
+        provider = _OAuthProvider()
+        if connector_ref == "slack":
             self.state.upsert_connector(
                 flwr_aid="other-account",
-                connector_ref="notion",
-                credentials_json='{"token":"secret"}',
+                connector_ref="slack",
+                credentials_json="{}",
                 config_json="{}",
             )
-        )
         request = StartRunRequest(connector_refs=[connector_ref])
 
         with (
@@ -473,10 +478,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         ):
             self.servicer.StartRun(request, Mock())
 
-        self.assertEqual(
-            error.exception.code,
-            expected_code or ApiErrorCode.CONNECTOR_NOT_FOUND,
-        )
+        self.assertEqual(error.exception.code, expected_code)
         self.assertEqual(list(self.state.get_run_info()), [])
 
     def test_start_run_defaults_to_account_simulation_federation(self) -> None:
@@ -592,7 +594,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.fab.content = fab_content
         request.federation = NOOP_FEDERATION_ID
-        for key, value in user_config_to_proto({"agent.input": "Hello"}).items():
+        agent_input = "  Hello\n  from\tthe agent  "
+        for key, value in user_config_to_proto({"agent.input": agent_input}).items():
             request.override_config[key].CopyFrom(value)
 
         with (
@@ -612,7 +615,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 "tool": {
                     "flwr": {
                         "app": {
-                            "config": {"agent": {"input": ""}},
+                            "config": {"agent": {"input": "Default input"}},
                             "components": {"agentapp": "agent:app"},
                         }
                     }
@@ -623,12 +626,14 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         runs = self.state.get_run_info(run_ids=[response.run_id])
         tasks = self.state.get_tasks()
+        series = self.state.get_run_series(series_ids=[response.series_id])
 
         self.assertEqual(len(runs), 1)
         self.assertEqual(runs[0].fab_id, "flwr/agent")
         self.assertEqual(runs[0].fab_version, "0.1.0")
         self.assertEqual(runs[0].primary_task_type, TaskType.AGENT_APP)
-        self.assertEqual(runs[0].override_config["agent.input"], "Hello")
+        self.assertEqual(runs[0].override_config["agent.input"], agent_input)
+        self.assertEqual(series[0].description, "Hello from the agent")
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, TaskType.AGENT_APP)

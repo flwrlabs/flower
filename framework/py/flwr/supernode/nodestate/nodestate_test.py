@@ -135,10 +135,11 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         """Test storing a message and preregistering its object tree."""
         # Prepare
         msg = make_dummy_message()
+        session_id = self.state.start_session(msg.metadata.run_id)
 
         # Execute
         stored, missing_objects = self.state.store_message_and_object_tree(
-            msg, get_object_tree(msg)
+            msg, get_object_tree(msg), session_id
         )
 
         # Assert

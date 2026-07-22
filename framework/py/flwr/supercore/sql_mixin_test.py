@@ -28,7 +28,7 @@ from .sql_mixin import SqlMixin
 class DummyDbSqlAlchemy(SqlMixin):
     """Simple subclass for testing SqlMixin behavior with SQLAlchemy."""
 
-    allowed_dialects = None  # type: ignore[assignment]
+    allowed_dialects: frozenset[str] | None = None
 
     def get_metadata(self) -> MetaData:
         """Return MetaData with test table definition."""
