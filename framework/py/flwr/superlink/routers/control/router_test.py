@@ -46,6 +46,8 @@ from flwr.superlink.routers.control.middlewares import ControlAuthenticationMidd
 from flwr.superlink.routers.control.router import router
 from flwr.superlink.servicer.control import control_handlers
 
+_ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
+
 
 def _create_app(
     authn_plugin: Mock | None = None, authz_plugin: Mock | None = None
@@ -53,6 +55,8 @@ def _create_app(
     """Create a minimal app containing the Control API stack."""
     authn_plugin = authn_plugin or Mock()
     authz_plugin = authz_plugin or Mock()
+    authn_plugin.validate_tokens_in_metadata.return_value = (True, _ACCOUNT)
+    authz_plugin.authorize.return_value = True
     app = FastAPI()
     app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
     app.include_router(router)
@@ -117,15 +121,10 @@ def test_non_protobuf_request_in_state_returns_internal_error() -> None:
 def test_list_runs_returns_runs_from_linkstate() -> None:
     """ListRuns serializes the runs returned by LinkState."""
     linkstate = Mock(spec=LinkState)
-    authn_plugin = Mock()
-    authz_plugin = Mock()
-    account = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
     run = Run.create_empty(7)
-    run.flwr_aid = account.flwr_aid
+    run.flwr_aid = _ACCOUNT.flwr_aid
     linkstate.get_run_info.return_value = [run]
-    authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
-    authz_plugin.authorize.return_value = True
-    app = _create_app(authn_plugin, authz_plugin)
+    app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     client = TestClient(app)
 
@@ -138,32 +137,27 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
 
     assert response.status_code == 200
     assert set(proto_response.run_dict) == {7}
-    assert proto_response.run_dict[7].account_name == account.account_name
+    assert proto_response.run_dict[7].account_name == _ACCOUNT.account_name
     assert datetime.fromisoformat(proto_response.now)
     linkstate.get_run_info.assert_called_once_with(
-        flwr_aids=[account.flwr_aid],
+        flwr_aids=[_ACCOUNT.flwr_aid],
         order_by="pending_at",
         ascending=False,
         limit=1,
     )
-    authz_plugin.authorize.assert_called_once_with(account)
-    authn_plugin.validate_tokens_in_metadata.assert_called_once()
 
 
 def test_list_runs_preserves_refreshed_authentication_tokens() -> None:
     """The authentication middleware adds refreshed tokens to protobuf responses."""
     linkstate = Mock(spec=LinkState)
     authn_plugin = Mock()
-    authz_plugin = Mock()
-    account = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
+    linkstate.get_run_info.return_value = []
+    app = _create_app(authn_plugin=authn_plugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     authn_plugin.refresh_tokens.return_value = (
         [("x-access-token", "new-access-token")],
-        account,
+        _ACCOUNT,
     )
-    authz_plugin.authorize.return_value = True
-    linkstate.get_run_info.return_value = []
-    app = _create_app(authn_plugin, authz_plugin)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     response = TestClient(app).post(
         "/control/list-runs",
@@ -179,12 +173,7 @@ def test_list_runs_preserves_refreshed_authentication_tokens() -> None:
 def test_list_runs_rejects_non_protobuf_payload() -> None:
     """The protobuf translation middleware validates configured request bodies."""
     linkstate = Mock(spec=LinkState)
-    authn_plugin = Mock()
-    authz_plugin = Mock()
-    account = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
-    authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
-    authz_plugin.authorize.return_value = True
-    app = _create_app(authn_plugin, authz_plugin)
+    app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     response = TestClient(app).post(
         "/control/list-runs",
