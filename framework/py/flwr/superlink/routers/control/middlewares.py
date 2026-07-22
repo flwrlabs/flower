@@ -17,11 +17,39 @@
 
 from fastapi import Request
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.types import ASGIApp
 
 from flwr.supercore.constant import UNAUTHENTICATED_PATHS
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.license_plugin import LicensePlugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
+
+
+class ControlLicenseMiddleware(BaseHTTPMiddleware):
+    """Check the license before Control API handlers run."""
+
+    def __init__(self, app: ASGIApp, license_plugin: LicensePlugin) -> None:
+        super().__init__(app)
+        self._license_plugin = license_plugin
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        """Reject Control API requests when the configured license is invalid."""
+        if request.url.path != "/control" and not request.url.path.startswith(
+            "/control/"
+        ):
+            return await call_next(request)
+
+        if not await run_in_threadpool(self._license_plugin.check_license):
+            raise FlowerError(
+                ApiErrorCode.LICENSE_CHECK_FAILED,
+                "License check failed.",
+            )
+
+        return await call_next(request)
 
 
 class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
