@@ -121,7 +121,8 @@ def get_license_plugin() -> LicensePlugin | None:
     except ImportError:
         return None
 
-    return cast(LicensePlugin | None, get_ee_license_plugin())
+    ret: LicensePlugin | None = get_ee_license_plugin()
+    return ret
 
 
 def get_federation_manager(is_simulation: bool = False) -> FederationManager:
