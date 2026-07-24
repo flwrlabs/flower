@@ -14,14 +14,14 @@
 # ==============================================================================
 """SuperLink API."""
 
-
 from __future__ import annotations
 
 import os
 from collections.abc import AsyncIterator, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
 from logging import INFO
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
+from urllib.parse import quote
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
@@ -49,6 +49,47 @@ from flwr.superlink.routers.control.middlewares import (
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
+
+
+_FLWR_POSTGRES_ENV_VARS = (
+    "FLWR_POSTGRES_HOST",
+    "FLWR_POSTGRES_PORT",
+    "FLWR_POSTGRES_DATABASE",
+    "FLWR_POSTGRES_USER",
+    "FLWR_POSTGRES_PASSWORD",
+)
+
+
+def _get_database_from_env() -> str:
+    """Return the database configured through environment variables."""
+    if database := os.getenv("FLWR_DATABASE"):
+        return database
+
+    postgres_values = {
+        env_var: os.getenv(env_var) for env_var in _FLWR_POSTGRES_ENV_VARS
+    }
+    if not any(postgres_values.values()):
+        return FLWR_IN_MEMORY_DB_NAME
+
+    missing = [env_var for env_var, value in postgres_values.items() if not value]
+    if missing:
+        missing_vars = ", ".join(missing)
+        raise ValueError(
+            "The PostgreSQL environment variables must be set together: "
+            f"{missing_vars}."
+        )
+
+    host = cast(str, postgres_values["FLWR_POSTGRES_HOST"])
+    port = cast(str, postgres_values["FLWR_POSTGRES_PORT"])
+    database = cast(str, postgres_values["FLWR_POSTGRES_DATABASE"])
+    user = cast(str, postgres_values["FLWR_POSTGRES_USER"])
+    password = cast(str, postgres_values["FLWR_POSTGRES_PASSWORD"])
+
+    return (
+        "postgresql+psycopg://"
+        f"{quote(user, safe='')}:{quote(password, safe='')}@"
+        f"{host}:{port}/{quote(database, safe='')}?sslmode=require"
+    )
 
 
 def generate_unique_route_id(route: APIRoute) -> str:
@@ -79,7 +120,7 @@ def create_app(
     """Create the SuperLink FastAPI app and its shared lifespan resources."""
     if config is None:
         is_simulation = False
-        database = os.getenv("FLWR_DATABASE", FLWR_IN_MEMORY_DB_NAME)
+        database = _get_database_from_env()
         authn_plugin, authz_plugin = load_control_auth_plugins(
             os.getenv("FLWR_ACCOUNT_AUTH_CONFIG"), verify_tls_cert=True
         )
