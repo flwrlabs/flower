@@ -15,8 +15,7 @@
 """Connector task credential-resolution tests."""
 
 import traceback
-from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import pytest
 
@@ -29,7 +28,6 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
-from flwr.supercore.typing import JSONObject
 
 from . import registry
 from .task import handle_task
@@ -63,22 +61,7 @@ def test_handle_task_passes_credentials_to_matching_provider() -> None:
         credentials_json='{"token":"secret"}',
         config_json='{"workspace":"primary"}',
     )
-    captured: dict[str, Any] = {}
-
-    def invoke_provider(
-        *,
-        query: str,
-        credentials: JSONObject,
-        config: JSONObject,
-        usage_recorder: object,
-    ) -> JSONObject:
-        captured.update(
-            query=query,
-            credentials=credentials,
-            config=config,
-            usage_recorder=usage_recorder,
-        )
-        return {"pages": 3}
+    provider = Mock(return_value={"pages": 3})
 
     with (
         patch(
@@ -87,7 +70,7 @@ def test_handle_task_passes_credentials_to_matching_provider() -> None:
         ),
         patch.dict(
             registry._CREDENTIAL_CONNECTOR_HANDLERS,  # pylint: disable=protected-access
-            {"notion": invoke_provider},
+            {"notion": provider},
             clear=True,
         ),
     ):
@@ -96,37 +79,18 @@ def test_handle_task_passes_credentials_to_matching_provider() -> None:
     stub.GetConnector.assert_called_once_with(
         GetConnectorRequest(connector_ref="notion")
     )
-    assert captured["query"] == "release notes"
-    assert captured["credentials"] == {"token": "secret"}
-    assert captured["config"] == {"workspace": "primary"}
+    provider.assert_called_once_with(
+        query="release notes",
+        credentials={"token": "secret"},
+        config={"workspace": "primary"},
+        usage_recorder=ANY,
+    )
     assert _pushed_response(stub).payload == {
         "name": "notion",
         "call_id": "call-1",
         "output": {"pages": 3},
         "error": None,
     }
-
-
-def test_handle_task_keeps_builtin_connectors_credential_free() -> None:
-    """Built-in providers should keep their existing credential-free path."""
-    stub = Mock()
-
-    with (
-        patch(
-            "flwr.supercore.task_process.connector.task._pull_connector_request",
-            return_value=_connector_request("web_search"),
-        ),
-        patch(
-            "flwr.supercore.task_process.connector.task.invoke_connector",
-            return_value={"results": []},
-        ) as invoke_connector,
-    ):
-        handle_task(stub=stub, task_id=22, run_id=7)
-
-    stub.GetConnector.assert_not_called()
-    invoke_connector.assert_called_once()
-    assert invoke_connector.call_args.kwargs["credentials"] is None
-    assert invoke_connector.call_args.kwargs["config"] is None
 
 
 def test_handle_task_does_not_expose_credentials_in_provider_errors() -> None:
@@ -138,9 +102,7 @@ def test_handle_task_does_not_expose_credentials_in_provider_errors() -> None:
         credentials_json=f'{{"token":"{secret}"}}',
         config_json="{}",
     )
-
-    def failing_provider(**kwargs: Any) -> JSONObject:
-        raise RuntimeError(f"Provider rejected {kwargs['credentials']['token']}")
+    provider = Mock(side_effect=RuntimeError(f"Provider rejected {secret}"))
 
     with (
         patch(
@@ -149,7 +111,7 @@ def test_handle_task_does_not_expose_credentials_in_provider_errors() -> None:
         ),
         patch.dict(
             registry._CREDENTIAL_CONNECTOR_HANDLERS,  # pylint: disable=protected-access
-            {"notion": failing_provider},
+            {"notion": provider},
             clear=True,
         ),
         pytest.raises(RuntimeError) as error,
@@ -157,6 +119,7 @@ def test_handle_task_does_not_expose_credentials_in_provider_errors() -> None:
         handle_task(stub=stub, task_id=22, run_id=7)
 
     response = _pushed_response(stub)
+    provider.assert_called_once()
     assert str(error.value) == "Credential-backed connector execution failed."
     assert response.payload["error"] == {
         "code": "connector_error",

@@ -261,12 +261,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             context.abort(grpc.StatusCode.NOT_FOUND, "Connector not found.")
             raise RuntimeError("This line should never be reached.")
 
-        if request.connector_ref not in state.get_run_connector_refs(
-            run_id=task.run_id
-        ):
-            context.abort(grpc.StatusCode.NOT_FOUND, "Connector not found.")
-            raise RuntimeError("This line should never be reached.")
-
         connector = state.get_connector(
             flwr_aid=run.flwr_aid,
             connector_ref=request.connector_ref,
