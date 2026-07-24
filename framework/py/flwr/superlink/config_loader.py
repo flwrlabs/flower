@@ -122,8 +122,8 @@ def get_license_plugin() -> LicensePlugin | None:
     except ImportError:
         return None
 
-    result: LicensePlugin | None = get_ee_license_plugin()
-    return result
+    ret: LicensePlugin | None = get_ee_license_plugin()
+    return ret
 
 
 def load_control_event_log_plugin() -> EventLogWriterPlugin:

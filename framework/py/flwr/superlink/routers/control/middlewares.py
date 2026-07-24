@@ -98,6 +98,9 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
             pass
 
         return response
+def _is_control_path(path: str) -> bool:
+    """Return whether the path belongs to a Control API endpoint."""
+    return path.startswith("/control/")
 
 
 class ControlLicenseMiddleware(BaseHTTPMiddleware):
@@ -111,7 +114,7 @@ class ControlLicenseMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Skip checks without a plugin and reject requests with an invalid license."""
-        if self._license_plugin is None or not request.url.path.startswith("/control/"):
+        if self._license_plugin is None or not _is_control_path(request.url.path):
             return await call_next(request)
 
         if not await run_in_threadpool(self._license_plugin.check_license):
@@ -131,7 +134,7 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         """Authenticate the request and preserve any refreshed token headers."""
         if (
-            not request.url.path.startswith("/control")
+            not _is_control_path(request.url.path)
             or request.url.path in UNAUTHENTICATED_PATHS
         ):
             return await call_next(request)
