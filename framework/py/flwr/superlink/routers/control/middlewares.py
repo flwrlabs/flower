@@ -98,6 +98,8 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
             pass
 
         return response
+
+
 def _is_control_path(path: str) -> bool:
     """Return whether the path belongs to a Control API endpoint."""
     return path.startswith("/control/")
