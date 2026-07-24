@@ -37,11 +37,13 @@ from flwr.superlink.config_loader import (
     get_federation_manager,
     get_objectstore_linkstate_factories,
     load_control_auth_plugins,
+    load_control_event_log_plugin,
 )
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.routers.control import router as control_router
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
+    ControlEventLogMiddleware,
     ControlLicenseMiddleware,
 )
 
@@ -81,10 +83,16 @@ def create_app(
         authn_plugin, authz_plugin = load_control_auth_plugins(
             os.getenv("FLWR_ACCOUNT_AUTH_CONFIG"), verify_tls_cert=True
         )
+        event_log_plugin = (
+            load_control_event_log_plugin()
+            if os.getenv("FLWR_ENABLE_EVENT_LOG") == "1"
+            else None
+        )
     else:
         is_simulation = config.simulation
         database = config.database
         authn_plugin, authz_plugin = config.authn_plugin, config.authz_plugin
+        event_log_plugin = config.event_log_plugin
 
     federation_manager = get_federation_manager(is_simulation=is_simulation)
     _, linkstate_factory = get_objectstore_linkstate_factories(
@@ -140,12 +148,14 @@ def create_app(
     fastapi_app.state.account_access_dep = AccountAccessDependency(
         authn_plugin, authz_plugin
     )
+    fastapi_app.state.control_event_log_plugin = event_log_plugin
 
     # Core APIs
     # fastapi_app.include_router(health.router)
 
     # SuperLink APIs
     fastapi_app.include_router(control_router)
+    fastapi_app.add_middleware(ControlEventLogMiddleware)
     fastapi_app.add_middleware(ProtobufTranslationMiddleware)
     fastapi_app.add_middleware(ControlLicenseMiddleware)
     fastapi_app.add_middleware(ControlAuthenticationMiddleware)

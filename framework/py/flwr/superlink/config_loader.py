@@ -29,6 +29,7 @@ from flwr.common.constant import (
     AUTHZ_TYPE_YAML_KEY,
     AuthnType,
     AuthzType,
+    EventLogWriterType,
 )
 from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.common.logger import log
@@ -121,7 +122,27 @@ def get_license_plugin() -> LicensePlugin | None:
     except ImportError:
         return None
 
-    return cast(LicensePlugin | None, get_ee_license_plugin())
+    ret: LicensePlugin | None = get_ee_license_plugin()
+    return ret
+
+
+def load_control_event_log_plugin() -> EventLogWriterPlugin:
+    """Load the configured Control API event log writer plugin."""
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from flwr.ee import get_control_event_log_writer_plugins
+    except ImportError:
+        sys.exit("No event log writer plugins are currently supported.")
+
+    try:
+        plugins: dict[str, type[EventLogWriterPlugin]] = (
+            get_control_event_log_writer_plugins()
+        )
+        return plugins[EventLogWriterType.STDOUT]()
+    except KeyError:
+        sys.exit("No event log writer plugin is provided.")
+    except NotImplementedError:
+        sys.exit("No event log writer plugins are currently supported.")
 
 
 def get_federation_manager(is_simulation: bool = False) -> FederationManager:
