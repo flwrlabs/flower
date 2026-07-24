@@ -92,6 +92,7 @@ from flwr.superlink.config_loader import (
     get_federation_manager,
     get_objectstore_linkstate_factories,
     load_control_auth_plugins,
+    load_control_event_log_plugin,
 )
 from flwr.superlink.servicer.control import run_control_api_grpc
 from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
@@ -99,7 +100,6 @@ from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
 try:
     from flwr.ee import (
         add_ee_args_superlink,
-        get_control_event_log_writer_plugins,
         get_ee_artifact_provider,
         get_fleet_event_log_writer_plugins,
     )
@@ -108,12 +108,6 @@ except ImportError:
     # pylint: disable-next=unused-argument
     def add_ee_args_superlink(parser: argparse.ArgumentParser) -> None:
         """Add EE-specific arguments to the parser."""
-
-    def get_control_event_log_writer_plugins() -> dict[str, type[EventLogWriterPlugin]]:
-        """Return all Control API event log writer plugins."""
-        raise NotImplementedError(
-            "No event log writer plugins are currently supported."
-        )
 
     def get_ee_artifact_provider(config_path: str) -> ArtifactProvider:
         """Return the EE artifact provider."""
@@ -421,7 +415,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
     if cfg_path is not None:
         # Enable event logging if the args.enable_event_log is True
         if args.enable_event_log:
-            event_log_plugin = _try_obtain_control_event_log_writer_plugin()
+            event_log_plugin = load_control_event_log_plugin()
 
     # Load artifact provider if the args.artifact_provider_config is provided
     artifact_provider = None
@@ -668,20 +662,6 @@ def _get_superexec_command(
 def _runtime_dependency_install_default() -> bool:
     """Return default runtime dependency installation setting."""
     return os.getenv(FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION) != "1"
-
-
-def _try_obtain_control_event_log_writer_plugin() -> EventLogWriterPlugin | None:
-    """Return an instance of the event log writer plugin."""
-    try:
-        all_plugins: dict[str, type[EventLogWriterPlugin]] = (
-            get_control_event_log_writer_plugins()
-        )
-        plugin_class = all_plugins[EventLogWriterType.STDOUT]
-        return plugin_class()
-    except KeyError:
-        sys.exit("No event log writer plugin is provided.")
-    except NotImplementedError:
-        sys.exit("No event log writer plugins are currently supported.")
 
 
 def _try_obtain_fleet_event_log_writer_plugin() -> EventLogWriterPlugin | None:
