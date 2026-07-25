@@ -506,6 +506,45 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         return True
 
+    def bind_connectors_to_run(
+        self, run_id: int, connector_refs: Sequence[str]
+    ) -> bool:
+        """Associate connector references with a run."""
+        if isinstance(connector_refs, str):
+            return False
+        stored_run_id = uint64_to_int64(run_id)
+        bound_refs = set(self.get_run_connector_refs(run_id))
+        data = [
+            {
+                "run_id": stored_run_id,
+                "connector_ref": connector_ref,
+            }
+            for connector_ref in dict.fromkeys(connector_refs)
+            if connector_ref not in bound_refs
+        ]
+        if data:
+            self.query(
+                """
+                INSERT INTO run_connector (run_id, connector_ref)
+                VALUES (:run_id, :connector_ref)
+                """,
+                data,
+            )
+        return True
+
+    def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
+        """Return connector references associated with a run."""
+        rows = self.query(
+            """
+            SELECT connector_ref
+            FROM run_connector
+            WHERE run_id = :run_id
+            ORDER BY connector_ref
+            """,
+            {"run_id": uint64_to_int64(run_id)},
+        )
+        return [row["connector_ref"] for row in rows]
+
     def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         oauth_session_id: str,

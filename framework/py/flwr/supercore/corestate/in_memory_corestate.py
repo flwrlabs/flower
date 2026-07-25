@@ -116,6 +116,8 @@ class InMemoryCoreState(
         self.lock_fab_store = Lock()
         self.connector_store: dict[tuple[str, str], ConnectorRecord] = {}
         self.lock_connector_store = Lock()
+        self.run_connector_store: dict[int, set[str]] = {}
+        self.lock_run_connector_store = Lock()
         self.connector_oauth_session_store: dict[str, ConnectorOAuthSessionRecord] = {}
         self.lock_connector_oauth_session_store = Lock()
         self.nonce_store: dict[tuple[str, str], float] = {}
@@ -362,6 +364,21 @@ class InMemoryCoreState(
             return False
         with self.lock_connector_store:
             return self.connector_store.pop((flwr_aid, connector_ref), None) is not None
+
+    def bind_connectors_to_run(
+        self, run_id: int, connector_refs: Sequence[str]
+    ) -> bool:
+        """Associate connector references with a run."""
+        if isinstance(connector_refs, str):
+            return False
+        with self.lock_run_connector_store:
+            self.run_connector_store.setdefault(run_id, set()).update(connector_refs)
+        return True
+
+    def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
+        """Return connector references associated with a run."""
+        with self.lock_run_connector_store:
+            return sorted(self.run_connector_store.get(run_id, set()))
 
     def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,

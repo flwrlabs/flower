@@ -19,6 +19,7 @@ import unittest
 from unittest.mock import MagicMock
 
 import grpc
+from fastapi import Request
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common.dummy_grpc_handlers_test import (
@@ -45,7 +46,7 @@ class DummyLogPlugin(EventLogWriterPlugin):
     def compose_log_before_event(
         self,
         request: GrpcMessage,
-        context: grpc.ServicerContext,
+        context: grpc.ServicerContext | Request,
         account_info: AccountInfo | None,
         method_name: str,
     ) -> LogEntry:
@@ -64,7 +65,7 @@ class DummyLogPlugin(EventLogWriterPlugin):
     def compose_log_after_event(  # pylint: disable=too-many-arguments,R0917
         self,
         request: GrpcMessage,
-        context: grpc.ServicerContext,
+        context: grpc.ServicerContext | Request,
         account_info: AccountInfo | None,
         method_name: str,
         response: GrpcMessage | BaseException | None,

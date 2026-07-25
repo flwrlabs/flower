@@ -160,6 +160,7 @@ class RuntimeAgentResponses(AgentResponses):
         self, *, name: str, call_id: str, arguments: JSONObject
     ) -> JSONValue:
         """Create one connector response through a child connector task."""
+        name = name.strip().lower()
         create_res = self._stub.CreateTask(
             CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=name)
         )
