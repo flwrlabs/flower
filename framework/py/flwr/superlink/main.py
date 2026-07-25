@@ -25,6 +25,8 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
+from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from flwr.common import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
@@ -70,6 +72,18 @@ def _merge_lifespan_state(
                 "Please ensure each SuperLink extension provides unique state keys."
             )
         lifespan_state[key] = value
+
+
+def _get_middleware() -> list[Middleware]:
+    """Return middleware in request execution order, outermost first."""
+    return [
+        *extensions.get_middleware(),
+        Middleware(BaseHTTPMiddleware, dispatch=http_error_translator),
+        Middleware(ControlAuthenticationMiddleware),
+        Middleware(ControlLicenseMiddleware),
+        Middleware(ProtobufTranslationMiddleware),
+        Middleware(ControlEventLogMiddleware),
+    ]
 
 
 def create_app(
@@ -142,6 +156,7 @@ def create_app(
         redoc_url=None,
         lifespan=lifespan,
         generate_unique_id_function=generate_unique_route_id,
+        middleware=_get_middleware(),
     )
     fastapi_app.state.superlink_lifespan = superlink_lifespan
     fastapi_app.state.linkstate_factory = linkstate_factory
@@ -155,12 +170,6 @@ def create_app(
 
     # SuperLink APIs
     fastapi_app.include_router(control_router)
-    fastapi_app.add_middleware(ControlEventLogMiddleware)
-    fastapi_app.add_middleware(ProtobufTranslationMiddleware)
-    fastapi_app.add_middleware(ControlLicenseMiddleware)
-    fastapi_app.add_middleware(ControlAuthenticationMiddleware)
-    # Register last so it is outermost and translates errors from every Control layer.
-    fastapi_app.middleware("http")(http_error_translator)
     # fastapi_app.include_router(runtime.router)
 
     # Extension hooks
