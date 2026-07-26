@@ -47,7 +47,7 @@ jobs:
   publish-wheel:
     if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Publish wheel
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: authorize-manual-trigger
     outputs:
@@ -74,7 +74,7 @@ jobs:
 
   prepare-docker-build-matrix:
     name: Collect docker build parameters
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     needs: publish-wheel
     outputs:

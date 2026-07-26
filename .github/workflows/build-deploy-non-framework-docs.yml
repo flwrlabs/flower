@@ -17,7 +17,7 @@ env:
 
 jobs:
   build_and_deploy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Build and deploy (non-framework)
     steps:
       - uses: actions/checkout@v5

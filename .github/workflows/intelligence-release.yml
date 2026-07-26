@@ -12,7 +12,7 @@ concurrency:
 jobs:
   check-version:
     name: Check version consistency
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -30,7 +30,7 @@ jobs:
     needs: check-version
     if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Publish Flower Intelligence TypeScript SDK to NPM
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -63,7 +63,7 @@ jobs:
     needs: check-version
     if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Publish Flower Intelligence Kotlin SDK to Maven Central
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     env:
