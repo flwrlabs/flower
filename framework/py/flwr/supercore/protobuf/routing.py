@@ -17,7 +17,8 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable, Iterator
+from itertools import chain
 from typing import Any, cast, get_type_hints
 
 from fastapi import Request
@@ -26,6 +27,15 @@ from fastapi.routing import APIRoute
 from starlette.concurrency import run_in_threadpool
 
 _HTTP_REQUEST_PARAMETER = "_protobuf_http_request"
+_END_OF_STREAM = object()
+
+
+def _prime_iterable(
+    iterable: Iterable[object],
+) -> tuple[Iterator[object], object]:
+    """Return an iterator and its first item, if present."""
+    iterator = iter(iterable)
+    return iterator, next(iterator, _END_OF_STREAM)
 
 
 class ProtobufRoute(APIRoute):
@@ -56,6 +66,13 @@ class ProtobufRoute(APIRoute):
             # Resolve any awaitable result before storing it in the request state.
             if inspect.isawaitable(result):
                 result = await cast(Awaitable[object], result)
+
+            if isinstance(result, Iterable):
+                iterator, first = await run_in_threadpool(_prime_iterable, result)
+                if first is _END_OF_STREAM:
+                    result = iterator
+                else:
+                    result = chain((first,), iterator)
 
             http_request.state.protobuf_response = result
             return Response()
