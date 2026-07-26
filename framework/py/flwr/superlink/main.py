@@ -32,6 +32,7 @@ from flwr.common import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import http_error_translator
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
+from flwr.supercore.routers import health
 from flwr.supercore.version import package_version
 from flwr.superlink import extensions
 from flwr.superlink.config_loader import (
@@ -166,7 +167,7 @@ def create_app(
     fastapi_app.state.control_event_log_plugin = event_log_plugin
 
     # Core APIs
-    # fastapi_app.include_router(health.router)
+    fastapi_app.include_router(health.router)
 
     # SuperLink APIs
     fastapi_app.include_router(control_router)
