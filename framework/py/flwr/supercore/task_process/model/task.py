@@ -36,6 +36,14 @@ from .provider import ModelProviderError, invoke_model_provider
 
 _DEFAULT_TASK_EVENT_BATCH_SIZE = 16
 
+# Events that must be flushed immediately to update callers without waiting
+# for the ordinary batch to fill, and before any normal event retains them.
+_IMMEDIATE_FLUSH_EVENTS = frozenset(
+    {
+        "response.flower_fusion.progress",
+    }
+)
+
 
 def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
     """Run one model task request."""
@@ -72,7 +80,10 @@ def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
             return
         encoded = strict_json_dumps(event, compact=True)
         events.append(TaskEvent(event=cast(str, event["type"]), data=encoded))
-        if len(events) >= _DEFAULT_TASK_EVENT_BATCH_SIZE:
+        if (
+            len(events) >= _DEFAULT_TASK_EVENT_BATCH_SIZE
+            or event.get("type") in _IMMEDIATE_FLUSH_EVENTS
+        ):
             _flush_events()
 
     response = None
