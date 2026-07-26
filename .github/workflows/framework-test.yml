@@ -68,6 +68,15 @@ jobs:
           - task: pytest
             name: Pytest
             python: '3.13'
+          - task: pytest_serial
+            name: Pytest serial scopes
+            python: '3.11'
+          - task: pytest_serial
+            name: Pytest serial scopes
+            python: '3.12'
+          - task: pytest_serial
+            name: Pytest serial scopes
+            python: '3.13'
 
     name: ${{ matrix.name }} (Python ${{ matrix.python }})
 
@@ -117,7 +126,34 @@ jobs:
         if: ${{ matrix.task == 'pytest' && needs.changes.outputs.framework == 'true' }}
         run: |
           cd framework
-          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest --cov=py/flwr --durations=25 --durations-min=0.5
+          # Most tests are isolated well enough to run in parallel. The
+          # process-wide Ray/VCE integration modules, fixed-port gRPC tests,
+          # and xdist-incompatible AppIO subtests run in a separate matrix job
+          # below so every Python version keeps the complete test coverage.
+          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest \
+            --cov=py/flwr \
+            --cov-report= \
+            --ignore=py/flwr/simulation/ray_transport/ray_client_proxy_test.py \
+            --ignore=py/flwr/server/superlink/fleet/vce/vce_api_test.py \
+            --ignore=py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
+            --ignore=py/flwr/server/superlink/fleet/grpc_rere \
+            --ignore=py/flwr/superlink/servicer/serverappio \
+            --ignore=py/flwr/supercore/servicer/appio/appio_servicer_test.py \
+            -n 4 \
+            --dist=loadscope \
+            --durations=50
+      - name: Test serial scopes
+        if: ${{ matrix.task == 'pytest_serial' && needs.changes.outputs.framework == 'true' }}
+        run: |
+          cd framework
+          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest \
+            --cov=py/flwr \
+            py/flwr/simulation/ray_transport/ray_client_proxy_test.py \
+            py/flwr/server/superlink/fleet/vce/vce_api_test.py \
+            py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
+            py/flwr/server/superlink/fleet/grpc_rere \
+            py/flwr/superlink/servicer/serverappio \
+            py/flwr/supercore/servicer/appio/appio_servicer_test.py
       - name: Check benchmarks and examples
         if: ${{ matrix.task == 'pytest' && needs.changes.outputs.ex_bench == 'true' }}
         run: |
