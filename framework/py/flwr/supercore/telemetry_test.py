@@ -46,11 +46,11 @@ class TelemetryTest(unittest.TestCase):
 
     @mock.patch("flwr.supercore.telemetry.create_event")
     def test_not_blocking(self, mock_create_event: mock.MagicMock) -> None:
-        """Test if the code is blocking.
+"""Test if the code is blocking.
 
-        If the code does not block duration_actual should be less than
-        0.001s.
-        """
+If the code does not block duration_actual should be less than
+0.005s.
+"""
         # Prepare
         def delayed_create_event(*_: object) -> str:
             time.sleep(0.1)
