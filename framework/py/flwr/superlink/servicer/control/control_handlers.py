@@ -20,9 +20,11 @@ import base64
 import hashlib
 import json
 import secrets
-from collections.abc import Sequence
+import time
+from collections.abc import Callable, Generator, Sequence
 from datetime import datetime
 from logging import ERROR, INFO
+from typing import cast
 
 import requests
 
@@ -38,6 +40,8 @@ from flwr.common.config import (
 from flwr.common.constant import (
     FAB_MAX_SIZE,
     HEARTBEAT_DEFAULT_INTERVAL,
+    LOG_STREAM_INTERVAL,
+    RUN_EVENTS_STREAM_INTERVAL,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
 )
@@ -110,6 +114,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StreamLogsRequest,
+    StreamLogsResponse,
+    StreamRunEventsRequest,
+    StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
 )
@@ -579,6 +587,106 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     return StartRunResponse(
         run_id=run_id, note=note, series_id=series_id, federation=run.federation_id
     )
+
+
+def stream_logs(
+    request: StreamLogsRequest,
+    account: AccountInfo,
+    state: LinkState,
+    is_active: Callable[[], bool] | None = None,
+) -> Generator[StreamLogsResponse, None, None]:
+    """Stream logs for a run."""
+    log(INFO, "ControlServicer.StreamLogs")
+
+    run_id = request.run_id
+    runs = state.get_run_info(run_ids=[run_id])
+    if not runs:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND,
+            f"Run {run_id} not found while streaming logs.",
+        )
+    run = runs[0]
+    task_id = cast(int, run.primary_task_id)
+
+    _validate_federation_membership_in_request(
+        state, account.flwr_aid, run.federation_id
+    )
+
+    after_timestamp = request.after_timestamp + 1e-6
+    while is_active is None or is_active():
+        log_msg, latest_timestamp = state.get_task_log(task_id, after_timestamp)
+        if log_msg:
+            yield StreamLogsResponse(
+                log_output=log_msg,
+                latest_timestamp=latest_timestamp,
+            )
+            # Add a small epsilon to the latest timestamp to avoid getting
+            # the same log
+            after_timestamp = max(latest_timestamp + 1e-6, after_timestamp)
+
+        # Wait for and continue to yield more log responses only if the
+        # run isn't completed yet. If the run is finished, the entire log
+        # is returned at this point and the server ends the stream.
+        run = state.get_run_info(run_ids=[run_id])[0]
+        if run.status.status == Status.FINISHED:
+            log(INFO, "All logs for run ID `%s` returned", run_id)
+            state.cleanup_run(run_id)
+            break
+
+        time.sleep(LOG_STREAM_INTERVAL)
+
+
+def stream_run_events(
+    request: StreamRunEventsRequest,
+    account: AccountInfo,
+    state: LinkState,
+    is_active: Callable[[], bool] | None = None,
+) -> Generator[StreamRunEventsResponse, None, None]:
+    """Stream task events for a run."""
+    log(INFO, "ControlServicer.StreamRunEvents")
+
+    run_id = request.run_id
+    runs = state.get_run_info(run_ids=[run_id])
+    if not runs:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND,
+            f"Run {run_id} not found while streaming run events.",
+        )
+    run = runs[0]
+
+    _validate_federation_membership_in_request(
+        state, account.flwr_aid, run.federation_id
+    )
+
+    after_task_event_id = None
+    if request.HasField("after_task_event_id"):
+        after_task_event_id = request.after_task_event_id
+    while is_active is None or is_active():
+        should_break = run.status.status == Status.FINISHED
+
+        # Retrieve and yield all task events generated after the latest
+        # streamed task event
+        events = state.get_task_events(
+            run_id=run_id,
+            after_task_event_id=after_task_event_id,
+        )
+        for event in events:
+            after_task_event_id = event.id
+            yield StreamRunEventsResponse(task_event=event)
+
+        # If the run was already finished before fetching this batch, all
+        # events are returned at this point and the server ends the stream.
+        if should_break:
+            log(INFO, "All events for run ID `%s` returned", run_id)
+            break
+
+        # Refresh status after yielding. If streaming this batch raced with
+        # run completion, continue immediately and fetch one final batch.
+        run = state.get_run_info(run_ids=[run_id])[0]
+        if run.status.status == Status.FINISHED:
+            continue
+
+        time.sleep(RUN_EVENTS_STREAM_INTERVAL)
 
 
 def start_automation(  # pylint: disable=too-many-locals

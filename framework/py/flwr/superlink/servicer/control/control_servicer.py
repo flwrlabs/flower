@@ -14,15 +14,10 @@
 # ==============================================================================
 """Control API servicer."""
 
-import time
 from collections.abc import Generator
-from logging import INFO
-from typing import Any, cast
 
 import grpc
 
-from flwr.common.constant import LOG_STREAM_INTERVAL, RUN_EVENTS_STREAM_INTERVAL, Status
-from flwr.common.logger import log
 from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -101,10 +96,7 @@ from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
 from . import control_handlers
 from .control_account_auth_interceptor import get_current_account_info
-from .control_handlers import (
-    _resolve_federation_id,
-    _validate_federation_membership_in_request,
-)
+from .control_handlers import _resolve_federation_id
 
 
 # pylint: disable=too-many-public-methods
@@ -135,53 +127,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
     def StreamLogs(  # pylint: disable=C0103
         self, request: StreamLogsRequest, context: grpc.ServicerContext
-    ) -> Generator[StreamLogsResponse, Any, None]:
+    ) -> Generator[StreamLogsResponse, None, None]:
         """Get logs."""
-        log(INFO, self.StreamLogs.__qualname__)
-
-        # Init link state
-        state = self.linkstate_factory.state()
-
-        # Retrieve run ID and run
-        run_id = request.run_id
-        runs = state.get_run_info(run_ids=[run_id])
-
-        # Exit if `run_id` not found
-        if not runs:
-            raise FlowerError(
-                ApiErrorCode.RUN_ID_NOT_FOUND,
-                f"Run {run_id} not found while streaming logs.",
-            )
-        run = runs[0]
-        task_id = cast(int, run.primary_task_id)
-
-        account = _get_account()
-        flwr_aid = account.flwr_aid
-        _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
-
-        after_timestamp = request.after_timestamp + 1e-6
-        while context.is_active():
-            log_msg, latest_timestamp = state.get_task_log(task_id, after_timestamp)
-            if log_msg:
-                yield StreamLogsResponse(
-                    log_output=log_msg,
-                    latest_timestamp=latest_timestamp,
-                )
-                # Add a small epsilon to the latest timestamp to avoid getting
-                # the same log
-                after_timestamp = max(latest_timestamp + 1e-6, after_timestamp)
-
-            # Wait for and continue to yield more log responses only if the
-            # run isn't completed yet. If the run is finished, the entire log
-            # is returned at this point and the server ends the stream.
-            run = state.get_run_info(run_ids=[run_id])[0]
-            if run.status.status == Status.FINISHED:
-                log(INFO, "All logs for run ID `%s` returned", run_id)
-
-                state.cleanup_run(run_id)
-                break
-
-            time.sleep(LOG_STREAM_INTERVAL)  # Sleep briefly to avoid busy waiting
+        return control_handlers.stream_logs(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            context.is_active,
+        )
 
     def ListRuns(
         self, request: ListRunsRequest, context: grpc.ServicerContext
@@ -436,59 +389,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
     def StreamRunEvents(
         self, request: StreamRunEventsRequest, context: grpc.ServicerContext
-    ) -> Generator[StreamRunEventsResponse, Any, None]:
+    ) -> Generator[StreamRunEventsResponse, None, None]:
         """Start run event stream."""
-        log(INFO, self.StreamRunEvents.__qualname__)
-
-        # Init link state
-        state = self.linkstate_factory.state()
-
-        # Retrieve run ID and run
-        run_id = request.run_id
-        runs = state.get_run_info(run_ids=[run_id])
-
-        # Exit if `run_id` not found
-        if not runs:
-            raise FlowerError(
-                ApiErrorCode.RUN_ID_NOT_FOUND,
-                f"Run {run_id} not found while streaming run events.",
-            )
-        run = runs[0]
-
-        account = _get_account()
-        flwr_aid = account.flwr_aid
-        _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
-
-        after_task_event_id = None
-        if request.HasField("after_task_event_id"):
-            after_task_event_id = request.after_task_event_id
-        while context.is_active():
-            should_break = run.status.status == Status.FINISHED
-
-            # Retrieve and yield all task events generated after the latest
-            # streamed task event
-            events = state.get_task_events(
-                run_id=run_id,
-                after_task_event_id=after_task_event_id,
-            )
-            for event in events:
-                after_task_event_id = event.id
-                yield StreamRunEventsResponse(task_event=event)
-
-            # If the run was already finished before fetching this batch, all
-            # events are returned at this point and the server ends the stream.
-            if should_break:
-                log(INFO, "All events for run ID `%s` returned", run_id)
-                break
-
-            # Refresh status after yielding. If streaming this batch raced with
-            # run completion, continue immediately and fetch one final batch.
-            run = state.get_run_info(run_ids=[run_id])[0]
-            if run.status.status == Status.FINISHED:
-                continue
-
-            # Sleep briefly to avoid busy waiting
-            time.sleep(RUN_EVENTS_STREAM_INTERVAL)
+        return control_handlers.stream_run_events(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            context.is_active,
+        )
 
     def _resolve_federation_id(self, account_name: str, federation_id: str) -> str:
         """Return the requested federation ID or derive the default federation ID."""
