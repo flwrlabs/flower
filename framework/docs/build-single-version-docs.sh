@@ -32,7 +32,32 @@ done
 current_version="$DOC_VERSION"
 export current_version
 
-for current_language in $languages; do
+# Each language has its own output and doctree directory, so the builds can run
+# concurrently without sharing mutable Sphinx state.
+build_language() {
+  current_language="$1"
   export current_language
-  sphinx-build -b html source/ build/html/${current_version}/${current_language} -A lang=True -D language=${current_language}
+
+  echo "Building ${current_language} docs"
+  sphinx-build \
+    -b html \
+    source/ \
+    "build/html/${current_version}/${current_language}" \
+    -A lang=True \
+    -D "language=${current_language}"
+}
+
+pids=""
+for current_language in $languages; do
+  build_language "${current_language}" &
+  pids="${pids} $!"
 done
+
+status=0
+for pid in ${pids}; do
+  if ! wait "${pid}"; then
+    status=1
+  fi
+done
+
+exit "${status}"
