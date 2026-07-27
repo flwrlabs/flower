@@ -910,7 +910,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             remaining_runs=row["remaining_runs"],
         )
 
-    def list_automations(  # pylint: disable=too-many-arguments,too-many-locals
+    def list_automations(  # pylint: disable=too-many-arguments,too-many-locals,too-many-boolean-expressions
         self,
         *,
         automation_ids: Sequence[int] | None = None,

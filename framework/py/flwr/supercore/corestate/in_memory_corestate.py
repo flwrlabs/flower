@@ -595,7 +595,7 @@ class InMemoryCoreState(
             )
             return automation
 
-    def list_automations(  # pylint: disable=too-many-arguments
+    def list_automations(  # pylint: disable=too-many-arguments,too-many-boolean-expressions
         self,
         *,
         automation_ids: Sequence[int] | None = None,
