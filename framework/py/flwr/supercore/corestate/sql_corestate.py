@@ -947,8 +947,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         conditions: list[str] = []
         params: dict[str, Any] = {}
         if automation_ids is not None:
+            sint64_automation_ids = [
+                uint64_to_int64(automation_id) for automation_id in automation_ids
+            ]
             placeholders, in_params = build_sql_in_params(
-                automation_ids, "automation_id"
+                sint64_automation_ids, "automation_id"
             )
             conditions.append(f"automation_id IN ({placeholders})")
             params.update(in_params)
@@ -1021,7 +1024,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             RETURNING automation_id
             """,
             {
-                "automation_id": automation_id,
+                "automation_id": uint64_to_int64(automation_id),
                 "status": AutomationStatus.STOPPED,
                 "updated_at": stopped_at,
                 "stopped_at": stopped_at,

@@ -614,6 +614,20 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(stopped[0].next_run_at, due_at)
 
+    def test_unknown_max_uint64_automation_id(self) -> None:
+        """The maximum uint64 should behave like an unknown automation ID."""
+        state = self.state_factory()
+        automation_id = 2**64 - 1
+
+        self.assertEqual(
+            state.list_automations(
+                automation_ids=[automation_id],
+                order_by="updated_at",
+            ),
+            [],
+        )
+        self.assertFalse(state.stop_automation(automation_id))
+
     def test_advance_and_finish_automation(self) -> None:
         """Automation advance should update records and finish terminally."""
         state = self.state_factory()
