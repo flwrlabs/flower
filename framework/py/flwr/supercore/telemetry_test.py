@@ -27,11 +27,14 @@ from flwr.supercore.telemetry import EventType, _get_partner_id, _get_source_id,
 class TelemetryTest(unittest.TestCase):
     """Tests for the telemetry module."""
 
+    @mock.patch("flwr.supercore.telemetry.urllib.request.urlopen")
     @mock.patch("flwr.supercore.telemetry.FLWR_TELEMETRY_ENABLED", "1")
-    def test_event(self) -> None:
-        """Test if sending works against the actual API."""
+    def test_event(self, mock_urlopen: mock.MagicMock) -> None:
+        """Test sending a telemetry event."""
         # Prepare
         expected = '{\n    "status": "created"\n}'
+        mock_response = mock_urlopen.return_value.__enter__.return_value
+        mock_response.read.return_value = expected.encode("utf-8")
 
         # Execute
         future = event(EventType.PING)
@@ -39,25 +42,32 @@ class TelemetryTest(unittest.TestCase):
 
         # Assert
         self.assertEqual(actual, expected)
+        mock_urlopen.assert_called_once()
 
-    @mock.patch("flwr.supercore.telemetry.FLWR_TELEMETRY_ENABLED", "1")
-    def test_not_blocking(self) -> None:
+    @mock.patch("flwr.supercore.telemetry.create_event")
+    def test_not_blocking(self, mock_create_event: mock.MagicMock) -> None:
         """Test if the code is blocking.
 
         If the code does not block duration_actual should be less than
         0.001s.
         """
         # Prepare
-        # Use 5ms as any blocking networked call would take longer.
+        def delayed_create_event(*_: object) -> str:
+            time.sleep(0.1)
+            return "created"
+
+        mock_create_event.side_effect = delayed_create_event
         duration_max = 0.005
         start = time.time()
 
         # Execute
-        event(EventType.PING)
+        future = event(EventType.PING)
         duration_actual = time.time() - start
+        future.result()
 
         # Assert
         self.assertLess(duration_actual, duration_max)
+        mock_create_event.assert_called_once()
 
     @mock.patch("flwr.supercore.telemetry.FLWR_TELEMETRY_ENABLED", "0")
     def test_telemetry_disabled(self) -> None:
