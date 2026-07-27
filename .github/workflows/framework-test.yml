@@ -43,52 +43,83 @@ jobs:
               - 'dev/test.sh'
               - '.github/workflows/framework-test.yml'
 
-  test_core:
+  framework_checks:
     runs-on: ubuntu-22.04
     needs: changes
     strategy:
+      fail-fast: true
       matrix:
-        # Latest version which comes cached in the host image can be found here:
-        # https://github.com/actions/runner-images/blob/main/images/linux/Ubuntu2204-Readme.md#python
-        # In case of a mismatch, the job has to download Python to install it.
-        python: ['3.11', '3.12', '3.13']
+        include:
+          - task: quality
+            name: Quality
+            python: '3.11'
+          - task: quality
+            name: Quality
+            python: '3.12'
+          - task: quality
+            name: Quality
+            python: '3.13'
+          - task: pytest
+            name: Pytest
+            python: '3.11'
+          - task: pytest
+            name: Pytest
+            python: '3.12'
+          - task: pytest
+            name: Pytest
+            python: '3.13'
 
-    name: Python ${{ matrix.python }}
+    name: ${{ matrix.name }} (Python ${{ matrix.python }})
 
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Bootstrap
-        if: ${{ needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true' }}
+        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python }}
       - name: Prepare framework
-        if: ${{ needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true' }}
+        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
         run: ./framework/dev/prepare-framework.sh
+      - name: Cache mypy
+        if: ${{ matrix.task == 'quality' && needs.changes.outputs.framework == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: framework/.mypy_cache
+          key: mypy-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('framework/pyproject.toml', 'framework/uv.lock') }}-${{ github.sha }}
+          restore-keys: |
+            mypy-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('framework/pyproject.toml', 'framework/uv.lock') }}-
       - name: Install dependencies
-        if: ${{ needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true' }}
+        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
         run: |
           cd framework
           uv sync --python=${{ matrix.python }} --locked --all-extras --all-groups
       - name: Check if protos need recompilation
-        if: ${{ needs.changes.outputs.framework == 'true' }}
+        if: ${{ matrix.task == 'quality' && needs.changes.outputs.framework == 'true' }}
         run: |
           cd framework
           uv run --no-sync ./dev/check-protos.sh
       - name: Check if migrations are up to date
-        if: ${{ needs.changes.outputs.framework == 'true' && matrix.python == '3.11' }}
+        if: ${{ matrix.task == 'quality' && matrix.python == '3.11' && needs.changes.outputs.framework == 'true' }}
         run: |
           cd framework
           uv run --no-sync ./dev/check-migrations.sh
-      - name: Lint + Test (isort/black/mypy/pylint/flake8/pytest)
-        if: ${{ needs.changes.outputs.framework == 'true' }}
+      - name: Lint and static checks
+        if: ${{ matrix.task == 'quality' && needs.changes.outputs.framework == 'true' }}
+        env:
+          RUN_PYTEST: 'false'
         run: |
           cd framework
           uv run --no-sync ./dev/test.sh
+      - name: Test
+        if: ${{ matrix.task == 'pytest' && needs.changes.outputs.framework == 'true' }}
+        run: |
+          cd framework
+          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest --cov=py/flwr --durations=25 --durations-min=0.5
       - name: Check benchmarks and examples
-        if: ${{ needs.changes.outputs.ex_bench == 'true' }}
+        if: ${{ matrix.task == 'pytest' && needs.changes.outputs.ex_bench == 'true' }}
         run: |
           cd framework
           uv run --no-sync ../dev/test.sh

@@ -461,8 +461,9 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             state.finish_task(
                 task_id,
                 sub_status=SubStatus.FAILED,
-                details="Pulling message objects failed.",
+                details=f"Pulling message objects failed: {err}",
             )
+            return None
 
     except RunNotRunningException:
         if message is None:

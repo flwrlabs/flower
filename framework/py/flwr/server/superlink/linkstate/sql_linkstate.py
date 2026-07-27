@@ -669,9 +669,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if not self.finish_task(primary_task_id, SubStatus.STOPPED, ""):
             return False
 
-        # Clean up messages and their objects related to the run
-        self.delete_messages(self.get_message_ids_from_run_id(run_id))
-        self.object_store.delete_objects_in_run(run_id)
+        self.cleanup_run(run_id)
         return True
 
     def create_node(
@@ -978,8 +976,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         flwr_aid: str | None,
         primary_task_type: str,
         series_id: int | None = None,
+        series_description: str | None = None,
+        connector_refs: Sequence[str] = (),
     ) -> int:
         """Create a new run."""
+        if isinstance(connector_refs, str) or any(
+            not connector_ref for connector_ref in connector_refs
+        ):
+            return 0
         # Convert federation_config to JSON string for storage
         fed_config_json = None
         if federation_config:
@@ -1018,6 +1022,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     run_id=run_id,
                     federation_id=federation_id,
                     series_id=series_id,
+                    description=series_description,
                 )
                 if resolved_series_id is None:
                     log(ERROR, "Unexpected run series membership failure.")
@@ -1063,6 +1068,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "sub_status": "",
                         "details": "",
                     },
+                )
+                self.bind_connectors_to_run(
+                    run_id=run_id,
+                    connector_refs=connector_refs,
                 )
                 return run_id
 

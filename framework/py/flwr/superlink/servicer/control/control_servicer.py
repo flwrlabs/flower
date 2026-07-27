@@ -17,7 +17,7 @@
 import time
 from collections.abc import Generator
 from logging import INFO
-from typing import Any, NoReturn, cast
+from typing import Any, cast
 
 import grpc
 
@@ -107,15 +107,6 @@ from .control_handlers import (
 )
 
 
-def _abort_connectors_unimplemented(context: grpc.ServicerContext) -> NoReturn:
-    """Abort a connector RPC that has no implementation yet."""
-    context.abort(
-        grpc.StatusCode.UNIMPLEMENTED,
-        "Connectors are not implemented.",
-    )
-    raise NotImplementedError("Connectors are not implemented.")
-
-
 # pylint: disable=too-many-public-methods
 class ControlServicer(control_pb2_grpc.ControlServicer):
     """Control API servicer."""
@@ -187,8 +178,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             if run.status.status == Status.FINISHED:
                 log(INFO, "All logs for run ID `%s` returned", run_id)
 
-                # Delete objects of the run from the object store
-                self.objectstore_factory.store().delete_objects_in_run(run_id)
+                state.cleanup_run(run_id)
                 break
 
             time.sleep(LOG_STREAM_INTERVAL)  # Sleep briefly to avoid busy waiting
@@ -267,25 +257,41 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: ListConnectorsRequest, context: grpc.ServicerContext
     ) -> ListConnectorsResponse:
         """List OAuth connectors available to the authenticated account."""
-        _abort_connectors_unimplemented(context)
+        return control_handlers.list_connectors(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+        )
 
     def DisconnectConnector(
         self, request: DisconnectConnectorRequest, context: grpc.ServicerContext
     ) -> DisconnectConnectorResponse:
         """Disconnect connector credentials for the authenticated account."""
-        _abort_connectors_unimplemented(context)
+        return control_handlers.disconnect_connector(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+        )
 
     def BeginConnectorOAuth(
         self, request: BeginConnectorOAuthRequest, context: grpc.ServicerContext
     ) -> BeginConnectorOAuthResponse:
         """Begin OAuth connector authorization flow."""
-        _abort_connectors_unimplemented(context)
+        return control_handlers.begin_connector_oauth(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+        )
 
     def CompleteConnectorOAuth(
         self, request: CompleteConnectorOAuthRequest, context: grpc.ServicerContext
     ) -> CompleteConnectorOAuthResponse:
         """Complete OAuth connector authorization flow."""
-        _abort_connectors_unimplemented(context)
+        return control_handlers.complete_connector_oauth(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+        )
 
     def PullArtifacts(
         self, request: PullArtifactsRequest, context: grpc.ServicerContext

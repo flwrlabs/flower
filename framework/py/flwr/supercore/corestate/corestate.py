@@ -47,6 +47,13 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Start a run-scoped object push session."""
 
     @abstractmethod
+    def delete_sessions_in_run(self, run_id: int) -> None:
+        """Delete bookkeeping for all object push sessions in a run.
+
+        This does not delete any messages or objects associated with the sessions.
+        """
+
+    @abstractmethod
     def preregister_object_tree(
         self, object_tree: ObjectTree, session_id: str
     ) -> list[str]:
@@ -174,6 +181,16 @@ class CoreState(ABC):  # pylint: disable=R0904
         bool
             `True` if the connector was deleted, otherwise `False`.
         """
+
+    @abstractmethod
+    def bind_connectors_to_run(
+        self, run_id: int, connector_refs: Sequence[str]
+    ) -> bool:
+        """Associate connector references with a run."""
+
+    @abstractmethod
+    def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
+        """Return connector references associated with a run."""
 
     @abstractmethod
     def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -340,6 +357,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         run_id: int,
         federation_id: str,
         series_id: int | None,
+        description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID.
 
@@ -353,6 +371,10 @@ class CoreState(ABC):  # pylint: disable=R0904
             Caller-provided series ID. If `None`, a new series ID is generated
             and creation is attempted. If set, the matching series must already
             exist and belong to `federation_id`.
+        description : str | None (default: None)
+            Optional description for a newly created run series. Ignored when
+            `series_id` refers to an existing run series. `None` means no
+            description was provided; an empty string is an explicit description.
 
         Returns
         -------

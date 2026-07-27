@@ -16,8 +16,10 @@
 
 # pylint: disable=too-many-lines
 
+import base64
 import hashlib
 import json
+import secrets
 from collections.abc import Sequence
 from datetime import datetime
 from logging import ERROR, INFO
@@ -25,6 +27,7 @@ from logging import ERROR, INFO
 import requests
 
 from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
+from flwr.app.user_config import UserConfig
 from flwr.cli.utils import validate_federation_name
 from flwr.common.config import (
     flatten_dict,
@@ -52,12 +55,19 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
     ArchiveFederationResponse,
+    BeginConnectorOAuthRequest,
+    BeginConnectorOAuthResponse,
+    CompleteConnectorOAuthRequest,
+    CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
+    Connector,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DisconnectConnectorRequest,
+    DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
@@ -66,6 +76,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetRunSeriesResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
+    ListConnectorsRequest,
+    ListConnectorsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -109,8 +121,10 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
+    FLWR_SUPERGRID_API_URL,
     NOOP_FEDERATION_ID,
-    PLATFORM_API_URL,
+    OAUTH_SESSION_TTL,
+    RUN_SERIES_DESCRIPTION_MAX_LENGTH,
     ActionType,
     RunTime,
     TaskType,
@@ -120,6 +134,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.run import Run
+from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
@@ -131,10 +146,292 @@ from flwr.supercore.utils import (
     parse_app_spec,
     request_download_link,
     resolve_account_ids,
+    strict_json_dumps,
 )
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
+
+
+class InvalidConnectorRequestError(FlowerError):
+    """Exception raised when a connector request is invalid."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            ApiErrorCode.INVALID_CONNECTOR_REQUEST,
+            f"Invalid connector request: {reason}.",
+        )
+
+
+class ConnectorFailureError(FlowerError):
+    """Exception raised when a connector operation fails."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            ApiErrorCode.CONNECTOR_FAILURE, f"Connector failure: {reason}."
+        )
+
+
+def list_connectors(
+    request: ListConnectorsRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> ListConnectorsResponse:
+    """List user-connectable OAuth providers and account connection status."""
+    log(INFO, "ControlServicer.ListConnectors")
+    _ = request
+
+    connectors: list[Connector] = []
+    for provider in sorted(
+        connector_registry.OAUTH_CONNECTOR_PROVIDERS,
+        key=lambda item: item.connector_ref,
+    ):
+        connector_ref = provider.connector_ref
+        connected = (
+            state.get_connector(flwr_aid=account.flwr_aid, connector_ref=connector_ref)
+            is not None
+        )
+        connectors.append(
+            Connector(
+                connector_ref=connector_ref,
+                display_name=provider.display_name,
+                description=provider.description,
+                connected=connected,
+            )
+        )
+    return ListConnectorsResponse(connectors=connectors)
+
+
+def disconnect_connector(
+    request: DisconnectConnectorRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> DisconnectConnectorResponse:
+    """Delete one account-scoped connector connection."""
+    log(INFO, "ControlServicer.DisconnectConnector")
+    connector_ref = request.connector_ref.strip().lower()
+    if not connector_ref:
+        raise InvalidConnectorRequestError("connector_ref is required")
+    try:
+        connector_registry.get_oauth_connector_provider(connector_ref)
+    except ValueError:
+        raise FlowerError(
+            ApiErrorCode.CONNECTOR_NOT_FOUND,
+            f"OAuth provider for connector '{connector_ref}' was not found.",
+        ) from None
+
+    deleted = state.delete_connector(
+        flwr_aid=account.flwr_aid, connector_ref=connector_ref
+    )
+    if not deleted:
+        raise FlowerError(
+            ApiErrorCode.CONNECTOR_NOT_FOUND,
+            f"Connector '{connector_ref}' is not connected for this account.",
+        )
+    return DisconnectConnectorResponse()
+
+
+def begin_connector_oauth(
+    request: BeginConnectorOAuthRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> BeginConnectorOAuthResponse:
+    """Create a short-lived account-scoped OAuth session."""
+    log(INFO, "ControlServicer.BeginConnectorOAuth")
+    connector_ref = request.connector_ref.strip().lower()
+    if not connector_ref:
+        raise InvalidConnectorRequestError("connector_ref is required")
+    redirect_uri = request.redirect_uri.strip()
+    if not redirect_uri:
+        raise InvalidConnectorRequestError("redirect_uri is required")
+    try:
+        provider = connector_registry.get_oauth_connector_provider(connector_ref)
+    except ValueError:
+        raise FlowerError(
+            ApiErrorCode.CONNECTOR_NOT_FOUND,
+            f"OAuth provider for connector '{connector_ref}' was not found.",
+        ) from None
+    try:
+        redirect_uri = provider.resolve_redirect_uri(redirect_uri)
+    except ValueError as err:
+        raise InvalidConnectorRequestError(
+            "redirect_uri is not allowed for this connector"
+        ) from err
+    # Provider implementations can raise arbitrary exceptions; sanitize them.
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        raise ConnectorFailureError(
+            f"Connector '{connector_ref}' failed to resolve redirect URI "
+            f"({type(err).__name__})"
+        ) from None
+    if not redirect_uri:
+        raise ConnectorFailureError(
+            f"Connector '{connector_ref}' failed to resolve redirect URI "
+            "(empty response)"
+        )
+
+    oauth_session_id = secrets.token_urlsafe(32)
+    oauth_state = secrets.token_urlsafe(32)
+    pkce_verifier = secrets.token_urlsafe(64)
+    digest = hashlib.sha256(pkce_verifier.encode("ascii")).digest()
+    pkce_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+    expires_at = now() + OAUTH_SESSION_TTL
+    try:
+        authorization_url = provider.build_authorization_url(
+            redirect_uri=redirect_uri,
+            state=oauth_state,
+            pkce_challenge=pkce_challenge,
+        )
+    # Provider implementations can raise arbitrary exceptions; sanitize them.
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        raise ConnectorFailureError(
+            f"Connector '{connector_ref}' failed to build authorization URL "
+            f"({type(err).__name__})"
+        ) from None
+    if not authorization_url:
+        raise ConnectorFailureError(
+            f"Connector '{connector_ref}' failed to build authorization URL "
+            "(empty response)"
+        )
+
+    session = state.create_connector_oauth_session(
+        oauth_session_id=oauth_session_id,
+        flwr_aid=account.flwr_aid,
+        connector_ref=connector_ref,
+        state=oauth_state,
+        redirect_uri=redirect_uri,
+        pkce_verifier=pkce_verifier,
+        expires_at=expires_at,
+    )
+    if session is None:
+        raise ConnectorFailureError("OAuth session could not be created")
+
+    return BeginConnectorOAuthResponse(
+        oauth_session_id=session.oauth_session_id,
+        authorization_url=authorization_url,
+        connector_ref=session.connector_ref,
+        expires_at=session.expires_at,
+    )
+
+
+def complete_connector_oauth(  # pylint: disable=too-many-locals
+    request: CompleteConnectorOAuthRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> CompleteConnectorOAuthResponse:
+    """Exchange an OAuth code and persist one account-scoped connection."""
+    log(INFO, "ControlServicer.CompleteConnectorOAuth")
+    oauth_session_id = request.oauth_session_id.strip()
+    if not oauth_session_id:
+        raise InvalidConnectorRequestError("oauth_session_id is required")
+    authorization_code = request.code.strip()
+    if not authorization_code:
+        raise InvalidConnectorRequestError("code is required")
+    if not request.state:
+        raise InvalidConnectorRequestError("state is required")
+
+    session = state.get_connector_oauth_session(
+        oauth_session_id=oauth_session_id, flwr_aid=account.flwr_aid
+    )
+    if session is None:
+        raise FlowerError(
+            ApiErrorCode.CONNECTOR_NOT_FOUND,
+            "Connector OAuth session was not found for this account.",
+        )
+
+    try:
+        expires_at = datetime.fromisoformat(session.expires_at)
+    except ValueError:
+        raise ConnectorFailureError("OAuth session expiry is invalid") from None
+    if expires_at.utcoffset() is None:
+        raise ConnectorFailureError("OAuth session expiry is timezone-naive")
+    if (
+        session.completed_at is not None
+        or expires_at <= now()
+        or not secrets.compare_digest(
+            request.state.encode("utf-8"), session.state.encode("utf-8")
+        )
+    ):
+        raise InvalidConnectorRequestError(
+            f"OAuth session '{session.oauth_session_id}' is invalid or no longer "
+            "pending"
+        )
+
+    connector_ref = session.connector_ref.strip().lower()
+    try:
+        provider = connector_registry.get_oauth_connector_provider(connector_ref)
+    except ValueError:
+        raise FlowerError(
+            ApiErrorCode.CONNECTOR_NOT_FOUND,
+            f"OAuth provider for connector '{connector_ref}' was not found.",
+        ) from None
+    claimed = state.complete_connector_oauth_session(
+        oauth_session_id=session.oauth_session_id,
+        flwr_aid=account.flwr_aid,
+    )
+    if not claimed:
+        raise InvalidConnectorRequestError(
+            f"OAuth session '{session.oauth_session_id}' is invalid or no longer "
+            "pending"
+        )
+
+    try:
+        credentials, config = provider.exchange_code(
+            code=authorization_code,
+            redirect_uri=session.redirect_uri,
+            pkce_verifier=session.pkce_verifier,
+        )
+    # Provider implementations can raise arbitrary exceptions; sanitize them.
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        raise ConnectorFailureError(
+            f"Connector '{connector_ref}' failed to exchange authorization code "
+            f"({type(err).__name__})"
+        ) from None
+    try:
+        credentials_json = strict_json_dumps(credentials, compact=True)
+        config_json = strict_json_dumps(config, compact=True)
+    except (TypeError, ValueError) as err:
+        raise ConnectorFailureError(
+            f"Connector '{connector_ref}' failed to serialize exchanged "
+            f"credentials ({type(err).__name__})"
+        ) from None
+
+    stored = state.upsert_connector(
+        flwr_aid=account.flwr_aid,
+        connector_ref=connector_ref,
+        credentials_json=credentials_json,
+        config_json=config_json,
+    )
+    if not stored:
+        raise ConnectorFailureError("Connector credentials could not be stored")
+    return CompleteConnectorOAuthResponse(connector_ref=connector_ref)
+
+
+def validate_run_connector_refs(
+    connector_refs: Sequence[str],
+    account: AccountInfo,
+    state: LinkState,
+) -> list[str]:
+    """Validate and canonicalize OAuth connector references for a new run."""
+    canonical_refs = list(
+        dict.fromkeys(requested_ref.strip().lower() for requested_ref in connector_refs)
+    )
+    if "" in canonical_refs:
+        raise InvalidConnectorRequestError("connector_ref is required")
+    for connector_ref in canonical_refs:
+        try:
+            connector_registry.get_oauth_connector_provider(connector_ref)
+        except ValueError:
+            raise FlowerError(
+                ApiErrorCode.CONNECTOR_NOT_FOUND,
+                f"OAuth provider for connector '{connector_ref}' was not found.",
+            ) from None
+        connector = state.get_connector(account.flwr_aid, connector_ref)
+        if connector is None:
+            raise FlowerError(
+                ApiErrorCode.CONNECTOR_NOT_FOUND,
+                f"Connector '{connector_ref}' is not connected for this account.",
+            )
+    return canonical_refs
 
 
 def start_run(  # pylint: disable=too-many-locals, too-many-statements
@@ -170,6 +467,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     flwr_aid = account.flwr_aid
     account_name = account.account_name
     override_config = user_config_from_proto(request.override_config)
+    connector_refs = validate_run_connector_refs(request.connector_refs, account, state)
 
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
 
@@ -196,7 +494,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
         # Validate user config overrides matches keys in run config in FAB
         fab_config = get_fab_config(fab_file)
         run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
-        _ = fuse_dicts(run_config, override_config)
+        fused_run_config = fuse_dicts(run_config, override_config)
 
         # Derive primary task type from the submitted FAB. AgentApp-only FABs can
         # be bundled locally and submitted through the regular `flwr run` path.
@@ -234,6 +532,12 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
                 f"FAB ({fab.hash_str}) hash from request doesn't match contents"
             )
         fab_id, fab_version = get_metadata_from_config(fab_config)
+        series_id = request.series_id if request.HasField("series_id") else None
+        series_description: str | None = None
+        if primary_task_type == TaskType.AGENT_APP and series_id is None:
+            series_description = (
+                _derive_run_series_description(fused_run_config) or None
+            )
 
         run_id = state.create_run(
             fab_id,
@@ -244,7 +548,9 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
             resolved_federation_config,
             flwr_aid,
             primary_task_type,
-            request.series_id if request.HasField("series_id") else None,
+            series_id=series_id,
+            series_description=series_description,
+            connector_refs=connector_refs,
         )
 
         if run_id == 0:
@@ -435,7 +741,7 @@ def list_runs(
             state, flwr_aid, runs[0].federation_id
         )
 
-    # Clear objects of finished runs
+    # Clean up resources of finished runs
     # Resolve only non-caller run owners; caller-owned runs use `account_name`.
     account_names = resolve_account_ids(
         {run.flwr_aid for run in runs if run.flwr_aid != flwr_aid}
@@ -444,7 +750,7 @@ def list_runs(
     for run in runs:
         run.account_name = account_names[run.flwr_aid]
         if run.status.status == Status.FINISHED:
-            state.object_store.delete_objects_in_run(run.run_id)
+            state.cleanup_run(run.run_id)
 
     # Construct and return response
     return ListRunsResponse(
@@ -1084,6 +1390,18 @@ def _resolve_federation_id(
     return federation_id
 
 
+def _derive_run_series_description(run_config: UserConfig) -> str:
+    """Derive a concise RunSeries description from the agent input."""
+    agent_input = run_config.get("agent.input")
+    if not isinstance(agent_input, str):
+        return ""
+
+    description = " ".join(agent_input.split())
+    if len(description) <= RUN_SERIES_DESCRIPTION_MAX_LENGTH:
+        return description
+    return f"{description[: RUN_SERIES_DESCRIPTION_MAX_LENGTH - 1]}…"
+
+
 class FederationNotSpecified(FlowerError):
     """Exception raised when a federation is not specified in a request that requires
     one."""
@@ -1205,7 +1523,7 @@ def _get_remote_fab(
         ) from e
 
     # Request download link and verification information
-    url = f"{PLATFORM_API_URL}/hub/fetch-fab"
+    url = f"{FLWR_SUPERGRID_API_URL}/hub/fetch-fab"
     try:
         presigned_url, verifications, note = request_download_link(
             app_id, app_version, url, "fab_url"

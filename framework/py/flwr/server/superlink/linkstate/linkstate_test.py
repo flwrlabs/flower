@@ -25,7 +25,7 @@ import threading
 import time
 import unittest
 from abc import abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import Mock, PropertyMock, patch
@@ -282,6 +282,38 @@ class StateTest(CoreStateTest):
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
 
+    def test_create_run_binds_connectors(self) -> None:
+        """Creating a run should atomically persist its connector allowlist."""
+        state = self.state_factory()
+
+        run_id = create_dummy_run(
+            state,
+            connector_refs=["notion", "github", "notion"],
+        )
+
+        self.assertEqual(
+            list(state.get_run_connector_refs(run_id=run_id)),
+            ["github", "notion"],
+        )
+
+    def test_create_run_rejects_empty_connector_ref(self) -> None:
+        """An invalid connector allowlist should prevent run creation."""
+        state = self.state_factory()
+
+        run_id = create_dummy_run(state, connector_refs=[""])
+
+        self.assertEqual(run_id, 0)
+        self.assertEqual(list(state.get_run_info()), [])
+
+    def test_create_run_rejects_string_connector_refs(self) -> None:
+        """A string should not be interpreted as a sequence of connector refs."""
+        state = self.state_factory()
+
+        run_id = create_dummy_run(state, connector_refs="notion")
+
+        self.assertEqual(run_id, 0)
+        self.assertEqual(list(state.get_run_info()), [])
+
     def test_store_messages_rejects_stopped_run(self) -> None:
         """Messages cannot be stored after a run is stopped."""
         state = self.state_factory()
@@ -302,6 +334,32 @@ class StateTest(CoreStateTest):
         self.assertIsNone(state.store_message_res(message=reply_msg))
         self.assertEqual(state.num_message_ins(), 0)
         self.assertEqual(state.num_message_res(), 0)
+
+    def test_cleanup_run(self) -> None:
+        """Test cleanup of run-scoped messages and objects."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        session_id = state.start_session(run_id)
+        stored, _ = state.store_message_and_object_tree(
+            msg, get_object_tree(msg), session_id
+        )
+        assert stored
+
+        state.cleanup_run(run_id)
+
+        self.assertEqual(state.num_message_ins(), 0)
+        self.assertFalse(msg.metadata.message_id in state.object_store)
+        self.assertFalse(
+            state.store_object(run_id, session_id, msg.metadata.message_id, b"content")
+        )
 
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""
@@ -2215,6 +2273,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     flwr_aid: str | None = "mock_flwr_aid",
     primary_task_type: str = TaskType.SERVER_APP,
     series_id: int | None = None,
+    connector_refs: Sequence[str] = (),
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -2227,6 +2286,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         flwr_aid=flwr_aid,
         primary_task_type=primary_task_type,
         series_id=series_id,
+        connector_refs=connector_refs,
     )
 
 
@@ -2290,6 +2350,17 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         )
         state.initialize()
         return state
+
+    def test_run_series_distinguishes_missing_and_empty_descriptions(self) -> None:
+        """Missing and explicitly empty descriptions remain distinct in SQL."""
+        state = self.state_factory()
+        self.assertIsNotNone(state.store_run_in_series(1, "@me/fed-a", series_id=None))
+        self.assertIsNotNone(
+            state.store_run_in_series(2, "@me/fed-a", series_id=None, description="")
+        )
+
+        rows = state.query("SELECT description FROM run_series")
+        self.assertCountEqual([row["description"] for row in rows], [None, ""])
 
     @parameterized.expand(
         [  # type: ignore

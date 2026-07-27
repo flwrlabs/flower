@@ -445,9 +445,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         if not self.finish_task(primary_task_id, SubStatus.STOPPED, ""):
             return False
 
-        # Clean up messages and their objects related to the run
-        self.delete_messages(self.get_message_ids_from_run_id(run_id))
-        self.object_store.delete_objects_in_run(run_id)
+        self.cleanup_run(run_id)
         return True
 
     def num_message_ins(self) -> int:
@@ -641,8 +639,14 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         flwr_aid: str | None,
         primary_task_type: str,
         series_id: int | None = None,
+        series_description: str | None = None,
+        connector_refs: Sequence[str] = (),
     ) -> int:
         """Create a new run."""
+        if isinstance(connector_refs, str) or any(
+            not connector_ref for connector_ref in connector_refs
+        ):
+            return 0
         with self.lock_task_store, self.lock:
             run_id = generate_rand_int_from_bytes(
                 RUN_ID_NUM_BYTES,
@@ -657,6 +661,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 run_id=run_id,
                 federation_id=federation_id,
                 series_id=series_id,
+                description=series_description,
             )
             if resolved_series_id is None:
                 log(ERROR, "Unexpected run series membership failure.")
@@ -710,6 +715,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 fab_hash=fab_hash,
                 model_ref=None,
                 connector_ref=None,
+            )
+            self.bind_connectors_to_run(
+                run_id=run_id,
+                connector_refs=connector_refs,
             )
 
             return run_id

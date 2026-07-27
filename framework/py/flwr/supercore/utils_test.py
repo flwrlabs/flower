@@ -507,7 +507,7 @@ def test_simulation_config_from_json_rejects_unknown_fields() -> None:
         (90000, "1d 1h"),  # day + hour
     ]
 )
-def test_humanize_duration(seconds, expected) -> None:
+def test_humanize_duration(seconds: int, expected: str) -> None:
     """Test the humanize_duration function."""
     assert humanize_duration(seconds) == expected
 
@@ -521,6 +521,6 @@ def test_humanize_duration(seconds, expected) -> None:
         (3 * 1024**3, "3.0 GB"),  # GB < 10
     ]
 )
-def test_humanize_bytes(num_bytes, expected) -> None:
+def test_humanize_bytes(num_bytes: int, expected: str) -> None:
     """Test the humanize_bytes function."""
     assert humanize_bytes(num_bytes) == expected

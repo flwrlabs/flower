@@ -222,7 +222,6 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
             res = message_handler.push_messages(
                 request=request,
                 state=self.state_factory.state(),
-                store=self.objectstore_factory.store(),
             )
         except InvalidRunStatusException as e:
             raise FlowerError(
@@ -243,7 +242,6 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
             res = message_handler.get_run(
                 request=request,
                 state=self.state_factory.state(),
-                store=self.objectstore_factory.store(),
             )
         except InvalidRunStatusException as e:
             raise FlowerError(
@@ -271,7 +269,6 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
             res = message_handler.get_fab(
                 request=request,
                 state=self.state_factory.state(),
-                store=self.objectstore_factory.store(),
             )
         except InvalidRunStatusException as e:
             raise FlowerError(
@@ -305,7 +302,6 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
             res = message_handler.push_object(
                 request=request,
                 state=self.state_factory.state(),
-                store=self.objectstore_factory.store(),
             )
         except InvalidRunStatusException as e:
             raise FlowerError(
@@ -334,7 +330,6 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
             res = message_handler.pull_object(
                 request=request,
                 state=self.state_factory.state(),
-                store=self.objectstore_factory.store(),
             )
         except InvalidRunStatusException as e:
             raise FlowerError(

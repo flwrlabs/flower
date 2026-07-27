@@ -138,7 +138,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
     register_signal_handlers(
         event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
-        exit_message="Task stopped by user.",
+        exit_message="Task stopped.",
         exit_handlers=[on_exit],
     )
 
@@ -206,11 +206,12 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
         log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
 
+        sub_status = SubStatus.FAILED
+        details = reason
+
         # Create error message
         if message:
             reply_message = Message(Error(code=e_code, reason=reason), reply_to=message)
-            sub_status = SubStatus.FAILED
-            details = reason
 
         # Set exit code
         exit_code = ExitCode.TASK_PROC_EXCEPTION
