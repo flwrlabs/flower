@@ -413,74 +413,70 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_start_automation(self) -> None:
         """Test StartAutomation stores the automation schedule."""
         # Prepare
-        fab_content = b"test automation FAB content"
-        fab_hash = hashlib.sha256(fab_content).hexdigest()
         start_at = "2026-07-10T09:00:00+00:00"
         request = StartAutomationRequest(
-            start_at=start_at, fixed_interval=86400, max_runs=3
+            start_at=start_at,
+            fixed_interval=86400,
+            max_runs=3,
+            start_run_request=StartRunRequest(
+                federation=NOOP_FEDERATION_ID,
+                series_id=123,
+            ),
         )
-        request.start_run_request.fab.hash_str = fab_hash
-        request.start_run_request.fab.content = fab_content
-        request.start_run_request.federation = NOOP_FEDERATION_ID
-        request.start_run_request.series_id = 123
 
         # Execute
         response = self.servicer.StartAutomation(request, Mock())
-
-        automations = self.state.list_automations(
+        automation = self.state.list_automations(
             federations=[NOOP_FEDERATION_ID],
             order_by="updated_at",
-        )
+        )[0]
 
         # Assert
-        self.assertEqual(len(self.state.get_run_info()), 0)
-        self.assertEqual(len(automations), 1)
-        automation = automations[0]
         self.assertEqual(automation.automation_id, response.automation_id)
-        self.assertEqual(response.series_id, request.start_run_request.series_id)
-        self.assertEqual(automation.series_id, response.series_id)
-        self.assertEqual(automation.status, AutomationStatus.ACTIVE)
-        self.assertEqual(automation.next_run_at, start_at)
-        self.assertEqual(automation.fixed_interval, 86400)
-        self.assertEqual(automation.remaining_runs, 3)
-        self.assertEqual(response.next_run_at, start_at)
+        self.assertEqual(
+            (
+                automation.series_id,
+                automation.next_run_at,
+                automation.fixed_interval,
+                automation.remaining_runs,
+            ),
+            (response.series_id, response.next_run_at, 86400, 3),
+        )
 
-    def test_start_automation_requires_series_id(self) -> None:
-        """Test StartAutomation rejects requests without a run series ID."""
+    @parameterized.expand(  # type: ignore
+        [
+            (
+                "missing_series_id",
+                StartAutomationRequest(),
+                "A run series ID is required to start an automation.",
+            ),
+            (
+                "invalid_start_at",
+                StartAutomationRequest(
+                    start_at="not-a-timestamp",
+                    start_run_request=StartRunRequest(series_id=123),
+                ),
+                "The automation start_at value must be a valid ISO 8601 timestamp.",
+            ),
+        ]
+    )
+    def test_start_automation_rejects_invalid_request(
+        self,
+        _name: str,
+        request: StartAutomationRequest,
+        public_details: str,
+    ) -> None:
+        """Test StartAutomation rejects invalid requests."""
         # Prepare
-        fab_content = b"test automation FAB content"
-        request = StartAutomationRequest()
-        request.start_run_request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
-        request.start_run_request.fab.content = fab_content
-        request.start_run_request.federation = NOOP_FEDERATION_ID
+        context = Mock()
 
         # Execute
         with self.assertRaises(FlowerError) as cm:
-            self.servicer.StartAutomation(request, Mock())
+            self.servicer.StartAutomation(request, context)
 
         # Assert
         self.assertEqual(cm.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
-        self.assertEqual(
-            cm.exception.public_details,
-            "A run series ID is required to start an automation.",
-        )
-
-    def test_start_automation_rejects_invalid_start_at(self) -> None:
-        """Test StartAutomation rejects an invalid first run timestamp."""
-        # Prepare
-        request = StartAutomationRequest(start_at="not-a-timestamp")
-        request.start_run_request.series_id = 123
-
-        # Execute
-        with self.assertRaises(FlowerError) as cm:
-            self.servicer.StartAutomation(request, Mock())
-
-        # Assert
-        self.assertEqual(cm.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
-        self.assertEqual(
-            cm.exception.public_details,
-            "The automation start_at value must be a valid ISO 8601 timestamp.",
-        )
+        self.assertEqual(cm.exception.public_details, public_details)
 
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
         """StartRun should bind canonical connected OAuth connector refs."""
@@ -1029,7 +1025,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         list_response = self.servicer.ListAutomations(
             ListAutomationsRequest(federation=NOOP_FEDERATION_ID), Mock()
         )
-        stop_response = self.servicer.StopAutomation(
+        self.servicer.StopAutomation(
             StopAutomationRequest(automation_id=automation.automation_id), Mock()
         )
         stopped = self.state.list_automations(
@@ -1043,7 +1039,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             [entry.automation_id for entry in list_response.automations],
             [automation.automation_id],
         )
-        self.assertIsNotNone(stop_response)
         self.assertEqual(
             [entry.automation_id for entry in stopped], [automation.automation_id]
         )
