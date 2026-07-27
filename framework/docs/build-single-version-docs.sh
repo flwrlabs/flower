@@ -21,6 +21,17 @@ cd "$(git rev-parse --show-toplevel)/framework/docs"
 # Clean previous output for this version only
 rm -rf "build/html/${DOC_VERSION}"
 
+# Generate autosummary sources once. Each locale uses the shared source tree,
+# so generating these files during every concurrent Sphinx build would race.
+rm -rf source/ref-api
+rm -rf "build/autosummary/${DOC_VERSION}"
+sphinx-build \
+  -b dummy \
+  source/ \
+  "build/autosummary/${DOC_VERSION}" \
+  -A lang=True \
+  -D language=en
+
 # Get a list of languages based on the folders in locales
 languages="en"
 for lang_dir in locales/*; do
@@ -39,7 +50,7 @@ build_language() {
   export current_language
 
   echo "Building ${current_language} docs"
-  sphinx-build \
+  FLWR_DOCS_AUTOSUMMARY_READY=1 sphinx-build \
     -b html \
     source/ \
     "build/html/${current_version}/${current_language}" \
