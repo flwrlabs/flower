@@ -66,7 +66,7 @@ def chat() -> None:
     try:
         _verify_authenticated(stub)
         typer.secho(
-            "Flower Chat. Type /exit or /quit to leave.",
+            "Flower Chat. Type /quit to leave.",
             fg=typer.colors.BLUE,
         )
         _run_interactive_shell(stub, superlink_connection.federation)

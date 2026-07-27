@@ -186,12 +186,12 @@ def test_chat_submits_prompt_to_builtin_agent_and_streams_response(
             return_value=channel,
         ),
         patch.object(chat_module, "ControlStub", return_value=stub),
-        patch("builtins.input", side_effect=["Hello", "/exit"]) as mock_input,
+        patch("builtins.input", side_effect=["Hello", "/quit"]) as mock_input,
     ):
         chat_module.chat()
 
     start_run_request = stub.StartRun.call_args.args[0]
-    assert start_run_request.app_spec == "@flwragent/flwr-agent"
+    assert start_run_request.app_spec == "@flwrlabs/flwr-agent"
     assert user_config_from_proto(start_run_request.override_config) == {
         "agent.input": "Hello"
     }
