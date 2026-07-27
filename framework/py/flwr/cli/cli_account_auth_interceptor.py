@@ -14,6 +14,7 @@
 # ==============================================================================
 """Flower run interceptor."""
 
+
 from collections.abc import Callable
 from typing import Any
 
@@ -31,8 +32,7 @@ Request = StartRunRequest | StreamLogsRequest | StreamRunEventsRequest
 
 
 class CliAccountAuthInterceptor(
-    grpc.UnaryUnaryClientInterceptor,  # type: ignore
-    grpc.UnaryStreamClientInterceptor,  # type: ignore
+    grpc.UnaryUnaryClientInterceptor, grpc.UnaryStreamClientInterceptor  # type: ignore
 ):
     """CLI interceptor for account authentication.
 

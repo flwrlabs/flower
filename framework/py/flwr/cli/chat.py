@@ -42,10 +42,11 @@ from .utils import (
     load_cli_auth_plugin_from_connection,
 )
 
-_BUILTIN_AGENT_APP_SPEC = "@flwrlabs/flwr-agent"
+_FLOWER_AGENT_APP_SPEC = "@flwrlabs/flwr-agent"
 _SUPERGRID_CONNECTION_NAME = "supergrid"
 _AGENT_INPUT_KEY = "agent.input"
-_EXIT_COMMANDS = {"/quit"}
+_EXIT_COMMAND = "/quit"
+_LOGIN_REQUIRED_MESSAGE = "Please run `flwr login supergrid` first."
 _TEXT_DELTA_EVENT = "response.output_text.delta"
 _TERMINAL_EVENTS = {"response.completed", "response.incomplete"}
 _FAILURE_EVENTS = {"error", "response.failed"}
@@ -66,7 +67,7 @@ def chat() -> None:
     try:
         _verify_authenticated(stub)
         typer.secho(
-            "Flower Chat. Type /quit to leave.",
+            f"Flower Chat. Type {_EXIT_COMMAND} to leave.",
             fg=typer.colors.BLUE,
         )
         _run_interactive_shell(stub, superlink_connection.federation)
@@ -80,18 +81,18 @@ def _load_logged_in_auth_plugin(
     """Load a logged-in auth plugin or fail before the chat prompt starts."""
     address = superlink_connection.address
     if address is None:
-        raise click.ClickException("Please run `flwr login supergrid` first.")
+        raise click.ClickException(_LOGIN_REQUIRED_MESSAGE)
 
     authn_type = get_authn_type(address)
     if authn_type == AuthnType.NOOP:
-        raise click.ClickException("Please run `flwr login supergrid` first.")
+        raise click.ClickException(_LOGIN_REQUIRED_MESSAGE)
 
     auth_plugin = load_cli_auth_plugin_from_connection(address, authn_type)
     auth_plugin.load_tokens()
     try:
         auth_plugin.write_tokens_to_metadata([])
     except click.ClickException as exc:
-        raise click.ClickException("Please run `flwr login supergrid` first.") from exc
+        raise click.ClickException(_LOGIN_REQUIRED_MESSAGE) from exc
 
     return auth_plugin
 
@@ -114,7 +115,7 @@ def _run_interactive_shell(stub: ControlStub, federation: str | None) -> None:
         stripped_prompt = prompt.strip()
         if not stripped_prompt:
             continue
-        if stripped_prompt.lower() in _EXIT_COMMANDS:
+        if stripped_prompt.lower() == _EXIT_COMMAND:
             return
 
         _run_prompt(stub, prompt, federation)
@@ -122,15 +123,11 @@ def _run_interactive_shell(stub: ControlStub, federation: str | None) -> None:
 
 def _run_prompt(stub: ControlStub, prompt: str, federation: str | None) -> None:
     """Submit one prompt and stream the response."""
-    status = Console().status(
+    with Console().status(
         "Thinking...", spinner="dots", spinner_style=_AGENT_COLOR_HEX
-    )
-    status.start()
-    try:
+    ) as status:
         run_id = _start_agent_run(stub, prompt, federation)
         _stream_agent_response(stub, run_id, status)
-    finally:
-        status.stop()
 
 
 def _start_agent_run(
@@ -138,9 +135,9 @@ def _start_agent_run(
     prompt: str,
     federation: str | None,
 ) -> int:
-    """Start one built-in AgentApp run for the given prompt."""
+    """Start one Flower AgentApp run for the given prompt."""
     req = StartRunRequest(
-        app_spec=_BUILTIN_AGENT_APP_SPEC,
+        app_spec=_FLOWER_AGENT_APP_SPEC,
         override_config=user_config_to_proto({_AGENT_INPUT_KEY: prompt}),
         federation=federation or "",
     )
@@ -155,7 +152,7 @@ def _start_agent_run(
 def _stream_agent_response(stub: ControlStub, run_id: int, status: Status) -> None:
     """Stream one AgentApp response to stdout."""
     terminal_event_seen = False
-    word_stream = _WordStreamPrinter(status)
+    response_started = False
     try:
         req = StreamRunEventsRequest(run_id=run_id)
         with flwr_cli_grpc_exc_handler():
@@ -168,14 +165,19 @@ def _stream_agent_response(stub: ControlStub, run_id: int, status: Status) -> No
                 if event_type == _TEXT_DELTA_EVENT:
                     delta = payload.get("delta")
                     if isinstance(delta, str):
-                        word_stream.write_delta(delta)
+                        if not response_started:
+                            status.stop()
+                            print(_AGENT_PROMPT, end="", flush=True)
+                            response_started = True
+                        print(delta, end="", flush=True)
                 elif event_type in _FAILURE_EVENTS:
                     raise click.ClickException(_format_failure_event(payload))
                 elif event_type in _TERMINAL_EVENTS:
                     terminal_event_seen = True
                     break
     finally:
-        word_stream.finish()
+        if response_started:
+            print(_ANSI_RESET)
 
     if not terminal_event_seen:
         raise click.ClickException(
@@ -188,51 +190,8 @@ def _load_task_event_data(data: str) -> JSONObject:
     try:
         payload = json.loads(data)
     except json.JSONDecodeError:
-        return {}
-    if not isinstance(payload, dict):
-        return {}
-    return cast(JSONObject, payload)
-
-
-class _WordStreamPrinter:
-    """Print streamed text at word boundaries."""
-
-    def __init__(self, status: Status) -> None:
-        self._status = status
-        self._buffer = ""
-        self.response_started = False
-
-    def write_delta(self, delta: str) -> None:
-        """Print complete words from one text delta."""
-        if not self.response_started:
-            self._status.stop()
-            print(_AGENT_PROMPT, end="", flush=True)
-            self.response_started = True
-
-        self._buffer += delta
-        boundary = _last_whitespace_boundary(self._buffer)
-        if boundary is None:
-            return
-
-        print(self._buffer[:boundary], end="", flush=True)
-        self._buffer = self._buffer[boundary:]
-
-    def finish(self) -> None:
-        """Flush any pending text and finish the response line."""
-        if not self.response_started:
-            return
-        if self._buffer:
-            print(self._buffer, end="", flush=True)
-            self._buffer = ""
-        print(_ANSI_RESET)
-
-
-def _last_whitespace_boundary(text: str) -> int | None:
-    """Return the index after the last whitespace character, if present."""
-    for idx in range(len(text) - 1, -1, -1):
-        if text[idx].isspace():
-            return idx + 1
-    return None
+        payload = {}
+    return cast(JSONObject, payload) if isinstance(payload, dict) else {}
 
 
 def _format_failure_event(payload: JSONObject) -> str:
@@ -242,6 +201,14 @@ def _format_failure_event(payload: JSONObject) -> str:
         message = error.get("message")
         if isinstance(message, str) and message:
             return message
+
+    response = payload.get("response")
+    if isinstance(response, dict):
+        error = response.get("error")
+        if isinstance(error, dict):
+            message = error.get("message")
+            if isinstance(message, str) and message:
+                return message
 
     message = payload.get("message")
     if isinstance(message, str) and message:

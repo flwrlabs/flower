@@ -133,7 +133,7 @@ def test_chat_verifies_login_before_prompt() -> None:
     channel.close.assert_called_once()
 
 
-def test_chat_submits_prompt_to_builtin_agent_and_streams_response(
+def test_chat_submits_prompt_to_flower_agent_and_streams_response(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Chat should submit prompts as agent.input and print streamed deltas."""
@@ -200,26 +200,13 @@ def test_chat_submits_prompt_to_builtin_agent_and_streams_response(
     channel.close.assert_called_once()
 
 
-def test_word_stream_printer_prints_at_word_boundaries(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Text deltas should be displayed when complete words are available."""
-    status = Mock()
-    printer = chat_module._WordStreamPrinter(status)  # pylint: disable=protected-access
+def test_format_failure_event_reads_response_error_message() -> None:
+    """Failure messages should be read from response.failed payloads."""
+    message = chat_module._format_failure_event(  # pylint: disable=protected-access
+        {
+            "type": "response.failed",
+            "response": {"id": "resp_1", "error": {"message": "quota exceeded"}},
+        }
+    )
 
-    printer.write_delta("Hel")
-    out = capsys.readouterr().out
-    assert out == "\033[38;2;242;182;7mAgent> "
-    assert click.unstyle(out) == "Agent> "
-
-    printer.write_delta("lo wor")
-    assert capsys.readouterr().out == "Hello "
-
-    printer.write_delta("ld")
-    assert capsys.readouterr().out == ""
-
-    printer.finish()
-    out = capsys.readouterr().out
-    assert out == "world\033[0m\n"
-    assert click.unstyle(out) == "world\n"
-    status.stop.assert_called_once()
+    assert message == "quota exceeded"
