@@ -25,6 +25,8 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
+from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from flwr.common import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
@@ -46,6 +48,17 @@ from flwr.superlink.routers.control.middlewares import (
     ControlEventLogMiddleware,
     ControlLicenseMiddleware,
 )
+
+try:
+    from flwr.ee import get_ee_linkstate_db as get_ee_linkstate_db
+except ModuleNotFoundError as exc:
+    if exc.name != "flwr.ee":
+        raise
+
+    def get_ee_linkstate_db() -> str:
+        """Return the configured LinkState database."""
+        return os.getenv("FLWR_DATABASE", FLWR_IN_MEMORY_DB_NAME)
+
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
@@ -72,6 +85,18 @@ def _merge_lifespan_state(
         lifespan_state[key] = value
 
 
+def _get_middleware() -> list[Middleware]:
+    """Return middleware in request execution order, outermost first."""
+    return [
+        *extensions.get_middleware(),
+        Middleware(BaseHTTPMiddleware, dispatch=http_error_translator),
+        Middleware(ControlAuthenticationMiddleware),
+        Middleware(ControlLicenseMiddleware),
+        Middleware(ProtobufTranslationMiddleware),
+        Middleware(ControlEventLogMiddleware),
+    ]
+
+
 def create_app(
     config: SuperLinkLifespanConfig | None = None,
     superlink_lifespan_class: type[SuperLinkLifespan] | None = None,
@@ -79,7 +104,7 @@ def create_app(
     """Create the SuperLink FastAPI app and its shared lifespan resources."""
     if config is None:
         is_simulation = False
-        database = os.getenv("FLWR_DATABASE", FLWR_IN_MEMORY_DB_NAME)
+        database = get_ee_linkstate_db()
         authn_plugin, authz_plugin = load_control_auth_plugins(
             os.getenv("FLWR_ACCOUNT_AUTH_CONFIG"), verify_tls_cert=True
         )
@@ -142,6 +167,7 @@ def create_app(
         redoc_url=None,
         lifespan=lifespan,
         generate_unique_id_function=generate_unique_route_id,
+        middleware=_get_middleware(),
     )
     fastapi_app.state.superlink_lifespan = superlink_lifespan
     fastapi_app.state.linkstate_factory = linkstate_factory
@@ -155,12 +181,6 @@ def create_app(
 
     # SuperLink APIs
     fastapi_app.include_router(control_router)
-    fastapi_app.add_middleware(ControlEventLogMiddleware)
-    fastapi_app.add_middleware(ProtobufTranslationMiddleware)
-    fastapi_app.add_middleware(ControlLicenseMiddleware)
-    fastapi_app.add_middleware(ControlAuthenticationMiddleware)
-    # Register last so it is outermost and translates errors from every Control layer.
-    fastapi_app.middleware("http")(http_error_translator)
     # fastapi_app.include_router(runtime.router)
 
     # Extension hooks

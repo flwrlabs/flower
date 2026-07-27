@@ -11,7 +11,7 @@ jobs:
     collect:
       if: ${{ github.repository == 'flwrlabs/flower' }}
       name: Collect Docker READMEs
-      runs-on: ubuntu-22.04
+      runs-on: ubuntu-24.04
       timeout-minutes: 10
       outputs:
         readme_files: ${{ steps.filter.outputs.readme_files }}
@@ -29,7 +29,7 @@ jobs:
     update:
       if: ${{ needs.collect.outputs.readme_files != '' && toJson(fromJson(needs.collect.outputs.readme_files)) != '[]' }}
       name: Update Docker READMEs
-      runs-on: ubuntu-22.04
+      runs-on: ubuntu-24.04
       timeout-minutes: 10
       needs: collect
       strategy:
