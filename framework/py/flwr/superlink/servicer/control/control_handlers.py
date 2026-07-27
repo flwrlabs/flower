@@ -644,6 +644,12 @@ def start_automation(  # pylint: disable=too-many-locals
             "`fixed_interval` must be greater than zero.",
             public_details="`fixed_interval` must be greater than zero.",
         )
+    if fixed_interval is not None and fixed_interval >= 2**63:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`fixed_interval` must be less than 2**63.",
+            public_details="`fixed_interval` must be less than 2**63.",
+        )
     if fixed_interval is None and (max_runs is None or max_runs > 1):
         raise FlowerError(
             ApiErrorCode.INVALID_AUTOMATION_REQUEST,
