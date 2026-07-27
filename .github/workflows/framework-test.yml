@@ -19,7 +19,7 @@ env:
 
 jobs:
   changes:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       framework: ${{ steps.filter.outputs.framework }}
       ex_bench: ${{ steps.filter.outputs.ex_bench }}  # Examples and Benchmarks
@@ -44,7 +44,7 @@ jobs:
               - '.github/workflows/framework-test.yml'
 
   framework_checks:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: changes
     strategy:
       fail-fast: true
