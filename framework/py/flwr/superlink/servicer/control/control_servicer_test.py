@@ -428,7 +428,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         response = self.servicer.StartAutomation(request, Mock())
 
         automations = self.state.list_automations(
-            federation=NOOP_FEDERATION_ID,
+            federations=[NOOP_FEDERATION_ID],
             order_by="updated_at",
         )
 
@@ -459,7 +459,28 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             self.servicer.StartAutomation(request, Mock())
 
         # Assert
-        self.assertEqual(cm.exception.code, ApiErrorCode.INVALID_RUN_CONFIG)
+        self.assertEqual(cm.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
+        self.assertEqual(
+            cm.exception.public_details,
+            "A run series ID is required to start an automation.",
+        )
+
+    def test_start_automation_rejects_invalid_start_at(self) -> None:
+        """Test StartAutomation rejects an invalid first run timestamp."""
+        # Prepare
+        request = StartAutomationRequest(start_at="not-a-timestamp")
+        request.start_run_request.series_id = 123
+
+        # Execute
+        with self.assertRaises(FlowerError) as cm:
+            self.servicer.StartAutomation(request, Mock())
+
+        # Assert
+        self.assertEqual(cm.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
+        self.assertEqual(
+            cm.exception.public_details,
+            "The automation start_at value must be a valid ISO 8601 timestamp.",
+        )
 
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
         """StartRun should bind canonical connected OAuth connector refs."""
@@ -1012,7 +1033,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             StopAutomationRequest(automation_id=automation.automation_id), Mock()
         )
         stopped = self.state.list_automations(
-            federation=NOOP_FEDERATION_ID,
+            federations=[NOOP_FEDERATION_ID],
             statuses=[AutomationStatus.STOPPED],
             order_by="updated_at",
         )

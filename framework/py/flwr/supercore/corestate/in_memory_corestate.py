@@ -598,7 +598,8 @@ class InMemoryCoreState(
     def list_automations(  # pylint: disable=too-many-arguments
         self,
         *,
-        federation: str | None = None,
+        automation_ids: Sequence[int] | None = None,
+        federations: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
         order_by: Literal["next_run_at", "updated_at"],
@@ -607,18 +608,36 @@ class InMemoryCoreState(
         """Return automations matching the given filters."""
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
-        if limit == 0 or (statuses is not None and not statuses):
+        if (
+            limit == 0
+            or (automation_ids is not None and not automation_ids)
+            or (federations is not None and not federations)
+            or (statuses is not None and not statuses)
+        ):
             return []
 
         status_set = set(statuses) if statuses is not None else None
+        federation_set = set(federations) if federations is not None else None
         cutoff = due_before.isoformat() if due_before is not None else None
         with self.lock_automation_store:
+            if automation_ids is None:
+                records = list(self.automation_store.values())
+            else:
+                records = [
+                    self.automation_store[automation_id]
+                    for automation_id in dict.fromkeys(automation_ids)
+                    if automation_id in self.automation_store
+                ]
+
             automations: list[Automation] = []
-            for record in self.automation_store.values():
+            for record in records:
                 automation = record.automation
 
                 # Apply federation filter.
-                if federation is not None and automation.federation != federation:
+                if (
+                    federation_set is not None
+                    and automation.federation not in federation_set
+                ):
                     continue
 
                 # Apply status filter.

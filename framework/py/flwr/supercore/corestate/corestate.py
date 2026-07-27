@@ -445,7 +445,8 @@ class CoreState(ABC):  # pylint: disable=R0904
     def list_automations(  # pylint: disable=too-many-arguments
         self,
         *,
-        federation: str | None = None,
+        automation_ids: Sequence[int] | None = None,
+        federations: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
         order_by: Literal["next_run_at", "updated_at"],
@@ -455,8 +456,10 @@ class CoreState(ABC):  # pylint: disable=R0904
 
         Parameters
         ----------
-        federation : str | None (default: None)
-            Federation ID to filter by.
+        automation_ids : Sequence[int] | None (default: None)
+            Automation IDs to filter by.
+        federations : Sequence[str] | None (default: None)
+            Federation IDs to filter by.
         statuses : Sequence[str] | None (default: None)
             Automation statuses to filter by.
         due_before : datetime | None (default: None)

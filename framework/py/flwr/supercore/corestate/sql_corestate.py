@@ -913,7 +913,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def list_automations(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         *,
-        federation: str | None = None,
+        automation_ids: Sequence[int] | None = None,
+        federations: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
         order_by: Literal["next_run_at", "updated_at"],
@@ -922,14 +923,26 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Return automations matching the given filters."""
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
-        if limit == 0 or (statuses is not None and not statuses):
+        if (
+            limit == 0
+            or (automation_ids is not None and not automation_ids)
+            or (federations is not None and not federations)
+            or (statuses is not None and not statuses)
+        ):
             return []
 
         conditions: list[str] = []
         params: dict[str, Any] = {}
-        if federation is not None:
-            conditions.append("federation_id = :federation_id")
-            params["federation_id"] = federation
+        if automation_ids is not None:
+            placeholders, in_params = build_sql_in_params(
+                automation_ids, "automation_id"
+            )
+            conditions.append(f"automation_id IN ({placeholders})")
+            params.update(in_params)
+        if federations is not None:
+            placeholders, in_params = build_sql_in_params(federations, "federation_id")
+            conditions.append(f"federation_id IN ({placeholders})")
+            params.update(in_params)
         if statuses is not None:
             placeholders = ",".join(f":status_{i}" for i in range(len(statuses)))
             conditions.append(f"status IN ({placeholders})")

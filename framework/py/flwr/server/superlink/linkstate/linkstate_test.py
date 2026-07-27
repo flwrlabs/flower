@@ -256,7 +256,7 @@ class StateTest(CoreStateTest):
         self.assertEqual(run.series_id, series_id)
 
         updated = state.list_automations(
-            federation="@me/health",
+            federations=["@me/health"],
             statuses=[AutomationStatus.ACTIVE],
             order_by="updated_at",
         )

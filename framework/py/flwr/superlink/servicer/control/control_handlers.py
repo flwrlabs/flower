@@ -580,7 +580,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     )
 
 
-def start_automation(  # pylint: disable=unused-argument
+def start_automation(  # pylint: disable=too-many-locals,unused-argument
     request: StartAutomationRequest,
     account: AccountInfo,
     state: LinkState,
@@ -589,24 +589,31 @@ def start_automation(  # pylint: disable=unused-argument
     """Create automation."""
     log(INFO, "ControlServicer.StartAutomation")
 
+    # Validate the run series shared by all runs in this automation.
     start_run_request = request.start_run_request
     if not start_run_request.HasField("series_id"):
         raise FlowerError(
-            ApiErrorCode.INVALID_RUN_CONFIG,
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
             "StartAutomation requires start_run_request.series_id.",
+            public_details="A run series ID is required to start an automation.",
         )
 
+    # Resolve the first scheduled run time.
     if request.HasField("start_at"):
         try:
             next_run_at = datetime.fromisoformat(request.start_at).isoformat()
         except ValueError as e:
             raise FlowerError(
-                ApiErrorCode.INVALID_RUN_CONFIG,
+                ApiErrorCode.INVALID_AUTOMATION_REQUEST,
                 f"Invalid automation start_at value: {request.start_at}",
+                public_details=(
+                    "The automation start_at value must be a valid ISO 8601 timestamp."
+                ),
             ) from e
     else:
         next_run_at = now().isoformat()
 
+    # Resolve recurrence settings and the default one-shot behavior.
     fixed_interval = (
         request.fixed_interval if request.HasField("fixed_interval") else None
     )
@@ -616,6 +623,7 @@ def start_automation(  # pylint: disable=unused-argument
         else 1 if fixed_interval is None else None
     )
 
+    # Resolve the account-scoped federation and run configuration.
     flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     federation_id = _resolve_federation_id(
@@ -623,12 +631,14 @@ def start_automation(  # pylint: disable=unused-argument
     )
     override_config = user_config_from_proto(start_run_request.override_config)
 
+    # Store embedded FAB content before persisting the automation.
     fab_hash = start_run_request.fab.hash_str or None
     if start_run_request.fab.content:
         fab_file = start_run_request.fab.content
         fab = Fab(hashlib.sha256(fab_file).hexdigest(), fab_file, {})
         fab_hash = state.store_fab(fab)
 
+    # Persist the validated automation schedule and run template.
     try:
         automation = state.store_automation(
             federation_id=federation_id,
@@ -668,20 +678,19 @@ def list_automations(
     flwr_aid = account.flwr_aid
     if request.federation:
         _validate_federation_membership_in_request(state, flwr_aid, request.federation)
-        automations = state.list_automations(
-            federation=request.federation,
-            order_by="updated_at",
-        )
+        federations = [request.federation]
     else:
-        federations = state.federation_manager.get_federations(flwr_aid)
-        federation_ids = {federation.id for federation in federations}
-        automations = [
-            automation
-            for automation in state.list_automations(order_by="updated_at")
-            if automation.federation in federation_ids
+        federations = [
+            federation.id
+            for federation in state.federation_manager.get_federations(flwr_aid)
         ]
 
-    return ListAutomationsResponse(automations=automations)
+    return ListAutomationsResponse(
+        automations=state.list_automations(
+            federations=federations,
+            order_by="updated_at",
+        )
+    )
 
 
 def stop_automation(
@@ -690,12 +699,14 @@ def stop_automation(
     """Stop an automation."""
     log(INFO, "ControlServicer.StopAutomation")
 
-    for automation in state.list_automations(order_by="updated_at"):
-        if automation.automation_id == request.automation_id:
-            _validate_federation_membership_in_request(
-                state, account.flwr_aid, automation.federation
-            )
-            break
+    automations = state.list_automations(
+        automation_ids=[request.automation_id],
+        order_by="updated_at",
+    )
+    if automations:
+        _validate_federation_membership_in_request(
+            state, account.flwr_aid, automations[0].federation
+        )
 
     state.stop_automation(request.automation_id)
     return StopAutomationResponse()
