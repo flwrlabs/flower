@@ -20,10 +20,8 @@ import argparse
 import os
 import subprocess
 import sys
-import threading
 from collections.abc import Sequence
 from logging import INFO, WARN
-from time import sleep
 from typing import cast
 
 import grpc
@@ -86,7 +84,6 @@ from flwr.supercore.tls import (
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import get_popen_detach_kwargs
 from flwr.supercore.version import package_version
-from flwr.superlink.automation import run_automation_scheduler_worker
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.config_loader import (
     SuperLinkLifespanConfig,
@@ -137,12 +134,10 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.config = config
         self.grpc_servers: list[grpc.Server] = []
-        self.bckg_threads: list[threading.Thread] = []
         self.superexec_process: subprocess.Popen[bytes] | None = None
         self.objectstore_factory = state_factory.objectstore_factory
         self.state_factory = state_factory
         self._serverappio_server: grpc.Server | None = None
-        self._background_stop_event = threading.Event()
         self._started = False
 
     def startup(self) -> None:
@@ -153,13 +148,10 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
         # Force initialization before starting network servers
         self.state_factory.state()
-        self._background_stop_event.clear()
-
         self._start_control_api()
         self._start_serverappio_api()
         self._start_fleet_api()
         self._start_superexec_if_needed()
-        self._start_automation_scheduler()
         self._start_health_server_if_needed()
         self._started = True
 
@@ -169,14 +161,9 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         if (
             not self._started
             and not self.grpc_servers
-            and not self.bckg_threads
             and self.superexec_process is None
         ):
             return
-
-        self._background_stop_event.set()
-        for thread in self.bckg_threads:
-            thread.join(timeout=1.0)
 
         # Stop in reverse startup order so dependent services disappear before
         # their backing state is considered unavailable.
@@ -191,15 +178,14 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
                 log(WARN, "SuperExec subprocess did not terminate within 1 second.")
 
         self.grpc_servers.clear()
-        self.bckg_threads.clear()
         self.superexec_process = None
         self._serverappio_server = None
         self._started = False
 
-    def wait_until_background_thread_exits(self) -> None:
-        """Block until a background thread exits."""
-        while all(thread.is_alive() for thread in self.bckg_threads):
-            sleep(0.1)
+    def wait_for_termination(self) -> None:
+        """Block until the first gRPC server terminates."""
+        if self.grpc_servers:
+            self.grpc_servers[0].wait_for_termination()
 
     def _start_control_api(self) -> None:
         config = self.config
@@ -224,6 +210,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             objectstore_factory=self.objectstore_factory,
             certificates=config.appio_certificates,
             superexec_auth_secret=config.superexec_auth_secret,
+            fleet_api_type=config.fleet_api_type,
         )
         self._serverappio_server = serverappio_server
         self.grpc_servers.append(serverappio_server)
@@ -296,16 +283,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         )
         # pylint: disable-next=consider-using-with
         self.superexec_process = subprocess.Popen(command, **get_popen_detach_kwargs())
-
-    def _start_automation_scheduler(self) -> None:
-        thread = threading.Thread(
-            target=run_automation_scheduler_worker,
-            args=(self.state_factory, self._background_stop_event),
-            name="automation-scheduler",
-            daemon=True,
-        )
-        thread.start()
-        self.bckg_threads.append(thread)
 
     def _start_health_server_if_needed(self) -> None:
         if self.config.health_server_address is None:
@@ -569,7 +546,7 @@ def flower_superlink() -> None:
         exit_handlers=[superlink_lifespan.shutdown],
     )
 
-    superlink_lifespan.wait_until_background_thread_exits()
+    superlink_lifespan.wait_for_termination()
 
 
 def _format_address(address: str) -> tuple[str, str, int]:

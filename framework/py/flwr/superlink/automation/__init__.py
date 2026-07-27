@@ -12,17 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SuperLink automation scheduler."""
+"""SuperLink automation processing."""
 
 
-from .scheduler import DEFAULT_AUTOMATION_SCHEDULER_BATCH_LIMIT
-from .scheduler import DEFAULT_AUTOMATION_SCHEDULER_POLL_INTERVAL
-from .scheduler import process_due_automations
-from .scheduler import run_automation_scheduler_worker
+from .processor import DEFAULT_AUTOMATION_BATCH_LIMIT, process_due_automations
 
 __all__ = [
-    "DEFAULT_AUTOMATION_SCHEDULER_BATCH_LIMIT",
-    "DEFAULT_AUTOMATION_SCHEDULER_POLL_INTERVAL",
+    "DEFAULT_AUTOMATION_BATCH_LIMIT",
     "process_due_automations",
-    "run_automation_scheduler_worker",
 ]

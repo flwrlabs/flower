@@ -22,7 +22,7 @@ import os
 import tempfile
 import threading
 import unittest
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock, patch
 
 import grpc
@@ -30,6 +30,7 @@ from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import (
+    NOOP_FLWR_AID,
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,
     Status,
@@ -45,6 +46,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullPendingTasksRequest,
+    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
@@ -54,6 +57,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
     ConfirmMessageReceivedResponse,
@@ -68,7 +72,12 @@ from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.utils import _STATUS_TO_MSG
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, TaskType
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION_ID,
+    AutomationStatus,
+    TaskType,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
@@ -396,6 +405,11 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=PullTaskInputRequest.SerializeToString,
             response_deserializer=PullTaskInputResponse.FromString,
         )
+        self._pull_pending_tasks = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PullPendingTasks",
+            request_serializer=PullPendingTasksRequest.SerializeToString,
+            response_deserializer=PullPendingTasksResponse.FromString,
+        )
         self._create_task = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/CreateTask",
             request_serializer=CreateTaskRequest.SerializeToString,
@@ -419,6 +433,34 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             assert self.state.activate_task(task_id)
         if num_transitions > 2:
             assert self.state.finish_task(task_id, "", "")
+
+    def test_pull_pending_tasks_processes_due_automations(self) -> None:
+        """A SuperExec poll should create and return a due automation's task."""
+        series_id = self.state.get_run_info(run_ids=[self._auth_run_id])[0].series_id
+        automation = self.state.store_automation(
+            federation_id=NOOP_FEDERATION_ID,
+            flwr_aid=NOOP_FLWR_AID,
+            start_run_request=StartRunRequest(
+                app_spec="@flwragent/flwr-agent",
+                federation=NOOP_FEDERATION_ID,
+                series_id=series_id,
+            ),
+            series_id=series_id,
+            next_run_at=datetime.now(tz=UTC).isoformat(),
+            max_runs=1,
+        )
+
+        response = self._pull_pending_tasks(PullPendingTasksRequest())
+
+        self.assertEqual(len(response.tasks), 1)
+        run = self.state.get_run_info(run_ids=[response.tasks[0].run_id])[0]
+        self.assertEqual(run.series_id, automation.series_id)
+        completed = self.state.list_automations(
+            automation_ids=[automation.automation_id],
+            statuses=[AutomationStatus.COMPLETED],
+            order_by="updated_at",
+        )
+        self.assertEqual(len(completed), 1)
 
     def _create_dummy_run(self, running: bool = True, *, fab_hash: str = "") -> int:
         run_id = self.state.create_run(

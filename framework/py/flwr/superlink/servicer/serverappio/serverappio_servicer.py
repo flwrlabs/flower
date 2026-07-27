@@ -37,6 +37,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullPendingTasksRequest,
+    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
@@ -65,6 +67,7 @@ from flwr.supercore.inflatable.inflatable_object import (
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supercore.servicer.appio import AppIoServicer
+from flwr.superlink.automation import process_due_automations
 
 SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE = (
     "Some ServerAppIo API endpoints are only available for Deployment Runtime runs."
@@ -78,13 +81,27 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         self,
         state_factory: LinkStateFactory,
         objectstore_factory: ObjectStoreFactory,
+        fleet_api_type: str | None = None,
     ) -> None:
         self.state_factory = state_factory
         self.objectstore_factory = objectstore_factory
+        self.fleet_api_type = fleet_api_type
 
     def state(self) -> LinkState:
         """Return the LinkState instance."""
         return self.state_factory.state()
+
+    def PullPendingTasks(
+        self, request: PullPendingTasksRequest, context: grpc.ServicerContext
+    ) -> PullPendingTasksResponse:
+        """Process due automations, then pull pending tasks."""
+        state = self.state()
+        try:
+            process_due_automations(state, fleet_api_type=self.fleet_api_type)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            log(ERROR, "Failed to process due automations: %s", exc)
+
+        return super().PullPendingTasks(request, context)
 
     def GetNodes(
         self, request: GetNodesRequest, context: grpc.ServicerContext
