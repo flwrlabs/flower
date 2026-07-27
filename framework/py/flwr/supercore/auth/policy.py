@@ -73,4 +73,6 @@ SERVERAPPIO_METHOD_AUTH_POLICY = {
     **_build_runtime_method_auth_policy("ServerAppIo"),
     "/flwr.proto.ServerAppIo/StartAutomation": MethodTokenPolicy.token_required(),
 }
+
+
 CLIENTAPPIO_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy("ClientAppIo")
