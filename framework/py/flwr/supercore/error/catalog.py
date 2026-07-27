@@ -239,6 +239,12 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         public_message="Connector operation failed.",
     ),
+    ApiErrorCode.LICENSE_CHECK_FAILED: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="License check failed. Please contact the SuperLink "
+        "administrator.",
+    ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,

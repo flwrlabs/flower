@@ -25,6 +25,8 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
+from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from flwr.common import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
@@ -37,10 +39,15 @@ from flwr.superlink.config_loader import (
     get_federation_manager,
     get_objectstore_linkstate_factories,
     load_control_auth_plugins,
+    load_control_event_log_plugin,
 )
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.routers.control import router as control_router
-from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
+from flwr.superlink.routers.control.middlewares import (
+    ControlAuthenticationMiddleware,
+    ControlEventLogMiddleware,
+    ControlLicenseMiddleware,
+)
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
@@ -67,6 +74,18 @@ def _merge_lifespan_state(
         lifespan_state[key] = value
 
 
+def _get_middleware() -> list[Middleware]:
+    """Return middleware in request execution order, outermost first."""
+    return [
+        *extensions.get_middleware(),
+        Middleware(BaseHTTPMiddleware, dispatch=http_error_translator),
+        Middleware(ControlAuthenticationMiddleware),
+        Middleware(ControlLicenseMiddleware),
+        Middleware(ProtobufTranslationMiddleware),
+        Middleware(ControlEventLogMiddleware),
+    ]
+
+
 def create_app(
     config: SuperLinkLifespanConfig | None = None,
     superlink_lifespan_class: type[SuperLinkLifespan] | None = None,
@@ -78,10 +97,16 @@ def create_app(
         authn_plugin, authz_plugin = load_control_auth_plugins(
             os.getenv("FLWR_ACCOUNT_AUTH_CONFIG"), verify_tls_cert=True
         )
+        event_log_plugin = (
+            load_control_event_log_plugin()
+            if os.getenv("FLWR_ENABLE_EVENT_LOG") == "1"
+            else None
+        )
     else:
         is_simulation = config.simulation
         database = config.database
         authn_plugin, authz_plugin = config.authn_plugin, config.authz_plugin
+        event_log_plugin = config.event_log_plugin
 
     federation_manager = get_federation_manager(is_simulation=is_simulation)
     _, linkstate_factory = get_objectstore_linkstate_factories(
@@ -131,22 +156,20 @@ def create_app(
         redoc_url=None,
         lifespan=lifespan,
         generate_unique_id_function=generate_unique_route_id,
+        middleware=_get_middleware(),
     )
     fastapi_app.state.superlink_lifespan = superlink_lifespan
     fastapi_app.state.linkstate_factory = linkstate_factory
     fastapi_app.state.account_access_dep = AccountAccessDependency(
         authn_plugin, authz_plugin
     )
+    fastapi_app.state.control_event_log_plugin = event_log_plugin
 
     # Core APIs
     # fastapi_app.include_router(health.router)
 
     # SuperLink APIs
     fastapi_app.include_router(control_router)
-    fastapi_app.add_middleware(ProtobufTranslationMiddleware)
-    fastapi_app.add_middleware(ControlAuthenticationMiddleware)
-    # Register last so it is outermost and translates errors from every Control layer.
-    fastapi_app.middleware("http")(http_error_translator)
     # fastapi_app.include_router(runtime.router)
 
     # Extension hooks
@@ -180,4 +203,10 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
             operation_ids.add(op_id)
 
 
-app = create_app()
+def __getattr__(name: str) -> FastAPI:
+    """Create the module-level FastAPI app lazily."""
+    if name == "app":
+        fastapi_app = create_app()
+        globals()[name] = fastapi_app
+        return fastapi_app
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

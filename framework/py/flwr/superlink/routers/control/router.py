@@ -75,7 +75,7 @@ from flwr.superlink.dependencies.account import get_account, get_authn_plugin
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.servicer.control import control_handlers
 
-router = APIRouter(prefix="/control", tags=["control"], route_class=ProtobufRoute)
+router = APIRouter(prefix="/control", tags=["Control"], route_class=ProtobufRoute)
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]

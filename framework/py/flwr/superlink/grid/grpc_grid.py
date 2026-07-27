@@ -357,7 +357,13 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
                                 created_at=now().timestamp(),
                             ),
                             error=Error(
-                                code=ErrorCode.MESSAGE_UNAVAILABLE, reason=(str(e))
+                                code=ErrorCode.MESSAGE_UNAVAILABLE,
+                                reason=(
+                                    "Reply message objects are unavailable. The "
+                                    "sender may not have completed the upload before "
+                                    "the object-push session expired. "
+                                    f"{e}"
+                                ),
                             ),
                         )
                     )
