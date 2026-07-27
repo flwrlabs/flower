@@ -23,7 +23,7 @@ env:
 
 jobs:
   check_format_docs:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Check Docs Formatting
     steps:
       - uses: actions/checkout@v5
@@ -38,7 +38,7 @@ jobs:
           cd dev
           uv run --no-sync docstrfmt --check ../intelligence/docs/source
   build_ts_docs:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Build TypeScript Docs
     steps:
       - uses: actions/checkout@v5
@@ -107,7 +107,7 @@ jobs:
           path: intelligence/docs/source/swift-api-ref/
 
   build_kt_docs:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Build Kotlin Docs
     steps:
       - uses: actions/checkout@v5
@@ -132,7 +132,7 @@ jobs:
           path: intelligence/docs/source/kt-api-ref/
 
   build_and_deploy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [build_ts_docs, build_kt_docs]
     name: Deploy Docs
     steps:
