@@ -78,6 +78,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAutomationsRequest,
+    ListAutomationsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
     ListFederationsRequest,
@@ -104,8 +106,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RevokeInvitationResponse,
     ShowFederationRequest,
     ShowFederationResponse,
+    StartAutomationRequest,
+    StartAutomationResponse,
     StartRunRequest,
     StartRunResponse,
+    StopAutomationRequest,
+    StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
     StreamLogsRequest,
@@ -128,6 +134,7 @@ from flwr.supercore.constant import (
     OAUTH_SESSION_TTL,
     RUN_SERIES_DESCRIPTION_MAX_LENGTH,
     ActionType,
+    AutomationStatus,
     RunTime,
     TaskType,
 )
@@ -680,6 +687,207 @@ def stream_run_events(
             continue
 
         time.sleep(RUN_EVENTS_STREAM_INTERVAL)
+def start_automation(  # pylint: disable=too-many-locals
+    request: StartAutomationRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> StartAutomationResponse:
+    """Create automation."""
+    log(INFO, "ControlServicer.StartAutomation")
+
+    # Validate the run series shared by all runs in this automation.
+    start_run_request = request.start_run_request
+    if not start_run_request.HasField("series_id"):
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "StartAutomation requires start_run_request.series_id.",
+            public_details="The run `series_id` is required to start an automation.",
+        )
+    if len(start_run_request.fab.content) > FAB_MAX_SIZE:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "StartAutomation FAB size exceeds the maximum allowed size of "
+            f"{FAB_MAX_SIZE} bytes.",
+            public_details=(
+                f"The FAB must not exceed {FAB_MAX_SIZE} bytes when starting "
+                "an automation."
+            ),
+        )
+
+    # Resolve the first scheduled run time.
+    if request.HasField("start_at"):
+        try:
+            next_run_at = datetime.fromisoformat(request.start_at).isoformat()
+        except ValueError as e:
+            raise FlowerError(
+                ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+                f"Invalid automation start_at value: {request.start_at}",
+                public_details=(
+                    "The automation start_at value must be a valid ISO 8601 timestamp."
+                ),
+            ) from e
+    else:
+        next_run_at = now().isoformat()
+
+    # Resolve recurrence settings and the default one-shot behavior.
+    fixed_interval = (
+        request.fixed_interval if request.HasField("fixed_interval") else None
+    )
+    max_runs = (
+        request.max_runs
+        if request.HasField("max_runs")
+        else 1 if fixed_interval is None else None
+    )
+    if max_runs is not None and max_runs < 1:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`max_runs` must be greater than zero.",
+            public_details="`max_runs` must be greater than zero.",
+        )
+    if fixed_interval is not None and fixed_interval < 1:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`fixed_interval` must be greater than zero.",
+            public_details="`fixed_interval` must be greater than zero.",
+        )
+    if fixed_interval is not None and fixed_interval >= 2**63:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`fixed_interval` must be less than 2**63.",
+            public_details="`fixed_interval` must be less than 2**63.",
+        )
+    if fixed_interval is None and (max_runs is None or max_runs > 1):
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`fixed_interval` is required for automations with multiple runs.",
+            public_details=(
+                "`fixed_interval` is required for automations with multiple runs."
+            ),
+        )
+
+    # Resolve the account-scoped federation and run configuration.
+    flwr_aid = account.flwr_aid
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+    federation_id = _resolve_federation_id(
+        state, account.account_name, start_run_request.federation
+    )
+    stored_start_run_request = StartRunRequest()
+    stored_start_run_request.CopyFrom(start_run_request)
+    stored_start_run_request.federation = federation_id
+
+    # Persist the unresolved run request so dispatch uses the StartRun workflow.
+    try:
+        automation = state.store_automation(
+            federation_id=federation_id,
+            flwr_aid=flwr_aid,
+            start_run_request=stored_start_run_request,
+            series_id=start_run_request.series_id,
+            next_run_at=next_run_at,
+            fixed_interval=fixed_interval,
+            max_runs=max_runs,
+        )
+    except ValueError as e:
+        raise FlowerError(
+            ApiErrorCode.FAILED_TO_CREATE_RUN,
+            "Failed to create automation for "
+            f"flwr_aid={flwr_aid}, federation_id={federation_id}, "
+            f"series_id={start_run_request.series_id}.",
+        ) from e
+
+    return StartAutomationResponse(
+        automation_id=automation.automation_id,
+        series_id=automation.series_id,
+        next_run_at=automation.next_run_at,
+    )
+
+
+def dispatch_automation(
+    state: LinkState,
+    automation_id: int,
+    *,
+    previous_next_run_at: str,
+    next_run_at: str | None,
+    fleet_api_type: str | None,
+) -> StartRunResponse | None:
+    """Claim an automation occurrence and execute it through StartRun."""
+    claimed = state.claim_automation(
+        automation_id,
+        previous_next_run_at=previous_next_run_at,
+        next_run_at=next_run_at,
+    )
+    if claimed is None:
+        return None
+
+    request, flwr_aid = claimed
+    try:
+        response = start_run(
+            request,
+            AccountInfo(flwr_aid=flwr_aid, account_name=""),
+            state,
+            fleet_api_type,
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        state.finish_automation(
+            automation_id,
+            status=AutomationStatus.FAILED,
+        )
+        raise
+
+    if not response.HasField("run_id"):
+        state.finish_automation(
+            automation_id,
+            status=AutomationStatus.FAILED,
+        )
+        return None
+    if next_run_at is None:
+        state.finish_automation(
+            automation_id,
+            status=AutomationStatus.COMPLETED,
+        )
+    return response
+
+
+def list_automations(
+    request: ListAutomationsRequest, account: AccountInfo, state: LinkState
+) -> ListAutomationsResponse:
+    """List automations."""
+    log(INFO, "ControlServicer.ListAutomations")
+
+    flwr_aid = account.flwr_aid
+    if request.federation:
+        _validate_federation_membership_in_request(state, flwr_aid, request.federation)
+        federations = [request.federation]
+    else:
+        federations = [
+            federation.id
+            for federation in state.federation_manager.get_federations(flwr_aid)
+        ]
+
+    return ListAutomationsResponse(
+        automations=state.list_automations(
+            federations=federations,
+            order_by="updated_at",
+        )
+    )
+
+
+def stop_automation(
+    request: StopAutomationRequest, account: AccountInfo, state: LinkState
+) -> StopAutomationResponse:
+    """Stop an automation."""
+    log(INFO, "ControlServicer.StopAutomation")
+
+    automations = state.list_automations(
+        automation_ids=[request.automation_id],
+        order_by="updated_at",
+    )
+    if automations:
+        _validate_federation_membership_in_request(
+            state, account.flwr_aid, automations[0].federation
+        )
+
+    state.stop_automation(request.automation_id)
+    return StopAutomationResponse()
 
 
 def list_runs(

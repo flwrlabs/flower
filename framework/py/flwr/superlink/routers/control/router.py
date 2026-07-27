@@ -37,6 +37,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAutomationsRequest,
+    ListAutomationsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -59,8 +61,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RevokeInvitationResponse,
     ShowFederationRequest,
     ShowFederationResponse,
+    StartAutomationRequest,
+    StartAutomationResponse,
     StartRunRequest,
     StartRunResponse,
+    StopAutomationRequest,
+    StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
     UnregisterNodeRequest,
@@ -131,6 +137,36 @@ def stop_run(
 ) -> StopRunResponse:
     """Stop a run."""
     return control_handlers.stop_run(request, account, linkstate)
+
+
+@router.post("/start-automation")
+def start_automation(
+    request: Annotated[StartAutomationRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> StartAutomationResponse:
+    """Start an automation."""
+    return control_handlers.start_automation(request, account, linkstate)
+
+
+@router.post("/list-automations")
+def list_automations(
+    request: Annotated[ListAutomationsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListAutomationsResponse:
+    """List automations."""
+    return control_handlers.list_automations(request, account, linkstate)
+
+
+@router.post("/stop-automation")
+def stop_automation(
+    request: Annotated[StopAutomationRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> StopAutomationResponse:
+    """Stop an automation."""
+    return control_handlers.stop_automation(request, account, linkstate)
 
 
 @router.post("/get-login-details")
