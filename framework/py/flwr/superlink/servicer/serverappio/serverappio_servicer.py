@@ -94,11 +94,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
     ) -> PullPendingTasksResponse:
         """Process due automations, then pull pending tasks."""
         state = self.state()
-        try:
-            process_due_automations(state)
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            log(ERROR, "Failed to process due automations: %s", exc)
-
+        process_due_automations(state)
         return super().PullPendingTasks(request, context)
 
     def GetNodes(

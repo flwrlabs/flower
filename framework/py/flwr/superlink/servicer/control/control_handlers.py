@@ -811,7 +811,7 @@ def dispatch_automation(
     *,
     previous_next_run_at: str,
     next_run_at: str | None,
-) -> StartRunResponse | None:
+) -> None:
     """Claim an automation occurrence and execute it through StartRun."""
     claimed = state.claim_automation(
         automation_id,
@@ -819,7 +819,7 @@ def dispatch_automation(
         next_run_at=next_run_at,
     )
     if claimed is None:
-        return None
+        return
 
     request, flwr_aid = claimed
     try:
@@ -829,24 +829,22 @@ def dispatch_automation(
             state,
             None,
         )
-    except Exception:  # pylint: disable=broad-exception-caught
+    except Exception as exc:  # pylint: disable=broad-exception-caught
         state.finish_automation(
             automation_id,
             status=AutomationStatus.FAILED,
         )
-        raise
+        log(ERROR, "Failing automation %d: %s", automation_id, exc)
+        return
 
-    if not response.HasField("run_id"):
-        state.finish_automation(
-            automation_id,
-            status=AutomationStatus.FAILED,
-        )
-        return None
     state.finish_automation(
         automation_id,
-        status=AutomationStatus.COMPLETED,
+        status=(
+            AutomationStatus.COMPLETED
+            if response.HasField("run_id")
+            else AutomationStatus.FAILED
+        ),
     )
-    return response
 
 
 def process_due_automations(
@@ -870,21 +868,12 @@ def process_due_automations(
             + timedelta(seconds=automation.fixed_interval)
         ).isoformat()
 
-        try:
-            dispatch_automation(
-                state,
-                automation.automation_id,
-                previous_next_run_at=automation.next_run_at,
-                next_run_at=next_run_at,
-            )
-        except FlowerError as exc:
-            log(
-                ERROR,
-                "Failing automation %d: %s",
-                automation.automation_id,
-                exc,
-            )
-            continue
+        dispatch_automation(
+            state,
+            automation.automation_id,
+            previous_next_run_at=automation.next_run_at,
+            next_run_at=next_run_at,
+        )
 
 
 def list_automations(
