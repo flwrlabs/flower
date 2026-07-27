@@ -245,6 +245,11 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         public_message="License check failed. Please contact the SuperLink "
         "administrator.",
     ),
+    ApiErrorCode.INVALID_AUTOMATION_REQUEST: ApiErrorSpec(
+        status_code=StatusCode.INVALID_ARGUMENT,
+        http_status_code=status.HTTP_400_BAD_REQUEST,
+        public_message="Invalid automation request.",
+    ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,

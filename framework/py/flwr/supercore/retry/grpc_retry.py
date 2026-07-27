@@ -75,10 +75,13 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
             # This can occur, for example, when the user runs `flwr stop`
             # Note: On Windows, `os.kill` terminates the process abruptly, not ideal
             # Note: `signal.raise_signal` is not effective in `flwr-simulation`
+            # Mark shutdown as requested before sending SIGINT because the signal
+            # handler can synchronously make another RPC from an exit handler.
             with shutdown_lock:
-                if not shutdown_requested:
-                    os.kill(os.getpid(), signal.SIGINT)
-                    shutdown_requested = True
+                if shutdown_requested:
+                    return True
+                shutdown_requested = True
+            os.kill(os.getpid(), signal.SIGINT)
             time.sleep(FORCE_EXIT_TIMEOUT_SECONDS + 1)
             return False
         if e.code() == grpc.StatusCode.UNAVAILABLE:  # type: ignore
