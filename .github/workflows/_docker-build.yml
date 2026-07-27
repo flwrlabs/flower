@@ -84,7 +84,7 @@ jobs:
       matrix:
         platform:
           [
-            { name: "amd64", docker: "linux/amd64", runner-os: "ubuntu-22.04" },
+            { name: "amd64", docker: "linux/amd64", runner-os: "ubuntu-24.04" },
             {
               name: "arm64",
               docker: "linux/arm64",
@@ -201,7 +201,7 @@ jobs:
 
   build-manifest:
     name: Build and push Docker manifest for all platforms
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: build
     outputs:
