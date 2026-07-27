@@ -34,6 +34,17 @@ def test_health_supports_get_and_head() -> None:
         assert response.content == b""
 
 
+def test_health_methods_have_unique_operation_ids() -> None:
+    """Document GET and HEAD with distinct operation IDs."""
+    app = FastAPI()
+    app.include_router(router)
+
+    health_operations = app.openapi()["paths"]["/health"]
+
+    assert health_operations["get"]["operationId"] == "health"
+    assert health_operations["head"]["operationId"] == "health_head"
+
+
 def test_router_does_not_expose_readiness() -> None:
     """Leave service-specific readiness checks to their owning application."""
     app = FastAPI()

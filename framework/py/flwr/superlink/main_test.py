@@ -82,10 +82,18 @@ def test_create_app_mounts_core_health_router(monkeypatch: MonkeyPatch) -> None:
         and route_context.path_format == "/health"
     ]
 
-    assert len(health_routes) == 1
-    assert health_routes[0].endpoint is health
-    assert health_routes[0].methods == {"GET", "HEAD"}
-    assert health_routes[0].tags == ["Health"]
+    assert len(health_routes) == 2
+    assert all(route.endpoint is health for route in health_routes)
+    assert {frozenset(route.methods or ()) for route in health_routes} == {
+        frozenset({"GET"}),
+        frozenset({"HEAD"}),
+    }
+    assert {route.name for route in health_routes} == {"health", "health_head"}
+    assert {route.operation_id for route in health_routes} == {
+        "health",
+        "health_head",
+    }
+    assert all(route.tags == ["Health"] for route in health_routes)
     assert all(
         route_context.path_format != "/ready"
         for route_context in iter_route_contexts(app.routes)
