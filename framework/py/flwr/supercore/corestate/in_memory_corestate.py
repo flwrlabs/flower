@@ -52,7 +52,7 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
-from .corestate import CoreState, validate_automation_schedule
+from .corestate import CoreState
 from .utils import (
     generate_rand_int_from_bytes,
     validate_task_event_data,
@@ -555,7 +555,6 @@ class InMemoryCoreState(
         max_runs: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
-        validate_automation_schedule(fixed_interval, max_runs)
         with self.lock_automation_store:
             current = now()
             automation_id = self._next_automation_id

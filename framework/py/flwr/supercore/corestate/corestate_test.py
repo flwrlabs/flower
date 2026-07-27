@@ -614,31 +614,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(stopped[0].next_run_at, due_at)
 
-    @parameterized.expand(  # type: ignore
-        [
-            ("zero_max_runs", None, 0),
-            ("zero_fixed_interval", 0, None),
-            ("multiple_runs_without_interval", None, 2),
-            ("unlimited_runs_without_interval", None, None),
-        ]
-    )
-    def test_store_automation_rejects_invalid_schedule(
-        self,
-        _name: str,
-        fixed_interval: int | None,
-        max_runs: int | None,
-    ) -> None:
-        """Automation storage should reject schedules that cannot advance."""
-        state = self.state_factory()
-
-        with self.assertRaises(ValueError):
-            self.store_automation(
-                state,
-                series_id=1,
-                fixed_interval=fixed_interval,
-                max_runs=max_runs,
-            )
-
     def test_advance_and_finish_automation(self) -> None:
         """Automation advance should update records and finish terminally."""
         state = self.state_factory()

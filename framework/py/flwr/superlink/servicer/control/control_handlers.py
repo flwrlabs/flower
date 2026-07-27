@@ -130,7 +130,6 @@ from flwr.supercore.constant import (
     RunTime,
     TaskType,
 )
-from flwr.supercore.corestate.corestate import validate_automation_schedule
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
@@ -633,14 +632,26 @@ def start_automation(  # pylint: disable=too-many-locals
         if request.HasField("max_runs")
         else 1 if fixed_interval is None else None
     )
-    try:
-        validate_automation_schedule(fixed_interval, max_runs)
-    except ValueError as e:
+    if max_runs is not None and max_runs < 1:
         raise FlowerError(
             ApiErrorCode.INVALID_AUTOMATION_REQUEST,
-            str(e),
-            public_details=str(e),
-        ) from e
+            "`max_runs` must be greater than zero.",
+            public_details="`max_runs` must be greater than zero.",
+        )
+    if fixed_interval is not None and fixed_interval < 1:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`fixed_interval` must be greater than zero.",
+            public_details="`fixed_interval` must be greater than zero.",
+        )
+    if fixed_interval is None and (max_runs is None or max_runs > 1):
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`fixed_interval` is required for automations with multiple runs.",
+            public_details=(
+                "`fixed_interval` is required for automations with multiple runs."
+            ),
+        )
 
     # Resolve the account-scoped federation and run configuration.
     flwr_aid = account.flwr_aid

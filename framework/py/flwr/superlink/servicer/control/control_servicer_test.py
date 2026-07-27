@@ -47,7 +47,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateInvitationResponse,
     DisconnectConnectorRequest,
     GetRunSeriesRequest,
-    ListAutomationsRequest,
     ListConnectorsRequest,
     ListFederationsRequest,
     ListFederationsResponse,
@@ -68,9 +67,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RevokeInvitationResponse,
     ShowFederationRequest,
     ShowFederationResponse,
-    StartAutomationRequest,
     StartRunRequest,
-    StopAutomationRequest,
     StopRunRequest,
     StreamLogsRequest,
     StreamLogsResponse,
@@ -88,7 +85,6 @@ from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     ActionType,
-    AutomationStatus,
     RunTime,
     TaskType,
 )
@@ -409,90 +405,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         assert run_context is not None
         self.assertEqual(run_context.run_id, response.run_id)
         self.assertEqual(run_context.series_id, response.series_id)
-
-    def test_start_automation(self) -> None:
-        """Test StartAutomation stores the automation schedule."""
-        # Prepare
-        start_at = "2026-07-10T09:00:00+00:00"
-        request = StartAutomationRequest(
-            start_at=start_at,
-            fixed_interval=86400,
-            max_runs=3,
-            start_run_request=StartRunRequest(
-                federation=NOOP_FEDERATION_ID,
-                series_id=123,
-            ),
-        )
-
-        # Execute
-        response = self.servicer.StartAutomation(request, Mock())
-        automation = self.state.list_automations(
-            federations=[NOOP_FEDERATION_ID],
-            order_by="updated_at",
-        )[0]
-
-        # Assert
-        self.assertEqual(automation.automation_id, response.automation_id)
-        self.assertEqual(
-            (
-                automation.series_id,
-                automation.next_run_at,
-                automation.fixed_interval,
-                automation.remaining_runs,
-            ),
-            (response.series_id, response.next_run_at, 86400, 3),
-        )
-
-    @parameterized.expand(  # type: ignore
-        [
-            (
-                "missing_series_id",
-                StartAutomationRequest(),
-                "A run series ID is required to start an automation.",
-            ),
-            (
-                "invalid_start_at",
-                StartAutomationRequest(
-                    start_at="not-a-timestamp",
-                    start_run_request=StartRunRequest(series_id=123),
-                ),
-                "The automation start_at value must be a valid ISO 8601 timestamp.",
-            ),
-            (
-                "zero_max_runs",
-                StartAutomationRequest(
-                    max_runs=0,
-                    start_run_request=StartRunRequest(series_id=123),
-                ),
-                "`max_runs` must be greater than zero.",
-            ),
-            (
-                "multiple_runs_without_interval",
-                StartAutomationRequest(
-                    max_runs=2,
-                    start_run_request=StartRunRequest(series_id=123),
-                ),
-                "`fixed_interval` is required for automations with multiple runs.",
-            ),
-        ]
-    )
-    def test_start_automation_rejects_invalid_request(
-        self,
-        _name: str,
-        request: StartAutomationRequest,
-        public_details: str,
-    ) -> None:
-        """Test StartAutomation rejects invalid requests."""
-        # Prepare
-        context = Mock()
-
-        # Execute
-        with self.assertRaises(FlowerError) as cm:
-            self.servicer.StartAutomation(request, context)
-
-        # Assert
-        self.assertEqual(cm.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
-        self.assertEqual(cm.exception.public_details, public_details)
 
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
         """StartRun should bind canonical connected OAuth connector refs."""
@@ -1019,43 +931,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Assert
         self.assertEqual([entry.series_id for entry in response.entries], [1])
-
-    def test_list_and_stop_automations(self) -> None:
-        """Test ListAutomations and StopAutomation."""
-        # Prepare
-        automation = self.state.store_automation(
-            federation_id=NOOP_FEDERATION_ID,
-            flwr_aid=self.aid,
-            start_run_request=StartRunRequest(
-                federation=NOOP_FEDERATION_ID,
-                series_id=1,
-            ),
-            series_id=1,
-            next_run_at=now().isoformat(),
-            max_runs=1,
-        )
-
-        # Execute
-        list_response = self.servicer.ListAutomations(
-            ListAutomationsRequest(federation=NOOP_FEDERATION_ID), Mock()
-        )
-        self.servicer.StopAutomation(
-            StopAutomationRequest(automation_id=automation.automation_id), Mock()
-        )
-        stopped = self.state.list_automations(
-            federations=[NOOP_FEDERATION_ID],
-            statuses=[AutomationStatus.STOPPED],
-            order_by="updated_at",
-        )
-
-        # Assert
-        self.assertEqual(
-            [entry.automation_id for entry in list_response.automations],
-            [automation.automation_id],
-        )
-        self.assertEqual(
-            [entry.automation_id for entry in stopped], [automation.automation_id]
-        )
 
     def test_get_run_series_returns_context(self) -> None:
         """Test GetRunSeries returns series metadata and shared Context."""

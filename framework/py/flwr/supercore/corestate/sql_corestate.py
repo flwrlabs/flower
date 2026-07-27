@@ -65,7 +65,7 @@ from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import build_sql_in_params, int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
-from .corestate import CoreState, validate_automation_schedule
+from .corestate import CoreState
 from .utils import (
     context_from_bytes,
     context_to_bytes,
@@ -835,7 +835,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         max_runs: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
-        validate_automation_schedule(fixed_interval, max_runs)
         try:
             with self.session():
                 current = now()

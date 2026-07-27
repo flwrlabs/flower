@@ -32,20 +32,6 @@ from ..constant import AutomationStatus
 from ..object_store import ObjectStore
 
 
-def validate_automation_schedule(
-    fixed_interval: int | None, max_runs: int | None
-) -> None:
-    """Validate normalized automation recurrence settings."""
-    if max_runs is not None and max_runs < 1:
-        raise ValueError("`max_runs` must be greater than zero.")
-    if fixed_interval is not None and fixed_interval < 1:
-        raise ValueError("`fixed_interval` must be greater than zero.")
-    if fixed_interval is None and (max_runs is None or max_runs > 1):
-        raise ValueError(
-            "`fixed_interval` is required for automations with multiple runs."
-        )
-
-
 class CoreState(ABC):  # pylint: disable=R0904
     """Abstract base class for core state."""
 
