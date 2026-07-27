@@ -594,7 +594,7 @@ def start_automation(  # pylint: disable=too-many-locals
         raise FlowerError(
             ApiErrorCode.INVALID_AUTOMATION_REQUEST,
             "StartAutomation requires start_run_request.series_id.",
-            public_details="A run series ID is required to start an automation.",
+            public_details="The run `series_id` is required to start an automation.",
         )
 
     # Resolve the first scheduled run time.
