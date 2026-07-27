@@ -20,8 +20,10 @@ import argparse
 import os
 import subprocess
 import sys
+import threading
 from collections.abc import Sequence
 from logging import INFO, WARN
+from time import sleep
 from typing import cast
 
 import grpc
@@ -134,6 +136,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
     ) -> None:
         self.config = config
         self.grpc_servers: list[grpc.Server] = []
+        self.bckg_threads: list[threading.Thread] = []
         self.superexec_process: subprocess.Popen[bytes] | None = None
         self.objectstore_factory = state_factory.objectstore_factory
         self.state_factory = state_factory
@@ -148,6 +151,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
         # Force initialization before starting network servers
         self.state_factory.state()
+
         self._start_control_api()
         self._start_serverappio_api()
         self._start_fleet_api()
@@ -182,10 +186,15 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self._serverappio_server = None
         self._started = False
 
-    def wait_for_termination(self) -> None:
-        """Block until the first gRPC server terminates."""
-        if self.grpc_servers:
-            self.grpc_servers[0].wait_for_termination()
+    def wait_until_background_thread_exits(self) -> None:
+        """Block like the historical `flower-superlink` command.
+
+        With only gRPC servers, `self.bckg_threads` is empty and `all([])` is
+        intentionally true, so this loop blocks until a signal handler exits the
+        process. This preserves the current CLI behavior.
+        """
+        while all(thread.is_alive() for thread in self.bckg_threads):
+            sleep(0.1)
 
     def _start_control_api(self) -> None:
         config = self.config
@@ -545,7 +554,7 @@ def flower_superlink() -> None:
         exit_handlers=[superlink_lifespan.shutdown],
     )
 
-    superlink_lifespan.wait_for_termination()
+    superlink_lifespan.wait_until_background_thread_exits()
 
 
 def _format_address(address: str) -> tuple[str, str, int]:
