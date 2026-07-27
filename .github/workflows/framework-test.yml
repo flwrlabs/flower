@@ -85,12 +85,12 @@ jobs:
         with:
           fetch-depth: 0
       - name: Bootstrap
-        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || ((matrix.task == 'pytest' || matrix.task == 'pytest_serial') && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
+        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) || (matrix.task == 'pytest_serial' && needs.changes.outputs.framework == 'true') }}
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python }}
       - name: Prepare framework
-        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || ((matrix.task == 'pytest' || matrix.task == 'pytest_serial') && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
+        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) || (matrix.task == 'pytest_serial' && needs.changes.outputs.framework == 'true') }}
         run: ./framework/dev/prepare-framework.sh
       - name: Cache mypy
         if: ${{ matrix.task == 'quality' && needs.changes.outputs.framework == 'true' }}
@@ -101,7 +101,7 @@ jobs:
           restore-keys: |
             mypy-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('framework/pyproject.toml', 'framework/uv.lock') }}-
       - name: Install dependencies
-        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || ((matrix.task == 'pytest' || matrix.task == 'pytest_serial') && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) }}
+        if: ${{ (matrix.task == 'quality' && needs.changes.outputs.framework == 'true') || (matrix.task == 'pytest' && (needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true')) || (matrix.task == 'pytest_serial' && needs.changes.outputs.framework == 'true') }}
         run: |
           cd framework
           uv sync --python=${{ matrix.python }} --locked --all-extras --all-groups
