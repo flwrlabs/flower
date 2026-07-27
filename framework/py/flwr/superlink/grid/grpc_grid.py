@@ -25,18 +25,16 @@ import grpc
 from flwr.app import Message, Metadata, RecordDict
 from flwr.app.error import Error
 from flwr.app.message import make_message, remove_content_from_message
-from flwr.common import now
 from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SUPERLINK_NODE_ID,
     ErrorCode,
 )
-from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log, warn_deprecated_feature
-from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.common.serde import message_to_proto
-from flwr.common.typing import Run
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetNodesRequest,
+    GetNodesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PushAppMessagesRequest,
@@ -46,13 +44,11 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
-    GetNodesRequest,
-    GetNodesResponse,
-)
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
 from flwr.serverapp.grid import Grid
 from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
+from flwr.supercore.date import now
+from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.inflatable.inflatable_object import (
     InflatableObject,
     get_all_nested_objects,
@@ -65,7 +61,7 @@ from flwr.supercore.inflatable.inflatable_protobuf_utils import (
     make_push_object_fn_protobuf,
 )
 from flwr.supercore.inflatable.inflatable_utils import (
-    ObjectUnavailableError,
+    ObjectPullError,
     inflate_object_from_contents,
     pull_objects,
     push_objects,
@@ -74,6 +70,8 @@ from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
+from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
+from flwr.supercore.run import Run
 
 ERROR_MESSAGE_PUSH_MESSAGES_RESOURCE_EXHAUSTED = """
 
@@ -265,6 +263,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
                 push_object_protobuf=self._stub.PushObject,
                 node=self.node,
                 run_id=run_id,
+                session_id=res.session_id,
             ),
             object_ids_to_push=set(res.objects_to_push),
         )
@@ -341,12 +340,9 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
                             run_id=run_id,
                         ),
                     )
-                except ObjectUnavailableError as e:
-                    # An ObjectUnavailableError indicates that the object is not yet
-                    # available. If this point has been reached, it means that the
-                    # Grid has tried to pull the object for the maximum number of times
-                    # or for the maximum time allowed, so we return an inflated message
-                    # with an error
+                except ObjectPullError as e:
+                    # Return an error message if an object is missing or remains
+                    # unavailable after all pull attempts.
                     inflated_msgs.append(
                         make_message(
                             metadata=Metadata(
@@ -361,7 +357,13 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
                                 created_at=now().timestamp(),
                             ),
                             error=Error(
-                                code=ErrorCode.MESSAGE_UNAVAILABLE, reason=(str(e))
+                                code=ErrorCode.MESSAGE_UNAVAILABLE,
+                                reason=(
+                                    "Reply message objects are unavailable. The "
+                                    "sender may not have completed the upload before "
+                                    "the object-push session expired. "
+                                    f"{e}"
+                                ),
                             ),
                         )
                     )

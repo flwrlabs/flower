@@ -14,18 +14,20 @@
 # ==============================================================================
 """Tests for utility functions for the infrastructure."""
 
-
 import json
+import sys
 from typing import Any
 
 import pytest
 import requests
 from parameterized import parameterized
 
+from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 from .utils import (
     MetadataLookupError,
+    build_sql_in_params,
     find_metadata_keys,
     get_metadata_bytes,
     get_metadata_str,
@@ -36,12 +38,42 @@ from .utils import (
     mask_string,
     parse_app_spec,
     request_download_link,
+    resolve_account_ids,
     simulation_config_from_json,
     simulation_config_to_json,
     strict_json_dumps,
     strict_json_loads,
     uint64_to_int64,
 )
+
+
+@pytest.mark.parametrize(
+    ("prefix", "values", "expected_placeholders", "expected_params"),
+    [
+        ("a", [10, 20, 30], ":a_0,:a_1,:a_2", {"a_0": 10, "a_1": 20, "a_2": 30}),
+        ("x", ["hello"], ":x_0", {"x_0": "hello"}),
+        ("p", [], "", {}),
+    ],
+)
+def test_build_sql_in_params(
+    prefix: str,
+    values: list[Any],
+    expected_placeholders: str,
+    expected_params: dict[str, Any],
+) -> None:
+    """Build matching SQL placeholders and parameters from ordered values."""
+    placeholders, params = build_sql_in_params(values, prefix)
+
+    assert placeholders == expected_placeholders
+    assert params == expected_params
+
+
+def test_build_sql_in_params_from_set() -> None:
+    """Keep placeholders aligned with parameters for unordered values."""
+    placeholders, params = build_sql_in_params({10, 20, 30}, "value")
+
+    assert placeholders == ",".join(f":{key}" for key in params)
+    assert set(params.values()) == {10, 20, 30}
 
 
 def test_find_metadata_keys() -> None:
@@ -65,6 +97,15 @@ def test_mask_string() -> None:
     assert mask_string("") == ""
     assert mask_string("1234567890", head=2, tail=3) == "12...890"
     assert mask_string("1234567890", head=5, tail=4) == "12345...7890"
+
+
+def test_resolve_account_ids_without_ee(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolve the noop account id and ignore unknown ids."""
+    monkeypatch.setitem(sys.modules, "flwr.ee", None)
+    monkeypatch.setitem(sys.modules, "flwr.ee.utils", None)
+    assert resolve_account_ids([NOOP_FLWR_AID, "unknown"]) == {
+        NOOP_FLWR_AID: NOOP_ACCOUNT_NAME
+    }
 
 
 def test_strict_json_loads() -> None:
@@ -466,7 +507,7 @@ def test_simulation_config_from_json_rejects_unknown_fields() -> None:
         (90000, "1d 1h"),  # day + hour
     ]
 )
-def test_humanize_duration(seconds, expected) -> None:
+def test_humanize_duration(seconds: int, expected: str) -> None:
     """Test the humanize_duration function."""
     assert humanize_duration(seconds) == expected
 
@@ -480,6 +521,6 @@ def test_humanize_duration(seconds, expected) -> None:
         (3 * 1024**3, "3.0 GB"),  # GB < 10
     ]
 )
-def test_humanize_bytes(num_bytes, expected) -> None:
+def test_humanize_bytes(num_bytes: int, expected: str) -> None:
     """Test the humanize_bytes function."""
     assert humanize_bytes(num_bytes) == expected

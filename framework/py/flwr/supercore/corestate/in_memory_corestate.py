@@ -14,19 +14,20 @@
 # ==============================================================================
 """In-memory CoreState implementation."""
 
-
+# pylint: disable=too-many-lines
 import hashlib
 import secrets
 from bisect import bisect_right
 from collections.abc import Sequence
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime, timedelta
 from logging import ERROR
-from threading import Lock
+from threading import Lock, RLock
 from typing import Literal, cast
+from uuid import uuid4
 
 from flwr.app import Context, Message
-from flwr.common import now
+from flwr.app.user_config import UserConfig
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -37,9 +38,20 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.logger import log
-from flwr.common.typing import Fab
+from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    Task,
+    TaskEvent,
+    TaskStatus,
+    TaskUsage,
+)
+from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
+from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -58,6 +70,41 @@ class TokenRecord:
     active_until: datetime
 
 
+@dataclass
+class TaskUsageRecord:
+    """Record containing task usage and reporting metadata."""
+
+    id: int
+    task_id: int
+    run_id: int
+    usage: TaskUsage
+    created_at: datetime
+    reported_at: datetime | None
+
+
+@dataclass
+class AutomationRecord:
+    """Record containing automation metadata and run template."""
+
+    automation: Automation
+    fab_id: str | None
+    fab_version: str | None
+    fab_hash: str | None
+    override_config: UserConfig
+    federation_config: SimulationConfig | None
+    primary_task_type: str
+
+
+@dataclass
+class ObjectPushSession:
+    """In-memory object push session."""
+
+    run_id: int
+    expires_at: datetime
+    root_object_ids: set[str]
+    pending_object_ids: set[str]
+
+
 class InMemoryCoreState(
     CoreState
 ):  # pylint: disable=R0904,too-many-instance-attributes
@@ -67,12 +114,21 @@ class InMemoryCoreState(
         self._object_store = object_store
         self.fab_store: dict[str, Fab] = {}
         self.lock_fab_store = Lock()
+        self.connector_store: dict[tuple[str, str], ConnectorRecord] = {}
+        self.lock_connector_store = Lock()
+        self.run_connector_store: dict[int, set[str]] = {}
+        self.lock_run_connector_store = Lock()
+        self.connector_oauth_session_store: dict[str, ConnectorOAuthSessionRecord] = {}
+        self.lock_connector_oauth_session_store = Lock()
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
         self.run_series_store: dict[int, RunSeries] = {}
         self.lock_run_series_store = Lock()
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
+        self.automation_store: dict[int, AutomationRecord] = {}
+        self.lock_automation_store = Lock()
+        self._next_automation_id = 1
         self.task_store: dict[int, Task] = {}
         # Store task ID to token mapping
         self.task_token_store: dict[int, TokenRecord] = {}
@@ -80,17 +136,168 @@ class InMemoryCoreState(
         self.task_token_to_task_id: dict[str, int] = {}
         self.task_logs: dict[int, list[tuple[float, str]]] = {}
         self.log_lock = Lock()
+        self.task_usage_store: dict[int, TaskUsageRecord] = {}
+        self.lock_task_usage_store = Lock()
+        self._next_task_usage_id = 1
         self.lock_task_store = Lock()
         self.task_message_store: dict[str, Message] = {}
         self.lock_task_message_store = Lock()
         self.task_event_store: dict[int, list[TaskEvent]] = {}
         self.lock_task_event_store = Lock()
         self._next_task_event_id = 1
+        self._object_push_sessions: dict[str, ObjectPushSession] = {}
+        # Store root object ID to session ID mapping
+        self._object_push_session_by_root: dict[str, str] = {}
+        self._lock_object_push_sessions = RLock()
 
     @property
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
         return self._object_store
+
+    def start_session(self, run_id: int) -> str:
+        """Start a run-scoped object push session."""
+        session_id = str(uuid4())
+        with self._lock_object_push_sessions:
+            self._object_push_sessions[session_id] = ObjectPushSession(
+                run_id=run_id,
+                expires_at=now() + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS),
+                root_object_ids=set(),
+                pending_object_ids=set(),
+            )
+        return session_id
+
+    def delete_sessions_in_run(self, run_id: int) -> None:
+        """Delete all object push session bookkeeping for a run."""
+        with self._lock_object_push_sessions:
+            session_ids = [
+                session_id
+                for session_id, session in self._object_push_sessions.items()
+                if session.run_id == run_id
+            ]
+            for session_id in session_ids:
+                self._cleanup_push_session(session_id, cleanup_messages=False)
+
+    def preregister_object_tree(
+        self, object_tree: ObjectTree, session_id: str
+    ) -> list[str]:
+        """Preregister an object tree and record its missing objects."""
+        with self._lock_object_push_sessions:
+            session = self._object_push_sessions.get(session_id)
+            if session is None:
+                raise ValueError(f"Unknown object push session: {session_id}")
+
+            # Preregister the tree and collect its currently missing objects
+            missing_objects = self.object_store.preregister(session.run_id, object_tree)
+
+            # Remove bookkeeping for an older session owning the same root
+            old_session_id = self._object_push_session_by_root.get(
+                object_tree.object_id
+            )
+            if old_session_id is not None and old_session_id != session_id:
+                self._cleanup_push_session(old_session_id, cleanup_messages=False)
+
+            # Record root ownership and pending objects for the session
+            session.root_object_ids.add(object_tree.object_id)
+            session.pending_object_ids.update(missing_objects)
+            self._object_push_session_by_root[object_tree.object_id] = session_id
+            return missing_objects
+
+    def store_object(
+        self,
+        run_id: int,
+        session_id: str,
+        object_id: str,
+        object_content: bytes,
+    ) -> bool:
+        """Store an object if it is pending for an active push session."""
+        with self._lock_object_push_sessions:
+            # Support legacy SuperNodes that do not send a session ID
+            if not session_id:
+                sessions = self._object_push_sessions.items()
+                session_id = next(
+                    (
+                        candidate_id
+                        for candidate_id, candidate in sessions
+                        if object_id in candidate.pending_object_ids
+                    ),
+                    "",
+                )
+                if not session_id:
+                    return False
+
+            # Validate session ownership and pending-object membership
+            session = self._object_push_sessions.get(session_id)
+            if (
+                session is None
+                or session.run_id != run_id
+                or object_id not in session.pending_object_ids
+            ):
+                return False
+
+            # Reject expired sessions and clean up their messages and objects
+            if session.expires_at <= now():
+                self._cleanup_push_session(session_id, cleanup_messages=True)
+                return False
+
+            # Store the object, mark it complete, and refresh the session TTL
+            try:
+                self.object_store.put(object_id, object_content)
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to store object %s: %s", object_id, err)
+                return False
+            session.pending_object_ids.remove(object_id)
+            session.expires_at = now() + timedelta(
+                seconds=OBJECT_PUSH_SESSION_TTL_SECONDS
+            )
+
+            # Remove session bookkeeping once every pending object is stored
+            if not session.pending_object_ids:
+                self._cleanup_push_session(session_id, cleanup_messages=False)
+            return True
+
+    def get_object(self, run_id: int, object_id: str) -> bytes | None:
+        """Get an object and clean up expired push sessions when needed."""
+        with self._lock_object_push_sessions:
+            # Return immediately unless the object is known but unavailable
+            content = self.object_store.get(object_id)
+            if content != b"":
+                return content
+
+            # Find expired sessions in this run that are waiting for the object
+            current = now()
+            expired_session_ids = [
+                session_id
+                for session_id, session in self._object_push_sessions.items()
+                if session.run_id == run_id
+                and object_id in session.pending_object_ids
+                and session.expires_at <= current
+            ]
+            if not expired_session_ids:
+                return content
+
+            # Clean up every expired session, then return the resulting object state
+            for session_id in expired_session_ids:
+                self._cleanup_push_session(session_id, cleanup_messages=True)
+            return self.object_store.get(object_id)
+
+    def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
+        """Remove an object push session and optionally its messages."""
+        with self._lock_object_push_sessions:
+            session = self._object_push_sessions.pop(session_id, None)
+            if session is None:
+                return
+
+            # Remove root ownership entries still belonging to this session
+            for object_id in session.root_object_ids:
+                if self._object_push_session_by_root.get(object_id) == session_id:
+                    del self._object_push_session_by_root[object_id]
+
+        # Delete expired object trees and their message metadata
+        if cleanup_messages and session.root_object_ids:
+            for object_id in session.root_object_ids:
+                self.object_store.delete(object_id)
+            self._on_push_session_expired(session.root_object_ids)
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
@@ -122,11 +329,131 @@ class InMemoryCoreState(
                 verifications=dict(fab.verifications),
             )
 
+    def upsert_connector(
+        self,
+        flwr_aid: str,
+        connector_ref: str,
+        credentials_json: str,
+        config_json: str,
+    ) -> bool:
+        """Create or update a connector for an account."""
+        if not flwr_aid or not connector_ref:
+            return False
+        connector = ConnectorRecord(
+            flwr_aid=flwr_aid,
+            connector_ref=connector_ref,
+            credentials_json=credentials_json,
+            config_json=config_json,
+        )
+        with self.lock_connector_store:
+            self.connector_store[(flwr_aid, connector_ref)] = connector
+        return True
+
+    def get_connector(
+        self, flwr_aid: str, connector_ref: str
+    ) -> ConnectorRecord | None:
+        """Return an account's connector, if present."""
+        if not flwr_aid or not connector_ref:
+            return None
+        with self.lock_connector_store:
+            return self.connector_store.get((flwr_aid, connector_ref))
+
+    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
+        """Delete an account's connector if it exists."""
+        if not flwr_aid or not connector_ref:
+            return False
+        with self.lock_connector_store:
+            return self.connector_store.pop((flwr_aid, connector_ref), None) is not None
+
+    def bind_connectors_to_run(
+        self, run_id: int, connector_refs: Sequence[str]
+    ) -> bool:
+        """Associate connector references with a run."""
+        if isinstance(connector_refs, str):
+            return False
+        with self.lock_run_connector_store:
+            self.run_connector_store.setdefault(run_id, set()).update(connector_refs)
+        return True
+
+    def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
+        """Return connector references associated with a run."""
+        with self.lock_run_connector_store:
+            return sorted(self.run_connector_store.get(run_id, set()))
+
+    def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        oauth_session_id: str,
+        flwr_aid: str,
+        connector_ref: str,
+        state: str,
+        redirect_uri: str,
+        pkce_verifier: str | None,
+        expires_at: datetime,
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Create and return a connector OAuth session."""
+        if (
+            not oauth_session_id
+            or not flwr_aid
+            or not connector_ref
+            or expires_at.utcoffset() is None
+        ):
+            return None
+        expires_at = expires_at.astimezone(UTC)
+        session = ConnectorOAuthSessionRecord(
+            oauth_session_id=oauth_session_id,
+            flwr_aid=flwr_aid,
+            connector_ref=connector_ref,
+            state=state,
+            redirect_uri=redirect_uri,
+            pkce_verifier=pkce_verifier,
+            created_at=now().isoformat(),
+            expires_at=expires_at.isoformat(),
+            completed_at=None,
+        )
+        with self.lock_connector_oauth_session_store:
+            if oauth_session_id in self.connector_oauth_session_store:
+                return None
+            self.connector_oauth_session_store[oauth_session_id] = session
+        return session
+
+    def get_connector_oauth_session(
+        self, oauth_session_id: str, flwr_aid: str
+    ) -> ConnectorOAuthSessionRecord | None:
+        """Return an account's connector OAuth session, if present."""
+        if not oauth_session_id or not flwr_aid:
+            return None
+        with self.lock_connector_oauth_session_store:
+            session = self.connector_oauth_session_store.get(oauth_session_id)
+            if session is None or session.flwr_aid != flwr_aid:
+                return None
+            return session
+
+    def complete_connector_oauth_session(
+        self, oauth_session_id: str, flwr_aid: str
+    ) -> bool:
+        """Mark a pending connector OAuth session as completed."""
+        if not oauth_session_id or not flwr_aid:
+            return False
+        completed_at = now()
+        with self.lock_connector_oauth_session_store:
+            session = self.connector_oauth_session_store.get(oauth_session_id)
+            if (
+                session is None
+                or session.flwr_aid != flwr_aid
+                or session.completed_at is not None
+                or datetime.fromisoformat(session.expires_at) <= completed_at
+            ):
+                return False
+            self.connector_oauth_session_store[oauth_session_id] = replace(
+                session, completed_at=completed_at.isoformat()
+            )
+        return True
+
     def get_run_series(
         self,
         *,
         series_ids: Sequence[int] | None = None,
-        federations: Sequence[str] | None = None,
+        federation_ids: Sequence[str] | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -136,12 +463,12 @@ class InMemoryCoreState(
         if (
             limit == 0
             or (series_ids is not None and not series_ids)
-            or (federations is not None and not federations)
+            or (federation_ids is not None and not federation_ids)
         ):
             return []
 
         series_id_set = set(series_ids) if series_ids is not None else None
-        federation_set = set(federations) if federations is not None else None
+        federation_id_set = set(federation_ids) if federation_ids is not None else None
 
         with self.lock_run_series_store:
             run_series = []
@@ -149,8 +476,8 @@ class InMemoryCoreState(
                 if series_id_set is not None and record.series_id not in series_id_set:
                     continue
                 if (
-                    federation_set is not None
-                    and record.federation not in federation_set
+                    federation_id_set is not None
+                    and record.federation not in federation_id_set
                 ):
                     continue
                 if updated_before is not None and record.updated_at >= updated_before:
@@ -174,8 +501,9 @@ class InMemoryCoreState(
     def store_run_in_series(
         self,
         run_id: int,
-        federation: str,
+        federation_id: str,
         series_id: int | None,
+        description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
         with self.lock_run_series_store:
@@ -185,13 +513,13 @@ class InMemoryCoreState(
                 if existing is None:
                     log(ERROR, "Run series %d not found", series_id)
                     return None
-                if existing.federation != federation:
+                if existing.federation != federation_id:
                     log(
                         ERROR,
                         "Run series %d belongs to federation %r, not %r",
                         series_id,
                         existing.federation,
-                        federation,
+                        federation_id,
                     )
                     return None
                 run_series = existing
@@ -206,8 +534,8 @@ class InMemoryCoreState(
                 timestamp = now().isoformat()
                 run_series = RunSeries(
                     series_id=new_series_id,
-                    federation=federation,
-                    description="",
+                    federation=federation_id,
+                    description=description if description is not None else "",
                     created_at=timestamp,
                     updated_at=timestamp,
                 )
@@ -221,6 +549,177 @@ class InMemoryCoreState(
             if series_id is not None:
                 run_series.updated_at = now().isoformat()
             return resolved_series_id
+
+    def store_automation(  # pylint: disable=too-many-arguments,too-many-locals
+        self,
+        *,
+        federation_id: str,
+        flwr_aid: str,
+        fab_id: str | None,
+        fab_version: str | None,
+        fab_hash: str | None,
+        override_config: UserConfig,
+        federation_config: SimulationConfig | None,
+        primary_task_type: str,
+        series_id: int,
+        next_run_at: str,
+        fixed_interval: int | None = None,
+        max_runs: int | None = None,
+    ) -> Automation:
+        """Store an automation and return its metadata."""
+        with self.lock_automation_store:
+            current = now()
+            automation_id = self._next_automation_id
+            self._next_automation_id += 1
+            automation = Automation(
+                automation_id=automation_id,
+                status=AutomationStatus.ACTIVE,
+                federation=federation_id,
+                series_id=series_id,
+                flwr_aid=flwr_aid,
+                created_at=current.isoformat(),
+                updated_at=current.isoformat(),
+                next_run_at=next_run_at,
+                fixed_interval=fixed_interval,
+                remaining_runs=max_runs,
+            )
+
+            self.automation_store[automation_id] = AutomationRecord(
+                automation=automation,
+                fab_id=fab_id,
+                fab_version=fab_version,
+                fab_hash=fab_hash,
+                override_config=dict(override_config),
+                federation_config=federation_config,
+                primary_task_type=primary_task_type,
+            )
+            return automation
+
+    def list_automations(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        federation: str | None = None,
+        statuses: Sequence[str] | None = None,
+        due_before: datetime | None = None,
+        order_by: Literal["next_run_at", "updated_at"],
+        limit: int | None = None,
+    ) -> Sequence[Automation]:
+        """Return automations matching the given filters."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if limit == 0 or (statuses is not None and not statuses):
+            return []
+
+        status_set = set(statuses) if statuses is not None else None
+        cutoff = due_before.isoformat() if due_before is not None else None
+        with self.lock_automation_store:
+            automations: list[Automation] = []
+            for record in self.automation_store.values():
+                automation = record.automation
+
+                # Apply federation filter.
+                if federation is not None and automation.federation != federation:
+                    continue
+
+                # Apply status filter.
+                if status_set is not None and automation.status not in status_set:
+                    continue
+
+                # Apply due time filter.
+                if cutoff is not None and automation.next_run_at > cutoff:
+                    continue
+                # Finite automations with no remaining runs are already claimed.
+                if (
+                    cutoff is not None
+                    and automation.HasField("remaining_runs")
+                    and automation.remaining_runs == 0
+                ):
+                    continue
+
+                automations.append(automation)
+
+            if order_by == "updated_at":
+                automations.sort(
+                    key=lambda automation: automation.updated_at,
+                    reverse=True,
+                )
+            else:
+                automations.sort(key=lambda automation: automation.next_run_at)
+            if limit is not None:
+                automations = automations[:limit]
+            return automations
+
+    def stop_automation(self, automation_id: int) -> bool:
+        """Stop an active automation."""
+        with self.lock_automation_store:
+            record = self.automation_store.get(automation_id)
+            if record is None or record.automation.status != AutomationStatus.ACTIVE:
+                return False
+
+            stopped_at = now().isoformat()
+            record.automation.status = AutomationStatus.STOPPED
+            record.automation.updated_at = stopped_at
+            record.automation.stopped_at = stopped_at
+            return True
+
+    def advance_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> bool:
+        """Advance an active automation occurrence."""
+        with self.lock_automation_store:
+            record = self.automation_store.get(automation_id)
+            if (
+                record is None
+                or record.automation.status != AutomationStatus.ACTIVE
+                or record.automation.next_run_at != previous_next_run_at
+                or (
+                    record.automation.HasField("remaining_runs")
+                    and record.automation.remaining_runs == 0
+                )
+            ):
+                return False
+
+            if next_run_at is None and (
+                not record.automation.HasField("remaining_runs")
+                or record.automation.remaining_runs > 1
+            ):
+                return False
+
+            record.automation.updated_at = now().isoformat()
+
+            if record.automation.HasField("remaining_runs"):
+                record.automation.remaining_runs = max(
+                    record.automation.remaining_runs - 1, 0
+                )
+
+            if next_run_at is not None:
+                record.automation.next_run_at = next_run_at
+            return True
+
+    def finish_automation(
+        self,
+        automation_id: int,
+        *,
+        status: Literal[AutomationStatus.COMPLETED, AutomationStatus.FAILED],
+    ) -> bool:
+        """Finish an active automation with a terminal status."""
+        with self.lock_automation_store:
+            record = self.automation_store.get(automation_id)
+            if record is None or record.automation.status != AutomationStatus.ACTIVE:
+                return False
+            if status == AutomationStatus.COMPLETED and (
+                not record.automation.HasField("remaining_runs")
+                or record.automation.remaining_runs != 0
+            ):
+                return False
+
+            record.automation.status = status
+            record.automation.updated_at = now().isoformat()
+            return True
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""
@@ -355,6 +854,48 @@ class InMemoryCoreState(
                 result.append(task_copy)
             return result
 
+    def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
+        """Record usage for the specified task."""
+        with self.lock_task_store:
+            task = self.task_store.get(task_id)
+            if task is None:
+                return
+            run_id = task.run_id
+
+        with self.lock_task_usage_store:
+            usage_id = self._next_task_usage_id
+            self.task_usage_store[usage_id] = TaskUsageRecord(
+                id=usage_id,
+                task_id=task_id,
+                run_id=run_id,
+                usage=usage,
+                created_at=now(),
+                reported_at=None,
+            )
+            self._next_task_usage_id += 1
+
+    def get_task_usage(
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        task_ids: Sequence[int] | None = None,
+    ) -> Sequence[TaskUsage]:
+        """Retrieve task usage records based on the specified filters."""
+        if (run_ids is not None and not run_ids) or (
+            task_ids is not None and not task_ids
+        ):
+            return []
+
+        with self.lock_task_usage_store:
+            records = sorted(
+                self.task_usage_store.values(), key=lambda record: record.id
+            )
+            if run_ids is not None:
+                records = [record for record in records if record.run_id in run_ids]
+            if task_ids is not None:
+                records = [record for record in records if record.task_id in task_ids]
+            return [record.usage for record in records]
+
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
         token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
@@ -389,10 +930,16 @@ class InMemoryCoreState(
             if task is None or task.status.status != Status.STARTING:
                 return False
 
-            task.running_at = now().isoformat()
+            activated_at = now()
+            task.running_at = activated_at.isoformat()
             task.status.CopyFrom(
                 TaskStatus(status=Status.RUNNING, sub_status="", details="")
             )
+            record = self.task_token_store.get(task_id)
+            if record is not None:
+                record.active_until = activated_at + timedelta(
+                    seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+                )
             return True
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:

@@ -19,15 +19,16 @@ import ctypes
 import json
 import os
 import re
+import subprocess
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from logging import WARN
 from pathlib import Path
 from typing import Any, Literal, TypeVar, cast
 
 import requests
 
-from flwr.common.constant import FLWR_DIR, FLWR_HOME
+from flwr.common.constant import FLWR_DIR, FLWR_HOME, NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.common.logger import log
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.version import package_version as flwr_version
@@ -123,6 +124,15 @@ def int64_to_uint64(signed: int) -> int:
     if signed < 0:
         return signed + (1 << 64)
     return signed
+
+
+def build_sql_in_params(
+    values: Iterable[Any], prefix: str
+) -> tuple[str, dict[str, Any]]:
+    """Build SQL IN-clause placeholders and a matching parameter dictionary."""
+    params = {f"{prefix}_{i}": value for i, value in enumerate(values)}
+    placeholders = ",".join(f":{key}" for key in params)
+    return placeholders, params
 
 
 def get_flwr_home() -> Path:
@@ -347,23 +357,23 @@ def humanize_bytes(num_bytes: int) -> str:
     raise RuntimeError("Unreachable code")  # Make mypy happy
 
 
-def check_federation_format(federation: str) -> None:
-    """Check if the federation string is valid.
+def check_federation_format(federation_id: str) -> None:
+    """Check if the federation ID string is valid.
 
     Parameters
     ----------
-    federation : str
-        The federation string to check.
+    federation_id : str
+        The federation ID string to check.
 
     Raises
     ------
     ValueError
-        If the federation string is not valid. The expected
+        If the federation ID string is not valid. The expected
         format is '@<account-name>/<federation-name>'.
     """
-    if not re.match(r"^@[a-zA-Z0-9\-_]+/[a-zA-Z0-9\-_]+$", federation):
+    if not re.match(r"^@[a-zA-Z0-9\-_]+/[a-zA-Z0-9\-_]+$", federation_id):
         raise ValueError(
-            f"Invalid federation format: {federation}. "
+            f"Invalid federation ID format: {federation_id}. "
             f"Expected format: '@<account-name>/<federation-name>'."
         )
 
@@ -507,3 +517,28 @@ def disable_process_dumping(strict: bool) -> None:
         if strict:
             raise RuntimeError(f"Failed to disable process dumping: {e!r}") from e
         log(WARN, "Failed to disable process dumping: %s", e)
+
+
+def resolve_account_ids(ids: Iterable[str]) -> dict[str, str]:
+    """Resolve account IDs to account names."""
+    # Lazy import to avoid circular dependency with flwr.ee.utils
+    try:
+        # pylint: disable-next=import-outside-toplevel
+        from flwr.ee.utils import resolve_account_ids as _resolve_account_ids_ee
+
+        resolve_account_ids_ee: Callable[[Iterable[str]], dict[str, str]]
+        resolve_account_ids_ee = _resolve_account_ids_ee
+        return resolve_account_ids_ee(ids)
+    except ModuleNotFoundError:
+        return {id_: NOOP_ACCOUNT_NAME for id_ in ids if id_ == NOOP_FLWR_AID}
+
+
+def get_popen_detach_kwargs() -> dict[str, Any]:
+    """Return platform-specific Popen kwargs to detach the process."""
+    if os.name == "nt":
+        return {
+            # The Windows-only constant is absent from non-Windows type stubs.
+            "creationflags": subprocess.CREATE_NEW_PROCESS_GROUP,  # type: ignore[attr-defined]
+        }
+
+    return {"start_new_session": True}

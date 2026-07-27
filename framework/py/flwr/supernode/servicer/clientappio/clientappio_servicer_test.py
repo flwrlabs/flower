@@ -18,18 +18,21 @@
 import unittest
 from unittest.mock import Mock, patch
 
+import grpc
 from parameterized import parameterized
 
 from flwr.app import Context
 from flwr.app.message import make_message
-from flwr.common import typing
 from flwr.common.constant import SubStatus
 from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
+    GetNodesRequest,
+    PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
+    PushAppMessagesRequest,
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
@@ -44,11 +47,13 @@ from flwr.proto.message_pb2 import (  # pylint:disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
+from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
     iterate_object_tree,
 )
+from flwr.supercore.run import Run
 from flwr.supernode.runtime.run_clientapp import (
     pull_task_input,
     push_message,
@@ -77,7 +82,7 @@ class TestClientAppIoServicer(unittest.TestCase):
             metadata=self.maker.metadata(),
             content=self.maker.recorddict(3, 2, 1),
         )
-        mock_fab = typing.Fab(
+        mock_fab = Fab(
             hash_str="abc123#$%",
             content=b"\xf3\xf5\xf8\x98",
             verifications={"ab12#$%": "abc123#$%"},
@@ -87,7 +92,7 @@ class TestClientAppIoServicer(unittest.TestCase):
             run=ProtoRun(run_id=61016, fab_id="mock/mock", fab_version="v1.0.0"),
             fab=fab_to_proto(mock_fab),
         )
-        self.mock_stub.PullMessage.return_value = PullAppMessagesResponse(
+        self.mock_stub.PullMessages.return_value = PullAppMessagesResponse(
             messages_list=[message_to_proto(mock_message)],
             message_object_trees=[get_object_tree(mock_message)],
         )
@@ -144,10 +149,10 @@ class TestClientAppIoServicer(unittest.TestCase):
         mock_response = PushTaskOutputResponse()
         self.mock_stub.PushTaskOutput.return_value = mock_response
 
-        # Prepare: Mock PushMessage RPC call
+        # Prepare: Mock PushMessages RPC call
         object_tree = get_object_tree(message)
         all_obj_ids = [tree.object_id for tree in iterate_object_tree(object_tree)]
-        self.mock_stub.PushMessage.return_value = PushAppMessagesResponse(
+        self.mock_stub.PushMessages.return_value = PushAppMessagesResponse(
             message_ids=[message.object_id],
             objects_to_push=all_obj_ids,
         )
@@ -173,7 +178,7 @@ class TestClientAppIoServicer(unittest.TestCase):
 
         # Assert
         self.mock_stub.PushTaskOutput.assert_called_once()
-        self.mock_stub.PushMessage.assert_called_once()
+        self.mock_stub.PushMessages.assert_called_once()
         self.assertSetEqual(pushed_obj_ids, set(all_obj_ids))
         push_outputs_request = self.mock_stub.PushTaskOutput.call_args.args[0]
         self.assertEqual(push_outputs_request.sub_status, sub_status)
@@ -185,7 +190,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         task_id = 123
         request = PullTaskInputRequest()
 
-        run = typing.Run.create_empty(run_id=run_id)
+        run = Run.create_empty(run_id=run_id)
         run.fab_id = "mock/mock"
         run.fab_version = "v1.0.0"
         run.fab_hash = "fab-hash"
@@ -199,7 +204,7 @@ class TestClientAppIoServicer(unittest.TestCase):
             run_config={"runconfig1": 6.1},
             series_id=run.series_id,
         )
-        fab = typing.Fab(
+        fab = Fab(
             hash_str="fab-hash",
             content=b"fab-content",
             verifications={"sig": "value"},
@@ -224,7 +229,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         """PushTaskOutput should finish the authenticated task."""
         run_id = 61016
         task_id = 123
-        run = typing.Run.create_empty(run_id=run_id)
+        run = Run.create_empty(run_id=run_id)
         run.series_id = 777
         app_context = Context(
             run_id=run_id,
@@ -256,6 +261,151 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.assertEqual(finish_task_kwargs["task_id"], task_id)
         self.assertEqual(finish_task_kwargs["sub_status"], request.sub_status)
 
+    def test_servicer_pull_messages_aborts_when_no_message_found(self) -> None:
+        """PullMessages should abort cleanly when no message is available."""
+        run_id = 61016
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+        self.mock_state.get_messages.return_value = []
+
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(run_id=run_id),
+        ):
+            with self.assertRaises(grpc.RpcError):
+                self.servicer.PullMessages(PullAppMessagesRequest(), context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.NOT_FOUND,
+            f"No message found for run {run_id} in NodeState.",
+        )
+        self.mock_state.record_message_processing_start.assert_not_called()
+
+    @parameterized.expand([(0, 0), (1, 0), (0, 1), (2, 1), (1, 2)])  # type: ignore
+    def test_servicer_push_messages_rejects_invalid_message_count(
+        self, message_count: int, object_tree_count: int
+    ) -> None:
+        """PushMessages should reject anything other than one message/tree."""
+        run_id = 61016
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+        message = make_message(
+            metadata=self.maker.metadata(),
+            content=self.maker.recorddict(1, 1, 1),
+        )
+        request = PushAppMessagesRequest(
+            messages_list=[message_to_proto(message)] * message_count,
+            message_object_trees=[get_object_tree(message)] * object_tree_count,
+        )
+
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(run_id=run_id),
+        ):
+            with self.assertRaises(grpc.RpcError):
+                self.servicer.PushMessages(request, context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.INVALID_ARGUMENT,
+            "ClientAppIo.PushMessages expects exactly one message and one object tree.",
+        )
+        self.mock_state.record_message_processing_end.assert_not_called()
+        self.mock_state.store_message_and_object_tree.assert_not_called()
+
+    def test_servicer_push_messages_stores_message_and_object_tree(self) -> None:
+        """PushMessages should store the message and preregister its object tree."""
+        message = make_message(
+            metadata=self.maker.metadata(),
+            content=self.maker.recorddict(1, 1, 1),
+        )
+        object_tree = get_object_tree(message)
+        request = PushAppMessagesRequest(
+            messages_list=[message_to_proto(message)],
+            message_object_trees=[object_tree],
+        )
+        self.mock_state.store_message_and_object_tree.return_value = (
+            True,
+            ["object-id"],
+        )
+        self.mock_state.start_session.return_value = "session-id"
+
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(run_id=message.metadata.run_id),
+        ):
+            response = self.servicer.PushMessages(request, Mock())
+
+        self.mock_state.record_message_processing_end.assert_called_once_with(
+            message_id=message.metadata.reply_to_message_id
+        )
+        self.mock_state.start_session.assert_called_once_with(message.metadata.run_id)
+        self.mock_state.store_message_and_object_tree.assert_called_once()
+        stored_message, stored_tree, session_id = (
+            self.mock_state.store_message_and_object_tree.call_args.args
+        )
+        self.assertEqual(
+            stored_message.metadata.message_id, message.metadata.message_id
+        )
+        self.assertEqual(stored_tree, object_tree)
+        self.assertEqual(session_id, "session-id")
+        self.assertEqual(list(response.objects_to_push), ["object-id"])
+        self.assertEqual(response.session_id, "session-id")
+
+    def test_push_object_uses_state(self) -> None:
+        """PushObject should delegate session validation and storage to state."""
+        request = PushObjectRequest(
+            run_id=456,
+            session_id="session-id",
+            object_id="object-id",
+            object_content=b"content",
+        )
+        self.mock_state.store_object.return_value = True
+
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(run_id=123),
+        ):
+            response = self.servicer.PushObject(request, Mock())
+
+        self.mock_state.store_object.assert_called_once_with(
+            123, "session-id", "object-id", b"content"
+        )
+        self.assertTrue(response.stored)
+
+    def test_pull_object_uses_state(self) -> None:
+        """PullObject should delegate retrieval and expiry cleanup to state."""
+        request = PullObjectRequest(run_id=456, object_id="object-id")
+        self.mock_state.get_object.return_value = b"content"
+
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(run_id=123),
+        ):
+            response = self.servicer.PullObject(request, Mock())
+
+        self.mock_state.get_object.assert_called_once_with(123, "object-id")
+        self.assertTrue(response.object_found)
+        self.assertTrue(response.object_available)
+        self.assertEqual(response.object_content, b"content")
+
+    def test_get_nodes_unimplemented(self) -> None:
+        """GetNodes should be unavailable on ClientAppIo."""
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.GetNodes(GetNodesRequest(), context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.UNIMPLEMENTED,
+            "GetNodes is not available on ClientAppIo.",
+        )
+
     @parameterized.expand([(True,), (False,)])  # type: ignore
     def test_send_task_heartbeat(self, success: bool) -> None:
         """Test sending a task heartbeat."""
@@ -266,7 +416,7 @@ class TestClientAppIoServicer(unittest.TestCase):
 
         # Execute
         with patch(
-            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+            "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
             return_value=Mock(task_id=task_id),
         ):
             response = self.servicer.SendTaskHeartbeat(request, Mock())

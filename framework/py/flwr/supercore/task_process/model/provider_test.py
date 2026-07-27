@@ -24,7 +24,11 @@ import pytest
 
 from flwr.supercore.typing import JSONObject
 
-from .provider import ModelProviderError, invoke_model_provider
+from .provider import (
+    DEFAULT_MODEL_API_ENDPOINT,
+    ModelProviderError,
+    invoke_model_provider,
+)
 
 
 @dataclass
@@ -51,6 +55,100 @@ def _patch_post(monkeypatch: pytest.MonkeyPatch, response: _Response) -> Mock:
         post_mock,
     )
     return post_mock
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        None,
+        DEFAULT_MODEL_API_ENDPOINT,
+        f"{DEFAULT_MODEL_API_ENDPOINT}/",
+    ],
+)
+def test_invoke_model_provider_requires_key_for_default_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+    endpoint: str | None,
+) -> None:
+    """Default model endpoint calls should fail before network without an API key."""
+    if endpoint is not None:
+        monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", endpoint)
+    post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
+
+    with pytest.raises(RuntimeError, match="FLWR_MODEL_API_KEY"):
+        invoke_model_provider({"model": "model", "input": []}, usage_recorder=Mock())
+
+    post_mock.assert_not_called()
+
+
+def test_invoke_model_provider_omits_auth_for_endpoint_without_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explicit endpoints should support proxy calls without bearer auth."""
+    monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "http://proxy/v1/responses")
+    post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
+
+    result = invoke_model_provider(
+        {"model": "model", "input": []}, usage_recorder=Mock()
+    )
+
+    assert result == {"id": "resp_1"}
+    assert post_mock.call_args.args == ("http://proxy/v1/responses",)
+    assert post_mock.call_args.kwargs["headers"] == {"Content-Type": "application/json"}
+
+
+def test_invoke_model_provider_keeps_auth_when_key_is_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Direct provider calls should keep sending bearer auth."""
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
+
+    result = invoke_model_provider(
+        {"model": "model", "input": []}, usage_recorder=Mock()
+    )
+
+    assert result == {"id": "resp_1"}
+    assert post_mock.call_args.kwargs["headers"] == {
+        "Authorization": "Bearer fk_test",
+        "Content-Type": "application/json",
+    }
+
+
+@pytest.mark.parametrize(
+    ("request_payload", "expected_provider"),
+    [
+        ({"model": "openai/gpt-test", "input": []}, "openai/gpt-test"),
+        ({"input": []}, "unknown"),
+    ],
+)
+def test_invoke_model_provider_records_static_usage_type_and_provider(
+    monkeypatch: pytest.MonkeyPatch,
+    request_payload: JSONObject,
+    expected_provider: str,
+) -> None:
+    """Model usage should include its static type and requested provider."""
+    monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "http://proxy/v1/responses")
+    _patch_post(
+        monkeypatch,
+        _Response(
+            body={
+                "id": "resp_1",
+                "usage": {
+                    "input_tokens": 10,
+                    "output_tokens": 20,
+                    "total_tokens": 30,
+                },
+            }
+        ),
+    )
+    usage_recorder = Mock()
+
+    result = invoke_model_provider(request_payload, usage_recorder=usage_recorder)
+
+    assert result["id"] == "resp_1"
+    usage = usage_recorder.record.call_args.args[0]
+    assert usage.usage_type == "model_inference"
+    assert usage.provider == expected_provider
 
 
 def test_invoke_model_provider_collects_stream_events(
@@ -80,6 +178,7 @@ def test_invoke_model_provider_collects_stream_events(
 
     result = invoke_model_provider(
         {"model": "model", "input": [], "stream": True},
+        usage_recorder=Mock(),
         on_stream_event=streamed_events.append,
     )
 
@@ -114,7 +213,10 @@ def test_invoke_model_provider_collects_stream_events(
         ),
     )
 
-    result = invoke_model_provider({"model": "model", "input": [], "stream": True})
+    result = invoke_model_provider(
+        {"model": "model", "input": [], "stream": True},
+        usage_recorder=Mock(),
+    )
 
     assert result == {
         "id": "resp_1",
@@ -170,7 +272,10 @@ def test_invoke_model_provider_raises_on_stream_failure_events(
     )
 
     with pytest.raises(ModelProviderError) as exc_info:
-        invoke_model_provider({"model": "model", "input": [], "stream": True})
+        invoke_model_provider(
+            {"model": "model", "input": [], "stream": True},
+            usage_recorder=Mock(),
+        )
 
     assert exc_info.value.status_code == 200
     assert exc_info.value.detail == expected_detail

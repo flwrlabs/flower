@@ -49,14 +49,12 @@ If you are starting here directly, install Flower and fetch the same app:
 
 .. code-block:: shell
 
-    # Install Flower with the simulation extra
-    $ pip install -U "flwr[simulation]"
+    # Install Flower
+    $ pip install -U flwr
     # Fetch the app from Flower Hub
     $ flwr new @flwrlabs/quickstart-pytorch
     # Navigate to the app directory
     $ cd quickstart-pytorch
-    # Install the app dependencies
-    $ pip install -e .
 
 Constructing Messages
 =====================
@@ -292,7 +290,7 @@ the ``aggregate_train`` method to deserialize the ``TrainProcessMetadata`` objec
 each client and print the training time and convergence status:
 
 .. code-block:: python
-    :emphasize-lines: 3-5,12,22-23,25
+    :emphasize-lines: 3-5,8,13,22,26-27,29
 
     # ... make sure you have these imports.
     # ... Some may exist from previous tutorials
@@ -301,6 +299,7 @@ each client and print the training time and convergence status:
     from typing import Iterable, Optional
 
     # ... unchanged
+    from pytorchexample.task import TrainProcessMetadata
 
 
     class CustomFedAdagrad(FedAdagrad):
@@ -312,6 +311,9 @@ each client and print the training time and convergence status:
         ) -> tuple[Optional[ArrayRecord], Optional[MetricRecord]]:
             """Aggregate ArrayRecords and MetricRecords in the received Messages."""
 
+            # Convert replies to a list before iterating over them so the parent
+            # strategy can still aggregate the same replies afterwards.
+            replies = list(replies)
             for reply in replies:
                 if reply.has_content():
                     # Retrieve the ConfigRecord from the message

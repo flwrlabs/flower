@@ -29,8 +29,6 @@ from sqlalchemy import (
     text,
 )
 
-from flwr.supercore.constant import RunType
-
 
 def create_linkstate_metadata() -> MetaData:
     """Create and return MetaData with LinkState table definitions."""
@@ -74,10 +72,9 @@ def create_linkstate_metadata() -> MetaData:
         Column("fab_hash", String),
         Column("override_config", String),
         Column("usage_reported_at", String, nullable=False, server_default=text("''")),
-        Column("federation", String),
+        Column("federation_id", String),
         Column("primary_task_id", BigInteger, nullable=False),
         Column("federation_config", String),
-        Column("run_type", String, nullable=False, server_default=RunType.SERVER_APP),
         Column("series_id", BigInteger, nullable=True),
         Column("flwr_aid", String),
         Column("bytes_sent", BigInteger, server_default="0"),

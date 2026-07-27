@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "flwr"
-version = "1.32.0"
+version = "1.33.0"
 description = "Flower: A Friendly Federated AI Framework"
 license = "Apache-2.0"
 authors = [{ name = "The Flower Authors", email = "hello@flower.ai" }]
@@ -53,14 +53,17 @@ dependencies = [
     "uv>=0.11.15,<0.12.0",
     "tomli>=2.0.1,<3.0.0",
     "tomli-w>=1.0.0,<2.0.0",
-    "pathspec>=0.12.1,<0.13.0",
-    "rich>=13.5.0,<14.0.0",
+    "pathspec>=1.0.4,<2.0.0",
+    "rich>=14.0.0,<15.0.0",
     "pyyaml>=6.0.2,<7.0.0",
     "requests>=2.33.0,<3.0.0",
     "click>=8.0.0,<9.0.0",
     "packaging>=24.0,<26.0",
-    "SQLAlchemy>=2.0.45,<3.0.0",
+    "SQLAlchemy[asyncio]>=2.0.45,<3.0.0",
     "alembic>=1.18.1,<2.0.0",
+    "uvicorn[standard]>=0.49.0,<0.50.0",
+    "fastapi>=0.138.0,<0.139.0",
+    "starlette>=1.3.1,<1.4.0",
 ]
 
 [project.optional-dependencies]
@@ -68,7 +71,7 @@ simulation = [
     "ray==2.55.1; python_version >= '3.11' and python_version < '3.13'",
     "ray==2.55.1; python_version >= '3.13' and python_version < '3.15' and sys_platform != 'win32'",
 ]
-rest = ["starlette>=0.50.0,<0.51.0", "uvicorn[standard]>=0.40.0,<0.41.0"]
+agent = ["browser-use[core]>=0.13.1,<0.14.0", "trafilatura>=2.1.0,<3.0.0"]
 
 [project.scripts]
 # `flwr` CLI
@@ -76,13 +79,14 @@ flwr = "flwr.cli.app:app"
 # Simulation Engine
 flwr-simulation = "flwr.simulation.app:flwr_simulation"
 # Deployment Engine
-flower-superlink = "flwr.server.app:run_superlink"
+flower-superlink = "flwr.superlink.cli:flower_superlink"
 flower-supernode = "flwr.supernode.cli:flower_supernode"
 flower-superexec = "flwr.supercore.cli:flower_superexec"
-flwr-serverapp = "flwr.server.serverapp:flwr_serverapp"
+flwr-serverapp = "flwr.superlink.cli:flwr_serverapp"
 flwr-clientapp = "flwr.supernode.cli:flwr_clientapp"
 flwr-agentapp = "flwr.supercore.cli:flwr_agentapp"
 flwr-model = "flwr.supercore.cli:flwr_model"
+flwr-connector = "flwr.supercore.cli:flwr_connector"
 
 [project.urls]
 homepage = "https://flower.ai"
@@ -100,7 +104,7 @@ dev = [
     "isort==5.13.2",
     "black[jupyter]==25.11.0",
     "taplo==0.9.3",
-    "mypy==1.8.0",
+    "mypy[faster-cache]==2.3.0",
     "pylint==4.0.5",
     "parameterized==0.9.0",
     "pytest==9.0.3",

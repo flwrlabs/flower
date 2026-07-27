@@ -22,9 +22,9 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from flwr.common.grpc import valid_certificates
 from flwr.server.client_manager import SimpleClientManager
 from flwr.server.superlink.fleet.grpc_bidi.grpc_server import start_grpc_server
+from flwr.supercore.grpc import valid_certificates
 
 
 def _generate_test_certificates() -> tuple[bytes, bytes, bytes]:

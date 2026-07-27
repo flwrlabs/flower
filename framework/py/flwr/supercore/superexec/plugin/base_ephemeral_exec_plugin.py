@@ -19,8 +19,8 @@ import os
 import subprocess
 from collections.abc import Callable, Sequence
 
-from flwr.common.exit import ExitCode, flwr_exit
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.exit import ExitCode, flwr_exit
 
 from .exec_plugin import ExecPlugin
 

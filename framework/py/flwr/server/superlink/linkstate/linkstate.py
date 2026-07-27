@@ -22,10 +22,10 @@ from typing import Literal
 from flwr.app import Context, Message, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
+from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
 
 
@@ -136,6 +136,12 @@ class LinkState(CoreState):  # pylint: disable=R0904
     @abc.abstractmethod
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
+
+    def cleanup_run(self, run_id: int) -> None:
+        """Clean up run-scoped messages and objects."""
+        self.delete_messages(self.get_message_ids_from_run_id(run_id))
+        self.object_store.delete_objects_in_run(run_id)
+        self.delete_sessions_in_run(run_id)
 
     @abc.abstractmethod
     def stop_run(self, run_id: int) -> bool:
@@ -263,11 +269,13 @@ class LinkState(CoreState):  # pylint: disable=R0904
         fab_version: str | None,
         fab_hash: str | None,
         override_config: UserConfig,
-        federation: str,
+        federation_id: str,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
-        run_type: str,
+        primary_task_type: str,
         series_id: int | None = None,
+        series_description: str | None = None,
+        connector_refs: Sequence[str] = (),
     ) -> int:
         """Create a new run.
 
@@ -281,18 +289,24 @@ class LinkState(CoreState):  # pylint: disable=R0904
             The SHA256 hex hash of the FAB.
         override_config : UserConfig
             Configuration overrides for the run config.
-        federation : str
-            The federation this run belongs to.
+        federation_id : str
+            The federation ID this run belongs to.
         federation_config : SimulationConfig | None
             Optional resolved federation configuration for the run.
         flwr_aid : str | None
             Flower Account ID of the creator.
-        run_type : str
-            The type of run being created.
+        primary_task_type : str
+            The type of the primary task to create for the run.
         series_id : int | None (default: None)
             Optional run series ID. If `None`, a new run series is created for
             the federation. If set, the series must already exist and belong to
             the federation.
+        series_description : str | None (default: None)
+            Optional description for a newly created run series. Ignored when
+            `series_id` refers to an existing run series. `None` means no
+            description was provided; an empty string is an explicit description.
+        connector_refs : Sequence[str] (default: ())
+            Connector references the run is allowed to invoke.
 
         Returns
         -------
@@ -306,13 +320,41 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
+    def dispatch_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> int | None:
+        """Create a run from a due automation and advance the automation.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to dispatch.
+        previous_next_run_at : str
+            Previously observed due time timestamp string. Dispatch only succeeds
+            if the stored `next_run_at` still matches this value, preventing
+            multiple workers from executing the same scheduled run concurrently.
+        next_run_at : str | None
+            Next due time timestamp string. If `None`, the current occurrence is
+            treated as the last finite occurrence and no next due time is stored.
+
+        Returns
+        -------
+        int | None
+            The created run ID if dispatch succeeded, otherwise `None`.
+        """
+
+    @abc.abstractmethod
     def get_run_info(  # pylint: disable=too-many-arguments
         self,
         *,
         run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
-        federations: Sequence[str] | None = None,
+        federation_ids: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
@@ -331,8 +373,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Sequence of run status values to filter by.
         flwr_aids : Optional[Sequence[str]] (default: None)
             Sequence of Flower Account IDs to filter by.
-        federations : Optional[Sequence[str]] (default: None)
-            Sequence of federation names to filter by.
+        federation_ids : Optional[Sequence[str]] (default: None)
+            Sequence of federation IDs to filter by.
         order_by : Optional[Literal["pending_at"]] (default: None)
             Field used to order the result.
         ascending : bool (default: True)

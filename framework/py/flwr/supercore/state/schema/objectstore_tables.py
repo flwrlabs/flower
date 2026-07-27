@@ -89,4 +89,15 @@ def create_objectstore_metadata() -> MetaData:
         PrimaryKeyConstraint("run_id", "object_id"),
     )
 
+    # --------------------------------------------------------------------------
+    #  Table: objectstore_locks
+    # --------------------------------------------------------------------------
+    Table(
+        "objectstore_locks",
+        metadata,
+        Column("lock_id", String, nullable=False),
+        Column("lock_value", Integer, nullable=False, server_default="0"),
+        PrimaryKeyConstraint("lock_id"),
+    )
+
     return metadata

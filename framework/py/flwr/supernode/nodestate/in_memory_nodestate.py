@@ -17,21 +17,24 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from logging import ERROR
 from threading import Lock, RLock
 
 from flwr.app import Error, Message
-from flwr.common import now
 from flwr.common.constant import ErrorCode
-from flwr.common.typing import Run
+from flwr.common.logger import log
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
+from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
     no_object_id_recompute,
 )
 from flwr.supercore.object_store import ObjectStore
+from flwr.supercore.run import Run
 
 from .nodestate import NodeState
 
@@ -91,10 +94,25 @@ class InMemoryNodeState(
         # verifies the authenticated task token before storing messages.
         with self.lock_msg_store:
             msg_id = message.metadata.message_id
-            if msg_id == "" or msg_id in self.msg_store:
+            if msg_id == "":
                 return None
+            if msg_id in self.msg_store:
+                return msg_id
             self.msg_store[msg_id] = MessageEntry(message=message)
             return msg_id
+
+    def store_message_and_object_tree(
+        self, message: Message, object_tree: ObjectTree, session_id: str
+    ) -> tuple[bool, list[str]]:
+        """Store a Message and preregister its ObjectTree."""
+        # Always acquire the push-session lock before the message-store lock
+        with self._lock_object_push_sessions, self.lock_msg_store:
+            stored = self.store_message(message) is not None
+            if not stored:
+                return False, []
+
+            missing_objects = self.preregister_object_tree(object_tree, session_id)
+            return True, missing_objects
 
     def get_messages(
         self,
@@ -210,9 +228,12 @@ class InMemoryNodeState(
         """Record the end time of message processing based on the message ID."""
         with self.lock_time_store:
             if message_id not in self.time_store:
-                raise ValueError(
-                    f"Cannot record end time: Message ID {message_id} not found."
+                log(
+                    ERROR,
+                    "Cannot record end time: Message ID %s not found.",
+                    message_id,
                 )
+                return
             entry = self.time_store[message_id]
             entry.finished_at = now().timestamp()
 
@@ -222,13 +243,21 @@ class InMemoryNodeState(
         self._cleanup_old_message_times()
         with self.lock_time_store:
             if message_id not in self.time_store:
-                raise ValueError(f"Message ID {message_id} not found.")
+                log(
+                    ERROR,
+                    "Cannot get processing duration: Message ID %s not found.",
+                    message_id,
+                )
+                return 0.0
 
             entry = self.time_store[message_id]
             if entry.starting_at is None or entry.finished_at is None:
-                raise ValueError(
-                    f"Start time or end time for message ID {message_id} is missing."
+                log(
+                    ERROR,
+                    "Start time or end time for message ID %s is missing.",
+                    message_id,
                 )
+                return 0.0
 
             duration = entry.finished_at - entry.starting_at
             return duration

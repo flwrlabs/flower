@@ -28,18 +28,17 @@ from flwr.cli.utils import (
 from flwr.common.constant import CliOutputFormat
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationRequest,
-    ConfigureSimulationFederationResponse,
 )
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.supercore.constant import NOOP_FEDERATION_ID
 
 
 def simulation_config(  # pylint: disable=R0913,R0917,W0613,R0914
     federation: Annotated[
         str | None,
         typer.Argument(
-            help="Name of the federation; must be in the "
-            "format `@<account>/<federation>`."
+            help="Federation ID; must be in the format `@<account>/<federation-name>`."
         ),
     ] = None,
     superlink: Annotated[
@@ -182,11 +181,13 @@ def _configure_federation_for_simulation(
 ) -> None:
     """Send a request to configure a federation for simulation."""
     with flwr_cli_grpc_exc_handler():
-        _: ConfigureSimulationFederationResponse = stub.ConfigureSimulationFederation(
-            request
-        )
+        response = stub.ConfigureSimulationFederation(request)
+        federation_id = response.federation_name
 
     if is_json:
-        print_json_to_stdout({"success": True})
+        print_json_to_stdout({"success": True, "federation-id": federation_id})
     else:
-        typer.secho("✅ Updated simulation configuration.")
+        message = "✅ Updated simulation configuration"
+        if federation_id and federation_id != NOOP_FEDERATION_ID:
+            message += f" of federation {federation_id}"
+        typer.secho(message)

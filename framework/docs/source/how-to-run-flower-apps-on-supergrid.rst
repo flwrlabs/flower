@@ -87,12 +87,12 @@ Pull the app locally with ``flwr new``:
 
 Then, log in to SuperGrid with ``flwr login``. This opens a browser window where you can
 authenticate with your SuperGrid account. Finally, run the app with ``flwr run`` and use
-``--federation`` to choose the federation:
+``--federation`` to choose the target federation:
 
 .. note::
 
-    Replace ``@<username>/<federation-name>`` with the unique name of your federation,
-    for example ``@peter123/my-federation``.
+    Replace ``@<username>/<federation-name>`` with your federation ID, for example
+    ``@peter123/my-federation``.
 
 .. code-block:: shell
 
@@ -100,6 +100,7 @@ authenticate with your SuperGrid account. Finally, run the app with ``flwr run``
     $ flwr login supergrid
 
     $ flwr run . --federation @<username>/<federation-name>
+    🎊 Successfully started run 1859953118041441032 in federation @<username>/<federation-name>
 
 The run appears in the same SuperGrid federation dashboard.
 

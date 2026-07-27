@@ -22,11 +22,9 @@ from typing import Final
 
 TRANSPORT_TYPE_GRPC_RERE = "grpc-rere"
 TRANSPORT_TYPE_GRPC_ADAPTER = "grpc-adapter"
-TRANSPORT_TYPE_REST = "rest"
 TRANSPORT_TYPE_VCE = "vce"
 TRANSPORT_TYPES = [
     TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_REST,
     TRANSPORT_TYPE_VCE,
 ]
 
@@ -35,7 +33,6 @@ TRANSPORT_TYPES = [
 CLIENTAPPIO_PORT = "9094"
 SERVERAPPIO_PORT = "9091"
 FLEETAPI_GRPC_RERE_PORT = "9092"
-FLEETAPI_PORT = "9095"
 CONTROL_API_PORT = "9093"
 # Octets
 SERVER_OCTET = "0.0.0.0"
@@ -50,7 +47,6 @@ FLEET_API_GRPC_RERE_DEFAULT_ADDRESS = f"{SERVER_OCTET}:{FLEETAPI_GRPC_RERE_PORT}
 FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS = (
     "[::]:8080"  # IPv6 to keep start_server compatible
 )
-FLEET_API_REST_DEFAULT_ADDRESS = f"{SERVER_OCTET}:{FLEETAPI_PORT}"
 CONTROL_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{CONTROL_API_PORT}"
 
 # Constants for heartbeat
@@ -139,6 +135,9 @@ ISOLATION_MODE_PROCESS = "process"
 
 # Runtime dependency installation toggle
 RUNTIME_DEPENDENCY_INSTALL = False
+FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION = (
+    "FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION"
+)
 
 # Log streaming configurations
 CONN_REFRESH_PERIOD = 60  # Stream connection refresh period
@@ -180,15 +179,8 @@ INT64_MAX_VALUE = 9223372036854775807  # (1 << 63) - 1
 # Constants for task-token generation
 FLWR_TASK_TOKEN_LENGTH = 128  # Number of bytes used to generate task tokens
 
-# ControlServicer constants
-RUN_ID_NOT_FOUND_MESSAGE = "Run ID not found"
-NO_ACCOUNT_AUTH_MESSAGE = "ControlServicer initialized without account authentication"
-NO_ARTIFACT_PROVIDER_MESSAGE = "ControlServicer initialized without artifact provider"
-PULL_UNFINISHED_RUN_MESSAGE = "Cannot pull artifacts for an unfinished run"
+# SuperLink Fleet API constants
 PUBLIC_KEY_ALREADY_IN_USE_MESSAGE = "Public key already in use"
-PUBLIC_KEY_NOT_VALID = "The provided public key is not valid"
-NODE_NOT_FOUND_MESSAGE = "Node ID not found for account"
-FEDERATION_NOT_FOUND_MESSAGE = "Federation '%s' does not exist"
 
 
 class MessageTypeLegacy:

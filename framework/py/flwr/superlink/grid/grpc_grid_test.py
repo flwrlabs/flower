@@ -30,12 +30,11 @@ from flwr.app.error import Error
 from flwr.app.message import Message
 from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import message_to_proto
-from flwr.common.typing import Run
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetNodesRequest,
     PullAppMessagesRequest,
     PushAppMessagesRequest,
 )
-from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.supercore.constant import PULL_MAX_TIME, PULL_MAX_TRIES_PER_OBJECT
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -45,6 +44,7 @@ from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
+from flwr.supercore.run import Run
 
 from .grpc_grid import GrpcGrid
 
@@ -118,6 +118,7 @@ class TestGrpcGrid(unittest.TestCase):
         mock_response = Mock(
             message_ids=[msg1.object_id, msg2.object_id],
             objects_to_push=[msg1.object_id, RecordDict().object_id, msg2.object_id],
+            session_id="",
         )
         self.mock_stub.PushMessages.return_value = mock_response
         self.mock_stub.PushObject.return_value = Mock(stored=True)
@@ -193,6 +194,7 @@ class TestGrpcGrid(unittest.TestCase):
         self.mock_stub.PushMessages.return_value = Mock(
             message_ids=[msg.object_id],
             objects_to_push=[msg.object_id, RecordDict().object_id],
+            session_id="",
         )
         self.mock_stub.PushObject.return_value = Mock(stored=True)
 
@@ -223,6 +225,7 @@ class TestGrpcGrid(unittest.TestCase):
         mock_response = Mock(
             message_ids=[msg.object_id],
             objects_to_push=[msg.object_id, RecordDict().object_id],
+            session_id="",
         )
         self.mock_stub.PushMessages.return_value = mock_response
         self.mock_stub.PushObject.return_value = Mock(stored=True)
@@ -258,7 +261,7 @@ class TestGrpcGrid(unittest.TestCase):
         # Assert
         self.mock_channel.close.assert_not_called()
 
-    def test_set_run_rejects_non_run_type(self) -> None:
+    def test_set_run_rejects_non_run_instance(self) -> None:
         """Test `set_run` rejects invalid input types."""
         with self.assertRaises(TypeError):
             self.grid.set_run(61016)  # type: ignore[arg-type]
@@ -320,6 +323,26 @@ class TestGrpcGrid(unittest.TestCase):
 
         # Assert
         self.assertIn(404, node_ids)
+
+    def test_missing_object_creates_message_with_error(self) -> None:
+        """Test that a missing object creates a message with an error."""
+        ins = self._prep_message(Message(RecordDict(), 123, "query"))
+        reply = Message(RecordDict(), reply_to=ins)
+        reply.metadata.__dict__["_message_id"] = reply.object_id
+        self.mock_stub.PullMessages.return_value = Mock(
+            messages_list=[message_to_proto(reply)],
+            message_object_trees=[get_object_tree(reply)],
+        )
+        self.mock_stub.PullObject.return_value = Mock(
+            object_found=False, object_available=False
+        )
+
+        messages = list(self.grid.pull_messages([ins.object_id]))
+
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].error.code, ErrorCode.MESSAGE_UNAVAILABLE)
+        self.assertEqual(messages[0].metadata.reply_to_message_id, ins.object_id)
+        self.mock_stub.ConfirmMessageReceived.assert_not_called()
 
     @parameterized.expand(  # type: ignore
         [

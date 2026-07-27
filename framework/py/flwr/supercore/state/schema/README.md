@@ -10,6 +10,45 @@
         layout: elk
 ---
 erDiagram
+  automation {
+    INTEGER automation_id PK
+    TIMESTAMP created_at
+    VARCHAR fab_hash "nullable"
+    VARCHAR fab_id "nullable"
+    VARCHAR fab_version "nullable"
+    VARCHAR federation_config "nullable"
+    VARCHAR federation_id
+    BIGINT fixed_interval "nullable"
+    VARCHAR flwr_aid
+    TIMESTAMP next_run_at
+    VARCHAR override_config
+    VARCHAR primary_task_type
+    INTEGER remaining_runs "nullable"
+    BIGINT series_id
+    VARCHAR status
+    TIMESTAMP stopped_at "nullable"
+    TIMESTAMP updated_at
+  }
+
+  connector {
+    VARCHAR connector_ref PK
+    VARCHAR flwr_aid PK
+    VARCHAR config_json
+    VARCHAR credentials_json
+  }
+
+  connector_oauth_session {
+    VARCHAR oauth_session_id PK
+    TIMESTAMP completed_at "nullable"
+    VARCHAR connector_ref
+    TIMESTAMP created_at
+    TIMESTAMP expires_at
+    VARCHAR flwr_aid
+    VARCHAR pkce_verifier "nullable"
+    VARCHAR redirect_uri
+    VARCHAR state
+  }
+
   context {
     BIGINT run_id FK "nullable"
     BLOB context "nullable"
@@ -83,11 +122,33 @@ erDiagram
     VARCHAR parent_id PK,FK
   }
 
+  object_push_session_pending {
+    VARCHAR object_id PK
+    VARCHAR session_id PK,FK
+  }
+
+  object_push_session_roots {
+    VARCHAR root_object_id PK
+    VARCHAR session_id FK
+  }
+
+  object_push_sessions {
+    VARCHAR session_id PK
+    TIMESTAMP expires_at
+    INTEGER pending_count
+    BIGINT run_id
+  }
+
   objects {
     VARCHAR object_id PK "nullable"
     BLOB content "nullable"
     INTEGER is_available
     INTEGER ref_count
+  }
+
+  objectstore_locks {
+    VARCHAR lock_id PK
+    INTEGER lock_value
   }
 
   run {
@@ -97,15 +158,19 @@ erDiagram
     VARCHAR fab_hash "nullable"
     VARCHAR fab_id "nullable"
     VARCHAR fab_version "nullable"
-    VARCHAR federation "nullable"
     VARCHAR federation_config "nullable"
+    VARCHAR federation_id "nullable"
     VARCHAR flwr_aid "nullable"
     VARCHAR override_config "nullable"
     BIGINT primary_task_id
     BIGINT run_id UK "nullable"
-    VARCHAR run_type
     BIGINT series_id "nullable"
     VARCHAR usage_reported_at
+  }
+
+  run_connector {
+    VARCHAR connector_ref PK
+    BIGINT run_id PK
   }
 
   run_objects {
@@ -117,7 +182,7 @@ erDiagram
     BIGINT series_id PK
     TIMESTAMP created_at
     VARCHAR description "nullable"
-    VARCHAR federation
+    VARCHAR federation_id
     TIMESTAMP updated_at
   }
 
@@ -177,17 +242,33 @@ erDiagram
     FLOAT ttl
   }
 
+  task_usage {
+    INTEGER id PK
+    BIGINT task_id FK
+    TIMESTAMP created_at
+    BIGINT input_tokens "nullable"
+    BIGINT output_tokens "nullable"
+    VARCHAR provider
+    TIMESTAMP reported_at "nullable"
+    BIGINT run_id
+    BIGINT total_tokens "nullable"
+    VARCHAR usage_type
+  }
+
   run ||--o| context : run_id
   run ||--o{ logs : run_id
   run ||--o{ message_ins : run_id
   run ||--o{ message_res : run_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
+  object_push_sessions ||--o| object_push_session_pending : session_id
+  object_push_sessions ||--o{ object_push_session_roots : session_id
   objects ||--o| run_objects : object_id
   task ||--o{ task_event : task_id
   task ||--o{ task_logs : task_id
   task ||--o{ task_message : src_task_id
   task ||--o{ task_message : dst_task_id
+  task ||--o{ task_usage : task_id
 
 ```
 <!-- END_SQLALCHEMY_DOCS -->

@@ -13,16 +13,19 @@ MNIST using Flower and PyTorch Lightning. It is recommended to create a virtual
 environment and run everything within a :doc:`virtualenv
 <contributor-how-to-set-up-a-virtual-env>`.
 
-Then, clone the code example directly from GitHub:
+Now that we have a rough idea of what this example is about, let's get started. First,
+install Flower in your new environment:
 
 .. code-block:: shell
 
-    git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
-                 && mv _tmp/examples/quickstart-pytorch-lightning . \
-                 && rm -rf _tmp && cd quickstart-pytorch-lightning
+    # In a new Python environment
+    $ pip install flwr
 
-This will create a new directory called `quickstart-pytorch-lightning` containing the
-following files:
+Then, run the command below:
+
+.. code-block:: shell
+
+    $ flwr new @flwrlabs/quickstart-pytorch-lightning
 
 .. code-block:: shell
 
@@ -34,20 +37,16 @@ following files:
     ├── pyproject.toml      # Project metadata like dependencies and configs
     └── README.md
 
-Next, activate your environment, then run:
+Next, activate your environment and navigate to the example directory:
 
 .. code-block:: shell
 
-    # Navigate to the example directory
-    $ cd path/to/quickstart-pytorch-lightning
-
-    # Install project and dependencies
-    $ pip install -e .
+    $ cd quickstart-pytorch-lightning
 
 By default, this project uses a local simulation profile that ``flwr run`` submits to a
 managed local SuperLink, which then executes the run with the Flower Simulation Runtime.
-It creates a federation of 4 nodes using |fedavg|_ as the aggregation strategy. The
-dataset will be partitioned using Flower Dataset's |iidpartitioner|_. To run the
+It creates a federation of two SuperNodes using |fedavg|_ as the aggregation strategy.
+The dataset will be partitioned using Flower Dataset's |iidpartitioner|_. To run the
 project, do:
 
 .. code-block:: shell
@@ -67,10 +66,10 @@ With default arguments you will see streamed output like this:
     INFO :      Starting FedAvg strategy:
     INFO :          ├── Number of rounds: 3
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 2 nodes (out of 4)
+    INFO :      configure_train: Sampled 2 nodes (out of 2)
     INFO :      aggregate_train: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'train_loss': 0.0487}
-    INFO :      configure_evaluate: Sampled 2 nodes (out of 4)
+    INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
     INFO :      aggregate_evaluate: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'eval_loss': 0.0495}
     INFO :      [ROUND 2/3]

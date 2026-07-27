@@ -117,7 +117,7 @@ delete icon.
 
 The invited user will see the invitation when they sign in to `flower.ai
 <https://flower.ai/>`__ and open their profile page. The invitation shows the federation
-name and the username of the user who sent it.
+ID and the username of the user who sent it.
 
 .. image:: ./_static/invitee_invite_view.png
     :alt: Pending federation invitation on the invited user's profile page

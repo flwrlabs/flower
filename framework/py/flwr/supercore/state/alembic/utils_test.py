@@ -40,8 +40,8 @@ from sqlalchemy import (
 from sqlalchemy.engine import URL, Connection, Engine
 
 from flwr.common.constant import SubStatus
-from flwr.common.exit import ExitCode
-from flwr.supercore.constant import RunType, TaskType
+from flwr.supercore.constant import TaskType
+from flwr.supercore.exit import ExitCode
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
     ALEMBIC_VERSION_TABLE,
@@ -55,6 +55,22 @@ from flwr.supercore.state.alembic.utils import (
     register_version_location,
     run_migrations,
 )
+
+
+class TestMigrationGraph(unittest.TestCase):
+    """Test the structure of the Flower migration graph."""
+
+    def test_flwr_migrations_have_single_head(self) -> None:
+        """Ensure Flower migrations form a graph with exactly one head."""
+        script = ScriptDirectory(str(ALEMBIC_DIR))
+
+        heads = script.get_heads()
+
+        self.assertEqual(
+            len(heads),
+            1,
+            f"Expected exactly one Flower migration head, found: {heads}",
+        )
 
 
 class TestAlembicRun(unittest.TestCase):
@@ -131,9 +147,9 @@ class TestAlembicRun(unittest.TestCase):
             "usage_reported_at": "",
             "sub_status": None,
             "details": None,
-            "federation": "fed",
+            "federation": "@me/fed",
             "federation_config": None,
-            "run_type": RunType.SERVER_APP,
+            "run_type": "serverapp",
             "flwr_aid": "aid",
             "bytes_sent": 0,
             "bytes_recv": 0,
@@ -300,7 +316,7 @@ class TestAlembicRun(unittest.TestCase):
                             fab_version="1.0.0",
                             fab_hash="fab-pending",
                             pending_at="2026-04-27T10:00:00+00:00",
-                            federation="fed-a",
+                            federation="@me/fed-a",
                             flwr_aid="aid-a",
                         ),
                         self.build_run_row(
@@ -314,9 +330,9 @@ class TestAlembicRun(unittest.TestCase):
                             finished_at="2026-04-27T11:03:00+00:00",
                             sub_status="completed",
                             details="done",
-                            federation="fed-b",
+                            federation="@me/fed-b",
                             federation_config="{}",
-                            run_type=RunType.SIMULATION,
+                            run_type="simulation",
                             flwr_aid="aid-b",
                             bytes_sent=7,
                             bytes_recv=8,
@@ -331,7 +347,7 @@ class TestAlembicRun(unittest.TestCase):
                             finished_at="2026-04-27T12:05:00+00:00",
                             sub_status="failed",
                             details="boom",
-                            federation="fed-c",
+                            federation="@me/fed-c",
                             flwr_aid="aid-c",
                             bytes_sent=1,
                             bytes_recv=2,
@@ -422,7 +438,7 @@ class TestAlembicRun(unittest.TestCase):
                             pending_at="2026-04-27T13:00:00+00:00",
                             starting_at="2026-04-27T13:01:00+00:00",
                             running_at="2026-04-27T13:02:00+00:00",
-                            federation="fed-live",
+                            federation="@me/live",
                             flwr_aid="aid-live",
                         )
                     ],
@@ -490,7 +506,7 @@ class TestAlembicRun(unittest.TestCase):
                             finished_at="2026-04-27T10:03:00+00:00",
                             sub_status=SubStatus.COMPLETED,
                             details="done",
-                            federation="fed",
+                            federation="@me/fed",
                             flwr_aid="aid",
                         )
                     ],

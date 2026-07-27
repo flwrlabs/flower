@@ -22,15 +22,15 @@ import ray
 
 from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.client import Client, NumPyClient
-from flwr.client.run_info_store import DeprecatedRunInfoStore
 from flwr.clientapp import ClientApp
 from flwr.common import Config, MessageTypeLegacy, Scalar
 from flwr.common.constant import NUM_PARTITIONS_KEY, PARTITION_ID_KEY
-from flwr.common.recorddict_compat import (
+from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
+from flwr.compat.common.recorddict_compat import (
     getpropertiesins_to_recorddict,
     recorddict_to_getpropertiesres,
 )
-from flwr.common.recorddict_compat_test import _get_valid_getpropertiesins
+from flwr.compat.common.recorddict_compat_test import _get_valid_getpropertiesins
 from flwr.simulation.legacy_app import (
     NodeToPartitionMapping,
     _create_node_id_to_partition_mapping,
@@ -83,8 +83,9 @@ def prep(
         client_resources=client_resources,
     )
 
-    # Create 373 client proxies
-    num_proxies = 373  # a prime number
+    # Create enough proxies to exercise queueing and shuffled result retrieval while
+    # keeping this per-test integration workload small enough for pull requests.
+    num_proxies = 37  # a prime number
     mapping = _create_node_id_to_partition_mapping(num_proxies)
     proxies = [
         RayActorClientProxy(

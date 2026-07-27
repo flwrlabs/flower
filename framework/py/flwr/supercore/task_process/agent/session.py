@@ -17,22 +17,35 @@
 
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Sequence
-from typing import cast
+from typing import Literal, cast
 
-from flwr.agentapp import AgentResponses, AgentSession
+from flwr.agentapp import AgentConnectors, AgentResponses, AgentSession
 from flwr.app import Context, Message
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     PullTaskMessageRequest,
+    PushTaskEventsRequest,
     PushTaskMessageRequest,
 )
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
-from flwr.supercore.model_message import ModelRequest, ModelResponse
+from flwr.supercore.json_message.connector_message import (
+    ConnectorRequest,
+    ConnectorResponse,
+)
+from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
+from flwr.supercore.task_process.connector.registry import (
+    get_builtin_connector_tool,
+    has_builtin_connector,
+)
+from flwr.supercore.task_process.connector.web_fetch import WEB_FETCH_CONNECTOR_NAME
 from flwr.supercore.typing import JSONObject, JSONValue
+from flwr.supercore.utils import strict_json_dumps
 
 from .context_items import append_items
 
@@ -43,13 +56,46 @@ _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
 class RuntimeAgentSession(AgentSession):
     """AgentSession bound to one AgentApp task."""
 
-    def __init__(self, responses: AgentResponses) -> None:
+    def __init__(self, responses: AgentResponses, connectors: AgentConnectors) -> None:
         self._responses = responses
+        self._connectors = connectors
 
     @property
     def responses(self) -> AgentResponses:
         """Model response creation API."""
         return self._responses
+
+    @property
+    def connectors(self) -> AgentConnectors:
+        """Connector tool schema and execution API."""
+        return self._connectors
+
+
+class RuntimeAgentConnectors(AgentConnectors):
+    """AgentConnectors implementation backed by connector tasks."""
+
+    def __init__(self, responses: RuntimeAgentResponses) -> None:
+        self._responses = responses
+
+    def tools(self, names: Sequence[str]) -> list[JSONObject]:
+        """Return model-facing tool schemas for built-in connectors."""
+        return [get_builtin_connector_tool(name) for name in names]
+
+    def call(self, tool_call: JSONObject) -> JSONObject:
+        """Execute one model function_call and return a function_call_output item."""
+        arguments = tool_call["arguments"]
+        if isinstance(arguments, str):
+            arguments = json.loads(arguments)
+
+        name = cast(str, tool_call["name"])
+        call_id = cast(str, tool_call["call_id"])
+        arguments_obj = cast(JSONObject, arguments)
+
+        return self._responses.call_connector_with_events(
+            name=name,
+            call_id=call_id,
+            arguments=arguments_obj,
+        )
 
 
 class RuntimeAgentResponses(AgentResponses):
@@ -70,6 +116,15 @@ class RuntimeAgentResponses(AgentResponses):
 
     def create(self, request: JSONObject) -> JSONObject:
         """Create a model response through a child model task."""
+        response_payload = self._create_model_response(request)
+
+        output = response_payload.get("output")
+        if _is_json_object_list(output):
+            append_items(self._context, cast(list[JSONObject], output))
+        return response_payload
+
+    def _create_model_response(self, request: JSONObject) -> JSONObject:
+        """Create one model response through a child model task."""
         model = request.get("model")
         if not isinstance(model, str) or not model:
             raise ValueError(
@@ -99,11 +154,118 @@ class RuntimeAgentResponses(AgentResponses):
         )
         response_message = self._send_and_receive(message)
         response = ModelResponse.from_message(response_message)
+        return response.payload
+
+    def create_connector_response(
+        self, *, name: str, call_id: str, arguments: JSONObject
+    ) -> JSONValue:
+        """Create one connector response through a child connector task."""
+        name = name.strip().lower()
+        create_res = self._stub.CreateTask(
+            CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=name)
+        )
+        if not create_res.HasField("task_id"):
+            raise RuntimeError("Connector task could not be created.")
+
+        connector_task_id = create_res.task_id
+        message = ConnectorRequest(
+            dst_task_id=connector_task_id,
+            name=name,
+            call_id=call_id,
+            arguments=arguments,
+        )
+        response_message = self._send_and_receive(message)
+        response = ConnectorResponse.from_message(response_message)
         response_payload = response.payload
-        output = response_payload.get("output")
-        if _is_json_object_list(output):
-            append_items(self._context, cast(list[JSONObject], output))
-        return response_payload
+
+        error = response_payload.get("error")
+        if error is not None:
+            if isinstance(error, dict) and isinstance(error.get("message"), str):
+                raise RuntimeError(f"Connector '{name}' failed: {error['message']}")
+            raise RuntimeError(f"Connector '{name}' failed.")
+
+        return response_payload["output"]
+
+    def call_connector_with_events(
+        self, *, name: str, call_id: str, arguments: JSONObject
+    ) -> JSONObject:
+        """Call a connector and emit/persist its activity events."""
+
+        def connector_event(
+            status: Literal["started", "completed", "failed"],
+            *,
+            output: JSONValue = None,
+            message: str | None = None,
+        ) -> list[JSONObject]:
+            if not has_builtin_connector(name):
+                return []
+
+            event: JSONObject = {
+                "type": f"response.tool_call.{status}",
+                "tool_call_id": call_id,
+                "connector_ref": name,
+                "arguments": arguments,
+            }
+
+            query = arguments.get("query")
+            if isinstance(query, str) and query:
+                event["query"] = query
+
+            url = arguments.get("url")
+            if name == WEB_FETCH_CONNECTOR_NAME and isinstance(url, str) and url:
+                event["links"] = [url]
+
+            if status == "completed":
+                event["output"] = output
+            elif status == "failed" and message is not None:
+                event["error"] = {"code": "connector_error", "message": message}
+
+            return [event]
+
+        self.append_and_push_run_events(connector_event("started"))
+
+        try:
+            output = self.create_connector_response(
+                name=name,
+                call_id=call_id,
+                arguments=arguments,
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            self.append_and_push_run_events(connector_event("failed", message=str(exc)))
+            raise
+
+        output_item: JSONObject = {
+            "type": "function_call_output",
+            "call_id": call_id,
+            "output": strict_json_dumps(output, compact=True),
+        }
+        self.append_and_push_run_events(connector_event("completed", output=output))
+        self.append_context_items([output_item])
+        return output_item
+
+    def push_run_events(self, events: Sequence[JSONObject]) -> None:
+        """Push structured run events for `StreamRunEvents` clients."""
+        if not events:
+            return
+        task_events = [
+            TaskEvent(
+                event=cast(str, event["type"]),
+                data=strict_json_dumps(event, compact=True),
+            )
+            for event in events
+        ]
+        self._stub.PushTaskEvents(PushTaskEventsRequest(events=task_events))
+
+    def append_and_push_run_events(self, events: list[JSONObject]) -> None:
+        """Append run events to context and push them to `StreamRunEvents` clients."""
+        if not events:
+            return
+        append_items(self._context, events)
+        self.push_run_events(events)
+
+    def append_context_items(self, items: list[JSONObject]) -> None:
+        """Append OpenResponses items to the AgentApp context."""
+        append_items(self._context, items)
 
     def _push_task_message(self, message: Message) -> None:
         """Push one task message and return its message ID."""
@@ -123,9 +285,9 @@ class RuntimeAgentResponses(AgentResponses):
         """Send one message and wait for its direct reply.
 
         For now, `flwr-agentapp` expects a strict one-request-one-reply exchange with
-        `flwr-model`, so any non-matching pulled message is treated as an error.
+        child tasks, so any non-matching pulled message is treated as an error.
         """
-        # Push the message to the flwr-model
+        # Push the message to the child task
         self._push_task_message(message)
         message_id = message.metadata.message_id
 

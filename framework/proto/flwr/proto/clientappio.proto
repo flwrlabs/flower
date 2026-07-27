@@ -81,16 +81,23 @@ service ClientAppIo {
   rpc PullTaskMessage(PullTaskMessageRequest)
       returns (PullTaskMessageResponse) {}
 
+  // Record task usage
+  rpc RecordTaskUsage(RecordTaskUsageRequest)
+      returns (RecordTaskUsageResponse) {}
+
   // Push task logs
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
 
   /////////////////////////////////////////////////////////////////////////////
-  // Specific endpoints for ClientAppIo
+  // Message and node endpoints
   /////////////////////////////////////////////////////////////////////////////
 
-  // Push Message
-  rpc PushMessage(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
+  // Push messages
+  rpc PushMessages(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
 
-  // Pull Message
-  rpc PullMessage(PullAppMessagesRequest) returns (PullAppMessagesResponse) {}
+  // Pull messages
+  rpc PullMessages(PullAppMessagesRequest) returns (PullAppMessagesResponse) {}
+
+  // Return a set of nodes
+  rpc GetNodes(GetNodesRequest) returns (GetNodesResponse) {}
 }

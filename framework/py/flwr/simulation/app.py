@@ -16,8 +16,10 @@
 
 
 import argparse
+import importlib.util
+import os
 from dataclasses import replace
-from logging import DEBUG, ERROR, INFO
+from logging import DEBUG, ERROR, INFO, WARNING
 from queue import Queue
 
 import grpc
@@ -26,7 +28,6 @@ from flwr.app.message import Context, RecordDict
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
-from flwr.common import EventType, event
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.config import (
     get_fused_config_from_dir,
@@ -38,7 +39,6 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SubStatus,
 )
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import (
     flush_logs,
     log,
@@ -64,13 +64,19 @@ from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import NOOP_FEDERATION
+from flwr.supercore.constant import NOOP_FEDERATION_ID
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.superexec.dependency_installer import (
+    RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import validate_and_resolve_root_certificates
+
+# Disable Ray's uv runtime-env hook when running flwr-simulation.
+os.environ.setdefault("RAY_ENABLE_UV_RUN_RUNTIME_ENV", "0")
 
 
 def _run_simulation_settings(
@@ -160,7 +166,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         token=token,
     )
 
-    # Initialize variables for finally block
+    # Initialize variables for exit handler
     log_uploader = None
     run_id_hash = None
     heartbeat_sender = None
@@ -171,132 +177,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
 
-    register_signal_handlers(
-        event_type=EventType.FLWR_SIMULATION_RUN_LEAVE,
-        exit_message="Task stopped by user.",
-    )
-
-    try:
-        # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(conn._stub))
-        heartbeat_sender.start()
-
-        # Pull SimulationInputs from LinkState
-        res: PullTaskInputResponse = conn._stub.PullTaskInput(PullTaskInputRequest())
-        context = context_from_proto(res.context)
-        run = run_from_proto(res.run)
-        fab = fab_from_proto(res.fab)
-
-        # Start log uploader for this run
-        log_uploader = start_log_uploader(
-            log_queue=log_queue,
-            node_id=context.node_id,
-            run_id=run.run_id,
-            stub=conn._stub,
-        )
-
-        log(DEBUG, "Simulation process starts FAB installation.")
-        install_from_fab(fab.content, skip_prompt=True)
-
-        fab_id, fab_version = get_fab_metadata(fab.content)
-
-        app_path = get_project_dir(fab_id, fab_version, fab.hash_str)
-
-        if runtime_dependency_install:
-            log(DEBUG, "Simulation process starts app dependency installation.")
-            runtime_env_dir = install_app_dependencies(
-                app_path,
-                launch_id=token,
-                run_id=run.run_id,
-                index_context={
-                    "component": "simulation",
-                    "project_dir": str(app_path),
-                    "run_id": run.run_id,
-                    "launch_id": token,
-                    "fab_id": run.fab_id,
-                    "fab_version": run.fab_version,
-                    "fab_hash": fab.hash_str,
-                },
-            )
-        else:
-            log(DEBUG, "Simulation runtime dependency installation is disabled.")
-
-        config = get_project_config(app_path)
-
-        # Get ClientApp and SeverApp components
-        app_components = config["tool"]["flwr"]["app"]["components"]
-        client_app_attr = app_components["clientapp"]
-        server_app_attr = app_components["serverapp"]
-        fused_config = get_fused_config_from_dir(app_path, run.override_config)
-
-        # Update run_config in context
-        context.run_config = fused_config
-
-        log(
-            DEBUG,
-            "Flower will load ServerApp `%s` in %s",
-            server_app_attr,
-            app_path,
-        )
-        log(
-            DEBUG,
-            "Flower will load ClientApp `%s` in %s",
-            client_app_attr,
-            app_path,
-        )
-
-        (
-            num_supernodes,
-            backend_name,
-            backend_config,
-            verbose,
-            enable_tf_gpu_growth,
-        ) = _run_simulation_settings(res.federation_config)
-
-        run_id_hash = get_sha256_hash(run.run_id)
-        event(
-            EventType.FLWR_SIMULATION_RUN_ENTER,
-            event_details={
-                "backend": backend_name,
-                "num-supernodes": num_supernodes,
-                "run-id-hash": run_id_hash,
-            },
-        )
-
-        # Launch the simulation
-        simulation_result = _run_simulation(
-            server_app_attr=server_app_attr,
-            client_app_attr=client_app_attr,
-            num_supernodes=num_supernodes,
-            backend_name=backend_name,
-            backend_config=backend_config,
-            app_dir=str(app_path),
-            run=replace(run, federation=NOOP_FEDERATION),
-            enable_tf_gpu_growth=enable_tf_gpu_growth,
-            verbose_logging=verbose,
-            server_app_context=context,
-            is_app=True,
-            exit_event=EventType.FLWR_SIMULATION_RUN_LEAVE,
-            metrics=metrics,
-        )
-        context = simulation_result.context
-
-        # Send resulting context
-        # Temporarily disable pushing resulting context to SuperLink
-        context.state = RecordDict()
-
-        sub_status = SubStatus.COMPLETED
-        details = ""
-
-    except Exception as ex:  # pylint: disable=broad-exception-caught
-        exc_entity = "Simulation"
-        log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
-        sub_status = SubStatus.FAILED
-        details = f"Simulation failed with exception: {str(ex)}"
-
-        # General exit code
-        exit_code = ExitCode.SIMULATION_EXCEPTION
-    finally:
+    def on_exit() -> None:
         log(DEBUG, "[flwr-simulation] Will push Simulation task output")
 
         # Set Grpc max retries to 1 to avoid blocking on exit
@@ -326,7 +207,169 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         if heartbeat_sender and heartbeat_sender.is_running:
             heartbeat_sender.stop()
 
+        # Close the gRPC connection
+        conn._disconnect()
+
         cleanup_app_runtime_environment(runtime_env_dir)
+
+    register_signal_handlers(
+        event_type=EventType.FLWR_SIMULATION_RUN_LEAVE,
+        exit_message="Task stopped by user.",
+        exit_handlers=[on_exit],
+    )
+
+    try:
+        # Set up heartbeat sender
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(conn._stub))
+        heartbeat_sender.start()
+
+        # Pull SimulationInputs from LinkState
+        res: PullTaskInputResponse = conn._stub.PullTaskInput(PullTaskInputRequest())
+        context = context_from_proto(res.context)
+        run = run_from_proto(res.run)
+        fab = fab_from_proto(res.fab)
+
+        # Start log uploader for this run
+        log_uploader = start_log_uploader(
+            log_queue=log_queue,
+            node_id=context.node_id,
+            run_id=run.run_id,
+            stub=conn._stub,
+        )
+
+        # Extract federation configuration
+        (
+            num_supernodes,
+            backend_name,
+            backend_config,
+            verbose,
+            enable_tf_gpu_growth,
+        ) = _run_simulation_settings(res.federation_config)
+        # Warn about changed default federation size
+        log(
+            WARNING,
+            "Since flwr 1.32, default simulated SuperNodes changed from 10 to 2.",
+        )
+        # Log federation size
+        log(
+            INFO,
+            "Federation `%s` (%s simulated SuperNodes)",
+            run.federation_id,
+            num_supernodes,
+        )
+        # Indicate how to resize federation
+        log(INFO, "To change federation size, use the following command:")
+        log(
+            INFO,
+            "\tflwr federation simulation-config "
+            "%s <superlink> --num-supernodes <N>",
+            run.federation_id,
+        )
+
+        log(DEBUG, "Simulation process starts FAB installation.")
+        install_from_fab(fab.content, skip_prompt=True)
+
+        fab_id, fab_version = get_fab_metadata(fab.content)
+
+        app_path = get_project_dir(fab_id, fab_version, fab.hash_str)
+
+        if runtime_dependency_install:
+            log(DEBUG, "Simulation process starts app dependency installation.")
+            runtime_env_dir = install_app_dependencies(
+                app_path,
+                launch_id=token,
+                run_id=run.run_id,
+                index_context={
+                    "component": "simulation",
+                    "project_dir": str(app_path),
+                    "run_id": run.run_id,
+                    "launch_id": token,
+                    "fab_id": run.fab_id,
+                    "fab_version": run.fab_version,
+                    "fab_hash": fab.hash_str,
+                },
+            )
+            if backend_name == "ray" and importlib.util.find_spec("ray") is None:
+                # Surface unsupported Ray/Python/platform combinations as dependency
+                # installation failures instead of missing simulation extras.
+                raise RuntimeDependencyInstallationError(
+                    "Runtime dependency installation completed, but `ray` is not "
+                    "available. Ensure your OS+Python combination supports `ray`."
+                )
+        else:
+            log(DEBUG, "Simulation runtime dependency installation is disabled.")
+
+        config = get_project_config(app_path)
+
+        # Get ClientApp and SeverApp components
+        app_components = config["tool"]["flwr"]["app"]["components"]
+        client_app_attr = app_components["clientapp"]
+        server_app_attr = app_components["serverapp"]
+        fused_config = get_fused_config_from_dir(app_path, run.override_config)
+
+        # Update run_config in context
+        context.run_config = fused_config
+
+        log(
+            DEBUG,
+            "Flower will load ServerApp `%s` in %s",
+            server_app_attr,
+            app_path,
+        )
+        log(
+            DEBUG,
+            "Flower will load ClientApp `%s` in %s",
+            client_app_attr,
+            app_path,
+        )
+
+        run_id_hash = get_sha256_hash(run.run_id)
+        event(
+            EventType.FLWR_SIMULATION_RUN_ENTER,
+            event_details={
+                "backend": backend_name,
+                "num-supernodes": num_supernodes,
+                "run-id-hash": run_id_hash,
+            },
+        )
+
+        # Launch the simulation
+        simulation_result = _run_simulation(
+            server_app_attr=server_app_attr,
+            client_app_attr=client_app_attr,
+            num_supernodes=num_supernodes,
+            backend_name=backend_name,
+            backend_config=backend_config,
+            app_dir=str(app_path),
+            run=replace(run, federation_id=NOOP_FEDERATION_ID),
+            enable_tf_gpu_growth=enable_tf_gpu_growth,
+            verbose_logging=verbose,
+            server_app_context=context,
+            is_app=True,
+            exit_event=EventType.FLWR_SIMULATION_RUN_LEAVE,
+            metrics=metrics,
+        )
+        context = simulation_result.context
+
+        # Send resulting context
+        # Temporarily disable pushing resulting context to SuperLink
+        context.state = RecordDict()
+
+        sub_status = SubStatus.COMPLETED
+        details = ""
+
+    except Exception as ex:  # pylint: disable=broad-exception-caught
+        exc_entity = "Simulation"
+        log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
+        sub_status = SubStatus.FAILED
+        details = f"Simulation failed with exception: {str(ex)}"
+
+        # General exit code
+        exit_code = ExitCode.SIMULATION_EXCEPTION
+        if isinstance(ex, ImportError):
+            exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
+        elif isinstance(ex, RuntimeDependencyInstallationError):
+            exit_code = ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR
 
     flwr_exit(
         code=exit_code,
