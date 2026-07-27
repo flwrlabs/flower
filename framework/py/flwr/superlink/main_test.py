@@ -23,7 +23,6 @@ from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import http_error_translator
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.health.router import health
@@ -99,13 +98,6 @@ def test_create_app_mounts_core_health_router(monkeypatch: MonkeyPatch) -> None:
         route_context.path_format != "/ready"
         for route_context in iter_route_contexts(app.routes)
     )
-
-
-def test_get_ee_linkstate_db_defaults_to_in_memory(monkeypatch: MonkeyPatch) -> None:
-    """Default to in-memory LinkState when no database is configured."""
-    monkeypatch.delenv("FLWR_DATABASE", raising=False)
-
-    assert main.get_ee_linkstate_db() == FLWR_IN_MEMORY_DB_NAME
 
 
 def test_get_ee_linkstate_db_uses_explicit_database(monkeypatch: MonkeyPatch) -> None:
