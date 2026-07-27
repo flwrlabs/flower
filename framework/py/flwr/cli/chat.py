@@ -42,10 +42,10 @@ from .utils import (
     load_cli_auth_plugin_from_connection,
 )
 
-_BUILTIN_AGENT_APP_SPEC = "@flwragent/flwr-agent"
+_BUILTIN_AGENT_APP_SPEC = "@flwrlabs/flwr-agent"
 _SUPERGRID_CONNECTION_NAME = "supergrid"
 _AGENT_INPUT_KEY = "agent.input"
-_EXIT_COMMANDS = {"/exit", "/quit"}
+_EXIT_COMMANDS = {"/quit"}
 _TEXT_DELTA_EVENT = "response.output_text.delta"
 _TERMINAL_EVENTS = {"response.completed", "response.incomplete"}
 _FAILURE_EVENTS = {"error", "response.failed"}
