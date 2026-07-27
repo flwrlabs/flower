@@ -450,7 +450,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert task.type == TaskType.MODEL
         assert task.model_ref == "models/abc"
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore
         [
             (TaskType.AGENT_APP,),
             (TaskType.SERVER_APP,),
