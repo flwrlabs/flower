@@ -22,7 +22,7 @@ import json
 import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import ERROR, INFO
 from typing import cast
 
@@ -160,6 +160,8 @@ from flwr.supercore.utils import (
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
+
+_AUTOMATION_BATCH_LIMIT = 1
 
 
 class InvalidConnectorRequestError(FlowerError):
@@ -809,7 +811,6 @@ def dispatch_automation(
     *,
     previous_next_run_at: str,
     next_run_at: str | None,
-    fleet_api_type: str | None,
 ) -> StartRunResponse | None:
     """Claim an automation occurrence and execute it through StartRun."""
     claimed = state.claim_automation(
@@ -826,7 +827,7 @@ def dispatch_automation(
             request,
             AccountInfo(flwr_aid=flwr_aid, account_name=""),
             state,
-            fleet_api_type,
+            None,
         )
     except Exception:  # pylint: disable=broad-exception-caught
         state.finish_automation(
@@ -841,12 +842,49 @@ def dispatch_automation(
             status=AutomationStatus.FAILED,
         )
         return None
-    if next_run_at is None:
-        state.finish_automation(
-            automation_id,
-            status=AutomationStatus.COMPLETED,
-        )
+    state.finish_automation(
+        automation_id,
+        status=AutomationStatus.COMPLETED,
+    )
     return response
+
+
+def process_due_automations(
+    state: LinkState,
+    *,
+    current_time: datetime | None = None,
+    limit: int = _AUTOMATION_BATCH_LIMIT,
+) -> None:
+    """Dispatch due automations."""
+    timestamp = current_time or now()
+    due_automations = state.list_automations(
+        statuses=[AutomationStatus.ACTIVE],
+        due_before=timestamp,
+        order_by="next_run_at",
+        limit=limit,
+    )
+
+    for automation in due_automations:
+        next_run_at = (
+            datetime.fromisoformat(automation.next_run_at)
+            + timedelta(seconds=automation.fixed_interval)
+        ).isoformat()
+
+        try:
+            dispatch_automation(
+                state,
+                automation.automation_id,
+                previous_next_run_at=automation.next_run_at,
+                next_run_at=next_run_at,
+            )
+        except FlowerError as exc:
+            log(
+                ERROR,
+                "Failing automation %d: %s",
+                automation.automation_id,
+                exc,
+            )
+            continue
 
 
 def list_automations(

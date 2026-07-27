@@ -51,7 +51,6 @@ from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
-from flwr.supercore.typing import StartRunContext
 from flwr.supercore.utils import (
     build_sql_in_params,
     int64_to_uint64,

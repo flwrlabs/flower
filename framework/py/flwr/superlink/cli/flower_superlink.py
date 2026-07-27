@@ -210,7 +210,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             objectstore_factory=self.objectstore_factory,
             certificates=config.appio_certificates,
             superexec_auth_secret=config.superexec_auth_secret,
-            fleet_api_type=config.fleet_api_type,
         )
         self._serverappio_server = serverappio_server
         self.grpc_servers.append(serverappio_server)

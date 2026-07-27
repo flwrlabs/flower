@@ -41,7 +41,6 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
     superexec_auth_secret: bytes | None = None,
-    fleet_api_type: str | None = None,
 ) -> grpc.Server:
     """Run ServerAppIo API (gRPC, request-response)."""
     if superexec_auth_secret is not None and certificates is None:
@@ -55,7 +54,6 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
     serverappio_servicer: grpc.Server = ServerAppIoServicer(
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
-        fleet_api_type=fleet_api_type,
     )
 
     # Create interceptors
