@@ -15,9 +15,6 @@
 """Control API servicer."""
 
 from collections.abc import Generator
-from typing import NoReturn
-from logging import INFO
-from typing import Any, cast
 
 import grpc
 

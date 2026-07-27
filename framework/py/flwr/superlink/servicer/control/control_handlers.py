@@ -687,6 +687,8 @@ def stream_run_events(
             continue
 
         time.sleep(RUN_EVENTS_STREAM_INTERVAL)
+
+
 def start_automation(  # pylint: disable=too-many-locals
     request: StartAutomationRequest,
     account: AccountInfo,
