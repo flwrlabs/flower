@@ -1,0 +1,225 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Tests for the CLI `chat` command."""
+
+import importlib
+from typing import cast
+from unittest.mock import Mock, patch
+
+import click
+import grpc
+import pytest
+from typer.testing import CliRunner
+
+from flwr.cli.typing import SuperLinkConnection
+from flwr.common.constant import AuthnType
+from flwr.common.serde import user_config_from_proto
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartRunResponse,
+    StreamRunEventsResponse,
+)
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
+
+from .app import app
+
+chat_module = importlib.import_module("flwr.cli.chat")
+
+runner = CliRunner()
+
+
+class _AuthPlugin:
+    """Minimal auth plugin for chat tests."""
+
+    def load_tokens(self) -> None:
+        """Load tokens."""
+
+    def write_tokens_to_metadata(
+        self, metadata: list[tuple[str, str | bytes]]
+    ) -> list[tuple[str, str | bytes]]:
+        """Return metadata unchanged."""
+        return metadata
+
+
+class _UnauthenticatedRpcError(grpc.RpcError):  # type: ignore
+    """Minimal unauthenticated gRPC error for chat tests."""
+
+    def code(self) -> grpc.StatusCode:
+        """Return unauthenticated status."""
+        return grpc.StatusCode.UNAUTHENTICATED
+
+    def details(self) -> str:
+        """Return empty details."""
+        return ""
+
+
+def test_chat_help_command() -> None:
+    """Test the chat help command."""
+    with patch("flwr.cli.app.warn_if_flwr_update_available"):
+        result = runner.invoke(app, ["chat", "--help"])
+
+    assert result.exit_code == 0
+    assert "Usage:" in result.output
+    assert "chat" in result.output
+
+
+def test_chat_requires_login_before_prompt() -> None:
+    """Chat should fail before prompting if the user has not logged in."""
+    superlink_connection = SuperLinkConnection(
+        name="supergrid",
+        address="supergrid.flower.ai",
+    )
+
+    with (
+        patch.object(
+            chat_module,
+            "read_superlink_connection",
+            return_value=superlink_connection,
+        ),
+        patch.object(chat_module, "get_authn_type", return_value=AuthnType.NOOP),
+        patch("builtins.input") as mock_input,
+    ):
+        with pytest.raises(click.ClickException, match="flwr login supergrid"):
+            chat_module.chat()
+
+    mock_input.assert_not_called()
+
+
+def test_chat_verifies_login_before_prompt() -> None:
+    """Chat should fail before prompting if stored credentials are rejected."""
+    superlink_connection = SuperLinkConnection(
+        name="supergrid",
+        address="supergrid.flower.ai",
+    )
+    channel = Mock()
+    stub = Mock()
+    stub.ListFederations.side_effect = cast(grpc.RpcError, _UnauthenticatedRpcError())
+
+    with (
+        patch.object(
+            chat_module,
+            "read_superlink_connection",
+            return_value=superlink_connection,
+        ),
+        patch.object(chat_module, "get_authn_type", return_value=AuthnType.OIDC),
+        patch.object(
+            chat_module,
+            "load_cli_auth_plugin_from_connection",
+            return_value=_AuthPlugin(),
+        ),
+        patch.object(
+            chat_module,
+            "init_channel_from_connection",
+            return_value=channel,
+        ),
+        patch.object(chat_module, "ControlStub", return_value=stub),
+        patch("builtins.input") as mock_input,
+    ):
+        with pytest.raises(click.ClickException, match="Authentication failed"):
+            chat_module.chat()
+
+    mock_input.assert_not_called()
+    channel.close.assert_called_once()
+
+
+def test_chat_submits_prompt_to_builtin_agent_and_streams_response(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Chat should submit prompts as agent.input and print streamed deltas."""
+    superlink_connection = SuperLinkConnection(
+        name="supergrid",
+        address="supergrid.flower.ai",
+    )
+    channel = Mock()
+    stub = Mock()
+    stub.ListFederations.return_value = Mock()
+    stub.StartRun.return_value = StartRunResponse(run_id=123)
+    stub.StreamRunEvents.return_value = iter(
+        [
+            StreamRunEventsResponse(
+                task_event=TaskEvent(
+                    event="response.output_text.delta",
+                    data='{"type":"response.output_text.delta","delta":"Hel"}',
+                )
+            ),
+            StreamRunEventsResponse(
+                task_event=TaskEvent(
+                    event="response.output_text.delta",
+                    data='{"type":"response.output_text.delta","delta":"lo"}',
+                )
+            ),
+            StreamRunEventsResponse(
+                task_event=TaskEvent(
+                    event="response.completed",
+                    data='{"type":"response.completed"}',
+                )
+            ),
+        ]
+    )
+
+    with (
+        patch.object(
+            chat_module,
+            "read_superlink_connection",
+            return_value=superlink_connection,
+        ),
+        patch.object(chat_module, "get_authn_type", return_value=AuthnType.OIDC),
+        patch.object(
+            chat_module,
+            "load_cli_auth_plugin_from_connection",
+            return_value=_AuthPlugin(),
+        ),
+        patch.object(
+            chat_module,
+            "init_channel_from_connection",
+            return_value=channel,
+        ),
+        patch.object(chat_module, "ControlStub", return_value=stub),
+        patch("builtins.input", side_effect=["Hello", "/exit"]) as mock_input,
+    ):
+        chat_module.chat()
+
+    start_run_request = stub.StartRun.call_args.args[0]
+    assert start_run_request.app_spec == "@flwragent/flwr-agent"
+    assert user_config_from_proto(start_run_request.override_config) == {
+        "agent.input": "Hello"
+    }
+    assert mock_input.call_args_list[0].args[0] == "You> "
+    assert "Agent> Hello\n" in click.unstyle(capsys.readouterr().out)
+    channel.close.assert_called_once()
+
+
+def test_word_stream_printer_prints_at_word_boundaries(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Text deltas should be displayed when complete words are available."""
+    status = Mock()
+    printer = chat_module._WordStreamPrinter(status)  # pylint: disable=protected-access
+
+    printer.write_delta("Hel")
+    out = capsys.readouterr().out
+    assert out == "\033[38;2;242;182;7mAgent> "
+    assert click.unstyle(out) == "Agent> "
+
+    printer.write_delta("lo wor")
+    assert capsys.readouterr().out == "Hello "
+
+    printer.write_delta("ld")
+    assert capsys.readouterr().out == ""
+
+    printer.finish()
+    out = capsys.readouterr().out
+    assert out == "world\033[0m\n"
+    assert click.unstyle(out) == "world\n"
+    status.stop.assert_called_once()
