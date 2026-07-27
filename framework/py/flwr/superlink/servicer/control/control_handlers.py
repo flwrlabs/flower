@@ -580,11 +580,10 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     )
 
 
-def start_automation(  # pylint: disable=too-many-locals,unused-argument
+def start_automation(  # pylint: disable=too-many-locals
     request: StartAutomationRequest,
     account: AccountInfo,
     state: LinkState,
-    fleet_api_type: str | None,
 ) -> StartAutomationResponse:
     """Create automation."""
     log(INFO, "ControlServicer.StartAutomation")

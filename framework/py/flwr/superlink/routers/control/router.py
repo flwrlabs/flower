@@ -146,8 +146,7 @@ def start_automation(
     account: AccountDependency,
 ) -> StartAutomationResponse:
     """Start an automation."""
-    # Temporary: pass an empty Fleet API type
-    return control_handlers.start_automation(request, account, linkstate, "")
+    return control_handlers.start_automation(request, account, linkstate)
 
 
 @router.post("/list-automations")

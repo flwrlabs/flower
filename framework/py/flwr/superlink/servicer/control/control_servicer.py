@@ -222,7 +222,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     ) -> StartAutomationResponse:
         """Start an automation."""
         return control_handlers.start_automation(
-            request, _get_account(), self.linkstate_factory.state(), self.fleet_api_type
+            request, _get_account(), self.linkstate_factory.state()
         )
 
     def ListAutomations(
