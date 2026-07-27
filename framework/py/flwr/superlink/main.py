@@ -50,8 +50,10 @@ from flwr.superlink.routers.control.middlewares import (
 )
 
 try:
-    from flwr.ee import get_ee_linkstate_db as get_ee_linkstate_db
-except ImportError:
+    from flwr.ee import get_ee_linkstate_db
+except ModuleNotFoundError as exc:
+    if exc.name != "flwr.ee":
+        raise
 
     def get_ee_linkstate_db() -> str:
         """Return the configured LinkState database."""
