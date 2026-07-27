@@ -14,7 +14,6 @@
 # ==============================================================================
 """SuperLink API."""
 
-
 from __future__ import annotations
 
 import os
@@ -48,6 +47,15 @@ from flwr.superlink.routers.control.middlewares import (
     ControlEventLogMiddleware,
     ControlLicenseMiddleware,
 )
+
+try:
+    from flwr.ee import get_ee_linkstate_db as get_ee_linkstate_db
+except ImportError:
+
+    def get_ee_linkstate_db() -> str:
+        """Return the configured LinkState database."""
+        return os.getenv("FLWR_DATABASE", FLWR_IN_MEMORY_DB_NAME)
+
 
 if TYPE_CHECKING:
     from flwr.superlink.cli.flower_superlink import SuperLinkLifespan
@@ -93,7 +101,7 @@ def create_app(
     """Create the SuperLink FastAPI app and its shared lifespan resources."""
     if config is None:
         is_simulation = False
-        database = os.getenv("FLWR_DATABASE", FLWR_IN_MEMORY_DB_NAME)
+        database = get_ee_linkstate_db()
         authn_plugin, authz_plugin = load_control_auth_plugins(
             os.getenv("FLWR_ACCOUNT_AUTH_CONFIG"), verify_tls_cert=True
         )
