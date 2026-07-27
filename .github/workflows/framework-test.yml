@@ -201,6 +201,7 @@ jobs:
       - name: Combine coverage data and report
         run: |
           cd framework
+          mkdir -p .pytest_cache
           find coverage-artifacts -type f -name 'coverage*' -print0 | while IFS= read -r -d '' file; do
             artifact="$(basename "$(dirname "$file")")"
             data_file="$(basename "$file")"
