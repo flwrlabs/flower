@@ -461,6 +461,12 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             order_by="updated_at",
         )
         self.assertEqual(len(completed), 1)
+        active = self.state.list_automations(
+            automation_ids=[automation.automation_id],
+            statuses=[AutomationStatus.ACTIVE],
+            order_by="updated_at",
+        )
+        self.assertEqual(active, [])
 
     def _create_dummy_run(self, running: bool = True, *, fab_hash: str = "") -> int:
         run_id = self.state.create_run(

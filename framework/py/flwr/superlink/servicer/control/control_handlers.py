@@ -161,8 +161,6 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
 
-_AUTOMATION_BATCH_LIMIT = 1
-
 
 class InvalidConnectorRequestError(FlowerError):
     """Exception raised when a connector request is invalid."""
@@ -850,14 +848,12 @@ def dispatch_automation(
 def process_due_automations(
     state: LinkState,
     *,
-    current_time: datetime | None = None,
-    limit: int = _AUTOMATION_BATCH_LIMIT,
+    limit: int,
 ) -> None:
     """Dispatch due automations."""
-    timestamp = current_time or now()
     due_automations = state.list_automations(
         statuses=[AutomationStatus.ACTIVE],
-        due_before=timestamp,
+        due_before=now(),
         order_by="next_run_at",
         limit=limit,
     )

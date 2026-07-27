@@ -58,7 +58,7 @@ from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.utils.validator import validate_message
-from flwr.supercore.constant import TaskType
+from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
@@ -94,7 +94,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
     ) -> PullPendingTasksResponse:
         """Process due automations, then pull pending tasks."""
         state = self.state()
-        process_due_automations(state)
+        process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
         return super().PullPendingTasks(request, context)
 
     def GetNodes(
