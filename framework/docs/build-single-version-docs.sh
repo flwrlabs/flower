@@ -18,6 +18,9 @@ fi
 # Move to the docs directory
 cd "$(git rev-parse --show-toplevel)/framework/docs"
 
+current_version="$DOC_VERSION"
+export current_version
+
 # Clean previous output for this version only
 rm -rf "build/html/${DOC_VERSION}"
 
@@ -39,9 +42,6 @@ for lang_dir in locales/*; do
     languages="$languages $(basename "$lang_dir")"
   fi
 done
-
-current_version="$DOC_VERSION"
-export current_version
 
 # Each language has its own output and doctree directory, so the builds can run
 # concurrently without sharing mutable Sphinx state.
