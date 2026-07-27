@@ -1692,6 +1692,32 @@ class TestControlServicerAuth(unittest.TestCase):
             self.assertEqual(msgs[0].log_output, "log1")
             self.assertEqual(msgs[0].latest_timestamp, 1.0)
 
+    def test_streamlogs_stops_when_grpc_context_is_inactive(self) -> None:
+        """Test StreamLogs retains gRPC cancellation behavior after delegation."""
+        run_id = 789
+        request = StreamLogsRequest(run_id=run_id, after_timestamp=0)
+        ctx = self.make_context()
+        mock_run = Mock(
+            federation_id=NOOP_FEDERATION_ID,
+            primary_task_id=456,
+            status=RunStatus(Status.RUNNING, "", ""),
+        )
+
+        with (
+            patch.object(self.state, "get_run_info", return_value=[mock_run]),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                return_value=SimpleNamespace(flwr_aid="user-123"),
+            ),
+        ):
+            msgs = list(self.servicer.StreamLogs(request, ctx))
+
+        self.assertEqual(msgs, [])
+        ctx.is_active.assert_called_once_with()
+
     def test_streamrunevents_yields_events(self) -> None:
         """Test StreamRunEvents streams task events for an accessible run."""
         # Prepare
