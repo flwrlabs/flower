@@ -24,7 +24,7 @@ import click
 import requests
 import typer
 
-from flwr.supercore.constant import PLATFORM_API_URL
+from flwr.supercore.constant import FLWR_SUPERGRID_API_URL
 from flwr.supercore.utils import parse_app_spec, request_download_link
 
 from ..archive_utils import safe_extract_zip
@@ -117,7 +117,7 @@ def print_success_prompt(package_name: str) -> None:
 
 def fetch_recommended_apps() -> list[dict[str, str]]:
     """Fetch recommended apps from Platform API."""
-    url = f"{PLATFORM_API_URL}/hub/apps?tag=recommended"
+    url = f"{FLWR_SUPERGRID_API_URL}/hub/apps?tag=recommended"
     try:
         response = requests.get(url, headers={"accept": "application/json"}, timeout=10)
         response.raise_for_status()
@@ -172,7 +172,7 @@ def download_remote_app_via_api(app_spec: str) -> None:
         bold=True,
     )
     # Fetch ZIP downloading URL
-    url = f"{PLATFORM_API_URL}/hub/fetch-zip"
+    url = f"{FLWR_SUPERGRID_API_URL}/hub/fetch-zip"
     try:
         presigned_url, _, note = request_download_link(
             app_id, app_version, url, "zip_url"

@@ -21,7 +21,6 @@ import random
 import threading
 import time
 from collections.abc import Callable, Iterable, Iterator
-from queue import Queue
 from typing import TypeVar
 
 from flwr.app.message import (
@@ -34,7 +33,6 @@ from flwr.app.message import (
 )
 from flwr.app.message.arraychunk import ArrayChunk
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
-from flwr.supercore.exit import add_exit_handler
 
 from ..constant import (
     FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS,
@@ -70,47 +68,29 @@ inflatable_class_registry: dict[str, type[InflatableObject]] = {
 T = TypeVar("T", bound=InflatableObject)
 
 
-# Allow thread pool executors to be shut down gracefully
-_thread_pool_executors: set[concurrent.futures.ThreadPoolExecutor] = set()
-_lock = threading.Lock()
-
-
-def _shutdown_thread_pool_executors() -> None:
-    """Shutdown all thread pool executors gracefully."""
-    with _lock:
-        for executor in _thread_pool_executors:
-            executor.shutdown(wait=False, cancel_futures=True)
-        _thread_pool_executors.clear()
-
-
-def _track_executor(executor: concurrent.futures.ThreadPoolExecutor) -> None:
-    """Track a thread pool executor for graceful shutdown."""
-    with _lock:
-        _thread_pool_executors.add(executor)
-
-
-def _untrack_executor(executor: concurrent.futures.ThreadPoolExecutor) -> None:
-    """Untrack a thread pool executor."""
-    with _lock:
-        _thread_pool_executors.discard(executor)
-
-
-add_exit_handler(_shutdown_thread_pool_executors)
-
-
 class ObjectUnavailableError(Exception):
-    """Exception raised when an object has been pre-registered but is not yet
-    available."""
+    """Signal that an object is not yet available and pulling should be retried."""
 
     def __init__(self, object_id: str):
         super().__init__(f"Object with ID '{object_id}' is not yet available.")
 
 
-class ObjectIdNotPreregisteredError(Exception):
-    """Exception raised when an object ID is not pre-registered."""
+class ObjectPullError(Exception):
+    """Exception raised when an object could not be pulled."""
 
-    def __init__(self, object_id: str):
-        super().__init__(f"Object with ID '{object_id}' could not be found.")
+    def __init__(self, object_id: str, reason: str):
+        super().__init__(f"Failed to pull object with ID '{object_id}': {reason}")
+
+
+class ObjectPushError(Exception):
+    """Exception raised when an object could not be pushed."""
+
+    def __init__(self, object_id: str, run_id: int, session_id: str):
+        super().__init__(
+            f"Failed to push object with ID '{object_id}' for run {run_id} using "
+            f"session '{session_id}'. The push session may have expired or been "
+            "replaced."
+        )
 
 
 def get_num_workers(max_concurrent: int) -> int:
@@ -137,8 +117,8 @@ def push_objects(
         `InflatableObject` instances.
     push_object_fn : Callable[[str, bytes], None]
         A function that takes an object ID and its content as bytes, and pushes
-        it to the servicer. This function should raise `ObjectIdNotPreregisteredError`
-        if the object ID is not pre-registered.
+        it to the servicer. This function should raise `ObjectPushError` if the
+        servicer fails to store the object.
     object_ids_to_push : Optional[set[str]] (default: None)
         A set of object IDs to push. If not provided, all objects will be pushed.
     keep_objects : bool (default: False)
@@ -187,13 +167,12 @@ def push_object_contents_from_iterable(
         `object_id` is the object ID, and `object_content` is the object content.
     push_object_fn : Callable[[str, bytes], None]
         A function that takes an object ID and its content as bytes, and pushes
-        it to the servicer. This function should raise `ObjectIdNotPreregisteredError`
-        if the object ID is not pre-registered.
+        it to the servicer. This function should raise `ObjectPushError` if the
+        servicer fails to store the object.
     max_concurrent_pushes : int (default: FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES)
         The maximum number of concurrent pushes to perform.
     """
     error_event = threading.Event()
-    err_queue: Queue[Exception] = Queue()
 
     def push(args: tuple[str, bytes]) -> None:
         """Push a single object."""
@@ -203,28 +182,20 @@ def push_object_contents_from_iterable(
         # Push the object using the provided function
         try:
             push_object_fn(obj_id, obj_content)
-        except Exception as err:  # pylint: disable=broad-except
+        except BaseException:  # pylint: disable=broad-except
             # Unexpected error during pushing
             error_event.set()
-            err_queue.put(err)
+            raise
 
     # Push all object contents concurrently
     num_workers = get_num_workers(max_concurrent_pushes)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
-        # Ensure that the thread pool executors are tracked for graceful shutdown
-        _track_executor(executor)
-
-        # Submit push tasks for each object content
-        executor.map(push, object_contents)  # Non-blocking map
-
-        # The context manager will block until all submitted tasks have completed
-
-    # Remove the executor from the list of tracked executors
-    _untrack_executor(executor)
-
-    # If an error occurred during pushing, raise it
-    if not err_queue.empty():
-        raise err_queue.get()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=num_workers)
+    try:
+        futures = [executor.submit(push, args) for args in object_contents]
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 def pull_objects(  # pylint: disable=too-many-arguments,too-many-locals
@@ -245,9 +216,8 @@ def pull_objects(  # pylint: disable=too-many-arguments,too-many-locals
         A list of object IDs to pull.
     pull_object_fn : Callable[[str], bytes]
         A function that takes an object ID and returns the object content as bytes.
-        The function should raise `ObjectUnavailableError` if the object is not yet
-        available, or `ObjectIdNotPreregisteredError` if the object ID is not
-        pre-registered.
+        The function should raise `ObjectUnavailableError` to trigger a retry if the
+        object is not yet available, or `ObjectPullError` if it cannot be pulled.
     max_concurrent_pulls : int (default: FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS)
         The maximum number of concurrent pulls to perform.
     max_time : Optional[float] (default: PULL_MAX_TIME)
@@ -275,13 +245,8 @@ def pull_objects(  # pylint: disable=too-many-arguments,too-many-locals
 
     results: dict[str, bytes] = {}
     results_lock = threading.Lock()
-    err_queue: Queue[Exception] = Queue()
     early_stop = threading.Event()
     start = time.monotonic()
-
-    def stop_on_error(err: Exception) -> None:
-        early_stop.set()
-        err_queue.put(err)
 
     def pull_with_retries(object_id: str) -> None:
         """Attempt to pull a single object with retry and backoff."""
@@ -294,49 +259,36 @@ def pull_objects(  # pylint: disable=too-many-arguments,too-many-locals
                 with results_lock:
                     results[object_id] = object_content
                 return
-
-            except ObjectUnavailableError as err:
+            except ObjectUnavailableError:
                 tries += 1
                 if (
                     tries >= max_tries_per_object
                     or time.monotonic() - start >= max_time
                 ):
                     # Stop all work if one object exhausts retries
-                    stop_on_error(err)
-                    return
+                    reason = "timeout or retry limit reached"
+                    early_stop.set()
+                    raise ObjectPullError(object_id, reason) from None
 
                 # Apply exponential backoff with ±20% jitter
                 sleep_time = delay * (1 + random.uniform(-0.2, 0.2))
                 early_stop.wait(sleep_time)
                 delay = min(delay * 2, backoff_cap)
-
-            except ObjectIdNotPreregisteredError as err:
-                # Permanent failure: object ID is invalid
-                stop_on_error(err)
-                return
-
-            except Exception as err:  # pylint: disable=broad-except
-                # Permanent failure: unexpected error
-                stop_on_error(err)
-                return
+            except (ObjectPullError, BaseException):
+                # Permanent failure: the object cannot be pulled or unexpected error
+                early_stop.set()
+                raise
 
     # Submit all pull tasks concurrently
     num_workers = get_num_workers(max_concurrent_pulls)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
-        # Ensure that the thread pool executors are tracked for graceful shutdown
-        _track_executor(executor)
-
-        # Submit pull tasks for each object ID
-        executor.map(pull_with_retries, object_ids)  # Non-blocking map
-
-        # The context manager will block until all submitted tasks have completed
-
-    # Remove the executor from the list of tracked executors
-    _untrack_executor(executor)
-
-    # If an error occurred during pulling, raise it
-    if not err_queue.empty():
-        raise err_queue.get()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=num_workers)
+    try:
+        futures = [executor.submit(pull_with_retries, obj_id) for obj_id in object_ids]
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
+    finally:
+        early_stop.set()
+        executor.shutdown(wait=False, cancel_futures=True)
 
     return results
 

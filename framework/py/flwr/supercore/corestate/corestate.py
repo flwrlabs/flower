@@ -21,9 +21,7 @@ from datetime import datetime
 from typing import Literal
 
 from flwr.app import Context, Message
-from flwr.app.user_config import UserConfig
-from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
-from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
@@ -47,10 +45,62 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Start a run-scoped object push session."""
 
     @abstractmethod
+    def delete_sessions_in_run(self, run_id: int) -> None:
+        """Delete bookkeeping for all object push sessions in a run.
+
+        This does not delete any messages or objects associated with the sessions.
+        """
+
+    @abstractmethod
     def preregister_object_tree(
         self, object_tree: ObjectTree, session_id: str
     ) -> list[str]:
         """Preregister the object tree for the object push session."""
+
+    @abstractmethod
+    def store_object(
+        self,
+        run_id: int,
+        session_id: str,
+        object_id: str,
+        object_content: bytes,
+    ) -> bool:
+        """Store an object if it is pending for an active push session.
+
+        Parameters
+        ----------
+        run_id : int
+            The ID of the run with which the push session is associated.
+        session_id : str
+            The ID of the object push session.
+        object_id : str
+            The ID of the object to store.
+        object_content : bytes
+            The object content to store.
+
+        Returns
+        -------
+        bool
+            True if the object was stored, otherwise False.
+        """
+
+    @abstractmethod
+    def get_object(self, run_id: int, object_id: str) -> bytes | None:
+        """Get an object and clean up expired push sessions when needed.
+
+        Parameters
+        ----------
+        run_id : int
+            The ID of the run requesting the object.
+        object_id : str
+            The ID of the object to retrieve.
+
+        Returns
+        -------
+        bytes | None
+            The object content, `b""` if it is known but unavailable, or None if it
+            is unknown.
+        """
 
     @abstractmethod
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
@@ -131,6 +181,16 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def bind_connectors_to_run(
+        self, run_id: int, connector_refs: Sequence[str]
+    ) -> bool:
+        """Associate connector references with a run."""
+
+    @abstractmethod
+    def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
+        """Return connector references associated with a run."""
+
+    @abstractmethod
     def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         oauth_session_id: str,
@@ -208,7 +268,7 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def store_message_and_object_tree(
-        self, message: Message, object_tree: ObjectTree
+        self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree.
 
@@ -218,6 +278,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             The Message to store.
         object_tree : ObjectTree
             The ObjectTree containing the IDs of objects to preregister.
+        session_id : str
+            The ID of the object push session.
 
         Returns
         -------
@@ -293,6 +355,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         run_id: int,
         federation_id: str,
         series_id: int | None,
+        description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID.
 
@@ -306,6 +369,10 @@ class CoreState(ABC):  # pylint: disable=R0904
             Caller-provided series ID. If `None`, a new series ID is generated
             and creation is attempted. If set, the matching series must already
             exist and belong to `federation_id`.
+        description : str | None (default: None)
+            Optional description for a newly created run series. Ignored when
+            `series_id` refers to an existing run series. `None` means no
+            description was provided; an empty string is an explicit description.
 
         Returns
         -------
@@ -322,12 +389,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         *,
         federation_id: str,
         flwr_aid: str,
-        fab_id: str | None,
-        fab_version: str | None,
-        fab_hash: str | None,
-        override_config: UserConfig,
-        federation_config: SimulationConfig | None,
-        primary_task_type: str,
+        start_run_request: StartRunRequest,
         series_id: int,
         next_run_at: str,
         fixed_interval: int | None = None,
@@ -341,18 +403,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Federation ID the automation belongs to.
         flwr_aid : str
             FLWR account ID used to dispatch the automation.
-        fab_id : str | None
-            FAB ID used by future runs.
-        fab_version : str | None
-            FAB version used by future runs.
-        fab_hash : str | None
-            FAB hash used by future runs.
-        override_config : UserConfig
-            Run override config used by future runs.
-        federation_config : SimulationConfig | None
-            Federation config override used by future runs.
-        primary_task_type : str
-            Primary task type used by future runs.
+        start_run_request : StartRunRequest
+            Unresolved run request to execute for each scheduled occurrence.
         series_id : int
             Run series ID to use when dispatching automation runs.
         next_run_at : str
@@ -373,10 +425,39 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def claim_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> tuple[StartRunRequest, str] | None:
+        """Claim an automation occurrence and return its unresolved run request.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to claim.
+        previous_next_run_at : str
+            Previously observed due time timestamp string. The claim only succeeds
+            if the stored `next_run_at` still matches this value.
+        next_run_at : str | None
+            Next due time timestamp string. If `None`, the current occurrence is
+            treated as the last finite occurrence.
+
+        Returns
+        -------
+        tuple[StartRunRequest, str] | None
+            A copy of the stored run request and its FLWR account ID if the claim
+            succeeded, otherwise `None`.
+        """
+
+    @abstractmethod
     def list_automations(  # pylint: disable=too-many-arguments
         self,
         *,
-        federation: str | None = None,
+        automation_ids: Sequence[int] | None = None,
+        federations: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
         order_by: Literal["next_run_at", "updated_at"],
@@ -386,8 +467,10 @@ class CoreState(ABC):  # pylint: disable=R0904
 
         Parameters
         ----------
-        federation : str | None (default: None)
-            Federation ID to filter by.
+        automation_ids : Sequence[int] | None (default: None)
+            Automation IDs to filter by.
+        federations : Sequence[str] | None (default: None)
+            Federation IDs to filter by.
         statuses : Sequence[str] | None (default: None)
             Automation statuses to filter by.
         due_before : datetime | None (default: None)

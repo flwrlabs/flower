@@ -139,10 +139,12 @@ class TaskUsage(google.protobuf.message.Message):
     INPUT_TOKENS_FIELD_NUMBER: builtins.int
     OUTPUT_TOKENS_FIELD_NUMBER: builtins.int
     TOTAL_TOKENS_FIELD_NUMBER: builtins.int
+    PROVIDER_FIELD_NUMBER: builtins.int
     usage_type: builtins.str
     input_tokens: builtins.int
     output_tokens: builtins.int
     total_tokens: builtins.int
+    provider: builtins.str
     def __init__(
         self,
         *,
@@ -150,9 +152,10 @@ class TaskUsage(google.protobuf.message.Message):
         input_tokens: builtins.int | None = ...,
         output_tokens: builtins.int | None = ...,
         total_tokens: builtins.int | None = ...,
+        provider: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_input_tokens", b"_input_tokens", "_output_tokens", b"_output_tokens", "_total_tokens", b"_total_tokens", "input_tokens", b"input_tokens", "output_tokens", b"output_tokens", "total_tokens", b"total_tokens"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_input_tokens", b"_input_tokens", "_output_tokens", b"_output_tokens", "_total_tokens", b"_total_tokens", "input_tokens", b"input_tokens", "output_tokens", b"output_tokens", "total_tokens", b"total_tokens", "usage_type", b"usage_type"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_input_tokens", b"_input_tokens", "_output_tokens", b"_output_tokens", "_total_tokens", b"_total_tokens", "input_tokens", b"input_tokens", "output_tokens", b"output_tokens", "provider", b"provider", "total_tokens", b"total_tokens", "usage_type", b"usage_type"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_input_tokens", b"_input_tokens"]) -> typing.Literal["input_tokens"] | None: ...
     @typing.overload

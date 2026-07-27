@@ -137,6 +137,12 @@ class LinkState(CoreState):  # pylint: disable=R0904
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
 
+    def cleanup_run(self, run_id: int) -> None:
+        """Clean up run-scoped messages and objects."""
+        self.delete_messages(self.get_message_ids_from_run_id(run_id))
+        self.object_store.delete_objects_in_run(run_id)
+        self.delete_sessions_in_run(run_id)
+
     @abc.abstractmethod
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up run-scoped messages and objects.
@@ -268,6 +274,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
         flwr_aid: str | None,
         primary_task_type: str,
         series_id: int | None = None,
+        series_description: str | None = None,
+        connector_refs: Sequence[str] = (),
     ) -> int:
         """Create a new run.
 
@@ -293,6 +301,12 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Optional run series ID. If `None`, a new run series is created for
             the federation. If set, the series must already exist and belong to
             the federation.
+        series_description : str | None (default: None)
+            Optional description for a newly created run series. Ignored when
+            `series_id` refers to an existing run series. `None` means no
+            description was provided; an empty string is an explicit description.
+        connector_refs : Sequence[str] (default: ())
+            Connector references the run is allowed to invoke.
 
         Returns
         -------
@@ -303,34 +317,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         -----
         This method will not verify if the account has permission to create
         a run in the federation.
-        """
-
-    @abc.abstractmethod
-    def dispatch_automation(
-        self,
-        automation_id: int,
-        *,
-        previous_next_run_at: str,
-        next_run_at: str | None,
-    ) -> int | None:
-        """Create a run from a due automation and advance the automation.
-
-        Parameters
-        ----------
-        automation_id : int
-            Automation ID to dispatch.
-        previous_next_run_at : str
-            Previously observed due time timestamp string. Dispatch only succeeds
-            if the stored `next_run_at` still matches this value, preventing
-            multiple workers from executing the same scheduled run concurrently.
-        next_run_at : str | None
-            Next due time timestamp string. If `None`, the current occurrence is
-            treated as the last finite occurrence and no next due time is stored.
-
-        Returns
-        -------
-        int | None
-            The created run ID if dispatch succeeded, otherwise `None`.
         """
 
     @abc.abstractmethod

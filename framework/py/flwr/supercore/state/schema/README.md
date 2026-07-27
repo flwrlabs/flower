@@ -13,18 +13,13 @@ erDiagram
   automation {
     INTEGER automation_id PK
     TIMESTAMP created_at
-    VARCHAR fab_hash "nullable"
-    VARCHAR fab_id "nullable"
-    VARCHAR fab_version "nullable"
-    VARCHAR federation_config "nullable"
     VARCHAR federation_id
     BIGINT fixed_interval "nullable"
     VARCHAR flwr_aid
     TIMESTAMP next_run_at
-    VARCHAR override_config
-    VARCHAR primary_task_type
     INTEGER remaining_runs "nullable"
     BIGINT series_id
+    BLOB start_run_request "nullable"
     VARCHAR status
     TIMESTAMP stopped_at "nullable"
     TIMESTAMP updated_at
@@ -248,6 +243,7 @@ erDiagram
     TIMESTAMP created_at
     BIGINT input_tokens "nullable"
     BIGINT output_tokens "nullable"
+    VARCHAR provider
     TIMESTAMP reported_at "nullable"
     BIGINT run_id
     BIGINT total_tokens "nullable"

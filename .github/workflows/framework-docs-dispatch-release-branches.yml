@@ -19,7 +19,7 @@ permissions:
 jobs:
   dispatch-release-docs-builds:
     if: ${{ github.repository == 'flwrlabs/flower' }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Dispatch framework-docs.yml to release branches

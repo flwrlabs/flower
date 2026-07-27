@@ -27,7 +27,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 
-from .inflatable_utils import ObjectIdNotPreregisteredError, ObjectUnavailableError
+from .inflatable_utils import ObjectPullError, ObjectPushError, ObjectUnavailableError
 
 ConfirmMessageReceivedProtobuf = Callable[
     [ConfirmMessageReceivedRequest], ConfirmMessageReceivedResponse
@@ -55,15 +55,15 @@ def make_pull_object_fn_protobuf(
     -------
     Callable[[str], bytes]
         A function that takes an object ID and returns the object content as bytes.
-        The function raises `ObjectIdNotPreregisteredError` if the object ID is not
-        pre-registered, or `ObjectUnavailableError` if the object is not yet available.
+        The function raises `ObjectPullError` if the object cannot be found, or
+        `ObjectUnavailableError` to signal that pulling should be retried.
     """
 
     def pull_object_fn(object_id: str) -> bytes:
         request = PullObjectRequest(node=node, run_id=run_id, object_id=object_id)
         response: PullObjectResponse = pull_object_protobuf(request)
         if not response.object_found:
-            raise ObjectIdNotPreregisteredError(object_id)
+            raise ObjectPullError(object_id, "the object could not be found.")
         if not response.object_available:
             raise ObjectUnavailableError(object_id)
         return response.object_content
@@ -95,8 +95,8 @@ def make_push_object_fn_protobuf(
     -------
     Callable[[str, bytes], None]
         A function that takes an object ID and its content as bytes, and pushes it
-        to the servicer. The function raises `ObjectIdNotPreregisteredError` if
-        the object ID is not pre-registered.
+        to the servicer. The function raises `ObjectPushError` if the servicer fails
+        to store the object.
     """
 
     def push_object_fn(object_id: str, object_content: bytes) -> None:
@@ -109,7 +109,7 @@ def make_push_object_fn_protobuf(
         )
         response: PushObjectResponse = push_object_protobuf(request)
         if not response.stored:
-            raise ObjectIdNotPreregisteredError(object_id)
+            raise ObjectPushError(object_id, run_id, session_id)
 
     return push_object_fn
 

@@ -16,14 +16,20 @@
 
 # pylint: disable=too-many-lines
 
+import base64
 import hashlib
 import json
-from collections.abc import Sequence
+import secrets
+import time
+from collections.abc import Callable, Generator, Sequence
+from datetime import datetime
 from logging import ERROR, INFO
+from typing import cast
 
 import requests
 
 from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
+from flwr.app.user_config import UserConfig
 from flwr.cli.utils import validate_federation_name
 from flwr.common.config import (
     flatten_dict,
@@ -34,6 +40,8 @@ from flwr.common.config import (
 from flwr.common.constant import (
     FAB_MAX_SIZE,
     HEARTBEAT_DEFAULT_INTERVAL,
+    LOG_STREAM_INTERVAL,
+    RUN_EVENTS_STREAM_INTERVAL,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
 )
@@ -51,18 +59,29 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
     ArchiveFederationResponse,
+    BeginConnectorOAuthRequest,
+    BeginConnectorOAuthResponse,
+    CompleteConnectorOAuthRequest,
+    CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
+    Connector,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DisconnectConnectorRequest,
+    DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAutomationsRequest,
+    ListAutomationsResponse,
+    ListConnectorsRequest,
+    ListConnectorsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -87,10 +106,18 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RevokeInvitationResponse,
     ShowFederationRequest,
     ShowFederationResponse,
+    StartAutomationRequest,
+    StartAutomationResponse,
     StartRunRequest,
     StartRunResponse,
+    StopAutomationRequest,
+    StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StreamLogsRequest,
+    StreamLogsResponse,
+    StreamRunEventsRequest,
+    StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
 )
@@ -102,9 +129,12 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
+    FLWR_SUPERGRID_API_URL,
     NOOP_FEDERATION_ID,
-    PLATFORM_API_URL,
+    OAUTH_SESSION_TTL,
+    RUN_SERIES_DESCRIPTION_MAX_LENGTH,
     ActionType,
+    AutomationStatus,
     RunTime,
     TaskType,
 )
@@ -113,6 +143,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.run import Run
+from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
@@ -124,10 +155,292 @@ from flwr.supercore.utils import (
     parse_app_spec,
     request_download_link,
     resolve_account_ids,
+    strict_json_dumps,
 )
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.federation.noop_federation_manager import NoOpFederationManager
+
+
+class InvalidConnectorRequestError(FlowerError):
+    """Exception raised when a connector request is invalid."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            ApiErrorCode.INVALID_CONNECTOR_REQUEST,
+            f"Invalid connector request: {reason}.",
+        )
+
+
+class ConnectorFailureError(FlowerError):
+    """Exception raised when a connector operation fails."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            ApiErrorCode.CONNECTOR_FAILURE, f"Connector failure: {reason}."
+        )
+
+
+def list_connectors(
+    request: ListConnectorsRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> ListConnectorsResponse:
+    """List user-connectable OAuth providers and account connection status."""
+    log(INFO, "ControlServicer.ListConnectors")
+    _ = request
+
+    connectors: list[Connector] = []
+    for provider in sorted(
+        connector_registry.OAUTH_CONNECTOR_PROVIDERS,
+        key=lambda item: item.connector_ref,
+    ):
+        connector_ref = provider.connector_ref
+        connected = (
+            state.get_connector(flwr_aid=account.flwr_aid, connector_ref=connector_ref)
+            is not None
+        )
+        connectors.append(
+            Connector(
+                connector_ref=connector_ref,
+                display_name=provider.display_name,
+                description=provider.description,
+                connected=connected,
+            )
+        )
+    return ListConnectorsResponse(connectors=connectors)
+
+
+def disconnect_connector(
+    request: DisconnectConnectorRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> DisconnectConnectorResponse:
+    """Delete one account-scoped connector connection."""
+    log(INFO, "ControlServicer.DisconnectConnector")
+    connector_ref = request.connector_ref.strip().lower()
+    if not connector_ref:
+        raise InvalidConnectorRequestError("connector_ref is required")
+    try:
+        connector_registry.get_oauth_connector_provider(connector_ref)
+    except ValueError:
+        raise FlowerError(
+            ApiErrorCode.CONNECTOR_NOT_FOUND,
+            f"OAuth provider for connector '{connector_ref}' was not found.",
+        ) from None
+
+    deleted = state.delete_connector(
+        flwr_aid=account.flwr_aid, connector_ref=connector_ref
+    )
+    if not deleted:
+        raise FlowerError(
+            ApiErrorCode.CONNECTOR_NOT_FOUND,
+            f"Connector '{connector_ref}' is not connected for this account.",
+        )
+    return DisconnectConnectorResponse()
+
+
+def begin_connector_oauth(
+    request: BeginConnectorOAuthRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> BeginConnectorOAuthResponse:
+    """Create a short-lived account-scoped OAuth session."""
+    log(INFO, "ControlServicer.BeginConnectorOAuth")
+    connector_ref = request.connector_ref.strip().lower()
+    if not connector_ref:
+        raise InvalidConnectorRequestError("connector_ref is required")
+    redirect_uri = request.redirect_uri.strip()
+    if not redirect_uri:
+        raise InvalidConnectorRequestError("redirect_uri is required")
+    try:
+        provider = connector_registry.get_oauth_connector_provider(connector_ref)
+    except ValueError:
+        raise FlowerError(
+            ApiErrorCode.CONNECTOR_NOT_FOUND,
+            f"OAuth provider for connector '{connector_ref}' was not found.",
+        ) from None
+    try:
+        redirect_uri = provider.resolve_redirect_uri(redirect_uri)
+    except ValueError as err:
+        raise InvalidConnectorRequestError(
+            "redirect_uri is not allowed for this connector"
+        ) from err
+    # Provider implementations can raise arbitrary exceptions; sanitize them.
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        raise ConnectorFailureError(
+            f"Connector '{connector_ref}' failed to resolve redirect URI "
+            f"({type(err).__name__})"
+        ) from None
+    if not redirect_uri:
+        raise ConnectorFailureError(
+            f"Connector '{connector_ref}' failed to resolve redirect URI "
+            "(empty response)"
+        )
+
+    oauth_session_id = secrets.token_urlsafe(32)
+    oauth_state = secrets.token_urlsafe(32)
+    pkce_verifier = secrets.token_urlsafe(64)
+    digest = hashlib.sha256(pkce_verifier.encode("ascii")).digest()
+    pkce_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+    expires_at = now() + OAUTH_SESSION_TTL
+    try:
+        authorization_url = provider.build_authorization_url(
+            redirect_uri=redirect_uri,
+            state=oauth_state,
+            pkce_challenge=pkce_challenge,
+        )
+    # Provider implementations can raise arbitrary exceptions; sanitize them.
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        raise ConnectorFailureError(
+            f"Connector '{connector_ref}' failed to build authorization URL "
+            f"({type(err).__name__})"
+        ) from None
+    if not authorization_url:
+        raise ConnectorFailureError(
+            f"Connector '{connector_ref}' failed to build authorization URL "
+            "(empty response)"
+        )
+
+    session = state.create_connector_oauth_session(
+        oauth_session_id=oauth_session_id,
+        flwr_aid=account.flwr_aid,
+        connector_ref=connector_ref,
+        state=oauth_state,
+        redirect_uri=redirect_uri,
+        pkce_verifier=pkce_verifier,
+        expires_at=expires_at,
+    )
+    if session is None:
+        raise ConnectorFailureError("OAuth session could not be created")
+
+    return BeginConnectorOAuthResponse(
+        oauth_session_id=session.oauth_session_id,
+        authorization_url=authorization_url,
+        connector_ref=session.connector_ref,
+        expires_at=session.expires_at,
+    )
+
+
+def complete_connector_oauth(  # pylint: disable=too-many-locals
+    request: CompleteConnectorOAuthRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> CompleteConnectorOAuthResponse:
+    """Exchange an OAuth code and persist one account-scoped connection."""
+    log(INFO, "ControlServicer.CompleteConnectorOAuth")
+    oauth_session_id = request.oauth_session_id.strip()
+    if not oauth_session_id:
+        raise InvalidConnectorRequestError("oauth_session_id is required")
+    authorization_code = request.code.strip()
+    if not authorization_code:
+        raise InvalidConnectorRequestError("code is required")
+    if not request.state:
+        raise InvalidConnectorRequestError("state is required")
+
+    session = state.get_connector_oauth_session(
+        oauth_session_id=oauth_session_id, flwr_aid=account.flwr_aid
+    )
+    if session is None:
+        raise FlowerError(
+            ApiErrorCode.CONNECTOR_NOT_FOUND,
+            "Connector OAuth session was not found for this account.",
+        )
+
+    try:
+        expires_at = datetime.fromisoformat(session.expires_at)
+    except ValueError:
+        raise ConnectorFailureError("OAuth session expiry is invalid") from None
+    if expires_at.utcoffset() is None:
+        raise ConnectorFailureError("OAuth session expiry is timezone-naive")
+    if (
+        session.completed_at is not None
+        or expires_at <= now()
+        or not secrets.compare_digest(
+            request.state.encode("utf-8"), session.state.encode("utf-8")
+        )
+    ):
+        raise InvalidConnectorRequestError(
+            f"OAuth session '{session.oauth_session_id}' is invalid or no longer "
+            "pending"
+        )
+
+    connector_ref = session.connector_ref.strip().lower()
+    try:
+        provider = connector_registry.get_oauth_connector_provider(connector_ref)
+    except ValueError:
+        raise FlowerError(
+            ApiErrorCode.CONNECTOR_NOT_FOUND,
+            f"OAuth provider for connector '{connector_ref}' was not found.",
+        ) from None
+    claimed = state.complete_connector_oauth_session(
+        oauth_session_id=session.oauth_session_id,
+        flwr_aid=account.flwr_aid,
+    )
+    if not claimed:
+        raise InvalidConnectorRequestError(
+            f"OAuth session '{session.oauth_session_id}' is invalid or no longer "
+            "pending"
+        )
+
+    try:
+        credentials, config = provider.exchange_code(
+            code=authorization_code,
+            redirect_uri=session.redirect_uri,
+            pkce_verifier=session.pkce_verifier,
+        )
+    # Provider implementations can raise arbitrary exceptions; sanitize them.
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        raise ConnectorFailureError(
+            f"Connector '{connector_ref}' failed to exchange authorization code "
+            f"({type(err).__name__})"
+        ) from None
+    try:
+        credentials_json = strict_json_dumps(credentials, compact=True)
+        config_json = strict_json_dumps(config, compact=True)
+    except (TypeError, ValueError) as err:
+        raise ConnectorFailureError(
+            f"Connector '{connector_ref}' failed to serialize exchanged "
+            f"credentials ({type(err).__name__})"
+        ) from None
+
+    stored = state.upsert_connector(
+        flwr_aid=account.flwr_aid,
+        connector_ref=connector_ref,
+        credentials_json=credentials_json,
+        config_json=config_json,
+    )
+    if not stored:
+        raise ConnectorFailureError("Connector credentials could not be stored")
+    return CompleteConnectorOAuthResponse(connector_ref=connector_ref)
+
+
+def validate_run_connector_refs(
+    connector_refs: Sequence[str],
+    account: AccountInfo,
+    state: LinkState,
+) -> list[str]:
+    """Validate and canonicalize OAuth connector references for a new run."""
+    canonical_refs = list(
+        dict.fromkeys(requested_ref.strip().lower() for requested_ref in connector_refs)
+    )
+    if "" in canonical_refs:
+        raise InvalidConnectorRequestError("connector_ref is required")
+    for connector_ref in canonical_refs:
+        try:
+            connector_registry.get_oauth_connector_provider(connector_ref)
+        except ValueError:
+            raise FlowerError(
+                ApiErrorCode.CONNECTOR_NOT_FOUND,
+                f"OAuth provider for connector '{connector_ref}' was not found.",
+            ) from None
+        connector = state.get_connector(account.flwr_aid, connector_ref)
+        if connector is None:
+            raise FlowerError(
+                ApiErrorCode.CONNECTOR_NOT_FOUND,
+                f"Connector '{connector_ref}' is not connected for this account.",
+            )
+    return canonical_refs
 
 
 def start_run(  # pylint: disable=too-many-locals, too-many-statements
@@ -163,6 +476,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     flwr_aid = account.flwr_aid
     account_name = account.account_name
     override_config = user_config_from_proto(request.override_config)
+    connector_refs = validate_run_connector_refs(request.connector_refs, account, state)
 
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
 
@@ -189,7 +503,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
         # Validate user config overrides matches keys in run config in FAB
         fab_config = get_fab_config(fab_file)
         run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
-        _ = fuse_dicts(run_config, override_config)
+        fused_run_config = fuse_dicts(run_config, override_config)
 
         # Derive primary task type from the submitted FAB. AgentApp-only FABs can
         # be bundled locally and submitted through the regular `flwr run` path.
@@ -227,6 +541,12 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
                 f"FAB ({fab.hash_str}) hash from request doesn't match contents"
             )
         fab_id, fab_version = get_metadata_from_config(fab_config)
+        series_id = request.series_id if request.HasField("series_id") else None
+        series_description: str | None = None
+        if primary_task_type == TaskType.AGENT_APP and series_id is None:
+            series_description = (
+                _derive_run_series_description(fused_run_config) or None
+            )
 
         run_id = state.create_run(
             fab_id,
@@ -237,7 +557,9 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
             resolved_federation_config,
             flwr_aid,
             primary_task_type,
-            request.series_id if request.HasField("series_id") else None,
+            series_id=series_id,
+            series_description=series_description,
+            connector_refs=connector_refs,
         )
 
         if run_id == 0:
@@ -265,6 +587,309 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     return StartRunResponse(
         run_id=run_id, note=note, series_id=series_id, federation=run.federation_id
     )
+
+
+def stream_logs(
+    request: StreamLogsRequest,
+    account: AccountInfo,
+    state: LinkState,
+    is_active: Callable[[], bool] | None = None,
+) -> Generator[StreamLogsResponse, None, None]:
+    """Stream logs for a run."""
+    log(INFO, "ControlServicer.StreamLogs")
+
+    run_id = request.run_id
+    runs = state.get_run_info(run_ids=[run_id])
+    if not runs:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND,
+            f"Run {run_id} not found while streaming logs.",
+        )
+    run = runs[0]
+    task_id = cast(int, run.primary_task_id)
+
+    _validate_federation_membership_in_request(
+        state, account.flwr_aid, run.federation_id
+    )
+
+    after_timestamp = request.after_timestamp + 1e-6
+    while is_active is None or is_active():
+        log_msg, latest_timestamp = state.get_task_log(task_id, after_timestamp)
+        if log_msg:
+            yield StreamLogsResponse(
+                log_output=log_msg,
+                latest_timestamp=latest_timestamp,
+            )
+            # Add a small epsilon to the latest timestamp to avoid getting
+            # the same log
+            after_timestamp = max(latest_timestamp + 1e-6, after_timestamp)
+
+        # Wait for and continue to yield more log responses only if the
+        # run isn't completed yet. If the run is finished, the entire log
+        # is returned at this point and the server ends the stream.
+        run = state.get_run_info(run_ids=[run_id])[0]
+        if run.status.status == Status.FINISHED:
+            log(INFO, "All logs for run ID `%s` returned", run_id)
+            state.cleanup_run(run_id)
+            break
+
+        time.sleep(LOG_STREAM_INTERVAL)
+
+
+def stream_run_events(
+    request: StreamRunEventsRequest,
+    account: AccountInfo,
+    state: LinkState,
+    is_active: Callable[[], bool] | None = None,
+) -> Generator[StreamRunEventsResponse, None, None]:
+    """Stream task events for a run."""
+    log(INFO, "ControlServicer.StreamRunEvents")
+
+    run_id = request.run_id
+    runs = state.get_run_info(run_ids=[run_id])
+    if not runs:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND,
+            f"Run {run_id} not found while streaming run events.",
+        )
+    run = runs[0]
+
+    _validate_federation_membership_in_request(
+        state, account.flwr_aid, run.federation_id
+    )
+
+    after_task_event_id = None
+    if request.HasField("after_task_event_id"):
+        after_task_event_id = request.after_task_event_id
+    while is_active is None or is_active():
+        should_break = run.status.status == Status.FINISHED
+
+        # Retrieve and yield all task events generated after the latest
+        # streamed task event
+        events = state.get_task_events(
+            run_id=run_id,
+            after_task_event_id=after_task_event_id,
+        )
+        for event in events:
+            after_task_event_id = event.id
+            yield StreamRunEventsResponse(task_event=event)
+
+        # If the run was already finished before fetching this batch, all
+        # events are returned at this point and the server ends the stream.
+        if should_break:
+            log(INFO, "All events for run ID `%s` returned", run_id)
+            break
+
+        # Refresh status after yielding. If streaming this batch raced with
+        # run completion, continue immediately and fetch one final batch.
+        run = state.get_run_info(run_ids=[run_id])[0]
+        if run.status.status == Status.FINISHED:
+            continue
+
+        time.sleep(RUN_EVENTS_STREAM_INTERVAL)
+
+
+def start_automation(  # pylint: disable=too-many-locals
+    request: StartAutomationRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> StartAutomationResponse:
+    """Create automation."""
+    log(INFO, "ControlServicer.StartAutomation")
+
+    # Validate the run series shared by all runs in this automation.
+    start_run_request = request.start_run_request
+    if not start_run_request.HasField("series_id"):
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "StartAutomation requires start_run_request.series_id.",
+            public_details="The run `series_id` is required to start an automation.",
+        )
+    if len(start_run_request.fab.content) > FAB_MAX_SIZE:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "StartAutomation FAB size exceeds the maximum allowed size of "
+            f"{FAB_MAX_SIZE} bytes.",
+            public_details=(
+                f"The FAB must not exceed {FAB_MAX_SIZE} bytes when starting "
+                "an automation."
+            ),
+        )
+
+    # Resolve the first scheduled run time.
+    if request.HasField("start_at"):
+        try:
+            next_run_at = datetime.fromisoformat(request.start_at).isoformat()
+        except ValueError as e:
+            raise FlowerError(
+                ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+                f"Invalid automation start_at value: {request.start_at}",
+                public_details=(
+                    "The automation start_at value must be a valid ISO 8601 timestamp."
+                ),
+            ) from e
+    else:
+        next_run_at = now().isoformat()
+
+    # Resolve recurrence settings and the default one-shot behavior.
+    fixed_interval = (
+        request.fixed_interval if request.HasField("fixed_interval") else None
+    )
+    max_runs = (
+        request.max_runs
+        if request.HasField("max_runs")
+        else 1 if fixed_interval is None else None
+    )
+    if max_runs is not None and max_runs < 1:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`max_runs` must be greater than zero.",
+            public_details="`max_runs` must be greater than zero.",
+        )
+    if fixed_interval is not None and fixed_interval < 1:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`fixed_interval` must be greater than zero.",
+            public_details="`fixed_interval` must be greater than zero.",
+        )
+    if fixed_interval is not None and fixed_interval >= 2**63:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`fixed_interval` must be less than 2**63.",
+            public_details="`fixed_interval` must be less than 2**63.",
+        )
+    if fixed_interval is None and (max_runs is None or max_runs > 1):
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`fixed_interval` is required for automations with multiple runs.",
+            public_details=(
+                "`fixed_interval` is required for automations with multiple runs."
+            ),
+        )
+
+    # Resolve the account-scoped federation and run configuration.
+    flwr_aid = account.flwr_aid
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+    federation_id = _resolve_federation_id(
+        state, account.account_name, start_run_request.federation
+    )
+    stored_start_run_request = StartRunRequest()
+    stored_start_run_request.CopyFrom(start_run_request)
+    stored_start_run_request.federation = federation_id
+
+    # Persist the unresolved run request so dispatch uses the StartRun workflow.
+    try:
+        automation = state.store_automation(
+            federation_id=federation_id,
+            flwr_aid=flwr_aid,
+            start_run_request=stored_start_run_request,
+            series_id=start_run_request.series_id,
+            next_run_at=next_run_at,
+            fixed_interval=fixed_interval,
+            max_runs=max_runs,
+        )
+    except ValueError as e:
+        raise FlowerError(
+            ApiErrorCode.FAILED_TO_CREATE_RUN,
+            "Failed to create automation for "
+            f"flwr_aid={flwr_aid}, federation_id={federation_id}, "
+            f"series_id={start_run_request.series_id}.",
+        ) from e
+
+    return StartAutomationResponse(
+        automation_id=automation.automation_id,
+        series_id=automation.series_id,
+        next_run_at=automation.next_run_at,
+    )
+
+
+def dispatch_automation(
+    state: LinkState,
+    automation_id: int,
+    *,
+    previous_next_run_at: str,
+    next_run_at: str | None,
+    fleet_api_type: str | None,
+) -> StartRunResponse | None:
+    """Claim an automation occurrence and execute it through StartRun."""
+    claimed = state.claim_automation(
+        automation_id,
+        previous_next_run_at=previous_next_run_at,
+        next_run_at=next_run_at,
+    )
+    if claimed is None:
+        return None
+
+    request, flwr_aid = claimed
+    try:
+        response = start_run(
+            request,
+            AccountInfo(flwr_aid=flwr_aid, account_name=""),
+            state,
+            fleet_api_type,
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        state.finish_automation(
+            automation_id,
+            status=AutomationStatus.FAILED,
+        )
+        raise
+
+    if not response.HasField("run_id"):
+        state.finish_automation(
+            automation_id,
+            status=AutomationStatus.FAILED,
+        )
+        return None
+    if next_run_at is None:
+        state.finish_automation(
+            automation_id,
+            status=AutomationStatus.COMPLETED,
+        )
+    return response
+
+
+def list_automations(
+    request: ListAutomationsRequest, account: AccountInfo, state: LinkState
+) -> ListAutomationsResponse:
+    """List automations."""
+    log(INFO, "ControlServicer.ListAutomations")
+
+    flwr_aid = account.flwr_aid
+    if request.federation:
+        _validate_federation_membership_in_request(state, flwr_aid, request.federation)
+        federations = [request.federation]
+    else:
+        federations = [
+            federation.id
+            for federation in state.federation_manager.get_federations(flwr_aid)
+        ]
+
+    return ListAutomationsResponse(
+        automations=state.list_automations(
+            federations=federations,
+            order_by="updated_at",
+        )
+    )
+
+
+def stop_automation(
+    request: StopAutomationRequest, account: AccountInfo, state: LinkState
+) -> StopAutomationResponse:
+    """Stop an automation."""
+    log(INFO, "ControlServicer.StopAutomation")
+
+    automations = state.list_automations(
+        automation_ids=[request.automation_id],
+        order_by="updated_at",
+    )
+    if automations:
+        _validate_federation_membership_in_request(
+            state, account.flwr_aid, automations[0].federation
+        )
+
+    state.stop_automation(request.automation_id)
+    return StopAutomationResponse()
 
 
 def list_runs(
@@ -307,7 +932,7 @@ def list_runs(
             state, flwr_aid, runs[0].federation_id
         )
 
-    # Clear objects of finished runs
+    # Clean up resources of finished runs
     # Resolve only non-caller run owners; caller-owned runs use `account_name`.
     account_names = resolve_account_ids(
         {run.flwr_aid for run in runs if run.flwr_aid != flwr_aid}
@@ -316,7 +941,7 @@ def list_runs(
     for run in runs:
         run.account_name = account_names[run.flwr_aid]
         if run.status.status == Status.FINISHED:
-            state.object_store.delete_objects_in_run(run.run_id)
+            state.cleanup_run(run.run_id)
 
     # Construct and return response
     return ListRunsResponse(
@@ -956,6 +1581,18 @@ def _resolve_federation_id(
     return federation_id
 
 
+def _derive_run_series_description(run_config: UserConfig) -> str:
+    """Derive a concise RunSeries description from the agent input."""
+    agent_input = run_config.get("agent.input")
+    if not isinstance(agent_input, str):
+        return ""
+
+    description = " ".join(agent_input.split())
+    if len(description) <= RUN_SERIES_DESCRIPTION_MAX_LENGTH:
+        return description
+    return f"{description[: RUN_SERIES_DESCRIPTION_MAX_LENGTH - 1]}…"
+
+
 class FederationNotSpecified(FlowerError):
     """Exception raised when a federation is not specified in a request that requires
     one."""
@@ -1077,7 +1714,7 @@ def _get_remote_fab(
         ) from e
 
     # Request download link and verification information
-    url = f"{PLATFORM_API_URL}/hub/fetch-fab"
+    url = f"{FLWR_SUPERGRID_API_URL}/hub/fetch-fab"
     try:
         presigned_url, verifications, note = request_download_link(
             app_id, app_version, url, "fab_url"
