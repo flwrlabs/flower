@@ -35,7 +35,15 @@ def start_automation_from_run(
     if not automation_task:
         raise ValueError("`task` must be a non-empty string.")
 
-    next_run_at = _parse_start_at(request)
+    next_run_at = now()
+    if request.HasField("start_at"):
+        try:
+            next_run_at = datetime.fromisoformat(request.start_at)
+        except ValueError as exc:
+            raise ValueError("`start_at` must be an RFC 3339 timestamp.") from exc
+        if next_run_at.tzinfo is None:
+            raise ValueError("`start_at` must include a timezone.")
+        next_run_at = next_run_at.astimezone(UTC)
     fixed_interval = (
         request.fixed_interval if request.HasField("fixed_interval") else None
     )
@@ -59,7 +67,7 @@ def start_automation_from_run(
         federation_config=state.get_federation_config(run.run_id),
         primary_task_type=run.primary_task_type,
         series_id=run.series_id,
-        next_run_at=next_run_at,
+        next_run_at=isoformat8601_utc(next_run_at),
         fixed_interval=fixed_interval,
         max_runs=max_runs if fixed_interval is not None else 1,
     )
@@ -68,16 +76,3 @@ def start_automation_from_run(
         series_id=automation.series_id,
         next_run_at=automation.next_run_at,
     )
-
-
-def _parse_start_at(request: StartAutomationFromTaskRequest) -> str:
-    """Parse and normalize the requested automation start time."""
-    if not request.HasField("start_at"):
-        return isoformat8601_utc(now())
-    try:
-        start_at = datetime.fromisoformat(request.start_at.replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise ValueError("`start_at` must be an RFC 3339 timestamp.") from exc
-    if start_at.tzinfo is None:
-        raise ValueError("`start_at` must include a timezone.")
-    return isoformat8601_utc(start_at.astimezone(UTC))
