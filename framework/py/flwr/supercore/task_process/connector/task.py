@@ -70,9 +70,7 @@ def handle_task(
         credentials: JSONObject | None = None
         config: JSONObject | None = None
         if uses_credentials:
-            connector = stub.GetConnector(GetConnectorRequest(connector_ref=name))
-            if connector.connector_ref != name:
-                raise RuntimeError("Connector credentials could not be loaded.")
+            connector = stub.GetConnector(GetConnectorRequest())
             credentials = _parse_connector_json(connector.credentials_json)
             config = _parse_connector_json(connector.config_json)
         response = {

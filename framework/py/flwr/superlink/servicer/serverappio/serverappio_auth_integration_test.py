@@ -154,9 +154,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
     def test_get_connector_requires_and_uses_connector_task_token(self) -> None:
         """GetConnector should derive credential access from its task token."""
         with self.assertRaises(grpc.RpcError) as unauthenticated:
-            self._get_connector_no_auth.with_call(
-                request=GetConnectorRequest(connector_ref="notion")
-            )
+            self._get_connector_no_auth.with_call(request=GetConnectorRequest())
         assert unauthenticated.exception.code() == grpc.StatusCode.UNAUTHENTICATED
 
         run_id = self.state.create_run(
@@ -187,7 +185,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         )
 
         response, call = self._get_connector_no_auth.with_call(
-            request=GetConnectorRequest(connector_ref="notion"),
+            request=GetConnectorRequest(),
             metadata=((TASK_TOKEN_HEADER, token),),
         )
 

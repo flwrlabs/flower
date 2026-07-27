@@ -367,14 +367,9 @@ class GetConnectorRequest(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    CONNECTOR_REF_FIELD_NUMBER: builtins.int
-    connector_ref: builtins.str
     def __init__(
         self,
-        *,
-        connector_ref: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["connector_ref", b"connector_ref"]) -> None: ...
 
 global___GetConnectorRequest = GetConnectorRequest
 

@@ -77,7 +77,7 @@ message RecordTaskUsageRequest { TaskUsage task_usage = 1; }
 message RecordTaskUsageResponse {}
 
 // GetConnector messages
-message GetConnectorRequest { string connector_ref = 1; }
+message GetConnectorRequest {}
 message GetConnectorResponse {
   string connector_ref = 1;
   string credentials_json = 2;

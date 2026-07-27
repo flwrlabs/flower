@@ -334,7 +334,7 @@ class TestGetConnector(unittest.TestCase):
             return_value=task,
         ):
             response = self.servicer.GetConnector(
-                GetConnectorRequest(connector_ref="notion"),
+                GetConnectorRequest(),
                 Mock(),
             )
 
@@ -354,16 +354,16 @@ class TestGetConnector(unittest.TestCase):
     @parameterized.expand(  # type: ignore
         [
             ("wrong_task_type", TaskType.AGENT_APP, "notion"),
-            ("mismatched_ref", TaskType.CONNECTOR, "github"),
+            ("missing_ref", TaskType.CONNECTOR, ""),
         ]
     )
     def test_rejects_wrong_task_identity(
         self,
         _name: str,
         task_type: str,
-        request_ref: str,
+        connector_ref: str,
     ) -> None:
-        """GetConnector should reject non-connector tasks and ref mismatches."""
+        """GetConnector should reject tasks without a connector identity."""
         context = Mock(spec=grpc.ServicerContext)
         context.abort.side_effect = grpc.RpcError()
 
@@ -373,14 +373,14 @@ class TestGetConnector(unittest.TestCase):
                 "get_authenticated_task",
                 return_value=Mock(
                     type=task_type,
-                    connector_ref="notion",
+                    connector_ref=connector_ref,
                     run_id=123,
                 ),
             ),
             self.assertRaises(grpc.RpcError),
         ):
             self.servicer.GetConnector(
-                GetConnectorRequest(connector_ref=request_ref),
+                GetConnectorRequest(),
                 context,
             )
 
@@ -407,7 +407,7 @@ class TestGetConnector(unittest.TestCase):
             self.assertRaises(grpc.RpcError),
         ):
             self.servicer.GetConnector(
-                GetConnectorRequest(connector_ref="notion"),
+                GetConnectorRequest(),
                 context,
             )
 

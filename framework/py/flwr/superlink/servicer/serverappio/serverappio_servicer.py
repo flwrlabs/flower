@@ -245,14 +245,12 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         log(DEBUG, "ServerAppIoServicer.GetConnector")
 
         task = get_authenticated_task()
-        if (
-            task.type != TaskType.CONNECTOR
-            or task.connector_ref != request.connector_ref
-        ):
+        if task.type != TaskType.CONNECTOR or not task.connector_ref:
             context.abort(
                 grpc.StatusCode.PERMISSION_DENIED,
                 "Connector credentials are not available to this task.",
             )
+        connector_ref = task.connector_ref
 
         state = self.state_factory.state()
         runs = state.get_run_info(run_ids=[task.run_id])
@@ -263,7 +261,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
         connector = state.get_connector(
             flwr_aid=run.flwr_aid,
-            connector_ref=request.connector_ref,
+            connector_ref=connector_ref,
         )
         if connector is None:
             context.abort(grpc.StatusCode.NOT_FOUND, "Connector not found.")

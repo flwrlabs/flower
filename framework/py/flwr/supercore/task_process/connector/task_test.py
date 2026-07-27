@@ -76,9 +76,7 @@ def test_handle_task_passes_credentials_to_matching_provider() -> None:
     ):
         handle_task(stub=stub, task_id=22, run_id=7)
 
-    stub.GetConnector.assert_called_once_with(
-        GetConnectorRequest(connector_ref="notion")
-    )
+    stub.GetConnector.assert_called_once_with(GetConnectorRequest())
     provider.assert_called_once_with(
         query="release notes",
         credentials={"token": "secret"},
