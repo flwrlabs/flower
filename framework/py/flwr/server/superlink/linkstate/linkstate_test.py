@@ -1433,6 +1433,18 @@ class StateTest(CoreStateTest):
         # Assert
         assert retrieved_node_id is None
 
+    def test_get_node_id_by_public_key_of_unknown_node(self) -> None:
+        """Test get_node_id_by_public_key of an unknown node."""
+        # Prepare
+        state: LinkState = self.state_factory()
+        state.create_node("fake_aid", "fake_name", b"known", 10)
+
+        # Execute
+        retrieved_node_id = state.get_node_id_by_public_key(b"unknown")
+
+        # Assert
+        assert retrieved_node_id is None
+
     def test_num_message_ins(self) -> None:
         """Test if num_message_ins returns correct number of not delivered Messages."""
         # Prepare

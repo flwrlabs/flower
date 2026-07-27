@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from logging import ERROR, WARNING
 from typing import Any, Literal, cast
 
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, select
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Message
@@ -61,6 +61,7 @@ from flwr.supercore.utils import (
 from flwr.superlink.federation import FederationManager
 
 from .linkstate import LinkState
+from .orm_models import LinkStateNode
 from .utils import (
     check_node_availability_for_in_message,
     convert_sint64_values_in_dict_to_uint64,
@@ -951,19 +952,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def get_node_id_by_public_key(self, public_key: bytes) -> int | None:
         """Get `node_id` for the specified `public_key` if it exists and is not
         deleted."""
-        query = """SELECT node_id FROM node
-                   WHERE public_key = :public_key AND status != :unregistered;"""
-        rows = self.query(
-            query, {"public_key": public_key, "unregistered": NodeStatus.UNREGISTERED}
+        statement = select(LinkStateNode.node_id).where(
+            LinkStateNode.public_key == public_key,
+            LinkStateNode.status != NodeStatus.UNREGISTERED,
         )
 
-        # If no result is found, return None
-        if not rows:
+        with self.session() as session:
+            node_id = session.execute(statement).scalar_one_or_none()
+
+        if node_id is None:
             return None
 
-        # Convert sint64 node_id to uint64
-        node_id = int64_to_uint64(rows[0]["node_id"])
-        return node_id
+        return int64_to_uint64(node_id)
 
     def create_run(  # pylint: disable=R0913, R0914, R0917
         self,
