@@ -134,7 +134,7 @@ def test_chat_verifies_login_before_prompt() -> None:
     channel.close.assert_called_once()
 
 
-def test_chat_submits_prompt_to_flower_agent_and_streams_response(
+def test_chat_waits_for_run_event_stream_and_streams_final_response(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Chat should submit prompts as agent.input and print streamed deltas."""
@@ -150,6 +150,18 @@ def test_chat_submits_prompt_to_flower_agent_and_streams_response(
         [
             StreamRunEventsResponse(
                 task_event=TaskEvent(
+                    event="response.completed",
+                    data='{"type":"response.completed","response":{"id":"resp_1"}}',
+                )
+            ),
+            StreamRunEventsResponse(
+                task_event=TaskEvent(
+                    event="response.tool_call.completed",
+                    data='{"type":"response.tool_call.completed"}',
+                )
+            ),
+            StreamRunEventsResponse(
+                task_event=TaskEvent(
                     event="response.output_text.delta",
                     data='{"type":"response.output_text.delta","delta":"Hel"}',
                 )
@@ -163,7 +175,7 @@ def test_chat_submits_prompt_to_flower_agent_and_streams_response(
             StreamRunEventsResponse(
                 task_event=TaskEvent(
                     event="response.completed",
-                    data='{"type":"response.completed"}',
+                    data='{"type":"response.completed","response":{"id":"resp_2"}}',
                 )
             ),
         ]

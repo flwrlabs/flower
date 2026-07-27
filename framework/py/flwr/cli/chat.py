@@ -61,6 +61,12 @@ _AGENT_PROMPT = f"{_AGENT_COLOR}Agent> "
 def chat() -> None:
     """Start an interactive chat session with the Flower agent."""
     superlink_connection = read_superlink_connection(_SUPERGRID_CONNECTION_NAME)
+    if superlink_connection.insecure:
+        raise click.ClickException(
+            "`flwr chat` requires TLS to be enabled. `insecure` must NOT be set to "
+            "`true` in the federation configuration."
+        )
+
     auth_plugin = _load_logged_in_auth_plugin(superlink_connection)
 
     channel = init_channel_from_connection(superlink_connection, auth_plugin)
@@ -152,7 +158,7 @@ def _start_agent_run(
 
 def _stream_agent_response(stub: ControlStub, run_id: int, status: Status) -> None:
     """Stream one AgentApp response to stdout."""
-    terminal_event_seen = False
+    last_event_was_terminal = False
     response_started = False
     try:
         req = StreamRunEventsRequest(run_id=run_id)
@@ -162,6 +168,7 @@ def _stream_agent_response(stub: ControlStub, run_id: int, status: Status) -> No
                 payload = _load_task_event_data(res.task_event.data)
                 if not event_type:
                     event_type = cast(str, payload.get("type", ""))
+                last_event_was_terminal = event_type in _TERMINAL_EVENTS
 
                 if event_type == _TEXT_DELTA_EVENT:
                     delta = payload.get("delta")
@@ -173,14 +180,11 @@ def _stream_agent_response(stub: ControlStub, run_id: int, status: Status) -> No
                         print(delta, end="", flush=True)
                 elif event_type in _FAILURE_EVENTS:
                     raise click.ClickException(_format_failure_event(payload))
-                elif event_type in _TERMINAL_EVENTS:
-                    terminal_event_seen = True
-                    break
     finally:
         if response_started:
             print(_ANSI_RESET)
 
-    if not terminal_event_seen:
+    if not last_event_was_terminal:
         raise click.ClickException(
             "Chat run ended before the agent response completed."
         )
