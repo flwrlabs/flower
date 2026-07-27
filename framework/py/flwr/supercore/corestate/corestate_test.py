@@ -31,7 +31,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
+from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskEvent,
@@ -200,12 +200,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         return state.store_automation(
             federation_id=federation_id,
             flwr_aid=flwr_aid,
-            fab_id=None,
-            fab_version=None,
-            fab_hash=None,
-            override_config={},
-            federation_config=None,
-            primary_task_type=TaskType.SERVER_APP,
+            start_run_request=StartRunRequest(
+                federation=federation_id,
+                series_id=series_id,
+            ),
             series_id=series_id,
             next_run_at=next_run_at or now().isoformat(),
             fixed_interval=fixed_interval,
@@ -615,6 +613,31 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [automation.automation_id for automation in stopped], [due.automation_id]
         )
         self.assertEqual(stopped[0].next_run_at, due_at)
+
+    @parameterized.expand(  # type: ignore
+        [
+            ("zero_max_runs", None, 0),
+            ("zero_fixed_interval", 0, None),
+            ("multiple_runs_without_interval", None, 2),
+            ("unlimited_runs_without_interval", None, None),
+        ]
+    )
+    def test_store_automation_rejects_invalid_schedule(
+        self,
+        _name: str,
+        fixed_interval: int | None,
+        max_runs: int | None,
+    ) -> None:
+        """Automation storage should reject schedules that cannot advance."""
+        state = self.state_factory()
+
+        with self.assertRaises(ValueError):
+            self.store_automation(
+                state,
+                series_id=1,
+                fixed_interval=fixed_interval,
+                max_runs=max_runs,
+            )
 
     def test_advance_and_finish_automation(self) -> None:
         """Automation advance should update records and finish terminally."""

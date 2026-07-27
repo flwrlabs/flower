@@ -458,6 +458,22 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 ),
                 "The automation start_at value must be a valid ISO 8601 timestamp.",
             ),
+            (
+                "zero_max_runs",
+                StartAutomationRequest(
+                    max_runs=0,
+                    start_run_request=StartRunRequest(series_id=123),
+                ),
+                "`max_runs` must be greater than zero.",
+            ),
+            (
+                "multiple_runs_without_interval",
+                StartAutomationRequest(
+                    max_runs=2,
+                    start_run_request=StartRunRequest(series_id=123),
+                ),
+                "`fixed_interval` is required for automations with multiple runs.",
+            ),
         ]
     )
     def test_start_automation_rejects_invalid_request(
@@ -1010,12 +1026,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         automation = self.state.store_automation(
             federation_id=NOOP_FEDERATION_ID,
             flwr_aid=self.aid,
-            fab_id="flwr/demo",
-            fab_version="v1.0.0",
-            fab_hash="hash123",
-            override_config={},
-            federation_config=None,
-            primary_task_type=TaskType.SERVER_APP,
+            start_run_request=StartRunRequest(
+                federation=NOOP_FEDERATION_ID,
+                series_id=1,
+            ),
             series_id=1,
             next_run_at=now().isoformat(),
             max_runs=1,

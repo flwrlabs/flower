@@ -44,6 +44,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
+from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -208,52 +209,46 @@ class StateTest(CoreStateTest):
         runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
         self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
 
-    def test_dispatch_automation_creates_run_from_stored_template(self) -> None:
-        """Dispatching an automation should create a run from stored inputs."""
+    def test_claim_automation_returns_stored_run_request(self) -> None:
+        """Claiming an automation should return its unresolved run request."""
         state = self.state_factory()
         initial_run_id = create_dummy_run(state, federation_id="@me/health")
         series_id = state.get_run_info(run_ids=[initial_run_id])[0].series_id
         previous_next_run_at = (now() - timedelta(seconds=30)).isoformat()
         next_run_at = (now() + timedelta(seconds=30)).isoformat()
+        start_run_request = StartRunRequest(
+            app_spec="@flwragent/flwr-agent",
+            federation="@me/health",
+            series_id=series_id,
+        )
         automation = state.store_automation(
             federation_id="@me/health",
             flwr_aid="aid-a",
-            fab_id="fab-id",
-            fab_version="1.0.0",
-            fab_hash="fab-hash",
-            override_config={"test_key": "test_value"},
-            federation_config=None,
-            primary_task_type=TaskType.SERVER_APP,
+            start_run_request=start_run_request,
             series_id=series_id,
             next_run_at=previous_next_run_at,
             fixed_interval=60,
             max_runs=2,
         )
 
-        run_id = state.dispatch_automation(
+        claimed = state.claim_automation(
             automation.automation_id,
             previous_next_run_at=previous_next_run_at,
             next_run_at=next_run_at,
         )
 
-        self.assertIsNotNone(run_id)
-        assert run_id is not None
+        self.assertIsNotNone(claimed)
+        assert claimed is not None
+        claimed_request, flwr_aid = claimed
+        self.assertEqual(claimed_request, start_run_request)
+        self.assertEqual(flwr_aid, "aid-a")
         self.assertIsNone(
-            state.dispatch_automation(
+            state.claim_automation(
                 automation.automation_id,
                 previous_next_run_at=previous_next_run_at,
                 next_run_at=next_run_at,
             )
         )
-        run = state.get_run_info(run_ids=[run_id])[0]
-        self.assertEqual(run.federation_id, "@me/health")
-        self.assertEqual(run.flwr_aid, "aid-a")
-        self.assertEqual(run.fab_id, "fab-id")
-        self.assertEqual(run.fab_version, "1.0.0")
-        self.assertEqual(run.fab_hash, "fab-hash")
-        self.assertEqual(run.override_config, {"test_key": "test_value"})
-        self.assertEqual(run.primary_task_type, TaskType.SERVER_APP)
-        self.assertEqual(run.series_id, series_id)
 
         updated = state.list_automations(
             federations=["@me/health"],

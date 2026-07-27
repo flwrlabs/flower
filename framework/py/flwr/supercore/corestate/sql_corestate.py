@@ -30,7 +30,6 @@ from sqlalchemy.exc import IntegrityError
 from flwr.app import Context, Message
 from flwr.app.message import make_message
 from flwr.app.metadata import Metadata
-from flwr.app.user_config import UserConfig
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -44,9 +43,8 @@ from flwr.common.constant import (
 from flwr.common.logger import log
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
-from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
+from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
-from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
@@ -64,15 +62,10 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
-from flwr.supercore.utils import (
-    build_sql_in_params,
-    int64_to_uint64,
-    simulation_config_to_json,
-    uint64_to_int64,
-)
+from flwr.supercore.utils import build_sql_in_params, int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
-from .corestate import CoreState
+from .corestate import CoreState, validate_automation_schedule
 from .utils import (
     context_from_bytes,
     context_to_bytes,
@@ -835,24 +828,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         *,
         federation_id: str,
         flwr_aid: str,
-        fab_id: str | None,
-        fab_version: str | None,
-        fab_hash: str | None,
-        override_config: UserConfig,
-        federation_config: SimulationConfig | None,
-        primary_task_type: str,
+        start_run_request: StartRunRequest,
         series_id: int,
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
-        federation_config_json = None
-        if federation_config is not None:
-            federation_config_json = json.dumps(
-                simulation_config_to_json(federation_config)
-            )
-
+        validate_automation_schedule(fixed_interval, max_runs)
         try:
             with self.session():
                 current = now()
@@ -860,15 +843,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     """
                     INSERT INTO automation (
                         federation_id, status, series_id, flwr_aid,
-                        fab_id, fab_version, fab_hash, override_config,
-                        federation_config, primary_task_type,
+                        start_run_request,
                         created_at, updated_at, next_run_at, fixed_interval,
                         remaining_runs, stopped_at
                     )
                     VALUES (
                         :federation_id, :status, :series_id, :flwr_aid,
-                        :fab_id, :fab_version, :fab_hash, :override_config,
-                        :federation_config, :primary_task_type,
+                        :start_run_request,
                         :created_at, :updated_at, :next_run_at, :fixed_interval,
                         :remaining_runs, :stopped_at
                     )
@@ -879,12 +860,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         "status": AutomationStatus.ACTIVE,
                         "series_id": uint64_to_int64(series_id),
                         "flwr_aid": flwr_aid,
-                        "fab_id": fab_id,
-                        "fab_version": fab_version,
-                        "fab_hash": fab_hash,
-                        "override_config": json.dumps(override_config),
-                        "federation_config": federation_config_json,
-                        "primary_task_type": primary_task_type,
+                        "start_run_request": start_run_request.SerializeToString(),
                         "created_at": current,
                         "updated_at": current,
                         "next_run_at": next_run_at,
@@ -909,6 +885,44 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             fixed_interval=row["fixed_interval"],
             remaining_runs=row["remaining_runs"],
         )
+
+    def claim_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> tuple[StartRunRequest, str] | None:
+        """Claim an automation occurrence and return its unresolved run request."""
+        with self.session():
+            rows = self.query(
+                """
+                SELECT start_run_request, flwr_aid
+                FROM automation
+                WHERE automation_id = :automation_id
+                AND status = :active_status
+                AND start_run_request IS NOT NULL
+                AND next_run_at = :previous_next_run_at
+                AND (remaining_runs IS NULL OR remaining_runs > 0)
+                AND (:next_run_at IS NOT NULL OR remaining_runs <= 1)
+                """,
+                {
+                    "automation_id": automation_id,
+                    "active_status": AutomationStatus.ACTIVE,
+                    "previous_next_run_at": previous_next_run_at,
+                    "next_run_at": next_run_at,
+                },
+            )
+            if not rows or not self.advance_automation(
+                automation_id,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            ):
+                return None
+
+            request = StartRunRequest()
+            request.ParseFromString(rows[0]["start_run_request"])
+            return request, rows[0]["flwr_aid"]
 
     def list_automations(  # pylint: disable=too-many-arguments,too-many-locals,too-many-boolean-expressions
         self,

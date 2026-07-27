@@ -126,9 +126,11 @@ from flwr.supercore.constant import (
     OAUTH_SESSION_TTL,
     RUN_SERIES_DESCRIPTION_MAX_LENGTH,
     ActionType,
+    AutomationStatus,
     RunTime,
     TaskType,
 )
+from flwr.supercore.corestate.corestate import validate_automation_schedule
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
@@ -594,7 +596,17 @@ def start_automation(  # pylint: disable=too-many-locals
         raise FlowerError(
             ApiErrorCode.INVALID_AUTOMATION_REQUEST,
             "StartAutomation requires start_run_request.series_id.",
-            public_details="The run `series_id` is required to start an automation.",
+            public_details="A run series ID is required to start an automation.",
+        )
+    if len(start_run_request.fab.content) > FAB_MAX_SIZE:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "StartAutomation FAB size exceeds the maximum allowed size of "
+            f"{FAB_MAX_SIZE} bytes.",
+            public_details=(
+                f"The FAB must not exceed {FAB_MAX_SIZE} bytes when starting "
+                "an automation."
+            ),
         )
 
     # Resolve the first scheduled run time.
@@ -621,6 +633,14 @@ def start_automation(  # pylint: disable=too-many-locals
         if request.HasField("max_runs")
         else 1 if fixed_interval is None else None
     )
+    try:
+        validate_automation_schedule(fixed_interval, max_runs)
+    except ValueError as e:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            str(e),
+            public_details=str(e),
+        ) from e
 
     # Resolve the account-scoped federation and run configuration.
     flwr_aid = account.flwr_aid
@@ -628,26 +648,16 @@ def start_automation(  # pylint: disable=too-many-locals
     federation_id = _resolve_federation_id(
         state, account.account_name, start_run_request.federation
     )
-    override_config = user_config_from_proto(start_run_request.override_config)
+    stored_start_run_request = StartRunRequest()
+    stored_start_run_request.CopyFrom(start_run_request)
+    stored_start_run_request.federation = federation_id
 
-    # Store embedded FAB content before persisting the automation.
-    fab_hash = start_run_request.fab.hash_str or None
-    if start_run_request.fab.content:
-        fab_file = start_run_request.fab.content
-        fab = Fab(hashlib.sha256(fab_file).hexdigest(), fab_file, {})
-        fab_hash = state.store_fab(fab)
-
-    # Persist the validated automation schedule and run template.
+    # Persist the unresolved run request so dispatch uses the StartRun workflow.
     try:
         automation = state.store_automation(
             federation_id=federation_id,
             flwr_aid=flwr_aid,
-            fab_id=None,
-            fab_version=None,
-            fab_hash=fab_hash,
-            override_config=override_config,
-            federation_config=None,
-            primary_task_type=TaskType.SERVER_APP,
+            start_run_request=stored_start_run_request,
             series_id=start_run_request.series_id,
             next_run_at=next_run_at,
             fixed_interval=fixed_interval,
@@ -658,7 +668,7 @@ def start_automation(  # pylint: disable=too-many-locals
             ApiErrorCode.FAILED_TO_CREATE_RUN,
             "Failed to create automation for "
             f"flwr_aid={flwr_aid}, federation_id={federation_id}, "
-            f"fab_hash={fab_hash}, primary_task_type={TaskType.SERVER_APP}.",
+            f"series_id={start_run_request.series_id}.",
         ) from e
 
     return StartAutomationResponse(
@@ -666,6 +676,52 @@ def start_automation(  # pylint: disable=too-many-locals
         series_id=automation.series_id,
         next_run_at=automation.next_run_at,
     )
+
+
+def dispatch_automation(
+    state: LinkState,
+    automation_id: int,
+    *,
+    previous_next_run_at: str,
+    next_run_at: str | None,
+    fleet_api_type: str | None,
+) -> StartRunResponse | None:
+    """Claim an automation occurrence and execute it through StartRun."""
+    claimed = state.claim_automation(
+        automation_id,
+        previous_next_run_at=previous_next_run_at,
+        next_run_at=next_run_at,
+    )
+    if claimed is None:
+        return None
+
+    request, flwr_aid = claimed
+    try:
+        response = start_run(
+            request,
+            AccountInfo(flwr_aid=flwr_aid, account_name=""),
+            state,
+            fleet_api_type,
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        state.finish_automation(
+            automation_id,
+            status=AutomationStatus.FAILED,
+        )
+        raise
+
+    if not response.HasField("run_id"):
+        state.finish_automation(
+            automation_id,
+            status=AutomationStatus.FAILED,
+        )
+        return None
+    if next_run_at is None:
+        state.finish_automation(
+            automation_id,
+            status=AutomationStatus.COMPLETED,
+        )
+    return response
 
 
 def list_automations(

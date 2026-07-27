@@ -27,7 +27,6 @@ from typing import Literal, cast
 from uuid import uuid4
 
 from flwr.app import Context, Message
-from flwr.app.user_config import UserConfig
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -38,8 +37,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.logger import log
-from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
-from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
@@ -54,7 +52,7 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
-from .corestate import CoreState
+from .corestate import CoreState, validate_automation_schedule
 from .utils import (
     generate_rand_int_from_bytes,
     validate_task_event_data,
@@ -87,12 +85,7 @@ class AutomationRecord:
     """Record containing automation metadata and run template."""
 
     automation: Automation
-    fab_id: str | None
-    fab_version: str | None
-    fab_hash: str | None
-    override_config: UserConfig
-    federation_config: SimulationConfig | None
-    primary_task_type: str
+    start_run_request: StartRunRequest
 
 
 @dataclass
@@ -127,7 +120,7 @@ class InMemoryCoreState(
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.automation_store: dict[int, AutomationRecord] = {}
-        self.lock_automation_store = Lock()
+        self.lock_automation_store = RLock()
         self._next_automation_id = 1
         self.task_store: dict[int, Task] = {}
         # Store task ID to token mapping
@@ -555,18 +548,14 @@ class InMemoryCoreState(
         *,
         federation_id: str,
         flwr_aid: str,
-        fab_id: str | None,
-        fab_version: str | None,
-        fab_hash: str | None,
-        override_config: UserConfig,
-        federation_config: SimulationConfig | None,
-        primary_task_type: str,
+        start_run_request: StartRunRequest,
         series_id: int,
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
+        validate_automation_schedule(fixed_interval, max_runs)
         with self.lock_automation_store:
             current = now()
             automation_id = self._next_automation_id
@@ -584,16 +573,36 @@ class InMemoryCoreState(
                 remaining_runs=max_runs,
             )
 
+            stored_request = StartRunRequest()
+            stored_request.CopyFrom(start_run_request)
             self.automation_store[automation_id] = AutomationRecord(
-                automation=automation,
-                fab_id=fab_id,
-                fab_version=fab_version,
-                fab_hash=fab_hash,
-                override_config=dict(override_config),
-                federation_config=federation_config,
-                primary_task_type=primary_task_type,
+                automation=automation, start_run_request=stored_request
             )
             return automation
+
+    def claim_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> tuple[StartRunRequest, str] | None:
+        """Claim an automation occurrence and return its unresolved run request."""
+        with self.lock_automation_store:
+            record = self.automation_store.get(automation_id)
+            if record is None:
+                return None
+            request = StartRunRequest()
+            request.CopyFrom(record.start_run_request)
+            flwr_aid = record.automation.flwr_aid
+
+            if not self.advance_automation(
+                automation_id,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            ):
+                return None
+            return request, flwr_aid
 
     def list_automations(  # pylint: disable=too-many-arguments,too-many-boolean-expressions
         self,

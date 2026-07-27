@@ -21,9 +21,7 @@ from datetime import datetime
 from typing import Literal
 
 from flwr.app import Context, Message
-from flwr.app.user_config import UserConfig
-from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
-from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
@@ -32,6 +30,20 @@ from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..constant import AutomationStatus
 from ..object_store import ObjectStore
+
+
+def validate_automation_schedule(
+    fixed_interval: int | None, max_runs: int | None
+) -> None:
+    """Validate normalized automation recurrence settings."""
+    if max_runs is not None and max_runs < 1:
+        raise ValueError("`max_runs` must be greater than zero.")
+    if fixed_interval is not None and fixed_interval < 1:
+        raise ValueError("`fixed_interval` must be greater than zero.")
+    if fixed_interval is None and (max_runs is None or max_runs > 1):
+        raise ValueError(
+            "`fixed_interval` is required for automations with multiple runs."
+        )
 
 
 class CoreState(ABC):  # pylint: disable=R0904
@@ -391,12 +403,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         *,
         federation_id: str,
         flwr_aid: str,
-        fab_id: str | None,
-        fab_version: str | None,
-        fab_hash: str | None,
-        override_config: UserConfig,
-        federation_config: SimulationConfig | None,
-        primary_task_type: str,
+        start_run_request: StartRunRequest,
         series_id: int,
         next_run_at: str,
         fixed_interval: int | None = None,
@@ -410,18 +417,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Federation ID the automation belongs to.
         flwr_aid : str
             FLWR account ID used to dispatch the automation.
-        fab_id : str | None
-            FAB ID used by future runs.
-        fab_version : str | None
-            FAB version used by future runs.
-        fab_hash : str | None
-            FAB hash used by future runs.
-        override_config : UserConfig
-            Run override config used by future runs.
-        federation_config : SimulationConfig | None
-            Federation config override used by future runs.
-        primary_task_type : str
-            Primary task type used by future runs.
+        start_run_request : StartRunRequest
+            Unresolved run request to execute for each scheduled occurrence.
         series_id : int
             Run series ID to use when dispatching automation runs.
         next_run_at : str
@@ -439,6 +436,34 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         Automation
             Stored automation metadata.
+        """
+
+    @abstractmethod
+    def claim_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> tuple[StartRunRequest, str] | None:
+        """Claim an automation occurrence and return its unresolved run request.
+
+        Parameters
+        ----------
+        automation_id : int
+            Automation ID to claim.
+        previous_next_run_at : str
+            Previously observed due time timestamp string. The claim only succeeds
+            if the stored `next_run_at` still matches this value.
+        next_run_at : str | None
+            Next due time timestamp string. If `None`, the current occurrence is
+            treated as the last finite occurrence.
+
+        Returns
+        -------
+        tuple[StartRunRequest, str] | None
+            A copy of the stored run request and its FLWR account ID if the claim
+            succeeded, otherwise `None`.
         """
 
     @abstractmethod
