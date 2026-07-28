@@ -78,7 +78,7 @@ def _make_start_automation_tool() -> JSONObject:
                 },
                 "start_at": {
                     "type": "string",
-                    "description": "RFC 3339 start time with timezone.",
+                    "description": "ISO 8601 timestamp indicating when to start.",
                 },
                 "fixed_interval": {
                     "type": "integer",
