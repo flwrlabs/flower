@@ -16,13 +16,35 @@
 
 from datetime import UTC, datetime
 
+from flwr.common.serde import fab_to_proto, user_config_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     StartAutomationFromTaskRequest,
     StartAutomationFromTaskResponse,
 )
+from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.date import isoformat8601_utc, now
 from flwr.supercore.run import Run
+
+
+def derive_start_run_request(
+    state: LinkState,
+    run: Run,
+    automation_task: str,
+) -> StartRunRequest:
+    """Derive a start run request from an authoritative run template."""
+    override_config = dict(run.override_config)
+    override_config["agent.input"] = automation_task
+    fab = state.get_fab(run.fab_hash)
+    federation_config = state.get_federation_config(run.run_id)
+    return StartRunRequest(
+        fab=fab_to_proto(fab) if fab is not None else None,
+        override_config=user_config_to_proto(override_config),
+        override_federation_config=federation_config,
+        federation=run.federation_id,
+        series_id=run.series_id,
+        connector_refs=state.get_run_connector_refs(run_id=run.run_id),
+    )
 
 
 def start_automation_from_run(
@@ -55,17 +77,10 @@ def start_automation_from_run(
     if fixed_interval is None and max_runs is not None:
         raise ValueError("`max_runs` requires `fixed_interval`.")
 
-    override_config = dict(run.override_config)
-    override_config["agent.input"] = automation_task
     automation = state.store_automation(
         federation_id=run.federation_id,
         flwr_aid=run.flwr_aid,
-        fab_id=run.fab_id or None,
-        fab_version=run.fab_version or None,
-        fab_hash=run.fab_hash or None,
-        override_config=override_config,
-        federation_config=state.get_federation_config(run.run_id),
-        primary_task_type=run.primary_task_type,
+        start_run_request=derive_start_run_request(state, run, automation_task),
         series_id=run.series_id,
         next_run_at=isoformat8601_utc(next_run_at),
         fixed_interval=fixed_interval,
