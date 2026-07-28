@@ -46,6 +46,10 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushTaskOutputRequest,
     PushTaskOutputResponse,
 )
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
+)
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
     ConfirmMessageReceivedResponse,
@@ -96,6 +100,16 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state()
         process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
         return super().PullPendingTasks(request, context)
+
+    def StartAutomation(
+        self, request: StartAutomationRequest, context: grpc.ServicerContext
+    ) -> StartAutomationResponse:
+        """Start an automation."""
+        context.abort(
+            grpc.StatusCode.UNIMPLEMENTED,
+            "StartAutomation is not implemented.",
+        )
+        raise RuntimeError("Unreachable code")  # for mypy
 
     def GetNodes(
         self, request: GetNodesRequest, context: grpc.ServicerContext
