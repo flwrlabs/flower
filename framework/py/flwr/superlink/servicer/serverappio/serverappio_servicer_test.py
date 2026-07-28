@@ -36,7 +36,12 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.serde import context_to_proto, message_from_proto
+from flwr.common.serde import (
+    context_to_proto,
+    message_from_proto,
+    user_config_from_proto,
+    user_config_to_proto,
+)
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -512,7 +517,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             "",
             "",
             "",
-            {},
+            {"existing": "value"},
             NOOP_FEDERATION_ID,
             None,
             "",
@@ -522,20 +527,30 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert run.primary_task_id is not None
         servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
 
-        with patch(
-            "flwr.superlink.servicer.serverappio.serverappio_servicer."
-            "get_authenticated_task",
-            return_value=Task(
-                task_id=run.primary_task_id,
-                run_id=run_id,
-                type=task_type,
+        with (
+            patch(
+                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "get_authenticated_task",
+                return_value=Task(
+                    task_id=run.primary_task_id,
+                    run_id=run_id,
+                    type=task_type,
+                ),
             ),
+            patch(
+                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "start_automation",
+                return_value=StartAutomationResponse(
+                    automation_id=1,
+                    series_id=run.series_id,
+                    next_run_at="2026-07-28T12:00:00Z",
+                ),
+            ) as start_automation_mock,
         ):
             response = servicer.StartAutomation(
                 StartAutomationRequest(
                     start_run_request=StartRunRequest(
-                        federation=NOOP_FEDERATION_ID,
-                        series_id=run.series_id,
+                        override_config=user_config_to_proto({"agent.input": "Do work"})
                     )
                 ),
                 Mock(),
@@ -543,6 +558,13 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
         assert isinstance(response, StartAutomationResponse)
         assert response.series_id == run.series_id
+        start_run_request = start_automation_mock.call_args.args[0].start_run_request
+        assert start_run_request.federation == run.federation_id
+        assert start_run_request.series_id == run.series_id
+        assert user_config_from_proto(start_run_request.override_config) == {
+            "existing": "value",
+            "agent.input": "Do work",
+        }
 
     def test_start_automation_rejects_clientapp_task(self) -> None:
         """ClientApp tasks cannot create automations through ServerAppIo."""

@@ -26,14 +26,17 @@ from google.protobuf.json_format import ParseDict
 
 from flwr.agentapp import AgentConnectors, AgentResponses, AgentSession
 from flwr.app import Context, Message
-from flwr.common.serde import message_from_proto, message_to_proto
+from flwr.common.serde import message_from_proto, message_to_proto, user_config_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
 )
-from flwr.proto.control_pb2 import StartAutomationRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartRunRequest,
+)
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
@@ -62,83 +65,16 @@ def _make_start_automation_tool() -> JSONObject:
     return {
         "type": "function",
         "name": _START_AUTOMATION_TOOL_NAME,
-        "description": "Start an automation using a complete run request.",
+        "description": (
+            "Schedule work only when the user explicitly asks for future or "
+            "recurring execution."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
-                "start_run_request": {
-                    "type": "object",
-                    "properties": {
-                        "fab": {
-                            "type": "object",
-                            "properties": {
-                                "hash_str": {"type": "string"},
-                                "content": {
-                                    "type": "string",
-                                    "description": "Base64-encoded FAB content.",
-                                },
-                                "verifications": {
-                                    "type": "object",
-                                    "additionalProperties": {"type": "string"},
-                                },
-                            },
-                            "additionalProperties": False,
-                        },
-                        "override_config": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "object",
-                                "properties": {
-                                    "double": {"type": "number"},
-                                    "uint64": {"type": "integer", "minimum": 0},
-                                    "sint64": {"type": "integer"},
-                                    "bool": {"type": "boolean"},
-                                    "string": {"type": "string"},
-                                    "bytes": {
-                                        "type": "string",
-                                        "description": "Base64-encoded bytes.",
-                                    },
-                                },
-                                "additionalProperties": False,
-                            },
-                        },
-                        "override_federation_config": {
-                            "type": "object",
-                            "properties": {
-                                "num_supernodes": {"type": "integer", "minimum": 0},
-                                "client_resources_num_cpus": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                },
-                                "client_resources_num_gpus": {
-                                    "type": "number",
-                                    "minimum": 0,
-                                },
-                                "backend": {"type": "string"},
-                                "verbose": {"type": "boolean"},
-                                "init_args_num_cpus": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                },
-                                "init_args_num_gpus": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                },
-                                "init_args_logging_level": {"type": "string"},
-                                "init_args_log_to_driver": {"type": "boolean"},
-                            },
-                            "additionalProperties": False,
-                        },
-                        "app_spec": {"type": "string"},
-                        "federation": {"type": "string"},
-                        "series_id": {"type": "integer", "minimum": 1},
-                        "connector_refs": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
-                    },
-                    "required": ["series_id"],
-                    "additionalProperties": False,
+                "input": {
+                    "type": "string",
+                    "description": "The input for each automated run.",
                 },
                 "start_at": {
                     "type": "string",
@@ -159,7 +95,7 @@ def _make_start_automation_tool() -> JSONObject:
                     ),
                 },
             },
-            "required": ["start_run_request"],
+            "required": ["input"],
             "additionalProperties": False,
         },
     }
@@ -397,7 +333,19 @@ class RuntimeAgentResponses(AgentResponses):
 
         self.append_and_push_run_events([automation_event("started")])
         try:
-            request = ParseDict(arguments, StartAutomationRequest())
+            input_value = arguments.get("input")
+            if not isinstance(input_value, str) or not input_value.strip():
+                raise ValueError("Automation input must be a non-empty string.")
+            request_data = dict(arguments)
+            del request_data["input"]
+            request = ParseDict(request_data, StartAutomationRequest())
+            request.start_run_request.CopyFrom(
+                StartRunRequest(
+                    override_config=user_config_to_proto(
+                        {"agent.input": input_value.strip()}
+                    )
+                )
+            )
             response = self._stub.StartAutomation(request)
             output: JSONObject = {
                 "automation_id": response.automation_id,

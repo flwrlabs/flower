@@ -35,19 +35,20 @@ from flwr.supercore.typing import JSONObject
 from .session import RuntimeAgentResponses, _make_start_automation_tool
 
 
-def test_start_automation_tool_uses_control_request() -> None:
-    """Expose the complete Control StartAutomation request."""
+def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
+    """Keep the embedded run request out of the model-facing schema."""
     parameters = _make_start_automation_tool()["parameters"]
 
     assert isinstance(parameters, dict)
     properties = parameters["properties"]
     assert isinstance(properties, dict)
-    assert "start_run_request" in properties
+    assert "input" in properties
+    assert "start_run_request" not in properties
     assert "task" not in properties
 
 
-def test_call_automation_uses_control_request() -> None:
-    """Send the complete Control StartAutomation request to ServerAppIo."""
+def test_call_automation_embeds_input_in_control_request() -> None:
+    """Embed model input in the Control request sent to ServerAppIo."""
     stub = Mock()
     stub.StartAutomation.return_value = StartAutomationResponse(
         automation_id=1,
@@ -61,13 +62,7 @@ def test_call_automation_uses_control_request() -> None:
         context=Mock(),
     )
     arguments: JSONObject = {
-        "start_run_request": {
-            "app_spec": "example/app",
-            "federation": "@account/federation",
-            "series_id": 2,
-            "connector_refs": ["calendar"],
-            "override_config": {"agent.input": {"string": "Do work"}},
-        },
+        "input": "Do work",
         "fixed_interval": 60,
         "max_runs": 3,
     }
@@ -80,11 +75,8 @@ def test_call_automation_uses_control_request() -> None:
 
     request = stub.StartAutomation.call_args.args[0]
     assert isinstance(request, StartAutomationRequest)
-    assert request.start_run_request.app_spec == "example/app"
-    assert request.start_run_request.federation == "@account/federation"
-    assert request.start_run_request.series_id == 2
-    assert list(request.start_run_request.connector_refs) == ["calendar"]
     assert request.start_run_request.override_config["agent.input"].string == "Do work"
+    assert not request.start_run_request.HasField("series_id")
     assert request.fixed_interval == 60
     assert request.max_runs == 3
 
