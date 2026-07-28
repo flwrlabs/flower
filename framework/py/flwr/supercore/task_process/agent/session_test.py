@@ -58,18 +58,20 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         series_id=2,
         next_run_at="2026-07-28T12:00:00Z",
     )
+    start_run_request = StartRunRequest(
+        app_spec="example/app",
+        override_config=user_config_to_proto({"existing": "value"}),
+        federation="@account/federation",
+        series_id=2,
+    )
     responses = RuntimeAgentResponses(
         stub=stub,
         run_id=123,
         task_id=789,
         context=Mock(),
-        start_run_request=StartRunRequest(
-            app_spec="example/app",
-            override_config=user_config_to_proto({"existing": "value"}),
-            federation="@account/federation",
-            series_id=2,
-        ),
+        start_run_request=start_run_request,
     )
+    start_run_request.federation = "@other/federation"
     arguments: JSONObject = {
         "input": "Do work",
         "start_at": "2026-07-28T12:00:00Z",

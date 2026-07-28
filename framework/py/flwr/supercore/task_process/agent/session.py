@@ -176,7 +176,8 @@ class RuntimeAgentResponses(AgentResponses):
         self._context = context
         self._run_id = run_id
         self._task_id = task_id
-        self._start_run_request = start_run_request
+        self._start_run_request = StartRunRequest()
+        self._start_run_request.CopyFrom(start_run_request)
 
     def create(self, request: JSONObject) -> JSONObject:
         """Create a model response through a child model task."""
