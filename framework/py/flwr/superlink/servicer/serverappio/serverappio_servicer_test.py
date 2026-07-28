@@ -57,7 +57,11 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
-from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
+    StartRunRequest,
+)
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
     ConfirmMessageReceivedResponse,
@@ -68,6 +72,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
@@ -494,6 +499,68 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert task.run_id == self._auth_run_id
         assert task.type == TaskType.MODEL
         assert task.model_ref == "models/abc"
+
+    def test_start_automation_enriches_connector_refs(self) -> None:
+        """Enrich connector refs and delegate automation creation."""
+        # Prepare
+        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+        request = StartAutomationRequest(
+            start_run_request=StartRunRequest(connector_refs=["untrusted"])
+        )
+        expected = StartAutomationResponse(automation_id=1)
+
+        # Execute
+        with (
+            patch(
+                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "get_authenticated_task",
+                return_value=Task(
+                    run_id=self._auth_run_id,
+                    type=TaskType.SERVER_APP,
+                ),
+            ),
+            patch(
+                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "start_automation",
+                return_value=expected,
+            ) as start_automation_mock,
+            patch.object(
+                self.state, "get_run_connector_refs", return_value=["calendar"]
+            ),
+        ):
+            response = servicer.StartAutomation(request, Mock())
+
+        # Assert
+        assert response is expected
+        assert list(request.start_run_request.connector_refs) == ["calendar"]
+        assert start_automation_mock.call_args.args[0] is request
+
+    def test_start_automation_rejects_clientapp_task(self) -> None:
+        """ClientApp tasks cannot create automations through ServerAppIo."""
+        # Prepare
+        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+        context = Mock()
+        context.abort.side_effect = RuntimeError("aborted")
+
+        # Execute
+        with (
+            patch(
+                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "get_authenticated_task",
+                return_value=Task(
+                    run_id=self._auth_run_id,
+                    type=TaskType.CLIENT_APP,
+                ),
+            ),
+            self.assertRaisesRegex(RuntimeError, "aborted"),
+        ):
+            servicer.StartAutomation(StartAutomationRequest(), context)
+
+        # Assert
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Only AgentApp and ServerApp tasks can create automations.",
+        )
 
     def test_push_task_output_stores_simulation_runtime(self) -> None:
         """PushTaskOutput should persist Simulation Runtime usage."""

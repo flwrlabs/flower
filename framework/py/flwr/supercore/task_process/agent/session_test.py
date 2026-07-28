@@ -17,17 +17,91 @@
 
 from unittest.mock import Mock, patch
 
+from flwr.common.serde import user_config_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     CreateTaskResponse,
+)
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
+    StartRunRequest,
 )
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
+from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
+from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
+from flwr.supercore.typing import JSONObject
 
 from .session import RuntimeAgentResponses
+
+
+def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
+    """Keep the embedded run request out of the model-facing schema."""
+    # Prepare
+    expected_properties = {"input", "start_at", "fixed_interval", "max_runs"}
+
+    # Execute
+    parameters = get_builtin_connector_tool(START_AUTOMATION_TOOL_NAME)["parameters"]
+
+    # Assert
+    assert isinstance(parameters, dict)
+    properties = parameters["properties"]
+    assert isinstance(properties, dict)
+    assert set(properties) == expected_properties
+    assert parameters["required"] == ["input", "start_at"]
+
+
+def test_call_automation_embeds_input_in_control_request() -> None:
+    """Embed model input in the Control request sent to ServerAppIo."""
+    # Prepare
+    stub = Mock()
+    stub.StartAutomation.return_value = StartAutomationResponse()
+    start_run_request = StartRunRequest(
+        app_spec="example/app",
+        override_config=user_config_to_proto({"existing": "value"}),
+        federation="@account/federation",
+        series_id=2,
+    )
+    responses = RuntimeAgentResponses(
+        stub=stub,
+        run_id=123,
+        task_id=789,
+        context=Mock(),
+        start_run_request=start_run_request,
+    )
+    arguments: JSONObject = {
+        "input": "Do work",
+        "start_at": "2026-07-28T12:00:00Z",
+        "fixed_interval": 60,
+        "max_runs": 3,
+    }
+
+    # Execute
+    with (
+        patch.object(responses, "append_and_push_run_events"),
+        patch.object(responses, "append_context_items"),
+    ):
+        responses.call_automation_with_events(call_id="call-1", arguments=arguments)
+
+    # Assert
+    request = stub.StartAutomation.call_args.args[0]
+    assert request == StartAutomationRequest(
+        start_at="2026-07-28T12:00:00Z",
+        fixed_interval=60,
+        max_runs=3,
+        start_run_request=StartRunRequest(
+            app_spec="example/app",
+            override_config=user_config_to_proto(
+                {"existing": "value", "agent.input": "Do work"}
+            ),
+            federation="@account/federation",
+            series_id=2,
+        ),
+    )
 
 
 def test_create_connector_response_canonicalizes_name() -> None:
@@ -39,6 +113,7 @@ def test_create_connector_response_canonicalizes_name() -> None:
         run_id=123,
         task_id=789,
         context=Mock(),
+        start_run_request=StartRunRequest(),
     )
     reply = ConnectorResponse(
         dst_task_id=789,

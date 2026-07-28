@@ -22,7 +22,7 @@ import json
 import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from logging import ERROR, INFO
 from typing import cast
 
@@ -719,13 +719,17 @@ def start_automation(  # pylint: disable=too-many-locals
     # Resolve the first scheduled run time.
     if request.HasField("start_at"):
         try:
-            next_run_at = datetime.fromisoformat(request.start_at).isoformat()
+            start_at = datetime.fromisoformat(request.start_at)
+            if start_at.tzinfo is None:
+                raise ValueError("Timezone is required.")
+            next_run_at = start_at.astimezone(UTC).isoformat()
         except ValueError as e:
             raise FlowerError(
                 ApiErrorCode.INVALID_AUTOMATION_REQUEST,
                 f"Invalid automation start_at value: {request.start_at}",
                 public_details=(
-                    "The automation start_at value must be a valid ISO 8601 timestamp."
+                    "The automation start_at value must be a valid ISO 8601 "
+                    "timestamp with a timezone."
                 ),
             ) from e
     else:
