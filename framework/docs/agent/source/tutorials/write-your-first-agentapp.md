@@ -7,7 +7,7 @@ it's time to build one of your own. You'll create a small AgentApp, package it
 as a Flower App, and run it with a prompt you choose.
 
 If you haven't already, complete [Get started with Flower
-Agent](get-started-with-flower-agent.md) first. It will help you install Flower
+Agent](get-started-with-flower-agent.md) first. It will help you install `uv`
 and authenticate your CLI with SuperGrid.
 
 ## Create the project
@@ -19,12 +19,20 @@ $ mkdir hello-agent
 $ cd hello-agent
 ```
 
-The finished project contains two files:
+You'll create these files:
 
 ```text
 hello-agent/
+├── .gitignore
 ├── agent.py
 └── pyproject.toml
+```
+
+First, add the virtual environment to `.gitignore` so it isn't scanned when you
+build the Flower App Bundle:
+
+```text
+.venv/
 ```
 
 ## Define the AgentApp
@@ -80,7 +88,11 @@ name = "hello-agent"
 version = "0.1.0"
 description = "My first Flower AgentApp"
 license = "Apache-2.0"
+requires-python = ">=3.11"
 dependencies = ["flwr>=1.33.0,<2.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
 
 [tool.flwr.app]
 publisher = "local"
@@ -98,12 +110,23 @@ The `agentapp` component is an object reference in the form
 The nested `config.agent.input` value becomes the flattened
 `context.run_config["agent.input"]` entry used by the app.
 
+## Create the environment
+
+Use `uv` to resolve the dependencies declared in `pyproject.toml`:
+
+```console
+$ uv sync
+```
+
+`uv` creates a virtual environment in `.venv` and writes a `uv.lock` file. You
+don't need to activate the environment: `uv run` executes commands inside it.
+
 ## Check the bundle
 
 Before sending anything to SuperGrid, build the Flower App Bundle (FAB):
 
 ```console
-$ flwr build
+$ uv run flwr build
 ```
 
 This validates the configuration and component reference before writing a
@@ -115,14 +138,14 @@ start the run.
 Submit the project directory through the `supergrid` connection:
 
 ```console
-$ flwr run . supergrid
+$ uv run flwr run . supergrid
 ```
 
 The default prompt comes from `pyproject.toml`. Override it for one run with
 `--run-config`:
 
 ```console
-$ flwr run . supergrid \
+$ uv run flwr run . supergrid \
     --run-config 'agent.input="Describe photosynthesis for a five-year-old."'
 ```
 
@@ -139,8 +162,8 @@ The app currently makes one model request and then exits. Try changing:
 - the app flow to use the connector loop described in [Using
   connectors](../explanations/using-connectors.md).
 
-Each invocation of `flwr run . supergrid` builds and submits the current local
-project, so saved changes are included in the next run.
+Each invocation of `uv run flwr run . supergrid` builds and submits the current
+local project, so saved changes are included in the next run.
 
 ## Final remarks
 

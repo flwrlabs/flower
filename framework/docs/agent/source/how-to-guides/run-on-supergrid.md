@@ -8,15 +8,18 @@ AgentApp](../tutorials/write-your-first-agentapp.md).
 
 ## Prepare the CLI
 
-First, install or update Flower and authenticate with SuperGrid:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you
+haven't already, then authenticate with SuperGrid:
 
 ```console
-$ pip install -U flwr
-$ flwr login supergrid
+$ uvx flwr login supergrid
 ```
 
 Your SuperGrid account must have access to the Flower Agent runtime. The
 `supergrid` connection is included in Flower's default CLI configuration.
+
+This guide uses `uvx flwr` for standalone CLI commands and `uv run flwr` for
+commands that need a local project's environment.
 
 ## Run the built-in AgentApp
 
@@ -24,7 +27,7 @@ Want to check your setup before submitting your own code? Run Flower's built-in
 AgentApp without a local project:
 
 ```console
-$ flwr run @flwragent/flwr-agent supergrid \
+$ uvx flwr run @flwragent/flwr-agent supergrid \
     --run-config 'agent.input="Summarize the benefits of federated AI."'
 ```
 
@@ -37,14 +40,14 @@ To run your own AgentApp, open a terminal in a project whose `pyproject.toml`
 declares an `agentapp` component:
 
 ```console
-$ flwr run . supergrid
+$ uv run flwr run . supergrid
 ```
 
 Flower validates the project, builds a Flower App Bundle, and submits it with
 the run request. Override configured values for one run with `--run-config`:
 
 ```console
-$ flwr run . supergrid \
+$ uv run flwr run . supergrid \
     --run-config 'agent.input="Compare federated learning and centralized learning."'
 ```
 
@@ -56,7 +59,7 @@ An override key must already exist in the app's
 If your account or deployment requires a specific federation, pass its full ID:
 
 ```console
-$ flwr run . supergrid \
+$ uv run flwr run . supergrid \
     --federation @<account>/<federation-name> \
     --run-config 'agent.input="Hello from this federation."'
 ```
@@ -71,14 +74,14 @@ Once SuperGrid accepts the request, `flwr run` prints a run ID. Keep it handy:
 you can use it to inspect the status and process logs:
 
 ```console
-$ flwr list --run-id <run-id> supergrid
-$ flwr log <run-id> supergrid
+$ uvx flwr list --run-id <run-id> supergrid
+$ uvx flwr log <run-id> supergrid
 ```
 
 Add `--stream` to the original run command to follow logs immediately:
 
 ```console
-$ flwr run . supergrid --stream
+$ uv run flwr run . supergrid --stream
 ```
 
 Process logs show app output and exceptions. Open the run in the SuperGrid
@@ -90,7 +93,7 @@ persisted agent context.
 Stop an active run with:
 
 ```console
-$ flwr stop <run-id> supergrid
+$ uvx flwr stop <run-id> supergrid
 ```
 
 Flower sends a stop request to SuperGrid and records the stopped run status.
@@ -100,8 +103,8 @@ Flower sends a stop request to SuperGrid and records the stopped run status.
 Start with the detailed status and logs:
 
 ```console
-$ flwr list --run-id <run-id> supergrid
-$ flwr log <run-id> supergrid --stream
+$ uvx flwr list --run-id <run-id> supergrid
+$ uvx flwr log <run-id> supergrid --stream
 ```
 
 Common failures include:
@@ -121,5 +124,5 @@ Common failures include:
 To catch configuration and component-reference errors before submission, run:
 
 ```console
-$ flwr build
+$ uv run flwr build
 ```

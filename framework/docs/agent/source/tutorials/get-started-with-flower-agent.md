@@ -16,23 +16,23 @@ releases.
 
 You need:
 
-- Python 3.11 or newer;
+- [uv](https://docs.astral.sh/uv/getting-started/installation/);
 - a Flower SuperGrid account with access to Flower Agent; and
-- a terminal where you can install and run the Flower CLI.
+- a terminal where you can run the Flower CLI.
 
 Let's get started! 🌼
 
-## Install Flower
+## Run Flower with uvx
 
-First, create and activate a virtual environment, then install Flower:
+The `uvx` command runs Flower in an isolated environment, so you don't need to
+create or activate a virtual environment. Check that the CLI is available:
 
 ```console
-$ python -m venv .venv
-$ source .venv/bin/activate
-$ pip install -U flwr
+$ uvx flwr --version
 ```
 
-On Windows, activate the environment with `.venv\Scripts\activate` instead.
+`uvx` downloads Flower the first time you run it and reuses the cached
+environment for later commands.
 
 ## Log in to SuperGrid
 
@@ -40,7 +40,7 @@ Now connect the Flower CLI to your SuperGrid account using the built-in
 `supergrid` connection:
 
 ```console
-$ flwr login supergrid
+$ uvx flwr login supergrid
 ```
 
 Follow the authentication link shown by the command. The CLI stores the
@@ -52,7 +52,7 @@ Run `@flwragent/flwr-agent` and provide the initial prompt through
 `agent.input`:
 
 ```console
-$ flwr run @flwragent/flwr-agent supergrid \
+$ uvx flwr run @flwragent/flwr-agent supergrid \
     --run-config 'agent.input="Explain Flower Agent in one sentence."'
 ```
 
@@ -64,13 +64,13 @@ Open the run in the SuperGrid dashboard to see the response and follow its
 activity. You can also check its status from the terminal:
 
 ```console
-$ flwr list --run-id <run-id> supergrid
+$ uvx flwr list --run-id <run-id> supergrid
 ```
 
 To stream the process logs while starting another run, add `--stream`:
 
 ```console
-$ flwr run @flwragent/flwr-agent supergrid \
+$ uvx flwr run @flwragent/flwr-agent supergrid \
     --run-config 'agent.input="Give me three uses for Flower Agent."' \
     --stream
 ```
@@ -97,10 +97,10 @@ persistent run state.
 
 Congratulations, you've run your first Flower Agent on SuperGrid! 🎉
 
-You installed Flower, authenticated with SuperGrid, started the built-in
-AgentApp with your own prompt, and inspected the resulting run. The same
-runtime will also run AgentApps you write yourself. You only need to provide
-the agent logic and project configuration.
+You ran Flower with `uvx`, authenticated with SuperGrid, started the built-in
+AgentApp with your own prompt, and inspected the resulting run. The same runtime
+will also run AgentApps you write yourself. You only need to provide the agent
+logic and project configuration.
 
 ## Next steps
 
