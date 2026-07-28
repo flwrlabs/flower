@@ -23,7 +23,6 @@ export current_version
 
 # Clean previous output for this version only
 rm -rf "build/html/${DOC_VERSION}"
-rm -rf "build/autosummary/${DOC_VERSION}"
 rm -rf "build/doctrees/${DOC_VERSION}"
 rm -rf "build/source/${DOC_VERSION}"
 
