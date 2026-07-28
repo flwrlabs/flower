@@ -51,6 +51,7 @@ class TelemetryTest(unittest.TestCase):
         If the code does not block duration_actual should be less than
         0.005s.
         """
+
         # Prepare
         def delayed_create_event(*_: object) -> str:
             time.sleep(0.1)
