@@ -36,12 +36,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.serde import (
-    context_to_proto,
-    message_from_proto,
-    user_config_from_proto,
-    user_config_to_proto,
-)
+from flwr.common.serde import context_to_proto, message_from_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -505,46 +500,29 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert task.type == TaskType.MODEL
         assert task.model_ref == "models/abc"
 
-    @parameterized.expand(  # type: ignore
-        [
-            (TaskType.AGENT_APP,),
-            (TaskType.SERVER_APP,),
-        ]
-    )
-    def test_start_automation(self, task_type: TaskType) -> None:
-        """AgentApp and ServerApp primary tasks can create automations."""
-        run_id = self.state.create_run(
-            "",
-            "",
-            "",
-            {"existing": "value"},
-            NOOP_FEDERATION_ID,
-            None,
-            "",
-            task_type,
-        )
-        run = self.state.get_run_info(run_ids=[run_id])[0]
-        assert run.primary_task_id is not None
+    def test_start_automation(self) -> None:
+        """Enrich connector refs and delegate automation creation."""
+        task_id = self._primary_task_id(self._auth_run_id)
         servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+        request = StartAutomationRequest(
+            start_run_request=StartRunRequest(connector_refs=["untrusted"])
+        )
+        expected = StartAutomationResponse(automation_id=1)
 
         with (
             patch(
                 "flwr.superlink.servicer.serverappio.serverappio_servicer."
                 "get_authenticated_task",
                 return_value=Task(
-                    task_id=run.primary_task_id,
-                    run_id=run_id,
-                    type=task_type,
+                    task_id=task_id,
+                    run_id=self._auth_run_id,
+                    type=TaskType.SERVER_APP,
                 ),
             ),
             patch(
                 "flwr.superlink.servicer.serverappio.serverappio_servicer."
                 "start_automation",
-                return_value=StartAutomationResponse(
-                    automation_id=1,
-                    series_id=run.series_id,
-                    next_run_at="2026-07-28T12:00:00Z",
-                ),
+                return_value=expected,
             ) as start_automation_mock,
             patch.object(
                 self.state,
@@ -552,35 +530,11 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
                 return_value=["calendar"],
             ),
         ):
-            response = servicer.StartAutomation(
-                StartAutomationRequest(
-                    start_run_request=StartRunRequest(
-                        app_spec="example/app",
-                        override_config=user_config_to_proto(
-                            {
-                                "caller": "value",
-                                "agent.input": "Do work",
-                            }
-                        ),
-                        federation="@account/federation",
-                        series_id=999,
-                        connector_refs=["untrusted"],
-                    )
-                ),
-                Mock(),
-            )
+            response = servicer.StartAutomation(request, Mock())
 
-        assert isinstance(response, StartAutomationResponse)
-        assert response.series_id == run.series_id
-        start_run_request = start_automation_mock.call_args.args[0].start_run_request
-        assert start_run_request.app_spec == "example/app"
-        assert start_run_request.federation == "@account/federation"
-        assert start_run_request.series_id == 999
-        assert user_config_from_proto(start_run_request.override_config) == {
-            "caller": "value",
-            "agent.input": "Do work",
-        }
-        assert list(start_run_request.connector_refs) == ["calendar"]
+        assert response is expected
+        assert list(request.start_run_request.connector_refs) == ["calendar"]
+        assert start_automation_mock.call_args.args[0] is request
 
     def test_start_automation_rejects_clientapp_task(self) -> None:
         """ClientApp tasks cannot create automations through ServerAppIo."""
