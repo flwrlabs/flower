@@ -78,9 +78,7 @@ def _make_start_automation_tool() -> JSONObject:
                 },
                 "start_at": {
                     "type": "string",
-                    "description": (
-                        "RFC 3339 start time with timezone. Omit to start now."
-                    ),
+                    "description": "RFC 3339 start time with timezone.",
                 },
                 "fixed_interval": {
                     "type": "integer",
@@ -95,7 +93,7 @@ def _make_start_automation_tool() -> JSONObject:
                     ),
                 },
             },
-            "required": ["input"],
+            "required": ["input", "start_at"],
             "additionalProperties": False,
         },
     }
@@ -338,6 +336,9 @@ class RuntimeAgentResponses(AgentResponses):
             input_value = arguments.get("input")
             if not isinstance(input_value, str) or not input_value.strip():
                 raise ValueError("Automation input must be a non-empty string.")
+            start_at = arguments.get("start_at")
+            if not isinstance(start_at, str) or not start_at.strip():
+                raise ValueError("Automation start_at must be a non-empty string.")
             request_data = dict(arguments)
             del request_data["input"]
             request = ParseDict(

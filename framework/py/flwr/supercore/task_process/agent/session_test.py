@@ -47,6 +47,7 @@ def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
     assert "input" in properties
     assert "start_run_request" not in properties
     assert "task" not in properties
+    assert parameters["required"] == ["input", "start_at"]
 
 
 def test_call_automation_embeds_input_in_control_request() -> None:
@@ -71,6 +72,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     )
     arguments: JSONObject = {
         "input": "Do work",
+        "start_at": "2026-07-28T12:00:00Z",
         "fixed_interval": 60,
         "max_runs": 3,
     }
@@ -92,6 +94,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     }
     assert request.fixed_interval == 60
     assert request.max_runs == 3
+    assert request.start_at == "2026-07-28T12:00:00Z"
 
 
 def test_create_connector_response_canonicalizes_name() -> None:
