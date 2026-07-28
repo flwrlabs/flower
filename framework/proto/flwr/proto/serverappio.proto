@@ -22,6 +22,7 @@ import "flwr/proto/log.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/appio.proto";
+import "flwr/proto/control.proto";
 
 service ServerAppIo {
 
@@ -70,9 +71,9 @@ service ServerAppIo {
   // Create a task
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
 
-  // Start an automation using the authenticated AgentApp run as its template
-  rpc StartAutomation(StartAutomationFromTaskRequest)
-      returns (StartAutomationFromTaskResponse) {}
+  // Start an automation
+  rpc StartAutomation(StartAutomationRequest)
+      returns (StartAutomationResponse) {}
 
   // Push task message
   rpc PushTaskMessage(PushTaskMessageRequest)

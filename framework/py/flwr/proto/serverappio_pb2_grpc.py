@@ -4,6 +4,7 @@ import grpc
 import warnings
 
 from flwr.proto import appio_pb2 as flwr_dot_proto_dot_appio__pb2
+from flwr.proto import control_pb2 as flwr_dot_proto_dot_control__pb2
 from flwr.proto import log_pb2 as flwr_dot_proto_dot_log__pb2
 from flwr.proto import message_pb2 as flwr_dot_proto_dot_message__pb2
 from flwr.proto import run_pb2 as flwr_dot_proto_dot_run__pb2
@@ -89,8 +90,8 @@ class ServerAppIoStub(object):
                 _registered_method=True)
         self.StartAutomation = channel.unary_unary(
                 '/flwr.proto.ServerAppIo/StartAutomation',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.StartAutomationFromTaskRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.StartAutomationFromTaskResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_control__pb2.StartAutomationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.StartAutomationResponse.FromString,
                 _registered_method=True)
         self.PushTaskMessage = channel.unary_unary(
                 '/flwr.proto.ServerAppIo/PushTaskMessage',
@@ -220,7 +221,7 @@ class ServerAppIoServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def StartAutomation(self, request, context):
-        """Start an automation using the authenticated AgentApp run as its template
+        """Start an automation
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -341,8 +342,8 @@ def add_ServerAppIoServicer_to_server(servicer, server):
             ),
             'StartAutomation': grpc.unary_unary_rpc_method_handler(
                     servicer.StartAutomation,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.StartAutomationFromTaskRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.StartAutomationFromTaskResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.StartAutomationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.StartAutomationResponse.SerializeToString,
             ),
             'PushTaskMessage': grpc.unary_unary_rpc_method_handler(
                     servicer.PushTaskMessage,
@@ -680,8 +681,8 @@ class ServerAppIo(object):
             request,
             target,
             '/flwr.proto.ServerAppIo/StartAutomation',
-            flwr_dot_proto_dot_appio__pb2.StartAutomationFromTaskRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.StartAutomationFromTaskResponse.FromString,
+            flwr_dot_proto_dot_control__pb2.StartAutomationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.StartAutomationResponse.FromString,
             options,
             channel_credentials,
             insecure,
