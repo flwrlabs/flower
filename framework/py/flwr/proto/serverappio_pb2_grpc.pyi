@@ -20,6 +20,7 @@ limitations under the License.
 import abc
 import collections.abc
 import flwr.proto.appio_pb2
+import flwr.proto.control_pb2
 import flwr.proto.log_pb2
 import flwr.proto.message_pb2
 import flwr.proto.run_pb2
@@ -112,10 +113,10 @@ class ServerAppIoStub:
     """Create a task"""
 
     StartAutomation: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.StartAutomationFromTaskRequest,
-        flwr.proto.appio_pb2.StartAutomationFromTaskResponse,
+        flwr.proto.control_pb2.StartAutomationRequest,
+        flwr.proto.control_pb2.StartAutomationResponse,
     ]
-    """Start an automation using the authenticated AgentApp run as its template"""
+    """Start an automation"""
 
     PushTaskMessage: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushTaskMessageRequest,
@@ -247,10 +248,10 @@ class ServerAppIoAsyncStub:
     """Create a task"""
 
     StartAutomation: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.StartAutomationFromTaskRequest,
-        flwr.proto.appio_pb2.StartAutomationFromTaskResponse,
+        flwr.proto.control_pb2.StartAutomationRequest,
+        flwr.proto.control_pb2.StartAutomationResponse,
     ]
-    """Start an automation using the authenticated AgentApp run as its template"""
+    """Start an automation"""
 
     PushTaskMessage: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushTaskMessageRequest,
@@ -404,10 +405,10 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def StartAutomation(
         self,
-        request: flwr.proto.appio_pb2.StartAutomationFromTaskRequest,
+        request: flwr.proto.control_pb2.StartAutomationRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.StartAutomationFromTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.StartAutomationFromTaskResponse]]:
-        """Start an automation using the authenticated AgentApp run as its template"""
+    ) -> typing.Union[flwr.proto.control_pb2.StartAutomationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.StartAutomationResponse]]:
+        """Start an automation"""
 
     @abc.abstractmethod
     def PushTaskMessage(
