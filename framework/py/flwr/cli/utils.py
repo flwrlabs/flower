@@ -458,8 +458,13 @@ def flwr_cli_grpc_exc_handler(
         # of the FlowerError catalog.
         # pylint: disable-next=E1101
         if e.code() == grpc.StatusCode.UNAUTHENTICATED:
+            superlink = cast(
+                str | None, click.get_current_context().params.get("superlink")
+            )
+            if superlink is None:
+                superlink = read_superlink_connection().name
             raise click.ClickException(
-                "Authentication failed. Please run `flwr login`"
+                f"Authentication failed. Please run `flwr login {superlink}`"
                 " to authenticate and try again."
             ) from None
         if e.code() == grpc.StatusCode.UNAVAILABLE:
