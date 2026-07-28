@@ -507,9 +507,7 @@ class StartAutomationFromTaskRequest(google.protobuf.message.Message):
     MAX_RUNS_FIELD_NUMBER: builtins.int
     task: builtins.str
     start_at: builtins.str
-    """RFC 3339 timestamp. If unset, start immediately."""
     fixed_interval: builtins.int
-    """Fixed interval in seconds. If unset, run once."""
     max_runs: builtins.int
     def __init__(
         self,
