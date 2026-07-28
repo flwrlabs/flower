@@ -173,7 +173,7 @@ def _stop_agent_run(stub: ControlStub, run_id: int) -> None:
         with flwr_cli_grpc_exc_handler():
             stub.StopRun(StopRunRequest(run_id=run_id))
     except click.ClickException:
-        return
+        pass
 
 
 def _stream_agent_response(stub: ControlStub, run_id: int, status: Status) -> None:
