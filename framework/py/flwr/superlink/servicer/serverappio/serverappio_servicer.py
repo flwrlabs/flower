@@ -105,16 +105,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
         return super().PullPendingTasks(request, context)
 
-    def StartAutomation(
-        self, request: StartAutomationRequest, context: grpc.ServicerContext
-    ) -> StartAutomationResponse:
-        """Start an automation."""
-        context.abort(
-            grpc.StatusCode.UNIMPLEMENTED,
-            "StartAutomation is not implemented.",
-        )
-        raise RuntimeError("Unreachable code")  # for mypy
-
     def GetNodes(
         self, request: GetNodesRequest, context: grpc.ServicerContext
     ) -> GetNodesResponse:
