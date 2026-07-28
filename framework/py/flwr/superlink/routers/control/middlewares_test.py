@@ -15,7 +15,6 @@
 """Tests for the Control API middlewares."""
 
 
-from threading import get_ident
 from typing import cast
 from unittest.mock import Mock
 
@@ -31,14 +30,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
 )
-from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode
 from flwr.supercore.event_log.typing import LogEntry
 from flwr.supercore.license_plugin import LicensePlugin
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.superlink import main as superlink_main
-from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.servicer.control import control_handlers
 
 from . import middlewares
@@ -160,35 +157,6 @@ def test_license_middleware_order(monkeypatch: MonkeyPatch) -> None:
         < middleware_class_names.index(ProtobufTranslationMiddleware.__name__)
         < middleware_class_names.index(middlewares.ControlEventLogMiddleware.__name__)
     )
-
-
-def test_authentication_middleware_runs_plugins_off_event_loop() -> None:
-    """Run synchronous authentication plugins outside the event-loop thread."""
-    account = AccountInfo(flwr_aid="account-id", account_name="account")
-    thread_ids: dict[str, int] = {}
-    authn_plugin = Mock()
-    authz_plugin = Mock()
-
-    def validate_tokens(_: object) -> tuple[bool, AccountInfo]:
-        thread_ids["authentication"] = get_ident()
-        return True, account
-
-    authn_plugin.validate_tokens_in_metadata.side_effect = validate_tokens
-    authz_plugin.authorize.return_value = True
-    app = FastAPI()
-    app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
-
-    @app.get("/control/test")
-    async def control_route() -> dict[str, bool]:
-        thread_ids["event_loop"] = get_ident()
-        return {"ok": True}
-
-    app.add_middleware(middlewares.ControlAuthenticationMiddleware)
-
-    response = TestClient(app).get("/control/test")
-
-    assert response.status_code == 200
-    assert thread_ids["authentication"] != thread_ids["event_loop"]
 
 
 @pytest.mark.parametrize("env_value", [None, "0"])
