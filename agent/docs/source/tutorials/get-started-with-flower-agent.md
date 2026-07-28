@@ -109,7 +109,7 @@ logic and project configuration.
 - [Understand the AgentApp
   runtime](../explanations/agentapp-runtime.md) to learn how a run is executed.
 - [Use connectors](../explanations/using-connectors.md) to let a model search
-  the web or work with Notion and Slack.
+  the web.
 
 ```{tip}
 If you get stuck, join the Flower community on [Flower

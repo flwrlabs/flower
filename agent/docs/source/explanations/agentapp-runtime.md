@@ -7,16 +7,31 @@ executes that app and provides model and connector access through an
 
 ## Where your app meets the runtime
 
-An AgentApp project declares one component in `pyproject.toml`:
+A small AgentApp project might look like this:
+
+```text
+flwr-agent/
+├── flwr_agent/
+│   ├── __init__.py
+│   └── agent_app.py
+└── pyproject.toml
+```
+
+The project declares its AgentApp component in `pyproject.toml`:
 
 ```toml
 [tool.flwr.app.components]
-agentapp = "agent:app"
+agentapp = "flwr_agent.agent_app:app"
 ```
 
-The value is an object reference. When a run starts, Flower installs the Flower
-App Bundle (FAB), imports the referenced object, verifies that it is an
-`AgentApp`, and calls its registered main function:
+The value follows the `<module>:<attribute>` format. In this example, Flower
+imports `app` from `flwr_agent/agent_app.py`. See [Configure
+`pyproject.toml`](https://flower.ai/docs/framework/how-to-configure-pyproject-toml.html)
+for more about Flower App components and the files included in a Flower App
+Bundle (FAB).
+
+When a run starts, Flower installs the FAB, imports the referenced object,
+verifies that it is an `AgentApp`, and calls its registered main function:
 
 ```python
 @app.main()
@@ -84,9 +99,23 @@ Open Responses user-message item before calling the AgentApp.
 
 Model output items, connector output items, and built-in connector activity are
 appended to `context.state` by the runtime. This persistence supports run
-inspection, but it does not replace the app's control flow: the app must still
-pass the appropriate input or `previous_response_id` when it makes the next
-model request.
+inspection and lets the app rebuild the input for its next model request. The
+items are stored as JSON strings:
+
+```python
+import json
+
+items_record = context.state.get("items")
+context_items = (
+    [json.loads(item) for item in items_record["json"]]
+    if items_record is not None
+    else []
+)
+```
+
+The default model provider at `api.flower.ai` does not currently support
+continuing a conversation with `previous_response_id`. Pass `context_items` as
+the `input` of each follow-up request instead.
 
 ## Run lifecycle
 
@@ -103,13 +132,13 @@ Now that we've met the main pieces, let's follow a complete AgentApp run:
 1. On an unhandled exception or stop request, Flower records the corresponding
    failed or stopped status.
 
-The model and connector tasks are runtime services, not Python objects created
-by the app. This is why the same AgentApp code can use provider-backed
-capabilities without embedding provider API keys.
-
 ## AgentApp and other Flower Apps
 
-An AgentApp-only bundle does not need `ServerApp` or `ClientApp` components.
-AgentApp runs are handled as agent tasks rather than federated-learning
-simulations. Keep agent orchestration in the AgentApp and declare only the
-dependencies its code imports.
+A Flower App Bundle currently supports either:
+
+- one `agentapp` component; or
+- a `serverapp` and a `clientapp`.
+
+Don't combine an `agentapp` with a `serverapp` or `clientapp` in the same
+bundle. AgentApp runs are handled as agent tasks rather than federated-learning
+simulations.

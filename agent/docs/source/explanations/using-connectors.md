@@ -3,22 +3,15 @@
 Connectors let an AgentApp expose runtime-provided tools to a model without
 embedding their implementation or provider credentials in the app.
 
-For example, an agent can look up public information, find project notes in
-Notion, and review a related discussion in Slack. Flower Agent currently
-provides these connectors:
-
-| Name         | Purpose                                            |
-| ------------ | -------------------------------------------------- |
-| `web_search` | Search the public web for current information.     |
-| `notion`     | Work with content in a connected Notion workspace. |
-| `slack`      | Search and read from a connected Slack workspace.  |
+The examples below use `web_search`, which is available without connecting an
+external account.
 
 ## Give tools to the model
 
 Start by asking the runtime for the tool definitions you want to expose:
 
 ```python
-tools = agent.connectors.tools(["web_search", "notion", "slack"])
+tools = agent.connectors.tools(["web_search"])
 ```
 
 Then include them in a model request:
@@ -27,10 +20,7 @@ Then include them in a model request:
 response = agent.responses.create(
     {
         "model": "openai/gpt-5.5",
-        "input": (
-            "Summarize our latest launch notes from Notion and Slack, "
-            "then verify the public details on the web."
-        ),
+        "input": "Find the latest Flower release and summarize what changed.",
         "tools": tools,
     }
 )
@@ -44,19 +34,31 @@ output, one function call, or multiple function calls.
 
 The AgentApp owns the tool loop. When the model asks to use a connector, your
 app executes the call and gives the result back to the model. For each output
-item whose type is
-`function_call`, call the connector and send the resulting
+item whose type is `function_call`, call the connector and send the resulting
 `function_call_output` items back to the model:
 
+This loop expects `agent.input` in the run configuration. Flower records that
+prompt in `context.state` before the AgentApp starts:
+
 ```python
-tools = agent.connectors.tools(["web_search", "notion", "slack"])
+import json
+
+from flwr.app import Context
+
+
+def load_context_items(context: Context) -> list[dict[str, object]]:
+    """Load the Open Responses items stored by the Flower runtime."""
+    record = context.state.get("items")
+    if record is None:
+        return []
+    return [json.loads(item) for item in record["json"]]
+
+
+tools = agent.connectors.tools(["web_search"])
 response = agent.responses.create(
     {
         "model": "openai/gpt-5.5",
-        "input": (
-            "Summarize our latest launch notes from Notion and Slack, "
-            "then verify the public details on the web."
-        ),
+        "input": load_context_items(context),
         "tools": tools,
     }
 )
@@ -73,14 +75,12 @@ while True:
     if tool_turns == 5:
         raise RuntimeError("Agent exceeded the connector turn limit")
 
-    tool_outputs = [
-        agent.connectors.call(tool_call) for tool_call in tool_calls
-    ]
+    for tool_call in tool_calls:
+        agent.connectors.call(tool_call)
     response = agent.responses.create(
         {
             "model": "openai/gpt-5.5",
-            "input": tool_outputs,
-            "previous_response_id": response["id"],
+            "input": load_context_items(context),
             "tools": tools,
         }
     )
@@ -88,8 +88,9 @@ while True:
 ```
 
 `agent.connectors.call` accepts the function-call item returned by the model. It
-parses the call arguments, starts the connector task, and returns an item with
-the same `call_id`.
+parses the call arguments, starts the connector task, and stores the output in
+the Flower `Context`. The next call to `load_context_items` includes that output
+with the same `call_id`.
 
 The loop allows at most five connector turns. A limit prevents a model from
 repeatedly requesting tools without reaching a final response.
@@ -97,25 +98,16 @@ repeatedly requesting tools without reaching a final response.
 Once the model returns no more function calls, the loop ends and `response`
 contains the final model response.
 
-## Choose the narrowest connector
-
-Each connector has a different job. As a rule of thumb, use:
-
-- `web_search` for public information;
-- `notion` for knowledge stored in a connected Notion workspace;
-- `slack` for messages and discussions in a connected Slack workspace.
+## Choose the narrowest set of connectors
 
 Only expose the connectors the task needs. This gives the model a smaller,
 clearer set of tools to choose from.
 
-## Connect Notion and Slack
-
-Notion and Slack must be connected to your SuperGrid account and available to
-the run before the AgentApp can use them. Flower supplies the connection to the
-runtime, so the AgentApp does not need to handle OAuth tokens or provider
-credentials.
-
-`web_search` does not require an account connection.
+Account-backed connectors have one more boundary: the person starting the run
+chooses which connected OAuth connectors to make available to that run. The
+AgentApp can only use the connectors included by the runner, even if the app
+asks for their tool definitions. Flower supplies the selected connections to
+the runtime, so the app does not handle OAuth tokens or provider credentials.
 
 ## Handle errors
 

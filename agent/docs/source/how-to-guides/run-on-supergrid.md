@@ -21,18 +21,10 @@ Your SuperGrid account must have access to the Flower Agent runtime. The
 This guide uses `uvx flwr` for standalone CLI commands and `uv run flwr` for
 commands that need a local project's environment.
 
-## Run the built-in AgentApp
-
-Want to check your setup before submitting your own code? Run Flower's built-in
-AgentApp without a local project:
-
-```console
-$ uvx flwr run @flwragent/flwr-agent supergrid \
-    --run-config 'agent.input="Summarize the benefits of federated AI."'
-```
-
-`@flwragent/flwr-agent` is resolved by SuperGrid as the built-in AgentApp.
-`agent.input` must be a non-empty string.
+If this is your first Flower Agent run, follow [Get started with Flower
+Agent](../tutorials/get-started-with-flower-agent.md) first. That tutorial uses
+the built-in AgentApp to check your account and CLI setup without a local
+project.
 
 ## Run a local AgentApp
 
@@ -54,9 +46,26 @@ $ uv run flwr run . supergrid \
 An override key must already exist in the app's
 `[tool.flwr.app.config]` configuration.
 
-## Select a federation
+For a longer set of overrides, put them in a TOML file:
 
-If your account or deployment requires a specific federation, pass its full ID:
+```toml
+# run-config.toml
+[agent]
+input = "Compare federated learning and centralized learning."
+```
+
+Then pass the file to `--run-config`:
+
+```console
+$ uv run flwr run . supergrid --run-config run-config.toml
+```
+
+Don't combine a TOML file with inline `--run-config` values in the same command.
+
+## Run in another federation
+
+Every SuperGrid account has a default federation, and the commands above use it
+automatically. To run in another federation, pass its full ID:
 
 ```console
 $ uv run flwr run . supergrid \
@@ -65,8 +74,7 @@ $ uv run flwr run . supergrid \
 ```
 
 The account must be a member of the target federation and entitled to start an
-AgentApp run there. Without `--federation`, SuperGrid resolves the account's
-default federation.
+AgentApp run there.
 
 ## Observe the run
 
@@ -117,7 +125,8 @@ Common failures include:
 - **Missing dependency:** add every imported third-party package to
   `[project].dependencies`.
 - **Unsupported model or connector:** use a model and connector available to
-  the account. Notion and Slack must be connected before the run can use them.
+  the account. Account-backed connectors must be connected and included by the
+  person starting the run.
 - **Federation or entitlement error:** verify the federation ID, membership,
   and Flower Agent access for the account.
 

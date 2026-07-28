@@ -24,7 +24,9 @@ You'll create these files:
 ```text
 hello-agent/
 ├── .gitignore
-├── agent.py
+├── hello_agent/
+│   ├── __init__.py
+│   └── agent_app.py
 └── pyproject.toml
 ```
 
@@ -37,7 +39,8 @@ build the Flower App Bundle:
 
 ## Define the AgentApp
 
-Now create `agent.py`. This file contains the agent logic Flower will run:
+Create an empty `hello_agent/__init__.py`, then add the agent logic Flower will
+run to `hello_agent/agent_app.py`:
 
 ```python
 from flwr.agentapp import AgentApp, AgentSession
@@ -96,19 +99,19 @@ packages = ["."]
 
 [tool.flwr.app]
 publisher = "local"
-fab-include = ["agent.py"]
+fab-include = ["hello_agent/**/*.py"]
 
 [tool.flwr.app.config.agent]
 input = "Explain why flowers turn toward light."
 
 [tool.flwr.app.components]
-agentapp = "agent:app"
+agentapp = "hello_agent.agent_app:app"
 ```
 
 The `agentapp` component is an object reference in the form
-`<module>:<attribute>`. Here, Flower imports the `app` object from `agent.py`.
-The nested `config.agent.input` value becomes the flattened
-`context.run_config["agent.input"]` entry used by the app.
+`<module>:<attribute>`. Here, Flower imports the `app` object from
+`hello_agent/agent_app.py`. The nested `config.agent.input` value becomes the
+flattened `context.run_config["agent.input"]` entry used by the app.
 
 ## Create the environment
 
@@ -177,8 +180,8 @@ You now have all the pieces of a Flower Agent project:
 - a `pyproject.toml` that makes the app discoverable and configurable.
 
 This example deliberately keeps the agent logic small. From here, you can add
-instructions, make multiple model calls, or give the model connectors that let
-it search the web or work with Notion and Slack.
+instructions, make multiple model calls, or give the model a connector that
+lets it search the web.
 
 Continue with [Using connectors](../explanations/using-connectors.md) to build
 your first tool-calling loop.
