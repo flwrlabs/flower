@@ -31,6 +31,7 @@ from flwr.supercore.constant import (
     NOOP_FEDERATION_ID,
     AutomationStatus,
 )
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.superlink.federation import NoOpFederationManager
 
 from .control_handlers import list_automations, start_automation, stop_automation
@@ -51,11 +52,11 @@ class TestAutomationHandlers(unittest.TestCase):
             account_name=NOOP_ACCOUNT_NAME,
         )
 
-    def test_start_automation(self) -> None:
-        """Start an automation."""
+    def test_start_automation_normalizes_start_at_to_utc(self) -> None:
+        """Normalize the automation start time to UTC."""
         # Prepare
         request = StartAutomationRequest(
-            start_at="2026-07-10T09:00:00+00:00",
+            start_at="2026-07-10T04:00:00-05:00",
             fixed_interval=60,
             max_runs=3,
             start_run_request=StartRunRequest(
@@ -79,7 +80,27 @@ class TestAutomationHandlers(unittest.TestCase):
                 automation.fixed_interval,
                 automation.remaining_runs,
             ),
-            (response.series_id, request.start_at, 60, 3),
+            (response.series_id, "2026-07-10T09:00:00+00:00", 60, 3),
+        )
+
+    def test_start_automation_rejects_start_at_without_timezone(self) -> None:
+        """Reject a start time without timezone information."""
+        # Prepare
+        request = StartAutomationRequest(
+            start_at="2026-07-10T09:00:00",
+            start_run_request=StartRunRequest(series_id=1),
+        )
+
+        # Execute
+        with self.assertRaises(FlowerError) as error:
+            start_automation(request, self.account, self.state)
+
+        # Assert
+        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
+        self.assertEqual(
+            error.exception.public_details,
+            "The automation start_at value must be a valid ISO 8601 "
+            "timestamp with a timezone.",
         )
 
     def test_list_automations(self) -> None:
