@@ -1,4 +1,4 @@
-name: Build and deploy baselines, examples, datasets, hub, and model docs
+name: Build and deploy agent, baselines, examples, datasets, hub, and model docs
 
 on:
   push:
@@ -34,6 +34,10 @@ jobs:
           cd framework
           uv sync --locked --all-groups
           uv pip install -e ../datasets
+      - name: Install Agent docs dependencies
+        run: |
+          cd agent
+          uv sync --locked
       - name: Install devtool dependencies
         run: |
           cd dev
@@ -42,6 +46,11 @@ jobs:
         run: |
           cd dev
           uv run --no-sync python -m devtool.update_html_themes
+      - name: Check and build Agent docs
+        run: |
+          cd agent
+          uv run --no-sync mdformat --check docs/README.md docs/source
+          uv run --no-sync sphinx-build -E -a -W --keep-going -b html docs/source docs/build/html
       - name: Build baselines docs
         run: |
           cd framework
@@ -70,6 +79,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.DOCS_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DOCS_AWS_SECRET_KEY_ID }}
         run: |
+          aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./agent/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/agent
           aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./baselines/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/baselines
           aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./examples/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/examples
           aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./datasets/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/datasets
