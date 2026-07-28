@@ -17,7 +17,7 @@
 
 from unittest.mock import Mock, patch
 
-from flwr.common.serde import user_config_from_proto, user_config_to_proto
+from flwr.common.serde import user_config_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     CreateTaskResponse,
@@ -41,25 +41,25 @@ from .session import RuntimeAgentResponses
 
 def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
     """Keep the embedded run request out of the model-facing schema."""
+    # Prepare
+    expected_properties = {"input", "start_at", "fixed_interval", "max_runs"}
+
+    # Execute
     parameters = get_builtin_connector_tool(START_AUTOMATION_TOOL_NAME)["parameters"]
 
+    # Assert
     assert isinstance(parameters, dict)
     properties = parameters["properties"]
     assert isinstance(properties, dict)
-    assert "input" in properties
-    assert "start_run_request" not in properties
-    assert "task" not in properties
+    assert set(properties) == expected_properties
     assert parameters["required"] == ["input", "start_at"]
 
 
 def test_call_automation_embeds_input_in_control_request() -> None:
     """Embed model input in the Control request sent to ServerAppIo."""
+    # Prepare
     stub = Mock()
-    stub.StartAutomation.return_value = StartAutomationResponse(
-        automation_id=1,
-        series_id=2,
-        next_run_at="2026-07-28T12:00:00Z",
-    )
+    stub.StartAutomation.return_value = StartAutomationResponse()
     start_run_request = StartRunRequest(
         app_spec="example/app",
         override_config=user_config_to_proto({"existing": "value"}),
@@ -73,7 +73,6 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         context=Mock(),
         start_run_request=start_run_request,
     )
-    start_run_request.federation = "@other/federation"
     arguments: JSONObject = {
         "input": "Do work",
         "start_at": "2026-07-28T12:00:00Z",
@@ -81,24 +80,28 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         "max_runs": 3,
     }
 
+    # Execute
     with (
         patch.object(responses, "append_and_push_run_events"),
         patch.object(responses, "append_context_items"),
     ):
         responses.call_automation_with_events(call_id="call-1", arguments=arguments)
 
+    # Assert
     request = stub.StartAutomation.call_args.args[0]
-    assert isinstance(request, StartAutomationRequest)
-    assert request.start_run_request.app_spec == "example/app"
-    assert request.start_run_request.federation == "@account/federation"
-    assert request.start_run_request.series_id == 2
-    assert user_config_from_proto(request.start_run_request.override_config) == {
-        "existing": "value",
-        "agent.input": "Do work",
-    }
-    assert request.fixed_interval == 60
-    assert request.max_runs == 3
-    assert request.start_at == "2026-07-28T12:00:00Z"
+    assert request == StartAutomationRequest(
+        start_at="2026-07-28T12:00:00Z",
+        fixed_interval=60,
+        max_runs=3,
+        start_run_request=StartRunRequest(
+            app_spec="example/app",
+            override_config=user_config_to_proto(
+                {"existing": "value", "agent.input": "Do work"}
+            ),
+            federation="@account/federation",
+            series_id=2,
+        ),
+    )
 
 
 def test_create_connector_response_canonicalizes_name() -> None:

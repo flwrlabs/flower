@@ -63,11 +63,7 @@ _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
 class RuntimeAgentSession(AgentSession):
     """AgentSession bound to one AgentApp task."""
 
-    def __init__(
-        self,
-        responses: AgentResponses,
-        connectors: AgentConnectors,
-    ) -> None:
+    def __init__(self, responses: AgentResponses, connectors: AgentConnectors) -> None:
         self._responses = responses
         self._connectors = connectors
 
@@ -108,7 +104,9 @@ class RuntimeAgentConnectors(AgentConnectors):
                 arguments=arguments_obj,
             )
         return self._responses.call_connector_with_events(
-            name=name, call_id=call_id, arguments=arguments_obj
+            name=name,
+            call_id=call_id,
+            arguments=arguments_obj,
         )
 
 
@@ -128,8 +126,7 @@ class RuntimeAgentResponses(AgentResponses):
         self._context = context
         self._run_id = run_id
         self._task_id = task_id
-        self._start_run_request = StartRunRequest()
-        self._start_run_request.CopyFrom(start_run_request)
+        self._start_run_request = start_run_request
 
     def create(self, request: JSONObject) -> JSONObject:
         """Create a model response through a child model task."""
