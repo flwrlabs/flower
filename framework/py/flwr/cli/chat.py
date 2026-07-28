@@ -22,94 +22,77 @@ import click
 import typer
 from rich.console import Console
 from rich.status import Status
+from rich.theme import Theme
 
 from flwr.cli.constant import (
-    CHAT_AGENT_COLOR_HEX,
     CHAT_AGENT_INPUT_KEY,
-    CHAT_AGENT_PROMPT,
-    CHAT_ANSI_RESET,
     CHAT_EXIT_COMMAND,
     CHAT_FAILURE_EVENTS,
     CHAT_FLOWER_AGENT_APP_SPEC,
-    CHAT_LOGIN_REQUIRED_MESSAGE,
     CHAT_SUPERGRID_CONNECTION_NAME,
     CHAT_TERMINAL_EVENTS,
     CHAT_TEXT_DELTA_EVENT,
     CHAT_USER_PROMPT,
 )
 from flwr.cli.flower_config import read_superlink_connection
-from flwr.common.constant import AuthnType
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListFederationsRequest,
     StartRunRequest,
-    StopRunRequest,
     StreamRunEventsRequest,
 )
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.typing import JSONObject
 
-from .utils import (
-    flwr_cli_grpc_exc_handler,
-    get_authn_type,
-    init_channel_from_connection,
-    load_cli_auth_plugin_from_connection,
+from .utils import flwr_cli_grpc_exc_handler, init_channel_from_connection
+
+# Use ANSI color names so terminals can map them to their active palette.
+_CHAT_THEME = Theme(
+    {
+        "user.prompt": "bold blue",
+        "agent.prompt": "bold magenta",
+        "agent.text": "default",
+        "status": "magenta",
+        "notice": "bold",
+        "error": "bold bright_red",
+    }
 )
 
 
 def chat() -> None:
     """Start an interactive chat session with the Flower agent."""
+    console = Console(theme=_CHAT_THEME)
+    console.print(
+        "Note: `flwr chat` is experimental and subject to change.",
+        style="notice",
+    )
     superlink_connection = read_superlink_connection(CHAT_SUPERGRID_CONNECTION_NAME)
 
-    # Reject insecure connections before loading stored auth tokens.
-    if superlink_connection.insecure:
-        raise click.ClickException(
-            "`flwr chat` requires TLS to be enabled. `insecure` must NOT be set to "
-            "`true` in the federation configuration."
-        )
-
-    # Load a logged-in auth plugin or fail before the chat prompt starts.
-    address = superlink_connection.address
-    if address is None:
-        raise click.ClickException(CHAT_LOGIN_REQUIRED_MESSAGE)
-
-    authn_type = get_authn_type(address)
-    if authn_type == AuthnType.NOOP:
-        raise click.ClickException(CHAT_LOGIN_REQUIRED_MESSAGE)
-
-    auth_plugin = load_cli_auth_plugin_from_connection(address, authn_type)
-    auth_plugin.load_tokens()
-    try:
-        auth_plugin.write_tokens_to_metadata([])
-    except click.ClickException as exc:
-        raise click.ClickException(CHAT_LOGIN_REQUIRED_MESSAGE) from exc
-
-    channel = init_channel_from_connection(superlink_connection, auth_plugin)
+    channel = init_channel_from_connection(superlink_connection)
     stub = ControlStub(channel)
     try:
         # Verify stored credentials before showing the interactive prompt.
         with flwr_cli_grpc_exc_handler():
             stub.ListFederations(ListFederationsRequest())
-        typer.secho(
-            f"Flower Chat. Type {CHAT_EXIT_COMMAND} or press Ctrl-D to leave.",
-            fg=typer.colors.BLUE,
+        console.print(
+            f"Flower Chat. Type {CHAT_EXIT_COMMAND} to leave.",
+            style="agent.prompt",
         )
-        _run_interactive_shell(stub, superlink_connection.federation)
+        _run_interactive_shell(stub, superlink_connection.federation, console)
     finally:
         channel.close()
 
 
-def _run_interactive_shell(stub: ControlStub, federation: str | None) -> None:
+def _run_interactive_shell(
+    stub: ControlStub, federation: str | None, console: Console
+) -> None:
     """Run the prompt-response loop."""
     while True:
         try:
             prompt = input(CHAT_USER_PROMPT)
-        except EOFError:
+        except (EOFError, KeyboardInterrupt):
             typer.echo()
             return
-        except KeyboardInterrupt:
-            typer.echo()
-            continue
 
         stripped_prompt = prompt.strip()
         if not stripped_prompt:
@@ -117,46 +100,26 @@ def _run_interactive_shell(stub: ControlStub, federation: str | None) -> None:
         if stripped_prompt.lower() == CHAT_EXIT_COMMAND:
             return
 
-        with Console().status(
-            "Thinking...", spinner="dots", spinner_style=CHAT_AGENT_COLOR_HEX
+        with console.status(
+            "Thinking...", spinner="dots", spinner_style="status"
         ) as status:
-            run_id = None
-            try:
-                # Start one Flower AgentApp run for the submitted prompt.
-                req = StartRunRequest(
-                    app_spec=CHAT_FLOWER_AGENT_APP_SPEC,
-                    override_config=user_config_to_proto(
-                        {CHAT_AGENT_INPUT_KEY: prompt}
-                    ),
-                    federation=federation or "",
-                )
-                with flwr_cli_grpc_exc_handler():
-                    res = stub.StartRun(req)
+            # Start one Flower AgentApp run for the submitted prompt.
+            req = StartRunRequest(
+                app_spec=CHAT_FLOWER_AGENT_APP_SPEC,
+                override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
+                federation=federation or "",
+            )
+            with flwr_cli_grpc_exc_handler():
+                res = stub.StartRun(req)
 
-                if not res.HasField("run_id"):
-                    raise click.ClickException("Failed to start chat run.")
-                run_id = cast(int, res.run_id)
-                _stream_agent_response(stub, run_id, status)
-            except KeyboardInterrupt:
-                status.stop()
-                typer.echo()
-                if run_id is not None:
-                    _stop_agent_run(stub, run_id)
+            if not res.HasField("run_id"):
+                raise click.ClickException("Failed to start chat run.")
+            _stream_agent_response(stub, cast(int, res.run_id), status, console)
 
 
-def _stop_agent_run(stub: ControlStub, run_id: int) -> None:
-    """Stop one interrupted AgentApp run."""
-    try:
-        with flwr_cli_grpc_exc_handler():
-            stub.StopRun(StopRunRequest(run_id=run_id))
-    except click.ClickException as exc:
-        typer.echo(
-            f"Warning: failed to stop: {exc.format_message()}",
-            err=True,
-        )
-
-
-def _stream_agent_response(stub: ControlStub, run_id: int, status: Status) -> None:
+def _stream_agent_response(
+    stub: ControlStub, run_id: int, status: Status, console: Console
+) -> None:
     """Stream one AgentApp response to stdout."""
     terminal_event_seen = False
     response_started = False
@@ -185,9 +148,15 @@ def _stream_agent_response(stub: ControlStub, run_id: int, status: Status) -> No
                     if isinstance(delta, str):
                         if not response_started:
                             status.stop()
-                            print(CHAT_AGENT_PROMPT, end="", flush=True)
+                            console.print("Agent> ", style="agent.prompt", end="")
                             response_started = True
-                        print(delta, end="", flush=True)
+                        console.print(
+                            delta,
+                            style="agent.text",
+                            end="",
+                            markup=False,
+                            highlight=False,
+                        )
                 elif event_type in CHAT_FAILURE_EVENTS:
                     raise click.ClickException(_format_failure_event(payload))
                 elif event_type in CHAT_TERMINAL_EVENTS:
@@ -195,7 +164,7 @@ def _stream_agent_response(stub: ControlStub, run_id: int, status: Status) -> No
                     break
     finally:
         if response_started:
-            print(CHAT_ANSI_RESET)
+            console.print()
 
     if not terminal_event_seen:
         raise click.ClickException(

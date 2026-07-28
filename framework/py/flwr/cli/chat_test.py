@@ -22,7 +22,6 @@ import click
 import pytest
 
 from flwr.cli.typing import SuperLinkConnection
-from flwr.common.constant import AuthnType
 from flwr.common.serde import user_config_from_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartRunResponse,
@@ -39,6 +38,11 @@ def test_chat_requires_login_before_prompt() -> None:
         name="supergrid",
         address="supergrid.flower.ai",
     )
+    channel = Mock()
+    stub = Mock()
+    stub.ListFederations.side_effect = click.ClickException(
+        "Missing authentication tokens. Please login first."
+    )
 
     with (
         patch.object(
@@ -46,13 +50,19 @@ def test_chat_requires_login_before_prompt() -> None:
             "read_superlink_connection",
             return_value=superlink_connection,
         ),
-        patch.object(chat_module, "get_authn_type", return_value=AuthnType.NOOP),
+        patch.object(
+            chat_module,
+            "init_channel_from_connection",
+            return_value=channel,
+        ),
+        patch.object(chat_module, "ControlStub", return_value=stub),
         patch("builtins.input") as mock_input,
     ):
-        with pytest.raises(click.ClickException, match="flwr login supergrid"):
+        with pytest.raises(click.ClickException, match="login first"):
             chat_module.chat()
 
     mock_input.assert_not_called()
+    channel.close.assert_called_once()
 
 
 def test_chat_submits_prompt_to_flower_agent_and_streams_response(
@@ -65,7 +75,6 @@ def test_chat_submits_prompt_to_flower_agent_and_streams_response(
     )
     channel = Mock()
     stub = Mock()
-    auth_plugin = Mock()
     stub.ListFederations.return_value = Mock()
     stub.StartRun.return_value = StartRunResponse(run_id=123)
     stub.StreamRunEvents.return_value = iter(
@@ -96,12 +105,6 @@ def test_chat_submits_prompt_to_flower_agent_and_streams_response(
             chat_module,
             "read_superlink_connection",
             return_value=superlink_connection,
-        ),
-        patch.object(chat_module, "get_authn_type", return_value=AuthnType.OIDC),
-        patch.object(
-            chat_module,
-            "load_cli_auth_plugin_from_connection",
-            return_value=auth_plugin,
         ),
         patch.object(
             chat_module,
