@@ -20,10 +20,7 @@ Then format-check and build the documentation:
 
 ```bash
 uv run --project agent --locked --python=3.11.14 \
-    mdformat --check agent/docs/source
-uv run --project agent --locked --python=3.11.14 \
-    sphinx-build -E -a -W --keep-going -b html \
-    agent/docs/source agent/docs/build/html
+    agent/dev/build-agent-docs.sh
 ```
 
 Open `agent/docs/build/html/index.html` in a browser to view the result.
