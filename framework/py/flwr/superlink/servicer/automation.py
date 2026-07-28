@@ -43,6 +43,7 @@ def derive_start_run_request(
         override_federation_config=federation_config,
         federation=run.federation_id,
         series_id=run.series_id,
+        connector_refs=state.get_run_connector_refs(run_id=run.run_id),
     )
 
 

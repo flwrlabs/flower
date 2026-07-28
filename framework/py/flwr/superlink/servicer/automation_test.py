@@ -35,6 +35,7 @@ def test_derive_start_run_request() -> None:
     federation_config = SimulationConfig(num_supernodes=2)
     state_mock.get_fab.return_value = fab
     state_mock.get_federation_config.return_value = federation_config
+    state_mock.get_run_connector_refs.return_value = ["calendar", "email"]
     run = Run.create_empty(run_id=123)
     run.fab_hash = fab.hash_str
     run.override_config = {"learning-rate": 0.1}
@@ -51,6 +52,7 @@ def test_derive_start_run_request() -> None:
     assert request.override_federation_config == federation_config
     assert request.federation == run.federation_id
     assert request.series_id == run.series_id
+    assert list(request.connector_refs) == ["calendar", "email"]
     assert user_config_from_proto(request.override_config) == {
         "learning-rate": 0.1,
         "agent.input": "Train a model",
@@ -62,6 +64,7 @@ def test_start_automation_from_run_stores_derived_request() -> None:
     state_mock = Mock(spec=LinkState)
     state_mock.get_fab.return_value = None
     state_mock.get_federation_config.return_value = None
+    state_mock.get_run_connector_refs.return_value = []
     state_mock.store_automation.return_value = Automation(
         automation_id=1,
         series_id=456,
