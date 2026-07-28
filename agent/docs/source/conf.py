@@ -15,10 +15,10 @@
 
 """Sphinx configuration for the standalone Flower Agent documentation."""
 
-from datetime import date
+import datetime
 
 project = "Flower Agent"
-copyright = f"{date.today().year} Flower Labs GmbH"
+copyright = f"{datetime.date.today().year} Flower Labs GmbH"
 author = "The Flower Authors"
 
 extensions = ["myst_parser"]
