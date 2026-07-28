@@ -1,18 +1,9 @@
 # Understand the AgentApp runtime
 
-When you run an AgentApp, your code can focus on the agent itself: what the
-model should do, which tools it can use, and when the task is complete. Flower
-takes care of getting that code onto the runtime, connecting it to models and
-connectors, and recording the result.
-
-Two pieces work together:
-
-- your `AgentApp` contains the agent's control flow;
-- the Flower runtime provides model and connector execution through an
-  `AgentSession`.
-
-Let's look at where they meet and follow an AgentApp from submission to
-completion.
+An `AgentApp` contains the control flow for an agent: what the model should do,
+which tools it can use, and when the task is complete. The Flower runtime
+executes that app and provides model and connector access through an
+`AgentSession`.
 
 ## Where your app meets the runtime
 
@@ -36,9 +27,6 @@ def main(agent: AgentSession, context: Context) -> None:
 The function is synchronous. It returns when the app has completed its work. An
 unhandled exception marks the AgentApp task as failed and makes the exception
 message available in the run details and logs.
-
-This boundary keeps your app small: you write the orchestration logic, while
-Flower handles the runtime services around it.
 
 ## AgentSession
 
@@ -125,8 +113,3 @@ An AgentApp-only bundle does not need `ServerApp` or `ClientApp` components.
 AgentApp runs are handled as agent tasks rather than federated-learning
 simulations. Keep agent orchestration in the AgentApp and declare only the
 dependencies its code imports.
-
-The important idea is the separation of responsibilities: your AgentApp
-decides what the agent does, and Flower provides the infrastructure it needs to
-do it. This keeps the app portable while letting the runtime manage execution,
-credentials, events, and persisted state.

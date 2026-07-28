@@ -1,9 +1,7 @@
 # Use connectors
 
-Models are great at understanding a task and deciding what to do next, but
-sometimes they need information or capabilities from the outside world.
-Connectors give an AgentApp a controlled way to provide those capabilities
-without embedding their implementation or provider credentials in the app.
+Connectors let an AgentApp expose runtime-provided tools to a model without
+embedding their implementation or provider credentials in the app.
 
 For example, an agent can search for a recent Flower release, fetch the
 relevant page, and use what it finds in its final response. The current Flower
@@ -91,8 +89,7 @@ The loop allows at most five connector turns. A limit prevents a model from
 repeatedly requesting tools without reaching a final response.
 
 Once the model returns no more function calls, the loop ends and `response`
-contains the final model response. Your app didn't need to implement a search
-client, fetcher, or credential flow—the Flower runtime handled those parts.
+contains the final model response.
 
 ## Choose the narrowest connector
 
@@ -125,10 +122,8 @@ runtime dependency installation.
 
 ## Handle errors
 
-Things don't always go as planned: a page might be unavailable, a search
-provider might time out, or a browser task might fail. Connector failures raise
-an exception in the AgentApp, and Flower records failed built-in connector
-activity before propagating the error.
+Connector calls can fail when a provider or target is unavailable. Flower
+records failed built-in connector activity before propagating the error.
 
 Catch an exception only when the app has a useful fallback, for example trying
 a different source:
@@ -143,6 +138,3 @@ except RuntimeError as exc:
 Do not put secrets in model prompts or connector arguments. Model requests and
 built-in connector activity are recorded as part of the run context for
 inspection.
-
-With this pattern, you can add useful capabilities to an AgentApp while keeping
-the app logic focused on the task you want the agent to accomplish.

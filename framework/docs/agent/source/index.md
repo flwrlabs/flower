@@ -1,14 +1,11 @@
 # Flower Agent
 
-Welcome to Flower Agent! 🌼
-
 Flower Agent provides the runtime and building blocks you need to create
 agentic applications on Flower. An `AgentApp` combines your agent logic with
 runtime-provided access to models and connectors, then runs it as a Flower App
 on SuperGrid.
 
-Whether you're building your first agent or bringing an existing workflow to
-Flower, this documentation will help you:
+This documentation shows you how to:
 
 - build and configure an `AgentApp`;
 - call models and connectors through an `AgentSession`;

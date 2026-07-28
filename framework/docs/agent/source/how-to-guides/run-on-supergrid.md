@@ -1,8 +1,7 @@
 # Run an AgentApp on SuperGrid
 
-Once your AgentApp is ready, SuperGrid gives it a managed place to run. This
-guide collects the commands you need to submit an AgentApp, follow its progress,
-inspect its logs, and stop it when necessary.
+Use SuperGrid to submit an AgentApp, follow its progress, inspect its logs, and
+stop it when necessary.
 
 If you haven't created an AgentApp yet, start with [Write your first
 AgentApp](../tutorials/write-your-first-agentapp.md).
@@ -125,6 +124,3 @@ To catch configuration and component-reference errors before submission, run:
 ```console
 $ flwr build
 ```
-
-That's it! With `flwr run`, `flwr list`, `flwr log`, and `flwr stop`, you have
-the complete CLI workflow for operating an AgentApp on SuperGrid.

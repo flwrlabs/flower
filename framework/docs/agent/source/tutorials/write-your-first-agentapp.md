@@ -112,8 +112,7 @@ start the run.
 
 ## Run the AgentApp
 
-Your AgentApp is ready! Submit the project directory through the `supergrid`
-connection:
+Submit the project directory through the `supergrid` connection:
 
 ```console
 $ flwr run . supergrid
@@ -130,8 +129,6 @@ $ flwr run . supergrid \
 Open the printed run ID in the SuperGrid dashboard to inspect the response and
 run activity.
 
-You did it—you've written and run your first custom AgentApp! 🎉
-
 ## Make it your own
 
 The app currently makes one model request and then exits. Try changing:
@@ -146,6 +143,8 @@ Each invocation of `flwr run . supergrid` builds and submits the current local
 project, so saved changes are included in the next run.
 
 ## Final remarks
+
+Congratulations, you've written and run your first custom AgentApp! 🎉
 
 You now have all the pieces of a Flower Agent project:
 

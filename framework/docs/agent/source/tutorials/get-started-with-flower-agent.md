@@ -20,7 +20,7 @@ You need:
 - a Flower SuperGrid account with access to Flower Agent; and
 - a terminal where you can install and run the Flower CLI.
 
-That's all. Let's get started! 🌼
+Let's get started! 🌼
 
 ## Install Flower
 
@@ -48,8 +48,8 @@ resulting account credentials for later SuperGrid commands.
 
 ## Start the built-in AgentApp
 
-You're ready to launch your first agent! Run `@flwragent/flwr-agent` and provide
-the initial prompt through `agent.input`:
+Run `@flwragent/flwr-agent` and provide the initial prompt through
+`agent.input`:
 
 ```console
 $ flwr run @flwragent/flwr-agent supergrid \
@@ -80,8 +80,8 @@ connector activity remains available on the run page in SuperGrid.
 
 ## What happened
 
-Quite a lot happened behind that one command. It started a Flower App Bundle
-containing an `AgentApp`, and SuperGrid:
+The command started a Flower App Bundle containing an `AgentApp`, and
+SuperGrid:
 
 1. resolved the built-in app;
 1. combined its default configuration with your `agent.input` override;
@@ -99,8 +99,8 @@ Congratulations, you've run your first Flower Agent on SuperGrid! 🎉
 
 You installed Flower, authenticated with SuperGrid, started the built-in
 AgentApp with your own prompt, and inspected the resulting run. The same
-runtime will also run AgentApps you write yourself—you only need to provide the
-agent logic and project configuration.
+runtime will also run AgentApps you write yourself. You only need to provide
+the agent logic and project configuration.
 
 ## Next steps
 
