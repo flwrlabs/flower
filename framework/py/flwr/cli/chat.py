@@ -149,8 +149,11 @@ def _stop_agent_run(stub: ControlStub, run_id: int) -> None:
     try:
         with flwr_cli_grpc_exc_handler():
             stub.StopRun(StopRunRequest(run_id=run_id))
-    except click.ClickException:
-        pass
+    except click.ClickException as exc:
+        typer.echo(
+            f"Warning: failed to stop: {exc.format_message()}",
+            err=True,
+        )
 
 
 def _stream_agent_response(stub: ControlStub, run_id: int, status: Status) -> None:
