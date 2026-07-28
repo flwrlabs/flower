@@ -31,14 +31,12 @@ from flwr.cli.constant import (
     CHAT_EXIT_COMMAND,
     CHAT_FAILURE_EVENTS,
     CHAT_FLOWER_AGENT_APP_SPEC,
-    CHAT_LOGIN_REQUIRED_MESSAGE,
     CHAT_SUPERGRID_CONNECTION_NAME,
     CHAT_TERMINAL_EVENTS,
     CHAT_TEXT_DELTA_EVENT,
     CHAT_USER_PROMPT,
 )
 from flwr.cli.flower_config import read_superlink_connection
-from flwr.common.constant import AuthnType
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListFederationsRequest,
@@ -50,14 +48,15 @@ from flwr.supercore.typing import JSONObject
 
 from .utils import (
     flwr_cli_grpc_exc_handler,
-    get_authn_type,
     init_channel_from_connection,
-    load_cli_auth_plugin_from_connection,
 )
 
 
 def chat() -> None:
     """Start an interactive chat session with the Flower agent."""
+    Console().print(
+        "[yellow]Note: `flwr chat` is experimental and subject to change.[/yellow]"
+    )
     superlink_connection = read_superlink_connection(CHAT_SUPERGRID_CONNECTION_NAME)
 
     # Reject insecure connections before loading stored auth tokens.
@@ -67,23 +66,7 @@ def chat() -> None:
             "`true` in the federation configuration."
         )
 
-    # Load a logged-in auth plugin or fail before the chat prompt starts.
-    address = superlink_connection.address
-    if address is None:
-        raise click.ClickException(CHAT_LOGIN_REQUIRED_MESSAGE)
-
-    authn_type = get_authn_type(address)
-    if authn_type == AuthnType.NOOP:
-        raise click.ClickException(CHAT_LOGIN_REQUIRED_MESSAGE)
-
-    auth_plugin = load_cli_auth_plugin_from_connection(address, authn_type)
-    auth_plugin.load_tokens()
-    try:
-        auth_plugin.write_tokens_to_metadata([])
-    except click.ClickException as exc:
-        raise click.ClickException(CHAT_LOGIN_REQUIRED_MESSAGE) from exc
-
-    channel = init_channel_from_connection(superlink_connection, auth_plugin)
+    channel = init_channel_from_connection(superlink_connection)
     stub = ControlStub(channel)
     try:
         # Verify stored credentials before showing the interactive prompt.
