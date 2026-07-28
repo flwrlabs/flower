@@ -78,7 +78,9 @@ def _make_start_automation_tool() -> JSONObject:
                 },
                 "start_at": {
                     "type": "string",
-                    "description": "ISO 8601 timestamp indicating when to start.",
+                    "description": (
+                        "When to start, for example 2026-07-28T12:00:00+00:00."
+                    ),
                 },
                 "fixed_interval": {
                     "type": "integer",
