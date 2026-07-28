@@ -112,10 +112,9 @@ Common failures include:
 - **Invalid run configuration:** define the key under
   `[tool.flwr.app.config]` before overriding it.
 - **Missing dependency:** add every imported third-party package to
-  `[project].dependencies`; use `flwr[agent]` for the optional Agent connector
-  dependencies.
-- **Unsupported model or connector:** use a model available to the account and
-  one of the connector names exposed by the runtime.
+  `[project].dependencies`.
+- **Unsupported model or connector:** use a model and connector available to
+  the account. Notion and Slack must be connected before the run can use them.
 - **Federation or entitlement error:** verify the federation ID, membership,
   and Flower Agent access for the account.
 

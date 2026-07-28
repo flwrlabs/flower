@@ -3,22 +3,22 @@
 Connectors let an AgentApp expose runtime-provided tools to a model without
 embedding their implementation or provider credentials in the app.
 
-For example, an agent can search for a recent Flower release, fetch the
-relevant page, and use what it finds in its final response. The current Flower
-runtime provides these built-in connectors:
+For example, an agent can look up public information, find project notes in
+Notion, and review a related discussion in Slack. Flower Agent currently
+provides these connectors:
 
-| Name          | Model-facing argument | Purpose                                               |
-| ------------- | --------------------- | ----------------------------------------------------- |
-| `web_search`  | `query`               | Search the web for current information.               |
-| `web_fetch`   | `url`                 | Fetch a public web page and extract readable content. |
-| `browser_use` | `task`                | Use a headless browser to complete a web task.        |
+| Name         | Purpose                                            |
+| ------------ | -------------------------------------------------- |
+| `web_search` | Search the public web for current information.     |
+| `notion`     | Work with content in a connected Notion workspace. |
+| `slack`      | Search and read from a connected Slack workspace.  |
 
 ## Give tools to the model
 
 Start by asking the runtime for the tool definitions you want to expose:
 
 ```python
-tools = agent.connectors.tools(["web_search", "web_fetch"])
+tools = agent.connectors.tools(["web_search", "notion", "slack"])
 ```
 
 Then include them in a model request:
@@ -27,15 +27,18 @@ Then include them in a model request:
 response = agent.responses.create(
     {
         "model": "openai/gpt-5.5",
-        "input": "What changed in the latest Flower release?",
+        "input": (
+            "Summarize our latest launch notes from Notion and Slack, "
+            "then verify the public details on the web."
+        ),
         "tools": tools,
     }
 )
 ```
 
-`tools` returns the registered schemas rather than executing anything. The
-model can respond with normal output, one function call, or multiple function
-calls.
+`tools` returns the registered schemas rather than executing anything. A
+connector can expose several related tools. The model can respond with normal
+output, one function call, or multiple function calls.
 
 ## Execute function calls
 
@@ -46,11 +49,14 @@ item whose type is
 `function_call_output` items back to the model:
 
 ```python
-tools = agent.connectors.tools(["web_search", "web_fetch"])
+tools = agent.connectors.tools(["web_search", "notion", "slack"])
 response = agent.responses.create(
     {
         "model": "openai/gpt-5.5",
-        "input": "Summarize the latest Flower release using primary sources.",
+        "input": (
+            "Summarize our latest launch notes from Notion and Slack, "
+            "then verify the public details on the web."
+        ),
         "tools": tools,
     }
 )
@@ -95,35 +101,27 @@ contains the final model response.
 
 Each connector has a different job. As a rule of thumb, use:
 
-- `web_search` to discover relevant pages;
-- `web_fetch` when the app already has a URL and only needs its readable
-  content;
-- `browser_use` when the task requires interaction or browser-rendered state.
+- `web_search` for public information;
+- `notion` for knowledge stored in a connected Notion workspace;
+- `slack` for messages and discussions in a connected Slack workspace.
 
-`web_fetch` accepts only HTTP or HTTPS URLs and rejects private, local, or
-otherwise non-public destinations. It validates redirect targets as well.
+Only expose the connectors the task needs. This gives the model a smaller,
+clearer set of tools to choose from.
 
-`browser_use` runs headlessly. Its tool schema accepts a natural-language
-`task`; describe both the intended action and the target site precisely.
+## Connect Notion and Slack
 
-## Declare optional dependencies
+Notion and Slack must be connected to your SuperGrid account and available to
+the run before the AgentApp can use them. Flower supplies the connection to the
+runtime, so the AgentApp does not need to handle OAuth tokens or provider
+credentials.
 
-The browser connector and local web content extraction use Flower's optional
-Agent dependencies. If your deployment does not provide them, declare the
-Agent extra in the app:
-
-```toml
-[project]
-dependencies = ["flwr[agent]>=1.33.0,<2.0"]
-```
-
-SuperGrid installs declared app dependencies when the AgentApp runtime supports
-runtime dependency installation.
+`web_search` does not require an account connection.
 
 ## Handle errors
 
-Connector calls can fail when a provider or target is unavailable. Flower
-records failed built-in connector activity before propagating the error.
+Connector calls can fail when a provider or target is unavailable. The call
+raises a `RuntimeError`; if the app does not catch it, the AgentApp task fails
+and the error is available in the run details and logs.
 
 Catch an exception only when the app has a useful fallback, for example trying
 a different source:
@@ -135,6 +133,5 @@ except RuntimeError as exc:
     print(f"Connector failed: {exc}")
 ```
 
-Do not put secrets in model prompts or connector arguments. Model requests and
-built-in connector activity are recorded as part of the run context for
-inspection.
+Do not put secrets in model prompts or connector arguments. The model or
+connected service receives those values when the tool runs.

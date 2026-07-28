@@ -155,7 +155,7 @@ You now have all the pieces of a Flower Agent project:
 
 This example deliberately keeps the agent logic small. From here, you can add
 instructions, make multiple model calls, or give the model connectors that let
-it interact with the web.
+it search the web or work with Notion and Slack.
 
 Continue with [Using connectors](../explanations/using-connectors.md) to build
 your first tool-calling loop.
