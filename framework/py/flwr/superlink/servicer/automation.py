@@ -35,18 +35,15 @@ def derive_start_run_request(
     """Derive a start run request from an authoritative run template."""
     override_config = dict(run.override_config)
     override_config["agent.input"] = automation_task
-    start_run_request = StartRunRequest(
+    fab = state.get_fab(run.fab_hash)
+    federation_config = state.get_federation_config(run.run_id)
+    return StartRunRequest(
+        fab=fab_to_proto(fab) if fab is not None else None,
         override_config=user_config_to_proto(override_config),
+        override_federation_config=federation_config,
         federation=run.federation_id,
         series_id=run.series_id,
     )
-    fab = state.get_fab(run.fab_hash)
-    if fab is not None:
-        start_run_request.fab.CopyFrom(fab_to_proto(fab))
-    federation_config = state.get_federation_config(run.run_id)
-    if federation_config is not None:
-        start_run_request.override_federation_config.CopyFrom(federation_config)
-    return start_run_request
 
 
 def start_automation_from_run(
