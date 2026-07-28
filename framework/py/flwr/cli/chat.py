@@ -46,10 +46,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.typing import JSONObject
 
-from .utils import (
-    flwr_cli_grpc_exc_handler,
-    init_channel_from_connection,
-)
+from .utils import flwr_cli_grpc_exc_handler, init_channel_from_connection
 
 
 def chat() -> None:
