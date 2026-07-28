@@ -20,9 +20,7 @@ from unittest.mock import Mock
 from flwr.common.serde import user_config_from_proto
 from flwr.proto.appio_pb2 import StartAutomationFromTaskRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
-from flwr.proto.federation_config_pb2 import (  # pylint: disable=E0611
-    SimulationConfig,
-)
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.fab import Fab
 from flwr.supercore.run import Run

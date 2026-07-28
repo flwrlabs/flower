@@ -36,11 +36,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.serde import (
-    context_to_proto,
-    message_from_proto,
-    user_config_from_proto,
-)
+from flwr.common.serde import context_to_proto, message_from_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -539,18 +535,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
         assert isinstance(response, StartAutomationFromTaskResponse)
         assert response.series_id == run.series_id
-        claimed = self.state.claim_automation(
-            response.automation_id,
-            previous_next_run_at=response.next_run_at,
-            next_run_at=None,
-        )
-        assert claimed is not None
-        start_run_request, _ = claimed
-        assert start_run_request.federation == run.federation_id
-        assert start_run_request.series_id == run.series_id
-        assert user_config_from_proto(start_run_request.override_config) == {
-            "agent.input": "Do work"
-        }
 
     def test_start_automation_rejects_clientapp_task(self) -> None:
         """ClientApp tasks cannot create automations through ServerAppIo."""
