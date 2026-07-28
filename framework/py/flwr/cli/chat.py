@@ -91,7 +91,7 @@ def chat() -> None:
         with flwr_cli_grpc_exc_handler():
             stub.ListFederations(ListFederationsRequest())
         typer.secho(
-            f"Flower Chat. Type {CHAT_EXIT_COMMAND} to leave.",
+            f"Flower Chat. Type {CHAT_EXIT_COMMAND} or press Ctrl-D to leave.",
             fg=typer.colors.BLUE,
         )
         _run_interactive_shell(stub, superlink_connection.federation)
@@ -104,7 +104,7 @@ def _run_interactive_shell(stub: ControlStub, federation: str | None) -> None:
     while True:
         try:
             prompt = input(CHAT_USER_PROMPT)
-        except (EOFError, KeyboardInterrupt):
+        except EOFError:
             typer.echo()
             return
         except KeyboardInterrupt:
@@ -120,18 +120,28 @@ def _run_interactive_shell(stub: ControlStub, federation: str | None) -> None:
         with Console().status(
             "Thinking...", spinner="dots", spinner_style=CHAT_AGENT_COLOR_HEX
         ) as status:
-            # Start one Flower AgentApp run for the submitted prompt.
-            req = StartRunRequest(
-                app_spec=CHAT_FLOWER_AGENT_APP_SPEC,
-                override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
-                federation=federation or "",
-            )
-            with flwr_cli_grpc_exc_handler():
-                res = stub.StartRun(req)
+            run_id = None
+            try:
+                # Start one Flower AgentApp run for the submitted prompt.
+                req = StartRunRequest(
+                    app_spec=CHAT_FLOWER_AGENT_APP_SPEC,
+                    override_config=user_config_to_proto(
+                        {CHAT_AGENT_INPUT_KEY: prompt}
+                    ),
+                    federation=federation or "",
+                )
+                with flwr_cli_grpc_exc_handler():
+                    res = stub.StartRun(req)
 
-            if not res.HasField("run_id"):
-                raise click.ClickException("Failed to start chat run.")
-            _stream_agent_response(stub, cast(int, res.run_id), status)
+                if not res.HasField("run_id"):
+                    raise click.ClickException("Failed to start chat run.")
+                run_id = cast(int, res.run_id)
+                _stream_agent_response(stub, run_id, status)
+            except KeyboardInterrupt:
+                status.stop()
+                typer.echo()
+                if run_id is not None:
+                    _stop_agent_run(stub, run_id)
 
 
 def _stop_agent_run(stub: ControlStub, run_id: int) -> None:
