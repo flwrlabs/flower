@@ -14,7 +14,7 @@
 # ==============================================================================
 """SQLAlchemy declarative model definitions for CoreState."""
 
-from sqlalchemy import Float, Index, MetaData, String
+from sqlalchemy import Float, Index, LargeBinary, MetaData, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -33,3 +33,13 @@ class NonceStore(FlwrBase):
     namespace: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     nonce: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     expires_at: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class Fab(FlwrBase):
+    """Represent stored FAB contents."""
+
+    __tablename__ = "fab"
+
+    fab_hash: Mapped[str] = mapped_column(String, primary_key=True)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    verifications: Mapped[str] = mapped_column(String, nullable=False)

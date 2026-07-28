@@ -16,6 +16,7 @@
 
 from typing import Any
 
+import pytest
 from sqlalchemy import Column, Table
 
 from flwr.supercore.state.schema.corestate_models import FlwrBase
@@ -68,10 +69,11 @@ def _primary_key_signature(table: Table) -> tuple[str, ...]:
     return tuple(column.name for column in table.primary_key.columns)
 
 
-def test_nonce_store_declarative_model_matches_core_metadata() -> None:
-    """Ensure nonce_store declarative metadata preserves the Core table schema."""
-    core_table = create_corestate_metadata().tables["nonce_store"]
-    model_table = FlwrBase.metadata.tables["nonce_store"]
+@pytest.mark.parametrize("table_name", ["nonce_store", "fab"])
+def test_declarative_model_matches_core_metadata(table_name: str) -> None:
+    """Ensure declarative metadata preserves the Core table schema."""
+    core_table = create_corestate_metadata().tables[table_name]
+    model_table = FlwrBase.metadata.tables[table_name]
 
     assert model_table.name == core_table.name
     assert [_column_signature(column) for column in model_table.columns] == [
