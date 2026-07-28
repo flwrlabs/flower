@@ -45,6 +45,9 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorResponse,
 )
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
+from flwr.supercore.task_process.connector.automation import (
+    START_AUTOMATION_TOOL_NAME,
+)
 from flwr.supercore.task_process.connector.registry import (
     get_builtin_connector_tool,
     has_builtin_connector,
@@ -57,48 +60,6 @@ from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
 _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
-_START_AUTOMATION_TOOL_NAME = "start_automation"
-
-
-def _make_start_automation_tool() -> JSONObject:
-    """Return the model-facing start-automation tool schema."""
-    return {
-        "type": "function",
-        "name": _START_AUTOMATION_TOOL_NAME,
-        "description": (
-            "Schedule work only when the user explicitly asks for future or "
-            "recurring execution."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "input": {
-                    "type": "string",
-                    "description": "The input for each automated run.",
-                },
-                "start_at": {
-                    "type": "string",
-                    "description": (
-                        "When to start, for example 2026-07-28T12:00:00+00:00."
-                    ),
-                },
-                "fixed_interval": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "description": "Seconds between runs. Omit for one execution.",
-                },
-                "max_runs": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "description": (
-                        "Maximum executions. Valid only with fixed_interval."
-                    ),
-                },
-            },
-            "required": ["input", "start_at"],
-            "additionalProperties": False,
-        },
-    }
 
 
 class RuntimeAgentSession(AgentSession):
@@ -131,14 +92,7 @@ class RuntimeAgentConnectors(AgentConnectors):
 
     def tools(self, names: Sequence[str]) -> list[JSONObject]:
         """Return model-facing schemas for built-in tools."""
-        return [
-            (
-                _make_start_automation_tool()
-                if name == _START_AUTOMATION_TOOL_NAME
-                else get_builtin_connector_tool(name)
-            )
-            for name in names
-        ]
+        return [get_builtin_connector_tool(name) for name in names]
 
     def call(self, tool_call: JSONObject) -> JSONObject:
         """Execute one model function_call and return a function_call_output item."""
@@ -150,7 +104,7 @@ class RuntimeAgentConnectors(AgentConnectors):
         call_id = cast(str, tool_call["call_id"])
         arguments_obj = cast(JSONObject, arguments)
 
-        if name == _START_AUTOMATION_TOOL_NAME:
+        if name == START_AUTOMATION_TOOL_NAME:
             return self._responses.call_automation_with_events(
                 call_id=call_id,
                 arguments=arguments_obj,
@@ -322,7 +276,7 @@ class RuntimeAgentResponses(AgentResponses):
             event: JSONObject = {
                 "type": f"response.tool_call.{status}",
                 "tool_call_id": call_id,
-                "tool_name": _START_AUTOMATION_TOOL_NAME,
+                "tool_name": START_AUTOMATION_TOOL_NAME,
                 "arguments": arguments,
             }
             if status == "completed":

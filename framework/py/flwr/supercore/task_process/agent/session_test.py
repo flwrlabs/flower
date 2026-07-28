@@ -32,14 +32,18 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
+from flwr.supercore.task_process.connector.automation import (
+    START_AUTOMATION_TOOL_NAME,
+)
+from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject
 
-from .session import RuntimeAgentResponses, _make_start_automation_tool
+from .session import RuntimeAgentResponses
 
 
 def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
     """Keep the embedded run request out of the model-facing schema."""
-    parameters = _make_start_automation_tool()["parameters"]
+    parameters = get_builtin_connector_tool(START_AUTOMATION_TOOL_NAME)["parameters"]
 
     assert isinstance(parameters, dict)
     properties = parameters["properties"]
