@@ -22,7 +22,7 @@ import json
 import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import ERROR, INFO
 from typing import cast
 
@@ -809,8 +809,7 @@ def dispatch_automation(
     *,
     previous_next_run_at: str,
     next_run_at: str | None,
-    fleet_api_type: str | None,
-) -> StartRunResponse | None:
+) -> None:
     """Claim an automation occurrence and execute it through StartRun."""
     claimed = state.claim_automation(
         automation_id,
@@ -818,7 +817,7 @@ def dispatch_automation(
         next_run_at=next_run_at,
     )
     if claimed is None:
-        return None
+        return
 
     request, flwr_aid = claimed
     try:
@@ -826,27 +825,51 @@ def dispatch_automation(
             request,
             AccountInfo(flwr_aid=flwr_aid, account_name=""),
             state,
-            fleet_api_type,
+            None,
         )
-    except Exception:  # pylint: disable=broad-exception-caught
+    except Exception as exc:  # pylint: disable=broad-exception-caught
         state.finish_automation(
             automation_id,
             status=AutomationStatus.FAILED,
         )
-        raise
+        log(ERROR, "Failing automation %d: %s", automation_id, exc)
+        return
 
-    if not response.HasField("run_id"):
-        state.finish_automation(
-            automation_id,
-            status=AutomationStatus.FAILED,
+    state.finish_automation(
+        automation_id,
+        status=(
+            AutomationStatus.COMPLETED
+            if response.HasField("run_id")
+            else AutomationStatus.FAILED
+        ),
+    )
+
+
+def process_due_automations(
+    state: LinkState,
+    *,
+    limit: int,
+) -> None:
+    """Dispatch due automations."""
+    due_automations = state.list_automations(
+        statuses=[AutomationStatus.ACTIVE],
+        due_before=now(),
+        order_by="next_run_at",
+        limit=limit,
+    )
+
+    for automation in due_automations:
+        next_run_at = (
+            datetime.fromisoformat(automation.next_run_at)
+            + timedelta(seconds=automation.fixed_interval)
+        ).isoformat()
+
+        dispatch_automation(
+            state,
+            automation.automation_id,
+            previous_next_run_at=automation.next_run_at,
+            next_run_at=next_run_at,
         )
-        return None
-    if next_run_at is None:
-        state.finish_automation(
-            automation_id,
-            status=AutomationStatus.COMPLETED,
-        )
-    return response
 
 
 def list_automations(

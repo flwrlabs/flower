@@ -37,6 +37,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullPendingTasksRequest,
+    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
@@ -58,7 +60,7 @@ from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.utils.validator import validate_message
-from flwr.supercore.constant import TaskType
+from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
@@ -68,6 +70,7 @@ from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supercore.servicer.appio import AppIoServicer
 from flwr.superlink.servicer.automation import start_automation_from_run
+from flwr.superlink.servicer.control.control_handlers import process_due_automations
 
 SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE = (
     "Some ServerAppIo API endpoints are only available for Deployment Runtime runs."
@@ -88,6 +91,14 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
     def state(self) -> LinkState:
         """Return the LinkState instance."""
         return self.state_factory.state()
+
+    def PullPendingTasks(
+        self, request: PullPendingTasksRequest, context: grpc.ServicerContext
+    ) -> PullPendingTasksResponse:
+        """Process due automations, then pull pending tasks."""
+        state = self.state()
+        process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
+        return super().PullPendingTasks(request, context)
 
     def GetNodes(
         self, request: GetNodesRequest, context: grpc.ServicerContext
