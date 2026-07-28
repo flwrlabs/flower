@@ -56,13 +56,6 @@ def chat() -> None:
     )
     superlink_connection = read_superlink_connection(CHAT_SUPERGRID_CONNECTION_NAME)
 
-    # Reject insecure connections before loading stored auth tokens.
-    if superlink_connection.insecure:
-        raise click.ClickException(
-            "`flwr chat` requires TLS to be enabled. `insecure` must NOT be set to "
-            "`true` in the federation configuration."
-        )
-
     channel = init_channel_from_connection(superlink_connection)
     stub = ControlStub(channel)
     try:
