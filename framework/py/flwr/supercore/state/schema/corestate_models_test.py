@@ -18,7 +18,7 @@ from typing import Any
 
 from sqlalchemy import Column, Table
 
-from flwr.supercore.state.schema.corestate_models import FlowerBase
+from flwr.supercore.state.schema.corestate_models import FlwrBase
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 
 
@@ -71,7 +71,7 @@ def _primary_key_signature(table: Table) -> tuple[str, ...]:
 def test_nonce_store_declarative_model_matches_core_metadata() -> None:
     """Ensure nonce_store declarative metadata preserves the Core table schema."""
     core_table = create_corestate_metadata().tables["nonce_store"]
-    model_table = FlowerBase.metadata.tables["nonce_store"]
+    model_table = FlwrBase.metadata.tables["nonce_store"]
 
     assert model_table.name == core_table.name
     assert [_column_signature(column) for column in model_table.columns] == [

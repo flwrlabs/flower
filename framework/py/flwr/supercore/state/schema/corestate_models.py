@@ -18,13 +18,13 @@ from sqlalchemy import Float, Index, MetaData, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
-class FlowerBase(DeclarativeBase):
+class FlwrBase(DeclarativeBase):
     """Base class for Flower OSS state models."""
 
     metadata = MetaData()
 
 
-class NonceStore(FlowerBase):
+class NonceStore(FlwrBase):
     """Represent stored nonces for replay protection."""
 
     __tablename__ = "nonce_store"
