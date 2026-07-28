@@ -30,8 +30,6 @@ from flwr.common.serde import (
     message_from_proto,
     message_to_proto,
     run_to_proto,
-    user_config_from_proto,
-    user_config_to_proto,
 )
 from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -51,7 +49,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
     StartAutomationResponse,
-    StartRunRequest,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -74,7 +71,6 @@ from flwr.supercore.inflatable.inflatable_object import (
 )
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
-from flwr.supercore.run import Run
 from flwr.supercore.servicer.appio import AppIoServicer
 from flwr.superlink.servicer.control.control_handlers import (
     process_due_automations,
@@ -84,35 +80,6 @@ from flwr.superlink.servicer.control.control_handlers import (
 SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE = (
     "Some ServerAppIo API endpoints are only available for Deployment Runtime runs."
 )
-
-
-def _embed_automation_run_request(
-    request: StartAutomationRequest,
-    state: LinkState,
-    run: Run,
-) -> StartAutomationRequest:
-    """Embed the authenticated run template into an automation request."""
-    requested_config = user_config_from_proto(request.start_run_request.override_config)
-    input_value = requested_config.get("agent.input")
-    if not isinstance(input_value, str) or not input_value.strip():
-        raise ValueError("Automation input must be a non-empty string.")
-
-    override_config = dict(run.override_config)
-    override_config["agent.input"] = input_value.strip()
-    fab = state.get_fab(run.fab_hash)
-    embedded = StartAutomationRequest()
-    embedded.CopyFrom(request)
-    embedded.start_run_request.CopyFrom(
-        StartRunRequest(
-            fab=fab_to_proto(fab) if fab is not None else None,
-            override_config=user_config_to_proto(override_config),
-            override_federation_config=state.get_federation_config(run.run_id),
-            federation=run.federation_id,
-            series_id=run.series_id,
-            connector_refs=state.get_run_connector_refs(run_id=run.run_id),
-        )
-    )
-    return embedded
 
 
 class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoServicer):
@@ -376,19 +343,18 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
         state = self.state_factory.state()
         run = state.get_run_info(run_ids=[task.run_id])[0]
-        try:
-            embedded = _embed_automation_run_request(request, state, run)
-            return start_automation(
-                embedded,
-                AccountInfo(
-                    flwr_aid=run.flwr_aid,
-                    account_name=run.account_name,
-                ),
-                state,
-            )
-        except ValueError as exc:
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
-            raise RuntimeError("Unreachable code") from exc
+        del request.start_run_request.connector_refs[:]
+        request.start_run_request.connector_refs.extend(
+            state.get_run_connector_refs(run_id=run.run_id)
+        )
+        return start_automation(
+            request,
+            AccountInfo(
+                flwr_aid=run.flwr_aid,
+                account_name=run.account_name,
+            ),
+            state,
+        )
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext

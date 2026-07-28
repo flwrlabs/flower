@@ -546,11 +546,25 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
                     next_run_at="2026-07-28T12:00:00Z",
                 ),
             ) as start_automation_mock,
+            patch.object(
+                self.state,
+                "get_run_connector_refs",
+                return_value=["calendar"],
+            ),
         ):
             response = servicer.StartAutomation(
                 StartAutomationRequest(
                     start_run_request=StartRunRequest(
-                        override_config=user_config_to_proto({"agent.input": "Do work"})
+                        app_spec="example/app",
+                        override_config=user_config_to_proto(
+                            {
+                                "caller": "value",
+                                "agent.input": "Do work",
+                            }
+                        ),
+                        federation="@account/federation",
+                        series_id=999,
+                        connector_refs=["untrusted"],
                     )
                 ),
                 Mock(),
@@ -559,12 +573,14 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert isinstance(response, StartAutomationResponse)
         assert response.series_id == run.series_id
         start_run_request = start_automation_mock.call_args.args[0].start_run_request
-        assert start_run_request.federation == run.federation_id
-        assert start_run_request.series_id == run.series_id
+        assert start_run_request.app_spec == "example/app"
+        assert start_run_request.federation == "@account/federation"
+        assert start_run_request.series_id == 999
         assert user_config_from_proto(start_run_request.override_config) == {
-            "existing": "value",
+            "caller": "value",
             "agent.input": "Do work",
         }
+        assert list(start_run_request.connector_refs) == ["calendar"]
 
     def test_start_automation_rejects_clientapp_task(self) -> None:
         """ClientApp tasks cannot create automations through ServerAppIo."""

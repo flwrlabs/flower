@@ -26,7 +26,12 @@ from google.protobuf.json_format import ParseDict
 
 from flwr.agentapp import AgentConnectors, AgentResponses, AgentSession
 from flwr.app import Context, Message
-from flwr.common.serde import message_from_proto, message_to_proto, user_config_to_proto
+from flwr.common.serde import (
+    message_from_proto,
+    message_to_proto,
+    user_config_from_proto,
+    user_config_to_proto,
+)
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     PullTaskMessageRequest,
@@ -170,11 +175,14 @@ class RuntimeAgentResponses(AgentResponses):
         run_id: int,
         task_id: int,
         context: Context,
+        start_run_request: StartRunRequest,
     ) -> None:
         self._stub = stub
         self._context = context
         self._run_id = run_id
         self._task_id = task_id
+        self._start_run_request = StartRunRequest()
+        self._start_run_request.CopyFrom(start_run_request)
 
     def create(self, request: JSONObject) -> JSONObject:
         """Create a model response through a child model task."""
@@ -339,13 +347,14 @@ class RuntimeAgentResponses(AgentResponses):
             request_data = dict(arguments)
             del request_data["input"]
             request = ParseDict(request_data, StartAutomationRequest())
-            request.start_run_request.CopyFrom(
-                StartRunRequest(
-                    override_config=user_config_to_proto(
-                        {"agent.input": input_value.strip()}
-                    )
-                )
-            )
+            start_run_request = StartRunRequest()
+            start_run_request.CopyFrom(self._start_run_request)
+            override_config = user_config_from_proto(start_run_request.override_config)
+            override_config["agent.input"] = input_value.strip()
+            start_run_request.override_config.clear()
+            for key, value in user_config_to_proto(override_config).items():
+                start_run_request.override_config[key].CopyFrom(value)
+            request.start_run_request.CopyFrom(start_run_request)
             response = self._stub.StartAutomation(request)
             output: JSONObject = {
                 "automation_id": response.automation_id,
