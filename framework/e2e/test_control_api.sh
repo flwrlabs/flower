@@ -76,7 +76,7 @@ combined_args="$server_arg $server_auth $simulation_arg"
 timeout 2m flower-superlink $combined_args &
 sleep 1
 sl_pid=$(pgrep -f "flower-superlink")
-sleep 2
+# sleep 0.1
 
 # Trigger migration
 flwr ls ../numpy-ci e2e || true
