@@ -21,13 +21,72 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     CreateTaskResponse,
 )
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
+)
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
+from flwr.supercore.typing import JSONObject
 
-from .session import RuntimeAgentResponses
+from .session import RuntimeAgentResponses, _make_start_automation_tool
+
+
+def test_start_automation_tool_uses_control_request() -> None:
+    """Expose the complete Control StartAutomation request."""
+    parameters = _make_start_automation_tool()["parameters"]
+
+    assert isinstance(parameters, dict)
+    properties = parameters["properties"]
+    assert isinstance(properties, dict)
+    assert "start_run_request" in properties
+    assert "task" not in properties
+
+
+def test_call_automation_uses_control_request() -> None:
+    """Send the complete Control StartAutomation request to ServerAppIo."""
+    stub = Mock()
+    stub.StartAutomation.return_value = StartAutomationResponse(
+        automation_id=1,
+        series_id=2,
+        next_run_at="2026-07-28T12:00:00Z",
+    )
+    responses = RuntimeAgentResponses(
+        stub=stub,
+        run_id=123,
+        task_id=789,
+        context=Mock(),
+    )
+    arguments: JSONObject = {
+        "start_run_request": {
+            "app_spec": "example/app",
+            "federation": "@account/federation",
+            "series_id": 2,
+            "connector_refs": ["calendar"],
+            "override_config": {"agent.input": {"string": "Do work"}},
+        },
+        "fixed_interval": 60,
+        "max_runs": 3,
+    }
+
+    with (
+        patch.object(responses, "append_and_push_run_events"),
+        patch.object(responses, "append_context_items"),
+    ):
+        responses.call_automation_with_events(call_id="call-1", arguments=arguments)
+
+    request = stub.StartAutomation.call_args.args[0]
+    assert isinstance(request, StartAutomationRequest)
+    assert request.start_run_request.app_spec == "example/app"
+    assert request.start_run_request.federation == "@account/federation"
+    assert request.start_run_request.series_id == 2
+    assert list(request.start_run_request.connector_refs) == ["calendar"]
+    assert request.start_run_request.override_config["agent.input"].string == "Do work"
+    assert request.fixed_interval == 60
+    assert request.max_runs == 3
 
 
 def test_create_connector_response_canonicalizes_name() -> None:

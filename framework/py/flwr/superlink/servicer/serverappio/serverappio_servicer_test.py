@@ -56,10 +56,12 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
-    StartAutomationFromTaskRequest,
-    StartAutomationFromTaskResponse,
 )
-from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
+    StartRunRequest,
+)
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
     ConfirmMessageReceivedResponse,
@@ -530,10 +532,16 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             ),
         ):
             response = servicer.StartAutomation(
-                StartAutomationFromTaskRequest(task="Do work"), Mock()
+                StartAutomationRequest(
+                    start_run_request=StartRunRequest(
+                        federation=NOOP_FEDERATION_ID,
+                        series_id=run.series_id,
+                    )
+                ),
+                Mock(),
             )
 
-        assert isinstance(response, StartAutomationFromTaskResponse)
+        assert isinstance(response, StartAutomationResponse)
         assert response.series_id == run.series_id
 
     def test_start_automation_rejects_clientapp_task(self) -> None:
@@ -554,9 +562,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             ),
             self.assertRaisesRegex(RuntimeError, "aborted"),
         ):
-            servicer.StartAutomation(
-                StartAutomationFromTaskRequest(task="Do work"), context
-            )
+            servicer.StartAutomation(StartAutomationRequest(), context)
 
         context.abort.assert_called_once_with(
             grpc.StatusCode.PERMISSION_DENIED,

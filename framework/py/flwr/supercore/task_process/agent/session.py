@@ -32,8 +32,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
-    StartAutomationFromTaskRequest,
 )
+from flwr.proto.control_pb2 import StartAutomationRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
@@ -62,17 +62,83 @@ def _make_start_automation_tool() -> JSONObject:
     return {
         "type": "function",
         "name": _START_AUTOMATION_TOOL_NAME,
-        "description": (
-            "Schedule a task only when the user explicitly asks for future or "
-            "recurring execution. The task must describe the work to perform "
-            "without the scheduling instruction."
-        ),
+        "description": "Start an automation using a complete run request.",
         "parameters": {
             "type": "object",
             "properties": {
-                "task": {
-                    "type": "string",
-                    "description": "The exact work to perform on each run.",
+                "start_run_request": {
+                    "type": "object",
+                    "properties": {
+                        "fab": {
+                            "type": "object",
+                            "properties": {
+                                "hash_str": {"type": "string"},
+                                "content": {
+                                    "type": "string",
+                                    "description": "Base64-encoded FAB content.",
+                                },
+                                "verifications": {
+                                    "type": "object",
+                                    "additionalProperties": {"type": "string"},
+                                },
+                            },
+                            "additionalProperties": False,
+                        },
+                        "override_config": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                    "double": {"type": "number"},
+                                    "uint64": {"type": "integer", "minimum": 0},
+                                    "sint64": {"type": "integer"},
+                                    "bool": {"type": "boolean"},
+                                    "string": {"type": "string"},
+                                    "bytes": {
+                                        "type": "string",
+                                        "description": "Base64-encoded bytes.",
+                                    },
+                                },
+                                "additionalProperties": False,
+                            },
+                        },
+                        "override_federation_config": {
+                            "type": "object",
+                            "properties": {
+                                "num_supernodes": {"type": "integer", "minimum": 0},
+                                "client_resources_num_cpus": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                },
+                                "client_resources_num_gpus": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                },
+                                "backend": {"type": "string"},
+                                "verbose": {"type": "boolean"},
+                                "init_args_num_cpus": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                },
+                                "init_args_num_gpus": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                },
+                                "init_args_logging_level": {"type": "string"},
+                                "init_args_log_to_driver": {"type": "boolean"},
+                            },
+                            "additionalProperties": False,
+                        },
+                        "app_spec": {"type": "string"},
+                        "federation": {"type": "string"},
+                        "series_id": {"type": "integer", "minimum": 1},
+                        "connector_refs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                    "required": ["series_id"],
+                    "additionalProperties": False,
                 },
                 "start_at": {
                     "type": "string",
@@ -93,7 +159,7 @@ def _make_start_automation_tool() -> JSONObject:
                     ),
                 },
             },
-            "required": ["task"],
+            "required": ["start_run_request"],
             "additionalProperties": False,
         },
     }
@@ -331,7 +397,7 @@ class RuntimeAgentResponses(AgentResponses):
 
         self.append_and_push_run_events([automation_event("started")])
         try:
-            request = ParseDict(arguments, StartAutomationFromTaskRequest())
+            request = ParseDict(arguments, StartAutomationRequest())
             response = self._stub.StartAutomation(request)
             output: JSONObject = {
                 "automation_id": response.automation_id,

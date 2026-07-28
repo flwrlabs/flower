@@ -45,8 +45,10 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
-    StartAutomationFromTaskRequest,
-    StartAutomationFromTaskResponse,
+)
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -60,6 +62,7 @@ from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.utils.validator import validate_message
+from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -69,8 +72,10 @@ from flwr.supercore.inflatable.inflatable_object import (
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supercore.servicer.appio import AppIoServicer
-from flwr.superlink.servicer.automation import start_automation_from_run
-from flwr.superlink.servicer.control.control_handlers import process_due_automations
+from flwr.superlink.servicer.control.control_handlers import (
+    process_due_automations,
+    start_automation,
+)
 
 SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE = (
     "Some ServerAppIo API endpoints are only available for Deployment Runtime runs."
@@ -325,10 +330,10 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
     def StartAutomation(
         self,
-        request: StartAutomationFromTaskRequest,
+        request: StartAutomationRequest,
         context: grpc.ServicerContext,
-    ) -> StartAutomationFromTaskResponse:
-        """Start an automation using the authenticated AgentApp run template."""
+    ) -> StartAutomationResponse:
+        """Start an automation."""
         task = get_authenticated_task()
         if task.type not in (TaskType.AGENT_APP, TaskType.SERVER_APP):
             context.abort(
@@ -338,12 +343,11 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
         state = self.state_factory.state()
         run = state.get_run_info(run_ids=[task.run_id])[0]
-
-        try:
-            return start_automation_from_run(state, run, request)
-        except ValueError as exc:
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
-            raise RuntimeError("Unreachable code") from exc
+        return start_automation(
+            request,
+            AccountInfo(flwr_aid=run.flwr_aid, account_name=""),
+            state,
+        )
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext
