@@ -27,7 +27,6 @@ from typing import Literal, cast
 from uuid import uuid4
 
 from flwr.app import Context, Message
-from flwr.app.user_config import UserConfig
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -38,8 +37,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.logger import log
-from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
-from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
@@ -87,12 +85,7 @@ class AutomationRecord:
     """Record containing automation metadata and run template."""
 
     automation: Automation
-    fab_id: str | None
-    fab_version: str | None
-    fab_hash: str | None
-    override_config: UserConfig
-    federation_config: SimulationConfig | None
-    primary_task_type: str
+    start_run_request: StartRunRequest
 
 
 @dataclass
@@ -127,7 +120,7 @@ class InMemoryCoreState(
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.automation_store: dict[int, AutomationRecord] = {}
-        self.lock_automation_store = Lock()
+        self.lock_automation_store = RLock()
         self._next_automation_id = 1
         self.task_store: dict[int, Task] = {}
         # Store task ID to token mapping
@@ -555,12 +548,7 @@ class InMemoryCoreState(
         *,
         federation_id: str,
         flwr_aid: str,
-        fab_id: str | None,
-        fab_version: str | None,
-        fab_hash: str | None,
-        override_config: UserConfig,
-        federation_config: SimulationConfig | None,
-        primary_task_type: str,
+        start_run_request: StartRunRequest,
         series_id: int,
         next_run_at: str,
         fixed_interval: int | None = None,
@@ -584,21 +572,42 @@ class InMemoryCoreState(
                 remaining_runs=max_runs,
             )
 
+            stored_request = StartRunRequest()
+            stored_request.CopyFrom(start_run_request)
             self.automation_store[automation_id] = AutomationRecord(
-                automation=automation,
-                fab_id=fab_id,
-                fab_version=fab_version,
-                fab_hash=fab_hash,
-                override_config=dict(override_config),
-                federation_config=federation_config,
-                primary_task_type=primary_task_type,
+                automation=automation, start_run_request=stored_request
             )
             return automation
 
-    def list_automations(  # pylint: disable=too-many-arguments
+    def claim_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> tuple[StartRunRequest, str] | None:
+        """Claim an automation occurrence and return its unresolved run request."""
+        with self.lock_automation_store:
+            record = self.automation_store.get(automation_id)
+            if record is None:
+                return None
+            request = StartRunRequest()
+            request.CopyFrom(record.start_run_request)
+            flwr_aid = record.automation.flwr_aid
+
+            if not self.advance_automation(
+                automation_id,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            ):
+                return None
+            return request, flwr_aid
+
+    def list_automations(  # pylint: disable=too-many-arguments,too-many-boolean-expressions
         self,
         *,
-        federation: str | None = None,
+        automation_ids: Sequence[int] | None = None,
+        federations: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
         order_by: Literal["next_run_at", "updated_at"],
@@ -607,18 +616,36 @@ class InMemoryCoreState(
         """Return automations matching the given filters."""
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
-        if limit == 0 or (statuses is not None and not statuses):
+        if (
+            limit == 0
+            or (automation_ids is not None and not automation_ids)
+            or (federations is not None and not federations)
+            or (statuses is not None and not statuses)
+        ):
             return []
 
         status_set = set(statuses) if statuses is not None else None
+        federation_set = set(federations) if federations is not None else None
         cutoff = due_before.isoformat() if due_before is not None else None
         with self.lock_automation_store:
+            if automation_ids is None:
+                records = list(self.automation_store.values())
+            else:
+                records = [
+                    self.automation_store[automation_id]
+                    for automation_id in dict.fromkeys(automation_ids)
+                    if automation_id in self.automation_store
+                ]
+
             automations: list[Automation] = []
-            for record in self.automation_store.values():
+            for record in records:
                 automation = record.automation
 
                 # Apply federation filter.
-                if federation is not None and automation.federation != federation:
+                if (
+                    federation_set is not None
+                    and automation.federation not in federation_set
+                ):
                     continue
 
                 # Apply status filter.

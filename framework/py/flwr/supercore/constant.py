@@ -197,6 +197,9 @@ class InvitationStatus(StrEnum):
     EXPIRED = "expired"
 
 
+AUTOMATION_BATCH_LIMIT = 1
+
+
 class AutomationStatus(StrEnum):
     """Status of an automation."""
 

@@ -31,7 +31,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto.control_pb2 import Automation  # pylint: disable=E0611
+from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskEvent,
@@ -200,12 +200,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         return state.store_automation(
             federation_id=federation_id,
             flwr_aid=flwr_aid,
-            fab_id=None,
-            fab_version=None,
-            fab_hash=None,
-            override_config={},
-            federation_config=None,
-            primary_task_type=TaskType.SERVER_APP,
+            start_run_request=StartRunRequest(
+                federation=federation_id,
+                series_id=series_id,
+            ),
             series_id=series_id,
             next_run_at=next_run_at or now().isoformat(),
             fixed_interval=fixed_interval,
@@ -550,7 +548,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             series_id=2,
             next_run_at=(current + timedelta(seconds=60)).isoformat(),
         )
-        _ = self.store_automation(
+        other = self.store_automation(
             state,
             series_id=3,
             federation_id="@me/fed-b",
@@ -559,14 +557,40 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(due.next_run_at, due_at)
 
-        listed = state.list_automations(federation="@me/fed-a", order_by="updated_at")
+        listed = state.list_automations(
+            federations=["@me/fed-a"], order_by="updated_at"
+        )
         self.assertSetEqual(
             {automation.automation_id for automation in listed},
             {due.automation_id, future.automation_id},
         )
 
+        listed_across_federations = state.list_automations(
+            federations=["@me/fed-a", "@me/fed-b"],
+            order_by="updated_at",
+        )
+        self.assertSetEqual(
+            {automation.automation_id for automation in listed_across_federations},
+            {due.automation_id, future.automation_id, other.automation_id},
+        )
+        self.assertEqual(
+            state.list_automations(federations=[], order_by="updated_at"), []
+        )
+
+        listed_by_id = state.list_automations(
+            automation_ids=[due.automation_id, future.automation_id],
+            order_by="updated_at",
+        )
+        self.assertSetEqual(
+            {automation.automation_id for automation in listed_by_id},
+            {due.automation_id, future.automation_id},
+        )
+        self.assertEqual(
+            state.list_automations(automation_ids=[], order_by="updated_at"), []
+        )
+
         due_list = state.list_automations(
-            federation="@me/fed-a",
+            federations=["@me/fed-a"],
             statuses=["active"],
             due_before=current,
             order_by="next_run_at",
@@ -581,7 +605,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(state.stop_automation(due.automation_id))
 
         stopped = state.list_automations(
-            federation="@me/fed-a",
+            federations=["@me/fed-a"],
             statuses=[AutomationStatus.STOPPED],
             order_by="updated_at",
         )
@@ -622,7 +646,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             )
         )
         updated = state.list_automations(
-            federation="@me/fed-a",
+            federations=["@me/fed-a"],
             statuses=[AutomationStatus.ACTIVE],
             order_by="updated_at",
         )
@@ -644,7 +668,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             )
         )
         completed = state.list_automations(
-            federation="@me/fed-a",
+            federations=["@me/fed-a"],
             statuses=[AutomationStatus.COMPLETED],
             order_by="updated_at",
         )
@@ -674,7 +698,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             )
         )
         failed = state.list_automations(
-            federation="@me/fed-a",
+            federations=["@me/fed-a"],
             statuses=[AutomationStatus.FAILED],
             order_by="updated_at",
         )
