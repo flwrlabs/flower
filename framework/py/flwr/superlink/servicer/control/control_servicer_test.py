@@ -67,7 +67,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RevokeInvitationResponse,
     ShowFederationRequest,
     ShowFederationResponse,
-    StartAutomationRequest,
     StartRunRequest,
     StopRunRequest,
     StreamLogsRequest,
