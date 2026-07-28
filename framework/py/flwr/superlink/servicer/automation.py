@@ -14,17 +14,20 @@
 # ==============================================================================
 """Automation creation from an authenticated run template."""
 
-from datetime import UTC, datetime
-
 from flwr.common.serde import fab_to_proto, user_config_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     StartAutomationFromTaskRequest,
     StartAutomationFromTaskResponse,
 )
-from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartRunRequest,
+)
 from flwr.server.superlink.linkstate import LinkState
-from flwr.supercore.date import isoformat8601_utc, now
+from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.error import FlowerError
 from flwr.supercore.run import Run
+from flwr.superlink.servicer.control.control_handlers import start_automation
 
 
 def derive_start_run_request(
@@ -57,37 +60,27 @@ def start_automation_from_run(
     if not automation_task:
         raise ValueError("`task` must be a non-empty string.")
 
-    next_run_at = now()
-    if request.HasField("start_at"):
-        try:
-            next_run_at = datetime.fromisoformat(request.start_at)
-        except ValueError as exc:
-            raise ValueError("`start_at` must be an RFC 3339 timestamp.") from exc
-        if next_run_at.tzinfo is None:
-            raise ValueError("`start_at` must include a timezone.")
-        next_run_at = next_run_at.astimezone(UTC)
-    fixed_interval = (
-        request.fixed_interval if request.HasField("fixed_interval") else None
-    )
-    max_runs = request.max_runs if request.HasField("max_runs") else None
-    if fixed_interval == 0:
-        raise ValueError("`fixed_interval` must be greater than zero.")
-    if max_runs == 0:
-        raise ValueError("`max_runs` must be greater than zero.")
-    if fixed_interval is None and max_runs is not None:
-        raise ValueError("`max_runs` requires `fixed_interval`.")
-
-    automation = state.store_automation(
-        federation_id=run.federation_id,
-        flwr_aid=run.flwr_aid,
+    control_request = StartAutomationRequest(
         start_run_request=derive_start_run_request(state, run, automation_task),
-        series_id=run.series_id,
-        next_run_at=isoformat8601_utc(next_run_at),
-        fixed_interval=fixed_interval,
-        max_runs=max_runs if fixed_interval is not None else 1,
     )
+    if request.HasField("start_at"):
+        control_request.start_at = request.start_at
+    if request.HasField("fixed_interval"):
+        control_request.fixed_interval = request.fixed_interval
+    if request.HasField("max_runs"):
+        control_request.max_runs = request.max_runs
+
+    try:
+        response = start_automation(
+            control_request,
+            AccountInfo(flwr_aid=run.flwr_aid, account_name=""),
+            state,
+        )
+    except FlowerError as exc:
+        raise ValueError(exc.public_details or exc.message) from exc
+
     return StartAutomationFromTaskResponse(
-        automation_id=automation.automation_id,
-        series_id=automation.series_id,
-        next_run_at=automation.next_run_at,
+        automation_id=response.automation_id,
+        series_id=response.series_id,
+        next_run_at=response.next_run_at,
     )

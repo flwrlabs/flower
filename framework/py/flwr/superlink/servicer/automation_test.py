@@ -15,11 +15,14 @@
 """Tests for automation creation from a run template."""
 
 from typing import cast
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from flwr.common.serde import user_config_from_proto
 from flwr.proto.appio_pb2 import StartAutomationFromTaskRequest  # pylint: disable=E0611
-from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationResponse,
+    StartRunRequest,
+)
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.fab import Fab
@@ -59,13 +62,16 @@ def test_derive_start_run_request() -> None:
     }
 
 
-def test_start_automation_from_run_stores_derived_request() -> None:
-    """Store the request derived from the authenticated run."""
+@patch("flwr.superlink.servicer.automation.start_automation")
+def test_start_automation_from_run_delegates_to_control(
+    start_automation_mock: Mock,
+) -> None:
+    """Delegate the derived request to the Control implementation."""
     state_mock = Mock(spec=LinkState)
     state_mock.get_fab.return_value = None
     state_mock.get_federation_config.return_value = None
     state_mock.get_run_connector_refs.return_value = []
-    state_mock.store_automation.return_value = Automation(
+    start_automation_mock.return_value = StartAutomationResponse(
         automation_id=1,
         series_id=456,
         next_run_at="2026-07-28T12:00:00Z",
@@ -78,16 +84,26 @@ def test_start_automation_from_run_stores_derived_request() -> None:
     response = start_automation_from_run(
         cast(LinkState, state_mock),
         run,
-        StartAutomationFromTaskRequest(task="Train a model"),
+        StartAutomationFromTaskRequest(
+            task="Train a model",
+            start_at="2026-07-28T12:00:00Z",
+            fixed_interval=60,
+            max_runs=3,
+        ),
     )
 
     assert response.automation_id == 1
-    stored_request = cast(
+    control_request = cast(
         StartRunRequest,
-        state_mock.store_automation.call_args.kwargs["start_run_request"],
+        start_automation_mock.call_args.args[0].start_run_request,
     )
-    assert stored_request.federation == run.federation_id
-    assert stored_request.series_id == run.series_id
-    assert user_config_from_proto(stored_request.override_config)["agent.input"] == (
+    assert control_request.federation == run.federation_id
+    assert control_request.series_id == run.series_id
+    assert user_config_from_proto(control_request.override_config)["agent.input"] == (
         "Train a model"
     )
+    assert start_automation_mock.call_args.args[0].start_at == ("2026-07-28T12:00:00Z")
+    assert start_automation_mock.call_args.args[0].fixed_interval == 60
+    assert start_automation_mock.call_args.args[0].max_runs == 3
+    assert start_automation_mock.call_args.args[1].flwr_aid == run.flwr_aid
+    assert start_automation_mock.call_args.args[2] is state_mock
