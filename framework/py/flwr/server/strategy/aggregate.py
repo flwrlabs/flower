@@ -55,6 +55,13 @@ def aggregate_inplace(results: list[tuple[ClientProxy, FitRes]]) -> NDArrays:
     """Compute in-place weighted average."""
     # Count total examples
     num_examples_total = sum(fit_res.num_examples for (_, fit_res) in results)
+    # Guard against a zero total: FedAvg uses this in-place path by default, and
+    # dividing by zero here would abort the round with a ZeroDivisionError.
+    if num_examples_total == 0:
+        raise ValueError(
+            "aggregate_inplace() requires the total number of examples across all "
+            "results to be greater than zero"
+        )
 
     # Compute scaling factors for each result
     scaling_factors = np.asarray(

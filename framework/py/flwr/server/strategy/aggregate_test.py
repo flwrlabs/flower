@@ -15,10 +15,15 @@
 """Aggregation function tests."""
 
 
+from unittest.mock import MagicMock
+
 import numpy as np
 import pytest
 
+from flwr.common import Code, FitRes, Status, ndarrays_to_parameters
+
 from .aggregate import (
+    aggregate_inplace,
     _aggregate_n_closest_weights,
     _check_weights_equality,
     _find_reference_weights,
@@ -35,6 +40,22 @@ def test_aggregate_zero_num_examples_total() -> None:
     # Execute & Assert: must raise rather than return NaN weights
     with pytest.raises(ValueError):
         aggregate(results)
+
+
+def test_aggregate_inplace_zero_num_examples_total() -> None:
+    """Test aggregate_inplace raises when every client reports zero examples."""
+    # Prepare: a round in which no client trained on any example (FedAvg default path)
+    fit_res = FitRes(
+        status=Status(code=Code.OK, message="Success"),
+        parameters=ndarrays_to_parameters([np.array([1.0, 2.0])]),
+        num_examples=0,
+        metrics={},
+    )
+    results = [(MagicMock(), fit_res), (MagicMock(), fit_res)]
+
+    # Execute & Assert: must raise rather than divide by zero
+    with pytest.raises(ValueError):
+        aggregate_inplace(results)
 
 
 def test_aggregate() -> None:
