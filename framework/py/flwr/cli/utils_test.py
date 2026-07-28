@@ -73,18 +73,6 @@ def _grpc_error_with_details(details: str) -> grpc.RpcError:
     return cast(grpc.RpcError, _GrpcErrorWithDetails(details))
 
 
-class _UnauthenticatedGrpcError(grpc.RpcError):
-    """Test helper for an unauthenticated gRPC error."""
-
-    def details(self) -> str:
-        """Return gRPC error details."""
-        return "Access denied"
-
-    def code(self) -> grpc.StatusCode:
-        """Return the unauthenticated gRPC status code."""
-        return grpc.StatusCode.UNAUTHENTICATED
-
-
 def _flower_error_details(code: ApiErrorCode, public_details: str | None = None) -> str:
     """Return serialized FlowerError details as sent through gRPC."""
     return FlowerError(code, "internal details", public_details).to_json(
@@ -320,18 +308,28 @@ def test_grpc_unauthenticated_error_includes_connection_name(
 ) -> None:
     """Suggest logging in to the selected SuperLink connection."""
     command = click.Command("ls")
+    grpc_error = grpc.RpcError()
 
     with (
         click.Context(command, info_name="ls") as ctx,
         patch(
             "flwr.cli.utils.read_superlink_connection",
-            return_value=SuperLinkConnection(name="default", address="localhost:9093"),
+            return_value=SuperLinkConnection(
+                name=expected_name, address="localhost:9093"
+            ),
+        ),
+        patch.object(grpc_error, "details", return_value="Access denied", create=True),
+        patch.object(
+            grpc_error,
+            "code",
+            return_value=grpc.StatusCode.UNAUTHENTICATED,
+            create=True,
         ),
     ):
         ctx.params["superlink"] = superlink
         with pytest.raises(click.ClickException) as exc_info:
             with flwr_cli_grpc_exc_handler():
-                raise _UnauthenticatedGrpcError()
+                raise grpc_error
 
     assert exc_info.value.message == (
         f"Authentication failed. Please run `flwr login {expected_name}` "
