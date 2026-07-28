@@ -70,6 +70,10 @@ service ServerAppIo {
   // Create a task
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
 
+  // Start an automation using the authenticated AgentApp run as its template
+  rpc StartAutomation(StartAutomationFromTaskRequest)
+      returns (StartAutomationFromTaskResponse) {}
+
   // Push task message
   rpc PushTaskMessage(PushTaskMessageRequest)
       returns (PushTaskMessageResponse) {}
