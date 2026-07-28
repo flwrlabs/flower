@@ -36,8 +36,8 @@ html_favicon = "_static/favicon.ico"
 html_baseurl = "https://flower.ai/docs/agent/"
 
 html_theme_options = {
-    "light_logo": "flower-logo-light.png",
-    "dark_logo": "flower-logo-dark.png",
+    "light_logo": "flower-agent-logo-light.png",
+    "dark_logo": "flower-agent-logo-dark.png",
     "light_css_variables": {
         "color-announcement-background": "#17222d",
         "color-announcement-text": "#ffffff",
