@@ -30,6 +30,7 @@ from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListFederationsRequest,
     StartRunRequest,
+    StopRunRequest,
     StreamRunEventsRequest,
 )
 from flwr.proto.control_pb2_grpc import ControlStub
@@ -74,7 +75,7 @@ def chat() -> None:
     try:
         _verify_authenticated(stub)
         typer.secho(
-            f"Flower Chat. Type {_EXIT_COMMAND} to leave.",
+            f"Flower Chat. Type {_EXIT_COMMAND} or press Ctrl-D to leave.",
             fg=typer.colors.BLUE,
         )
         _run_interactive_shell(stub, superlink_connection.federation)
@@ -115,9 +116,12 @@ def _run_interactive_shell(stub: ControlStub, federation: str | None) -> None:
     while True:
         try:
             prompt = input(_USER_PROMPT)
-        except (EOFError, KeyboardInterrupt):
+        except EOFError:
             typer.echo()
             return
+        except KeyboardInterrupt:
+            typer.echo()
+            continue
 
         stripped_prompt = prompt.strip()
         if not stripped_prompt:
@@ -130,11 +134,18 @@ def _run_interactive_shell(stub: ControlStub, federation: str | None) -> None:
 
 def _run_prompt(stub: ControlStub, prompt: str, federation: str | None) -> None:
     """Submit one prompt and stream the response."""
+    run_id = None
     with Console().status(
         "Thinking...", spinner="dots", spinner_style=_AGENT_COLOR_HEX
     ) as status:
-        run_id = _start_agent_run(stub, prompt, federation)
-        _stream_agent_response(stub, run_id, status)
+        try:
+            run_id = _start_agent_run(stub, prompt, federation)
+            _stream_agent_response(stub, run_id, status)
+        except KeyboardInterrupt:
+            status.stop()
+            typer.echo()
+            if run_id is not None:
+                _stop_agent_run(stub, run_id)
 
 
 def _start_agent_run(
@@ -154,6 +165,15 @@ def _start_agent_run(
     if not res.HasField("run_id"):
         raise click.ClickException("Failed to start chat run.")
     return cast(int, res.run_id)
+
+
+def _stop_agent_run(stub: ControlStub, run_id: int) -> None:
+    """Stop one interrupted AgentApp run."""
+    try:
+        with flwr_cli_grpc_exc_handler():
+            stub.StopRun(StopRunRequest(run_id=run_id))
+    except click.ClickException:
+        return
 
 
 def _stream_agent_response(stub: ControlStub, run_id: int, status: Status) -> None:
