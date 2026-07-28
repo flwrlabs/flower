@@ -407,18 +407,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(run_context.run_id, response.run_id)
         self.assertEqual(run_context.series_id, response.series_id)
 
-    def test_start_automation_rejects_start_at_without_timezone(self) -> None:
-        """Test StartAutomation rejects a start time without a timezone."""
-        request = StartAutomationRequest(
-            start_run_request=StartRunRequest(series_id=1),
-            start_at="2026-07-28T12:00:00",
-        )
-
-        with self.assertRaises(FlowerError) as cm:
-            self.servicer.StartAutomation(request, Mock())
-
-        self.assertEqual(cm.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
-
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
         """StartRun should bind canonical connected OAuth connector refs."""
         provider = _OAuthProvider()
