@@ -49,8 +49,7 @@ jobs:
       - name: Check and build Agent docs
         run: |
           cd agent
-          uv run --no-sync mdformat --check docs/README.md docs/source
-          uv run --no-sync sphinx-build -E -a -W --keep-going -b html docs/source docs/build/html
+          uv run --no-sync ./dev/build-agent-docs.sh
       - name: Build baselines docs
         run: |
           cd framework
