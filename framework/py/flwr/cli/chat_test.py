@@ -33,19 +33,6 @@ from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 chat_module = importlib.import_module("flwr.cli.chat")
 
 
-class _AuthPlugin:
-    """Minimal auth plugin for chat tests."""
-
-    def load_tokens(self) -> None:
-        """Load tokens."""
-
-    def write_tokens_to_metadata(
-        self, metadata: list[tuple[str, str | bytes]]
-    ) -> list[tuple[str, str | bytes]]:
-        """Return metadata unchanged."""
-        return metadata
-
-
 def test_chat_requires_login_before_prompt() -> None:
     """Chat should fail before prompting if the user has not logged in."""
     superlink_connection = SuperLinkConnection(
@@ -78,6 +65,7 @@ def test_chat_submits_prompt_to_flower_agent_and_streams_response(
     )
     channel = Mock()
     stub = Mock()
+    auth_plugin = Mock()
     stub.ListFederations.return_value = Mock()
     stub.StartRun.return_value = StartRunResponse(run_id=123)
     stub.StreamRunEvents.return_value = iter(
@@ -113,7 +101,7 @@ def test_chat_submits_prompt_to_flower_agent_and_streams_response(
         patch.object(
             chat_module,
             "load_cli_auth_plugin_from_connection",
-            return_value=_AuthPlugin(),
+            return_value=auth_plugin,
         ),
         patch.object(
             chat_module,

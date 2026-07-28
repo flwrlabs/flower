@@ -23,8 +23,21 @@ import typer
 from rich.console import Console
 from rich.status import Status
 
+from flwr.cli.constant import (
+    CHAT_AGENT_COLOR_HEX,
+    CHAT_AGENT_INPUT_KEY,
+    CHAT_AGENT_PROMPT,
+    CHAT_ANSI_RESET,
+    CHAT_EXIT_COMMAND,
+    CHAT_FAILURE_EVENTS,
+    CHAT_FLOWER_AGENT_APP_SPEC,
+    CHAT_LOGIN_REQUIRED_MESSAGE,
+    CHAT_SUPERGRID_CONNECTION_NAME,
+    CHAT_TERMINAL_EVENTS,
+    CHAT_TEXT_DELTA_EVENT,
+    CHAT_USER_PROMPT,
+)
 from flwr.cli.flower_config import read_superlink_connection
-from flwr.cli.typing import SuperLinkConnection
 from flwr.common.constant import AuthnType
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -35,7 +48,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.typing import JSONObject
 
-from .auth_plugin import CliAuthPlugin
 from .utils import (
     flwr_cli_grpc_exc_handler,
     get_authn_type,
@@ -43,38 +55,42 @@ from .utils import (
     load_cli_auth_plugin_from_connection,
 )
 
-_FLOWER_AGENT_APP_SPEC = "@flwrlabs/flwr-agent"
-_SUPERGRID_CONNECTION_NAME = "supergrid"
-_AGENT_INPUT_KEY = "agent.input"
-_EXIT_COMMAND = "/quit"
-_LOGIN_REQUIRED_MESSAGE = "Please run `flwr login supergrid` first."
-_TEXT_DELTA_EVENT = "response.output_text.delta"
-_TERMINAL_EVENTS = {"response.completed", "response.incomplete"}
-_FAILURE_EVENTS = {"error", "response.failed"}
-_AGENT_COLOR_HEX = "#f2b607"
-_USER_PROMPT = "You> "
-_AGENT_COLOR = "\033[38;2;242;182;7m"
-_ANSI_RESET = "\033[0m"
-_AGENT_PROMPT = f"{_AGENT_COLOR}Agent> "
-
 
 def chat() -> None:
     """Start an interactive chat session with the Flower agent."""
-    superlink_connection = read_superlink_connection(_SUPERGRID_CONNECTION_NAME)
+    superlink_connection = read_superlink_connection(CHAT_SUPERGRID_CONNECTION_NAME)
+
+    # Reject insecure connections before loading stored auth tokens.
     if superlink_connection.insecure:
         raise click.ClickException(
             "`flwr chat` requires TLS to be enabled. `insecure` must NOT be set to "
             "`true` in the federation configuration."
         )
 
-    auth_plugin = _load_logged_in_auth_plugin(superlink_connection)
+    # Load a logged-in auth plugin or fail before the chat prompt starts.
+    address = superlink_connection.address
+    if address is None:
+        raise click.ClickException(CHAT_LOGIN_REQUIRED_MESSAGE)
+
+    authn_type = get_authn_type(address)
+    if authn_type == AuthnType.NOOP:
+        raise click.ClickException(CHAT_LOGIN_REQUIRED_MESSAGE)
+
+    auth_plugin = load_cli_auth_plugin_from_connection(address, authn_type)
+    auth_plugin.load_tokens()
+    try:
+        auth_plugin.write_tokens_to_metadata([])
+    except click.ClickException as exc:
+        raise click.ClickException(CHAT_LOGIN_REQUIRED_MESSAGE) from exc
 
     channel = init_channel_from_connection(superlink_connection, auth_plugin)
     stub = ControlStub(channel)
     try:
-        _verify_authenticated(stub)
+        # Verify stored credentials before showing the interactive prompt.
+        with flwr_cli_grpc_exc_handler():
+            stub.ListFederations(ListFederationsRequest())
         typer.secho(
-            f"Flower Chat. Type {_EXIT_COMMAND} to leave.",
+            f"Flower Chat. Type {CHAT_EXIT_COMMAND} to leave.",
             fg=typer.colors.BLUE,
         )
         _run_interactive_shell(stub, superlink_connection.federation)
@@ -82,39 +98,11 @@ def chat() -> None:
         channel.close()
 
 
-def _load_logged_in_auth_plugin(
-    superlink_connection: SuperLinkConnection,
-) -> CliAuthPlugin:
-    """Load a logged-in auth plugin or fail before the chat prompt starts."""
-    address = superlink_connection.address
-    if address is None:
-        raise click.ClickException(_LOGIN_REQUIRED_MESSAGE)
-
-    authn_type = get_authn_type(address)
-    if authn_type == AuthnType.NOOP:
-        raise click.ClickException(_LOGIN_REQUIRED_MESSAGE)
-
-    auth_plugin = load_cli_auth_plugin_from_connection(address, authn_type)
-    auth_plugin.load_tokens()
-    try:
-        auth_plugin.write_tokens_to_metadata([])
-    except click.ClickException as exc:
-        raise click.ClickException(_LOGIN_REQUIRED_MESSAGE) from exc
-
-    return auth_plugin
-
-
-def _verify_authenticated(stub: ControlStub) -> None:
-    """Verify the stored credentials against the SuperGrid before prompting."""
-    with flwr_cli_grpc_exc_handler():
-        stub.ListFederations(ListFederationsRequest())
-
-
 def _run_interactive_shell(stub: ControlStub, federation: str | None) -> None:
     """Run the prompt-response loop."""
     while True:
         try:
-            prompt = input(_USER_PROMPT)
+            prompt = input(CHAT_USER_PROMPT)
         except (EOFError, KeyboardInterrupt):
             typer.echo()
             return
@@ -122,38 +110,24 @@ def _run_interactive_shell(stub: ControlStub, federation: str | None) -> None:
         stripped_prompt = prompt.strip()
         if not stripped_prompt:
             continue
-        if stripped_prompt.lower() == _EXIT_COMMAND:
+        if stripped_prompt.lower() == CHAT_EXIT_COMMAND:
             return
 
-        _run_prompt(stub, prompt, federation)
+        with Console().status(
+            "Thinking...", spinner="dots", spinner_style=CHAT_AGENT_COLOR_HEX
+        ) as status:
+            # Start one Flower AgentApp run for the submitted prompt.
+            req = StartRunRequest(
+                app_spec=CHAT_FLOWER_AGENT_APP_SPEC,
+                override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
+                federation=federation or "",
+            )
+            with flwr_cli_grpc_exc_handler():
+                res = stub.StartRun(req)
 
-
-def _run_prompt(stub: ControlStub, prompt: str, federation: str | None) -> None:
-    """Submit one prompt and stream the response."""
-    with Console().status(
-        "Thinking...", spinner="dots", spinner_style=_AGENT_COLOR_HEX
-    ) as status:
-        run_id = _start_agent_run(stub, prompt, federation)
-        _stream_agent_response(stub, run_id, status)
-
-
-def _start_agent_run(
-    stub: ControlStub,
-    prompt: str,
-    federation: str | None,
-) -> int:
-    """Start one Flower AgentApp run for the given prompt."""
-    req = StartRunRequest(
-        app_spec=_FLOWER_AGENT_APP_SPEC,
-        override_config=user_config_to_proto({_AGENT_INPUT_KEY: prompt}),
-        federation=federation or "",
-    )
-    with flwr_cli_grpc_exc_handler():
-        res = stub.StartRun(req)
-
-    if not res.HasField("run_id"):
-        raise click.ClickException("Failed to start chat run.")
-    return cast(int, res.run_id)
+            if not res.HasField("run_id"):
+                raise click.ClickException("Failed to start chat run.")
+            _stream_agent_response(stub, cast(int, res.run_id), status)
 
 
 def _stream_agent_response(stub: ControlStub, run_id: int, status: Status) -> None:
@@ -165,40 +139,42 @@ def _stream_agent_response(stub: ControlStub, run_id: int, status: Status) -> No
         with flwr_cli_grpc_exc_handler():
             for res in stub.StreamRunEvents(req):
                 event_type = res.task_event.event
-                payload = _load_task_event_data(res.task_event.data)
+
+                # Parse event payloads defensively; event names can carry the type.
+                try:
+                    raw_payload = json.loads(res.task_event.data)
+                except json.JSONDecodeError:
+                    raw_payload = {}
+                payload = (
+                    cast(JSONObject, raw_payload)
+                    if isinstance(raw_payload, dict)
+                    else {}
+                )
                 if not event_type:
                     event_type = cast(str, payload.get("type", ""))
 
-                if event_type == _TEXT_DELTA_EVENT:
+                # Print streamed text deltas as the agent response.
+                if event_type == CHAT_TEXT_DELTA_EVENT:
                     delta = payload.get("delta")
                     if isinstance(delta, str):
                         if not response_started:
                             status.stop()
-                            print(_AGENT_PROMPT, end="", flush=True)
+                            print(CHAT_AGENT_PROMPT, end="", flush=True)
                             response_started = True
                         print(delta, end="", flush=True)
-                elif event_type in _FAILURE_EVENTS:
+                elif event_type in CHAT_FAILURE_EVENTS:
                     raise click.ClickException(_format_failure_event(payload))
-                elif event_type in _TERMINAL_EVENTS:
+                elif event_type in CHAT_TERMINAL_EVENTS:
                     terminal_event_seen = True
                     break
     finally:
         if response_started:
-            print(_ANSI_RESET)
+            print(CHAT_ANSI_RESET)
 
     if not terminal_event_seen:
         raise click.ClickException(
             "Chat run ended before the agent response completed."
         )
-
-
-def _load_task_event_data(data: str) -> JSONObject:
-    """Parse a task event JSON payload."""
-    try:
-        payload = json.loads(data)
-    except json.JSONDecodeError:
-        payload = {}
-    return cast(JSONObject, payload) if isinstance(payload, dict) else {}
 
 
 def _format_failure_event(payload: JSONObject) -> str:
