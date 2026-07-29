@@ -488,7 +488,7 @@ jobs:
     runs-on: windows-latest
     env:
       PYTHONIOENCODING: utf-8
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs: [changes, wheel]
 
     name: Windows compatibility test
@@ -510,6 +510,7 @@ jobs:
           python -m pip install --upgrade .
       - name: Run test
         if: ${{ needs.changes.outputs.framework == 'true' }}
+        timeout-minutes: 5
         working-directory: ./framework/e2e
         run: ./test_windows.sh
         shell: bash
