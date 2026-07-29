@@ -85,7 +85,7 @@ def chat() -> None:
         channel.close()
 
 
-def _run_interactive_shell(
+def _run_interactive_shell(  # pylint: disable=R0912
     stub: ControlStub, federation: str | None, console: Console
 ) -> None:
     """Run the prompt-response loop."""
@@ -197,7 +197,6 @@ def _stream_agent_response(
                     raise click.ClickException(_format_failure_event(payload))
                 elif event_type in CHAT_TERMINAL_EVENTS:
                     terminal_event_seen = True
-                    break
     finally:
         if response_started:
             console.print()
