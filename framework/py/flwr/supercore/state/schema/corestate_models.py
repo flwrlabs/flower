@@ -90,3 +90,85 @@ class SeriesRuns(FlwrBase):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     series_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     run_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+
+
+class Automation(FlwrBase):
+    """Represent an automation schedule."""
+
+    __tablename__ = "automation"
+    __table_args__ = (
+        Index("idx_automation_status_next_run_at", "status", "next_run_at"),
+        Index(
+            "idx_automation_federation_id_status_updated_at",
+            "federation_id",
+            "status",
+            "updated_at",
+        ),
+    )
+
+    automation_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True, nullable=False
+    )
+    federation_id: Mapped[str] = mapped_column(String, nullable=False)
+    flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    series_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    start_run_request: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    next_run_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    fixed_interval: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    remaining_runs: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    stopped_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
+
+class Connector(FlwrBase):
+    """Represent connector configuration for an account."""
+
+    __tablename__ = "connector"
+
+    flwr_aid: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    connector_ref: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    credentials_json: Mapped[str] = mapped_column(String, nullable=False)
+    config_json: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class ConnectorOAuthSession(FlwrBase):
+    """Represent an OAuth authorization session for a connector."""
+
+    __tablename__ = "connector_oauth_session"
+
+    oauth_session_id: Mapped[str] = mapped_column(
+        String, primary_key=True, nullable=False
+    )
+    flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    connector_ref: Mapped[str] = mapped_column(String, nullable=False)
+    state: Mapped[str] = mapped_column(String, nullable=False)
+    redirect_uri: Mapped[str] = mapped_column(String, nullable=False)
+    pkce_verifier: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+
+
+class RunConnector(FlwrBase):
+    """Represent the connectors attached to a run."""
+
+    __tablename__ = "run_connector"
+
+    run_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
+    connector_ref: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
