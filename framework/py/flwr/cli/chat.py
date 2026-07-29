@@ -87,6 +87,7 @@ def _run_interactive_shell(
     stub: ControlStub, federation: str | None, console: Console
 ) -> None:
     """Run the prompt-response loop."""
+    series_id: int | None = None
     while True:
         try:
             prompt = input(CHAT_USER_PROMPT)
@@ -109,11 +110,16 @@ def _run_interactive_shell(
                 override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
                 federation=federation or "",
             )
+            if series_id is not None:
+                req.series_id = series_id
+
             with flwr_cli_grpc_exc_handler():
                 res = stub.StartRun(req)
 
             if not res.HasField("run_id"):
                 raise click.ClickException("Failed to start chat run.")
+            if res.HasField("series_id"):
+                series_id = cast(int, res.series_id)
             _stream_agent_response(stub, cast(int, res.run_id), status, console)
 
 
