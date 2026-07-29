@@ -129,7 +129,14 @@ def _run_interactive_shell(
             if run_id is not None:
                 try:
                     with flwr_cli_grpc_exc_handler():
-                        stub.StopRun(request=StopRunRequest(run_id=run_id))
+                        response = stub.StopRun(
+                            request=StopRunRequest(run_id=run_id)
+                        )
+                    if not response.success:
+                        typer.echo(
+                            f"Warning: run {run_id} could not be stopped.",
+                            err=True,
+                        )
                 except click.ClickException as exc:
                     typer.echo(
                         f"Warning: failed to stop run {run_id}: "
