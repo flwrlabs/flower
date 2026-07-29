@@ -20,6 +20,7 @@ limitations under the License.
 import abc
 import collections.abc
 import flwr.proto.appio_pb2
+import flwr.proto.control_pb2
 import flwr.proto.log_pb2
 import flwr.proto.message_pb2
 import flwr.proto.run_pb2
@@ -110,6 +111,12 @@ class ServerAppIoStub:
         flwr.proto.appio_pb2.CreateTaskResponse,
     ]
     """Create a task"""
+
+    StartAutomation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StartAutomationRequest,
+        flwr.proto.control_pb2.StartAutomationResponse,
+    ]
+    """Start an automation"""
 
     PushTaskMessage: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushTaskMessageRequest,
@@ -245,6 +252,12 @@ class ServerAppIoAsyncStub:
         flwr.proto.appio_pb2.CreateTaskResponse,
     ]
     """Create a task"""
+
+    StartAutomation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StartAutomationRequest,
+        flwr.proto.control_pb2.StartAutomationResponse,
+    ]
+    """Start an automation"""
 
     PushTaskMessage: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushTaskMessageRequest,
@@ -400,6 +413,14 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.CreateTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.CreateTaskResponse]]:
         """Create a task"""
+
+    @abc.abstractmethod
+    def StartAutomation(
+        self,
+        request: flwr.proto.control_pb2.StartAutomationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.StartAutomationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.StartAutomationResponse]]:
+        """Start an automation"""
 
     @abc.abstractmethod
     def PushTaskMessage(

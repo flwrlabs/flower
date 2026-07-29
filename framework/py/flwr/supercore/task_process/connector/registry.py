@@ -19,7 +19,7 @@ from collections.abc import Callable
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from . import browser_use, web_fetch, web_search
+from . import automation, browser_use, web_fetch, web_search
 from .oauth import OAuthConnectorProvider
 
 ConnectorHandler = Callable[..., JSONValue]
@@ -35,6 +35,7 @@ _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
 # Concrete OAuth connector implementations populate this static registry.
 _CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {}
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
+    automation.START_AUTOMATION_TOOL_NAME: automation.make_start_automation_tool,
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.make_web_search_tool,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.make_web_fetch_tool,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.make_browser_use_tool,

@@ -17,14 +17,15 @@
 from typing import cast
 
 from fastapi import FastAPI
+from fastapi.routing import APIRoute, iter_route_contexts
 from pytest import MonkeyPatch
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import http_error_translator
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
+from flwr.supercore.routers.health.router import health
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
     ControlEventLogMiddleware,
@@ -70,11 +71,33 @@ def _middleware_classes(app: FastAPI) -> list[type[object]]:
     return [cast(type[object], middleware.cls) for middleware in app.user_middleware]
 
 
-def test_get_ee_linkstate_db_defaults_to_in_memory(monkeypatch: MonkeyPatch) -> None:
-    """Default to in-memory LinkState when no database is configured."""
-    monkeypatch.delenv("FLWR_DATABASE", raising=False)
+def test_create_app_mounts_core_health_router(monkeypatch: MonkeyPatch) -> None:
+    """Mount the health route from SuperCore without a readiness route."""
+    app = _create_app(monkeypatch)
 
-    assert main.get_ee_linkstate_db() == FLWR_IN_MEMORY_DB_NAME
+    health_routes = [
+        route_context.route
+        for route_context in iter_route_contexts(app.routes)
+        if isinstance(route_context.route, APIRoute)
+        and route_context.path_format == "/health"
+    ]
+
+    assert len(health_routes) == 2
+    assert all(route.endpoint is health for route in health_routes)
+    assert {frozenset(route.methods or ()) for route in health_routes} == {
+        frozenset({"GET"}),
+        frozenset({"HEAD"}),
+    }
+    assert {route.name for route in health_routes} == {"health", "health_head"}
+    assert {route.operation_id for route in health_routes} == {
+        "health",
+        "health_head",
+    }
+    assert all(route.tags == ["Health"] for route in health_routes)
+    assert all(
+        route_context.path_format != "/ready"
+        for route_context in iter_route_contexts(app.routes)
+    )
 
 
 def test_get_ee_linkstate_db_uses_explicit_database(monkeypatch: MonkeyPatch) -> None:

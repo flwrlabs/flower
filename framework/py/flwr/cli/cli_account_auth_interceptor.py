@@ -23,11 +23,12 @@ import grpc
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartRunRequest,
     StreamLogsRequest,
+    StreamRunEventsRequest,
 )
 
 from .auth_plugin import CliAuthPlugin
 
-Request = StartRunRequest | StreamLogsRequest
+Request = StartRunRequest | StreamLogsRequest | StreamRunEventsRequest
 
 
 class CliAccountAuthInterceptor(
