@@ -9,9 +9,10 @@ cleanup() {
 
     echo "Stopping Flower processes..."
     for pid in "${background_pids[@]}"; do
-        kill "$pid" 2>/dev/null || true
         if command -v taskkill >/dev/null 2>&1; then
             taskkill //F //PID "$pid" //T >/dev/null 2>&1 || true
+        else
+            kill "$pid" 2>/dev/null || true
         fi
     done
     if ((${#background_pids[@]} > 0)); then
