@@ -48,11 +48,11 @@ resulting account credentials for later SuperGrid commands.
 
 ## Start the built-in AgentApp
 
-Run `@flwrlabs/flwr-agent` and provide the initial prompt through
+Run `@flwragent/flwr-agent` and provide the initial prompt through
 `agent.input`:
 
 ```console
-$ uvx flwr run @flwrlabs/flwr-agent supergrid \
+$ uvx flwr run @flwragent/flwr-agent supergrid \
     --run-config 'agent.input="Explain Flower Agent in one sentence."'
 ```
 
@@ -70,7 +70,7 @@ $ uvx flwr list --run-id <run-id> supergrid
 To stream the process logs while starting another run, add `--stream`:
 
 ```console
-$ uvx flwr run @flwrlabs/flwr-agent supergrid \
+$ uvx flwr run @flwragent/flwr-agent supergrid \
     --run-config 'agent.input="Give me three uses for Flower Agent."' \
     --stream
 ```
