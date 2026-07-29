@@ -72,6 +72,8 @@ def flwr_ls(
 
     Parameters
     ----------
+    deadline : float
+        Monotonic deadline shared by all attempts.
     max_retries : int
         Maximum number of `flwr ls` attempts before failing.
     retry_delay : float
@@ -93,7 +95,7 @@ def flwr_ls(
             capture_output=True,
             text=True,
             check=False,
-            timeout=remaining,
+            timeout=min(COMMAND_TIMEOUT, remaining),
         )
 
         data = json.loads(result.stdout)  # fail immediately on invalid JSON
@@ -134,7 +136,11 @@ def wait_for_pid(
             raise AssertionError("SuperExec exited before the app process started")
 
         remaining = deadline - time.monotonic()
-        if pids := get_pids(command, remaining):
+        try:
+            pids = get_pids(command, remaining)
+        except subprocess.TimeoutExpired:
+            continue
+        if pids:
             return pids[0]
         time.sleep(0.1)
     raise AssertionError(
@@ -147,16 +153,27 @@ def stop_process(process: subprocess.Popen | None) -> None:
     if process is None or process.poll() is not None:
         return
 
-    process.terminate()
+    try:
+        process.terminate()
+    except ProcessLookupError:
+        process.wait(timeout=PROCESS_STOP_TIMEOUT)
+        return
     try:
         process.wait(timeout=PROCESS_STOP_TIMEOUT)
     except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout=PROCESS_STOP_TIMEOUT)
+        try:
+            process.kill()
+        except ProcessLookupError:
+            process.wait(timeout=PROCESS_STOP_TIMEOUT)
+            return
+        try:
+            process.wait(timeout=PROCESS_STOP_TIMEOUT)
+        except subprocess.TimeoutExpired as exc:
+            raise AssertionError("Process did not stop after SIGKILL") from exc
 
 
 def main() -> None:
-    """."""
+    """Test heartbeat handling across a SuperLink restart."""
     with tempfile.TemporaryDirectory(prefix="flwr-e2e-heartbeat-") as temp_dir:
         database_path = os.path.join(temp_dir, "tmp.db")
         secret_path = os.path.join(temp_dir, SUPEREXEC_AUTH_SECRET_FILE)
@@ -222,7 +239,10 @@ def main() -> None:
 
             # Kill the first ServerApp process
             print("Terminating the first ServerApp process...")
-            os.kill(app_pid, 9)  # SIGKILL to ensure it stops immediately
+            try:
+                os.kill(app_pid, 9)  # SIGKILL to ensure it stops immediately
+            except ProcessLookupError:
+                pass
 
             # Restart the SuperLink
             print("Restarting SuperLink...")
