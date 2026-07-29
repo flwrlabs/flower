@@ -104,11 +104,12 @@ deadline=$((SECONDS + training_timeout))
 
 # Define a cleanup function
 cleanup_and_exit() {
-    kill $cl1_pid; kill $cl2_pid
+    local exit_code=$1
+    kill "$cl1_pid" "$cl2_pid" 2>/dev/null || true
     sleep 2  # Allow some time for SuperNodes to terminate
     check_and_kill "$sl_pids"
     sleep 2  # Allow some time for SuperLink to terminate
-    exit $1
+    exit "$exit_code"
 }
 
 while [ "$SECONDS" -lt "$deadline" ]; do
@@ -126,8 +127,13 @@ while [ "$SECONDS" -lt "$deadline" ]; do
         cleanup_and_exit 0
         ;;
       finished:*)
-        status_details=$(echo "$output" | jq -r '.runs[0]["status-details"]')
-        echo "Training failed: ${status_details}"
+        status_details=$(echo "$output" | jq -r '.runs[0]["status-details"] // empty')
+        if [ -n "$status_details" ]; then
+          echo "Training failed: ${status_details}"
+        else
+          echo "Training failed with status ${status}:"
+          echo "$output"
+        fi
         cleanup_and_exit 1
         ;;
     esac
