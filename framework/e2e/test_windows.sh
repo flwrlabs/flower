@@ -76,6 +76,7 @@ timeout 1m flwr run --run-config num-server-rounds=1 . e2e
 
 training_timeout=120
 deadline=$((SECONDS + training_timeout))
+status_query_timeout=10
 
 while [ "$SECONDS" -lt "$deadline" ]; do
     if ! kill -0 "$sl_pid" 2>/dev/null; then
@@ -83,7 +84,10 @@ while [ "$SECONDS" -lt "$deadline" ]; do
         exit 1
     fi
 
-    output=$(flwr ls e2e --format=json)
+    if ! output=$(timeout "${status_query_timeout}s" flwr ls e2e --format=json); then
+        echo "flwr ls failed or timed out after ${status_query_timeout} seconds."
+        exit 1
+    fi
     if ! echo "$output" | jq -e '.success == true' >/dev/null; then
         echo "Unexpected flwr ls output:"
         echo "$output"
