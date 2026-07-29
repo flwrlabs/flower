@@ -101,6 +101,7 @@ sleep 5
 
 training_timeout=120
 deadline=$((SECONDS + training_timeout))
+status_query_timeout=10
 
 # Define a cleanup function
 cleanup_and_exit() {
@@ -114,7 +115,10 @@ cleanup_and_exit() {
 
 while [ "$SECONDS" -lt "$deadline" ]; do
     # Run the command and capture output
-    output=$(flwr ls . e2e --format=json)
+    if ! output=$(timeout "${status_query_timeout}s" flwr ls . e2e --format=json); then
+      echo "flwr ls failed or timed out after ${status_query_timeout} seconds."
+      cleanup_and_exit 1
+    fi
 
     # Extract status from the first run (or loop over all if needed)
     status=$(echo "$output" | jq -r '.runs[0].status')
