@@ -76,7 +76,7 @@ def chat() -> None:
         with flwr_cli_grpc_exc_handler():
             stub.ListFederations(ListFederationsRequest())
         console.print(
-            f"Flower Chat. Type {CHAT_EXIT_COMMAND} or press Ctrl-D to leave.",
+            f"Flower Chat. Type {CHAT_EXIT_COMMAND} or press Ctrl-C to leave.",
             style="agent.prompt",
         )
         _run_interactive_shell(stub, superlink_connection.federation, console)
@@ -93,10 +93,10 @@ def _run_interactive_shell(
             prompt = input(CHAT_USER_PROMPT)
         except EOFError:
             typer.echo()
-            return
+            continue
         except KeyboardInterrupt:
             typer.echo()
-            continue
+            return
 
         stripped_prompt = prompt.strip()
         if not stripped_prompt:
