@@ -21,6 +21,7 @@ env:
 jobs:
   changes:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     outputs:
       framework: ${{ steps.filter.outputs.framework }}
     steps:
@@ -39,6 +40,7 @@ jobs:
 
   wheel:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     name: Build, test and upload wheel
     steps:
       - uses: actions/checkout@v5
