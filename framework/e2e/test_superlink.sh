@@ -142,8 +142,13 @@ while [ "$SECONDS" -lt "$deadline" ]; do
         exit 0
         ;;
       finished:*)
-        status_details=$(echo "$output" | jq -r '.runs[0]["status-details"]')
-        echo "Training failed: ${status_details}"
+        status_details=$(echo "$output" | jq -r '.runs[0]["status-details"] // empty')
+        if [ -n "$status_details" ]; then
+          echo "Training failed: ${status_details}"
+        else
+          echo "Training failed with status ${status}:"
+          echo "$output"
+        fi
         exit 1
         ;;
     esac
