@@ -119,6 +119,7 @@ timeout 1m flwr run --run-config num-server-rounds=1 ../numpy-ci e2e
 # timeout remains the final guard if cleanup or a command hangs.
 training_timeout=300
 deadline=$((SECONDS + training_timeout))
+status_query_timeout=10
 
 while [ "$SECONDS" -lt "$deadline" ]; do
     if ! kill -0 "$sl_pid" 2>/dev/null; then
@@ -127,7 +128,10 @@ while [ "$SECONDS" -lt "$deadline" ]; do
     fi
 
     # Run the command and capture output
-    output=$(flwr ls e2e --format=json)
+    if ! output=$(timeout "${status_query_timeout}s" flwr ls e2e --format=json); then
+      echo "flwr ls failed or timed out after ${status_query_timeout} seconds."
+      exit 1
+    fi
 
     # Extract status from the first run (or loop over all if needed)
     status=$(echo "$output" | jq -r '.runs[0].status')
