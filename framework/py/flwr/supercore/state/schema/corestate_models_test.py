@@ -77,6 +77,7 @@ def _primary_key_signature(table: Table) -> tuple[str, ...]:
         "run_series",
         "series_context",
         "series_runs",
+        "automation",
         "connector",
         "connector_oauth_session",
         "run_connector",
