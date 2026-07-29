@@ -20,6 +20,7 @@ from sqlalchemy import (
     TIMESTAMP,
     BigInteger,
     Float,
+    ForeignKey,
     Index,
     Integer,
     LargeBinary,
@@ -215,3 +216,49 @@ class Task(FlwrBase):
     )
 
     __mapper_args__ = {"primary_key": [task_id]}
+
+
+class TaskEvent(FlwrBase):
+    """Represent a task event."""
+
+    __tablename__ = "task_event"
+    __table_args__ = (
+        Index("idx_task_event_run_id_id", "run_id", "id"),
+        Index("idx_task_event_task_id", "task_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("task.task_id"), nullable=False
+    )
+    event: Mapped[str] = mapped_column(String, nullable=False)
+    data: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class TaskMessage(FlwrBase):
+    """Represent a task message."""
+
+    __tablename__ = "task_message"
+    __table_args__ = (
+        Index("idx_task_message_dst_task_id_created_at", "dst_task_id", "created_at"),
+        Index("idx_task_message_run_id", "run_id"),
+    )
+
+    message_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    src_task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("task.task_id"), nullable=False
+    )
+    dst_task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("task.task_id"), nullable=False
+    )
+    reply_to_message_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[float] = mapped_column(Float, nullable=False)
+    ttl: Mapped[float] = mapped_column(Float, nullable=False)
+    message_type: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    error: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)

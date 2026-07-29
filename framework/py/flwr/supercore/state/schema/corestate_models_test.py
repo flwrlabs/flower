@@ -82,6 +82,8 @@ def _primary_key_signature(table: Table) -> tuple[str, ...]:
         "connector_oauth_session",
         "run_connector",
         "task",
+        "task_event",
+        "task_message",
     ],
 )
 def test_declarative_model_matches_core_metadata(table_name: str) -> None:
