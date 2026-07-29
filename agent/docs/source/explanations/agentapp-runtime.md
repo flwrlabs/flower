@@ -82,7 +82,7 @@ returns a `function_call`, the app passes that item to
 The connector call returns a `function_call_output` item suitable for the next
 model request. Flower validates the connector name, executes it in a child
 task, and records connector activity. See [Using
-connectors](using-connectors.md) for a complete loop.
+connectors](use-connectors.md) for a complete loop.
 
 ## Context
 

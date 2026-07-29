@@ -39,7 +39,7 @@ tutorials/write-your-first-agentapp
 :maxdepth: 1
 
 explanations/agentapp-runtime
-explanations/using-connectors
+explanations/use-connectors
 ```
 
 ```{toctree}

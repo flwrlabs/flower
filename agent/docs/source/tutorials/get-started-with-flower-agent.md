@@ -108,7 +108,7 @@ logic and project configuration.
   Flower Agent project.
 - [Understand the AgentApp
   runtime](../explanations/agentapp-runtime.md) to learn how a run is executed.
-- [Use connectors](../explanations/using-connectors.md) to let a model search
+- [Use connectors](../explanations/use-connectors.md) to let a model search
   the web.
 - [Run an AgentApp on
   SuperGrid](../how-to-guides/run-on-supergrid.md) to learn how to configure,
