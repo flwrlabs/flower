@@ -56,9 +56,9 @@ $ uvx flwr run @flwragent/flwr-agent supergrid \
     --run-config 'agent.input="Explain Flower Agent in one sentence."'
 ```
 
-The CLI prints the run ID after SuperGrid accepts the run. The built-in
-AgentApp sends your prompt to its configured model and records the response as
-agent activity for the run.
+The CLI prints the run ID after SuperGrid accepts the run. The built-in AgentApp
+sends your prompt to its configured model and records the response as agent
+activity for the run.
 
 Open the run in the SuperGrid dashboard to see the response and follow its
 activity. You can also check its status from the terminal:
