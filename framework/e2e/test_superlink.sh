@@ -121,15 +121,27 @@ timeout 1m flwr run "." e2e
 
 training_timeout=240
 deadline=$((SECONDS + training_timeout))
+status_query_timeout=10
+
+check_process() {
+  local pid=$1
+  local name=$2
+  if ! kill -0 "$pid" 2>/dev/null; then
+    echo "$name exited before training completed."
+    return 1
+  fi
+}
 
 while [ "$SECONDS" -lt "$deadline" ]; do
-    if ! kill -0 "$sl_pid" 2>/dev/null; then
-      echo "SuperLink exited before training completed."
-      exit 1
-    fi
+    check_process "$sl_pid" "SuperLink"
+    check_process "$cl1_pid" "SuperNode 1"
+    check_process "$cl2_pid" "SuperNode 2"
 
     # Run the command and capture output
-    output=$(flwr ls e2e --format=json)
+    if ! output=$(timeout "${status_query_timeout}s" flwr ls e2e --format=json); then
+      echo "flwr ls failed or timed out after ${status_query_timeout} seconds."
+      exit 1
+    fi
 
     # Extract status from the first run (or loop over all if needed)
     status=$(echo "$output" | jq -r '.runs[0].status')
