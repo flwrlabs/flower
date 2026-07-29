@@ -25,6 +25,7 @@ from sqlalchemy import (
     LargeBinary,
     MetaData,
     String,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -172,3 +173,45 @@ class RunConnector(FlwrBase):
 
     run_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
     connector_ref: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+
+
+class Task(FlwrBase):
+    """Represent a task."""
+
+    __tablename__ = "task"
+    __table_args__ = (
+        Index("idx_task_run_id", "run_id"),
+        Index("idx_task_token", "token"),
+        Index("idx_task_active_until", "active_until"),
+    )
+
+    task_id: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True)
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    model_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    connector_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    token: Mapped[str | None] = mapped_column(String, nullable=True)
+    active_until: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    pending_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    starting_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    running_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    sub_status: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("''")
+    )
+    details: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("''")
+    )
+
+    __mapper_args__ = {"primary_key": [task_id]}
