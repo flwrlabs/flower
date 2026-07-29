@@ -121,11 +121,16 @@ def _run_interactive_shell(
                     ),
                     federation=federation or "",
                 )
+                if series_id is not None:
+                    req.series_id = series_id
+
                 with flwr_cli_grpc_exc_handler():
                     res = stub.StartRun(req)
 
                 if not res.HasField("run_id"):
                     raise click.ClickException("Failed to start chat run.")
+                if res.HasField("series_id"):
+                    series_id = cast(int, res.series_id)
                 run_id = cast(int, res.run_id)
                 _stream_agent_response(stub, run_id, status, console)
         except KeyboardInterrupt:
