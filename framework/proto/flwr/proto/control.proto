@@ -159,6 +159,7 @@ message StartRunRequest {
   string federation = 5;
   optional uint64 series_id = 6;
   repeated string connector_refs = 7;
+  optional uint64 source_run_id = 8;
 }
 message StartRunResponse {
   optional uint64 run_id = 1;
