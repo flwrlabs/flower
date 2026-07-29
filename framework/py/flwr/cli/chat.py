@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower command line interface `chat` command."""
 
-
 import json
 import sys
 from typing import cast
@@ -110,7 +109,9 @@ def _run_interactive_shell(  # pylint: disable=R0912
             return
         if stripped_prompt.lower() == CHAT_NEW_COMMAND:
             series_id = None
-            console.print("Started a new chat.", style="notice")
+            console.print(
+                "Your next message will start a fresh conversation.", style="notice"
+            )
             continue
 
         run_id: int | None = None
@@ -151,8 +152,7 @@ def _run_interactive_shell(  # pylint: disable=R0912
                         )
                 except click.ClickException as exc:
                     typer.echo(
-                        f"Warning: failed to stop run {run_id}: "
-                        f"{exc.format_message()}",
+                        f"Warning: failed to stop run {run_id}: {exc.format_message()}",
                         err=True,
                     )
             continue
