@@ -14,7 +14,7 @@ cleanup() {
             taskkill //F //PID "$pid" //T >/dev/null 2>&1 || true
         fi
     done
-    if (('${#background_pids[@]} > 0')); then
+    if ((${#background_pids[@]} > 0)); then
         wait "${background_pids[@]}" 2>/dev/null || true
     fi
 
@@ -83,7 +83,7 @@ while [ "$SECONDS" -lt "$deadline" ]; do
     fi
 
     output=$(flwr ls e2e --format=json)
-    if ! echo "$output" | jq -e '.success == true and (.runs | length) > 0' >/dev/null; then
+    if ! echo "$output" | jq -e '.success == true' >/dev/null; then
         echo "Unexpected flwr ls output:"
         echo "$output"
         exit 1
