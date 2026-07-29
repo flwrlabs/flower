@@ -19,7 +19,7 @@ from typing import Any
 import pytest
 from sqlalchemy import Column, Table
 
-from flwr.supercore.state.schema.corestate_models import FlwrBase
+from flwr.supercore.state.schema.corestate_models import FlwrBase, Task
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 
 
@@ -70,7 +70,24 @@ def _primary_key_signature(table: Table) -> tuple[str, ...]:
 
 
 @pytest.mark.parametrize(
-    "table_name", ["nonce_store", "fab", "run_series", "series_context", "series_runs"]
+    "table_name",
+    [
+        "nonce_store",
+        "fab",
+        "run_series",
+        "series_context",
+        "series_runs",
+        "automation",
+        "connector",
+        "connector_oauth_session",
+        "run_connector",
+        "task",
+        "task_event",
+        "task_message",
+        "object_push_sessions",
+        "object_push_session_roots",
+        "object_push_session_pending",
+    ],
 )
 def test_declarative_model_matches_core_metadata(table_name: str) -> None:
     """Ensure declarative metadata preserves the Core table schema."""
@@ -83,3 +100,8 @@ def test_declarative_model_matches_core_metadata(table_name: str) -> None:
     ]
     assert _primary_key_signature(model_table) == _primary_key_signature(core_table)
     assert _index_signature(model_table) == _index_signature(core_table)
+
+
+def test_task_mapper_uses_task_id_as_identity_key() -> None:
+    """Ensure the mapper-only primary key uses the existing unique task_id column."""
+    assert [column.name for column in Task.__mapper__.primary_key] == ["task_id"]
