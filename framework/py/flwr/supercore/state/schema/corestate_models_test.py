@@ -69,7 +69,9 @@ def _primary_key_signature(table: Table) -> tuple[str, ...]:
     return tuple(column.name for column in table.primary_key.columns)
 
 
-@pytest.mark.parametrize("table_name", ["nonce_store", "fab"])
+@pytest.mark.parametrize(
+    "table_name", ["nonce_store", "fab", "run_series", "series_context", "series_runs"]
+)
 def test_declarative_model_matches_core_metadata(table_name: str) -> None:
     """Ensure declarative metadata preserves the Core table schema."""
     core_table = create_corestate_metadata().tables[table_name]
