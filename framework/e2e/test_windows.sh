@@ -8,15 +8,17 @@ cleanup() {
     trap - EXIT
 
     echo "Stopping Flower processes..."
-    for pid in "${background_pids[@]}"; do
-        if command -v taskkill >/dev/null 2>&1; then
+    if command -v taskkill >/dev/null 2>&1; then
+        for pid in "${background_pids[@]}"; do
             taskkill //F //PID "$pid" //T >/dev/null 2>&1 || true
-        else
+        done
+    else
+        for pid in "${background_pids[@]}"; do
             kill "$pid" 2>/dev/null || true
+        done
+        if ((${#background_pids[@]} > 0)); then
+            wait "${background_pids[@]}" 2>/dev/null || true
         fi
-    done
-    if ((${#background_pids[@]} > 0)); then
-        wait "${background_pids[@]}" 2>/dev/null || true
     fi
 
     exit "$exit_code"
