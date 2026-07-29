@@ -25,6 +25,7 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     MetaData,
+    PrimaryKeyConstraint,
     String,
     text,
 )
@@ -262,3 +263,57 @@ class TaskMessage(FlwrBase):
     message_type: Mapped[str] = mapped_column(String, nullable=False)
     content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     error: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+
+
+class ObjectPushSession(FlwrBase):
+    """Represent an object push session."""
+
+    __tablename__ = "object_push_sessions"
+    __table_args__ = (
+        Index("idx_object_push_sessions_run_id", "run_id"),
+        Index("idx_object_push_sessions_expires_at", "expires_at"),
+    )
+
+    session_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    pending_count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class ObjectPushSessionRoot(FlwrBase):
+    """Represent a root object for an object push session."""
+
+    __tablename__ = "object_push_session_roots"
+    __table_args__ = (Index("idx_object_push_session_roots_session_id", "session_id"),)
+
+    session_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("object_push_sessions.session_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    root_object_id: Mapped[str] = mapped_column(
+        String, primary_key=True, nullable=False
+    )
+
+
+class ObjectPushSessionPending(FlwrBase):
+    """Represent a pending object for an object push session."""
+
+    __tablename__ = "object_push_session_pending"
+    __table_args__ = (
+        PrimaryKeyConstraint("session_id", "object_id"),
+        Index(
+            "idx_object_push_session_pending_object_id_session_id",
+            "object_id",
+            "session_id",
+        ),
+    )
+
+    session_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("object_push_sessions.session_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    object_id: Mapped[str] = mapped_column(String, nullable=False)

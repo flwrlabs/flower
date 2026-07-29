@@ -84,6 +84,9 @@ def _primary_key_signature(table: Table) -> tuple[str, ...]:
         "task",
         "task_event",
         "task_message",
+        "object_push_sessions",
+        "object_push_session_roots",
+        "object_push_session_pending",
     ],
 )
 def test_declarative_model_matches_core_metadata(table_name: str) -> None:
