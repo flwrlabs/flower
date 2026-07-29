@@ -99,10 +99,8 @@ cl1_pid=$!
 echo "Starting new client"
 sleep 5
 
-# Initialize a flag to track if training is successful
-found_success=false
-timeout=120  # Timeout after 120 seconds
-elapsed=0
+training_timeout=120
+deadline=$((SECONDS + training_timeout))
 
 # Define a cleanup function
 cleanup_and_exit() {
@@ -113,8 +111,7 @@ cleanup_and_exit() {
     exit $1
 }
 
-# Check for "finished:completed" status in a loop with a timeout
-while [ "$found_success" = false ] && [ $elapsed -lt $timeout ]; do
+while [ "$SECONDS" -lt "$deadline" ]; do
     # Run the command and capture output
     output=$(flwr ls . e2e --format=json)
 
@@ -123,17 +120,21 @@ while [ "$found_success" = false ] && [ $elapsed -lt $timeout ]; do
 
     echo "Current status: $status"
 
-    if [ "$status" == "finished:completed" ]; then
-      found_success=true
-      echo "Training worked correctly!"
-      cleanup_and_exit 0
-    else
-      echo "⏳ Not completed yet, retrying in 2s..."
-      sleep 2
-    fi
+    case "$status" in
+      finished:completed)
+        echo "Training worked correctly!"
+        cleanup_and_exit 0
+        ;;
+      finished:*)
+        status_details=$(echo "$output" | jq -r '.runs[0]["status-details"]')
+        echo "Training failed: ${status_details}"
+        cleanup_and_exit 1
+        ;;
+    esac
+
+    echo "⏳ Not completed yet, retrying in 2s..."
+    sleep 2
 done
 
-if [ "$found_success" = false ]; then
-    echo "Training had an issue and timed out."
-    cleanup_and_exit 1
-fi
+echo "Training did not complete within ${training_timeout} seconds."
+cleanup_and_exit 1
