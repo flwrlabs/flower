@@ -72,7 +72,7 @@ cl2_pid=$!
 background_pids+=("$cl2_pid")
 wait_for_port "$cl2_pid" 9095 "SuperNode 2"
 
-timeout 1m flwr run --run-config num-server-rounds=1 . e2e
+python ../run_with_timeout.py 60 flwr run --run-config num-server-rounds=1 . e2e
 
 training_timeout=120
 deadline=$((SECONDS + training_timeout))
@@ -84,7 +84,7 @@ while [ "$SECONDS" -lt "$deadline" ]; do
         exit 1
     fi
 
-    if ! output=$(timeout "${status_query_timeout}s" flwr ls e2e --format=json); then
+    if ! output=$(python ../run_with_timeout.py "$status_query_timeout" flwr ls e2e --format=json); then
         echo "flwr ls failed or timed out after ${status_query_timeout} seconds."
         exit 1
     fi
