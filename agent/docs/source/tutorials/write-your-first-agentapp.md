@@ -162,7 +162,8 @@ The app currently makes one model request and then exits. Try changing:
 - `MODEL` to another model available to your SuperGrid account;
 - `instructions`, `reasoning`, or `max_output_tokens` in the response request;
   or
-- the app flow to make several model requests.
+- the app flow to make several model requests or use the connector loop
+  described in [Use connectors](../explanations/using-connectors.md).
 
 Each invocation of `uv run flwr run . supergrid` builds and submits the current
 local project, so saved changes are included in the next run.
@@ -182,7 +183,9 @@ This example deliberately keeps the agent logic small. From here, you can add
 instructions, make multiple model calls, or give the model a connector that
 lets it search the web.
 
-Continue with [Run an AgentApp on
-SuperGrid](../how-to-guides/run-on-supergrid.md) to learn how to configure,
-observe, and stop a run. For local development, see [Run an AgentApp with a
-local SuperLink](../how-to-guides/run-with-local-superlink.md).
+Continue with [Use connectors](../explanations/using-connectors.md) to build
+your first tool-calling loop. To learn how to configure, observe, and stop a
+run, see [Run an AgentApp on
+SuperGrid](../how-to-guides/run-on-supergrid.md). For local development, see
+[Run an AgentApp with a local
+SuperLink](../how-to-guides/run-with-local-superlink.md).
