@@ -8,6 +8,8 @@ locally or on SuperGrid.
 This documentation shows you how to:
 
 - build and configure an `AgentApp`;
+- call models and connectors through an `AgentSession`;
+- understand what happens inside the AgentApp runtime;
 - run and observe your agents on SuperGrid; and
 - run an AgentApp with a local SuperLink.
 
@@ -30,6 +32,14 @@ AgentApp](tutorials/write-your-first-agentapp.md).
 
 tutorials/get-started-with-flower-agent
 tutorials/write-your-first-agentapp
+```
+
+```{toctree}
+:caption: Explanations
+:maxdepth: 1
+
+explanations/agentapp-runtime
+explanations/use-connectors
 ```
 
 ```{toctree}
