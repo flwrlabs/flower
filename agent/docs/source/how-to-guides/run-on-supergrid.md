@@ -6,6 +6,9 @@ stop it when necessary.
 If you haven't created an AgentApp yet, start with [Write your first
 AgentApp](../tutorials/write-your-first-agentapp.md).
 
+To run the same app without SuperGrid, see [Run an AgentApp with a local
+SuperLink](run-with-local-superlink.md).
+
 ## Prepare the CLI
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you

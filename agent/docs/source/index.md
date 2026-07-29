@@ -3,14 +3,13 @@
 Flower Agent provides the runtime and building blocks you need to create
 agentic applications on Flower. An `AgentApp` combines your agent logic with
 runtime-provided access to models and connectors, then runs it as a Flower App
-on SuperGrid.
+locally or on SuperGrid.
 
 This documentation shows you how to:
 
 - build and configure an `AgentApp`;
-- call models and connectors through an `AgentSession`;
-- understand what happens inside the AgentApp runtime; and
-- run and observe your agents on SuperGrid.
+- run and observe your agents on SuperGrid; and
+- run an AgentApp with a local SuperLink.
 
 ```{note}
 Flower Agent is experimental. Its APIs and runtime behavior may change between
@@ -34,18 +33,11 @@ tutorials/write-your-first-agentapp
 ```
 
 ```{toctree}
-:caption: Explanations
-:maxdepth: 1
-
-explanations/agentapp-runtime
-explanations/using-connectors
-```
-
-```{toctree}
 :caption: How-to guides
 :maxdepth: 1
 
 how-to-guides/run-on-supergrid
+how-to-guides/run-with-local-superlink
 ```
 
 ## Documentation boundaries
