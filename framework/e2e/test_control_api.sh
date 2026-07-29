@@ -73,9 +73,19 @@ fi
 # Combine the arguments into a single command for flower-superlink
 combined_args="$server_arg $server_auth $simulation_arg"
 
-timeout 2m flower-superlink $combined_args &
+background_pids=()
+cleanup() {
+  if [ "${#background_pids[@]}" -gt 0 ]; then
+    kill "${background_pids[@]}" 2>/dev/null || true
+    wait "${background_pids[@]}" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
+
+flower-superlink $combined_args &
+sl_pid=$!
+background_pids+=("$sl_pid")
 sleep 1
-sl_pid=$(pgrep -f "flower-superlink")
 sleep 2
 
 # Trigger migration
@@ -88,39 +98,34 @@ if [ "$2" = "client-auth" ] && [ "$3" = "deployment-engine" ]; then
 fi
 
 if [ "$3" = "deployment-engine" ]; then
-  timeout 2m flower-supernode $client_arg \
+  flower-supernode $client_arg \
       --superlink $server_address $client_auth_1 \
       --clientappio-api-address localhost:9094 \
       --node-config "partition-id=0 num-partitions=2" --max-retries 0 &
-  cl1_pid=$!
+  background_pids+=("$!")
   sleep 2
 
-  timeout 2m flower-supernode $client_arg \
+  flower-supernode $client_arg \
       --superlink $server_address $client_auth_2 \
       --clientappio-api-address localhost:9095 \
       --node-config "partition-id=1 num-partitions=2" --max-retries 0 &
-  cl2_pid=$!
+  background_pids+=("$!")
   sleep 2
 fi
 
 timeout 1m flwr run --run-config num-server-rounds=1 ../numpy-ci e2e
 
-# Initialize a flag to track if training is successful
-found_success=false
-timeout=120  # Timeout after 120 seconds
-elapsed=0
-engine="$3"
+# Keep the services alive for the entire training run. The workflow-level
+# timeout remains the final guard if cleanup or a command hangs.
+training_timeout=300
+deadline=$((SECONDS + training_timeout))
 
-# Define a cleanup function
-cleanup_and_exit() {
-    if [ "$engine" = "deployment-engine" ]; then
-      kill $cl1_pid; kill $cl2_pid;
+while [ "$SECONDS" -lt "$deadline" ]; do
+    if ! kill -0 "$sl_pid" 2>/dev/null; then
+      echo "SuperLink exited before training completed."
+      exit 1
     fi
-    sleep 1; kill $sl_pid;
-    exit $1
-}
 
-while [ "$found_success" = false ] && [ $elapsed -lt $timeout ]; do
     # Run the command and capture output
     output=$(flwr ls e2e --format=json)
 
@@ -129,17 +134,21 @@ while [ "$found_success" = false ] && [ $elapsed -lt $timeout ]; do
 
     echo "Current status: $status"
 
-    if [ "$status" == "finished:completed" ]; then
-      found_success=true
-      echo "Training worked correctly!"
-      cleanup_and_exit 0
-    else
-      echo "⏳ Not completed yet, retrying in 2s..."
-      sleep 2
-    fi
+    case "$status" in
+      finished:completed)
+        echo "Training worked correctly!"
+        exit 0
+        ;;
+      finished:*)
+        status_details=$(echo "$output" | jq -r '.runs[0]["status-details"]')
+        echo "Training failed: ${status_details}"
+        exit 1
+        ;;
+    esac
+
+    echo "⏳ Not completed yet, retrying in 2s..."
+    sleep 2
 done
 
-if [ "$found_success" = false ]; then
-    echo "Training had an issue and timed out."
-    cleanup_and_exit 1
-fi
+echo "Training did not complete within ${training_timeout} seconds."
+exit 1
