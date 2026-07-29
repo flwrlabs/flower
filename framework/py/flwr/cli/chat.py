@@ -30,6 +30,7 @@ from flwr.cli.constant import (
     CHAT_EXIT_COMMAND,
     CHAT_FAILURE_EVENTS,
     CHAT_FLOWER_AGENT_APP_SPEC,
+    CHAT_NEW_COMMAND,
     CHAT_SUPERGRID_CONNECTION_NAME,
     CHAT_TERMINAL_EVENTS,
     CHAT_TEXT_DELTA_EVENT,
@@ -107,6 +108,10 @@ def _run_interactive_shell(  # pylint: disable=R0912
             continue
         if stripped_prompt.lower() == CHAT_EXIT_COMMAND:
             return
+        if stripped_prompt.lower() == CHAT_NEW_COMMAND:
+            series_id = None
+            console.print("Started a new chat.", style="notice")
+            continue
 
         run_id: int | None = None
         try:

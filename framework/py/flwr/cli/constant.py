@@ -51,6 +51,7 @@ CHAT_FLOWER_AGENT_APP_SPEC = "@flwrlabs/flwr-agent"
 CHAT_SUPERGRID_CONNECTION_NAME = "supergrid"
 CHAT_AGENT_INPUT_KEY = "agent.input"
 CHAT_EXIT_COMMAND = "/quit"
+CHAT_NEW_COMMAND = "/new"
 CHAT_TEXT_DELTA_EVENT = "response.output_text.delta"
 CHAT_TERMINAL_EVENTS = {"response.completed", "response.incomplete"}
 CHAT_FAILURE_EVENTS = {"error", "response.failed"}
