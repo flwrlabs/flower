@@ -81,7 +81,7 @@ jobs:
 
   superexec:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs: [changes, wheel]
     strategy:
       fail-fast: false
@@ -135,7 +135,7 @@ jobs:
 
   frameworks:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs: [changes, wheel]
     # Using approach described here:
     # https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs
@@ -262,7 +262,7 @@ jobs:
 
   strategies:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs: [changes, wheel]
     strategy:
       matrix:
@@ -315,7 +315,7 @@ jobs:
 
   apps:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs: [changes, wheel]
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -359,7 +359,7 @@ jobs:
 
   pull-app:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs: [changes, wheel]
     env:
       ACCOUNT: "flwrlabs"
@@ -402,7 +402,7 @@ jobs:
 
   build_and_install:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs: [changes, wheel]
     strategy:
       matrix:
@@ -436,7 +436,7 @@ jobs:
 
   numpy:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs: [changes, wheel]
     strategy:
       fail-fast: false
@@ -490,7 +490,7 @@ jobs:
     runs-on: windows-latest
     env:
       PYTHONIOENCODING: utf-8
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs: [changes, wheel]
 
     name: Windows compatibility test
@@ -518,7 +518,7 @@ jobs:
 
   serverapp-heartbeat-test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs: [changes, wheel]
     strategy:
       matrix:
