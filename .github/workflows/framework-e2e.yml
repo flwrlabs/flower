@@ -488,7 +488,7 @@ jobs:
     runs-on: windows-latest
     env:
       PYTHONIOENCODING: utf-8
-    timeout-minutes: 10
+    timeout-minutes: 5
     needs: [changes, wheel]
 
     name: Windows compatibility test
