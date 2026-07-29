@@ -16,6 +16,7 @@
 
 
 import json
+import sys
 from typing import cast
 
 import click
@@ -93,6 +94,8 @@ def _run_interactive_shell(
             prompt = input(CHAT_USER_PROMPT)
         except EOFError:
             typer.echo()
+            if not sys.stdin.isatty():
+                return
             continue
         except KeyboardInterrupt:
             typer.echo()
