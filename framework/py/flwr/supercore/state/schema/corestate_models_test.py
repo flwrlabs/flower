@@ -22,6 +22,8 @@ from sqlalchemy import Column, Table
 from flwr.supercore.state.schema.corestate_models import FlwrBase, Task
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 
+UNMAPPED_CORE_TABLES = {"task_logs"}
+
 
 def _server_default(column: Column[Any]) -> str | None:
     """Return a comparable representation of a column server default."""
@@ -87,6 +89,7 @@ def _primary_key_signature(table: Table) -> tuple[str, ...]:
         "object_push_sessions",
         "object_push_session_roots",
         "object_push_session_pending",
+        "task_usage",
     ],
 )
 def test_declarative_model_matches_core_metadata(table_name: str) -> None:
@@ -102,6 +105,21 @@ def test_declarative_model_matches_core_metadata(table_name: str) -> None:
     assert _index_signature(model_table) == _index_signature(core_table)
 
 
+def test_declarative_metadata_covers_all_mappable_core_tables() -> None:
+    """Ensure all mappable CoreState tables have a declarative representation."""
+    core_table_names = set(create_corestate_metadata().tables)
+    model_table_names = set(FlwrBase.metadata.tables)
+
+    assert model_table_names == core_table_names - UNMAPPED_CORE_TABLES
+    assert model_table_names.isdisjoint(UNMAPPED_CORE_TABLES)
+
+
 def test_task_mapper_uses_task_id_as_identity_key() -> None:
     """Ensure the mapper-only primary key uses the existing unique task_id column."""
     assert [column.name for column in Task.__mapper__.primary_key] == ["task_id"]
+
+
+def test_task_logs_remains_unmapped_without_unique_identity_key() -> None:
+    """Ensure keyless task_logs is not mapped with an unsafe ORM identity key."""
+    assert "task_logs" in create_corestate_metadata().tables
+    assert "task_logs" not in FlwrBase.metadata.tables

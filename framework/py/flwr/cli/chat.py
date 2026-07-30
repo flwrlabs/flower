@@ -30,6 +30,7 @@ from flwr.cli.constant import (
     CHAT_EXIT_COMMAND,
     CHAT_FAILURE_EVENTS,
     CHAT_FLOWER_AGENT_APP_SPEC,
+    CHAT_NEW_COMMAND,
     CHAT_SUPERGRID_CONNECTION_NAME,
     CHAT_TERMINAL_EVENTS,
     CHAT_TEXT_DELTA_EVENT,
@@ -85,10 +86,11 @@ def chat() -> None:
         channel.close()
 
 
-def _run_interactive_shell(
+def _run_interactive_shell(  # pylint: disable=R0912
     stub: ControlStub, federation: str | None, console: Console
 ) -> None:
     """Run the prompt-response loop."""
+    series_id: int | None = None
     while True:
         try:
             prompt = input(CHAT_USER_PROMPT)
@@ -106,6 +108,12 @@ def _run_interactive_shell(
             continue
         if stripped_prompt.lower() == CHAT_EXIT_COMMAND:
             return
+        if stripped_prompt.lower() == CHAT_NEW_COMMAND:
+            series_id = None
+            console.print(
+                "Your next message will start a fresh conversation.", style="notice"
+            )
+            continue
 
         run_id: int | None = None
         try:
@@ -120,11 +128,16 @@ def _run_interactive_shell(
                     ),
                     federation=federation or "",
                 )
+                if series_id is not None:
+                    req.series_id = series_id
+
                 with flwr_cli_grpc_exc_handler():
                     res = stub.StartRun(req)
 
                 if not res.HasField("run_id"):
                     raise click.ClickException("Failed to start chat run.")
+                if res.HasField("series_id"):
+                    series_id = cast(int, res.series_id)
                 run_id = cast(int, res.run_id)
                 _stream_agent_response(stub, run_id, status, console)
         except KeyboardInterrupt:
@@ -191,7 +204,6 @@ def _stream_agent_response(
                     raise click.ClickException(_format_failure_event(payload))
                 elif event_type in CHAT_TERMINAL_EVENTS:
                     terminal_event_seen = True
-                    break
     finally:
         if response_started:
             console.print()
