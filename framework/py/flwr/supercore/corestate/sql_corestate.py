@@ -60,6 +60,7 @@ from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationS
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
+from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
@@ -449,24 +450,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Return an account's connector, if present."""
         if not flwr_aid or not connector_ref:
             return None
-        rows = self.query(
-            """
-            SELECT flwr_aid, connector_ref, credentials_json, config_json
-            FROM connector
-            WHERE flwr_aid = :flwr_aid
-              AND connector_ref = :connector_ref
-            """,
-            {"flwr_aid": flwr_aid, "connector_ref": connector_ref},
-        )
-        if not rows:
-            return None
-        row = rows[0]
-        return ConnectorRecord(
-            flwr_aid=row["flwr_aid"],
-            connector_ref=row["connector_ref"],
-            credentials_json=row["credentials_json"],
-            config_json=row["config_json"],
-        )
+        with self.session() as session:
+            row = session.get(
+                ConnectorModel,
+                (flwr_aid, connector_ref),
+                populate_existing=True,
+            )
+            if row is None:
+                return None
+            return ConnectorRecord(
+                flwr_aid=row.flwr_aid,
+                connector_ref=row.connector_ref,
+                credentials_json=row.credentials_json,
+                config_json=row.config_json,
+            )
 
     def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
         """Delete an account's connector if it exists."""
