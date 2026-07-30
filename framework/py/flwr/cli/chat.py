@@ -43,23 +43,23 @@ from prompt_toolkit.utils import get_cwidth
 from prompt_toolkit.widgets import Frame
 
 from flwr.cli.constant import (
-    CHAT_AGENT_NAME,
     CHAT_AGENT_INPUT_KEY,
+    CHAT_AGENT_NAME,
     CHAT_APP_STYLE,
-    CHAT_EXIT_HINT,
     CHAT_EXIT_COMMAND,
-    CHAT_FAILURE_EVENTS,
-    CHAT_FLOWER_LOGO,
-    CHAT_FLOWER_AGENT_APP_SPEC,
+    CHAT_EXIT_HINT,
     CHAT_EXPERIMENTAL_WARNING,
+    CHAT_FAILURE_EVENTS,
+    CHAT_FLOWER_AGENT_APP_SPEC,
+    CHAT_FLOWER_LOGO,
     CHAT_NEW_COMMAND,
     CHAT_NEW_CONVERSATION_MESSAGE,
     CHAT_SPINNER_FRAMES,
     CHAT_SUPERGRID_CONNECTION_NAME,
     CHAT_TERMINAL_EVENTS,
     CHAT_TEXT_DELTA_EVENT,
-    CHAT_WELCOME_MESSAGE,
     CHAT_USER_PROMPT,
+    CHAT_WELCOME_MESSAGE,
 )
 from flwr.cli.flower_config import read_superlink_connection
 from flwr.common.serde import user_config_to_proto
