@@ -400,7 +400,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
         with self.session() as session:
-            row = session.get(FabModel, fab_hash)
+            row = session.get(FabModel, fab_hash, populate_existing=True)
             if row is None:
                 return None
             # Launch tradeoff: do not recompute content hash on reads; rely on

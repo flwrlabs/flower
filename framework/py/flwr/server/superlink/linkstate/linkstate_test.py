@@ -2346,6 +2346,23 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state.initialize()
         return state
 
+    def test_get_fab_refreshes_cached_row_in_shared_session(self) -> None:
+        """Test get_fab observes raw SQL updates in a shared session."""
+        state = self.state_factory()
+        content = b"fab-content"
+        fab_hash = hashlib.sha256(content).hexdigest()
+
+        with state.session():
+            state.store_fab(Fab(fab_hash, content, {"meta": "old"}))
+            first = state.get_fab(fab_hash)
+            state.store_fab(Fab(fab_hash, content, {"meta": "new"}))
+            second = state.get_fab(fab_hash)
+
+        assert first is not None
+        assert second is not None
+        self.assertEqual(first.verifications, {"meta": "old"})
+        self.assertEqual(second.verifications, {"meta": "new"})
+
     def test_run_series_distinguishes_missing_and_empty_descriptions(self) -> None:
         """Missing and explicitly empty descriptions remain distinct in SQL."""
         state = self.state_factory()
