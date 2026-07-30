@@ -34,6 +34,7 @@ _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
 }
 # Concrete OAuth connector implementations populate this static registry.
 _CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {}
+_CREDENTIAL_CONNECTOR_REFS: dict[str, str] = {}
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     automation.START_AUTOMATION_TOOL_NAME: automation.make_start_automation_tool,
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.make_web_search_tool,
@@ -70,6 +71,11 @@ def invoke_connector(
 def requires_connector_credentials(name: str) -> bool:
     """Return whether a connector uses account-scoped credentials."""
     return name in _CREDENTIAL_CONNECTOR_HANDLERS
+
+
+def get_connector_ref(name: str) -> str:
+    """Return the connector reference associated with a tool name."""
+    return _CREDENTIAL_CONNECTOR_REFS.get(name, name)
 
 
 def get_builtin_connector_tools() -> list[JSONObject]:

@@ -55,6 +55,7 @@ def _pushed_response(stub: Mock) -> ConnectorResponse:
 
 def test_handle_task_passes_credentials_to_matching_provider() -> None:
     """Credential-backed providers should receive decoded credentials and config."""
+    tool_name = "notion_search"
     stub = Mock()
     stub.GetConnector.return_value = GetConnectorResponse(
         connector_ref="notion",
@@ -66,11 +67,16 @@ def test_handle_task_passes_credentials_to_matching_provider() -> None:
     with (
         patch(
             "flwr.supercore.task_process.connector.task._pull_connector_request",
-            return_value=_connector_request("notion"),
+            return_value=_connector_request(tool_name),
         ),
         patch.dict(
             registry._CREDENTIAL_CONNECTOR_HANDLERS,  # pylint: disable=protected-access
-            {"notion": provider},
+            {tool_name: provider},
+            clear=True,
+        ),
+        patch.dict(
+            registry._CREDENTIAL_CONNECTOR_REFS,  # pylint: disable=protected-access
+            {tool_name: "notion"},
             clear=True,
         ),
     ):
@@ -84,11 +90,40 @@ def test_handle_task_passes_credentials_to_matching_provider() -> None:
         usage_recorder=ANY,
     )
     assert _pushed_response(stub).payload == {
-        "name": "notion",
+        "name": tool_name,
         "call_id": "call-1",
         "output": {"pages": 3},
         "error": None,
     }
+
+
+def test_handle_task_rejects_credentials_for_different_connector() -> None:
+    """Credential-backed providers should receive only their connector's secrets."""
+    stub = Mock()
+    stub.GetConnector.return_value = GetConnectorResponse(
+        connector_ref="notion",
+        credentials_json='{"token":"secret"}',
+        config_json="{}",
+    )
+    provider = Mock()
+
+    with (
+        patch(
+            "flwr.supercore.task_process.connector.task._pull_connector_request",
+            return_value=_connector_request("github"),
+        ),
+        patch.dict(
+            registry._CREDENTIAL_CONNECTOR_HANDLERS,  # pylint: disable=protected-access
+            {"github": provider},
+            clear=True,
+        ),
+        pytest.raises(
+            RuntimeError, match="Credential-backed connector execution failed."
+        ),
+    ):
+        handle_task(stub=stub, task_id=22, run_id=7)
+
+    provider.assert_not_called()
 
 
 def test_handle_task_does_not_expose_credentials_in_provider_errors() -> None:
