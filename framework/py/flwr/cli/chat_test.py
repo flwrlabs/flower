@@ -21,6 +21,12 @@ from unittest.mock import Mock, patch
 import click
 import pytest
 
+from flwr.cli.constant import (
+    CHAT_AGENT_INPUT_KEY,
+    CHAT_FLOWER_AGENT_APP_SPEC,
+    CHAT_SUPERGRID_CONNECTION_NAME,
+    CHAT_USER_PROMPT,
+)
 from flwr.cli.typing import SuperLinkConnection
 from flwr.common.serde import user_config_from_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -35,7 +41,7 @@ chat_module = importlib.import_module("flwr.cli.chat")
 def test_chat_requires_login_before_prompt() -> None:
     """Chat should fail before prompting if the user has not logged in."""
     superlink_connection = SuperLinkConnection(
-        name="supergrid",
+        name=CHAT_SUPERGRID_CONNECTION_NAME,
         address="supergrid.flower.ai",
     )
     channel = Mock()
@@ -70,7 +76,7 @@ def test_chat_submits_prompt_to_flower_agent_and_streams_response(
 ) -> None:
     """Chat should submit prompts as agent.input and print streamed deltas."""
     superlink_connection = SuperLinkConnection(
-        name="supergrid",
+        name=CHAT_SUPERGRID_CONNECTION_NAME,
         address="supergrid.flower.ai",
     )
     channel = Mock()
@@ -112,16 +118,18 @@ def test_chat_submits_prompt_to_flower_agent_and_streams_response(
             return_value=channel,
         ),
         patch.object(chat_module, "ControlStub", return_value=stub),
+        patch.object(chat_module.sys.stdin, "isatty", return_value=False),
+        patch.object(chat_module.sys.stdout, "isatty", return_value=False),
         patch("builtins.input", side_effect=["Hello", "/quit"]) as mock_input,
     ):
         chat_module.chat()
 
     start_run_request = stub.StartRun.call_args.args[0]
     stub.ListFederations.assert_called_once()
-    assert start_run_request.app_spec == "@flwrlabs/flwr-agent"
+    assert start_run_request.app_spec == CHAT_FLOWER_AGENT_APP_SPEC
     assert user_config_from_proto(start_run_request.override_config) == {
-        "agent.input": "Hello"
+        CHAT_AGENT_INPUT_KEY: "Hello"
     }
-    assert mock_input.call_args_list[0].args[0] == "❯ "
+    assert mock_input.call_args_list[0].args[0] == CHAT_USER_PROMPT
     assert "Hello\n" in click.unstyle(capsys.readouterr().out)
     channel.close.assert_called_once()

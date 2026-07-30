@@ -60,6 +60,7 @@ from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationS
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
+from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import build_sql_in_params, int64_to_uint64, uint64_to_int64
@@ -398,22 +399,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
-        query = """
-            SELECT fab_hash, content, verifications
-            FROM fab
-            WHERE fab_hash = :fab_hash
-        """
-        rows = self.query(query, {"fab_hash": fab_hash})
-        if not rows:
-            return None
-        row = rows[0]
-        # Launch tradeoff: do not recompute content hash on reads; rely on
-        # write-time validation and hash-addressed lookup.
-        return Fab(
-            hash_str=row["fab_hash"],
-            content=row["content"],
-            verifications=json.loads(row["verifications"]),
-        )
+        with self.session() as session:
+            row = session.get(FabModel, fab_hash, populate_existing=True)
+            if row is None:
+                return None
+            # Launch tradeoff: do not recompute content hash on reads; rely on
+            # write-time validation and hash-addressed lookup.
+            return Fab(
+                hash_str=row.fab_hash,
+                content=row.content,
+                verifications=json.loads(row.verifications),
+            )
 
     def upsert_connector(
         self,
