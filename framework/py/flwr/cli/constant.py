@@ -55,7 +55,7 @@ CHAT_NEW_COMMAND = "/new"
 CHAT_TEXT_DELTA_EVENT = "response.output_text.delta"
 CHAT_TERMINAL_EVENTS = {"response.completed", "response.incomplete"}
 CHAT_FAILURE_EVENTS = {"error", "response.failed"}
-CHAT_USER_PROMPT = "You> "
+CHAT_USER_PROMPT = "❯ "
 
 
 class SuperLinkConnectionTomlKey:

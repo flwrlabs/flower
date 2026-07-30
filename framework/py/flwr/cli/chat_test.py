@@ -122,6 +122,6 @@ def test_chat_submits_prompt_to_flower_agent_and_streams_response(
     assert user_config_from_proto(start_run_request.override_config) == {
         "agent.input": "Hello"
     }
-    assert mock_input.call_args_list[0].args[0] == "You> "
-    assert "Agent> Hello\n" in click.unstyle(capsys.readouterr().out)
+    assert mock_input.call_args_list[0].args[0] == "❯ "
+    assert "Hello\n" in click.unstyle(capsys.readouterr().out)
     channel.close.assert_called_once()
