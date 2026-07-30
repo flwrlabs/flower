@@ -639,58 +639,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
         self.assertEqual(tasks[0].fab_hash, runs[0].fab_hash)
 
-    def test_start_run_uses_source_run_fab_and_launch_context(self) -> None:
-        """Test StartRun can reuse a historical run's stored FAB."""
-        fab_content = b"historical AgentApp FAB"
-        source_request = StartRunRequest(federation=NOOP_FEDERATION_ID)
-        source_request.fab.content = fab_content
-        source_request.override_config["agent.input"].string = "First input"
-
-        with (
-            patch(
-                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
-                return_value={
-                    "tool": {
-                        "flwr": {
-                            "app": {
-                                "config": {"agent": {"input": "Default input"}},
-                                "components": {"agentapp": "agent:app"},
-                            }
-                        }
-                    }
-                },
-            ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers"
-                ".get_metadata_from_config",
-                return_value=("alice/custom-agent", "0.1.0"),
-            ),
-        ):
-            source_response = self.servicer.StartRun(source_request, Mock())
-            request = StartRunRequest(source_run_id=source_response.run_id)
-            request.override_config["agent.input"].string = "Second input"
-            response = self.servicer.StartRun(request, Mock())
-
-        source_run = self.state.get_run_info(run_ids=[source_response.run_id])[0]
-        run = self.state.get_run_info(run_ids=[response.run_id])[0]
-        self.assertNotEqual(run.run_id, source_run.run_id)
-        self.assertEqual(run.fab_hash, source_run.fab_hash)
-        self.assertEqual(run.federation_id, source_run.federation_id)
-        self.assertEqual(run.series_id, source_run.series_id)
-        self.assertEqual(run.override_config["agent.input"], "Second input")
-
-    def test_start_run_rejects_source_run_from_another_account(self) -> None:
-        """Test StartRun requires ownership of the source run."""
-        source_run_id = self._create_dummy_run("other-account")
-
-        with self.assertRaises(FlowerError) as exc:
-            self.servicer.StartRun(
-                StartRunRequest(source_run_id=source_run_id),
-                Mock(),
-            )
-
-        self.assertEqual(exc.exception.code, ApiErrorCode.RUN_ID_NOT_BELONG_TO_ACCOUNT)
-
     def test_start_run_creates_builtin_agentapp_run_from_app_spec(self) -> None:
         """Test StartRun creates an AgentApp run for the built-in flwr agent."""
         request = StartRunRequest(
