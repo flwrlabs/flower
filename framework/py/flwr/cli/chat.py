@@ -17,6 +17,7 @@
 import asyncio
 import json
 import sys
+from collections.abc import Callable
 from time import monotonic
 from typing import cast
 
@@ -37,7 +38,8 @@ from prompt_toolkit.layout import (
     Layout,
     Window,
 )
-from prompt_toolkit.layout.processors import BeforeInput
+from prompt_toolkit.layout.processors import BeforeInput, Processor
+from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 from prompt_toolkit.styles import Style
 from prompt_toolkit.utils import get_cwidth
 from prompt_toolkit.widgets import Frame
@@ -96,6 +98,38 @@ _CHAT_FLOWER_LOGO = r"""
 _CHAT_FLOWER_LOGO_LINES = _CHAT_FLOWER_LOGO.splitlines()
 _CHAT_USER_MESSAGE_MARKER = "❯ "
 _SPINNER_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
+
+
+class _ScrollablePromptControl(BufferControl):  # pylint: disable=too-few-public-methods
+    """Buffer control that scrolls wrapped prompt text with the mouse wheel."""
+
+    def __init__(
+        self,
+        buffer: Buffer,
+        input_processors: list[Processor],
+        width: Callable[[], int],
+    ) -> None:
+        super().__init__(buffer=buffer, input_processors=input_processors)
+        self._get_width = width
+
+    def mouse_handler(self, mouse_event: MouseEvent) -> object:
+        """Handle mouse wheel events over the prompt."""
+        if mouse_event.event_type == MouseEventType.SCROLL_UP:
+            self._move_cursor_visual_row(-1)
+            return None
+        if mouse_event.event_type == MouseEventType.SCROLL_DOWN:
+            self._move_cursor_visual_row(1)
+            return None
+        return super().mouse_handler(mouse_event)
+
+    def _move_cursor_visual_row(self, row_delta: int) -> None:
+        """Move the cursor across wrapped prompt rows."""
+        self.buffer.cursor_position = _get_wrapped_prompt_cursor_position(
+            text=self.buffer.text,
+            cursor_position=self.buffer.cursor_position,
+            width=self._get_width(),
+            row_delta=row_delta,
+        )
 
 
 class _ChatApplication:  # pylint: disable=too-many-instance-attributes
@@ -188,11 +222,12 @@ class _ChatApplication:  # pylint: disable=too-many-instance-attributes
             filter=Condition(lambda: bool(self.status)),
         )
         prompt = Window(
-            BufferControl(
+            _ScrollablePromptControl(
                 buffer=self.input_buffer,
                 input_processors=[
                     BeforeInput(CHAT_USER_PROMPT, style="class:user.prompt")
                 ],
+                width=self._get_transcript_width,
             ),
             height=Dimension(min=1, max=2),
             dont_extend_height=True,
@@ -537,6 +572,67 @@ def _wrap_transcript_fragments(
             current_width += char_width
 
     return wrapped_fragments
+
+
+def _get_wrapped_prompt_cursor_position(
+    text: str, cursor_position: int, width: int, row_delta: int
+) -> int:
+    """Return the cursor position one wrapped prompt row away."""
+    positions = _get_wrapped_prompt_cursor_positions(text, width)
+    cursor_position = max(0, min(cursor_position, len(positions) - 1))
+    current_row, current_column = positions[cursor_position]
+    target_row = max(0, min(current_row + row_delta, positions[-1][0]))
+    if target_row == current_row:
+        return cursor_position
+
+    target_positions = [
+        (index, column)
+        for index, (row, column) in enumerate(positions)
+        if row == target_row
+    ]
+    return min(
+        target_positions,
+        key=lambda item: (abs(item[1] - current_column), item[0]),
+    )[0]
+
+
+def _get_wrapped_prompt_cursor_positions(
+    text: str, width: int
+) -> list[tuple[int, int]]:
+    """Return display row and column for each cursor position in the prompt."""
+    width = max(1, width)
+    row = 0
+    column = 0
+    for char in CHAT_USER_PROMPT:
+        row, column = _advance_wrapped_position(row, column, get_cwidth(char), width)
+
+    positions: list[tuple[int, int]] = []
+    for char in text:
+        if char == "\n":
+            positions.append((row, column))
+            row += 1
+            column = 0
+            continue
+
+        char_width = get_cwidth(char)
+        if column and column + char_width > width:
+            row += 1
+            column = 0
+        positions.append((row, column))
+        row, column = _advance_wrapped_position(row, column, char_width, width)
+
+    positions.append((row, column))
+    return positions
+
+
+def _advance_wrapped_position(
+    row: int, column: int, char_width: int, width: int
+) -> tuple[int, int]:
+    """Advance one character cell position with wrapping."""
+    if column and column + char_width > width:
+        row += 1
+        column = 0
+    return row, column + char_width
 
 
 def _wrap_transcript_line(line: str, width: int) -> list[str]:
