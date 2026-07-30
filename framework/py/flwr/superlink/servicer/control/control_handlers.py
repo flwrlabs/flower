@@ -468,16 +468,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     verification_dict: dict[str, str] = {}
     note: str | None = None
 
-    builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
-    if builtin_agent_fab is not None:
-        fab_file, verification_dict = builtin_agent_fab
-    elif request.app_spec:
-        fab_file, verification_dict, note = _get_remote_fab(
-            fleet_api_type, request.app_spec
-        )
-    elif request.fab.content:
-        fab_file = request.fab.content
-    elif source_run is not None:
+    if source_run is not None:
         source_fab = state.get_fab(source_run.fab_hash)
         if source_fab is None:
             raise FlowerError(
@@ -487,7 +478,15 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
         fab_file = source_fab.content
         verification_dict = source_fab.verifications
     else:
-        fab_file = request.fab.content
+        builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
+        if builtin_agent_fab is not None:
+            fab_file, verification_dict = builtin_agent_fab
+        elif request.app_spec:
+            fab_file, verification_dict, note = _get_remote_fab(
+                fleet_api_type, request.app_spec
+            )
+        else:
+            fab_file = request.fab.content
 
     if len(fab_file) > FAB_MAX_SIZE:
         log(
@@ -497,32 +496,15 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
         )
         return StartRunResponse()
 
-    request_override_config = user_config_from_proto(request.override_config)
-    override_config = (
-        {**source_run.override_config, **request_override_config}
-        if source_run is not None
-        else request_override_config
-    )
-    requested_connector_refs: Sequence[str] = request.connector_refs
-    if source_run is not None and not requested_connector_refs:
-        requested_connector_refs = state.get_run_connector_refs(source_run.run_id)
+    override_config = user_config_from_proto(request.override_config)
     connector_refs = validate_run_connector_refs(
-        requested_connector_refs, account, state
+        request.connector_refs, account, state
     )
 
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
 
     # Check (1) federation exists and (2) the flwr_aid is a member
-    federation_id = (
-        source_run.federation_id
-        if source_run is not None and not request.federation
-        else _resolve_federation_id(state, account_name, request.federation)
-    )
-    if source_run is not None and federation_id != source_run.federation_id:
-        raise FlowerError(
-            ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
-            "A source-based run must use the source run's federation.",
-        )
+    federation_id = _resolve_federation_id(state, account_name, request.federation)
     if not state.federation_manager.exists(federation_id):
         if request.federation:
             raise FlowerError(
@@ -553,11 +535,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
         primary_task_type = (
             TaskType.AGENT_APP if is_agentapp_bundle else TaskType.SERVER_APP
         )
-        series_id = (
-            request.series_id
-            if request.HasField("series_id")
-            else source_run.series_id if source_run is not None else None
-        )
+        series_id = request.series_id if request.HasField("series_id") else None
         resolved_federation_config = None
         runtime = RunTime.DEPLOYMENT
         sim_cfg = state.federation_manager.get_simulation_config(federation_id)
@@ -565,20 +543,8 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
             primary_task_type = TaskType.SIMULATION
             runtime = RunTime.SIMULATION
             resolved_federation_config = SimulationConfig()
-            source_federation_config = (
-                state.get_federation_config(source_run.run_id)
-                if source_run is not None
-                else None
-            )
-            resolved_federation_config.CopyFrom(source_federation_config or sim_cfg)
+            resolved_federation_config.CopyFrom(sim_cfg)
             resolved_federation_config.MergeFrom(request.override_federation_config)
-
-        if (
-            source_run is not None
-            and series_id == source_run.series_id
-            and primary_task_type != source_run.primary_task_type
-        ):
-            raise ValueError("A source run series cannot change its primary task type")
 
         state.federation_manager.can_execute(
             flwr_aid,
