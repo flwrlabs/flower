@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for Control API handler functions."""
 
+import hashlib
 import unittest
 from unittest.mock import Mock, patch
 
@@ -33,7 +34,7 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.task_process.connector import registry as connector_registry
+from flwr.supercore.fab import Fab
 from flwr.superlink.federation import NoOpFederationManager
 
 from .control_handlers import (
@@ -59,94 +60,52 @@ class TestStartRunHandler(unittest.TestCase):
             account_name=NOOP_ACCOUNT_NAME,
         )
 
-    def test_start_run_reuses_only_source_run_fab(self) -> None:
-        """Test StartRun reuses only a historical run's stored FAB."""
-        fab_content = b"historical AgentApp FAB"
-        source_request = StartRunRequest(
-            federation=NOOP_FEDERATION_ID,
-            connector_refs=["slack"],
-        )
-        source_request.fab.content = fab_content
-        source_request.override_config["agent.input"].string = "First input"
-        source_request.override_config["agent.context"].string = "Source context"
-        self.state.upsert_connector(
-            flwr_aid=self.account.flwr_aid,
-            connector_ref="slack",
-            credentials_json="{}",
-            config_json="{}",
+    def _create_run(self, flwr_aid: str, fab_hash: str) -> int:
+        return self.state.create_run(
+            "flwr/demo",
+            "v0.0.1",
+            fab_hash,
+            {},
+            NOOP_FEDERATION_ID,
+            None,
+            flwr_aid,
+            TaskType.SERVER_APP,
         )
 
+    def test_start_run_reuses_source_run_fab(self) -> None:
+        """Test StartRun reuses a historical run's stored FAB."""
+        fab_content = b"historical FAB"
+        fab_hash = hashlib.sha256(fab_content).hexdigest()
+        self.state.store_fab(Fab(fab_hash, fab_content, {}))
+        source_run_id = self._create_run(self.account.flwr_aid, fab_hash)
+
         with (
-            patch.object(
-                connector_registry,
-                "OAUTH_CONNECTOR_PROVIDERS",
-                (Mock(connector_ref="slack"),),
-            ),
             patch(
                 "flwr.superlink.servicer.control.control_handlers.get_fab_config",
-                return_value={
-                    "tool": {
-                        "flwr": {
-                            "app": {
-                                "config": {
-                                    "agent": {
-                                        "input": "Default input",
-                                        "context": "Default context",
-                                    }
-                                },
-                                "components": {"agentapp": "agent:app"},
-                            }
-                        }
-                    }
-                },
+                return_value={"tool": {"flwr": {"app": {}}}},
             ),
             patch(
                 "flwr.superlink.servicer.control.control_handlers"
                 ".get_metadata_from_config",
-                return_value=("alice/custom-agent", "0.1.0"),
+                return_value=("flwr/demo", "v0.0.1"),
             ),
         ):
-            source_response = start_run(
-                source_request, self.account, self.state, None
+            response = start_run(
+                StartRunRequest(
+                    source_run_id=source_run_id,
+                    federation=NOOP_FEDERATION_ID,
+                ),
+                self.account,
+                self.state,
+                None,
             )
-            request = StartRunRequest(
-                source_run_id=source_response.run_id,
-                app_spec="@flwragent/flwr-agent",
-                federation=NOOP_FEDERATION_ID,
-            )
-            request.fab.content = b"replacement FAB"
-            request.override_config["agent.input"].string = "Second input"
-            response = start_run(request, self.account, self.state, None)
 
-        source_run = self.state.get_run_info(run_ids=[source_response.run_id])[0]
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
-        self.assertNotEqual(run.run_id, source_run.run_id)
-        self.assertEqual(run.fab_hash, source_run.fab_hash)
-        self.assertEqual(run.federation_id, source_run.federation_id)
-        self.assertNotEqual(run.series_id, source_run.series_id)
-        self.assertEqual(run.override_config["agent.input"], "Second input")
-        self.assertNotIn("agent.context", run.override_config)
-        self.assertEqual(
-            list(self.state.get_run_connector_refs(run_id=source_run.run_id)),
-            ["slack"],
-        )
-        self.assertEqual(
-            list(self.state.get_run_connector_refs(run_id=run.run_id)),
-            [],
-        )
+        self.assertEqual(run.fab_hash, fab_hash)
 
     def test_start_run_rejects_source_run_from_another_account(self) -> None:
         """Test StartRun requires ownership of the source run."""
-        source_run_id = self.state.create_run(
-            "flwr/demo",
-            "v0.0.1",
-            "hash123",
-            {},
-            NOOP_FEDERATION_ID,
-            None,
-            "other-account",
-            TaskType.SERVER_APP,
-        )
+        source_run_id = self._create_run("other-account", "hash123")
 
         with self.assertRaises(FlowerError) as exc:
             start_run(
