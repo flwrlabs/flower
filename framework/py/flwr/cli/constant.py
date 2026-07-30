@@ -14,6 +14,7 @@
 # ==============================================================================
 """Constants for CLI commands."""
 
+
 import os
 
 from flwr.supercore.constant import SUPERGRID_ADDRESS

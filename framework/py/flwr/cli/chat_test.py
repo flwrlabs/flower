@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for the CLI `chat` command."""
 
+
 import importlib
 from unittest.mock import Mock, patch
 
