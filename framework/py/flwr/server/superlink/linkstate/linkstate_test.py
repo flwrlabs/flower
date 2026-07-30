@@ -25,7 +25,7 @@ import threading
 import time
 import unittest
 from abc import abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import Mock, PropertyMock, patch
@@ -44,6 +44,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
+from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -208,55 +209,49 @@ class StateTest(CoreStateTest):
         runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
         self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
 
-    def test_dispatch_automation_creates_run_from_stored_template(self) -> None:
-        """Dispatching an automation should create a run from stored inputs."""
+    def test_claim_automation_returns_stored_run_request(self) -> None:
+        """Claiming an automation should return its unresolved run request."""
         state = self.state_factory()
         initial_run_id = create_dummy_run(state, federation_id="@me/health")
         series_id = state.get_run_info(run_ids=[initial_run_id])[0].series_id
         previous_next_run_at = (now() - timedelta(seconds=30)).isoformat()
         next_run_at = (now() + timedelta(seconds=30)).isoformat()
+        start_run_request = StartRunRequest(
+            app_spec="@flwragent/flwr-agent",
+            federation="@me/health",
+            series_id=series_id,
+        )
         automation = state.store_automation(
             federation_id="@me/health",
             flwr_aid="aid-a",
-            fab_id="fab-id",
-            fab_version="1.0.0",
-            fab_hash="fab-hash",
-            override_config={"test_key": "test_value"},
-            federation_config=None,
-            primary_task_type=TaskType.SERVER_APP,
+            start_run_request=start_run_request,
             series_id=series_id,
             next_run_at=previous_next_run_at,
             fixed_interval=60,
             max_runs=2,
         )
 
-        run_id = state.dispatch_automation(
+        claimed = state.claim_automation(
             automation.automation_id,
             previous_next_run_at=previous_next_run_at,
             next_run_at=next_run_at,
         )
 
-        self.assertIsNotNone(run_id)
-        assert run_id is not None
+        self.assertIsNotNone(claimed)
+        assert claimed is not None
+        claimed_request, flwr_aid = claimed
+        self.assertEqual(claimed_request, start_run_request)
+        self.assertEqual(flwr_aid, "aid-a")
         self.assertIsNone(
-            state.dispatch_automation(
+            state.claim_automation(
                 automation.automation_id,
                 previous_next_run_at=previous_next_run_at,
                 next_run_at=next_run_at,
             )
         )
-        run = state.get_run_info(run_ids=[run_id])[0]
-        self.assertEqual(run.federation_id, "@me/health")
-        self.assertEqual(run.flwr_aid, "aid-a")
-        self.assertEqual(run.fab_id, "fab-id")
-        self.assertEqual(run.fab_version, "1.0.0")
-        self.assertEqual(run.fab_hash, "fab-hash")
-        self.assertEqual(run.override_config, {"test_key": "test_value"})
-        self.assertEqual(run.primary_task_type, TaskType.SERVER_APP)
-        self.assertEqual(run.series_id, series_id)
 
         updated = state.list_automations(
-            federation="@me/health",
+            federations=["@me/health"],
             statuses=[AutomationStatus.ACTIVE],
             order_by="updated_at",
         )
@@ -281,6 +276,38 @@ class StateTest(CoreStateTest):
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
+
+    def test_create_run_binds_connectors(self) -> None:
+        """Creating a run should atomically persist its connector allowlist."""
+        state = self.state_factory()
+
+        run_id = create_dummy_run(
+            state,
+            connector_refs=["notion", "github", "notion"],
+        )
+
+        self.assertEqual(
+            list(state.get_run_connector_refs(run_id=run_id)),
+            ["github", "notion"],
+        )
+
+    def test_create_run_rejects_empty_connector_ref(self) -> None:
+        """An invalid connector allowlist should prevent run creation."""
+        state = self.state_factory()
+
+        run_id = create_dummy_run(state, connector_refs=[""])
+
+        self.assertEqual(run_id, 0)
+        self.assertEqual(list(state.get_run_info()), [])
+
+    def test_create_run_rejects_string_connector_refs(self) -> None:
+        """A string should not be interpreted as a sequence of connector refs."""
+        state = self.state_factory()
+
+        run_id = create_dummy_run(state, connector_refs="notion")
+
+        self.assertEqual(run_id, 0)
+        self.assertEqual(list(state.get_run_info()), [])
 
     def test_store_messages_rejects_stopped_run(self) -> None:
         """Messages cannot be stored after a run is stopped."""
@@ -2241,6 +2268,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     flwr_aid: str | None = "mock_flwr_aid",
     primary_task_type: str = TaskType.SERVER_APP,
     series_id: int | None = None,
+    connector_refs: Sequence[str] = (),
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -2253,6 +2281,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         flwr_aid=flwr_aid,
         primary_task_type=primary_task_type,
         series_id=series_id,
+        connector_refs=connector_refs,
     )
 
 

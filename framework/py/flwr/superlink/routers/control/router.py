@@ -37,6 +37,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAutomationsRequest,
+    ListAutomationsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -59,8 +61,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RevokeInvitationResponse,
     ShowFederationRequest,
     ShowFederationResponse,
+    StartAutomationRequest,
+    StartAutomationResponse,
     StartRunRequest,
     StartRunResponse,
+    StopAutomationRequest,
+    StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
     UnregisterNodeRequest,
@@ -68,23 +74,23 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.protobuf.routing import ProtobufRouter
+from flwr.supercore.protobuf.routing import ProtobufRoute
+from flwr.supercore.protobuf.translation import get_protobuf_request
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.dependencies.account import get_account, get_authn_plugin
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.servicer.control import control_handlers
 
-router = APIRouter(prefix="/control", tags=["control"])
-protobuf_router = ProtobufRouter(router)
+router = APIRouter(prefix="/control", tags=["Control"], route_class=ProtobufRoute)
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
 AuthnPluginDependency = Annotated[ControlAuthnPlugin, Depends(get_authn_plugin)]
 
 
-@protobuf_router.unary_unary("/start-run")
+@router.post("/start-run")
 def start_run(
-    request: StartRunRequest,
+    request: Annotated[StartRunRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> StartRunResponse:
@@ -93,9 +99,9 @@ def start_run(
     return control_handlers.start_run(request, account, linkstate, "")
 
 
-@protobuf_router.unary_unary("/list-runs")
+@router.post("/list-runs")
 def list_runs(
-    request: ListRunsRequest,
+    request: Annotated[ListRunsRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> ListRunsResponse:
@@ -103,9 +109,9 @@ def list_runs(
     return control_handlers.list_runs(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/list-run-series")
+@router.post("/list-run-series")
 def list_run_series(
-    request: ListRunSeriesRequest,
+    request: Annotated[ListRunSeriesRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> ListRunSeriesResponse:
@@ -113,9 +119,9 @@ def list_run_series(
     return control_handlers.list_run_series(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/get-run-series")
+@router.post("/get-run-series")
 def get_run_series(
-    request: GetRunSeriesRequest,
+    request: Annotated[GetRunSeriesRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> GetRunSeriesResponse:
@@ -123,9 +129,9 @@ def get_run_series(
     return control_handlers.get_run_series(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/stop-run")
+@router.post("/stop-run")
 def stop_run(
-    request: StopRunRequest,
+    request: Annotated[StopRunRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> StopRunResponse:
@@ -133,27 +139,57 @@ def stop_run(
     return control_handlers.stop_run(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/get-login-details")
+@router.post("/start-automation")
+def start_automation(
+    request: Annotated[StartAutomationRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> StartAutomationResponse:
+    """Start an automation."""
+    return control_handlers.start_automation(request, account, linkstate)
+
+
+@router.post("/list-automations")
+def list_automations(
+    request: Annotated[ListAutomationsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListAutomationsResponse:
+    """List automations."""
+    return control_handlers.list_automations(request, account, linkstate)
+
+
+@router.post("/stop-automation")
+def stop_automation(
+    request: Annotated[StopAutomationRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> StopAutomationResponse:
+    """Stop an automation."""
+    return control_handlers.stop_automation(request, account, linkstate)
+
+
+@router.post("/get-login-details")
 def get_login_details(
-    request: GetLoginDetailsRequest,
+    request: Annotated[GetLoginDetailsRequest, Depends(get_protobuf_request)],
     authn_plugin: AuthnPluginDependency,
 ) -> GetLoginDetailsResponse:
     """Get login details."""
     return control_handlers.get_login_details(request, authn_plugin)
 
 
-@protobuf_router.unary_unary("/get-auth-tokens")
+@router.post("/get-auth-tokens")
 def get_auth_tokens(
-    request: GetAuthTokensRequest,
+    request: Annotated[GetAuthTokensRequest, Depends(get_protobuf_request)],
     authn_plugin: AuthnPluginDependency,
 ) -> GetAuthTokensResponse:
     """Get authentication tokens."""
     return control_handlers.get_auth_tokens(request, authn_plugin)
 
 
-@protobuf_router.unary_unary("/register-node")
+@router.post("/register-node")
 def register_node(
-    request: RegisterNodeRequest,
+    request: Annotated[RegisterNodeRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> RegisterNodeResponse:
@@ -161,9 +197,9 @@ def register_node(
     return control_handlers.register_node(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/unregister-node")
+@router.post("/unregister-node")
 def unregister_node(
-    request: UnregisterNodeRequest,
+    request: Annotated[UnregisterNodeRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> UnregisterNodeResponse:
@@ -171,9 +207,9 @@ def unregister_node(
     return control_handlers.unregister_node(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/list-nodes")
+@router.post("/list-nodes")
 def list_nodes(
-    request: ListNodesRequest,
+    request: Annotated[ListNodesRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> ListNodesResponse:
@@ -181,9 +217,9 @@ def list_nodes(
     return control_handlers.list_nodes(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/list-federations")
+@router.post("/list-federations")
 def list_federations(
-    request: ListFederationsRequest,
+    request: Annotated[ListFederationsRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> ListFederationsResponse:
@@ -191,9 +227,9 @@ def list_federations(
     return control_handlers.list_federations(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/show-federation")
+@router.post("/show-federation")
 def show_federation(
-    request: ShowFederationRequest,
+    request: Annotated[ShowFederationRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> ShowFederationResponse:
@@ -201,9 +237,9 @@ def show_federation(
     return control_handlers.show_federation(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/create-federation")
+@router.post("/create-federation")
 def create_federation(
-    request: CreateFederationRequest,
+    request: Annotated[CreateFederationRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> CreateFederationResponse:
@@ -211,9 +247,9 @@ def create_federation(
     return control_handlers.create_federation(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/archive-federation")
+@router.post("/archive-federation")
 def archive_federation(
-    request: ArchiveFederationRequest,
+    request: Annotated[ArchiveFederationRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> ArchiveFederationResponse:
@@ -221,9 +257,9 @@ def archive_federation(
     return control_handlers.archive_federation(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/add-node-to-federation")
+@router.post("/add-node-to-federation")
 def add_node_to_federation(
-    request: AddNodeToFederationRequest,
+    request: Annotated[AddNodeToFederationRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> AddNodeToFederationResponse:
@@ -231,9 +267,9 @@ def add_node_to_federation(
     return control_handlers.add_node_to_federation(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/remove-node-from-federation")
+@router.post("/remove-node-from-federation")
 def remove_node_from_federation(
-    request: RemoveNodeFromFederationRequest,
+    request: Annotated[RemoveNodeFromFederationRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> RemoveNodeFromFederationResponse:
@@ -241,9 +277,11 @@ def remove_node_from_federation(
     return control_handlers.remove_node_from_federation(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/remove-account-from-federation")
+@router.post("/remove-account-from-federation")
 def remove_account_from_federation(
-    request: RemoveAccountFromFederationRequest,
+    request: Annotated[
+        RemoveAccountFromFederationRequest, Depends(get_protobuf_request)
+    ],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> RemoveAccountFromFederationResponse:
@@ -251,9 +289,9 @@ def remove_account_from_federation(
     return control_handlers.remove_account_from_federation(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/create-invitation")
+@router.post("/create-invitation")
 def create_invitation(
-    request: CreateInvitationRequest,
+    request: Annotated[CreateInvitationRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> CreateInvitationResponse:
@@ -261,9 +299,9 @@ def create_invitation(
     return control_handlers.create_invitation(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/list-invitations")
+@router.post("/list-invitations")
 def list_invitations(
-    request: ListInvitationsRequest,
+    request: Annotated[ListInvitationsRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> ListInvitationsResponse:
@@ -271,9 +309,9 @@ def list_invitations(
     return control_handlers.list_invitations(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/accept-invitation")
+@router.post("/accept-invitation")
 def accept_invitation(
-    request: AcceptInvitationRequest,
+    request: Annotated[AcceptInvitationRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> AcceptInvitationResponse:
@@ -281,9 +319,9 @@ def accept_invitation(
     return control_handlers.accept_invitation(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/reject-invitation")
+@router.post("/reject-invitation")
 def reject_invitation(
-    request: RejectInvitationRequest,
+    request: Annotated[RejectInvitationRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> RejectInvitationResponse:
@@ -291,9 +329,9 @@ def reject_invitation(
     return control_handlers.reject_invitation(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/revoke-invitation")
+@router.post("/revoke-invitation")
 def revoke_invitation(
-    request: RevokeInvitationRequest,
+    request: Annotated[RevokeInvitationRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> RevokeInvitationResponse:
@@ -301,9 +339,11 @@ def revoke_invitation(
     return control_handlers.revoke_invitation(request, account, linkstate)
 
 
-@protobuf_router.unary_unary("/configure-simulation-federation")
+@router.post("/configure-simulation-federation")
 def configure_simulation_federation(
-    request: ConfigureSimulationFederationRequest,
+    request: Annotated[
+        ConfigureSimulationFederationRequest, Depends(get_protobuf_request)
+    ],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> ConfigureSimulationFederationResponse:

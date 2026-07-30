@@ -138,7 +138,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
     register_signal_handlers(
         event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
-        exit_message="Task stopped by user.",
+        exit_message="Task stopped.",
         exit_handlers=[on_exit],
     )
 

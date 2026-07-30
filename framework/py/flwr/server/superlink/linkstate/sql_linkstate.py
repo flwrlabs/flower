@@ -43,7 +43,7 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.utils.validator import validate_message
-from flwr.supercore.constant import AutomationStatus, NodeStatus
+from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.sql_corestate import SqlCoreState, determine_task_status
 from flwr.supercore.corestate.utils import timestamp_to_iso
 from flwr.supercore.date import now
@@ -977,8 +977,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         primary_task_type: str,
         series_id: int | None = None,
         series_description: str | None = None,
+        connector_refs: Sequence[str] = (),
     ) -> int:
         """Create a new run."""
+        if isinstance(connector_refs, str) or any(
+            not connector_ref for connector_ref in connector_refs
+        ):
+            return 0
         # Convert federation_config to JSON string for storage
         fed_config_json = None
         if federation_config:
@@ -1064,79 +1069,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "details": "",
                     },
                 )
+                self.bind_connectors_to_run(
+                    run_id=run_id,
+                    connector_refs=connector_refs,
+                )
                 return run_id
 
         log(ERROR, "Unexpected run creation failure.")
         return 0
-
-    def dispatch_automation(
-        self,
-        automation_id: int,
-        *,
-        previous_next_run_at: str,
-        next_run_at: str | None,
-    ) -> int | None:
-        """Create a run from a due automation and advance the automation."""
-        params: dict[str, Any] = {
-            "automation_id": automation_id,
-            "active_status": AutomationStatus.ACTIVE,
-            "previous_next_run_at": previous_next_run_at,
-            "next_run_at": next_run_at,
-        }
-
-        try:
-            with self.session():
-                rows = self.query(
-                    """
-                    SELECT federation_id, series_id, flwr_aid, fab_id, fab_version,
-                        fab_hash, override_config, federation_config,
-                        primary_task_type
-                    FROM automation
-                    WHERE automation_id = :automation_id
-                    AND status = :active_status
-                    AND next_run_at = :previous_next_run_at
-                    AND (remaining_runs IS NULL OR remaining_runs > 0)
-                    AND (:next_run_at IS NOT NULL OR remaining_runs <= 1)
-                    """,
-                    params,
-                )
-                if not rows:
-                    return None
-
-                if not self.advance_automation(
-                    automation_id,
-                    previous_next_run_at=previous_next_run_at,
-                    next_run_at=next_run_at,
-                ):
-                    return None
-
-                row = rows[0]
-                federation_config = None
-                if row["federation_config"] is not None:
-                    federation_config = simulation_config_from_json(
-                        json.loads(row["federation_config"])
-                    )
-
-                run_id = self.create_run(
-                    fab_id=row["fab_id"],
-                    fab_version=row["fab_version"],
-                    fab_hash=row["fab_hash"],
-                    override_config=cast(
-                        UserConfig,
-                        json.loads(row["override_config"]),
-                    ),
-                    federation_id=row["federation_id"],
-                    federation_config=federation_config,
-                    flwr_aid=row["flwr_aid"],
-                    primary_task_type=row["primary_task_type"],
-                    series_id=int64_to_uint64(row["series_id"]),
-                )
-                if run_id == 0:
-                    raise RuntimeError("Unexpected automation run creation failure.")
-                return run_id
-        except RuntimeError as exc:
-            log(ERROR, "%s", exc)
-            return None
 
     def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches
         self,

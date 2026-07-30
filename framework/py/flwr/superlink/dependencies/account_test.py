@@ -174,14 +174,14 @@ def test_get_authn_plugin_raises_when_plugin_is_missing() -> None:
     )
 
 
-def test_get_account_raises_when_dependency_is_missing() -> None:
-    """get_account should fail clearly when the app is not configured."""
+def test_get_account_raises_when_authentication_middleware_did_not_run() -> None:
+    """get_account should require the account saved by the middleware."""
     with pytest.raises(FlowerError) as exc_info:
-        get_account(_make_app_request(FastAPI()), Response())
+        get_account(_make_app_request(FastAPI()))
 
     assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED
     assert (
         exc_info.value.message
-        == "SuperLink account authentication is not initialized: expected "
-        "AccountAccessDependency, got NoneType."
+        == "SuperLink account authentication is not initialized: expected an "
+        "authenticated account, got NoneType."
     )
