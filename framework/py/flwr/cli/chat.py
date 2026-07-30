@@ -42,14 +42,22 @@ from prompt_toolkit.utils import get_cwidth
 from prompt_toolkit.widgets import Frame
 
 from flwr.cli.constant import (
+    CHAT_AGENT_NAME,
     CHAT_AGENT_INPUT_KEY,
+    CHAT_APP_STYLE,
+    CHAT_EXIT_HINT,
     CHAT_EXIT_COMMAND,
     CHAT_FAILURE_EVENTS,
+    CHAT_FLOWER_LOGO,
     CHAT_FLOWER_AGENT_APP_SPEC,
+    CHAT_EXPERIMENTAL_WARNING,
     CHAT_NEW_COMMAND,
+    CHAT_NEW_CONVERSATION_MESSAGE,
+    CHAT_SPINNER_FRAMES,
     CHAT_SUPERGRID_CONNECTION_NAME,
     CHAT_TERMINAL_EVENTS,
     CHAT_TEXT_DELTA_EVENT,
+    CHAT_WELCOME_MESSAGE,
     CHAT_USER_PROMPT,
 )
 from flwr.cli.flower_config import read_superlink_connection
@@ -67,36 +75,6 @@ from flwr.supercore.typing import JSONObject
 from .utils import flwr_cli_grpc_exc_handler, init_channel_from_connection
 
 
-_CHAT_APP_STYLE = Style.from_dict(
-    {
-        "user.prompt": "bold #ffffff bg:#404040",
-        "user.message": "#ffffff bg:#404040",
-        "agent.prompt": "bold #dc8400",
-        "agent.name": "bold #111827 bg:#dc8400",
-        "agent.separator": "#dc8400",
-        "prompt.background": "fg:#ffffff bg:#404040",
-        "content": "noinherit",
-        "status": "#dc8400",
-        "notice": "bold #111827 bg:#dc8400",
-        "error": "bold ansibrightred",
-        "logo": "bold #dc8400",
-        "welcome": "bold #dc8400",
-    }
-)
-_CHAT_AGENT_NAME = "Flower Agent"
-_CHAT_FLOWER_LOGO = r"""
-███████╗██╗      ██████╗ ██╗    ██╗███████╗██████╗
-██╔════╝██║     ██╔═══██╗██║    ██║██╔════╝██╔══██╗
-█████╗  ██║     ██║   ██║██║ █╗ ██║█████╗  ██████╔╝
-██╔══╝  ██║     ██║   ██║██║███╗██║██╔══╝  ██╔══██╗
-██║     ███████╗╚██████╔╝╚███╔███╔╝███████╗██║  ██║
-╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝ ╚══════╝╚═╝  ╚═╝
-""".strip("\n")
-_CHAT_FLOWER_LOGO_LINES = _CHAT_FLOWER_LOGO.splitlines()
-_CHAT_USER_MESSAGE_MARKER = "❯ "
-_SPINNER_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
-
-
 class _ChatApplication:  # pylint: disable=too-many-instance-attributes
     """Persistent full-screen Flower Chat application."""
 
@@ -107,9 +85,7 @@ class _ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.run_id: int | None = None
         self.busy = False
         self.cancel_requested = False
-        self.response_started = False
         self.transcript: list[tuple[str, str]] = []
-        self.dynamic_sections: list[tuple[str, str]] = []
         self.status = ""
         self.input_buffer = Buffer(read_only=Condition(lambda: self.busy))
         self.application = self._create_application()
@@ -121,6 +97,7 @@ class _ChatApplication:  # pylint: disable=too-many-instance-attributes
     def _create_application(self) -> Application[None]:
         """Create the persistent full-screen layout."""
         key_bindings = KeyBindings()
+        logo_lines = CHAT_FLOWER_LOGO.splitlines()
 
         @key_bindings.add("enter")
         def _submit_prompt(event: KeyPressEvent) -> None:
@@ -138,42 +115,25 @@ class _ChatApplication:  # pylint: disable=too-many-instance-attributes
             Window(
                 FormattedTextControl(
                     [
-                        *[
-                            ("class:logo", f"{line}\n")
-                            for line in _CHAT_FLOWER_LOGO_LINES
-                        ],
+                        *[("class:logo", f"{line}\n") for line in logo_lines],
                         ("", "\n"),
-                        (
-                            "class:notice",
-                            "Note: `flwr chat` is experimental and subject to change.",
-                        ),
-                        ("class:welcome", "\nWelcome to the Flower Chat."),
-                        (
-                            "",
-                            f"\nType {CHAT_EXIT_COMMAND} or press Ctrl-C to leave.",
-                        ),
+                        ("class:notice", CHAT_EXPERIMENTAL_WARNING),
+                        ("class:welcome", f"\n{CHAT_WELCOME_MESSAGE}."),
+                        ("", f"\n{CHAT_EXIT_HINT}"),
                     ]
                 ),
-                height=len(_CHAT_FLOWER_LOGO_LINES) + 4,
+                height=len(logo_lines) + 4,
             ),
             style="class:agent.prompt",
         )
         transcript = Window(
             FormattedTextControl(
-                self._render_transcript,
+                lambda: self.transcript,
                 get_cursor_position=self._transcript_cursor,
                 show_cursor=False,
             ),
             wrap_lines=True,
             always_hide_cursor=True,
-        )
-        dynamic_sections = ConditionalContainer(
-            Window(
-                FormattedTextControl(lambda: self.dynamic_sections),
-                wrap_lines=True,
-                always_hide_cursor=True,
-            ),
-            filter=Condition(lambda: bool(self.dynamic_sections)),
         )
         status = Window(
             FormattedTextControl(self._render_status),
@@ -196,11 +156,11 @@ class _ChatApplication:  # pylint: disable=too-many-instance-attributes
             style="class:prompt.background",
         )
         chat_window = HSplit(
-            [transcript, dynamic_sections, status, status_gap],
+            [transcript, status, status_gap],
             style="class:content",
         )
         agent_name = Window(
-            FormattedTextControl([("class:agent.name", f" ✿ {_CHAT_AGENT_NAME} ")]),
+            FormattedTextControl([("class:agent.name", f" ✿ {CHAT_AGENT_NAME} ")]),
             height=1,
             style="class:content",
         )
@@ -223,7 +183,7 @@ class _ChatApplication:  # pylint: disable=too-many-instance-attributes
                 focused_element=prompt,
             ),
             key_bindings=key_bindings,
-            style=_CHAT_APP_STYLE,
+            style=Style.from_dict(CHAT_APP_STYLE),
             full_screen=True,
             refresh_interval=0.1,
         )
@@ -245,14 +205,13 @@ class _ChatApplication:  # pylint: disable=too-many-instance-attributes
             self.series_id = None
             self._append_transcript(
                 "class:notice",
-                "Your next message will start a fresh conversation.\n\n",
+                f"{CHAT_NEW_CONVERSATION_MESSAGE}\n\n",
             )
             return
 
         self._append_user_message(prompt)
         self.busy = True
         self.cancel_requested = False
-        self.response_started = False
         self.status = "Thinking..."
         event.app.create_background_task(self._run_prompt(prompt))
         event.app.invalidate()
@@ -289,27 +248,15 @@ class _ChatApplication:  # pylint: disable=too-many-instance-attributes
 
     def _run_prompt_sync(self, prompt: str) -> None:
         """Start and stream one Flower AgentApp run."""
-        req = StartRunRequest(
-            app_spec=CHAT_FLOWER_AGENT_APP_SPEC,
-            override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
-            federation=self.federation or "",
+        self.run_id, self.series_id = _start_chat_run(
+            self.stub, prompt, self.federation, self.series_id
         )
-        if self.series_id is not None:
-            req.series_id = self.series_id
-
-        with flwr_cli_grpc_exc_handler():
-            res = self.stub.StartRun(req)
-
-        if not res.HasField("run_id"):
-            raise click.ClickException("Failed to start chat run.")
-        if res.HasField("series_id"):
-            self.series_id = cast(int, res.series_id)
-        self.run_id = cast(int, res.run_id)
 
         if self.cancel_requested:
             self._stop_run(self.run_id)
             return
 
+        response_started = False
         terminal_event_seen = False
         req_events = StreamRunEventsRequest(run_id=self.run_id)
         with flwr_cli_grpc_exc_handler():
@@ -318,8 +265,8 @@ class _ChatApplication:  # pylint: disable=too-many-instance-attributes
                 if event_type == CHAT_TEXT_DELTA_EVENT:
                     delta = payload.get("delta")
                     if isinstance(delta, str):
-                        if not self.response_started:
-                            self.response_started = True
+                        if not response_started:
+                            response_started = True
                             self.status = ""
                         self._append_transcript("", delta)
                 elif event_type in CHAT_FAILURE_EVENTS:
@@ -327,7 +274,7 @@ class _ChatApplication:  # pylint: disable=too-many-instance-attributes
                 elif event_type in CHAT_TERMINAL_EVENTS:
                     terminal_event_seen = True
 
-        if self.response_started:
+        if response_started:
             self._append_transcript("", "\n\n")
         if not terminal_event_seen and not self.cancel_requested:
             raise click.ClickException(
@@ -356,9 +303,13 @@ class _ChatApplication:  # pylint: disable=too-many-instance-attributes
 
     def _append_user_message(self, prompt: str) -> None:
         """Append a full-width highlighted user message."""
-        width = self._get_transcript_width()
+        width = self._get_terminal_width()
         for line_index, line in enumerate(prompt.split("\n")):
-            prefix = _CHAT_USER_MESSAGE_MARKER if line_index == 0 else "  "
+            prefix = (
+                CHAT_USER_PROMPT
+                if line_index == 0
+                else " " * get_cwidth(CHAT_USER_PROMPT)
+            )
             for visual_line in _wrap_transcript_line(f"{prefix}{line}", width):
                 padding = " " * max(0, width - get_cwidth(visual_line))
                 self.transcript.append(
@@ -367,19 +318,15 @@ class _ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.transcript.append(("", "\n"))
         self.application.invalidate()
 
-    def _get_transcript_width(self) -> int:
-        """Return the current transcript width."""
+    def _get_terminal_width(self) -> int:
+        """Return the current terminal width."""
         return max(1, self.application.output.get_size().columns)
-
-    def _render_transcript(self) -> list[tuple[str, str]]:
-        """Return the styled transcript."""
-        return self.transcript
 
     def _render_status(self) -> list[tuple[str, str]]:
         """Return the animated status line."""
         if not self.status:
             return []
-        frame = _SPINNER_FRAMES[int(monotonic() * 10) % len(_SPINNER_FRAMES)]
+        frame = CHAT_SPINNER_FRAMES[int(monotonic() * 10) % len(CHAT_SPINNER_FRAMES)]
         return [("class:status", f"{frame} {self.status}")]
 
     def _transcript_cursor(self) -> Point:
@@ -402,18 +349,14 @@ def chat() -> None:
         if sys.stdin.isatty() and sys.stdout.isatty():
             _ChatApplication(stub, superlink_connection.federation).run()
         else:
-            typer.echo("Welcome to the Flower Chat")
-            typer.echo(
-                f"Flower Chat. Type {CHAT_EXIT_COMMAND} or press Ctrl-C to leave.",
-            )
+            typer.echo(CHAT_WELCOME_MESSAGE)
+            typer.echo(f"Flower Chat. {CHAT_EXIT_HINT}")
             _run_interactive_shell(stub, superlink_connection.federation)
     finally:
         channel.close()
 
 
-def _run_interactive_shell(  # pylint: disable=R0912
-    stub: ControlStub, federation: str | None
-) -> None:
+def _run_interactive_shell(stub: ControlStub, federation: str | None) -> None:
     """Run the non-TTY prompt-response loop."""
     series_id: int | None = None
     while True:
@@ -435,28 +378,12 @@ def _run_interactive_shell(  # pylint: disable=R0912
             return
         if stripped_prompt.lower() == CHAT_NEW_COMMAND:
             series_id = None
-            typer.echo("Your next message will start a fresh conversation.")
+            typer.echo(CHAT_NEW_CONVERSATION_MESSAGE)
             continue
 
         run_id: int | None = None
         try:
-            # Start one Flower AgentApp run for the submitted prompt.
-            req = StartRunRequest(
-                app_spec=CHAT_FLOWER_AGENT_APP_SPEC,
-                override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
-                federation=federation or "",
-            )
-            if series_id is not None:
-                req.series_id = series_id
-
-            with flwr_cli_grpc_exc_handler():
-                res = stub.StartRun(req)
-
-            if not res.HasField("run_id"):
-                raise click.ClickException("Failed to start chat run.")
-            if res.HasField("series_id"):
-                series_id = cast(int, res.series_id)
-            run_id = cast(int, res.run_id)
+            run_id, series_id = _start_chat_run(stub, prompt, federation, series_id)
             _stream_agent_response(stub, run_id)
         except KeyboardInterrupt:
             typer.echo()
@@ -490,6 +417,31 @@ def _parse_task_event(task_event: TaskEvent) -> tuple[str, JSONObject]:
     return event_type, payload
 
 
+def _start_chat_run(
+    stub: ControlStub,
+    prompt: str,
+    federation: str | None,
+    series_id: int | None,
+) -> tuple[int, int | None]:
+    """Start one Flower AgentApp run."""
+    req = StartRunRequest(
+        app_spec=CHAT_FLOWER_AGENT_APP_SPEC,
+        override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
+        federation=federation or "",
+    )
+    if series_id is not None:
+        req.series_id = series_id
+
+    with flwr_cli_grpc_exc_handler():
+        res = stub.StartRun(req)
+
+    if not res.HasField("run_id"):
+        raise click.ClickException("Failed to start chat run.")
+    if res.HasField("series_id"):
+        series_id = cast(int, res.series_id)
+    return cast(int, res.run_id), series_id
+
+
 def _wrap_transcript_line(line: str, width: int) -> list[str]:
     """Wrap a line to the transcript width."""
     lines: list[str] = []
@@ -518,7 +470,6 @@ def _stream_agent_response(stub: ControlStub, run_id: int) -> None:
             for res in stub.StreamRunEvents(req):
                 event_type, payload = _parse_task_event(res.task_event)
 
-                # Print streamed text deltas as the agent response.
                 if event_type == CHAT_TEXT_DELTA_EVENT:
                     delta = payload.get("delta")
                     if isinstance(delta, str):
