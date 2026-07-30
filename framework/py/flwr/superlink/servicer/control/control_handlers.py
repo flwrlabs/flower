@@ -497,9 +497,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
         return StartRunResponse()
 
     override_config = user_config_from_proto(request.override_config)
-    connector_refs = validate_run_connector_refs(
-        request.connector_refs, account, state
-    )
+    connector_refs = validate_run_connector_refs(request.connector_refs, account, state)
 
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
 
@@ -535,7 +533,6 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
         primary_task_type = (
             TaskType.AGENT_APP if is_agentapp_bundle else TaskType.SERVER_APP
         )
-        series_id = request.series_id if request.HasField("series_id") else None
         resolved_federation_config = None
         runtime = RunTime.DEPLOYMENT
         sim_cfg = state.federation_manager.get_simulation_config(federation_id)
@@ -565,6 +562,7 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
                 f"FAB ({fab.hash_str}) hash from request doesn't match contents"
             )
         fab_id, fab_version = get_metadata_from_config(fab_config)
+        series_id = request.series_id if request.HasField("series_id") else None
         series_description: str | None = None
         if primary_task_type == TaskType.AGENT_APP and series_id is None:
             series_description = (
