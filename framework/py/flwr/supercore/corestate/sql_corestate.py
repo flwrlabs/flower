@@ -403,16 +403,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             row = session.get(FabModel, fab_hash)
             if row is None:
                 return None
-            stored_fab_hash = row.fab_hash
-            content = row.content
-            verifications = json.loads(row.verifications)
-        # Launch tradeoff: do not recompute content hash on reads; rely on
-        # write-time validation and hash-addressed lookup.
-        return Fab(
-            hash_str=stored_fab_hash,
-            content=content,
-            verifications=verifications,
-        )
+            # Launch tradeoff: do not recompute content hash on reads; rely on
+            # write-time validation and hash-addressed lookup.
+            return Fab(
+                hash_str=row.fab_hash,
+                content=row.content,
+                verifications=json.loads(row.verifications),
+            )
 
     def upsert_connector(
         self,
