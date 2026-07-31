@@ -204,7 +204,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 dont_extend_height=True,
                 style="class:completion-menu",
             ),
-            filter=has_completions & ~is_done,
+            # show when completions exist AND the application is NOT finished
+            filter=Condition(lambda: has_completions() and not is_done()),
         )
         # Combine transcript and status in the main chat area.
         chat_window = HSplit(
