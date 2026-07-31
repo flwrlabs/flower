@@ -58,7 +58,11 @@ CHAT_COMMANDS = {
     CHAT_NEW_COMMAND: "Start a new conversation.",
     CHAT_EXIT_COMMAND: "Exit Flower Chat.",
 }
+CHAT_REASONING_DELTA_EVENT = "response.reasoning_summary_text.delta"
 CHAT_TEXT_DELTA_EVENT = "response.output_text.delta"
+CHAT_TOOL_CALL_STARTED_EVENT = "response.tool_call.started"
+CHAT_TOOL_CALL_COMPLETED_EVENT = "response.tool_call.completed"
+CHAT_WEB_SEARCH_CONNECTOR_REF = "web_search"
 CHAT_TERMINAL_EVENTS = {"response.completed", "response.incomplete"}
 CHAT_FAILURE_EVENTS = {"error", "response.failed"}
 CHAT_USER_PROMPT = "❯ "
@@ -70,6 +74,8 @@ CHAT_APP_STYLE = {
     "agent.separator": "#dc8400",
     "prompt.background": "fg:#ffffff bg:#404040",
     "content": "noinherit",
+    "details.header": "bold #dc8400 bg:#292929",
+    "details.body": "#d1d5db",
     "status": "#dc8400",
     "completion-menu": "fg:#ffffff bg:#404040",
     "completion-menu.completion": "fg:#ffffff bg:#404040",
