@@ -218,8 +218,10 @@ def aggregate_bulyan(
 def weighted_loss_avg(results: list[tuple[int, float]]) -> float:
     """Aggregate evaluation results obtained from multiple clients."""
     num_total_evaluation_examples = sum(num_examples for (num_examples, _) in results)
-    # Guard against a zero total: dividing by it raises ZeroDivisionError and
-    # aborts the round instead of reporting a usable aggregated loss.
+    # There is no meaningful weighted average when no client evaluated on any
+    # example. Raise with an explicit reason rather than letting the division
+    # below fail with a bare ZeroDivisionError; both stop the caller, but this
+    # one says why.
     if num_total_evaluation_examples == 0:
         raise ValueError(
             "weighted_loss_avg() requires the total number of evaluation examples "

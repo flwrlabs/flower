@@ -147,6 +147,8 @@ def test_weighted_loss_avg_zero_total_examples() -> None:
     # Prepare: a round in which no client evaluated on any example
     results: list[tuple[int, float]] = [(0, 2.0), (0, 3.0)]
 
-    # Execute & Assert: must raise rather than divide by zero
-    with pytest.raises(ValueError):
+    # Execute & Assert: must raise rather than divide by zero, and say why
+    with pytest.raises(
+        ValueError, match="total number of evaluation examples.*greater than zero"
+    ):
         weighted_loss_avg(results)
