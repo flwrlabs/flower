@@ -16,6 +16,7 @@
 
 
 import json
+import sys
 from typing import cast
 
 import click
@@ -29,6 +30,7 @@ from flwr.cli.constant import (
     CHAT_EXIT_COMMAND,
     CHAT_FAILURE_EVENTS,
     CHAT_FLOWER_AGENT_APP_SPEC,
+    CHAT_NEW_COMMAND,
     CHAT_SUPERGRID_CONNECTION_NAME,
     CHAT_TERMINAL_EVENTS,
     CHAT_TEXT_DELTA_EVENT,
@@ -39,6 +41,7 @@ from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListFederationsRequest,
     StartRunRequest,
+    StopRunRequest,
     StreamRunEventsRequest,
 )
 from flwr.proto.control_pb2_grpc import ControlStub
@@ -75,7 +78,7 @@ def chat() -> None:
         with flwr_cli_grpc_exc_handler():
             stub.ListFederations(ListFederationsRequest())
         console.print(
-            f"Flower Chat. Type {CHAT_EXIT_COMMAND} to leave.",
+            f"Flower Chat. Type {CHAT_EXIT_COMMAND} or press Ctrl-C to leave.",
             style="agent.prompt",
         )
         _run_interactive_shell(stub, superlink_connection.federation, console)
@@ -83,14 +86,20 @@ def chat() -> None:
         channel.close()
 
 
-def _run_interactive_shell(
+def _run_interactive_shell(  # pylint: disable=R0912
     stub: ControlStub, federation: str | None, console: Console
 ) -> None:
     """Run the prompt-response loop."""
+    series_id: int | None = None
     while True:
         try:
             prompt = input(CHAT_USER_PROMPT)
-        except (EOFError, KeyboardInterrupt):
+        except EOFError:
+            typer.echo()
+            if not sys.stdin.isatty():
+                return
+            continue
+        except KeyboardInterrupt:
             typer.echo()
             return
 
@@ -99,22 +108,56 @@ def _run_interactive_shell(
             continue
         if stripped_prompt.lower() == CHAT_EXIT_COMMAND:
             return
-
-        with console.status(
-            "Thinking...", spinner="dots", spinner_style="status"
-        ) as status:
-            # Start one Flower AgentApp run for the submitted prompt.
-            req = StartRunRequest(
-                app_spec=CHAT_FLOWER_AGENT_APP_SPEC,
-                override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
-                federation=federation or "",
+        if stripped_prompt.lower() == CHAT_NEW_COMMAND:
+            series_id = None
+            console.print(
+                "Your next message will start a fresh conversation.", style="notice"
             )
-            with flwr_cli_grpc_exc_handler():
-                res = stub.StartRun(req)
+            continue
 
-            if not res.HasField("run_id"):
-                raise click.ClickException("Failed to start chat run.")
-            _stream_agent_response(stub, cast(int, res.run_id), status, console)
+        run_id: int | None = None
+        try:
+            with console.status(
+                "Thinking...", spinner="dots", spinner_style="status"
+            ) as status:
+                # Start one Flower AgentApp run for the submitted prompt.
+                req = StartRunRequest(
+                    app_spec=CHAT_FLOWER_AGENT_APP_SPEC,
+                    override_config=user_config_to_proto(
+                        {CHAT_AGENT_INPUT_KEY: prompt}
+                    ),
+                    federation=federation or "",
+                )
+                if series_id is not None:
+                    req.series_id = series_id
+
+                with flwr_cli_grpc_exc_handler():
+                    res = stub.StartRun(req)
+
+                if not res.HasField("run_id"):
+                    raise click.ClickException("Failed to start chat run.")
+                if res.HasField("series_id"):
+                    series_id = cast(int, res.series_id)
+                run_id = cast(int, res.run_id)
+                _stream_agent_response(stub, run_id, status, console)
+        except KeyboardInterrupt:
+            typer.echo()
+            if run_id is not None:
+                try:
+                    with flwr_cli_grpc_exc_handler():
+                        response = stub.StopRun(request=StopRunRequest(run_id=run_id))
+                    if not response.success:
+                        typer.echo(
+                            f"Warning: run {run_id} could not be stopped.",
+                            err=True,
+                        )
+                except click.ClickException as exc:
+                    typer.echo(
+                        f"Warning: failed to stop run {run_id}: "
+                        f"{exc.format_message()}",
+                        err=True,
+                    )
+            continue
 
 
 def _stream_agent_response(
@@ -161,7 +204,6 @@ def _stream_agent_response(
                     raise click.ClickException(_format_failure_event(payload))
                 elif event_type in CHAT_TERMINAL_EVENTS:
                     terminal_event_seen = True
-                    break
     finally:
         if response_started:
             console.print()

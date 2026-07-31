@@ -102,6 +102,21 @@ AgentApp with your own prompt, and inspected the resulting run. The same runtime
 will also run AgentApps you write yourself. You only need to provide the agent
 logic and project configuration.
 
+## Next steps
+
+- [Write your first AgentApp](write-your-first-agentapp.md) to create a custom
+  Flower Agent project.
+- [Understand the AgentApp
+  runtime](../explanations/agentapp-runtime.md) to learn how a run is executed.
+- [Use connectors](../explanations/use-connectors.md) to let a model search
+  the web.
+- [Run an AgentApp on
+  SuperGrid](../how-to-guides/run-on-supergrid.md) to learn how to configure,
+  observe, and stop a run.
+- [Run an AgentApp with a local
+  SuperLink](../how-to-guides/run-with-local-superlink.md) for local
+  development.
+
 ```{tip}
 If you get stuck, join the Flower community on [Flower
 Discuss](https://discuss.flower.ai/) or [Flower

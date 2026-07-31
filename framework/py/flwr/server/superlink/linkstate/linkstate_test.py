@@ -16,6 +16,7 @@
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
 import hashlib
+import json
 import multiprocessing
 import os
 import secrets
@@ -67,6 +68,8 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import get_object_tree
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
+from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.superlink.federation import NoOpFederationManager
 
 
@@ -2345,6 +2348,49 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         )
         state.initialize()
         return state
+
+    def test_get_fab_refreshes_cached_row_in_shared_session(self) -> None:
+        """Test get_fab observes raw SQL updates in a shared session."""
+        state = self.state_factory()
+        content = b"fab-content"
+        fab_hash = hashlib.sha256(content).hexdigest()
+
+        with state.session() as session:
+            state.store_fab(Fab(fab_hash, content, {"meta": "old"}))
+            cached_row = session.get(FabModel, fab_hash)
+            assert cached_row is not None
+            self.assertEqual(json.loads(cached_row.verifications), {"meta": "old"})
+            state.store_fab(Fab(fab_hash, content, {"meta": "new"}))
+            second = state.get_fab(fab_hash)
+
+        assert second is not None
+        self.assertEqual(second.verifications, {"meta": "new"})
+
+    def test_get_connector_refreshes_cached_row_in_shared_session(self) -> None:
+        """Test get_connector observes raw SQL updates in a shared session."""
+        state = self.state_factory()
+
+        with state.session() as session:
+            state.upsert_connector(
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                credentials_json='{"token":"old"}',
+                config_json='{"calendar":"primary"}',
+            )
+            cached_row = session.get(ConnectorModel, ("account-a", "calendar"))
+            assert cached_row is not None
+            self.assertEqual(cached_row.credentials_json, '{"token":"old"}')
+            state.upsert_connector(
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                credentials_json='{"token":"new"}',
+                config_json='{"calendar":"work"}',
+            )
+            second = state.get_connector(flwr_aid="account-a", connector_ref="calendar")
+
+        assert second is not None
+        self.assertEqual(second.credentials_json, '{"token":"new"}')
+        self.assertEqual(second.config_json, '{"calendar":"work"}')
 
     def test_run_series_distinguishes_missing_and_empty_descriptions(self) -> None:
         """Missing and explicitly empty descriptions remain distinct in SQL."""

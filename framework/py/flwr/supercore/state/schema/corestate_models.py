@@ -20,11 +20,14 @@ from sqlalchemy import (
     TIMESTAMP,
     BigInteger,
     Float,
+    ForeignKey,
     Index,
     Integer,
     LargeBinary,
     MetaData,
+    PrimaryKeyConstraint,
     String,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -172,3 +175,175 @@ class RunConnector(FlwrBase):
 
     run_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
     connector_ref: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+
+
+class Task(FlwrBase):
+    """Represent a task."""
+
+    __tablename__ = "task"
+    __table_args__ = (
+        Index("idx_task_run_id", "run_id"),
+        Index("idx_task_token", "token"),
+        Index("idx_task_active_until", "active_until"),
+    )
+
+    task_id: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True)
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    model_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    connector_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    token: Mapped[str | None] = mapped_column(String, nullable=True)
+    active_until: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    pending_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    starting_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    running_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    sub_status: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("''")
+    )
+    details: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("''")
+    )
+
+    __mapper_args__ = {"primary_key": [task_id]}
+
+
+class TaskEvent(FlwrBase):
+    """Represent a task event."""
+
+    __tablename__ = "task_event"
+    __table_args__ = (
+        Index("idx_task_event_run_id_id", "run_id", "id"),
+        Index("idx_task_event_task_id", "task_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("task.task_id"), nullable=False
+    )
+    event: Mapped[str] = mapped_column(String, nullable=False)
+    data: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class TaskMessage(FlwrBase):
+    """Represent a task message."""
+
+    __tablename__ = "task_message"
+    __table_args__ = (
+        Index("idx_task_message_dst_task_id_created_at", "dst_task_id", "created_at"),
+        Index("idx_task_message_run_id", "run_id"),
+    )
+
+    message_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    src_task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("task.task_id"), nullable=False
+    )
+    dst_task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("task.task_id"), nullable=False
+    )
+    reply_to_message_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[float] = mapped_column(Float, nullable=False)
+    ttl: Mapped[float] = mapped_column(Float, nullable=False)
+    message_type: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    error: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+
+
+class ObjectPushSession(FlwrBase):
+    """Represent an object push session."""
+
+    __tablename__ = "object_push_sessions"
+    __table_args__ = (
+        Index("idx_object_push_sessions_run_id", "run_id"),
+        Index("idx_object_push_sessions_expires_at", "expires_at"),
+    )
+
+    session_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    pending_count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class ObjectPushSessionRoot(FlwrBase):
+    """Represent a root object for an object push session."""
+
+    __tablename__ = "object_push_session_roots"
+    __table_args__ = (Index("idx_object_push_session_roots_session_id", "session_id"),)
+
+    session_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("object_push_sessions.session_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    root_object_id: Mapped[str] = mapped_column(
+        String, primary_key=True, nullable=False
+    )
+
+
+class ObjectPushSessionPending(FlwrBase):
+    """Represent a pending object for an object push session."""
+
+    __tablename__ = "object_push_session_pending"
+    __table_args__ = (
+        PrimaryKeyConstraint("session_id", "object_id"),
+        Index(
+            "idx_object_push_session_pending_object_id_session_id",
+            "object_id",
+            "session_id",
+        ),
+    )
+
+    session_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("object_push_sessions.session_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    object_id: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class TaskUsage(FlwrBase):
+    """Represent reported task usage."""
+
+    __tablename__ = "task_usage"
+    __table_args__ = (
+        Index("idx_task_usage_run_id", "run_id"),
+        Index("idx_task_usage_task_id", "task_id"),
+        Index("idx_task_usage_reported_at", "reported_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("task.task_id"), nullable=False
+    )
+    input_tokens: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    total_tokens: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    usage_type: Mapped[str] = mapped_column(String, nullable=False)
+    provider: Mapped[str] = mapped_column(
+        String, server_default="unknown", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    reported_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
