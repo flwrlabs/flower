@@ -25,6 +25,7 @@ from prompt_toolkit.application import Application
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.data_structures import Point
 from prompt_toolkit.filters import Condition
+from prompt_toolkit.formatted_text.utils import split_lines
 from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
 from prompt_toolkit.layout import (
     BufferControl,
@@ -82,8 +83,10 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.busy = False
         self.cancel_requested = False
         self.transcript: list[tuple[str, str]] = []
+        self.rendered_transcript: list[tuple[str, str]] = []
         self.status = ""
-        self.input_buffer = Buffer(read_only=Condition(lambda: self.busy))
+        self.transcript_window: Window | None = None
+        self.input_buffer = Buffer()
         self.application = self._create_application()
 
     def run(self) -> None:
@@ -124,13 +127,14 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         )
         transcript = Window(
             FormattedTextControl(
-                lambda: self.transcript,
+                self._render_transcript,
                 get_cursor_position=self._transcript_cursor,
                 show_cursor=False,
             ),
-            wrap_lines=True,
+            wrap_lines=False,
             always_hide_cursor=True,
         )
+        self.transcript_window = transcript
         status = Window(
             FormattedTextControl(self._render_status),
             height=1,
@@ -146,7 +150,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                     BeforeInput(CHAT_USER_PROMPT, style="class:user.prompt")
                 ],
             ),
-            height=Dimension(min=1, max=2),
+            height=Dimension(min=1),
             dont_extend_height=True,
             wrap_lines=True,
             style="class:prompt.background",
@@ -181,6 +185,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             key_bindings=key_bindings,
             style=Style.from_dict(CHAT_APP_STYLE),
             full_screen=True,
+            mouse_support=True,
             refresh_interval=0.1,
         )
 
@@ -325,11 +330,33 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         frame = CHAT_SPINNER_FRAMES[int(monotonic() * 10) % len(CHAT_SPINNER_FRAMES)]
         return [("class:status", f"{frame} {self.status}")]
 
+    def _render_transcript(self) -> list[tuple[str, str]]:
+        """Return transcript text wrapped to the current terminal width."""
+        self.rendered_transcript = _wrap_transcript_fragments(
+            self.transcript, self._get_terminal_width()
+        )
+        return self.rendered_transcript
+
     def _transcript_cursor(self) -> Point:
         """Keep the transcript scrolled to its last line."""
-        text = "".join(fragment for _, fragment in self.transcript)
-        lines = text.split("\n")
-        return Point(x=len(lines[-1]), y=len(lines) - 1)
+        rendered_transcript = self.rendered_transcript or self._render_transcript()
+        lines = list(split_lines(rendered_transcript)) or [[]]
+        last_line_index = len(lines) - 1
+        if self._transcript_is_scrolled_up():
+            window = cast(Window, self.transcript_window)
+            return Point(x=0, y=min(window.vertical_scroll, last_line_index))
+
+        last_line_width = sum(get_cwidth(fragment[1]) for fragment in lines[-1])
+        return Point(x=last_line_width, y=last_line_index)
+
+    def _transcript_is_scrolled_up(self) -> bool:
+        """Return whether the transcript is manually scrolled above the bottom."""
+        if self.transcript_window is None or self.transcript_window.render_info is None:
+            return False
+
+        render_info = self.transcript_window.render_info
+        bottom_scroll = max(0, render_info.content_height - render_info.window_height)
+        return self.transcript_window.vertical_scroll < bottom_scroll
 
 
 def parse_task_event(task_event: TaskEvent) -> tuple[str, JSONObject]:
@@ -409,3 +436,28 @@ def _wrap_transcript_line(line: str, width: int) -> list[str]:
             current_width += char_width
     lines.append(current_line)
     return lines
+
+
+def _wrap_transcript_fragments(
+    fragments: list[tuple[str, str]], width: int
+) -> list[tuple[str, str]]:
+    """Wrap formatted transcript fragments to the transcript width."""
+    if width <= 0:
+        return fragments
+
+    wrapped_fragments: list[tuple[str, str]] = []
+    current_width = 0
+    for style, text in fragments:
+        for char in text:
+            if char == "\n":
+                wrapped_fragments.append((style, char))
+                current_width = 0
+                continue
+
+            char_width = get_cwidth(char)
+            if current_width and current_width + char_width > width:
+                wrapped_fragments.append(("", "\n"))
+                current_width = 0
+            wrapped_fragments.append((style, char))
+            current_width += char_width
+    return wrapped_fragments
