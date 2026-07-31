@@ -102,9 +102,7 @@ class _ChatCommandCompleter(Completer):
 class _FullWidthCompletionsMenuControl(CompletionsMenuControl):
     """Render completion menu rows across the available width."""
 
-    def _get_menu_width(
-        self, max_width: int, _complete_state: CompletionState
-    ) -> int:
+    def _get_menu_width(self, max_width: int, _complete_state: CompletionState) -> int:
         """Use all available columns for each completion row."""
         return max_width
 
@@ -453,9 +451,10 @@ def parse_task_event(task_event: TaskEvent) -> tuple[str, JSONObject]:
 
 def format_chat_help() -> str:
     """Return formatted chat command help."""
+    command_width = max(len(command) for command in CHAT_COMMANDS)
     lines = ["Available Commands:"]
     for command, description in CHAT_COMMANDS.items():
-        lines.append(f"  {command:<5} {description}")
+        lines.append(f"  {command:<{command_width}} {description}")
     return "\n".join(lines) + "\n\n"
 
 
