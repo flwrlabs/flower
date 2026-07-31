@@ -137,6 +137,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         key_bindings = KeyBindings()
         logo_lines = CHAT_FLOWER_LOGO.splitlines()
 
+        # Register prompt submission and interruption shortcuts.
         @key_bindings.add("enter")
         def _submit_prompt(event: KeyPressEvent) -> None:
             self._submit_prompt(event)
@@ -149,6 +150,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         def _ignore_eof(_: KeyPressEvent) -> None:
             pass
 
+        # Build the fixed welcome header.
         welcome = Frame(
             Window(
                 FormattedTextControl(
@@ -164,6 +166,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             ),
             style="class:agent.prompt",
         )
+        # Build the transcript and response status area.
         transcript = Window(
             FormattedTextControl(
                 lambda: self.transcript,
@@ -181,6 +184,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             Window(height=1),
             filter=Condition(lambda: bool(self.status)),
         )
+        # Build the user input area.
         prompt = Window(
             BufferControl(
                 buffer=self.input_buffer,
@@ -202,10 +206,12 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             ),
             filter=has_completions & ~is_done,
         )
+        # Combine transcript and status in the main chat area.
         chat_window = HSplit(
             [transcript, status, status_gap],
             style="class:content",
         )
+        # Build the agent label above the input area.
         agent_name = Window(
             FormattedTextControl([("class:agent.name", f" ✿ {CHAT_AGENT_NAME} ")]),
             height=1,
@@ -226,6 +232,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 completion_menu,
             ]
         )
+        # Assemble the full-screen chat layout.
         return Application[None](
             layout=Layout(
                 root,
@@ -247,20 +254,10 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         stripped_prompt = prompt.strip()
         if not stripped_prompt:
             return
-        if stripped_prompt.lower() == CHAT_HELP_COMMAND:
-            self._append_transcript("class:notice", format_chat_help())
-            return
-        if stripped_prompt.lower() == CHAT_EXIT_COMMAND:
-            event.app.exit()
-            return
-        if stripped_prompt.lower() == CHAT_NEW_COMMAND:
-            self.series_id = None
-            self._append_transcript(
-                "class:notice",
-                f"{CHAT_NEW_CONVERSATION_MESSAGE}\n\n",
-            )
+        if self._handle_command(event, stripped_prompt):
             return
 
+        # Start the agent run without blocking the UI event loop.
         self._append_user_message(prompt)
         self.busy = True
         self.cancel_requested = False
@@ -268,8 +265,24 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         event.app.create_background_task(self._run_prompt(prompt))
         event.app.invalidate()
 
+    def _handle_command(self, event: KeyPressEvent, prompt: str) -> bool:
+        """Handle a slash command and return whether the prompt was consumed."""
+        command = prompt.lower()
+        if command == CHAT_EXIT_COMMAND:
+            event.app.exit()
+            return True
+        if command == CHAT_NEW_COMMAND:
+            self.series_id = None
+            self._append_transcript(
+                "class:notice",
+                f"{CHAT_NEW_CONVERSATION_MESSAGE}\n\n",
+            )
+            return True
+        return False
+
     def _interrupt_prompt(self, event: KeyPressEvent) -> None:
         """Exit while idle or stop the active run."""
+        # Clear a draft or exit when no run is active.
         if not self.busy:
             if self.input_buffer.text:
                 self.input_buffer.reset()
@@ -278,6 +291,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             event.app.exit()
             return
 
+        # Request cancellation without blocking the UI event loop.
         self.cancel_requested = True
         if self.run_id is not None:
             event.app.create_background_task(
@@ -300,6 +314,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
     def _run_prompt_sync(self, prompt: str) -> None:
         """Start and stream one Flower AgentApp run."""
+        # Start a run in the current conversation series.
         self.run_id, self.series_id = start_chat_run(
             self.stub, prompt, self.federation, self.series_id
         )
@@ -311,6 +326,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         response_started = False
         terminal_event_seen = False
         req_events = StreamRunEventsRequest(run_id=self.run_id)
+        # Append streamed response text until the run reaches a terminal event.
         with flwr_cli_grpc_exc_handler():
             for res_events in self.stub.StreamRunEvents(req_events):
                 event_type, payload = parse_task_event(res_events.task_event)

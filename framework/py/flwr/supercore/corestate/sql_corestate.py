@@ -24,7 +24,7 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, select
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Context, Message
@@ -60,7 +60,11 @@ from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationS
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
+from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.corestate_models import (
+    RunConnector as RunConnectorModel,
+)
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import build_sql_in_params, int64_to_uint64, uint64_to_int64
@@ -449,24 +453,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Return an account's connector, if present."""
         if not flwr_aid or not connector_ref:
             return None
-        rows = self.query(
-            """
-            SELECT flwr_aid, connector_ref, credentials_json, config_json
-            FROM connector
-            WHERE flwr_aid = :flwr_aid
-              AND connector_ref = :connector_ref
-            """,
-            {"flwr_aid": flwr_aid, "connector_ref": connector_ref},
-        )
-        if not rows:
-            return None
-        row = rows[0]
-        return ConnectorRecord(
-            flwr_aid=row["flwr_aid"],
-            connector_ref=row["connector_ref"],
-            credentials_json=row["credentials_json"],
-            config_json=row["config_json"],
-        )
+        with self.session() as session:
+            row = session.get(
+                ConnectorModel,
+                (flwr_aid, connector_ref),
+                populate_existing=True,
+            )
+            if row is None:
+                return None
+            return ConnectorRecord(
+                flwr_aid=row.flwr_aid,
+                connector_ref=row.connector_ref,
+                credentials_json=row.credentials_json,
+                config_json=row.config_json,
+            )
 
     def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
         """Delete an account's connector if it exists."""
@@ -523,16 +523,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
         """Return connector references associated with a run."""
-        rows = self.query(
-            """
-            SELECT connector_ref
-            FROM run_connector
-            WHERE run_id = :run_id
-            ORDER BY connector_ref
-            """,
-            {"run_id": uint64_to_int64(run_id)},
-        )
-        return [row["connector_ref"] for row in rows]
+        with self.session() as session:
+            return list(
+                session.scalars(
+                    select(RunConnectorModel.connector_ref)
+                    .where(RunConnectorModel.run_id == uint64_to_int64(run_id))
+                    .order_by(RunConnectorModel.connector_ref)
+                )
+            )
 
     def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
