@@ -414,7 +414,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 reasoning_block = _DetailsBlock("Reasoning")
                 self.transcript.insert(response_start, reasoning_block)
             tool_call_id = cast(str, payload["tool_call_id"])
-            block = _DetailsBlock(f"Web search · {payload['query']}")
+            block = _DetailsBlock("Web search")
             web_search_blocks[tool_call_id] = block
             self.transcript.append(block)
         elif (
