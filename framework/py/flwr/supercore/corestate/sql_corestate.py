@@ -61,6 +61,9 @@ from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
+from flwr.supercore.state.schema.corestate_models import (
+    ConnectorOAuthSession as ConnectorOAuthSessionModel,
+)
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     RunConnector as RunConnectorModel,
@@ -599,20 +602,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Return an account's connector OAuth session, if present."""
         if not oauth_session_id or not flwr_aid:
             return None
-        rows = self.query(
-            """
-            SELECT oauth_session_id, flwr_aid, connector_ref, state,
-                   redirect_uri, pkce_verifier, created_at, expires_at,
-                   completed_at
-            FROM connector_oauth_session
-            WHERE oauth_session_id = :oauth_session_id
-              AND flwr_aid = :flwr_aid
-            """,
-            {"oauth_session_id": oauth_session_id, "flwr_aid": flwr_aid},
-        )
-        if not rows:
-            return None
-        return _connector_oauth_session_from_row(rows[0])
+        with self.session() as session:
+            row = session.get(
+                ConnectorOAuthSessionModel,
+                oauth_session_id,
+                populate_existing=True,
+            )
+            if row is None or row.flwr_aid != flwr_aid:
+                return None
+            return _connector_oauth_session_from_model(row)
 
     def complete_connector_oauth_session(
         self, oauth_session_id: str, flwr_aid: str
@@ -1769,6 +1767,23 @@ def _connector_oauth_session_from_row(
         created_at=timestamp_to_iso(row["created_at"]),
         expires_at=timestamp_to_iso(row["expires_at"]),
         completed_at=timestamp_to_iso(row["completed_at"]) or None,
+    )
+
+
+def _connector_oauth_session_from_model(
+    row: ConnectorOAuthSessionModel,
+) -> ConnectorOAuthSessionRecord:
+    """Convert a connector OAuth session model to its persistence record."""
+    return ConnectorOAuthSessionRecord(
+        oauth_session_id=row.oauth_session_id,
+        flwr_aid=row.flwr_aid,
+        connector_ref=row.connector_ref,
+        state=row.state,
+        redirect_uri=row.redirect_uri,
+        pkce_verifier=row.pkce_verifier,
+        created_at=timestamp_to_iso(row.created_at),
+        expires_at=timestamp_to_iso(row.expires_at),
+        completed_at=timestamp_to_iso(row.completed_at) or None,
     )
 
 
