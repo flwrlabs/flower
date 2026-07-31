@@ -885,9 +885,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_add_and_get_task_usage(self) -> None:
         """Task usage should round-trip and filter by task ID."""
         state = self.state_factory()
+        run_id = self.task_run_id(state)
         task_id = state.create_task(
             task_type=TaskType.MODEL,
-            run_id=self.task_run_id(state),
+            run_id=run_id,
         )
         assert task_id is not None
 
@@ -911,8 +912,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
 
         usages = state.get_task_usage(task_ids=[task_id])
+        usages_by_run = state.get_task_usage(run_ids=[run_id])
+        empty_by_task = state.get_task_usage(task_ids=[])
+        empty_by_run = state.get_task_usage(run_ids=[])
 
         self.assertEqual(len(usages), 2)
+        self.assertEqual(usages_by_run, usages)
+        self.assertEqual(empty_by_task, [])
+        self.assertEqual(empty_by_run, [])
         usage = usages[0]
         self.assertEqual(usage.input_tokens, 10)
         self.assertEqual(usage.output_tokens, 20)
