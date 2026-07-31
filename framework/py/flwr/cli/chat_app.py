@@ -320,13 +320,18 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
     def _append_user_message(self, prompt: str) -> None:
         """Append a full-width highlighted user message."""
+        width = self._get_terminal_width()
         for line_index, line in enumerate(prompt.split("\n")):
             prefix = (
                 CHAT_USER_PROMPT
                 if line_index == 0
                 else " " * get_cwidth(CHAT_USER_PROMPT)
             )
-            self.transcript.append(("class:user.message", f"{prefix}{line}\n"))
+            for visual_line in _wrap_transcript_line(f"{prefix}{line}", width):
+                padding = " " * max(0, width - get_cwidth(visual_line))
+                self.transcript.append(
+                    ("class:user.message", f"{visual_line}{padding}\n")
+                )
         self.transcript.append(("", "\n"))
         self.application.invalidate()
 
