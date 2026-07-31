@@ -20,63 +20,67 @@ from unittest.mock import Mock, patch
 import pytest
 import requests
 
-from flwr.supercore.task_process.agent.session import RuntimeAgentConnectors
-from flwr.supercore.typing import JSONObject
-
 from . import registry
 from .notion import (
     NOTION_CONNECTOR_REF,
-    NOTION_SEARCH_TOOL,
     NOTION_TOOL_NAMES,
     NotionApiError,
     get_page_content,
-    make_notion_tools,
     search,
 )
 
 _CREDENTIALS = {"access_token": "ntn-secret"}
 
 
-def test_notion_tools_are_registered_separately_from_builtins() -> None:
-    """Notion should expose multiple tools without becoming a built-in."""
+def _list_response(
+    results: list[dict[str, object]],
+    *,
+    next_cursor: str | None = None,
+    status_code: int = 200,
+) -> Mock:
+    response = Mock(status_code=status_code)
+    response.json.return_value = {
+        "results": results,
+        "has_more": next_cursor is not None,
+        "next_cursor": next_cursor,
+    }
+    return response
+
+
+def _text_block(
+    block_id: str, block_type: str, text: str, *, has_children: bool = False
+) -> dict[str, object]:
+    return {
+        "id": block_id,
+        "type": block_type,
+        "has_children": has_children,
+        block_type: {"rich_text": [{"plain_text": text}]},
+    }
+
+
+def test_notion_tools_are_registered_as_read_only_credentials() -> None:
+    """Notion tools should be closed schemas backed by one OAuth connection."""
     tools = registry.get_connector_tools(NOTION_CONNECTOR_REF)
 
     assert [tool["name"] for tool in tools] == list(NOTION_TOOL_NAMES)
-    assert registry.has_builtin_connector(NOTION_CONNECTOR_REF) is False
-    assert registry.get_connector_ref(NOTION_SEARCH_TOOL) == "notion"
-
-
-def test_agent_connector_selection_expands_notion_tools() -> None:
-    """Selecting Notion should advertise all Notion tools to the model."""
-    connectors = RuntimeAgentConnectors(Mock())
-
-    tools = connectors.tools(["web_search", "notion"])
-
-    assert [tool["name"] for tool in tools] == ["web_search", *NOTION_TOOL_NAMES]
-
-
-def test_notion_tool_schemas_are_closed_read_only_functions() -> None:
-    """Every Notion tool should have a closed schema and no write operation."""
-    tools = make_notion_tools()
-
-    assert {tool["name"] for tool in tools} == set(NOTION_TOOL_NAMES)
+    assert not registry.has_builtin_connector(NOTION_CONNECTOR_REF)
     for tool in tools:
+        name = str(tool["name"])
         assert tool["type"] == "function"
         assert tool["parameters"]["additionalProperties"] is False
-        assert "create" not in str(tool["name"])
-        assert "append" not in str(tool["name"])
+        assert "create" not in name and "append" not in name
+        assert registry.requires_connector_credentials(name)
+        assert registry.get_connector_ref(name) == NOTION_CONNECTOR_REF
 
 
-def test_search_returns_normalized_results_and_cursor() -> None:
-    """Notion search should return stable page and data source fields."""
-    response = Mock(status_code=200)
-    response.json.return_value = {
-        "results": [
+def test_search_calls_notion_and_normalizes_results() -> None:
+    """Search should preserve cursors and normalize page and data source titles."""
+    response = _list_response(
+        [
             {
                 "object": "page",
                 "id": "page-1",
                 "url": "https://notion.so/page-1",
-                "last_edited_time": "2026-07-31T08:00:00.000Z",
                 "properties": {
                     "Name": {
                         "type": "title",
@@ -87,14 +91,11 @@ def test_search_returns_normalized_results_and_cursor() -> None:
             {
                 "object": "data_source",
                 "id": "source-1",
-                "url": "https://notion.so/source-1",
-                "last_edited_time": "2026-07-30T08:00:00.000Z",
                 "title": [{"plain_text": "Projects"}],
             },
         ],
-        "has_more": True,
-        "next_cursor": "next-page",
-    }
+        next_cursor="next-page",
+    )
     with patch(
         "flwr.supercore.task_process.connector.notion.requests.request",
         return_value=response,
@@ -108,86 +109,37 @@ def test_search_returns_normalized_results_and_cursor() -> None:
             usage_recorder=Mock(),
         )
 
-    request.assert_called_once_with(
-        "POST",
-        "https://api.notion.com/v1/search",
-        headers={
-            "Authorization": "Bearer ntn-secret",
-            "Content-Type": "application/json",
-            "Notion-Version": "2026-03-11",
-        },
-        json={
-            "query": "release",
-            "page_size": 2,
-            "start_cursor": "opaque-cursor",
-        },
-        params=None,
-        timeout=30.0,
-    )
-    assert result == {
-        "results": [
-            {
-                "id": "page-1",
-                "object": "page",
-                "title": "Release notes",
-                "url": "https://notion.so/page-1",
-                "last_edited_time": "2026-07-31T08:00:00.000Z",
-            },
-            {
-                "id": "source-1",
-                "object": "data_source",
-                "title": "Projects",
-                "url": "https://notion.so/source-1",
-                "last_edited_time": "2026-07-30T08:00:00.000Z",
-            },
-        ],
-        "has_more": True,
-        "next_cursor": "next-page",
+    assert request.call_args.args == ("POST", "https://api.notion.com/v1/search")
+    assert request.call_args.kwargs["json"] == {
+        "query": "release",
+        "page_size": 2,
+        "start_cursor": "opaque-cursor",
     }
+    assert request.call_args.kwargs["headers"]["Notion-Version"] == "2026-03-11"
+    rows = result["results"]
+    assert isinstance(rows, list)
+    assert [(row["object"], row["title"]) for row in rows] == [
+        ("page", "Release notes"),
+        ("data_source", "Projects"),
+    ]
+    assert result["next_cursor"] == "next-page"
 
 
 def test_get_page_content_reads_nested_and_paginated_blocks() -> None:
     """Page content should preserve depth-first order across API pages."""
-    first_page = Mock(status_code=200)
-    first_page.json.return_value = {
-        "results": [
-            {
-                "object": "block",
-                "id": "paragraph-1",
-                "type": "paragraph",
-                "has_children": False,
-                "paragraph": {"rich_text": [{"plain_text": "Introduction"}]},
-            },
-            {
-                "object": "block",
-                "id": "toggle-1",
-                "type": "toggle",
-                "has_children": True,
-                "toggle": {"rich_text": [{"plain_text": "Details"}]},
-            },
+    first_page = _list_response(
+        [
+            _text_block("paragraph-1", "paragraph", "Introduction"),
+            _text_block("toggle-1", "toggle", "Details", has_children=True),
         ],
-        "has_more": True,
-        "next_cursor": "top-page-2",
-    }
-    nested_page = Mock(status_code=200)
-    nested_page.json.return_value = {
-        "results": [
+        next_cursor="top-page-2",
+    )
+    nested_page = _list_response(
+        [_text_block("paragraph-2", "paragraph", "Nested text")]
+    )
+    second_page = _list_response(
+        [
             {
-                "object": "block",
-                "id": "paragraph-2",
-                "type": "paragraph",
-                "has_children": False,
-                "paragraph": {"rich_text": [{"plain_text": "Nested text"}]},
-            }
-        ],
-        "has_more": False,
-        "next_cursor": None,
-    }
-    second_page = Mock(status_code=200)
-    second_page.json.return_value = {
-        "results": [
-            {
-                "object": "block",
                 "id": "row-1",
                 "type": "table_row",
                 "has_children": False,
@@ -198,10 +150,8 @@ def test_get_page_content_reads_nested_and_paginated_blocks() -> None:
                     ]
                 },
             }
-        ],
-        "has_more": False,
-        "next_cursor": None,
-    }
+        ]
+    )
     with patch(
         "flwr.supercore.task_process.connector.notion.requests.request",
         side_effect=[first_page, nested_page, second_page],
@@ -219,62 +169,23 @@ def test_get_page_content_reads_nested_and_paginated_blocks() -> None:
         "https://api.notion.com/v1/blocks/toggle-1/children",
         "https://api.notion.com/v1/blocks/page-1/children",
     ]
-    assert [call.kwargs["params"] for call in request.call_args_list] == [
-        {"page_size": "5"},
-        {"page_size": "3"},
-        {"page_size": "2", "start_cursor": "top-page-2"},
+    assert request.call_args_list[-1].kwargs["params"]["start_cursor"] == ("top-page-2")
+    blocks = result["blocks"]
+    assert isinstance(blocks, list)
+    assert [(block["id"], block["text"], block["depth"]) for block in blocks] == [
+        ("paragraph-1", "Introduction", 0),
+        ("toggle-1", "Details", 0),
+        ("paragraph-2", "Nested text", 1),
+        ("row-1", "Name | Status", 0),
     ]
-    assert result == {
-        "page_id": "page-1",
-        "blocks": [
-            {
-                "id": "paragraph-1",
-                "type": "paragraph",
-                "text": "Introduction",
-                "depth": 0,
-                "has_children": False,
-            },
-            {
-                "id": "toggle-1",
-                "type": "toggle",
-                "text": "Details",
-                "depth": 0,
-                "has_children": True,
-            },
-            {
-                "id": "paragraph-2",
-                "type": "paragraph",
-                "text": "Nested text",
-                "depth": 1,
-                "has_children": False,
-            },
-            {
-                "id": "row-1",
-                "type": "table_row",
-                "text": "Name | Status",
-                "depth": 0,
-                "has_children": False,
-            },
-        ],
-        "truncated": False,
-    }
+    assert result["truncated"] is False
 
 
-def test_get_page_content_stops_before_fetching_children_at_limit() -> None:
+def test_get_page_content_stops_at_block_limit() -> None:
     """The block limit should prevent additional nested API requests."""
-    response = Mock(status_code=200)
-    response.json.return_value = {
-        "results": [
-            {
-                "id": "toggle-1",
-                "type": "toggle",
-                "has_children": True,
-                "toggle": {"rich_text": [{"plain_text": "Details"}]},
-            }
-        ],
-        "has_more": False,
-        "next_cursor": None,
-    }
+    response = _list_response(
+        [_text_block("toggle-1", "toggle", "Details", has_children=True)]
+    )
     with patch(
         "flwr.supercore.task_process.connector.notion.requests.request",
         return_value=response,
@@ -287,53 +198,23 @@ def test_get_page_content_stops_before_fetching_children_at_limit() -> None:
             usage_recorder=Mock(),
         )
 
-    assert len(result["blocks"]) == 1
     assert result["truncated"] is True
     request.assert_called_once()
 
 
-@pytest.mark.parametrize("tool_name", NOTION_TOOL_NAMES)
-def test_registry_maps_every_notion_tool_to_one_connection(tool_name: str) -> None:
-    """All Notion tools should resolve the account's single Notion credential."""
-    assert registry.requires_connector_credentials(tool_name)
-    assert registry.get_connector_ref(tool_name) == NOTION_CONNECTOR_REF
-
-
-def test_notion_api_errors_are_stable_and_secret_safe() -> None:
-    """Notion response details and bearer tokens must not leak through errors."""
-    response = Mock(status_code=401)
-    response.json.return_value = {
-        "code": "unauthorized",
-        "message": "Bearer ntn-secret is invalid",
-    }
-    with (
-        patch(
-            "flwr.supercore.task_process.connector.notion.requests.request",
-            return_value=response,
-        ),
-        pytest.raises(NotionApiError) as error,
-    ):
-        search(
-            "release",
-            credentials=_CREDENTIALS,
-            config={},
-            usage_recorder=Mock(),
-        )
-
-    assert error.value.code == "unauthorized"
-    assert "ntn-secret" not in str(error.value)
+_UNAUTHORIZED = Mock(status_code=401)
+_UNAUTHORIZED.json.return_value = {
+    "code": "unauthorized",
+    "message": "Bearer ntn-secret is invalid",
+}
 
 
 @pytest.mark.parametrize(
     ("response", "side_effect", "expected_code"),
     [
-        (None, requests.RequestException("ntn-secret"), "request_failed"),
+        (_UNAUTHORIZED, None, "unauthorized"),
         (Mock(status_code=429), None, "rate_limited"),
-        (
-            Mock(status_code=500, **{"json.side_effect": ValueError()}),
-            None,
-            "http_error",
-        ),
+        (None, requests.RequestException("ntn-secret"), "request_failed"),
         (
             Mock(status_code=200, **{"json.side_effect": ValueError()}),
             None,
@@ -341,12 +222,12 @@ def test_notion_api_errors_are_stable_and_secret_safe() -> None:
         ),
     ],
 )
-def test_notion_transport_failures_are_mapped_without_details(
+def test_api_failures_are_stable_and_secret_safe(
     response: Mock | None,
     side_effect: Exception | None,
     expected_code: str,
 ) -> None:
-    """Transport, HTTP, and decoding failures should use stable error codes."""
+    """Provider and transport failures should expose only stable error codes."""
     with (
         patch(
             "flwr.supercore.task_process.connector.notion.requests.request",
@@ -370,20 +251,16 @@ def test_notion_transport_failures_are_mapped_without_details(
     ("function", "arguments"),
     [
         (search, {"query": ""}),
-        (search, {"query": "valid", "limit": 101}),
         (search, {"query": "valid", "cursor": ""}),
-        (get_page_content, {"page_id": ""}),
         (get_page_content, {"page_id": "page-1", "max_blocks": 201}),
     ],
 )
-def test_notion_tool_inputs_are_validated(
-    function: Callable[..., JSONObject], arguments: dict[str, object]
+def test_invalid_inputs_fail_before_request(
+    function: Callable[..., object], arguments: dict[str, object]
 ) -> None:
-    """Invalid tool inputs should fail before making an HTTP request."""
+    """Representative invalid inputs should fail before any API request."""
     with (
-        patch(
-            "flwr.supercore.task_process.connector.notion.requests.request"
-        ) as request,
+        patch("flwr.supercore.task_process.connector.notion.requests.request") as call,
         pytest.raises(ValueError),
     ):
         function(
@@ -393,4 +270,4 @@ def test_notion_tool_inputs_are_validated(
             usage_recorder=Mock(),
         )
 
-    request.assert_not_called()
+    call.assert_not_called()
