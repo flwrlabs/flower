@@ -125,6 +125,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             ),
             style="class:agent.prompt",
         )
+        # Build the transcript and response status area.
         self.transcript_window = Window(
             FormattedTextControl(
                 self._render_transcript,
@@ -349,6 +350,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
     def _transcript_cursor(self) -> Point:
         """Keep the transcript scrolled to its last line."""
+        # Cursor rows must match the manually wrapped transcript lines.
         wrapped_text = "".join(text for _, text in self.wrapped_transcript)
         lines = wrapped_text.split("\n")
         last_line_index = len(lines) - 1
@@ -356,11 +358,13 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         if render_info is not None:
             bottom_scroll = render_info.content_height - render_info.window_height
             if self.transcript_window.vertical_scroll < bottom_scroll:
+                # Preserve manual scrolling and clamp stale offsets after resizing.
                 return Point(
                     x=0,
                     y=min(self.transcript_window.vertical_scroll, last_line_index),
                 )
 
+        # Follow the newest transcript line while the view remains at the bottom.
         last_line_width = get_cwidth(lines[-1])
         return Point(x=last_line_width, y=last_line_index)
 
@@ -432,10 +436,12 @@ def _wrap_transcript_fragments(
     """Wrap formatted transcript fragments to the transcript width."""
     wrapped_fragments: list[tuple[str, str]] = []
     current_width = 0
+    # Track display-cell width across adjacent styled fragments.
     for style, text in fragments:
         chunk: list[str] = []
         for char in text:
             if char == "\n":
+                # Finish explicit lines and extend highlighted user rows.
                 if chunk:
                     wrapped_fragments.append((style, "".join(chunk)))
                     chunk = []
@@ -447,6 +453,7 @@ def _wrap_transcript_fragments(
 
             char_width = get_cwidth(char)
             if current_width and current_width + char_width > width:
+                # Insert a visual line break before exceeding the terminal width.
                 if chunk:
                     wrapped_fragments.append((style, "".join(chunk)))
                     chunk = []
