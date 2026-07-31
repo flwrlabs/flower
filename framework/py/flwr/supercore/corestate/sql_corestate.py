@@ -68,6 +68,9 @@ from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     RunConnector as RunConnectorModel,
 )
+from flwr.supercore.state.schema.corestate_models import (
+    SeriesContext as SeriesContextModel,
+)
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import build_sql_in_params, int64_to_uint64, uint64_to_int64
@@ -712,17 +715,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
-        rows = self.query(
-            """
-            SELECT context
-            FROM series_context
-            WHERE series_id = :series_id
-            """,
-            {"series_id": uint64_to_int64(series_id)},
-        )
-        if not rows or rows[0]["context"] is None:
-            return None
-        return context_from_bytes(rows[0]["context"])
+        with self.session() as session:
+            row = session.get(
+                SeriesContextModel,
+                uint64_to_int64(series_id),
+                populate_existing=True,
+            )
+            if row is None or row.context is None:
+                return None
+            return context_from_bytes(row.context)
 
     def set_run_series_context(self, series_id: int, context: Context) -> None:
         """Set the shared Context for the specified RunSeries."""
