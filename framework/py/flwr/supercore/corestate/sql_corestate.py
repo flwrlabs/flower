@@ -24,7 +24,7 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, select
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Context, Message
@@ -60,6 +60,19 @@ from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationS
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
+from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
+from flwr.supercore.state.schema.corestate_models import (
+    ConnectorOAuthSession as ConnectorOAuthSessionModel,
+)
+from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.corestate_models import (
+    RunConnector as RunConnectorModel,
+)
+from flwr.supercore.state.schema.corestate_models import (
+    SeriesContext as SeriesContextModel,
+)
+from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
+from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import build_sql_in_params, int64_to_uint64, uint64_to_int64
@@ -398,22 +411,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
-        query = """
-            SELECT fab_hash, content, verifications
-            FROM fab
-            WHERE fab_hash = :fab_hash
-        """
-        rows = self.query(query, {"fab_hash": fab_hash})
-        if not rows:
-            return None
-        row = rows[0]
-        # Launch tradeoff: do not recompute content hash on reads; rely on
-        # write-time validation and hash-addressed lookup.
-        return Fab(
-            hash_str=row["fab_hash"],
-            content=row["content"],
-            verifications=json.loads(row["verifications"]),
-        )
+        with self.session() as session:
+            row = session.get(FabModel, fab_hash, populate_existing=True)
+            if row is None:
+                return None
+            # Launch tradeoff: do not recompute content hash on reads; rely on
+            # write-time validation and hash-addressed lookup.
+            return Fab(
+                hash_str=row.fab_hash,
+                content=row.content,
+                verifications=json.loads(row.verifications),
+            )
 
     def upsert_connector(
         self,
@@ -453,24 +461,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Return an account's connector, if present."""
         if not flwr_aid or not connector_ref:
             return None
-        rows = self.query(
-            """
-            SELECT flwr_aid, connector_ref, credentials_json, config_json
-            FROM connector
-            WHERE flwr_aid = :flwr_aid
-              AND connector_ref = :connector_ref
-            """,
-            {"flwr_aid": flwr_aid, "connector_ref": connector_ref},
-        )
-        if not rows:
-            return None
-        row = rows[0]
-        return ConnectorRecord(
-            flwr_aid=row["flwr_aid"],
-            connector_ref=row["connector_ref"],
-            credentials_json=row["credentials_json"],
-            config_json=row["config_json"],
-        )
+        with self.session() as session:
+            row = session.get(
+                ConnectorModel,
+                (flwr_aid, connector_ref),
+                populate_existing=True,
+            )
+            if row is None:
+                return None
+            return ConnectorRecord(
+                flwr_aid=row.flwr_aid,
+                connector_ref=row.connector_ref,
+                credentials_json=row.credentials_json,
+                config_json=row.config_json,
+            )
 
     def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
         """Delete an account's connector if it exists."""
@@ -527,16 +531,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
         """Return connector references associated with a run."""
-        rows = self.query(
-            """
-            SELECT connector_ref
-            FROM run_connector
-            WHERE run_id = :run_id
-            ORDER BY connector_ref
-            """,
-            {"run_id": uint64_to_int64(run_id)},
-        )
-        return [row["connector_ref"] for row in rows]
+        with self.session() as session:
+            return list(
+                session.scalars(
+                    select(RunConnectorModel.connector_ref)
+                    .where(RunConnectorModel.run_id == uint64_to_int64(run_id))
+                    .order_by(RunConnectorModel.connector_ref)
+                )
+            )
 
     def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
@@ -605,20 +607,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Return an account's connector OAuth session, if present."""
         if not oauth_session_id or not flwr_aid:
             return None
-        rows = self.query(
-            """
-            SELECT oauth_session_id, flwr_aid, connector_ref, state,
-                   redirect_uri, pkce_verifier, created_at, expires_at,
-                   completed_at
-            FROM connector_oauth_session
-            WHERE oauth_session_id = :oauth_session_id
-              AND flwr_aid = :flwr_aid
-            """,
-            {"oauth_session_id": oauth_session_id, "flwr_aid": flwr_aid},
-        )
-        if not rows:
-            return None
-        return _connector_oauth_session_from_row(rows[0])
+        with self.session() as session:
+            row = session.scalars(
+                select(ConnectorOAuthSessionModel)
+                .where(ConnectorOAuthSessionModel.oauth_session_id == oauth_session_id)
+                .where(ConnectorOAuthSessionModel.flwr_aid == flwr_aid)
+                .execution_options(populate_existing=True)
+            ).one_or_none()
+            if row is None:
+                return None
+            return _connector_oauth_session_from_model(row)
 
     def complete_connector_oauth_session(
         self, oauth_session_id: str, flwr_aid: str
@@ -719,17 +717,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
-        rows = self.query(
-            """
-            SELECT context
-            FROM series_context
-            WHERE series_id = :series_id
-            """,
-            {"series_id": uint64_to_int64(series_id)},
-        )
-        if not rows or rows[0]["context"] is None:
-            return None
-        return context_from_bytes(rows[0]["context"])
+        with self.session() as session:
+            row = session.get(
+                SeriesContextModel,
+                uint64_to_int64(series_id),
+                populate_existing=True,
+            )
+            if row is None or row.context is None:
+                return None
+            return context_from_bytes(row.context)
 
     def set_run_series_context(self, series_id: int, context: Context) -> None:
         """Set the shared Context for the specified RunSeries."""
@@ -1315,36 +1311,23 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         task_ids: Sequence[int] | None = None,
     ) -> Sequence[TaskUsage]:
         """Retrieve task usage records based on the specified filters."""
-        conditions = []
-        params: dict[str, Any] = {}
+        query = select(TaskUsageModel).order_by(TaskUsageModel.id.asc())
 
         if run_ids is not None:
             if not run_ids:
                 return []
             sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            placeholders, in_params = build_sql_in_params(sint64_run_ids, "rid")
-            conditions.append(f"run_id IN ({placeholders})")
-            params.update(in_params)
+            query = query.where(TaskUsageModel.run_id.in_(sint64_run_ids))
 
         if task_ids is not None:
             if not task_ids:
                 return []
             sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            placeholders, in_params = build_sql_in_params(sint64_task_ids, "tid")
-            conditions.append(f"task_id IN ({placeholders})")
-            params.update(in_params)
+            query = query.where(TaskUsageModel.task_id.in_(sint64_task_ids))
 
-        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-
-        query = f"""
-            SELECT input_tokens, output_tokens, total_tokens, usage_type, provider
-            FROM task_usage
-            {where_clause}
-            ORDER BY id ASC
-        """
-
-        rows = self.query(query, params)
-        return [_task_usage_from_row(row) for row in rows]
+        with self.session() as session:
+            rows = session.scalars(query).all()
+            return [_task_usage_from_model(row) for row in rows]
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
@@ -1587,33 +1570,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
         cursor = after_task_event_id if after_task_event_id is not None else 0
-        conditions = ["id > :after_task_event_id"]
-        params = {"after_task_event_id": cursor}
-        if run_id is not None:
-            conditions.append("run_id = :run_id")
-            params["run_id"] = uint64_to_int64(run_id)
-
-        rows = self.query(
-            f"""
-            SELECT id, timestamp, run_id, task_id, event, data
-            FROM task_event
-            WHERE {" AND ".join(conditions)}
-            ORDER BY id ASC
-            """,
-            params,
+        query = (
+            select(TaskEventModel)
+            .where(TaskEventModel.id > cursor)
+            .order_by(TaskEventModel.id.asc())
         )
+        if run_id is not None:
+            query = query.where(TaskEventModel.run_id == uint64_to_int64(run_id))
 
-        return [
-            TaskEvent(
-                id=row["id"],
-                timestamp=timestamp_to_iso(row["timestamp"]),
-                run_id=int64_to_uint64(row["run_id"]),
-                task_id=int64_to_uint64(row["task_id"]),
-                event=row["event"],
-                data=row["data"],
-            )
-            for row in rows
-        ]
+        with self.session() as session:
+            rows = session.scalars(query).all()
+            return [_task_event_from_model(row) for row in rows]
 
     def _claim_task_message_rows(
         self,
@@ -1761,20 +1728,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return False
 
 
-def _connector_oauth_session_from_row(
-    row: dict[str, Any],
+def _connector_oauth_session_from_model(
+    row: ConnectorOAuthSessionModel,
 ) -> ConnectorOAuthSessionRecord:
-    """Convert a connector OAuth session row to its persistence record."""
+    """Convert a connector OAuth session model to its persistence record."""
     return ConnectorOAuthSessionRecord(
-        oauth_session_id=row["oauth_session_id"],
-        flwr_aid=row["flwr_aid"],
-        connector_ref=row["connector_ref"],
-        state=row["state"],
-        redirect_uri=row["redirect_uri"],
-        pkce_verifier=row["pkce_verifier"],
-        created_at=timestamp_to_iso(row["created_at"]),
-        expires_at=timestamp_to_iso(row["expires_at"]),
-        completed_at=timestamp_to_iso(row["completed_at"]) or None,
+        oauth_session_id=row.oauth_session_id,
+        flwr_aid=row.flwr_aid,
+        connector_ref=row.connector_ref,
+        state=row.state,
+        redirect_uri=row.redirect_uri,
+        pkce_verifier=row.pkce_verifier,
+        created_at=timestamp_to_iso(row.created_at),
+        expires_at=timestamp_to_iso(row.expires_at),
+        completed_at=timestamp_to_iso(row.completed_at) or None,
     )
 
 
@@ -1838,14 +1805,26 @@ def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:
     }
 
 
-def _task_usage_from_row(row: dict[str, Any]) -> TaskUsage:
-    """Convert a task_usage row to a TaskUsage proto."""
+def _task_usage_from_model(row: TaskUsageModel) -> TaskUsage:
+    """Convert a task_usage ORM model to a TaskUsage proto."""
     return TaskUsage(
-        usage_type=row["usage_type"],
-        provider=row["provider"],
-        input_tokens=row["input_tokens"],
-        output_tokens=row["output_tokens"],
-        total_tokens=row["total_tokens"],
+        usage_type=row.usage_type,
+        provider=row.provider,
+        input_tokens=row.input_tokens,
+        output_tokens=row.output_tokens,
+        total_tokens=row.total_tokens,
+    )
+
+
+def _task_event_from_model(row: TaskEventModel) -> TaskEvent:
+    """Convert a task_event ORM model to a TaskEvent proto."""
+    return TaskEvent(
+        id=row.id,
+        timestamp=timestamp_to_iso(row.timestamp),
+        run_id=int64_to_uint64(row.run_id),
+        task_id=int64_to_uint64(row.task_id),
+        event=row.event,
+        data=row.data,
     )
 
 

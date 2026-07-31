@@ -512,6 +512,7 @@ jobs:
           python -m pip install --upgrade .
       - name: Run test
         if: ${{ needs.changes.outputs.framework == 'true' }}
+        timeout-minutes: 5
         working-directory: ./framework/e2e
         run: ./test_windows.sh
         shell: bash
