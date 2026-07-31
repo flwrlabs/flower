@@ -24,6 +24,7 @@ from unittest.mock import call, patch
 
 from parameterized import parameterized
 
+from flwr.app import Context, RecordDict
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
@@ -145,6 +146,30 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state.bind_connectors_to_run(run_id=43, connector_refs="notion")
         )
         self.assertEqual(list(state.get_run_connector_refs(run_id=43)), [])
+
+    def test_run_series_context_roundtrip(self) -> None:
+        """A run series context can be stored and retrieved."""
+        state = self.state_factory()
+
+        self.assertIsNone(state.get_run_series_context(series_id=42))
+        context = Context(
+            run_id=123,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={"node": "value"},
+            state=RecordDict(),
+            run_config={"run": "value"},
+            series_id=42,
+        )
+        state.set_run_series_context(series_id=42, context=context)
+
+        retrieved = state.get_run_series_context(series_id=42)
+
+        assert retrieved is not None
+        self.assertEqual(retrieved.run_id, context.run_id)
+        self.assertEqual(retrieved.node_id, context.node_id)
+        self.assertEqual(retrieved.node_config, context.node_config)
+        self.assertEqual(retrieved.run_config, context.run_config)
+        self.assertEqual(retrieved.series_id, context.series_id)
 
     def test_connector_oauth_session_lifecycle(self) -> None:
         """An OAuth session can be created, retrieved, and completed once."""
