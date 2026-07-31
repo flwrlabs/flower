@@ -81,7 +81,7 @@ def aggregate_arrayrecords(
     total_weight = sum(weights)
     if total_weight == 0:
         raise InconsistentMessageReplies(
-            reason=f"The total '{weighting_metric_name}' across all replies is zero, "
+            reason=f"The total `{weighting_metric_name}` across all replies is zero, "
             "so a weighted aggregation is undefined. Skipping aggregation."
         )
     weight_factors = [w / total_weight for w in weights]
@@ -121,7 +121,7 @@ def aggregate_metricrecords(
     total_weight = sum(weights)
     if total_weight == 0:
         raise InconsistentMessageReplies(
-            reason=f"The total '{weighting_metric_name}' across all replies is zero, "
+            reason=f"The total `{weighting_metric_name}` across all replies is zero, "
             "so a weighted aggregation is undefined. Skipping aggregation."
         )
     weight_factors = [w / total_weight for w in weights]
