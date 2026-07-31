@@ -73,7 +73,7 @@ CHAT_APP_STYLE = {
     "status": "#dc8400",
     "completion-menu": "fg:#ffffff bg:#404040",
     "completion-menu.completion": "fg:#ffffff bg:#404040",
-    "completion-menu.completion.current": "bold #111827 bg:#dc8400",
+    "completion-menu.completion.current": "#ffffff bg:#dc8400 noreverse",
     "notice": "bold #111827 bg:#dc8400",
     "error": "bold ansibrightred",
     "logo": "bold #dc8400",

@@ -23,7 +23,7 @@ from typing import cast
 
 import click
 from prompt_toolkit.application import Application
-from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.buffer import Buffer, CompletionState
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.data_structures import Point
 from prompt_toolkit.document import Document
@@ -33,8 +33,6 @@ from prompt_toolkit.layout import (
     BufferControl,
     ConditionalContainer,
     Dimension,
-    Float,
-    FloatContainer,
     FormattedTextControl,
     HSplit,
     Layout,
@@ -96,9 +94,19 @@ class _ChatCommandCompleter(Completer):
                 yield Completion(
                     command,
                     start_position=-len(text),
-                    display=f"{command:<{command_width}}  {description}",
-                    selected_style="bold #111827 bg:#dc8400",
+                    display=f"{command:<{command_width}}        {description}",
+                    selected_style="#ffffff bg:#dc8400 noreverse",
                 )
+
+
+class _FullWidthCompletionsMenuControl(CompletionsMenuControl):
+    """Render completion menu rows across the available width."""
+
+    def _get_menu_width(
+        self, max_width: int, _complete_state: CompletionState
+    ) -> int:
+        """Use all available columns for each completion row."""
+        return max_width
 
 
 class ChatApplication:  # pylint: disable=too-many-instance-attributes
@@ -185,6 +193,15 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             wrap_lines=True,
             style="class:prompt.background",
         )
+        completion_menu = ConditionalContainer(
+            Window(
+                content=_FullWidthCompletionsMenuControl(),
+                height=Dimension(min=1, max=4),
+                dont_extend_height=True,
+                style="class:completion-menu",
+            ),
+            filter=has_completions & ~is_done,
+        )
         chat_window = HSplit(
             [transcript, status, status_gap],
             style="class:content",
@@ -206,29 +223,12 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 agent_name,
                 agent_separator,
                 prompt,
+                completion_menu,
             ]
         )
         return Application[None](
             layout=Layout(
-                FloatContainer(
-                    content=root,
-                    floats=[
-                        Float(
-                            xcursor=True,
-                            ycursor=True,
-                            content=ConditionalContainer(
-                                Window(
-                                    content=CompletionsMenuControl(),
-                                    width=Dimension(min=8),
-                                    height=Dimension(min=1, max=4),
-                                    dont_extend_width=True,
-                                    style="class:completion-menu",
-                                ),
-                                filter=has_completions & ~is_done,
-                            ),
-                        )
-                    ],
-                ),
+                root,
                 focused_element=prompt,
             ),
             key_bindings=key_bindings,
