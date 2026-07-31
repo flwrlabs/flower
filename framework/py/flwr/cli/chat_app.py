@@ -358,9 +358,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         width = self._get_terminal_width()
         cache_key = (len(self.transcript), width)
         if cache_key != self.wrapped_transcript_key:
-            self.wrapped_transcript = _wrap_transcript_fragments(
-                self.transcript, width
-            )
+            self.wrapped_transcript = _wrap_transcript_fragments(self.transcript, width)
             self.wrapped_transcript_key = cache_key
         return self.wrapped_transcript
 
