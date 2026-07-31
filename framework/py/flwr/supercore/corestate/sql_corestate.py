@@ -603,12 +603,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if not oauth_session_id or not flwr_aid:
             return None
         with self.session() as session:
-            row = session.get(
-                ConnectorOAuthSessionModel,
-                oauth_session_id,
-                populate_existing=True,
-            )
-            if row is None or row.flwr_aid != flwr_aid:
+            row = session.scalars(
+                select(ConnectorOAuthSessionModel)
+                .where(ConnectorOAuthSessionModel.oauth_session_id == oauth_session_id)
+                .where(ConnectorOAuthSessionModel.flwr_aid == flwr_aid)
+                .execution_options(populate_existing=True)
+            ).one_or_none()
+            if row is None:
                 return None
             return _connector_oauth_session_from_model(row)
 
@@ -1751,23 +1752,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         # IntegrityError can only arise from (namespace, nonce) uniqueness.
         except IntegrityError:
             return False
-
-
-def _connector_oauth_session_from_row(
-    row: dict[str, Any],
-) -> ConnectorOAuthSessionRecord:
-    """Convert a connector OAuth session row to its persistence record."""
-    return ConnectorOAuthSessionRecord(
-        oauth_session_id=row["oauth_session_id"],
-        flwr_aid=row["flwr_aid"],
-        connector_ref=row["connector_ref"],
-        state=row["state"],
-        redirect_uri=row["redirect_uri"],
-        pkce_verifier=row["pkce_verifier"],
-        created_at=timestamp_to_iso(row["created_at"]),
-        expires_at=timestamp_to_iso(row["expires_at"]),
-        completed_at=timestamp_to_iso(row["completed_at"]) or None,
-    )
 
 
 def _connector_oauth_session_from_model(
