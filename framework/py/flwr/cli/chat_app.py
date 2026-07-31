@@ -134,6 +134,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 get_cursor_position=self._transcript_cursor,
                 show_cursor=False,
             ),
+            # Wrap manually so scroll offsets map to visual transcript lines.
             wrap_lines=False,
             always_hide_cursor=True,
         )
@@ -153,6 +154,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                     BeforeInput(CHAT_USER_PROMPT, style="class:user.prompt")
                 ],
             ),
+            # Grow with the draft until the layout constrains and scrolls it.
             height=Dimension(min=1),
             dont_extend_height=True,
             wrap_lines=True,
@@ -322,6 +324,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
     def _append_user_message(self, prompt: str) -> None:
         """Append a full-width highlighted user message."""
+        # Store logical lines; rendering handles wrapping and row padding.
         for line_index, line in enumerate(prompt.split("\n")):
             prefix = (
                 CHAT_USER_PROMPT
@@ -357,6 +360,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
         width = self._get_terminal_width()
         cache_key = (len(self.transcript), width)
+        # Rewrap only after transcript growth or a terminal resize.
         if cache_key != self.wrapped_transcript_key:
             self.wrapped_transcript = _wrap_transcript_fragments(self.transcript, width)
             self.wrapped_transcript_key = cache_key
