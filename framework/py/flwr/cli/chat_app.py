@@ -94,9 +94,6 @@ class _DetailsBlock:
     expanded: bool = False
 
 
-_TranscriptEntry = tuple[str, str] | _DetailsBlock
-
-
 class _ChatCommandCompleter(Completer):
     """Complete slash commands in the prompt."""
 
@@ -137,11 +134,10 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.run_id: int | None = None
         self.busy = False
         self.cancel_requested = False
-        self.transcript: list[_TranscriptEntry] = []
+        self.transcript: list[tuple[str, str] | _DetailsBlock] = []
         self.wrapped_transcript: StyleAndTextTuples = []
         self.wrapped_transcript_key: tuple[int, int] | None = None
         self.transcript_revision = 0
-        self.response_start = 0
         self.follow_transcript = True
         self.status = ""
         self.input_buffer = Buffer(
@@ -353,7 +349,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
         response_started = False
         terminal_event_seen = False
-        self.response_start = len(self.transcript)
+        response_start = len(self.transcript)
         reasoning_block: _DetailsBlock | None = None
         web_search_blocks: dict[str, _DetailsBlock] = {}
         req_events = StreamRunEventsRequest(run_id=self.run_id)
@@ -376,6 +372,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                     reasoning_block = self._handle_details_event(
                         event_type,
                         payload,
+                        response_start,
                         reasoning_block,
                         web_search_blocks,
                     )
@@ -391,10 +388,11 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 "Chat run ended before the agent response completed."
             )
 
-    def _handle_details_event(
+    def _handle_details_event(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         event_type: str,
         payload: JSONObject,
+        response_start: int,
         reasoning_block: _DetailsBlock | None,
         web_search_blocks: dict[str, _DetailsBlock],
     ) -> _DetailsBlock | None:
@@ -402,7 +400,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         if event_type == CHAT_REASONING_DELTA_EVENT:
             if reasoning_block is None:
                 reasoning_block = _DetailsBlock("Reasoning")
-                self.transcript.insert(self.response_start, reasoning_block)
+                self.transcript.insert(response_start, reasoning_block)
             reasoning_block.body += cast(str, payload["delta"])
         elif (
             event_type == CHAT_TOOL_CALL_STARTED_EVENT
@@ -411,7 +409,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             # Reserve reasoning above web search before either block is populated.
             if reasoning_block is None:
                 reasoning_block = _DetailsBlock("Reasoning")
-                self.transcript.insert(self.response_start, reasoning_block)
+                self.transcript.insert(response_start, reasoning_block)
             tool_call_id = cast(str, payload["tool_call_id"])
             block = _DetailsBlock(f"Web search · {payload['query']}")
             web_search_blocks[tool_call_id] = block
