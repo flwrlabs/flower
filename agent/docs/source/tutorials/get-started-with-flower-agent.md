@@ -35,7 +35,18 @@ environment for later commands.
 ## Log in to SuperGrid
 
 Now connect the Flower CLI to your SuperGrid account using the built-in
-`supergrid` connection:
+`supergrid` connection.
+
+The Flower CLI includes this connection when it creates
+`~/.flwr/config.toml`. If you already have a custom configuration that doesn't
+define `supergrid`, add:
+
+```toml
+[superlink.supergrid]
+address = "supergrid.flower.ai"
+```
+
+Log in:
 
 ```console
 $ uvx flwr login supergrid
