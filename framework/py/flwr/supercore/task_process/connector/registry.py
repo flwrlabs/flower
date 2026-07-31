@@ -34,6 +34,9 @@ _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
 }
+# Concrete OAuth connector implementations populate these static registries.
+# A provider can expose multiple tool names under one connector ref (for example,
+# ``slack_search_messages`` maps to ``slack``).
 _CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = dict(
     slack.SLACK_TOOL_HANDLERS
 )
@@ -82,7 +85,7 @@ def requires_connector_credentials(name: str) -> bool:
 
 
 def get_connector_ref(name: str) -> str:
-    """Return the connector reference associated with a tool name."""
+    """Resolve a connector tool name to its OAuth connector reference."""
     return _CREDENTIAL_CONNECTOR_REFS.get(name, name)
 
 

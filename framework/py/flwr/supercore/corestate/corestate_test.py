@@ -24,6 +24,7 @@ from unittest.mock import call, patch
 
 from parameterized import parameterized
 
+from flwr.app import Context, RecordDict
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
@@ -146,6 +147,30 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(list(state.get_run_connector_refs(run_id=43)), [])
 
+    def test_run_series_context_roundtrip(self) -> None:
+        """A run series context can be stored and retrieved."""
+        state = self.state_factory()
+
+        self.assertIsNone(state.get_run_series_context(series_id=42))
+        context = Context(
+            run_id=123,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={"node": "value"},
+            state=RecordDict(),
+            run_config={"run": "value"},
+            series_id=42,
+        )
+        state.set_run_series_context(series_id=42, context=context)
+
+        retrieved = state.get_run_series_context(series_id=42)
+
+        assert retrieved is not None
+        self.assertEqual(retrieved.run_id, context.run_id)
+        self.assertEqual(retrieved.node_id, context.node_id)
+        self.assertEqual(retrieved.node_config, context.node_config)
+        self.assertEqual(retrieved.run_config, context.run_config)
+        self.assertEqual(retrieved.series_id, context.series_id)
+
     def test_connector_oauth_session_lifecycle(self) -> None:
         """An OAuth session can be created, retrieved, and completed once."""
         state = self.state_factory()
@@ -168,6 +193,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
                 oauth_session_id="session-1", flwr_aid="account-a"
             ),
             session,
+        )
+        self.assertIsNone(
+            state.get_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-b"
+            )
         )
         self.assertTrue(
             state.complete_connector_oauth_session(
@@ -855,9 +885,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_add_and_get_task_usage(self) -> None:
         """Task usage should round-trip and filter by task ID."""
         state = self.state_factory()
+        run_id = self.task_run_id(state)
         task_id = state.create_task(
             task_type=TaskType.MODEL,
-            run_id=self.task_run_id(state),
+            run_id=run_id,
         )
         assert task_id is not None
 
@@ -881,8 +912,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
 
         usages = state.get_task_usage(task_ids=[task_id])
+        usages_by_run = state.get_task_usage(run_ids=[run_id])
+        empty_by_task = state.get_task_usage(task_ids=[])
+        empty_by_run = state.get_task_usage(run_ids=[])
 
         self.assertEqual(len(usages), 2)
+        self.assertEqual(usages_by_run, usages)
+        self.assertEqual(empty_by_task, [])
+        self.assertEqual(empty_by_run, [])
         usage = usages[0]
         self.assertEqual(usage.input_tokens, 10)
         self.assertEqual(usage.output_tokens, 20)
