@@ -127,7 +127,6 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.input_buffer = Buffer(
             completer=_ChatCommandCompleter(),
             complete_while_typing=True,
-            read_only=Condition(lambda: self.busy),
         )
         self.application = self._create_application()
 
