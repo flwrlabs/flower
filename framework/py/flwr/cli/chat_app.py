@@ -14,27 +14,32 @@
 # ==============================================================================
 """Flower command line interface `chat` application."""
 
-
 import asyncio
 import json
+from collections.abc import Iterable
 from time import monotonic
 from typing import cast
 
 import click
 from prompt_toolkit.application import Application
 from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.data_structures import Point
-from prompt_toolkit.filters import Condition
+from prompt_toolkit.document import Document
+from prompt_toolkit.filters import Condition, has_completions, is_done
 from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
 from prompt_toolkit.layout import (
     BufferControl,
     ConditionalContainer,
     Dimension,
+    Float,
+    FloatContainer,
     FormattedTextControl,
     HSplit,
     Layout,
     Window,
 )
+from prompt_toolkit.layout.menus import CompletionsMenuControl
 from prompt_toolkit.layout.processors import BeforeInput
 from prompt_toolkit.styles import Style
 from prompt_toolkit.utils import get_cwidth
@@ -44,12 +49,14 @@ from flwr.cli.constant import (
     CHAT_AGENT_INPUT_KEY,
     CHAT_AGENT_NAME,
     CHAT_APP_STYLE,
+    CHAT_COMMANDS,
     CHAT_EXIT_COMMAND,
     CHAT_EXIT_HINT,
     CHAT_EXPERIMENTAL_WARNING,
     CHAT_FAILURE_EVENTS,
     CHAT_FLOWER_AGENT_APP_SPEC,
     CHAT_FLOWER_LOGO,
+    CHAT_HELP_COMMAND,
     CHAT_NEW_COMMAND,
     CHAT_NEW_CONVERSATION_MESSAGE,
     CHAT_SPINNER_FRAMES,
@@ -71,6 +78,28 @@ from flwr.supercore.typing import JSONObject
 from .utils import flwr_cli_grpc_exc_handler
 
 
+class _ChatCommandCompleter(Completer):
+    """Complete slash commands in the prompt."""
+
+    def get_completions(
+        self, document: Document, _complete_event: CompleteEvent
+    ) -> Iterable[Completion]:
+        """Yield matching slash commands."""
+        text = document.text_before_cursor
+        if not text.startswith("/") or any(char.isspace() for char in text):
+            return
+
+        command_width = max(len(command) for command in CHAT_COMMANDS)
+        for command, description in CHAT_COMMANDS.items():
+            if command.startswith(text):
+                yield Completion(
+                    command,
+                    start_position=-len(text),
+                    display=f"{command:<{command_width}}  {description}",
+                    selected_style="bold #111827 bg:#dc8400",
+                )
+
+
 class ChatApplication:  # pylint: disable=too-many-instance-attributes
     """Persistent full-screen Flower Chat application."""
 
@@ -83,7 +112,11 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.cancel_requested = False
         self.transcript: list[tuple[str, str]] = []
         self.status = ""
-        self.input_buffer = Buffer(read_only=Condition(lambda: self.busy))
+        self.input_buffer = Buffer(
+            completer=_ChatCommandCompleter(),
+            complete_while_typing=True,
+            read_only=Condition(lambda: self.busy),
+        )
         self.application = self._create_application()
 
     def run(self) -> None:
@@ -165,16 +198,35 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             char="─",
             style="class:agent.separator",
         )
+        root = HSplit(
+            [
+                welcome,
+                chat_window,
+                agent_name,
+                agent_separator,
+                prompt,
+            ]
+        )
         return Application[None](
             layout=Layout(
-                HSplit(
-                    [
-                        welcome,
-                        chat_window,
-                        agent_name,
-                        agent_separator,
-                        prompt,
-                    ]
+                FloatContainer(
+                    content=root,
+                    floats=[
+                        Float(
+                            xcursor=True,
+                            ycursor=True,
+                            content=ConditionalContainer(
+                                Window(
+                                    content=CompletionsMenuControl(),
+                                    width=Dimension(min=8),
+                                    height=Dimension(min=1, max=4),
+                                    dont_extend_width=True,
+                                    style="class:completion-menu",
+                                ),
+                                filter=has_completions & ~is_done,
+                            ),
+                        )
+                    ],
                 ),
                 focused_element=prompt,
             ),
@@ -193,6 +245,9 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.input_buffer.reset()
         stripped_prompt = prompt.strip()
         if not stripped_prompt:
+            return
+        if stripped_prompt.lower() == CHAT_HELP_COMMAND:
+            self._append_transcript("class:notice", format_chat_help())
             return
         if stripped_prompt.lower() == CHAT_EXIT_COMMAND:
             event.app.exit()
@@ -343,6 +398,14 @@ def parse_task_event(task_event: TaskEvent) -> tuple[str, JSONObject]:
     if not event_type:
         event_type = cast(str, payload.get("type", ""))
     return event_type, payload
+
+
+def format_chat_help() -> str:
+    """Return formatted chat command help."""
+    lines = ["Available Command:s"]
+    for command, description in CHAT_COMMANDS.items():
+        lines.append(f"  {command:<5} {description}")
+    return "\n".join(lines) + "\n\n"
 
 
 def start_chat_run(

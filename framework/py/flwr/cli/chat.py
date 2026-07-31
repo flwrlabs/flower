@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower command line interface `chat` command."""
 
-
 import sys
 
 import click
@@ -24,6 +23,7 @@ from flwr.cli.constant import (
     CHAT_EXIT_COMMAND,
     CHAT_EXIT_HINT,
     CHAT_FAILURE_EVENTS,
+    CHAT_HELP_COMMAND,
     CHAT_NEW_COMMAND,
     CHAT_NEW_CONVERSATION_MESSAGE,
     CHAT_SUPERGRID_CONNECTION_NAME,
@@ -42,6 +42,7 @@ from flwr.proto.control_pb2_grpc import ControlStub
 
 from .chat_app import (
     ChatApplication,
+    format_chat_help,
     format_failure_event,
     parse_task_event,
     start_chat_run,
@@ -86,6 +87,9 @@ def _run_interactive_shell(stub: ControlStub, federation: str | None) -> None:
 
         stripped_prompt = prompt.strip()
         if not stripped_prompt:
+            continue
+        if stripped_prompt.lower() == CHAT_HELP_COMMAND:
+            typer.echo(format_chat_help(), nl=False)
             continue
         if stripped_prompt.lower() == CHAT_EXIT_COMMAND:
             return
