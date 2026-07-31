@@ -26,7 +26,6 @@ from uuid import uuid4
 
 from sqlalchemy import MetaData, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.sql.elements import ColumnElement
 
 from flwr.app import Context, Message
 from flwr.app.message import make_message
@@ -1312,23 +1311,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         task_ids: Sequence[int] | None = None,
     ) -> Sequence[TaskUsage]:
         """Retrieve task usage records based on the specified filters."""
-        conditions: list[ColumnElement[bool]] = []
+        query = select(TaskUsageModel).order_by(TaskUsageModel.id.asc())
 
         if run_ids is not None:
             if not run_ids:
                 return []
             sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            conditions.append(TaskUsageModel.run_id.in_(sint64_run_ids))
+            query = query.where(TaskUsageModel.run_id.in_(sint64_run_ids))
 
         if task_ids is not None:
             if not task_ids:
                 return []
             sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            conditions.append(TaskUsageModel.task_id.in_(sint64_task_ids))
-
-        query = select(TaskUsageModel).order_by(TaskUsageModel.id.asc())
-        if conditions:
-            query = query.where(*conditions)
+            query = query.where(TaskUsageModel.task_id.in_(sint64_task_ids))
 
         with self.session() as session:
             rows = session.scalars(query).all()
@@ -1575,13 +1570,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
         cursor = after_task_event_id if after_task_event_id is not None else 0
-        conditions: list[ColumnElement[bool]] = [TaskEventModel.id > cursor]
-        if run_id is not None:
-            conditions.append(TaskEventModel.run_id == uint64_to_int64(run_id))
-
         query = (
-            select(TaskEventModel).where(*conditions).order_by(TaskEventModel.id.asc())
+            select(TaskEventModel)
+            .where(TaskEventModel.id > cursor)
+            .order_by(TaskEventModel.id.asc())
         )
+        if run_id is not None:
+            query = query.where(TaskEventModel.run_id == uint64_to_int64(run_id))
 
         with self.session() as session:
             rows = session.scalars(query).all()
