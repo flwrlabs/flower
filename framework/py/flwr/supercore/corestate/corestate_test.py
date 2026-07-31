@@ -169,6 +169,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             ),
             session,
         )
+        self.assertIsNone(
+            state.get_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-b"
+            )
+        )
         self.assertTrue(
             state.complete_connector_oauth_session(
                 oauth_session_id="session-1", flwr_aid="account-a"

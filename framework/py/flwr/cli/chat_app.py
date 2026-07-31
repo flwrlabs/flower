@@ -120,6 +120,9 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.busy = False
         self.cancel_requested = False
         self.transcript: list[tuple[str, str]] = []
+        self.wrapped_transcript: list[tuple[str, str]] = []
+        self.wrapped_transcript_key: tuple[int, int] | None = None
+        self.follow_transcript = True
         self.status = ""
         self.input_buffer = Buffer(
             completer=_ChatCommandCompleter(),
@@ -167,13 +170,14 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             style="class:agent.prompt",
         )
         # Build the transcript and response status area.
-        transcript = Window(
+        self.transcript_window = Window(
             FormattedTextControl(
-                lambda: self.transcript,
+                self._render_transcript,
                 get_cursor_position=self._transcript_cursor,
                 show_cursor=False,
             ),
-            wrap_lines=True,
+            # Wrap manually so scroll offsets map to visual transcript lines.
+            wrap_lines=False,
             always_hide_cursor=True,
         )
         status = Window(
@@ -192,7 +196,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                     BeforeInput(CHAT_USER_PROMPT, style="class:user.prompt")
                 ],
             ),
-            height=Dimension(min=1, max=2),
+            # Grow with the draft until the layout constrains and scrolls it.
+            height=Dimension(min=1),
             dont_extend_height=True,
             wrap_lines=True,
             style="class:prompt.background",
@@ -209,7 +214,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         )
         # Combine transcript and status in the main chat area.
         chat_window = HSplit(
-            [transcript, status, status_gap],
+            [self.transcript_window, status, status_gap],
             style="class:content",
         )
         # Build the agent label above the input area.
@@ -241,6 +246,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             key_bindings=key_bindings,
             style=Style.from_dict(CHAT_APP_STYLE),
             full_screen=True,
+            mouse_support=True,
             refresh_interval=0.1,
         )
 
@@ -374,18 +380,14 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
     def _append_user_message(self, prompt: str) -> None:
         """Append a full-width highlighted user message."""
-        width = self._get_terminal_width()
+        # Store logical lines; rendering handles wrapping and row padding.
         for line_index, line in enumerate(prompt.split("\n")):
             prefix = (
                 CHAT_USER_PROMPT
                 if line_index == 0
                 else " " * get_cwidth(CHAT_USER_PROMPT)
             )
-            for visual_line in _wrap_transcript_line(f"{prefix}{line}", width):
-                padding = " " * max(0, width - get_cwidth(visual_line))
-                self.transcript.append(
-                    ("class:user.message", f"{visual_line}{padding}\n")
-                )
+            self.transcript.append(("class:user.message", f"{prefix}{line}\n"))
         self.transcript.append(("", "\n"))
         self.application.invalidate()
 
@@ -400,11 +402,41 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         frame = CHAT_SPINNER_FRAMES[int(monotonic() * 10) % len(CHAT_SPINNER_FRAMES)]
         return [("class:status", f"{frame} {self.status}")]
 
+    def _render_transcript(self) -> list[tuple[str, str]]:
+        """Return transcript text wrapped to the current terminal width."""
+        # Detect manual scrolling against the previous rendered transcript.
+        render_info = self.transcript_window.render_info
+        if render_info is not None:
+            bottom_scroll = max(
+                0, render_info.content_height - render_info.window_height
+            )
+            self.follow_transcript = (
+                self.transcript_window.vertical_scroll >= bottom_scroll
+            )
+
+        width = self._get_terminal_width()
+        cache_key = (len(self.transcript), width)
+        # Rewrap only after transcript growth or a terminal resize.
+        if cache_key != self.wrapped_transcript_key:
+            self.wrapped_transcript = _wrap_transcript_fragments(self.transcript, width)
+            self.wrapped_transcript_key = cache_key
+        return self.wrapped_transcript
+
     def _transcript_cursor(self) -> Point:
         """Keep the transcript scrolled to its last line."""
-        text = "".join(fragment for _, fragment in self.transcript)
-        lines = text.split("\n")
-        return Point(x=len(lines[-1]), y=len(lines) - 1)
+        # Cursor rows must match the manually wrapped transcript lines.
+        wrapped_text = "".join(text for _, text in self.wrapped_transcript)
+        lines = wrapped_text.split("\n")
+        last_line_index = len(lines) - 1
+        if not self.follow_transcript:
+            # Preserve manual scrolling and clamp stale offsets after resizing.
+            return Point(
+                x=0,
+                y=min(self.transcript_window.vertical_scroll, last_line_index),
+            )
+
+        # Follow the newest transcript line while the view remains at the bottom.
+        return Point(x=0, y=last_line_index)
 
 
 def parse_task_event(task_event: TaskEvent) -> tuple[str, JSONObject]:
@@ -476,19 +508,39 @@ def format_failure_event(payload: JSONObject) -> str:
     return "Agent response failed."
 
 
-def _wrap_transcript_line(line: str, width: int) -> list[str]:
-    """Wrap a line to the transcript width."""
-    lines: list[str] = []
-    current_line = ""
+def _wrap_transcript_fragments(
+    fragments: list[tuple[str, str]], width: int
+) -> list[tuple[str, str]]:
+    """Wrap formatted transcript fragments to the transcript width."""
+    wrapped_fragments: list[tuple[str, str]] = []
     current_width = 0
-    for char in line:
-        char_width = get_cwidth(char)
-        if current_line and current_width + char_width > width:
-            lines.append(current_line)
-            current_line = char
-            current_width = char_width
-        else:
-            current_line += char
+    # Track display-cell width across adjacent styled fragments.
+    for style, text in fragments:
+        chunk: list[str] = []
+        for char in text:
+            if char == "\n":
+                # Finish explicit lines and extend highlighted user rows.
+                if chunk:
+                    wrapped_fragments.append((style, "".join(chunk)))
+                    chunk = []
+                if style == "class:user.message" and current_width < width:
+                    wrapped_fragments.append((style, " " * (width - current_width)))
+                wrapped_fragments.append((style, char))
+                current_width = 0
+                continue
+
+            char_width = get_cwidth(char)
+            if current_width and current_width + char_width > width:
+                # Insert a visual line break before exceeding the terminal width.
+                if chunk:
+                    wrapped_fragments.append((style, "".join(chunk)))
+                    chunk = []
+                if style == "class:user.message" and current_width < width:
+                    wrapped_fragments.append((style, " " * (width - current_width)))
+                wrapped_fragments.append(("", "\n"))
+                current_width = 0
+            chunk.append(char)
             current_width += char_width
-    lines.append(current_line)
-    return lines
+        if chunk:
+            wrapped_fragments.append((style, "".join(chunk)))
+    return wrapped_fragments
