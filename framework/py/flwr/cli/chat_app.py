@@ -83,6 +83,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.cancel_requested = False
         self.transcript: list[tuple[str, str]] = []
         self.wrapped_transcript: list[tuple[str, str]] = []
+        self.wrapped_transcript_key: tuple[int, int] | None = None
+        self.follow_transcript = True
         self.status = ""
         self.input_buffer = Buffer()
         self.application = self._create_application()
@@ -343,9 +345,23 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
     def _render_transcript(self) -> list[tuple[str, str]]:
         """Return transcript text wrapped to the current terminal width."""
-        self.wrapped_transcript = _wrap_transcript_fragments(
-            self.transcript, self._get_terminal_width()
-        )
+        # Detect manual scrolling against the previous rendered transcript.
+        render_info = self.transcript_window.render_info
+        if render_info is not None:
+            bottom_scroll = max(
+                0, render_info.content_height - render_info.window_height
+            )
+            self.follow_transcript = (
+                self.transcript_window.vertical_scroll >= bottom_scroll
+            )
+
+        width = self._get_terminal_width()
+        cache_key = (len(self.transcript), width)
+        if cache_key != self.wrapped_transcript_key:
+            self.wrapped_transcript = _wrap_transcript_fragments(
+                self.transcript, width
+            )
+            self.wrapped_transcript_key = cache_key
         return self.wrapped_transcript
 
     def _transcript_cursor(self) -> Point:
@@ -354,15 +370,12 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         wrapped_text = "".join(text for _, text in self.wrapped_transcript)
         lines = wrapped_text.split("\n")
         last_line_index = len(lines) - 1
-        render_info = self.transcript_window.render_info
-        if render_info is not None:
-            bottom_scroll = render_info.content_height - render_info.window_height
-            if self.transcript_window.vertical_scroll < bottom_scroll:
-                # Preserve manual scrolling and clamp stale offsets after resizing.
-                return Point(
-                    x=0,
-                    y=min(self.transcript_window.vertical_scroll, last_line_index),
-                )
+        if not self.follow_transcript:
+            # Preserve manual scrolling and clamp stale offsets after resizing.
+            return Point(
+                x=0,
+                y=min(self.transcript_window.vertical_scroll, last_line_index),
+            )
 
         # Follow the newest transcript line while the view remains at the bottom.
         last_line_width = get_cwidth(lines[-1])
