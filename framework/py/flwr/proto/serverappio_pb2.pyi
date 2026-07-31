@@ -17,40 +17,6 @@ limitations under the License.
 ==============================================================================
 """
 
-import builtins
-import collections.abc
-import flwr.proto.node_pb2
 import google.protobuf.descriptor
-import google.protobuf.internal.containers
-import google.protobuf.message
-import typing
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
-
-@typing.final
-class GetNodesRequest(google.protobuf.message.Message):
-    """GetNodes messages"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    def __init__(
-        self,
-    ) -> None: ...
-
-global___GetNodesRequest = GetNodesRequest
-
-@typing.final
-class GetNodesResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    NODES_FIELD_NUMBER: builtins.int
-    @property
-    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.node_pb2.Node]: ...
-    def __init__(
-        self,
-        *,
-        nodes: collections.abc.Iterable[flwr.proto.node_pb2.Node] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["nodes", b"nodes"]) -> None: ...
-
-global___GetNodesResponse = GetNodesResponse

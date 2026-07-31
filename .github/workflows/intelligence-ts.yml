@@ -24,18 +24,18 @@ env:
 jobs:
   fi_ts_build:
     name: Build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: '22.14.0'
 
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@10.25.0
 
       - name: Install dependencies
         working-directory: intelligence/ts
@@ -47,18 +47,18 @@ jobs:
 
   fi_ts_format:
     name: Format Check
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: '22.14.0'
 
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@10.25.0
 
       - name: Install dependencies
         working-directory: intelligence/ts
@@ -70,7 +70,7 @@ jobs:
 
   fi_ts_copyright:
     name: Copyright Check
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -81,18 +81,18 @@ jobs:
 
   fi_ts_lint:
     name: Lint Check
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: '22.14.0'
 
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@10.25.0
 
       - name: Install dependencies
         working-directory: intelligence/ts
@@ -104,18 +104,18 @@ jobs:
 
   fi_ts_demos:
     name: Demos
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: '22.14.0'
 
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@10.25.0
 
       - name: Install dependencies
         working-directory: intelligence/ts
@@ -142,18 +142,18 @@ jobs:
 
   fi_ts_tests:
     name: Tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: '22.14.0'
 
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@10.25.0
 
       - name: Install dependencies
         working-directory: intelligence/ts
@@ -178,18 +178,18 @@ jobs:
 
   fi_ts_docs:
     name: Docs build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
-          node-version: '20.11.0'
+          node-version: '22.14.0'
 
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@10.25.0
 
       - name: Install dependencies
         working-directory: intelligence/ts
@@ -201,20 +201,20 @@ jobs:
 
   fi_ts_release_dry_run:
     name: Release dry-run
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: '22.14.0'
           registry-url: https://registry.npmjs.org
 
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@10.25.0
 
       - name: Install dependencies
         working-directory: intelligence/ts

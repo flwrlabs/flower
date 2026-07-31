@@ -8,6 +8,8 @@ echo "=== test.sh ==="
 # Default value (true)
 RUN_FULL_TEST=${1:-true}
 echo "RUN_FULL_TEST: $RUN_FULL_TEST"
+RUN_PYTEST=${RUN_PYTEST:-true}
+echo "RUN_PYTEST: $RUN_PYTEST"
 
 echo "- Start Python checks"
 
@@ -17,17 +19,25 @@ echo "- clang-format:  done"
 
 echo "- isort: start"
 if $RUN_FULL_TEST; then
-    python -m isort --check-only --skip py/flwr/proto py/flwr e2e
+    python -m isort \
+        --check-only \
+        --skip py/flwr/proto \
+        --skip-glob "**/.venv/**" \
+        py e2e
 else
-    python -m isort --check-only --skip py/flwr/proto py/flwr
+    python -m isort --check-only --skip py/flwr/proto py
 fi
 echo "- isort: done"
 
 echo "- black: start"
 if $RUN_FULL_TEST; then
-    python -m black --exclude "py\/flwr\/proto" --check py/flwr e2e
+    python -m black \
+        --extend-exclude "py\/flwr\/proto|(^|\/)\.venv\/" \
+        --check py e2e
 else
-    python -m black --exclude "py\/flwr\/proto" --check py/flwr
+    python -m black \
+        --extend-exclude "py\/flwr\/proto" \
+        --check py
 fi
 echo "- black: done"
 
@@ -52,9 +62,20 @@ python -m pylint --ignore=py/flwr/proto py/flwr
 echo "- pylint: done"
 
 echo "- pytest: start"
-# Ray's uv runtime-env hook can stall under `uv run` during pytest.
-RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 python -m pytest --cov=py/flwr
-echo "- pytest: done"
+case "$RUN_PYTEST" in
+true)
+    # Ray's uv runtime-env hook can stall under `uv run` during pytest.
+    RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 python -m pytest --cov=py/flwr
+    echo "- pytest: done"
+    ;;
+false)
+    echo "- pytest: skipped"
+    ;;
+*)
+    echo "RUN_PYTEST must be 'true' or 'false' (got '$RUN_PYTEST')" >&2
+    exit 1
+    ;;
+esac
 
 echo "- All Python checks passed"
 

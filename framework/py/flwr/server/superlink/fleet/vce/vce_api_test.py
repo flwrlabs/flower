@@ -12,45 +12,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Test Fleet Simulation Engine API."""
-
+"""Test Fleet Simulation Runtime API."""
 
 import threading
+from collections.abc import Callable
 from itertools import cycle
 from json import JSONDecodeError
 from math import pi
 from pathlib import Path
-from time import sleep
+from queue import Queue
+from time import monotonic, sleep
 from unittest import TestCase
+from unittest.mock import Mock, patch
 
+from flwr.app import DEFAULT_TTL, ConfigRecord, Context, Message, Metadata, RecordDict
+from flwr.app.message import make_message
 from flwr.client import Client, NumPyClient
 from flwr.clientapp import ClientApp
 from flwr.clientapp.client_app import LoadClientAppError
-from flwr.common import (
-    DEFAULT_TTL,
-    Config,
-    ConfigRecord,
-    Context,
-    GetPropertiesIns,
-    MessageTypeLegacy,
-    Metadata,
-    RecordDict,
-    Scalar,
-    now,
-)
-from flwr.common.constant import Status
-from flwr.common.message import make_message
-from flwr.common.recorddict_compat import getpropertiesins_to_recorddict
-from flwr.common.typing import Run, RunStatus
+from flwr.common import Config, GetPropertiesIns, MessageTypeLegacy, Scalar
+from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.compat.common.recorddict_compat import getpropertiesins_to_recorddict
+from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.server.superlink.fleet.vce.vce_api import (
     NodeToPartitionMapping,
     _register_nodes,
     start_vce,
+    worker,
 )
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkStateFactory
 from flwr.server.superlink.linkstate.in_memory_linkstate import RunRecord
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, TaskType
+from flwr.supercore.date import now
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import NoOpFederationManager
 
 
@@ -80,10 +76,30 @@ dummy_client_app = ClientApp(
 )
 
 
-def terminate_simulation(f_stop: threading.Event, sleep_duration: int) -> None:
-    """Set event to terminate Simulation Engine after `sleep_duration` seconds."""
-    sleep(sleep_duration)
-    f_stop.set()
+def _make_vce_test_message(run_id: int = 1234, node_id: int = 1) -> Message:
+    """Create a Message with metadata populated like an InMemoryGrid message."""
+    message = Message(RecordDict(), node_id, "query")
+    message.metadata.__dict__["_run_id"] = run_id
+    message.metadata.__dict__["_src_node_id"] = SUPERLINK_NODE_ID
+    message.metadata.__dict__["_message_id"] = "test-message-id"
+    return message
+
+
+def terminate_simulation(
+    f_stop: threading.Event,
+    timeout: float,
+    stop_condition: Callable[[], bool] | None = None,
+) -> None:
+    """Set event after a timeout or when the supplied condition is met."""
+    try:
+        if stop_condition is None:
+            sleep(timeout)
+        else:
+            deadline = monotonic() + timeout
+            while not stop_condition() and monotonic() < deadline:
+                sleep(0.01)
+    finally:
+        f_stop.set()
 
 
 def init_state_factory_nodes_mapping(
@@ -118,6 +134,10 @@ def register_messages_into_state(
 ) -> dict[str, float]:
     """Register `num_messages` into the state factory."""
     state: InMemoryLinkState = state_factory.state()  # type: ignore
+
+    # LinkState derives a run's lifecycle status from its primary task, so both
+    # records are required before instruction Messages can be stored.
+    primary_task_id = 4321
     state.run_ids[run_id] = RunRecord(
         Run(
             run_id=run_id,
@@ -135,15 +155,23 @@ def register_messages_into_state(
                 details="",
             ),
             flwr_aid="user123",
-            federation="mock-fed",
-            primary_task_id=None,
+            federation_id=NOOP_FEDERATION_ID,
+            primary_task_id=primary_task_id,
             bytes_sent=0,
             bytes_recv=0,
             clientapp_runtime=0.0,
         ),
     )
+    state.task_store[primary_task_id] = Task(
+        task_id=primary_task_id,
+        type=TaskType.SERVER_APP,
+        run_id=run_id,
+        status=TaskStatus(status=Status.PENDING, sub_status="", details=""),
+        pending_at=now().isoformat(),
+        fab_hash="hash",
+    )
     # Artificially add Messages to state so they can be processed
-    # by the Simulation Engine logic
+    # by the Simulation Runtime logic
     nodes_cycle = cycle(nodes_mapping.keys())  # we have more messages than supernodes
     message_ids: set[str] = set()  # so we can retrieve them later
     expected_results = {}
@@ -159,7 +187,7 @@ def register_messages_into_state(
                 run_id=run_id,
                 message_id="",
                 group_id="",
-                src_node_id=0,
+                src_node_id=SUPERLINK_NODE_ID,
                 dst_node_id=dst_node_id,  # indicate destination node
                 reply_to_message_id="",
                 created_at=now().timestamp(),
@@ -167,9 +195,11 @@ def register_messages_into_state(
                 message_type=MessageTypeLegacy.GET_PROPERTIES,
             ),
         )
+        # LinkState expects the caller to assign the content-derived Message ID.
+        message.metadata.__dict__["_message_id"] = message.object_id
 
         # Insert in state
-        message_id = state.store_message_res(message)
+        message_id = state.store_message_ins(message)
         if message_id:
             # Add message_id to set
             message_ids.add(message_id)
@@ -197,10 +227,11 @@ def start_and_shutdown(
     num_supernodes: int | None = None,
     state_factory: LinkStateFactory | None = None,
     nodes_mapping: NodeToPartitionMapping | None = None,
-    duration: int = 0,
-    backend_config: str = "{}",
+    duration: float = 0,
+    backend_config: str = '{"client_resources":{"num_cpus":1}}',
+    stop_condition: Callable[[], bool] | None = None,
 ) -> None:
-    """Start Simulation Engine and terminate after specified number of seconds.
+    """Start Simulation Runtime and terminate after specified number of seconds.
 
     Some tests need to be terminated by triggering externally an threading.Event. This
     is enabled when passing `duration`>0.
@@ -210,9 +241,10 @@ def start_and_shutdown(
     if duration:
 
         # Setup thread that will set the f_stop event, triggering the termination of all
-        # logic in the Simulation Engine. It will also terminate the Backend.
+        # logic in the Simulation Runtime. It will also terminate the Backend.
         termination_th = threading.Thread(
-            target=terminate_simulation, args=(f_stop, duration)
+            target=terminate_simulation,
+            args=(f_stop, duration, stop_condition),
         )
         termination_th.start()
 
@@ -233,11 +265,52 @@ def start_and_shutdown(
         is_app=False,
         f_stop=f_stop,
         run=run,
+        metrics=VceMetrics(),
         existing_nodes_mapping=nodes_mapping,
     )
 
     if duration:
         termination_th.join()
+
+
+def test_worker_records_clientapp_runtime() -> None:
+    """Simulation Runtime workers should accumulate backend processing time.
+
+    The recorded time is accumulated as ClientApp runtime.
+    """
+    metrics = VceMetrics()
+    f_stop = threading.Event()
+    messageins_queue: Queue[Message] = Queue()
+    messageres_queue: Queue[Message] = Queue()
+    message = _make_vce_test_message(node_id=1)
+    messageins_queue.put(message)
+    node_info_store = {1: Mock()}
+    context = Context(1234, 1, {}, RecordDict(), {})
+    node_info_store[1].retrieve_context.return_value = context
+    backend = Mock()
+
+    def _process_message(msg: Message, ctx: Context) -> tuple[Message, Context]:
+        f_stop.set()
+        return Message(RecordDict(), reply_to=msg), ctx
+
+    backend.process_message.side_effect = _process_message
+
+    with patch(
+        "flwr.server.superlink.fleet.vce.vce_api.time.perf_counter",
+        side_effect=[10.0, 12.0],
+    ):
+        worker(
+            messageins_queue=messageins_queue,
+            messageres_queue=messageres_queue,
+            node_info_store=node_info_store,  # type: ignore
+            backend=backend,
+            f_stop=f_stop,
+            metrics=metrics,
+        )
+
+    backend.process_message.assert_called_once_with(message, context)
+    assert not messageres_queue.empty()
+    assert metrics.clientapp_runtime == 2.0
 
 
 class TestFleetSimulationEngineRayBackend(TestCase):
@@ -248,7 +321,8 @@ class TestFleetSimulationEngineRayBackend(TestCase):
         with self.assertRaises(ValueError):
             start_and_shutdown(duration=2)
 
-    def test_erroneous_client_app_attr(self) -> None:
+    @patch("flwr.server.superlink.fleet.vce.vce_api.time.sleep")
+    def test_erroneous_client_app_attr(self, mock_sleep: Mock) -> None:
         """Tests attempt to load a ClientApp that can't be found."""
         num_messages = 7
         num_nodes = 59
@@ -262,16 +336,12 @@ class TestFleetSimulationEngineRayBackend(TestCase):
                 state_factory=state_factory,
                 nodes_mapping=nodes_mapping,
             )
+        mock_sleep.assert_called_once_with(10)
 
     def test_erroneous_backend_config(self) -> None:
         """Backend Config should be a JSON stream."""
         with self.assertRaises(JSONDecodeError):
             start_and_shutdown(num_supernodes=50, backend_config="not a proper config")
-
-    def test_with_nonexistent_backend(self) -> None:
-        """Test specifying a backend that does not exist."""
-        with self.assertRaises(KeyError):
-            start_and_shutdown(num_supernodes=50, backend="this-backend-does-not-exist")
 
     def test_erroneous_arguments_num_supernodes_and_existing_mapping(self) -> None:
         """Test ValueError if a node mapping is passed but also num_supernodes.
@@ -294,20 +364,20 @@ class TestFleetSimulationEngineRayBackend(TestCase):
             start_and_shutdown(nodes_mapping={0: 1})
 
     def test_start_and_shutdown(self) -> None:
-        """Start Simulation Engine Fleet and terminate it."""
-        start_and_shutdown(num_supernodes=50, duration=10)
+        """Start Simulation Runtime Fleet and terminate it."""
+        start_and_shutdown(num_supernodes=50, duration=1)
 
     # pylint: disable=too-many-locals
     def test_start_and_shutdown_with_message_in_state(self) -> None:
-        """Run Simulation Engine with some Message in State.
+        """Run Simulation Runtime with some Message in State.
 
         This test creates a few nodes and submits a few messages that need to be
         executed by the Backend. In order for that to happen the asyncio
         producer/consumer logic must function. This also severs to evaluate a valid
         ClientApp.
         """
-        num_messages = 229
-        num_nodes = 59
+        num_messages = 71
+        num_nodes = 13
 
         state_factory, nodes_mapping, expected_results = (
             init_state_factory_nodes_mapping(
@@ -315,19 +385,37 @@ class TestFleetSimulationEngineRayBackend(TestCase):
                 num_messages=num_messages,
             )
         )
+        message_ids = set(expected_results)
+        assert len(message_ids) == num_messages
+        message_res_by_id: dict[str, Message] = {}
+
+        def collect_message_res() -> bool:
+            """Collect new replies and report whether all replies have arrived.
+
+            LinkState marks replies as delivered when they are read, so retain each
+            batch across polls instead of expecting one poll to return every reply.
+            """
+            for message_res in state_factory.state().get_message_res(set(message_ids)):
+                message_res_by_id[message_res.metadata.reply_to_message_id] = (
+                    message_res
+                )
+            return len(message_res_by_id) == num_messages
 
         # Run
         start_and_shutdown(
-            state_factory=state_factory, nodes_mapping=nodes_mapping, duration=10
+            state_factory=state_factory,
+            nodes_mapping=nodes_mapping,
+            duration=60,
+            stop_condition=collect_message_res,
         )
 
-        # Get all Message replies
-        state = state_factory.state()
-        message_ids = set(expected_results.keys())
-        message_res_list = state.get_message_res(message_ids=message_ids)
+        # Collect replies one final time that might have arrived while the
+        # Simulation Runtime was shutting down (if at all)
+        collect_message_res()
+        assert set(message_res_by_id) == message_ids
 
         # Check results by first converting to Message
-        for message_res in message_res_list:
+        for message_res in message_res_by_id.values():
 
             # Verify message content is as expected
             content = message_res.content

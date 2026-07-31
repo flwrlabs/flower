@@ -20,6 +20,7 @@ package flwr.proto;
 import "flwr/proto/message.proto";
 import "flwr/proto/fab.proto";
 import "flwr/proto/federation_config.proto";
+import "flwr/proto/node.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/task.proto";
 
@@ -45,6 +46,7 @@ message PushAppMessagesRequest {
 message PushAppMessagesResponse {
   repeated string message_ids = 1;
   repeated string objects_to_push = 2;
+  string session_id = 3;
 }
 
 // PullAppMessages messages
@@ -54,13 +56,25 @@ message PullAppMessagesResponse {
   repeated ObjectTree message_object_trees = 2;
 }
 
+// GetNodes messages
+message GetNodesRequest {}
+message GetNodesResponse { repeated Node nodes = 1; }
+
 // PushTaskMessage messages
 message PushTaskMessageRequest { Message message = 1; }
 message PushTaskMessageResponse { string message_id = 1; }
 
+// PushTaskEvents messages
+message PushTaskEventsRequest { repeated TaskEvent events = 1; }
+message PushTaskEventsResponse {}
+
 // PullTaskMessage messages
 message PullTaskMessageRequest { optional uint64 limit = 1; }
 message PullTaskMessageResponse { repeated Message messages = 1; }
+
+// RecordTaskUsage messages
+message RecordTaskUsageRequest { TaskUsage task_usage = 1; }
+message RecordTaskUsageResponse {}
 
 // PullTaskInput messages
 message PullTaskInputRequest {}
@@ -77,6 +91,8 @@ message PushTaskOutputRequest {
   Context context = 1;
   string sub_status = 2;
   string details = 3;
+  // Simulation Runtime usage only.
+  optional double clientapp_runtime = 4;
 }
 message PushTaskOutputResponse {}
 

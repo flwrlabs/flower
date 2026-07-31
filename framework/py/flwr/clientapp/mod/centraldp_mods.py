@@ -20,23 +20,24 @@ from typing import cast
 
 import numpy as np
 
-from flwr.app import Error
-from flwr.clientapp.typing import ClientAppCallable
-from flwr.common import (
+from flwr.app import (
     Array,
     ArrayRecord,
     ConfigRecord,
     Context,
+    Error,
     Message,
     MetricRecord,
-    log,
 )
+from flwr.clientapp.typing import ClientAppCallable
+from flwr.common import log
 from flwr.common.constant import ErrorCode
-from flwr.common.differential_privacy import (
+from flwr.supercore.differential_privacy import (
+    KEY_CLIPPING_NORM,
+    KEY_NORM_BIT,
     compute_adaptive_clip_model_update,
     compute_clip_model_update,
 )
-from flwr.common.differential_privacy_constants import KEY_CLIPPING_NORM, KEY_NORM_BIT
 
 
 # pylint: disable=too-many-return-statements

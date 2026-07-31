@@ -17,6 +17,18 @@
 
 from typing import Any, cast
 
+from flwr import common
+from flwr.app.message import (
+    Array,
+    ArrayRecord,
+    ConfigRecord,
+    Context,
+    Message,
+    MetricRecord,
+    RecordDict,
+    make_message,
+)
+from flwr.app.typing import ConfigRecordValues, MetricRecordValues
 from flwr.app.user_config import UserConfig, UserConfigValue
 
 # pylint: disable=E0611
@@ -41,19 +53,11 @@ from flwr.proto.transport_pb2 import (
     ServerMessage,
     Status,
 )
+from flwr.supercore.fab import Fab
+from flwr.supercore.run import Run, RunStatus
 
 # pylint: enable=E0611
-from . import (
-    Array,
-    ArrayRecord,
-    ConfigRecord,
-    Context,
-    MetricRecord,
-    RecordDict,
-    typing,
-)
 from .constant import INT64_MAX_VALUE
-from .message import Message, make_message
 from .serde_utils import (
     error_from_proto,
     error_to_proto,
@@ -66,21 +70,23 @@ from .serde_utils import (
 #  === Parameters message ===
 
 
-def parameters_to_proto(parameters: typing.Parameters) -> Parameters:
+def parameters_to_proto(parameters: common.Parameters) -> Parameters:
     """Serialize `Parameters` to ProtoBuf."""
     return Parameters(tensors=parameters.tensors, tensor_type=parameters.tensor_type)
 
 
-def parameters_from_proto(msg: Parameters) -> typing.Parameters:
+def parameters_from_proto(msg: Parameters) -> common.Parameters:
     """Deserialize `Parameters` from ProtoBuf."""
     tensors: list[bytes] = list(msg.tensors)
-    return typing.Parameters(tensors=tensors, tensor_type=msg.tensor_type)
+    return common.Parameters(tensors=tensors, tensor_type=msg.tensor_type)
 
 
 #  === ReconnectIns message ===
 
 
-def reconnect_ins_to_proto(ins: typing.ReconnectIns) -> ServerMessage.ReconnectIns:
+def reconnect_ins_to_proto(
+    ins: common.ReconnectIns,
+) -> ServerMessage.ReconnectIns:
     """Serialize `ReconnectIns` to ProtoBuf."""
     if ins.seconds is not None:
         return ServerMessage.ReconnectIns(seconds=ins.seconds)
@@ -90,22 +96,24 @@ def reconnect_ins_to_proto(ins: typing.ReconnectIns) -> ServerMessage.ReconnectI
 # === DisconnectRes message ===
 
 
-def disconnect_res_from_proto(msg: ClientMessage.DisconnectRes) -> typing.DisconnectRes:
+def disconnect_res_from_proto(
+    msg: ClientMessage.DisconnectRes,
+) -> common.DisconnectRes:
     """Deserialize `DisconnectRes` from ProtoBuf."""
     if msg.reason == Reason.RECONNECT:
-        return typing.DisconnectRes(reason="RECONNECT")
+        return common.DisconnectRes(reason="RECONNECT")
     if msg.reason == Reason.POWER_DISCONNECTED:
-        return typing.DisconnectRes(reason="POWER_DISCONNECTED")
+        return common.DisconnectRes(reason="POWER_DISCONNECTED")
     if msg.reason == Reason.WIFI_UNAVAILABLE:
-        return typing.DisconnectRes(reason="WIFI_UNAVAILABLE")
-    return typing.DisconnectRes(reason="UNKNOWN")
+        return common.DisconnectRes(reason="WIFI_UNAVAILABLE")
+    return common.DisconnectRes(reason="UNKNOWN")
 
 
 # === GetParameters messages ===
 
 
 def get_parameters_ins_to_proto(
-    ins: typing.GetParametersIns,
+    ins: common.GetParametersIns,
 ) -> ServerMessage.GetParametersIns:
     """Serialize `GetParametersIns` to ProtoBuf."""
     config = properties_to_proto(ins.config)
@@ -114,18 +122,18 @@ def get_parameters_ins_to_proto(
 
 def get_parameters_ins_from_proto(
     msg: ServerMessage.GetParametersIns,
-) -> typing.GetParametersIns:
+) -> common.GetParametersIns:
     """Deserialize `GetParametersIns` from ProtoBuf."""
     config = properties_from_proto(msg.config)
-    return typing.GetParametersIns(config=config)
+    return common.GetParametersIns(config=config)
 
 
 def get_parameters_res_to_proto(
-    res: typing.GetParametersRes,
+    res: common.GetParametersRes,
 ) -> ClientMessage.GetParametersRes:
     """Serialize `GetParametersRes` to ProtoBuf."""
     status_msg = status_to_proto(res.status)
-    if res.status.code == typing.Code.GET_PARAMETERS_NOT_IMPLEMENTED:
+    if res.status.code == common.Code.GET_PARAMETERS_NOT_IMPLEMENTED:
         return ClientMessage.GetParametersRes(status=status_msg)
     parameters_proto = parameters_to_proto(res.parameters)
     return ClientMessage.GetParametersRes(
@@ -135,34 +143,34 @@ def get_parameters_res_to_proto(
 
 def get_parameters_res_from_proto(
     msg: ClientMessage.GetParametersRes,
-) -> typing.GetParametersRes:
+) -> common.GetParametersRes:
     """Deserialize `GetParametersRes` from ProtoBuf."""
     status = status_from_proto(msg=msg.status)
     parameters = parameters_from_proto(msg.parameters)
-    return typing.GetParametersRes(status=status, parameters=parameters)
+    return common.GetParametersRes(status=status, parameters=parameters)
 
 
 # === Fit messages ===
 
 
-def fit_ins_to_proto(ins: typing.FitIns) -> ServerMessage.FitIns:
+def fit_ins_to_proto(ins: common.FitIns) -> ServerMessage.FitIns:
     """Serialize `FitIns` to ProtoBuf."""
     parameters_proto = parameters_to_proto(ins.parameters)
     config_msg = metrics_to_proto(ins.config)
     return ServerMessage.FitIns(parameters=parameters_proto, config=config_msg)
 
 
-def fit_ins_from_proto(msg: ServerMessage.FitIns) -> typing.FitIns:
+def fit_ins_from_proto(msg: ServerMessage.FitIns) -> common.FitIns:
     """Deserialize `FitIns` from ProtoBuf."""
     parameters = parameters_from_proto(msg.parameters)
     config = metrics_from_proto(msg.config)
-    return typing.FitIns(parameters=parameters, config=config)
+    return common.FitIns(parameters=parameters, config=config)
 
 
-def fit_res_to_proto(res: typing.FitRes) -> ClientMessage.FitRes:
+def fit_res_to_proto(res: common.FitRes) -> ClientMessage.FitRes:
     """Serialize `FitIns` to ProtoBuf."""
     status_msg = status_to_proto(res.status)
-    if res.status.code == typing.Code.FIT_NOT_IMPLEMENTED:
+    if res.status.code == common.Code.FIT_NOT_IMPLEMENTED:
         return ClientMessage.FitRes(status=status_msg)
     parameters_proto = parameters_to_proto(res.parameters)
     metrics_msg = None if res.metrics is None else metrics_to_proto(res.metrics)
@@ -174,12 +182,12 @@ def fit_res_to_proto(res: typing.FitRes) -> ClientMessage.FitRes:
     )
 
 
-def fit_res_from_proto(msg: ClientMessage.FitRes) -> typing.FitRes:
+def fit_res_from_proto(msg: ClientMessage.FitRes) -> common.FitRes:
     """Deserialize `FitRes` from ProtoBuf."""
     status = status_from_proto(msg=msg.status)
     parameters = parameters_from_proto(msg.parameters)
     metrics = None if msg.metrics is None else metrics_from_proto(msg.metrics)
-    return typing.FitRes(
+    return common.FitRes(
         status=status,
         parameters=parameters,
         num_examples=msg.num_examples,
@@ -191,7 +199,7 @@ def fit_res_from_proto(msg: ClientMessage.FitRes) -> typing.FitRes:
 
 
 def get_properties_ins_to_proto(
-    ins: typing.GetPropertiesIns,
+    ins: common.GetPropertiesIns,
 ) -> ServerMessage.GetPropertiesIns:
     """Serialize `GetPropertiesIns` to ProtoBuf."""
     config = properties_to_proto(ins.config)
@@ -200,18 +208,18 @@ def get_properties_ins_to_proto(
 
 def get_properties_ins_from_proto(
     msg: ServerMessage.GetPropertiesIns,
-) -> typing.GetPropertiesIns:
+) -> common.GetPropertiesIns:
     """Deserialize `GetPropertiesIns` from ProtoBuf."""
     config = properties_from_proto(msg.config)
-    return typing.GetPropertiesIns(config=config)
+    return common.GetPropertiesIns(config=config)
 
 
 def get_properties_res_to_proto(
-    res: typing.GetPropertiesRes,
+    res: common.GetPropertiesRes,
 ) -> ClientMessage.GetPropertiesRes:
     """Serialize `GetPropertiesIns` to ProtoBuf."""
     status_msg = status_to_proto(res.status)
-    if res.status.code == typing.Code.GET_PROPERTIES_NOT_IMPLEMENTED:
+    if res.status.code == common.Code.GET_PROPERTIES_NOT_IMPLEMENTED:
         return ClientMessage.GetPropertiesRes(status=status_msg)
     properties_msg = properties_to_proto(res.properties)
     return ClientMessage.GetPropertiesRes(status=status_msg, properties=properties_msg)
@@ -219,34 +227,36 @@ def get_properties_res_to_proto(
 
 def get_properties_res_from_proto(
     msg: ClientMessage.GetPropertiesRes,
-) -> typing.GetPropertiesRes:
+) -> common.GetPropertiesRes:
     """Deserialize `GetPropertiesRes` from ProtoBuf."""
     status = status_from_proto(msg=msg.status)
     properties = properties_from_proto(msg.properties)
-    return typing.GetPropertiesRes(status=status, properties=properties)
+    return common.GetPropertiesRes(status=status, properties=properties)
 
 
 # === Evaluate messages ===
 
 
-def evaluate_ins_to_proto(ins: typing.EvaluateIns) -> ServerMessage.EvaluateIns:
+def evaluate_ins_to_proto(ins: common.EvaluateIns) -> ServerMessage.EvaluateIns:
     """Serialize `EvaluateIns` to ProtoBuf."""
     parameters_proto = parameters_to_proto(ins.parameters)
     config_msg = metrics_to_proto(ins.config)
     return ServerMessage.EvaluateIns(parameters=parameters_proto, config=config_msg)
 
 
-def evaluate_ins_from_proto(msg: ServerMessage.EvaluateIns) -> typing.EvaluateIns:
+def evaluate_ins_from_proto(
+    msg: ServerMessage.EvaluateIns,
+) -> common.EvaluateIns:
     """Deserialize `EvaluateIns` from ProtoBuf."""
     parameters = parameters_from_proto(msg.parameters)
     config = metrics_from_proto(msg.config)
-    return typing.EvaluateIns(parameters=parameters, config=config)
+    return common.EvaluateIns(parameters=parameters, config=config)
 
 
-def evaluate_res_to_proto(res: typing.EvaluateRes) -> ClientMessage.EvaluateRes:
+def evaluate_res_to_proto(res: common.EvaluateRes) -> ClientMessage.EvaluateRes:
     """Serialize `EvaluateIns` to ProtoBuf."""
     status_msg = status_to_proto(res.status)
-    if res.status.code == typing.Code.EVALUATE_NOT_IMPLEMENTED:
+    if res.status.code == common.Code.EVALUATE_NOT_IMPLEMENTED:
         return ClientMessage.EvaluateRes(status=status_msg)
     metrics_msg = None if res.metrics is None else metrics_to_proto(res.metrics)
     return ClientMessage.EvaluateRes(
@@ -257,11 +267,13 @@ def evaluate_res_to_proto(res: typing.EvaluateRes) -> ClientMessage.EvaluateRes:
     )
 
 
-def evaluate_res_from_proto(msg: ClientMessage.EvaluateRes) -> typing.EvaluateRes:
+def evaluate_res_from_proto(
+    msg: ClientMessage.EvaluateRes,
+) -> common.EvaluateRes:
     """Deserialize `EvaluateRes` from ProtoBuf."""
     status = status_from_proto(msg=msg.status)
     metrics = None if msg.metrics is None else metrics_from_proto(msg.metrics)
-    return typing.EvaluateRes(
+    return common.EvaluateRes(
         status=status,
         loss=msg.loss,
         num_examples=msg.num_examples,
@@ -272,38 +284,38 @@ def evaluate_res_from_proto(msg: ClientMessage.EvaluateRes) -> typing.EvaluateRe
 # === Status messages ===
 
 
-def status_to_proto(status: typing.Status) -> Status:
+def status_to_proto(status: common.Status) -> Status:
     """Serialize `Status` to ProtoBuf."""
     code = Code.OK
-    if status.code == typing.Code.GET_PROPERTIES_NOT_IMPLEMENTED:
+    if status.code == common.Code.GET_PROPERTIES_NOT_IMPLEMENTED:
         code = Code.GET_PROPERTIES_NOT_IMPLEMENTED
-    if status.code == typing.Code.GET_PARAMETERS_NOT_IMPLEMENTED:
+    if status.code == common.Code.GET_PARAMETERS_NOT_IMPLEMENTED:
         code = Code.GET_PARAMETERS_NOT_IMPLEMENTED
-    if status.code == typing.Code.FIT_NOT_IMPLEMENTED:
+    if status.code == common.Code.FIT_NOT_IMPLEMENTED:
         code = Code.FIT_NOT_IMPLEMENTED
-    if status.code == typing.Code.EVALUATE_NOT_IMPLEMENTED:
+    if status.code == common.Code.EVALUATE_NOT_IMPLEMENTED:
         code = Code.EVALUATE_NOT_IMPLEMENTED
     return Status(code=code, message=status.message)
 
 
-def status_from_proto(msg: Status) -> typing.Status:
+def status_from_proto(msg: Status) -> common.Status:
     """Deserialize `Status` from ProtoBuf."""
-    code = typing.Code.OK
+    code = common.Code.OK
     if msg.code == Code.GET_PROPERTIES_NOT_IMPLEMENTED:
-        code = typing.Code.GET_PROPERTIES_NOT_IMPLEMENTED
+        code = common.Code.GET_PROPERTIES_NOT_IMPLEMENTED
     if msg.code == Code.GET_PARAMETERS_NOT_IMPLEMENTED:
-        code = typing.Code.GET_PARAMETERS_NOT_IMPLEMENTED
+        code = common.Code.GET_PARAMETERS_NOT_IMPLEMENTED
     if msg.code == Code.FIT_NOT_IMPLEMENTED:
-        code = typing.Code.FIT_NOT_IMPLEMENTED
+        code = common.Code.FIT_NOT_IMPLEMENTED
     if msg.code == Code.EVALUATE_NOT_IMPLEMENTED:
-        code = typing.Code.EVALUATE_NOT_IMPLEMENTED
-    return typing.Status(code=code, message=msg.message)
+        code = common.Code.EVALUATE_NOT_IMPLEMENTED
+    return common.Status(code=code, message=msg.message)
 
 
 # === Properties messages ===
 
 
-def properties_to_proto(properties: typing.Properties) -> Any:
+def properties_to_proto(properties: common.Properties) -> Any:
     """Serialize `Properties` to ProtoBuf."""
     proto = {}
     for key in properties:
@@ -311,7 +323,7 @@ def properties_to_proto(properties: typing.Properties) -> Any:
     return proto
 
 
-def properties_from_proto(proto: Any) -> typing.Properties:
+def properties_from_proto(proto: Any) -> common.Properties:
     """Deserialize `Properties` from ProtoBuf."""
     properties = {}
     for k in proto:
@@ -322,7 +334,7 @@ def properties_from_proto(proto: Any) -> typing.Properties:
 # === Metrics messages ===
 
 
-def metrics_to_proto(metrics: typing.Metrics) -> Any:
+def metrics_to_proto(metrics: common.Metrics) -> Any:
     """Serialize `Metrics` to ProtoBuf."""
     proto = {}
     for key in metrics:
@@ -330,7 +342,7 @@ def metrics_to_proto(metrics: typing.Metrics) -> Any:
     return proto
 
 
-def metrics_from_proto(proto: Any) -> typing.Metrics:
+def metrics_from_proto(proto: Any) -> common.Metrics:
     """Deserialize `Metrics` from ProtoBuf."""
     metrics = {}
     for k in proto:
@@ -341,7 +353,7 @@ def metrics_from_proto(proto: Any) -> typing.Metrics:
 # === Scalar messages ===
 
 
-def scalar_to_proto(scalar: typing.Scalar) -> Scalar:
+def scalar_to_proto(scalar: common.Scalar) -> Scalar:
     """Serialize `Scalar` to ProtoBuf."""
     if isinstance(scalar, bool):
         return Scalar(bool=scalar)
@@ -366,11 +378,11 @@ def scalar_to_proto(scalar: typing.Scalar) -> Scalar:
     )
 
 
-def scalar_from_proto(scalar_msg: Scalar) -> typing.Scalar:
+def scalar_from_proto(scalar_msg: Scalar) -> common.Scalar:
     """Deserialize `Scalar` from ProtoBuf."""
     scalar_field = scalar_msg.WhichOneof("scalar")
     scalar = getattr(scalar_msg, cast(str, scalar_field))
-    return cast(typing.Scalar, scalar)
+    return cast(common.Scalar, scalar)
 
 
 # === Record messages ===
@@ -431,7 +443,7 @@ def metric_record_from_proto(record_proto: ProtoMetricRecord) -> MetricRecord:
     protos = {item.key: item.value for item in record_proto.items}
     return MetricRecord(
         metric_dict=cast(
-            dict[str, typing.MetricRecordValues],
+            dict[str, MetricRecordValues],
             record_value_dict_from_proto(protos),
         ),
         keep_input=False,
@@ -455,7 +467,7 @@ def config_record_from_proto(record_proto: ProtoConfigRecord) -> ConfigRecord:
     protos = {item.key: item.value for item in record_proto.items}
     return ConfigRecord(
         config_dict=cast(
-            dict[str, typing.ConfigRecordValues],
+            dict[str, ConfigRecordValues],
             record_value_dict_from_proto(protos),
         ),
         keep_input=False,
@@ -500,16 +512,16 @@ def recorddict_from_proto(recorddict_proto: ProtoRecordDict) -> RecordDict:
 # === FAB ===
 
 
-def fab_to_proto(fab: typing.Fab) -> ProtoFab:
+def fab_to_proto(fab: Fab) -> ProtoFab:
     """Create a proto Fab object from a Python Fab."""
     return ProtoFab(
         hash_str=fab.hash_str, content=fab.content, verifications=fab.verifications
     )
 
 
-def fab_from_proto(fab: ProtoFab) -> typing.Fab:
+def fab_from_proto(fab: ProtoFab) -> Fab:
     """Create a Python Fab object from a proto Fab."""
-    return typing.Fab(fab.hash_str, fab.content, dict(fab.verifications))
+    return Fab(fab.hash_str, fab.content, dict(fab.verifications))
 
 
 # === User configs ===
@@ -600,6 +612,7 @@ def context_to_proto(context: Context) -> ProtoContext:
         node_config=user_config_to_proto(context.node_config),
         state=recorddict_to_proto(context.state),
         run_config=user_config_to_proto(context.run_config),
+        series_id=context.series_id,
     )
     return proto
 
@@ -612,6 +625,7 @@ def context_from_proto(context_proto: ProtoContext) -> Context:
         node_config=user_config_from_proto(context_proto.node_config),
         state=recorddict_from_proto(context_proto.state),
         run_config=user_config_from_proto(context_proto.run_config),
+        series_id=context_proto.series_id,
     )
     return context
 
@@ -619,7 +633,7 @@ def context_from_proto(context_proto: ProtoContext) -> Context:
 # === Run messages ===
 
 
-def run_to_proto(run: typing.Run) -> ProtoRun:
+def run_to_proto(run: Run) -> ProtoRun:
     """Serialize `Run` to ProtoBuf."""
     proto = ProtoRun(
         run_id=run.run_id,
@@ -633,20 +647,22 @@ def run_to_proto(run: typing.Run) -> ProtoRun:
         finished_at=run.finished_at,
         status=run_status_to_proto(run.status),
         flwr_aid=run.flwr_aid,
-        federation=run.federation,
+        federation=run.federation_id,
         bytes_sent=run.bytes_sent,
         bytes_recv=run.bytes_recv,
         clientapp_runtime=run.clientapp_runtime,
-        run_type=run.run_type,
+        primary_task_type=run.primary_task_type,
+        series_id=run.series_id,
+        account_name=run.account_name,
     )
     if run.primary_task_id is not None:
         proto.primary_task_id = run.primary_task_id
     return proto
 
 
-def run_from_proto(run_proto: ProtoRun) -> typing.Run:
+def run_from_proto(run_proto: ProtoRun) -> Run:
     """Deserialize `Run` from ProtoBuf."""
-    run = typing.Run(
+    run = Run(
         run_id=run_proto.run_id,
         fab_id=run_proto.fab_id,
         fab_version=run_proto.fab_version,
@@ -658,14 +674,16 @@ def run_from_proto(run_proto: ProtoRun) -> typing.Run:
         finished_at=run_proto.finished_at,
         status=run_status_from_proto(run_proto.status),
         flwr_aid=run_proto.flwr_aid,
-        federation=run_proto.federation,
+        federation_id=run_proto.federation,
         primary_task_id=(
             run_proto.primary_task_id if run_proto.HasField("primary_task_id") else None
         ),
         bytes_sent=run_proto.bytes_sent,
         bytes_recv=run_proto.bytes_recv,
         clientapp_runtime=run_proto.clientapp_runtime,
-        run_type=run_proto.run_type,
+        primary_task_type=run_proto.primary_task_type,
+        series_id=run_proto.series_id,
+        account_name=run_proto.account_name,
     )
     return run
 
@@ -673,7 +691,7 @@ def run_from_proto(run_proto: ProtoRun) -> typing.Run:
 # === Run status ===
 
 
-def run_status_to_proto(run_status: typing.RunStatus) -> ProtoRunStatus:
+def run_status_to_proto(run_status: RunStatus) -> ProtoRunStatus:
     """Serialize `RunStatus` to ProtoBuf."""
     return ProtoRunStatus(
         status=run_status.status,
@@ -682,9 +700,9 @@ def run_status_to_proto(run_status: typing.RunStatus) -> ProtoRunStatus:
     )
 
 
-def run_status_from_proto(run_status_proto: ProtoRunStatus) -> typing.RunStatus:
+def run_status_from_proto(run_status_proto: ProtoRunStatus) -> RunStatus:
     """Deserialize `RunStatus` from ProtoBuf."""
-    return typing.RunStatus(
+    return RunStatus(
         status=run_status_proto.status,
         sub_status=run_status_proto.sub_status,
         details=run_status_proto.details,

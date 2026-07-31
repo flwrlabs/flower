@@ -28,12 +28,12 @@ from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_RANDOM_RANGE,
 )
-from flwr.common.retry_invoker import RetryInvoker, exponential
 
 # pylint: disable=E0611
 from flwr.proto.appio_pb2 import SendTaskHeartbeatRequest
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.supercore.retry import RetryInvoker, exponential
 
 # pylint: enable=E0611
 
@@ -141,7 +141,7 @@ def make_task_heartbeat_fn_grpc(
         try:
             res = stub.SendTaskHeartbeat(req)
         except grpc.RpcError as e:
-            status_code = e.code()
+            status_code = e.code()  # pylint: disable=E1101
             if status_code == grpc.StatusCode.UNAVAILABLE:
                 return False
             if status_code == grpc.StatusCode.DEADLINE_EXCEEDED:

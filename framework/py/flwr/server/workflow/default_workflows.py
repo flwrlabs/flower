@@ -20,26 +20,17 @@ import timeit
 from logging import INFO, WARN
 from typing import cast
 
-import flwr.common.recorddict_compat as compat
+import flwr.compat.common.recorddict_compat as compat
+from flwr.app import ArrayRecord, ConfigRecord, Context, Message
 from flwr.app.message_type import MessageType
-from flwr.common import (
-    ArrayRecord,
-    Code,
-    ConfigRecord,
-    Context,
-    EvaluateRes,
-    FitRes,
-    GetParametersIns,
-    Message,
-    log,
-)
+from flwr.common import Code, EvaluateRes, FitRes, GetParametersIns, log
 from flwr.common.constant import MessageTypeLegacy
+from flwr.compat.server.typing import Workflow
+from flwr.serverapp.grid import Grid
 
 from ..client_proxy import ClientProxy
 from ..compat.app_utils import start_update_client_manager_thread
 from ..compat.legacy_context import LegacyContext
-from ..grid import Grid
-from ..typing import Workflow
 from .constant import MAIN_CONFIGS_RECORD, MAIN_PARAMS_RECORD, Key
 
 

@@ -23,37 +23,34 @@ env:
 
 jobs:
   check_format_docs:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Check Docs Formatting
     steps:
       - uses: actions/checkout@v5
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
-        with:
-          uv-skip: "false"
-          poetry-skip: "true"
       - name: Install dependencies
         run: |
           cd dev
-          uv sync --frozen
+          uv sync --locked
       - name: Check docs format
         run: |
           cd dev
-          uv run docstrfmt --check ../intelligence/docs/source
+          uv run --no-sync docstrfmt --check ../intelligence/docs/source
   build_ts_docs:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Build TypeScript Docs
     steps:
       - uses: actions/checkout@v5
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: "22.14.0"
       - name: Install pnpm
         run: |
-          npm install -g pnpm
+          npm install -g pnpm@10.25.0
       - name: Install Flower Intelligence
         run: |
           cd intelligence/ts
@@ -80,7 +77,7 @@ jobs:
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
         with:
-          python-version: "3.10"
+          python-version: "3.11"
       - uses: swift-actions/setup-swift@v2
         with:
           swift-version: "6.0.0"
@@ -110,7 +107,7 @@ jobs:
           path: intelligence/docs/source/swift-api-ref/
 
   build_kt_docs:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Build Kotlin Docs
     steps:
       - uses: actions/checkout@v5
@@ -135,7 +132,7 @@ jobs:
           path: intelligence/docs/source/kt-api-ref/
 
   build_and_deploy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [build_ts_docs, build_kt_docs]
     name: Deploy Docs
     steps:
@@ -151,7 +148,7 @@ jobs:
         if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         run: |
           cd framework
-          python -m poetry install --extras "simulation"
+          uv sync --locked --all-groups --extra simulation
       - name: Download TS docs
         if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         uses: actions/download-artifact@v4
@@ -167,8 +164,8 @@ jobs:
       - name: Build final docs
         if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         run: |
-          cd intelligence/docs
-          make html
+          cd framework
+          uv run --no-sync make -C ../intelligence/docs html
       - name: Deploy docs
         if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         env:

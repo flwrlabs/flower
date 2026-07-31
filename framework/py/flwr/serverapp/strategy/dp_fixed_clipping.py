@@ -24,18 +24,17 @@ from logging import INFO, WARNING
 
 import numpy as np
 
-from flwr.common import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, log
-from flwr.common.differential_privacy import (
+from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord
+from flwr.common import log
+from flwr.supercore.differential_privacy import (
+    CLIENTS_DISCREPANCY_WARNING,
+    KEY_CLIPPING_NORM,
     add_gaussian_noise_inplace,
     compute_clip_model_update,
     compute_stdv,
 )
-from flwr.common.differential_privacy_constants import (
-    CLIENTS_DISCREPANCY_WARNING,
-    KEY_CLIPPING_NORM,
-)
-from flwr.server import Grid
 
+from ..grid import Grid
 from .strategy import Strategy
 
 

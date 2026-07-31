@@ -16,26 +16,29 @@
 
 
 import importlib
+from typing import Any
 
 from flwr.simulation.app import run_simulation_process
 from flwr.simulation.run_simulation import run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 
-is_ray_installed = importlib.util.find_spec("ray") is not None
-
-if is_ray_installed:
-    from flwr.simulation.legacy_app import start_simulation
-else:
-    RAY_IMPORT_ERROR: str = """Unable to import module `ray`.
+RAY_IMPORT_ERROR: str = """Unable to import module `ray`.
 
 To install the necessary dependencies, install `flwr` with the `simulation` extra:
 
     pip install -U "flwr[simulation]"
 """
 
-    def start_simulation(*args, **kwargs):  # type: ignore
-        """Log error stating that module `ray` could not be imported."""
+
+def start_simulation(*args: Any, **kwargs: Any) -> Any:
+    """Start a Ray-based Flower simulation server."""
+    if importlib.util.find_spec("ray") is None:
         raise ImportError(RAY_IMPORT_ERROR)
+
+    # pylint: disable-next=import-outside-toplevel
+    from flwr.simulation.legacy_app import start_simulation as start_simulation_legacy
+
+    return start_simulation_legacy(*args, **kwargs)
 
 
 __all__ = [

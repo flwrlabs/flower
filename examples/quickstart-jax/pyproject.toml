@@ -4,15 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-jax"
-version = "1.1.1"
+version = "1.1.8"
 description = "Federated Learning with JAX and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 dependencies = [
     "flwr[simulation]>=1.28.0",
     "flwr-datasets[vision]>=0.6.0",
-    "jax==0.4.31",
-    "jaxlib==0.4.31",
-    "flax==0.9.0",
+    "jax==0.4.36",
+    "jaxlib==0.4.36",
+    "flax==0.10.2",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -21,7 +21,7 @@ packages = ["."]
 [tool.flwr.app]
 publisher = "flwrlabs"
 fab-format-version = 1
-flwr-version-target = "1.29.0"
+flwr-version-target = "1.32.1"
 
 [tool.flwr.app.components]
 serverapp = "jaxexample.server_app:app"
@@ -30,5 +30,6 @@ clientapp = "jaxexample.client_app:app"
 [tool.flwr.app.config]
 num-server-rounds = 5
 learning-rate = 0.1
-fraction-evaluate = 0.2
+fraction-evaluate = 1.0
 batch-size = 64
+save-model = false

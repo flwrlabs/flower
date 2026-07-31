@@ -50,7 +50,7 @@ virtual environment and run everything within a :doc:`virtualenv
 <contributor-how-to-set-up-a-virtual-env>`.
 
 Let's use ``flwr new`` to create a complete Flower+XGBoost project. It will generate all
-the files needed to run a federation of 10 nodes using |fedxgbbagging_link|_ strategy.
+the files needed to run a federation of two nodes using |fedxgbbagging_link|_ strategy.
 By default, the generated app uses a local simulation profile that ``flwr run`` submits
 to a managed local SuperLink, which then executes the run with the Flower Simulation
 Runtime. The dataset will be partitioned using Flower Dataset's `IidPartitioner
@@ -67,7 +67,7 @@ install Flower in your new environment:
 .. code-block:: shell
 
     # In a new Python environment
-    $ pip install flwr[simulation]
+    $ pip install flwr
 
 Then, run the command below:
 
@@ -89,16 +89,11 @@ created. It should have the following structure:
     ├── pyproject.toml      # Project metadata like dependencies and configs
     └── README.md
 
-If you haven't yet installed the project and its dependencies, you can do so by:
-
-.. code-block:: shell
-
-    # From the directory where your pyproject.toml is
-    $ pip install -e .
-
 To run the project do:
 
 .. code-block:: shell
+
+    $ cd quickstart-xgboost
 
     # Run with default arguments and stream logs
     $ flwr run . --stream
@@ -115,10 +110,10 @@ With default arguments, you will see streamed output like this:
     INFO :      Starting FedXgbBagging strategy:
     INFO :              ├── Number of rounds: 3
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 2 nodes (out of 10)
+    INFO :      configure_train: Sampled 2 nodes (out of 2)
     INFO :      aggregate_train: Received 2 results and 0 failures
     INFO :              └──> Aggregated MetricRecord: {}
-    INFO :      configure_evaluate: Sampled 2 nodes (out of 10)
+    INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
     INFO :      aggregate_evaluate: Received 2 results and 0 failures
     INFO :              └──> Aggregated MetricRecord: {'auc': 0.7677505289821278}
     INFO :      [ROUND 2/3]
@@ -129,7 +124,6 @@ With default arguments, you will see streamed output like this:
     INFO :      Final results:
     INFO :              ServerApp-side Evaluate Metrics:
     INFO :              {}
-    Saving final model to disk...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
 in the ``pyproject.toml`` like this:
@@ -157,6 +151,7 @@ file:
     fraction-train = 0.1
     fraction-evaluate = 0.1
     local-epochs = 1
+    save-model = false
 
     # XGBoost parameters
     params.objective = "binary:logistic"
@@ -415,16 +410,17 @@ After that, the execution of the strategy is launched when invoking its
             num_rounds=num_rounds,
         )
 
-        # Save final model to disk
-        bst = xgb.Booster(params=params)
-        global_model = bytearray(result.arrays["0"].numpy().tobytes())
+        if context.run_config["save-model"]:
+            # Save final model to disk
+            bst = xgb.Booster(params=params)
+            global_model = bytearray(result.arrays["0"].numpy().tobytes())
 
-        # Load global model into booster
-        bst.load_model(global_model)
+            # Load global model into booster
+            bst.load_model(global_model)
 
-        # Save model
-        print("\nSaving final model to disk...")
-        bst.save_model("final_model.json")
+            # Save model
+            print("\nSaving final model to disk...")
+            bst.save_model("final_model.json")
 
 Note the ``start`` method of the strategy returns a |result_link|_ object. This object
 contains all the relevant information about the FL process, including the final model

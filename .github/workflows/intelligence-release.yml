@@ -12,13 +12,13 @@ concurrency:
 jobs:
   check-version:
     name: Check version consistency
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: '22.14.0'
           registry-url: https://registry.npmjs.org
@@ -30,20 +30,20 @@ jobs:
     needs: check-version
     if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Publish Flower Intelligence TypeScript SDK to NPM
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: '22.14.0'
           registry-url: https://registry.npmjs.org
 
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@10.25.0
 
       - name: Install dependencies
         working-directory: intelligence/ts
@@ -63,7 +63,7 @@ jobs:
     needs: check-version
     if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Publish Flower Intelligence Kotlin SDK to Maven Central
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     env:

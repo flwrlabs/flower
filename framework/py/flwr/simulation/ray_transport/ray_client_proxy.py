@@ -19,15 +19,15 @@ import traceback
 from logging import ERROR
 
 from flwr import common
+from flwr.app import DEFAULT_TTL, Message, Metadata, RecordDict
+from flwr.app.message import make_message
 from flwr.app.message_type import MessageType
 from flwr.client import ClientFnExt
-from flwr.client.run_info_store import DeprecatedRunInfoStore
 from flwr.clientapp.client_app import ClientApp
-from flwr.common import DEFAULT_TTL, Message, Metadata, RecordDict, now
 from flwr.common.constant import NUM_PARTITIONS_KEY, PARTITION_ID_KEY, MessageTypeLegacy
 from flwr.common.logger import log
-from flwr.common.message import make_message
-from flwr.common.recorddict_compat import (
+from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
+from flwr.compat.common.recorddict_compat import (
     evaluateins_to_recorddict,
     fitins_to_recorddict,
     getparametersins_to_recorddict,
@@ -39,6 +39,7 @@ from flwr.common.recorddict_compat import (
 )
 from flwr.server.client_proxy import ClientProxy
 from flwr.simulation.ray_transport.ray_actor import VirtualClientEngineActorPool
+from flwr.supercore.date import now
 
 
 class RayActorClientProxy(ClientProxy):

@@ -46,6 +46,47 @@ FEDERATION_CONFIG_HELP_MESSAGE = CONFIG_HELP_MESSAGE.format(
     "",
 )
 
+# Constants for `flwr chat`
+CHAT_FLOWER_AGENT_APP_SPEC = "@flwrlabs/flwr-agent"
+CHAT_SUPERGRID_CONNECTION_NAME = "supergrid"
+CHAT_AGENT_INPUT_KEY = "agent.input"
+CHAT_EXIT_COMMAND = "/quit"
+CHAT_NEW_COMMAND = "/new"
+CHAT_TEXT_DELTA_EVENT = "response.output_text.delta"
+CHAT_TERMINAL_EVENTS = {"response.completed", "response.incomplete"}
+CHAT_FAILURE_EVENTS = {"error", "response.failed"}
+CHAT_USER_PROMPT = "❯ "
+CHAT_APP_STYLE = {
+    "user.prompt": "bold #ffffff bg:#404040",
+    "user.message": "#ffffff bg:#404040",
+    "agent.prompt": "bold #dc8400",
+    "agent.name": "bold #111827 bg:#dc8400",
+    "agent.separator": "#dc8400",
+    "prompt.background": "fg:#ffffff bg:#404040",
+    "content": "noinherit",
+    "status": "#dc8400",
+    "notice": "bold #111827 bg:#dc8400",
+    "error": "bold ansibrightred",
+    "logo": "bold #dc8400",
+    "welcome": "bold #dc8400",
+}
+CHAT_AGENT_NAME = "Flower Agent"
+CHAT_EXPERIMENTAL_WARNING = "Note: `flwr chat` is experimental and subject to change."
+CHAT_WELCOME_MESSAGE = "Welcome to the Flower Chat"
+CHAT_EXIT_HINT = f"Type {CHAT_EXIT_COMMAND} or press Ctrl-C to leave."
+CHAT_NEW_CONVERSATION_MESSAGE = "Your next message will start a fresh conversation."
+CHAT_SPINNER_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
+CHAT_FLOWER_LOGO = r"""
+███████╗██╗      ██████╗ ██╗    ██╗███████╗██████╗
+██╔════╝██║     ██╔═══██╗██║    ██║██╔════╝██╔══██╗
+█████╗  ██║     ██║   ██║██║ █╗ ██║█████╗  ██████╔╝
+██╔══╝  ██║     ██║   ██║██║███╗██║██╔══╝  ██╔══██╗
+██║     ███████╗╚██████╔╝╚███╔███╔╝███████╗██║  ██║
+╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝ ╚══════╝╚═╝  ╚═╝
+""".strip(
+    "\n"
+)
+
 
 class SuperLinkConnectionTomlKey:
     """TOML keys for SuperLink connection configuration."""

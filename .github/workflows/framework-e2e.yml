@@ -20,7 +20,8 @@ env:
 
 jobs:
   changes:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     outputs:
       framework: ${{ steps.filter.outputs.framework }}
     steps:
@@ -38,7 +39,8 @@ jobs:
               - '.github/workflows/framework-e2e.yml'
 
   wheel:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     name: Build, test and upload wheel
     steps:
       - uses: actions/checkout@v5
@@ -47,11 +49,15 @@ jobs:
       - name: Install dependencies
         run: |
           cd framework
-          python -m poetry install --all-extras
+          uv sync --locked --all-extras --all-groups
       - name: Build wheel
-        run: ./framework/dev/build.sh
+        run: |
+          cd framework
+          uv run --no-sync ./dev/build.sh
       - name: Test wheel
-        run: ./framework/dev/test-wheel.sh
+        run: |
+          cd framework
+          uv run --no-sync ./dev/test-wheel.sh
       - name: Upload wheel
         if: ${{ github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
         id: upload
@@ -74,13 +80,13 @@ jobs:
       dir: ${{ steps.upload.outputs.DIR }}
 
   superexec:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [changes, wheel]
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13"]
         directory: [e2e-bare-auth]
         connection: [secure, insecure]
         engine: [deployment-engine, simulation-engine]
@@ -99,7 +105,6 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python-version }}
-          poetry-skip: "true"
       - name: Install Flower from repo
         if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
         working-directory: ./framework
@@ -129,7 +134,7 @@ jobs:
         run: ./../test_control_api.sh "${{ matrix.connection }}" "${{ matrix.authentication}}" "${{ matrix.engine }}"
 
   frameworks:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [changes, wheel]
     # Using approach described here:
@@ -199,7 +204,7 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: actions/setup-python@v6
         with:
-          python-version: "3.10"
+          python-version: "3.11"
       - name: Install build tools
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: |
@@ -238,9 +243,6 @@ jobs:
       - name: Run driver test
         if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory != 'e2e-bare-auth' }}
         run: ./../test_superlink.sh "${{ matrix.directory }}"
-      - name: Run driver test with REST
-        if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory == 'e2e-bare' }}
-        run: ./../test_superlink.sh bare rest
       - name: Run driver test with SQLite database
         if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory == 'e2e-bare' }}
         run: ./../test_superlink.sh bare sqlite
@@ -259,7 +261,7 @@ jobs:
           key: pythonloc-${{ runner.os }}-${{ matrix.directory }}-${{ env.pythonLocation }}-${{ hashFiles(format('./framework/e2e/{0}/pyproject.toml', matrix.directory)) }}
 
   strategies:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [changes, wheel]
     strategy:
@@ -287,8 +289,6 @@ jobs:
       - name: Bootstrap
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: ./.github/actions/bootstrap
-        with:
-          poetry-skip: "true"
       - name: Install dependencies
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: |
@@ -314,7 +314,7 @@ jobs:
           python test.py "${{ matrix.strat }}"
 
   apps:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [changes, wheel]
     env:
@@ -335,13 +335,6 @@ jobs:
       - name: Bootstrap
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: ./.github/actions/bootstrap
-      - name: Install project dependencies
-        if: ${{ needs.changes.outputs.framework == 'true' }}
-        working-directory: examples/${{ matrix.example }}
-        run: |
-          # Replace tensorflow with tensorflow-cpu to avoid GPU warnings in CI
-          sed -i 's/"tensorflow\([^"]*\)"/"tensorflow-cpu\1"/g' pyproject.toml
-          python -m pip install . --extra-index-url https://download.pytorch.org/whl/cpu
       - name: Install Flower from repo
         if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
         run: |
@@ -365,7 +358,7 @@ jobs:
           fi
 
   pull-app:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [changes, wheel]
     env:
@@ -408,13 +401,13 @@ jobs:
           fi
 
   build_and_install:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [changes, wheel]
     strategy:
       matrix:
         framework: ["numpy"]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13"]
     name: Build & Install / Python ${{ matrix.python-version }} / ${{ matrix.framework }}
     steps:
       - uses: actions/checkout@v5
@@ -423,7 +416,6 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python-version }}
-          poetry-skip: "true"
       - name: Install Flower from repo
         if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
         run: |
@@ -443,7 +435,7 @@ jobs:
           flwr install *.fab
 
   numpy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [changes, wheel]
     strategy:
@@ -466,7 +458,6 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python-version }}
-          poetry-skip: "true"
       - name: Install Flower from repo
         if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
         working-directory: ./framework
@@ -510,7 +501,7 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: actions/setup-python@v6
         with:
-          python-version: "3.10"
+          python-version: "3.11"
       - name: Install build tools
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: python -m pip install -U pip==26.0.1
@@ -521,18 +512,19 @@ jobs:
           python -m pip install --upgrade .
       - name: Run test
         if: ${{ needs.changes.outputs.framework == 'true' }}
+        timeout-minutes: 5
         working-directory: ./framework/e2e
         run: ./test_windows.sh
         shell: bash
 
   serverapp-heartbeat-test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [changes, wheel]
     strategy:
       matrix:
         engine: [deployment, simulation]
-        python-version: ["3.10"]
+        python-version: ["3.11"]
 
     if: ${{ needs.changes.outputs.framework == 'true' }}
     name: ServerApp/run heartbeat test with ${{ matrix.engine }} runtime / Python ${{ matrix.python-version }}

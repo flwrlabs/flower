@@ -16,12 +16,12 @@
 
 
 import unittest
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from alembic import command
 from alembic.autogenerate import compare_metadata
@@ -40,8 +40,8 @@ from sqlalchemy import (
 from sqlalchemy.engine import URL, Connection, Engine
 
 from flwr.common.constant import SubStatus
-from flwr.common.exit import ExitCode
-from flwr.supercore.constant import RunType, TaskType
+from flwr.supercore.constant import TaskType
+from flwr.supercore.exit import ExitCode
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
     ALEMBIC_VERSION_TABLE,
@@ -55,6 +55,22 @@ from flwr.supercore.state.alembic.utils import (
     register_version_location,
     run_migrations,
 )
+
+
+class TestMigrationGraph(unittest.TestCase):
+    """Test the structure of the Flower migration graph."""
+
+    def test_flwr_migrations_have_single_head(self) -> None:
+        """Ensure Flower migrations form a graph with exactly one head."""
+        script = ScriptDirectory(str(ALEMBIC_DIR))
+
+        heads = script.get_heads()
+
+        self.assertEqual(
+            len(heads),
+            1,
+            f"Expected exactly one Flower migration head, found: {heads}",
+        )
 
 
 class TestAlembicRun(unittest.TestCase):
@@ -76,6 +92,28 @@ class TestAlembicRun(unittest.TestCase):
         """Create a SQLAlchemy engine for a test database."""
         db_path = self.temp_path / db_name
         return create_engine(f"sqlite:///{db_path}")
+
+    def create_mock_engine(self, dialect_name: str) -> tuple[MagicMock, MagicMock]:
+        """Create a mock SQLAlchemy engine and connection."""
+        engine = MagicMock()
+        connection = MagicMock(spec=Connection)
+        engine.dialect.name = dialect_name
+        engine.connect.return_value.__enter__.return_value = connection
+        return engine, connection
+
+    def create_advisory_lock_event_recorder(
+        self, events: list[str]
+    ) -> Callable[[object, object], None]:
+        """Return a side effect that records advisory lock SQL statements."""
+
+        def record_event(statement: object, _params: object) -> None:
+            sql = str(statement)
+            if "pg_advisory_lock" in sql:
+                events.append("lock")
+            if "pg_advisory_unlock" in sql:
+                events.append("unlock")
+
+        return record_event
 
     def upgrade_to_revision(self, engine: Engine, revision: str) -> None:
         """Upgrade the test database to the specified Alembic revision."""
@@ -109,9 +147,9 @@ class TestAlembicRun(unittest.TestCase):
             "usage_reported_at": "",
             "sub_status": None,
             "details": None,
-            "federation": "fed",
+            "federation": "@me/fed",
             "federation_config": None,
-            "run_type": RunType.SERVER_APP,
+            "run_type": "serverapp",
             "flwr_aid": "aid",
             "bytes_sent": 0,
             "bytes_recv": 0,
@@ -176,6 +214,70 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
+    @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
+    def test_run_migrations_uses_postgresql_advisory_lock(
+        self, mock_run_migrations: MagicMock
+    ) -> None:
+        """Ensure PostgreSQL migrations are serialized with an advisory lock."""
+        # Prepare
+        events: list[str] = []
+        engine, connection = self.create_mock_engine("postgresql")
+        connection.in_transaction.return_value = True
+        connection.execute.side_effect = self.create_advisory_lock_event_recorder(
+            events
+        )
+        connection.commit.side_effect = lambda: events.append("commit")
+        mock_run_migrations.side_effect = lambda _engine, _bind: events.append(
+            "migrate"
+        )
+
+        # Execute
+        run_migrations(engine)
+
+        # Assert
+        self.assertEqual(
+            events, ["lock", "commit", "migrate", "commit", "unlock", "commit"]
+        )
+        self.assertEqual(connection.commit.call_count, 3)
+        mock_run_migrations.assert_called_once_with(engine, connection)
+
+    @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
+    def test_run_migrations_releases_postgresql_advisory_lock_on_error(
+        self, mock_run_migrations: MagicMock
+    ) -> None:
+        """Ensure PostgreSQL advisory locks are released when migrations fail."""
+        # Prepare
+        events: list[str] = []
+        engine, connection = self.create_mock_engine("postgresql")
+        connection.in_transaction.return_value = True
+        connection.execute.side_effect = self.create_advisory_lock_event_recorder(
+            events
+        )
+        mock_run_migrations.side_effect = RuntimeError("migration failed")
+
+        # Execute & Assert
+        with self.assertRaisesRegex(RuntimeError, "migration failed"):
+            run_migrations(engine)
+
+        self.assertEqual(events, ["lock", "unlock"])
+        connection.rollback.assert_called_once_with()
+        mock_run_migrations.assert_called_once_with(engine, connection)
+
+    @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
+    def test_run_migrations_does_not_lock_non_postgresql_backends(
+        self, mock_run_migrations: MagicMock
+    ) -> None:
+        """Ensure non-PostgreSQL backends keep the existing migration behavior."""
+        # Prepare
+        engine, _ = self.create_mock_engine("sqlite")
+
+        # Execute
+        run_migrations(engine)
+
+        # Assert
+        engine.connect.assert_not_called()
+        mock_run_migrations.assert_called_once_with(engine, engine)
+
     def test_migrated_schema_matches_metadata(self) -> None:
         """Verify that migrations match current SQLAlchemy metadata."""
         # Prepare
@@ -214,7 +316,7 @@ class TestAlembicRun(unittest.TestCase):
                             fab_version="1.0.0",
                             fab_hash="fab-pending",
                             pending_at="2026-04-27T10:00:00+00:00",
-                            federation="fed-a",
+                            federation="@me/fed-a",
                             flwr_aid="aid-a",
                         ),
                         self.build_run_row(
@@ -228,9 +330,9 @@ class TestAlembicRun(unittest.TestCase):
                             finished_at="2026-04-27T11:03:00+00:00",
                             sub_status="completed",
                             details="done",
-                            federation="fed-b",
+                            federation="@me/fed-b",
                             federation_config="{}",
-                            run_type=RunType.SIMULATION,
+                            run_type="simulation",
                             flwr_aid="aid-b",
                             bytes_sent=7,
                             bytes_recv=8,
@@ -245,7 +347,7 @@ class TestAlembicRun(unittest.TestCase):
                             finished_at="2026-04-27T12:05:00+00:00",
                             sub_status="failed",
                             details="boom",
-                            federation="fed-c",
+                            federation="@me/fed-c",
                             flwr_aid="aid-c",
                             bytes_sent=1,
                             bytes_recv=2,
@@ -336,7 +438,7 @@ class TestAlembicRun(unittest.TestCase):
                             pending_at="2026-04-27T13:00:00+00:00",
                             starting_at="2026-04-27T13:01:00+00:00",
                             running_at="2026-04-27T13:02:00+00:00",
-                            federation="fed-live",
+                            federation="@me/live",
                             flwr_aid="aid-live",
                         )
                     ],
@@ -404,7 +506,7 @@ class TestAlembicRun(unittest.TestCase):
                             finished_at="2026-04-27T10:03:00+00:00",
                             sub_status=SubStatus.COMPLETED,
                             details="done",
-                            federation="fed",
+                            federation="@me/fed",
                             flwr_aid="aid",
                         )
                     ],

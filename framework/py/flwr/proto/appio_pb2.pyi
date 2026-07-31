@@ -22,6 +22,7 @@ import collections.abc
 import flwr.proto.fab_pb2
 import flwr.proto.federation_config_pb2
 import flwr.proto.message_pb2
+import flwr.proto.node_pb2
 import flwr.proto.run_pb2
 import flwr.proto.task_pb2
 import google.protobuf.descriptor
@@ -151,6 +152,8 @@ class PushAppMessagesResponse(google.protobuf.message.Message):
 
     MESSAGE_IDS_FIELD_NUMBER: builtins.int
     OBJECTS_TO_PUSH_FIELD_NUMBER: builtins.int
+    SESSION_ID_FIELD_NUMBER: builtins.int
+    session_id: builtins.str
     @property
     def message_ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     @property
@@ -160,8 +163,9 @@ class PushAppMessagesResponse(google.protobuf.message.Message):
         *,
         message_ids: collections.abc.Iterable[builtins.str] | None = ...,
         objects_to_push: collections.abc.Iterable[builtins.str] | None = ...,
+        session_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["message_ids", b"message_ids", "objects_to_push", b"objects_to_push"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["message_ids", b"message_ids", "objects_to_push", b"objects_to_push", "session_id", b"session_id"]) -> None: ...
 
 global___PushAppMessagesResponse = PushAppMessagesResponse
 
@@ -204,6 +208,34 @@ class PullAppMessagesResponse(google.protobuf.message.Message):
 global___PullAppMessagesResponse = PullAppMessagesResponse
 
 @typing.final
+class GetNodesRequest(google.protobuf.message.Message):
+    """GetNodes messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetNodesRequest = GetNodesRequest
+
+@typing.final
+class GetNodesResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NODES_FIELD_NUMBER: builtins.int
+    @property
+    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.node_pb2.Node]: ...
+    def __init__(
+        self,
+        *,
+        nodes: collections.abc.Iterable[flwr.proto.node_pb2.Node] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["nodes", b"nodes"]) -> None: ...
+
+global___GetNodesResponse = GetNodesResponse
+
+@typing.final
 class PushTaskMessageRequest(google.protobuf.message.Message):
     """PushTaskMessage messages"""
 
@@ -236,6 +268,34 @@ class PushTaskMessageResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["message_id", b"message_id"]) -> None: ...
 
 global___PushTaskMessageResponse = PushTaskMessageResponse
+
+@typing.final
+class PushTaskEventsRequest(google.protobuf.message.Message):
+    """PushTaskEvents messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.TaskEvent]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[flwr.proto.task_pb2.TaskEvent] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___PushTaskEventsRequest = PushTaskEventsRequest
+
+@typing.final
+class PushTaskEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___PushTaskEventsResponse = PushTaskEventsResponse
 
 @typing.final
 class PullTaskMessageRequest(google.protobuf.message.Message):
@@ -271,6 +331,35 @@ class PullTaskMessageResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["messages", b"messages"]) -> None: ...
 
 global___PullTaskMessageResponse = PullTaskMessageResponse
+
+@typing.final
+class RecordTaskUsageRequest(google.protobuf.message.Message):
+    """RecordTaskUsage messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_USAGE_FIELD_NUMBER: builtins.int
+    @property
+    def task_usage(self) -> flwr.proto.task_pb2.TaskUsage: ...
+    def __init__(
+        self,
+        *,
+        task_usage: flwr.proto.task_pb2.TaskUsage | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["task_usage", b"task_usage"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["task_usage", b"task_usage"]) -> None: ...
+
+global___RecordTaskUsageRequest = RecordTaskUsageRequest
+
+@typing.final
+class RecordTaskUsageResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___RecordTaskUsageResponse = RecordTaskUsageResponse
 
 @typing.final
 class PullTaskInputRequest(google.protobuf.message.Message):
@@ -325,8 +414,11 @@ class PushTaskOutputRequest(google.protobuf.message.Message):
     CONTEXT_FIELD_NUMBER: builtins.int
     SUB_STATUS_FIELD_NUMBER: builtins.int
     DETAILS_FIELD_NUMBER: builtins.int
+    CLIENTAPP_RUNTIME_FIELD_NUMBER: builtins.int
     sub_status: builtins.str
     details: builtins.str
+    clientapp_runtime: builtins.float
+    """Simulation Runtime usage only."""
     @property
     def context(self) -> flwr.proto.message_pb2.Context: ...
     def __init__(
@@ -335,9 +427,11 @@ class PushTaskOutputRequest(google.protobuf.message.Message):
         context: flwr.proto.message_pb2.Context | None = ...,
         sub_status: builtins.str = ...,
         details: builtins.str = ...,
+        clientapp_runtime: builtins.float | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["context", b"context"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["context", b"context", "details", b"details", "sub_status", b"sub_status"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_clientapp_runtime", b"_clientapp_runtime", "clientapp_runtime", b"clientapp_runtime", "context", b"context"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_clientapp_runtime", b"_clientapp_runtime", "clientapp_runtime", b"clientapp_runtime", "context", b"context", "details", b"details", "sub_status", b"sub_status"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_clientapp_runtime", b"_clientapp_runtime"]) -> typing.Literal["clientapp_runtime"] | None: ...
 
 global___PushTaskOutputRequest = PushTaskOutputRequest
 

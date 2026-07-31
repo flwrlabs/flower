@@ -18,8 +18,8 @@
 from __future__ import annotations
 
 import os
-import sys
-from enum import Enum
+from datetime import timedelta
+from enum import StrEnum
 
 from flwr.common.constant import (
     FLWR_DIR,
@@ -28,22 +28,6 @@ from flwr.common.constant import (
     TIMESTAMP_TOLERANCE,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-
-if sys.version_info >= (3, 11):
-    from enum import StrEnum
-else:
-
-    class StrEnum(str, Enum):
-        """Python 3.10-compatible fallback for enum.StrEnum.
-
-        Preserves StrEnum behavior by returning the member value from str(). Remove this
-        fallback once Python 3.10 support is dropped.
-        """
-
-        def __str__(self) -> str:
-            """Return the member value."""
-            return str(self.value)
-
 
 # Constants for Inflatable
 HEAD_BODY_DIVIDER = b"\x00"
@@ -56,6 +40,7 @@ FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES = int(
 FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS = int(
     os.getenv("FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS", "2")
 )  # Default maximum number of concurrent pulls
+OBJECT_PUSH_SESSION_TTL_SECONDS = 180
 PULL_MAX_TIME = 7200  # Default maximum time to wait for pulling objects
 PULL_MAX_TRIES_PER_OBJECT = 500  # Default maximum number of tries to pull an object
 PULL_INITIAL_BACKOFF = 1  # Initial backoff time for pulling objects
@@ -73,19 +58,31 @@ FLWR_IN_MEMORY_SQLITE_DB_URL = "sqlite:///:memory:"
 # Constants for Hub
 APP_ID_PATTERN = r"^@[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
 APP_VERSION_PATTERN = r"^\d+\.\d+\.\d+$"
-PLATFORM_API_URL = "https://api.flower.ai/v1"
+FLWR_SUPERGRID_API_URL = os.getenv("FLWR_SUPERGRID_API_URL", "https://api.flower.ai/v1")
 
 # Constants for Flower CLI update check
 FLWR_DISABLE_UPDATE_CHECK = "FLWR_DISABLE_UPDATE_CHECK"
-FLWR_UPDATE_CHECK_URL = f"{PLATFORM_API_URL}/update-check/flwr"
+FLWR_UPDATE_CHECK_URL = f"{FLWR_SUPERGRID_API_URL}/update-check/flwr"
 FLWR_UPDATE_CHECK_CONNECT_TIMEOUT_SECONDS = 1
 FLWR_UPDATE_CHECK_READ_TIMEOUT_SECONDS = 2
 FLWR_UPDATE_CHECK_CACHE_DIR = ".cache"
 FLWR_UPDATE_CHECK_CACHE_FILENAME = "update-check.json"
 FLWR_UPDATE_CHECK_SHOW_INTERVAL_SECONDS = 12 * 60 * 60
 
+# Constants for Uvicorn-backed API servers
+UVICORN_DEFAULT_HOST = "127.0.0.1"
+UVICORN_DEFAULT_PORT = 8000
+
 # SuperGrid constants
-SUPERGRID_ADDRESS = "supergrid.flower.ai"
+SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "supergrid.flower.ai")
+
+# Control API constants
+OAUTH_SESSION_TTL = timedelta(minutes=10)
+RUN_SERIES_DESCRIPTION_MAX_LENGTH = 80
+UNAUTHENTICATED_PATHS = {
+    "/control/get-login-details",
+    "/control/get-auth-tokens",
+}
 
 # Specification for app publishing
 APP_PUBLISH_ALLOWED_LICENSE_FILES = ("LICENSE", "LICENSE.md")
@@ -119,10 +116,10 @@ MIME_MAP = {
 MAX_NAME_LENGTH = 32  # max length for app names; also used for federation names
 
 # Constants for federations
-NOOP_FEDERATION = f"@{NOOP_ACCOUNT_NAME}/default"
+NOOP_FEDERATION_ID = f"@{NOOP_ACCOUNT_NAME}/default"
 NOOP_FEDERATION_DESCRIPTION = "A federation for testing and development purposes."
 DEFAULT_SIMULATION_CONFIG = SimulationConfig(
-    num_supernodes=10,
+    num_supernodes=2,
     client_resources_num_cpus=2,
     client_resources_num_gpus=0.0,
     backend="ray",
@@ -132,6 +129,10 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
     init_args_logging_level="WARNING",
     init_args_log_to_driver=True,
 )
+
+
+# Default federation names for every Flower account
+DEFAULT_FEDERATION_SIMULATION = "workspace"
 
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
@@ -196,11 +197,16 @@ class InvitationStatus(StrEnum):
     EXPIRED = "expired"
 
 
-class RunType(StrEnum):
-    """Supported run types."""
+AUTOMATION_BATCH_LIMIT = 1
 
-    SERVER_APP = "serverapp"
-    SIMULATION = "simulation"
+
+class AutomationStatus(StrEnum):
+    """Status of an automation."""
+
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    STOPPED = "stopped"
 
 
 class RunTime(StrEnum):
@@ -208,6 +214,13 @@ class RunTime(StrEnum):
 
     DEPLOYMENT = "deployment"
     SIMULATION = "simulation"
+
+
+class ExecutorType(StrEnum):
+    """Supported SuperExec executor types."""
+
+    SUBPROCESS = "subprocess"
+    KUBERNETES = "kubernetes"
 
 
 class TaskType(StrEnum):
@@ -221,6 +234,22 @@ class TaskType(StrEnum):
     CONNECTOR = "flwr-connector"
 
 
+TASK_TYPE_TO_APPIO_API_ADDRESS_ARG: dict[TaskType, str] = {
+    TaskType.AGENT_APP: "--serverappio-api-address",
+    TaskType.CLIENT_APP: "--clientappio-api-address",
+    TaskType.CONNECTOR: "--serverappio-api-address",
+    TaskType.MODEL: "--serverappio-api-address",
+    TaskType.SERVER_APP: "--serverappio-api-address",
+    TaskType.SIMULATION: "--serverappio-api-address",
+}
+TASK_TYPE_TO_COMMAND: dict[TaskType, str] = {
+    TaskType.AGENT_APP: "flwr-agentapp",
+    TaskType.CLIENT_APP: "flwr-clientapp",
+    TaskType.CONNECTOR: "flwr-connector",
+    TaskType.MODEL: "flwr-model",
+    TaskType.SERVER_APP: "flwr-serverapp",
+    TaskType.SIMULATION: "flwr-simulation",
+}
 TASK_TYPES_ALLOWED_TO_CREATE_TASKS: frozenset[TaskType] = frozenset(
     {
         TaskType.AGENT_APP,

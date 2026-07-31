@@ -221,12 +221,12 @@ def configure_superlink_log_file(
     for handler in FLOWER_LOGGER.handlers:
         if not isinstance(handler, TimedRotatingFileHandler):
             continue
-        if Path(handler.baseFilename).resolve() != path:
+        if Path(handler.baseFilename).resolve() != path:  # pylint: disable=no-member
             continue
         matching_handlers.append(handler)
-        if handler.interval != interval_hours * 60 * 60:
+        if handler.interval != interval_hours * 60 * 60:  # pylint: disable=no-member
             continue
-        if handler.backupCount != backup_count:
+        if handler.backupCount != backup_count:  # pylint: disable=no-member
             continue
         return
 
@@ -442,6 +442,22 @@ def stop_log_uploader(
     """Stop the log uploader thread."""
     log_queue.put(None)
     log_uploader.join(timeout=timeout)
+
+
+def flush_logs(log_queue: Queue[str | None], timeout: float = 3.0) -> bool:
+    """Wait until queued logs have been consumed by the uploader."""
+    deadline = time.monotonic() + timeout
+    while not log_queue.empty():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(LOG_UPLOAD_INTERVAL, remaining))
+
+    remaining = deadline - time.monotonic()
+    if remaining > 0:
+        # Allow the PushLogs call to complete
+        time.sleep(min(1, remaining))
+    return True
 
 
 def _remove_emojis(text: str) -> str:

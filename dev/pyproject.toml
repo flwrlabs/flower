@@ -8,13 +8,12 @@ version = "0.0.0"
 description = "Tools for developers."
 license = "Apache-2.0"
 authors = [{ name = "The Flower Authors", email = "hello@flower.ai" }]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "black==25.11.0",
     "grpcio-tools==1.70.0",
     "mypy-protobuf==3.6.0",
     "PyYAML>=6.0.2,<7.0.0",
-    "tomli>=2.0.1,<3.0.0; python_version < '3.11'",
 ]
 
 [dependency-groups]
@@ -24,7 +23,7 @@ dev = [
     "taplo==0.9.3",
     "mypy==1.8.0",
     "pylint==3.3.1",
-    "pytest==7.4.4",
+    "pytest==9.0.3",
     "types-PyYAML>=6.0.2,<7.0.0",
     "rope==1.13.0",
     "semver==3.0.2",
@@ -46,7 +45,7 @@ dev = [
     "mdformat-frontmatter==2.0.10",
     "mdformat-beautysh==1.0.0",
     "beautysh==6.4.2",
-    "GitPython==3.1.41",
+    "GitPython==3.1.50",
     "sphinx-substitution-extensions==2022.2.16",
     "sphinxext-opengraph==0.9.1",
     "docstrfmt",
@@ -77,7 +76,7 @@ known_third_party = ["datasets"]
 
 [tool.black]
 line-length = 88
-target-version = ["py310", "py311", "py312", "py313"]
+target-version = ["py311", "py312", "py313"]
 
 [tool.mypy]
 strict = true

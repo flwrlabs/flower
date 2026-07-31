@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   pr_title_check:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Title format
     steps:
       - uses: actions/checkout@v5
@@ -20,7 +20,6 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: 3.13
-          poetry-skip: 'true'
       - name: Check PR title format 
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}

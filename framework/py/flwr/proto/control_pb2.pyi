@@ -22,8 +22,11 @@ import collections.abc
 import flwr.proto.fab_pb2
 import flwr.proto.federation_config_pb2
 import flwr.proto.federation_pb2
+import flwr.proto.message_pb2
 import flwr.proto.node_pb2
 import flwr.proto.run_pb2
+import flwr.proto.runseries_pb2
+import flwr.proto.task_pb2
 import flwr.proto.transport_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -59,14 +62,19 @@ class StartRunRequest(google.protobuf.message.Message):
     OVERRIDE_FEDERATION_CONFIG_FIELD_NUMBER: builtins.int
     APP_SPEC_FIELD_NUMBER: builtins.int
     FEDERATION_FIELD_NUMBER: builtins.int
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    CONNECTOR_REFS_FIELD_NUMBER: builtins.int
     app_spec: builtins.str
     federation: builtins.str
+    series_id: builtins.int
     @property
     def fab(self) -> flwr.proto.fab_pb2.Fab: ...
     @property
     def override_config(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, flwr.proto.transport_pb2.Scalar]: ...
     @property
     def override_federation_config(self) -> flwr.proto.federation_config_pb2.SimulationConfig: ...
+    @property
+    def connector_refs(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
     def __init__(
         self,
         *,
@@ -75,9 +83,12 @@ class StartRunRequest(google.protobuf.message.Message):
         override_federation_config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
         app_spec: builtins.str = ...,
         federation: builtins.str = ...,
+        series_id: builtins.int | None = ...,
+        connector_refs: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["fab", b"fab", "override_federation_config", b"override_federation_config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["app_spec", b"app_spec", "fab", b"fab", "federation", b"federation", "override_config", b"override_config", "override_federation_config", b"override_federation_config"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_series_id", b"_series_id", "fab", b"fab", "override_federation_config", b"override_federation_config", "series_id", b"series_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_series_id", b"_series_id", "app_spec", b"app_spec", "connector_refs", b"connector_refs", "fab", b"fab", "federation", b"federation", "override_config", b"override_config", "override_federation_config", b"override_federation_config", "series_id", b"series_id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_series_id", b"_series_id"]) -> typing.Literal["series_id"] | None: ...
 
 global___StartRunRequest = StartRunRequest
 
@@ -87,22 +98,191 @@ class StartRunResponse(google.protobuf.message.Message):
 
     RUN_ID_FIELD_NUMBER: builtins.int
     NOTE_FIELD_NUMBER: builtins.int
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    FEDERATION_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     note: builtins.str
+    series_id: builtins.int
+    federation: builtins.str
     def __init__(
         self,
         *,
         run_id: builtins.int | None = ...,
         note: builtins.str | None = ...,
+        series_id: builtins.int | None = ...,
+        federation: builtins.str = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_note", b"_note", "_run_id", b"_run_id", "note", b"note", "run_id", b"run_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_note", b"_note", "_run_id", b"_run_id", "note", b"note", "run_id", b"run_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_note", b"_note", "_run_id", b"_run_id", "_series_id", b"_series_id", "note", b"note", "run_id", b"run_id", "series_id", b"series_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_note", b"_note", "_run_id", b"_run_id", "_series_id", b"_series_id", "federation", b"federation", "note", b"note", "run_id", b"run_id", "series_id", b"series_id"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_note", b"_note"]) -> typing.Literal["note"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_run_id", b"_run_id"]) -> typing.Literal["run_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_series_id", b"_series_id"]) -> typing.Literal["series_id"] | None: ...
 
 global___StartRunResponse = StartRunResponse
+
+@typing.final
+class StartAutomationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    START_RUN_REQUEST_FIELD_NUMBER: builtins.int
+    START_AT_FIELD_NUMBER: builtins.int
+    FIXED_INTERVAL_FIELD_NUMBER: builtins.int
+    MAX_RUNS_FIELD_NUMBER: builtins.int
+    start_at: builtins.str
+    fixed_interval: builtins.int
+    max_runs: builtins.int
+    @property
+    def start_run_request(self) -> global___StartRunRequest: ...
+    def __init__(
+        self,
+        *,
+        start_run_request: global___StartRunRequest | None = ...,
+        start_at: builtins.str | None = ...,
+        fixed_interval: builtins.int | None = ...,
+        max_runs: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_max_runs", b"_max_runs", "_start_at", b"_start_at", "fixed_interval", b"fixed_interval", "max_runs", b"max_runs", "start_at", b"start_at", "start_run_request", b"start_run_request"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_max_runs", b"_max_runs", "_start_at", b"_start_at", "fixed_interval", b"fixed_interval", "max_runs", b"max_runs", "start_at", b"start_at", "start_run_request", b"start_run_request"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_fixed_interval", b"_fixed_interval"]) -> typing.Literal["fixed_interval"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_max_runs", b"_max_runs"]) -> typing.Literal["max_runs"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_start_at", b"_start_at"]) -> typing.Literal["start_at"] | None: ...
+
+global___StartAutomationRequest = StartAutomationRequest
+
+@typing.final
+class StartAutomationResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AUTOMATION_ID_FIELD_NUMBER: builtins.int
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    NEXT_RUN_AT_FIELD_NUMBER: builtins.int
+    automation_id: builtins.int
+    series_id: builtins.int
+    next_run_at: builtins.str
+    def __init__(
+        self,
+        *,
+        automation_id: builtins.int = ...,
+        series_id: builtins.int = ...,
+        next_run_at: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["automation_id", b"automation_id", "next_run_at", b"next_run_at", "series_id", b"series_id"]) -> None: ...
+
+global___StartAutomationResponse = StartAutomationResponse
+
+@typing.final
+class Automation(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AUTOMATION_ID_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
+    FEDERATION_FIELD_NUMBER: builtins.int
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    FLWR_AID_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    UPDATED_AT_FIELD_NUMBER: builtins.int
+    NEXT_RUN_AT_FIELD_NUMBER: builtins.int
+    FIXED_INTERVAL_FIELD_NUMBER: builtins.int
+    REMAINING_RUNS_FIELD_NUMBER: builtins.int
+    STOPPED_AT_FIELD_NUMBER: builtins.int
+    automation_id: builtins.int
+    status: builtins.str
+    federation: builtins.str
+    series_id: builtins.int
+    flwr_aid: builtins.str
+    created_at: builtins.str
+    updated_at: builtins.str
+    next_run_at: builtins.str
+    fixed_interval: builtins.int
+    remaining_runs: builtins.int
+    stopped_at: builtins.str
+    def __init__(
+        self,
+        *,
+        automation_id: builtins.int = ...,
+        status: builtins.str = ...,
+        federation: builtins.str = ...,
+        series_id: builtins.int = ...,
+        flwr_aid: builtins.str = ...,
+        created_at: builtins.str = ...,
+        updated_at: builtins.str = ...,
+        next_run_at: builtins.str = ...,
+        fixed_interval: builtins.int | None = ...,
+        remaining_runs: builtins.int | None = ...,
+        stopped_at: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_remaining_runs", b"_remaining_runs", "_stopped_at", b"_stopped_at", "fixed_interval", b"fixed_interval", "remaining_runs", b"remaining_runs", "stopped_at", b"stopped_at"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_fixed_interval", b"_fixed_interval", "_remaining_runs", b"_remaining_runs", "_stopped_at", b"_stopped_at", "automation_id", b"automation_id", "created_at", b"created_at", "federation", b"federation", "fixed_interval", b"fixed_interval", "flwr_aid", b"flwr_aid", "next_run_at", b"next_run_at", "remaining_runs", b"remaining_runs", "series_id", b"series_id", "status", b"status", "stopped_at", b"stopped_at", "updated_at", b"updated_at"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_fixed_interval", b"_fixed_interval"]) -> typing.Literal["fixed_interval"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_remaining_runs", b"_remaining_runs"]) -> typing.Literal["remaining_runs"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_stopped_at", b"_stopped_at"]) -> typing.Literal["stopped_at"] | None: ...
+
+global___Automation = Automation
+
+@typing.final
+class ListAutomationsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_FIELD_NUMBER: builtins.int
+    federation: builtins.str
+    def __init__(
+        self,
+        *,
+        federation: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation", b"federation"]) -> None: ...
+
+global___ListAutomationsRequest = ListAutomationsRequest
+
+@typing.final
+class ListAutomationsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AUTOMATIONS_FIELD_NUMBER: builtins.int
+    @property
+    def automations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Automation]: ...
+    def __init__(
+        self,
+        *,
+        automations: collections.abc.Iterable[global___Automation] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["automations", b"automations"]) -> None: ...
+
+global___ListAutomationsResponse = ListAutomationsResponse
+
+@typing.final
+class StopAutomationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AUTOMATION_ID_FIELD_NUMBER: builtins.int
+    automation_id: builtins.int
+    def __init__(
+        self,
+        *,
+        automation_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["automation_id", b"automation_id"]) -> None: ...
+
+global___StopAutomationRequest = StopAutomationRequest
+
+@typing.final
+class StopAutomationResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___StopAutomationResponse = StopAutomationResponse
 
 @typing.final
 class StreamLogsRequest(google.protobuf.message.Message):
@@ -201,6 +381,86 @@ class ListRunsResponse(google.protobuf.message.Message):
 global___ListRunsResponse = ListRunsResponse
 
 @typing.final
+class ListRunSeriesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    UPDATED_BEFORE_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    FEDERATION_ID_FIELD_NUMBER: builtins.int
+    updated_before: builtins.str
+    limit: builtins.int
+    federation_id: builtins.str
+    def __init__(
+        self,
+        *,
+        updated_before: builtins.str | None = ...,
+        limit: builtins.int | None = ...,
+        federation_id: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_federation_id", b"_federation_id", "_limit", b"_limit", "_updated_before", b"_updated_before", "federation_id", b"federation_id", "limit", b"limit", "updated_before", b"updated_before"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_federation_id", b"_federation_id", "_limit", b"_limit", "_updated_before", b"_updated_before", "federation_id", b"federation_id", "limit", b"limit", "updated_before", b"updated_before"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_federation_id", b"_federation_id"]) -> typing.Literal["federation_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_updated_before", b"_updated_before"]) -> typing.Literal["updated_before"] | None: ...
+
+global___ListRunSeriesRequest = ListRunSeriesRequest
+
+@typing.final
+class ListRunSeriesResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENTRIES_FIELD_NUMBER: builtins.int
+    @property
+    def entries(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.runseries_pb2.RunSeries]: ...
+    def __init__(
+        self,
+        *,
+        entries: collections.abc.Iterable[flwr.proto.runseries_pb2.RunSeries] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["entries", b"entries"]) -> None: ...
+
+global___ListRunSeriesResponse = ListRunSeriesResponse
+
+@typing.final
+class GetRunSeriesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    series_id: builtins.int
+    def __init__(
+        self,
+        *,
+        series_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["series_id", b"series_id"]) -> None: ...
+
+global___GetRunSeriesRequest = GetRunSeriesRequest
+
+@typing.final
+class GetRunSeriesResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SERIES_FIELD_NUMBER: builtins.int
+    CONTEXT_FIELD_NUMBER: builtins.int
+    @property
+    def series(self) -> flwr.proto.runseries_pb2.RunSeries: ...
+    @property
+    def context(self) -> flwr.proto.message_pb2.Context: ...
+    def __init__(
+        self,
+        *,
+        series: flwr.proto.runseries_pb2.RunSeries | None = ...,
+        context: flwr.proto.message_pb2.Context | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["context", b"context", "series", b"series"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["context", b"context", "series", b"series"]) -> None: ...
+
+global___GetRunSeriesResponse = GetRunSeriesResponse
+
+@typing.final
 class GetLoginDetailsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -269,6 +529,159 @@ class GetAuthTokensResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["access_token", b"access_token", "refresh_token", b"refresh_token"]) -> None: ...
 
 global___GetAuthTokensResponse = GetAuthTokensResponse
+
+@typing.final
+class ListConnectorsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___ListConnectorsRequest = ListConnectorsRequest
+
+@typing.final
+class Connector(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONNECTOR_REF_FIELD_NUMBER: builtins.int
+    DISPLAY_NAME_FIELD_NUMBER: builtins.int
+    DESCRIPTION_FIELD_NUMBER: builtins.int
+    CONNECTED_FIELD_NUMBER: builtins.int
+    connector_ref: builtins.str
+    display_name: builtins.str
+    description: builtins.str
+    connected: builtins.bool
+    def __init__(
+        self,
+        *,
+        connector_ref: builtins.str = ...,
+        display_name: builtins.str = ...,
+        description: builtins.str = ...,
+        connected: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["connected", b"connected", "connector_ref", b"connector_ref", "description", b"description", "display_name", b"display_name"]) -> None: ...
+
+global___Connector = Connector
+
+@typing.final
+class ListConnectorsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONNECTORS_FIELD_NUMBER: builtins.int
+    @property
+    def connectors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Connector]: ...
+    def __init__(
+        self,
+        *,
+        connectors: collections.abc.Iterable[global___Connector] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["connectors", b"connectors"]) -> None: ...
+
+global___ListConnectorsResponse = ListConnectorsResponse
+
+@typing.final
+class DisconnectConnectorRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONNECTOR_REF_FIELD_NUMBER: builtins.int
+    connector_ref: builtins.str
+    def __init__(
+        self,
+        *,
+        connector_ref: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["connector_ref", b"connector_ref"]) -> None: ...
+
+global___DisconnectConnectorRequest = DisconnectConnectorRequest
+
+@typing.final
+class DisconnectConnectorResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___DisconnectConnectorResponse = DisconnectConnectorResponse
+
+@typing.final
+class BeginConnectorOAuthRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONNECTOR_REF_FIELD_NUMBER: builtins.int
+    REDIRECT_URI_FIELD_NUMBER: builtins.int
+    connector_ref: builtins.str
+    redirect_uri: builtins.str
+    def __init__(
+        self,
+        *,
+        connector_ref: builtins.str = ...,
+        redirect_uri: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["connector_ref", b"connector_ref", "redirect_uri", b"redirect_uri"]) -> None: ...
+
+global___BeginConnectorOAuthRequest = BeginConnectorOAuthRequest
+
+@typing.final
+class BeginConnectorOAuthResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OAUTH_SESSION_ID_FIELD_NUMBER: builtins.int
+    AUTHORIZATION_URL_FIELD_NUMBER: builtins.int
+    CONNECTOR_REF_FIELD_NUMBER: builtins.int
+    EXPIRES_AT_FIELD_NUMBER: builtins.int
+    oauth_session_id: builtins.str
+    authorization_url: builtins.str
+    connector_ref: builtins.str
+    expires_at: builtins.str
+    def __init__(
+        self,
+        *,
+        oauth_session_id: builtins.str = ...,
+        authorization_url: builtins.str = ...,
+        connector_ref: builtins.str = ...,
+        expires_at: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["authorization_url", b"authorization_url", "connector_ref", b"connector_ref", "expires_at", b"expires_at", "oauth_session_id", b"oauth_session_id"]) -> None: ...
+
+global___BeginConnectorOAuthResponse = BeginConnectorOAuthResponse
+
+@typing.final
+class CompleteConnectorOAuthRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OAUTH_SESSION_ID_FIELD_NUMBER: builtins.int
+    CODE_FIELD_NUMBER: builtins.int
+    STATE_FIELD_NUMBER: builtins.int
+    oauth_session_id: builtins.str
+    code: builtins.str
+    state: builtins.str
+    def __init__(
+        self,
+        *,
+        oauth_session_id: builtins.str = ...,
+        code: builtins.str = ...,
+        state: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["code", b"code", "oauth_session_id", b"oauth_session_id", "state", b"state"]) -> None: ...
+
+global___CompleteConnectorOAuthRequest = CompleteConnectorOAuthRequest
+
+@typing.final
+class CompleteConnectorOAuthResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONNECTOR_REF_FIELD_NUMBER: builtins.int
+    connector_ref: builtins.str
+    def __init__(
+        self,
+        *,
+        connector_ref: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["connector_ref", b"connector_ref"]) -> None: ...
+
+global___CompleteConnectorOAuthResponse = CompleteConnectorOAuthResponse
 
 @typing.final
 class StopRunRequest(google.protobuf.message.Message):
@@ -788,29 +1201,34 @@ global___ConfigureSimulationFederationRequest = ConfigureSimulationFederationReq
 class ConfigureSimulationFederationResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    FEDERATION_NAME_FIELD_NUMBER: builtins.int
+    federation_name: builtins.str
     def __init__(
         self,
+        *,
+        federation_name: builtins.str = ...,
     ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation_name", b"federation_name"]) -> None: ...
 
 global___ConfigureSimulationFederationResponse = ConfigureSimulationFederationResponse
 
 @typing.final
 class StreamRunEventsRequest(google.protobuf.message.Message):
-    """##############
-    Unused for now
-    ##############
-    """
-
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RUN_ID_FIELD_NUMBER: builtins.int
+    AFTER_TASK_EVENT_ID_FIELD_NUMBER: builtins.int
     run_id: builtins.int
+    after_task_event_id: builtins.int
     def __init__(
         self,
         *,
         run_id: builtins.int = ...,
+        after_task_event_id: builtins.int | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["run_id", b"run_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_task_event_id", b"_after_task_event_id", "after_task_event_id", b"after_task_event_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_task_event_id", b"_after_task_event_id", "after_task_event_id", b"after_task_event_id", "run_id", b"run_id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_after_task_event_id", b"_after_task_event_id"]) -> typing.Literal["after_task_event_id"] | None: ...
 
 global___StreamRunEventsRequest = StreamRunEventsRequest
 
@@ -818,16 +1236,15 @@ global___StreamRunEventsRequest = StreamRunEventsRequest
 class StreamRunEventsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    EVENT_FIELD_NUMBER: builtins.int
-    DATA_FIELD_NUMBER: builtins.int
-    event: builtins.str
-    data: builtins.str
+    TASK_EVENT_FIELD_NUMBER: builtins.int
+    @property
+    def task_event(self) -> flwr.proto.task_pb2.TaskEvent: ...
     def __init__(
         self,
         *,
-        event: builtins.str = ...,
-        data: builtins.str = ...,
+        task_event: flwr.proto.task_pb2.TaskEvent | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["task_event", b"task_event"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["task_event", b"task_event"]) -> None: ...
 
 global___StreamRunEventsResponse = StreamRunEventsResponse

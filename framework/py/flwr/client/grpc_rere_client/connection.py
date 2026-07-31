@@ -23,19 +23,15 @@ from pathlib import Path
 import grpc
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH
+from flwr.app.message import Message, remove_content_from_message
 from flwr.common.constant import HEARTBEAT_CALL_TIMEOUT, HEARTBEAT_DEFAULT_INTERVAL
-from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
-from flwr.common.message import Message, remove_content_from_message
-from flwr.common.retry_invoker import RetryInvoker, wrap_stub
 from flwr.common.serde import (
     fab_from_proto,
     message_from_proto,
     message_to_proto,
     run_from_proto,
 )
-from flwr.common.typing import Fab, Run
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -56,6 +52,12 @@ from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
+from flwr.supercore.fab import Fab
+from flwr.supercore.grpc import (
+    GRPC_MAX_MESSAGE_LENGTH,
+    create_channel,
+    on_channel_state_change,
+)
 from flwr.supercore.heartbeat import HeartbeatSender
 from flwr.supercore.inflatable.inflatable_protobuf_utils import (
     make_confirm_message_received_fn_protobuf,
@@ -64,6 +66,8 @@ from flwr.supercore.inflatable.inflatable_protobuf_utils import (
 )
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.retry import RetryInvoker, wrap_stub
+from flwr.supercore.run import Run
 
 from .grpc_adapter import GrpcAdapter
 from .node_auth_client_interceptor import NodeAuthClientInterceptor
@@ -84,11 +88,11 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     tuple[
         int,
         Callable[[], tuple[Message, ObjectTree] | None],
-        Callable[[Message, ObjectTree, float], set[str]],
+        Callable[[Message, ObjectTree, float], tuple[set[str], str]],
         Callable[[int], Run],
         Callable[[str, int], Fab],
         Callable[[int, str], bytes],
-        Callable[[int, str, bytes], None],
+        Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
     ]
 ]:
@@ -115,7 +119,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     root_certificates : Optional[Union[bytes, str]] (default: None)
         Path of the root certificate. If provided, a secure
         connection using the certificates will be established to an SSL-enabled
-        Flower server. Bytes won't work for the REST API.
+        Flower server.
     authentication_keys : Optional[Tuple[PrivateKey, PublicKey]] (default: None)
         Tuple containing the elliptic curve private key and public key for
         authentication from the cryptography library.
@@ -129,12 +133,12 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     -------
     node_id : int
     receive : Callable[[], Optional[tuple[Message, ObjectTree]]]
-    send : Callable[[Message, ObjectTree, float], set[str]]
+    send : Callable[[Message, ObjectTree, float], tuple[set[str], str]]
     get_run : Callable[[int], Run]
     get_fab : Callable[[str, int], Fab]
-    pull_object : Callable[[str], bytes]
-    push_object : Callable[[str, bytes], None]
-    confirm_message_received : Callable[[str], None]
+    pull_object : Callable[[int, str], bytes]
+    push_object : Callable[[int, str, str, bytes], None]
+    confirm_message_received : Callable[[int, str], None]
     """
     if isinstance(root_certificates, str):
         root_certificates = Path(root_certificates).expanduser().read_bytes()
@@ -189,7 +193,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
                 req, timeout=HEARTBEAT_CALL_TIMEOUT
             )
         except grpc.RpcError as e:
-            status_code = e.code()
+            status_code = e.code()  # pylint: disable=E1101
             if status_code == grpc.StatusCode.UNAVAILABLE:
                 return False
             if status_code == grpc.StatusCode.DEADLINE_EXCEEDED:
@@ -281,12 +285,12 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
 
     def send(
         message: Message, object_tree: ObjectTree, clientapp_runtime: float
-    ) -> set[str]:
+    ) -> tuple[set[str], str]:
         """Send the message with its ObjectTree to SuperLink."""
         # Get Node
         if node is None:
             log(ERROR, "Node instance missing")
-            return set()
+            return set(), ""
 
         # Remove the content from the message if it has
         if message.has_content():
@@ -301,8 +305,8 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         )
         response: PushMessagesResponse = stub.PushMessages(request=request)
 
-        # Get and return the object IDs to push
-        return set(response.objects_to_push)
+        # Get and return the object IDs to push and the session ID
+        return set(response.objects_to_push), response.session_id
 
     def get_run(run_id: int) -> Run:
         # Call FleetAPI
@@ -332,7 +336,9 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         )
         return fn(object_id)
 
-    def push_object(run_id: int, object_id: str, contents: bytes) -> None:
+    def push_object(
+        run_id: int, session_id: str, object_id: str, contents: bytes
+    ) -> None:
         """Push the object to the SuperLink."""
         # Check Node
         if node is None:
@@ -342,6 +348,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
             push_object_protobuf=stub.PushObject,
             node=node,
             run_id=run_id,
+            session_id=session_id,
         )
         fn(object_id, contents)
 

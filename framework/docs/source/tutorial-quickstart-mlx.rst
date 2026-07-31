@@ -49,7 +49,7 @@ using Flower and MLX. It is recommended to create a virtual environment and run
 everything within a :doc:`virtualenv <contributor-how-to-set-up-a-virtual-env>`.
 
 Let's use ``flwr new`` to create a complete Flower+MLX project. It will generate all the
-files needed to run a federation of 10 nodes using |fedavg_link|_. By default, the
+files needed to run a federation of two nodes using |fedavg_link|_. By default, the
 generated app uses a local simulation profile that ``flwr run`` submits to a managed
 local SuperLink, which then executes the run with the Flower Simulation Runtime. The
 dataset will be partitioned using Flower Dataset's `IidPartitioner
@@ -61,7 +61,7 @@ install Flower in your new environment:
 .. code-block:: shell
 
     # In a new Python environment
-    $ pip install flwr[simulation]
+    $ pip install flwr
 
 Then, run the command below:
 
@@ -83,16 +83,11 @@ created. It should have the following structure:
     ├── pyproject.toml      # Project metadata like dependencies and configs
     └── README.md
 
-If you haven't yet installed the project and its dependencies, you can do so by:
-
-.. code-block:: shell
-
-    # From the directory where your pyproject.toml is
-    $ pip install -e .
-
 To run the project do:
 
 .. code-block:: shell
+
+    $ cd quickstart-mlx
 
     # Run with default arguments and stream logs
     $ flwr run . --stream
@@ -109,11 +104,11 @@ With default arguments, you will see streamed output like this:
     INFO :      Starting FedAvg strategy:
     INFO :          ├── Number of rounds: 3
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_train: Received 10 results and 0 failures
+    INFO :      configure_train: Sampled 2 nodes (out of 2)
+    INFO :      aggregate_train: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'accuracy': 0.270375007390976, 'loss': 2.2390866}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
+    INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
+    INFO :      aggregate_evaluate: Received 2 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'accuracy': 0.2720000118017197, 'loss': 2.24028}
     INFO :      [ROUND 2/3]
     INFO :      ...
@@ -123,7 +118,6 @@ With default arguments, you will see streamed output like this:
     INFO :      Final results:
     INFO :          ServerApp-side Evaluate Metrics:
     INFO :          {}
-    Saving final model to disk...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
 in the ``pyproject.toml`` like this:
@@ -437,11 +431,12 @@ To it we pass:
             num_rounds=num_rounds,
         )
 
-        # Save final model to disk
-        print("\nSaving final model to disk...")
-        ndarrays = result.arrays.to_numpy_ndarrays()
-        set_params(model, ndarrays)
-        model.save_weights("final_model.npz")
+        if context.run_config["save-model"]:
+            # Save final model to disk
+            print("\nSaving final model to disk...")
+            ndarrays = result.arrays.to_numpy_ndarrays()
+            set_params(model, ndarrays)
+            model.save_weights("final_model.npz")
 
 Note the ``start`` method of the strategy returns a |result_link|_ object. This object
 contains all the relevant information about the FL process, including the final model

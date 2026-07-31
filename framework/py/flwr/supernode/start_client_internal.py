@@ -31,10 +31,10 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 from grpc import RpcError
 
+from flwr.app import Context, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.client.grpc_adapter_client.connection import grpc_adapter
 from flwr.client.grpc_rere_client.connection import grpc_request_response
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH, Context, Error, Message, RecordDict
 from flwr.common.config import get_fused_config_from_fab
 from flwr.common.constant import (
     CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
@@ -42,22 +42,19 @@ from flwr.common.constant import (
     RUNTIME_DEPENDENCY_INSTALL,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_REST,
     TRANSPORT_TYPES,
     ErrorCode,
     ExecPluginType,
     SubStatus,
 )
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import log
-from flwr.common.retry_invoker import RetryInvoker, make_simple_grpc_retry_invoker
-from flwr.common.telemetry import EventType
-from flwr.common.typing import Fab, Run, RunNotRunningException
 from flwr.proto.clientappio_pb2_grpc import add_ClientAppIoServicer_to_server
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.constant import TaskType
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.supercore.fab import Fab
+from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -80,6 +77,9 @@ from flwr.supercore.primitives.asymmetric_ed25519 import (
     decode_base64url,
     verify_signature,
 )
+from flwr.supercore.retry import RetryInvoker, make_simple_grpc_retry_invoker
+from flwr.supercore.run import Run, RunNotRunningException
+from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import get_client_tls_args
 from flwr.supercore.version import package_version
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
@@ -135,7 +135,6 @@ def start_client_internal(
         Configure the transport layer. Allowed values:
         - 'grpc-rere': gRPC, request-response
         - 'grpc-adapter': gRPC via 3rd party adapter (experimental)
-        - 'rest': HTTP (experimental)
     authentication_keys : Optional[Tuple[PrivateKey, PublicKey]] (default: None)
         Tuple containing the elliptic curve private key and public key for
         authentication from the cryptography library.
@@ -400,18 +399,21 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                     _insert_message(reply, state, object_store)
                     return run_id
 
-            # Initialize the context
+            # Initialize or refresh the context
             run_cfg = get_fused_config_from_fab(fab.content, run_info)
-            run_ctx = Context(
+            context = Context(
                 run_id=run_id,
                 node_id=state.get_node_id(),
                 node_config=node_config,
                 state=RecordDict(),
                 run_config=run_cfg,
+                series_id=run_info.series_id,
             )
+            if existing_context := state.get_run_series_context(run_info.series_id):
+                context.state = existing_context.state
 
             # Store in the state
-            state.store_context(run_ctx)
+            state.set_run_series_context(run_info.series_id, context)
             state.store_run(run_info)
             state.store_fab(fab)
 
@@ -459,8 +461,9 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             state.finish_task(
                 task_id,
                 sub_status=SubStatus.FAILED,
-                details="Pulling message objects failed.",
+                details=f"Pulling message objects failed: {err}",
             )
+            return None
 
     except RunNotRunningException:
         if message is None:
@@ -484,8 +487,8 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
 def _push_messages(
     state: NodeState,
     object_store: ObjectStore,
-    send: Callable[[Message, ObjectTree, float], set[str]],
-    push_object: Callable[[int, str, bytes], None],
+    send: Callable[[Message, ObjectTree, float], tuple[set[str], str]],
+    push_object: Callable[[int, str, str, bytes], None],
 ) -> None:
     """Push reply messages to the SuperLink."""
     # This is to ensure that only one message is processed at a time
@@ -537,7 +540,7 @@ def _push_messages(
             )
             # Send the reply message with its ObjectTree and ClientApp runtime
             # Get the IDs of objects to send
-            ids_obj_to_send = send(message, object_tree, clientapp_runtime)
+            ids_obj_to_send, session_id = send(message, object_tree, clientapp_runtime)
 
             # Push object contents from the ObjectStore
             run_id = message.metadata.run_id
@@ -546,8 +549,10 @@ def _push_messages(
                 # Use functools.partial to bind run_id explicitly,
                 # avoiding late binding issues and satisfying flake8 (B023)
                 # Equivalent to:
-                # lambda object_id, content: push_object(run_id, object_id, content)
-                push_object_fn=partial(push_object, run_id),
+                # lambda object_id, content: push_object(
+                #     run_id, session_id, object_id, content
+                # )
+                push_object_fn=partial(push_object, run_id, session_id),
             )
             log(INFO, "Sent successfully")
         except RunNotRunningException:
@@ -594,11 +599,11 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
     tuple[
         int,
         Callable[[], tuple[Message, ObjectTree] | None],
-        Callable[[Message, ObjectTree, float], set[str]],
+        Callable[[Message, ObjectTree, float], tuple[set[str], str]],
         Callable[[int], Run],
         Callable[[str, int], Fab],
         Callable[[int, str], bytes],
-        Callable[[int, str, bytes], None],
+        Callable[[int, str, str, bytes], None],
         Callable[[int, str], None],
     ]
 ]:
@@ -613,21 +618,11 @@ def _init_connection(  # pylint: disable=too-many-positional-arguments
     host, port, is_v6 = parsed_address
     address = f"[{host}]:{port}" if is_v6 else f"{host}:{port}"
 
-    # Use either gRPC bidirectional streaming or REST request/response
-    if transport == TRANSPORT_TYPE_REST:
-        try:
-            from requests.exceptions import ConnectionError as RequestsConnectionError
-
-            from flwr.client.rest_client.connection import http_request_response
-        except ModuleNotFoundError:
-            flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
-        if server_address[:4] != "http":
-            flwr_exit(ExitCode.SUPERNODE_REST_ADDRESS_INVALID)
-        connection, error_type = http_request_response, RequestsConnectionError
-    elif transport == TRANSPORT_TYPE_GRPC_RERE:
+    # Use one of the supported gRPC transports
+    if transport == TRANSPORT_TYPE_GRPC_RERE:
         connection, error_type = grpc_request_response, RpcError
     elif transport == TRANSPORT_TYPE_GRPC_ADAPTER:
-        connection, error_type = grpc_adapter, RpcError
+        connection, error_type = grpc_adapter, RpcError  # type: ignore[assignment]
     else:
         raise ValueError(
             f"Unknown transport type: {transport} (possible: {TRANSPORT_TYPES})"

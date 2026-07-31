@@ -16,7 +16,7 @@
 
 .. _clientapp_link: ref-api/flwr.client.ClientApp.html
 
-.. _context_link: ref-api/flwr.common.Context.html
+.. _context_link: ref-api/flwr.app.Context.html
 
 .. _flwr_fed_sim_config_link: ref-api-cli.html#flwr-federation-simulation-config
 
@@ -24,7 +24,7 @@
 
 .. _flwr_run_link: ref-api-cli.html#flwr-run
 
-.. _message_link: ref-api/flwr.common.Message.html
+.. _message_link: ref-api/flwr.app.Message.html
 
 #################
  Run simulations
@@ -99,8 +99,8 @@ particular, each worker is an `Actor
 
 .. tip::
 
-    If you haven't already, install Flower via ``pip install -U "flwr[simulation]"`` in
-    a Python environment.
+    If you haven't already, install Flower via ``pip install -U flwr`` in a Python
+    environment.
 
 Running a simulation is straightforward; in fact, it is the default mode of operation
 for |flwr_run_link|_. Therefore, the only requirement for running Flower simulations is
@@ -151,14 +151,16 @@ simulation-ready.
 The complete list of examples can be found in `the Flower GitHub
 <https://github.com/flwrlabs/flower/tree/main/examples>`_.
 
+.. _clientappresources:
+
 **********************************
  Customize the Simulation Runtime
 **********************************
 
-By default, the Simulation Runtime simulates a cohort of 10 SuperNodes and assigns two
-CPU cores to each backend worker. This means that if your system has 12 CPU cores, six
-backend workers can be running in parallel, each executing a different ``ClientApp``
-instance.
+By default, the Simulation Runtime simulates a cohort of two SuperNodes and assigns two
+CPU cores to each backend worker. This means that if your system has four or more CPU
+cores, all backend workers can be running in parallel, each executing a different
+``ClientApp`` instance.
 
 More often than not, you would probably like to adjust the resources your ``ClientApp``
 gets assigned based on the complexity (i.e., compute and memory footprint) of your

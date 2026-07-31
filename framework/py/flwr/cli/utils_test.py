@@ -16,7 +16,6 @@
 
 
 import hashlib
-import json
 import os
 import tempfile
 import unittest
@@ -34,18 +33,15 @@ from flwr.cli.constant import (
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
 )
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
-from flwr.common.constant import (
-    ACCESS_TOKEN_KEY,
-    AUTHN_TYPE_JSON_KEY,
-    FLWR_DIR,
-    REFRESH_TOKEN_KEY,
-)
-from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
+from flwr.common.constant import FLWR_DIR
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
+from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.error.catalog import API_ERROR_MAP
+from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 
 from .utils import (
-    _format_grpc_error,
+    _format_flower_error,
     build_pathspec,
     cli_output_handler,
     collect_files,
@@ -56,8 +52,8 @@ from .utils import (
     get_sha256_hash,
     init_channel_from_connection,
     load_gitignore_patterns,
-    validate_credentials_content,
     validate_federation_name,
+    wait_for_control_api_channel,
 )
 
 
@@ -75,6 +71,13 @@ class _GrpcErrorWithDetails:
 def _grpc_error_with_details(details: str) -> grpc.RpcError:
     """Return a grpc.RpcError-compatible test helper with a details method."""
     return cast(grpc.RpcError, _GrpcErrorWithDetails(details))
+
+
+def _flower_error_details(code: ApiErrorCode, public_details: str | None = None) -> str:
+    """Return serialized FlowerError details as sent through gRPC."""
+    return FlowerError(code, "internal details", public_details).to_json(
+        API_ERROR_MAP[code].public_message
+    )
 
 
 class TestGetSHA256Hash(unittest.TestCase):
@@ -162,19 +165,6 @@ class TestGetSHA256Hash(unittest.TestCase):
             get_sha256_hash(nonexistent_path)
 
 
-def test_validate_credentials_content_success(tmp_path: Path) -> None:
-    """Test the credentials content loading."""
-    creds = {
-        AUTHN_TYPE_JSON_KEY: "userpass",
-        ACCESS_TOKEN_KEY: "abc",
-        REFRESH_TOKEN_KEY: "def",
-    }
-    path = tmp_path / "creds.json"
-    path.write_text(json.dumps(creds), encoding="utf-8")
-    token = validate_credentials_content(path)
-    assert token == "abc"
-
-
 def test_load_gitignore_patterns(tmp_path: Path) -> None:
     """Test gitignore pattern loading."""
     path = tmp_path / ".gitignore"
@@ -199,6 +189,27 @@ def test_load_gitignore_patterns_with_pathspec() -> None:
 
     # Should not match normal files
     assert spec.match_file("good.py") is False
+
+
+def test_wait_for_control_api_channel_retries_until_ready() -> None:
+    """Test that Control API readiness waits through transient unavailability."""
+    future = Mock()
+    future.result.side_effect = [grpc.FutureTimeoutError(), None]
+
+    with patch("flwr.cli.utils.grpc.channel_ready_future", return_value=future):
+        wait_for_control_api_channel(Mock(), timeout=1, check_interval=0.01)
+
+    assert future.result.call_count == 2
+
+
+def test_wait_for_control_api_channel_fails_after_timeout() -> None:
+    """Test that Control API readiness fails after the timeout expires."""
+    future = Mock()
+    future.result.side_effect = grpc.FutureTimeoutError()
+
+    with patch("flwr.cli.utils.grpc.channel_ready_future", return_value=future):
+        with pytest.raises(click.ClickException, match="SuperLink is unavailable"):
+            wait_for_control_api_channel(Mock(), timeout=0.01, check_interval=0.01)
 
 
 def test_get_executed_command_single() -> None:
@@ -242,15 +253,17 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
     auth_plugin = Mock()
     auth_plugin.load_tokens = Mock()
 
-    with patch(
-        "flwr.cli.utils.ensure_local_superlink", return_value=resolved
-    ) as mock_ensure:
-        with patch("flwr.cli.utils.load_certificate_in_connection", return_value=None):
-            with patch("flwr.cli.utils.create_channel") as mock_create:
-                channel = Mock()
-                mock_create.return_value = channel
-
-                ret = init_channel_from_connection(unresolved, auth_plugin)
+    with (
+        patch(
+            "flwr.cli.utils.ensure_local_superlink", return_value=resolved
+        ) as mock_ensure,
+        patch("flwr.cli.utils.load_certificate_in_connection", return_value=None),
+        patch("flwr.cli.utils.create_channel") as mock_create,
+        patch("flwr.cli.utils.wait_for_control_api_channel"),
+    ):
+        channel = Mock()
+        mock_create.return_value = channel
+        ret = init_channel_from_connection(unresolved, auth_plugin)
 
     assert ret is channel
     mock_ensure.assert_called_once_with(unresolved)
@@ -286,21 +299,18 @@ def test_custom_grpc_err_handler() -> None:
     mock_handler.assert_called_once_with(grpc_error)
 
 
-def test_format_grpc_error_uses_json_message_field() -> None:
-    """Structured Flower errors combine public message and details."""
-    err = _grpc_error_with_details(
-        '{"public_message": "request failed", '
-        '"public_details": "missing entitlement", "code": 400}'
+def test_format_flower_error() -> None:
+    """Format FlowerError code, message, and public details."""
+    err = FlowerError(
+        ApiErrorCode.INVALID_RUN_CONFIG,
+        "Invalid run configuration.",
+        "Unknown override key: tool.invalid-key",
     )
 
-    assert _format_grpc_error(err) == "request failed\nmissing entitlement"
-
-
-def test_format_grpc_error_falls_back_to_plain_string() -> None:
-    """Non-JSON errors fall back to their normal string form."""
-    err = _grpc_error_with_details("plain failure")
-
-    assert _format_grpc_error(err) == "plain failure"
+    assert _format_flower_error(err) == (
+        "[code: 15] Invalid run configuration. "
+        "Unknown override key: tool.invalid-key"
+    )
 
 
 def test_cli_output_handler_raises_click_exception_for_json_error() -> None:

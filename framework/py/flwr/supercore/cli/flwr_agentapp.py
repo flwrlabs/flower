@@ -19,22 +19,17 @@ import argparse
 from logging import DEBUG, INFO
 from queue import Queue
 
-from flwr.common.args import add_args_flwr_app_common
+from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
-from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log, mirror_output_to_queue, restore_output
-from flwr.supercore.executors.run_agentapp import run_agentapp
+from flwr.supercore.task_process import run_agentapp
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 
 def flwr_agentapp() -> None:
     """Run process-isolated Flower AgentApp."""
     args = _parse_args_run_flwr_agentapp().parse_args()
-
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "`flwr-agentapp` does not support TLS yet.",
-        )
+    token = try_obtain_flwr_app_token(args)
 
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()
@@ -50,8 +45,11 @@ def flwr_agentapp() -> None:
     run_agentapp(
         serverappio_api_address=args.serverappio_api_address,
         log_queue=log_queue,
-        token=args.token,
-        certificates=None,
+        token=token,
+        insecure=args.insecure,
+        certificates=validate_and_resolve_root_certificates(
+            args.root_certificates, args.insecure
+        ),
         parent_pid=args.parent_pid,
         runtime_dependency_install=args.runtime_dependency_install,
     )

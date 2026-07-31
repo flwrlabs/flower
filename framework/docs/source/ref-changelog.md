@@ -1,6 +1,172 @@
 # Changelog
 
-## Unreleased
+## v1.32.1 (2026-07-01)
+
+### Thanks to our contributors
+
+We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
+
+`Chong Shen Ng`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Micah Sheller` <!---TOKEN_v1.32.1-->
+
+### What's new?
+
+- **Fix `flwr-simulation` failing to exit** ([#7504](https://github.com/flwrlabs/flower/pull/7504))
+
+  Closes the gRPC channel on exit, preventing `flwr-simulation` from hanging in some cases.
+
+- **Improve agent reliability and security** ([#7505](https://github.com/flwrlabs/flower/pull/7505), [#7507](https://github.com/flwrlabs/flower/pull/7507), [#7509](https://github.com/flwrlabs/flower/pull/7509))
+
+  Improves agent reliability and security with several small enhancements and fixes.
+
+## v1.32.0 (2026-06-25)
+
+### Thanks to our contributors
+
+We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
+
+`Aleksei Balan`, `Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Julian Rußmeyer`, `Micah Sheller`, `Mohammad Naseri`, `Patrick Foley`, `Ruth Galindo`, `William Lindskog`, `reducedradius` <!---TOKEN_v1.32.0-->
+
+### What's new?
+
+- **Introduce default federations on SuperGrid** ([#7436](https://github.com/flwrlabs/flower/pull/7436), [#7437](https://github.com/flwrlabs/flower/pull/7437), [#7460](https://github.com/flwrlabs/flower/pull/7460), [#7486](https://github.com/flwrlabs/flower/pull/7486), [#7488](https://github.com/flwrlabs/flower/pull/7488), [#7491](https://github.com/flwrlabs/flower/pull/7491), [#7492](https://github.com/flwrlabs/flower/pull/7492))
+
+  Introduces default federations for every Flower account in SuperGrid, allowing `flwr run` commands targeting SuperGrid to run without explicitly specifying `--federation`. Run your first Flower App on SuperGrid by taking [the tutorial](https://flower.ai/docs/framework/1.32/en/tutorial-series-get-started-with-flower.html).
+
+- **Enable runtime installation of Flower App dependencies** ([#7372](https://github.com/flwrlabs/flower/pull/7372), [#7386](https://github.com/flwrlabs/flower/pull/7386), [#7408](https://github.com/flwrlabs/flower/pull/7408), [#7410](https://github.com/flwrlabs/flower/pull/7410), [#7423](https://github.com/flwrlabs/flower/pull/7423), [#7428](https://github.com/flwrlabs/flower/pull/7428), [#7469](https://github.com/flwrlabs/flower/pull/7469), [#7494](https://github.com/flwrlabs/flower/pull/7494))
+
+  Enables automatic runtime installation of Flower App dependencies by default in SuperLink and improves error handling. For more information, see the [runtime dependency installation documentation](https://flower.ai/docs/framework/1.32/en/how-to-install-app-dependencies-at-runtime.html).
+
+- **Add experimental next-gen Kubernetes executor support** ([#7269](https://github.com/flwrlabs/flower/pull/7269), [#7298](https://github.com/flwrlabs/flower/pull/7298), [#7300](https://github.com/flwrlabs/flower/pull/7300), [#7367](https://github.com/flwrlabs/flower/pull/7367), [#7377](https://github.com/flwrlabs/flower/pull/7377), [#7378](https://github.com/flwrlabs/flower/pull/7378), [#7463](https://github.com/flwrlabs/flower/pull/7463))
+
+  Introduces an experimental next-gen Kubernetes executor, a dedicated execution backend designed specifically for Kubernetes environments. It leverages Kubernetes-native mechanisms for task execution, capacity management, and lifecycle handling, providing stronger workload isolation and improved operational control.
+
+- **Expand experimental Flower Agent support in SuperGrid** ([#7336](https://github.com/flwrlabs/flower/pull/7336), [#7341](https://github.com/flwrlabs/flower/pull/7341), [#7344](https://github.com/flwrlabs/flower/pull/7344), [#7345](https://github.com/flwrlabs/flower/pull/7345), [#7346](https://github.com/flwrlabs/flower/pull/7346), [#7351](https://github.com/flwrlabs/flower/pull/7351), [#7360](https://github.com/flwrlabs/flower/pull/7360), [#7366](https://github.com/flwrlabs/flower/pull/7366), [#7379](https://github.com/flwrlabs/flower/pull/7379), [#7397](https://github.com/flwrlabs/flower/pull/7397), [#7409](https://github.com/flwrlabs/flower/pull/7409), [#7418](https://github.com/flwrlabs/flower/pull/7418), [#7419](https://github.com/flwrlabs/flower/pull/7419), [#7435](https://github.com/flwrlabs/flower/pull/7435), [#7440](https://github.com/flwrlabs/flower/pull/7440), [#7441](https://github.com/flwrlabs/flower/pull/7441), [#7468](https://github.com/flwrlabs/flower/pull/7468))
+
+  Expands experimental Flower Agent capabilities in SuperGrid, including connectors for web search, web fetch, and browser use. Improved infrastructure and building blocks are part of the experimental Flower Agent foundation for upcoming enterprise-grade agentic AI workflows.
+
+- **Improve SuperLink high availability** ([#7308](https://github.com/flwrlabs/flower/pull/7308), [#7371](https://github.com/flwrlabs/flower/pull/7371), [#7381](https://github.com/flwrlabs/flower/pull/7381), [#7387](https://github.com/flwrlabs/flower/pull/7387), [#7483](https://github.com/flwrlabs/flower/pull/7483))
+
+  Improves high-availability deployment capabilites for Flower SuperLink to improve the robustness of large-scale Flower SuperGrid deployments. See the [documentation](https://flower.ai/docs/framework/1.32/en/explanation-superlink-high-availability.html) for more details.
+
+- **Update and fix Flower examples** ([#7364](https://github.com/flwrlabs/flower/pull/7364), [#7447](https://github.com/flwrlabs/flower/pull/7447))
+
+  Updates `UserConfig` imports across examples and fixes the loss calculation in the Opacus federated learning example.
+
+- **Show SuperLink name and address in Flower CLI** ([#7485](https://github.com/flwrlabs/flower/pull/7485))
+
+- **Restructure Flower framework packages** ([#7288](https://github.com/flwrlabs/flower/pull/7288), [#7342](https://github.com/flwrlabs/flower/pull/7342), [#7352](https://github.com/flwrlabs/flower/pull/7352), [#7359](https://github.com/flwrlabs/flower/pull/7359), [#7363](https://github.com/flwrlabs/flower/pull/7363), [#7420](https://github.com/flwrlabs/flower/pull/7420), [#7425](https://github.com/flwrlabs/flower/pull/7425), [#7429](https://github.com/flwrlabs/flower/pull/7429), [#7430](https://github.com/flwrlabs/flower/pull/7430), [#7442](https://github.com/flwrlabs/flower/pull/7442), [#7443](https://github.com/flwrlabs/flower/pull/7443), [#7448](https://github.com/flwrlabs/flower/pull/7448), [#7449](https://github.com/flwrlabs/flower/pull/7449), [#7450](https://github.com/flwrlabs/flower/pull/7450), [#7451](https://github.com/flwrlabs/flower/pull/7451), [#7455](https://github.com/flwrlabs/flower/pull/7455), [#7457](https://github.com/flwrlabs/flower/pull/7457), [#7458](https://github.com/flwrlabs/flower/pull/7458))
+
+- **Update documentation and translations** ([#7340](https://github.com/flwrlabs/flower/pull/7340), [#7358](https://github.com/flwrlabs/flower/pull/7358), [#7368](https://github.com/flwrlabs/flower/pull/7368), [#7398](https://github.com/flwrlabs/flower/pull/7398), [#7416](https://github.com/flwrlabs/flower/pull/7416), [#7424](https://github.com/flwrlabs/flower/pull/7424), [#7431](https://github.com/flwrlabs/flower/pull/7431), [#7446](https://github.com/flwrlabs/flower/pull/7446), [#7493](https://github.com/flwrlabs/flower/pull/7493))
+
+- **General improvements** ([#6871](https://github.com/flwrlabs/flower/pull/6871), [#7307](https://github.com/flwrlabs/flower/pull/7307), [#7317](https://github.com/flwrlabs/flower/pull/7317), [#7332](https://github.com/flwrlabs/flower/pull/7332), [#7339](https://github.com/flwrlabs/flower/pull/7339), [#7361](https://github.com/flwrlabs/flower/pull/7361), [#7362](https://github.com/flwrlabs/flower/pull/7362), [#7374](https://github.com/flwrlabs/flower/pull/7374), [#7400](https://github.com/flwrlabs/flower/pull/7400), [#7402](https://github.com/flwrlabs/flower/pull/7402), [#7404](https://github.com/flwrlabs/flower/pull/7404), [#7413](https://github.com/flwrlabs/flower/pull/7413), [#7421](https://github.com/flwrlabs/flower/pull/7421), [#7426](https://github.com/flwrlabs/flower/pull/7426), [#7432](https://github.com/flwrlabs/flower/pull/7432), [#7434](https://github.com/flwrlabs/flower/pull/7434), [#7438](https://github.com/flwrlabs/flower/pull/7438), [#7439](https://github.com/flwrlabs/flower/pull/7439), [#7454](https://github.com/flwrlabs/flower/pull/7454), [#7461](https://github.com/flwrlabs/flower/pull/7461), [#7462](https://github.com/flwrlabs/flower/pull/7462), [#7464](https://github.com/flwrlabs/flower/pull/7464), [#7465](https://github.com/flwrlabs/flower/pull/7465), [#7466](https://github.com/flwrlabs/flower/pull/7466), [#7470](https://github.com/flwrlabs/flower/pull/7470), [#7472](https://github.com/flwrlabs/flower/pull/7472), [#7474](https://github.com/flwrlabs/flower/pull/7474), [#7475](https://github.com/flwrlabs/flower/pull/7475), [#7477](https://github.com/flwrlabs/flower/pull/7477), [#7481](https://github.com/flwrlabs/flower/pull/7481), [#7484](https://github.com/flwrlabs/flower/pull/7484), [#7487](https://github.com/flwrlabs/flower/pull/7487))
+
+  As always, many parts of the Flower framework and quality infrastructure were improved and updated.
+
+### Incompatible changes
+
+- **Remove `owner-aid` from `flwr supernode ls` JSON output** ([#7373](https://github.com/flwrlabs/flower/pull/7373))
+
+  Removes the SuperNode owner's account ID from the JSON output returned by `flwr supernode ls`.
+
+- **Default simulations to 2 SuperNodes** ([#7476](https://github.com/flwrlabs/flower/pull/7476), [#7478](https://github.com/flwrlabs/flower/pull/7478), [#7479](https://github.com/flwrlabs/flower/pull/7479), [#7482](https://github.com/flwrlabs/flower/pull/7482))
+
+  Changes the default number of SuperNodes in simulation runs from 10 to 2, updates related examples and tutorials, and adds a helper message at startup. See the [documentation](https://flower.ai/docs/framework/how-to-run-simulations.html#customize-the-simulation-runtime) to customize the number of SuperNodes.
+
+## v1.31.0 (2026-06-08)
+
+### Thanks to our contributors
+
+We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
+
+`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Gustavo Bertoli`, `Heng Pan`, `Javier`, `Leandro`, `Lorenzo Sani`, `Micah Sheller`, `Mohammad Naseri`, `Nyam2C`, `Patrick Foley`, `Seulki Yun`, `Sijiaomg Ohoh`, `Taner Topal`, `Yan Gao`, `Young D. Kwon`, `reducedradius` <!---TOKEN_v1.31.0-->
+
+### What's new?
+
+- **Prepare support for Flower Agent** ([#7215](https://github.com/flwrlabs/flower/pull/7215), [#7216](https://github.com/flwrlabs/flower/pull/7216), [#7220](https://github.com/flwrlabs/flower/pull/7220), [#7238](https://github.com/flwrlabs/flower/pull/7238), [#7252](https://github.com/flwrlabs/flower/pull/7252), [#7253](https://github.com/flwrlabs/flower/pull/7253), [#7256](https://github.com/flwrlabs/flower/pull/7256), [#7261](https://github.com/flwrlabs/flower/pull/7261), [#7264](https://github.com/flwrlabs/flower/pull/7264), [#7272](https://github.com/flwrlabs/flower/pull/7272), [#7273](https://github.com/flwrlabs/flower/pull/7273), [#7277](https://github.com/flwrlabs/flower/pull/7277), [#7287](https://github.com/flwrlabs/flower/pull/7287), [#7291](https://github.com/flwrlabs/flower/pull/7291), [#7292](https://github.com/flwrlabs/flower/pull/7292), [#7293](https://github.com/flwrlabs/flower/pull/7293), [#7301](https://github.com/flwrlabs/flower/pull/7301), [#7314](https://github.com/flwrlabs/flower/pull/7314), [#7324](https://github.com/flwrlabs/flower/pull/7324), [#7337](https://github.com/flwrlabs/flower/pull/7337))
+
+  Prepares the foundation for running Flower Agent on SuperGrid, introducing the infrastructure and building blocks needed for upcoming agentic AI workflows.
+
+- **Add SuperGrid guides** ([#7188](https://github.com/flwrlabs/flower/pull/7188), [#7221](https://github.com/flwrlabs/flower/pull/7221), [#7257](https://github.com/flwrlabs/flower/pull/7257), [#7279](https://github.com/flwrlabs/flower/pull/7279), [#7328](https://github.com/flwrlabs/flower/pull/7328), [#7334](https://github.com/flwrlabs/flower/pull/7334))
+
+  Adds new and expanded SuperGrid guides, including Flower CLI usage and instructions for running apps on SuperGrid. To learn more about using SuperGrid, see the [Get started with Flower tutorial](https://flower.ai/docs/framework/1.31/en/tutorial-series-get-started-with-flower.html).
+
+- **Add Executor Abstraction for SuperExecs** ([#7174](https://github.com/flwrlabs/flower/pull/7174), [#7206](https://github.com/flwrlabs/flower/pull/7206), [#7231](https://github.com/flwrlabs/flower/pull/7231), [#7232](https://github.com/flwrlabs/flower/pull/7232), [#7233](https://github.com/flwrlabs/flower/pull/7233), [#7234](https://github.com/flwrlabs/flower/pull/7234), [#7235](https://github.com/flwrlabs/flower/pull/7235), [#7323](https://github.com/flwrlabs/flower/pull/7323))
+
+  Introduces a SuperExec Executor framework that separates task selection from how tasks are launched. The new execution specification, launch result handling, token-file support, and capacity hook make it easier to add and enrich launch paths for different execution environments, from local subprocesses to containers, Kubernetes pods, and other managed runtimes.
+
+- **Improve high availability** ([#7169](https://github.com/flwrlabs/flower/pull/7169), [#7173](https://github.com/flwrlabs/flower/pull/7173), [#7265](https://github.com/flwrlabs/flower/pull/7265), [#7266](https://github.com/flwrlabs/flower/pull/7266), [#7282](https://github.com/flwrlabs/flower/pull/7282), [#7284](https://github.com/flwrlabs/flower/pull/7284), [#7285](https://github.com/flwrlabs/flower/pull/7285), [#7303](https://github.com/flwrlabs/flower/pull/7303))
+
+  Improves high availability by making cleanup and startup operations safer, and strengthening concurrent node, message, and run handling.
+
+- **Track `ClientApp` runtime metrics in simulation runs** ([#7248](https://github.com/flwrlabs/flower/pull/7248), [#7250](https://github.com/flwrlabs/flower/pull/7250), [#7251](https://github.com/flwrlabs/flower/pull/7251), [#7260](https://github.com/flwrlabs/flower/pull/7260))
+
+  Tracks `ClientApp` runtime metrics in simulation runs by adding run metrics to the `AppIo` proto, collecting run metrics, and forwarding simulation run metrics.
+
+- **Add task-to-task communication** ([#7156](https://github.com/flwrlabs/flower/pull/7156), [#7178](https://github.com/flwrlabs/flower/pull/7178), [#7194](https://github.com/flwrlabs/flower/pull/7194), [#7213](https://github.com/flwrlabs/flower/pull/7213))
+
+  Adds the base structure for task-process-to-task-process communication on the same host.
+
+- **Restructure framework modules** ([#7242](https://github.com/flwrlabs/flower/pull/7242), [#7246](https://github.com/flwrlabs/flower/pull/7246), [#7259](https://github.com/flwrlabs/flower/pull/7259), [#7278](https://github.com/flwrlabs/flower/pull/7278))
+
+  Restructures `flwr` by relocating `Context`, `Message`, and `RecordDict` to `flwr.app`, and `Grid` and `ServerApp` to `flwr.serverapp`.
+
+- **Migrate framework CI/CD to uv** ([#6693](https://github.com/flwrlabs/flower/pull/6693), [#7202](https://github.com/flwrlabs/flower/pull/7202), [#7214](https://github.com/flwrlabs/flower/pull/7214), [#7223](https://github.com/flwrlabs/flower/pull/7223), [#7275](https://github.com/flwrlabs/flower/pull/7275))
+
+  Migrates framework CI/CD to `uv`, including the Poetry replacement, `uv-build` backend switch, and CI workflow update.
+
+- **Update translations** ([#7222](https://github.com/flwrlabs/flower/pull/7222), [#7227](https://github.com/flwrlabs/flower/pull/7227), [#7228](https://github.com/flwrlabs/flower/pull/7228), [#7230](https://github.com/flwrlabs/flower/pull/7230), [#7245](https://github.com/flwrlabs/flower/pull/7245), [#7255](https://github.com/flwrlabs/flower/pull/7255), [#7270](https://github.com/flwrlabs/flower/pull/7270), [#7286](https://github.com/flwrlabs/flower/pull/7286), [#7289](https://github.com/flwrlabs/flower/pull/7289), [#7295](https://github.com/flwrlabs/flower/pull/7295), [#7296](https://github.com/flwrlabs/flower/pull/7296), [#7302](https://github.com/flwrlabs/flower/pull/7302), [#7309](https://github.com/flwrlabs/flower/pull/7309))
+
+- **Upgrade Ray to 2.55.1** ([#7181](https://github.com/flwrlabs/flower/pull/7181))
+
+- **General improvements** ([#7155](https://github.com/flwrlabs/flower/pull/7155), [#7218](https://github.com/flwrlabs/flower/pull/7218), [#7219](https://github.com/flwrlabs/flower/pull/7219), [#7229](https://github.com/flwrlabs/flower/pull/7229), [#7243](https://github.com/flwrlabs/flower/pull/7243), [#7254](https://github.com/flwrlabs/flower/pull/7254), [#7262](https://github.com/flwrlabs/flower/pull/7262), [#7267](https://github.com/flwrlabs/flower/pull/7267), [#7281](https://github.com/flwrlabs/flower/pull/7281), [#7306](https://github.com/flwrlabs/flower/pull/7306), [#7315](https://github.com/flwrlabs/flower/pull/7315), [#7331](https://github.com/flwrlabs/flower/pull/7331))
+
+  As always, many parts of the Flower framework and quality infrastructure were improved and updated.
+
+### Incompatible changes
+
+- **Drop Python 3.10 support** ([#7190](https://github.com/flwrlabs/flower/pull/7190))
+
+  With Python 3.10 reaching end-of-life in October 2026, Flower drops support for Python 3.10.
+
+## v1.30.0 (2026-05-20)
+
+### Thanks to our contributors
+
+We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
+
+`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Micah Sheller`, `Mohammad Naseri`, `Patrick Foley`, `Taner Topal`, `Yan Gao` <!---TOKEN_v1.30.0-->
+
+### What's new?
+
+- **Introduce the task system for executor process lifecycle management** ([#7030](https://github.com/flwrlabs/flower/pull/7030), [#7031](https://github.com/flwrlabs/flower/pull/7031), [#7036](https://github.com/flwrlabs/flower/pull/7036), [#7040](https://github.com/flwrlabs/flower/pull/7040), [#7044](https://github.com/flwrlabs/flower/pull/7044), [#7047](https://github.com/flwrlabs/flower/pull/7047), [#7053](https://github.com/flwrlabs/flower/pull/7053), [#7054](https://github.com/flwrlabs/flower/pull/7054), [#7058](https://github.com/flwrlabs/flower/pull/7058), [#7068](https://github.com/flwrlabs/flower/pull/7068), [#7069](https://github.com/flwrlabs/flower/pull/7069), [#7078](https://github.com/flwrlabs/flower/pull/7078), [#7079](https://github.com/flwrlabs/flower/pull/7079), [#7080](https://github.com/flwrlabs/flower/pull/7080), [#7081](https://github.com/flwrlabs/flower/pull/7081), [#7083](https://github.com/flwrlabs/flower/pull/7083), [#7087](https://github.com/flwrlabs/flower/pull/7087), [#7088](https://github.com/flwrlabs/flower/pull/7088), [#7089](https://github.com/flwrlabs/flower/pull/7089), [#7090](https://github.com/flwrlabs/flower/pull/7090), [#7094](https://github.com/flwrlabs/flower/pull/7094), [#7095](https://github.com/flwrlabs/flower/pull/7095), [#7097](https://github.com/flwrlabs/flower/pull/7097), [#7100](https://github.com/flwrlabs/flower/pull/7100), [#7101](https://github.com/flwrlabs/flower/pull/7101), [#7102](https://github.com/flwrlabs/flower/pull/7102), [#7105](https://github.com/flwrlabs/flower/pull/7105), [#7106](https://github.com/flwrlabs/flower/pull/7106), [#7110](https://github.com/flwrlabs/flower/pull/7110), [#7111](https://github.com/flwrlabs/flower/pull/7111), [#7112](https://github.com/flwrlabs/flower/pull/7112), [#7115](https://github.com/flwrlabs/flower/pull/7115), [#7116](https://github.com/flwrlabs/flower/pull/7116), [#7117](https://github.com/flwrlabs/flower/pull/7117), [#7118](https://github.com/flwrlabs/flower/pull/7118), [#7122](https://github.com/flwrlabs/flower/pull/7122), [#7139](https://github.com/flwrlabs/flower/pull/7139), [#7144](https://github.com/flwrlabs/flower/pull/7144), [#7151](https://github.com/flwrlabs/flower/pull/7151), [#7153](https://github.com/flwrlabs/flower/pull/7153), [#7157](https://github.com/flwrlabs/flower/pull/7157), [#7158](https://github.com/flwrlabs/flower/pull/7158), [#7163](https://github.com/flwrlabs/flower/pull/7163), [#7167](https://github.com/flwrlabs/flower/pull/7167), [#7180](https://github.com/flwrlabs/flower/pull/7180), [#7184](https://github.com/flwrlabs/flower/pull/7184), [#7197](https://github.com/flwrlabs/flower/pull/7197))
+
+  Introduces the task system as the foundation for managing task process lifecycles across the framework. Tasks represent executable units such as `flwr-serverapp` and `flwr-clientapp`, enabling consistent creation, claiming, activation, heartbeat tracking, completion, and logging. The change also refactors existing run and executor workflows to operate on tasks and links a run status to its primary task for improved orchestration and lifecycle tracking.
+
+- **Add initial runtime version compatibility checks across framework components** ([#7038](https://github.com/flwrlabs/flower/pull/7038), [#7067](https://github.com/flwrlabs/flower/pull/7067), [#7077](https://github.com/flwrlabs/flower/pull/7077), [#7084](https://github.com/flwrlabs/flower/pull/7084), [#7091](https://github.com/flwrlabs/flower/pull/7091), [#7092](https://github.com/flwrlabs/flower/pull/7092), [#7093](https://github.com/flwrlabs/flower/pull/7093), [#7103](https://github.com/flwrlabs/flower/pull/7103), [#7107](https://github.com/flwrlabs/flower/pull/7107), [#7108](https://github.com/flwrlabs/flower/pull/7108), [#7113](https://github.com/flwrlabs/flower/pull/7113), [#7141](https://github.com/flwrlabs/flower/pull/7141), [#7146](https://github.com/flwrlabs/flower/pull/7146), [#7160](https://github.com/flwrlabs/flower/pull/7160), [#7191](https://github.com/flwrlabs/flower/pull/7191))
+
+  Introduces runtime version compatibility metadata and checks across Flower runtime components. AppIo communication for `flwr-serverapp`, `flwr-simulation`, and `flwr-clientapp` now enforces matching `major.minor` Flower releases, which prevents incompatible app runtime combinations from proceeding. Control API and Fleet API also observe runtime version metadata to prepare these paths for stricter compatibility handling in future releases.
+
+- **Add TLS support for AppIo APIs** ([#6986](https://github.com/flwrlabs/flower/pull/6986), [#7046](https://github.com/flwrlabs/flower/pull/7046), [#7175](https://github.com/flwrlabs/flower/pull/7175))
+
+  Introduces TLS support for the ServerAppIo and ClientAppIo APIs. Adds root certificate configuration for `flwr-` commands and `flower-superexec`. Find out more details in the [TLS guide](https://flower.ai/docs/framework/1.30/en/how-to-enable-tls-connections.html).
+
+- **Support dynamic ClientAppIo ports in SuperNode** ([#7128](https://github.com/flwrlabs/flower/pull/7128))
+
+  Fixes support for `localhost:0` in the SuperNode ClientAppIo API.
+
+- **Improve framework CI and release workflows** ([#7007](https://github.com/flwrlabs/flower/pull/7007), [#7034](https://github.com/flwrlabs/flower/pull/7034), [#7041](https://github.com/flwrlabs/flower/pull/7041), [#7055](https://github.com/flwrlabs/flower/pull/7055), [#7072](https://github.com/flwrlabs/flower/pull/7072), [#7073](https://github.com/flwrlabs/flower/pull/7073), [#7086](https://github.com/flwrlabs/flower/pull/7086), [#7138](https://github.com/flwrlabs/flower/pull/7138), [#7145](https://github.com/flwrlabs/flower/pull/7145), [#7152](https://github.com/flwrlabs/flower/pull/7152), [#7154](https://github.com/flwrlabs/flower/pull/7154), [#7159](https://github.com/flwrlabs/flower/pull/7159), [#7166](https://github.com/flwrlabs/flower/pull/7166), [#7170](https://github.com/flwrlabs/flower/pull/7170), [#7176](https://github.com/flwrlabs/flower/pull/7176), [#7187](https://github.com/flwrlabs/flower/pull/7187))
+
+- **Improve framework documentation** ([#7006](https://github.com/flwrlabs/flower/pull/7006), [#7011](https://github.com/flwrlabs/flower/pull/7011), [#7022](https://github.com/flwrlabs/flower/pull/7022), [#7050](https://github.com/flwrlabs/flower/pull/7050), [#7150](https://github.com/flwrlabs/flower/pull/7150), [#7186](https://github.com/flwrlabs/flower/pull/7186))
+
+- **General improvements** ([#7013](https://github.com/flwrlabs/flower/pull/7013), [#7021](https://github.com/flwrlabs/flower/pull/7021), [#7024](https://github.com/flwrlabs/flower/pull/7024), [#7025](https://github.com/flwrlabs/flower/pull/7025), [#7027](https://github.com/flwrlabs/flower/pull/7027), [#7028](https://github.com/flwrlabs/flower/pull/7028), [#7037](https://github.com/flwrlabs/flower/pull/7037), [#7043](https://github.com/flwrlabs/flower/pull/7043), [#7051](https://github.com/flwrlabs/flower/pull/7051), [#7056](https://github.com/flwrlabs/flower/pull/7056), [#7057](https://github.com/flwrlabs/flower/pull/7057), [#7061](https://github.com/flwrlabs/flower/pull/7061), [#7063](https://github.com/flwrlabs/flower/pull/7063), [#7104](https://github.com/flwrlabs/flower/pull/7104), [#7109](https://github.com/flwrlabs/flower/pull/7109), [#7123](https://github.com/flwrlabs/flower/pull/7123), [#7124](https://github.com/flwrlabs/flower/pull/7124), [#7125](https://github.com/flwrlabs/flower/pull/7125), [#7134](https://github.com/flwrlabs/flower/pull/7134), [#7136](https://github.com/flwrlabs/flower/pull/7136), [#7140](https://github.com/flwrlabs/flower/pull/7140), [#7143](https://github.com/flwrlabs/flower/pull/7143), [#7148](https://github.com/flwrlabs/flower/pull/7148), [#7149](https://github.com/flwrlabs/flower/pull/7149), [#7161](https://github.com/flwrlabs/flower/pull/7161), [#7162](https://github.com/flwrlabs/flower/pull/7162), [#7165](https://github.com/flwrlabs/flower/pull/7165), [#7172](https://github.com/flwrlabs/flower/pull/7172), [#7183](https://github.com/flwrlabs/flower/pull/7183), [#7192](https://github.com/flwrlabs/flower/pull/7192), [#7195](https://github.com/flwrlabs/flower/pull/7195), [#7196](https://github.com/flwrlabs/flower/pull/7196), [#7200](https://github.com/flwrlabs/flower/pull/7200), [#7204](https://github.com/flwrlabs/flower/pull/7204))
+
+  As always, many parts of the Flower framework and quality infrastructure were improved and updated.
+
+### Incompatible changes
+
+- **Disallow manually running internal `flwr-*` commands** ([#7019](https://github.com/flwrlabs/flower/pull/7019))
+
+  Removes support for manually starting `flwr-serverapp`, `flwr-simulation`, and `flwr-clientapp`; these commands can only be launched by SuperExec.
 
 ## v1.29.0 (2026-04-12)
 

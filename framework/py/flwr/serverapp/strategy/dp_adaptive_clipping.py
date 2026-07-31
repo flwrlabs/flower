@@ -24,17 +24,19 @@ from logging import INFO
 
 import numpy as np
 
-from flwr.common import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, log
-from flwr.common.differential_privacy import (
+from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord
+from flwr.common import log
+from flwr.supercore.differential_privacy import (
+    KEY_CLIPPING_NORM,
+    KEY_NORM_BIT,
     adaptive_clip_inputs_inplace,
     add_gaussian_noise_inplace,
     compute_adaptive_noise_params,
     compute_stdv,
 )
-from flwr.common.differential_privacy_constants import KEY_CLIPPING_NORM, KEY_NORM_BIT
-from flwr.server import Grid
-from flwr.serverapp.exception import AggregationError
 
+from ..exception import AggregationError
+from ..grid import Grid
 from .dp_fixed_clipping import validate_replies
 from .strategy import Strategy
 

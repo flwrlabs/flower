@@ -19,6 +19,8 @@ from typing import Any, TypeVar, cast
 
 from google.protobuf.message import Message as GrpcMessage
 
+from flwr.app.message.typeddict import TypedDict
+
 # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
@@ -34,7 +36,6 @@ from flwr.proto.recorddict_pb2 import (
 from ..app.error import Error
 from ..app.metadata import Metadata
 from .constant import INT64_MAX_VALUE
-from .record.typeddict import TypedDict
 
 # pylint: enable=E0611
 
@@ -156,6 +157,10 @@ def metadata_to_proto(metadata: Metadata) -> ProtoMetadata:
         message_type=metadata.message_type,
         created_at=metadata.created_at,
     )
+    if metadata.src_task_id is not None:
+        proto.src_task_id = metadata.src_task_id
+    if metadata.dst_task_id is not None:
+        proto.dst_task_id = metadata.dst_task_id
     return proto
 
 
@@ -171,5 +176,15 @@ def metadata_from_proto(metadata_proto: ProtoMetadata) -> Metadata:
         created_at=metadata_proto.created_at,
         ttl=metadata_proto.ttl,
         message_type=metadata_proto.message_type,
+        src_task_id=(
+            metadata_proto.src_task_id
+            if metadata_proto.HasField("src_task_id")
+            else None
+        ),
+        dst_task_id=(
+            metadata_proto.dst_task_id
+            if metadata_proto.HasField("dst_task_id")
+            else None
+        ),
     )
     return metadata

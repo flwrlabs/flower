@@ -19,8 +19,8 @@ import os
 import subprocess
 from collections.abc import Callable, Sequence
 
-from flwr.common.exit import ExitCode, flwr_exit
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.exit import ExitCode, flwr_exit
 
 from .exec_plugin import ExecPlugin
 
@@ -49,7 +49,7 @@ class BaseEphemeralExecPlugin(ExecPlugin):
             return None
         return candidate_tasks[0]
 
-    def launch_task(self, token: str, task: Task) -> None:
+    def launch_task(self, token: str, task: Task) -> None:  # type: ignore[override]
         """Launch the process to execute the given task using the given token."""
         cmds = [self.command]
         if self.insecure:

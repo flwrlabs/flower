@@ -14,7 +14,6 @@
 # ==============================================================================
 """Utils tests."""
 
-
 import unittest
 from copy import deepcopy
 

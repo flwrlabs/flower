@@ -20,18 +20,11 @@ from dataclasses import dataclass, field
 from logging import DEBUG, WARNING
 from typing import Any, cast
 
+from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.message_type import MessageType
-from flwr.client.typing import ClientAppCallable
-from flwr.common import (
-    ConfigRecord,
-    Context,
-    Message,
-    Parameters,
-    RecordDict,
-    ndarray_to_bytes,
-    parameters_to_ndarrays,
-)
-from flwr.common import recorddict_compat as compat
+from flwr.app.typing import ConfigRecordValues
+from flwr.clientapp.typing import ClientAppCallable
+from flwr.common import Parameters, ndarray_to_bytes, parameters_to_ndarrays
 from flwr.common.logger import log
 from flwr.common.secure_aggregation.crypto.shamir import create_shares
 from flwr.common.secure_aggregation.crypto.symmetric_encryption import (
@@ -58,7 +51,7 @@ from flwr.common.secure_aggregation.secaggplus_utils import (
     share_keys_plaintext_concat,
     share_keys_plaintext_separate,
 )
-from flwr.common.typing import ConfigRecordValues
+from flwr.compat.common import recorddict_compat as compat
 from flwr.supercore.primitives.asymmetric import (
     bytes_to_private_key,
     bytes_to_public_key,

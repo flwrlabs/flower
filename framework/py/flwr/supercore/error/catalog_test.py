@@ -22,3 +22,10 @@ from .catalog import API_ERROR_MAP
 def test_api_error_map_covers_all_api_error_codes() -> None:
     """Ensure every ApiErrorCode has an API_ERROR_MAP entry."""
     assert set(API_ERROR_MAP.keys()) == set(ApiErrorCode)
+
+
+def test_api_error_map_entries_have_http_status_codes() -> None:
+    """Ensure every API error contract has an HTTP status code."""
+    assert all(
+        isinstance(spec.http_status_code, int) for spec in API_ERROR_MAP.values()
+    )

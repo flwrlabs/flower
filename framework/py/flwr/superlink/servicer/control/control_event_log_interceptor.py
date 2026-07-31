@@ -22,7 +22,7 @@ import grpc
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common.event_log_plugin.event_log_plugin import EventLogWriterPlugin
-from flwr.common.typing import LogEntry
+from flwr.supercore.event_log.typing import LogEntry
 
 from .control_account_auth_interceptor import get_current_account_info
 

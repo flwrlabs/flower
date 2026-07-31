@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Fleet Simulation Engine API."""
+"""Fleet Simulation Runtime API."""
 
 
 import json
@@ -27,11 +27,10 @@ from pathlib import Path
 from queue import Empty, Queue
 from uuid import uuid4
 
+from flwr.app import Message
 from flwr.app.error import Error
-from flwr.client.run_info_store import DeprecatedRunInfoStore
 from flwr.clientapp.client_app import ClientApp, ClientAppException, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
-from flwr.common import Message
 from flwr.common.constant import (
     HEARTBEAT_INTERVAL_INF,
     NOOP_ACCOUNT_NAME,
@@ -41,13 +40,15 @@ from flwr.common.constant import (
     ErrorCode,
 )
 from flwr.common.logger import log
-from flwr.common.typing import Run
+from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.run import Run
 from flwr.superlink.federation import NoOpFederationManager
 
-from .backend import Backend, error_messages_backends, supported_backends
+from .backend import Backend
+from .metrics import VceMetrics
 
 NodeToPartitionMapping = dict[int, int]
 
@@ -101,18 +102,20 @@ def _register_node_info_stores(
     return node_info_store
 
 
-# pylint: disable=too-many-arguments,too-many-locals
+# pylint: disable-next=too-many-arguments,too-many-locals,too-many-positional-arguments
 def worker(
     messageins_queue: Queue[Message],
     messageres_queue: Queue[Message],
     node_info_store: dict[int, DeprecatedRunInfoStore],
     backend: Backend,
     f_stop: threading.Event,
+    metrics: VceMetrics,
 ) -> None:
     """Process messages from the queue, execute them, update context, and enqueue
     replies."""
     while not f_stop.is_set():
         out_mssg = None
+        processing_started_at = None
         try:
             # Fetch from queue with timeout. We use a timeout so
             # the stopping event can be evaluated even when the queue is empty.
@@ -125,6 +128,7 @@ def worker(
             )
 
             # Let backend process message
+            processing_started_at = time.perf_counter()
             out_mssg, updated_context = backend.process_message(message, context)
 
             # Update Context
@@ -150,6 +154,10 @@ def worker(
             out_mssg = Message(Error(code=e_code, reason=reason), reply_to=message)
 
         finally:
+            if processing_started_at is not None:
+                metrics.add_clientapp_runtime(
+                    time.perf_counter() - processing_started_at
+                )
             if out_mssg:
                 # Assign a message_id
                 out_mssg.metadata.__dict__["_message_id"] = str(uuid4())
@@ -185,7 +193,7 @@ def put_message_into_state(
             pass
 
 
-# pylint: disable=too-many-positional-arguments
+# pylint: disable-next=too-many-positional-arguments,too-many-arguments
 def run_api(
     app_fn: Callable[[], ClientApp],
     backend_fn: Callable[[], Backend],
@@ -193,8 +201,9 @@ def run_api(
     state_factory: LinkStateFactory,
     node_info_stores: dict[int, DeprecatedRunInfoStore],
     f_stop: threading.Event,
+    metrics: VceMetrics,
 ) -> None:
-    """Run the VCE."""
+    """Run the Simulation Runtime."""
     messageins_queue: Queue[Message] = Queue()
     messageres_queue: Queue[Message] = Queue()
 
@@ -240,6 +249,7 @@ def run_api(
                     node_info_stores,
                     backend,
                     f_stop,
+                    metrics,
                 )
                 for _ in range(backend.num_workers)
             ]
@@ -251,10 +261,10 @@ def run_api(
 
         log(ERROR, "An exception occured!! %s", ex)
         log(ERROR, traceback.format_exc())
-        log(WARN, "Stopping Simulation Engine.")
+        log(WARN, "Stopping Simulation Runtime.")
 
         # Raise exception
-        raise RuntimeError("Simulation Engine crashed.") from ex
+        raise RuntimeError("Simulation Runtime crashed.") from ex
 
     finally:
         # Manually trigger stopping event
@@ -274,13 +284,14 @@ def start_vce(
     is_app: bool,
     f_stop: threading.Event,
     run: Run,
+    metrics: VceMetrics,
     client_app: ClientApp | None = None,
     client_app_attr: str | None = None,
     num_supernodes: int | None = None,
     state_factory: LinkStateFactory | None = None,
     existing_nodes_mapping: NodeToPartitionMapping | None = None,
 ) -> None:
-    """Start Fleet API with the Simulation Engine."""
+    """Start Fleet API with the Simulation Runtime."""
     nodes_mapping = {}
 
     if client_app_attr is not None and client_app is not None:
@@ -333,27 +344,13 @@ def start_vce(
     )
 
     # Load backend config
-    log(DEBUG, "Supported backends: %s", list(supported_backends.keys()))
     backend_config = json.loads(backend_config_json_stream)
-
-    try:
-        backend_type = supported_backends[backend_name]
-    except KeyError as ex:
-        log(
-            ERROR,
-            "Backend `%s`, is not supported. Use any of %s or add support "
-            "for a new backend.",
-            backend_name,
-            list(supported_backends.keys()),
-        )
-        if backend_name in error_messages_backends:
-            log(ERROR, error_messages_backends[backend_name])
-
-        raise ex
 
     def backend_fn() -> Backend:
         """Instantiate a Backend."""
-        return backend_type(backend_config)
+        from .backend.raybackend import RayBackend  # pylint: disable=C0415
+
+        return RayBackend(backend_config)
 
     # Load ClientApp if needed
     def _load() -> ClientApp:
@@ -392,6 +389,7 @@ def start_vce(
             state_factory,
             node_info_stores,
             f_stop,
+            metrics,
         )
     except LoadClientAppError as loadapp_ex:
         f_stop_delay = 10

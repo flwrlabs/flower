@@ -19,6 +19,7 @@ import unittest
 from unittest.mock import MagicMock
 
 import grpc
+from fastapi import Request
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common.dummy_grpc_handlers_test import (
@@ -29,7 +30,8 @@ from flwr.common.dummy_grpc_handlers_test import (
     get_noop_unary_unary_handler,
 )
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.common.typing import AccountInfo, Actor, Event, LogEntry
+from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.event_log.typing import Actor, Event, LogEntry
 
 from .control_account_auth_interceptor import shared_account_info
 from .control_event_log_interceptor import ControlEventLogInterceptor
@@ -44,7 +46,7 @@ class DummyLogPlugin(EventLogWriterPlugin):
     def compose_log_before_event(
         self,
         request: GrpcMessage,
-        context: grpc.ServicerContext,
+        context: grpc.ServicerContext | Request,
         account_info: AccountInfo | None,
         method_name: str,
     ) -> LogEntry:
@@ -63,7 +65,7 @@ class DummyLogPlugin(EventLogWriterPlugin):
     def compose_log_after_event(  # pylint: disable=too-many-arguments,R0917
         self,
         request: GrpcMessage,
-        context: grpc.ServicerContext,
+        context: grpc.ServicerContext | Request,
         account_info: AccountInfo | None,
         method_name: str,
         response: GrpcMessage | BaseException | None,
