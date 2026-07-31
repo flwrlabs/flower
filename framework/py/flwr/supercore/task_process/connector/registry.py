@@ -19,15 +19,25 @@ from collections.abc import Callable
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from . import automation, browser_use, slack, slack_oauth, web_fetch, web_search
+from . import (
+    automation,
+    browser_use,
+    notion,
+    notion_oauth,
+    slack,
+    slack_oauth,
+    web_fetch,
+    web_search,
+)
 from .oauth import OAuthConnectorProvider
 
 ConnectorHandler = Callable[..., JSONValue]
 ConnectorToolFactory = Callable[[], JSONObject]
 
 
-OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthConnectorProvider, ...] = tuple(
-    slack_oauth.get_configured_connector_oauth_providers()
+OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthConnectorProvider, ...] = (
+    *slack_oauth.get_configured_connector_oauth_providers(),
+    *notion_oauth.get_configured_connector_oauth_providers(),
 )
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
@@ -37,14 +47,17 @@ _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
 # Concrete OAuth connector implementations populate these static registries.
 # A provider can expose multiple tool names under one connector ref (for example,
 # ``slack_search_messages`` maps to ``slack``).
-_CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = dict(
-    slack.SLACK_TOOL_HANDLERS
-)
-_CREDENTIAL_CONNECTOR_REFS: dict[str, str] = dict.fromkeys(
-    slack.SLACK_TOOL_NAMES, slack.SLACK_CONNECTOR_REF
-)
+_CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
+    **slack.SLACK_TOOL_HANDLERS,
+    **notion.NOTION_TOOL_HANDLERS,
+}
+_CREDENTIAL_CONNECTOR_REFS: dict[str, str] = {
+    **dict.fromkeys(slack.SLACK_TOOL_NAMES, slack.SLACK_CONNECTOR_REF),
+    **dict.fromkeys(notion.NOTION_TOOL_NAMES, notion.NOTION_CONNECTOR_REF),
+}
 _CREDENTIAL_CONNECTOR_TOOL_FACTORIES: dict[str, Callable[[], list[JSONObject]]] = {
     slack.SLACK_CONNECTOR_REF: slack.make_slack_tools,
+    notion.NOTION_CONNECTOR_REF: notion.make_notion_tools,
 }
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     automation.START_AUTOMATION_TOOL_NAME: automation.make_start_automation_tool,
