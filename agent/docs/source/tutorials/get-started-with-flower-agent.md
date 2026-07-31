@@ -4,7 +4,7 @@ Welcome to Flower Agent!
 
 In this tutorial, you'll chat with Flower's built-in AgentApp on SuperGrid. You
 won't need to write any code or provide model credentials. By the end, you'll
-have chatted with Flower Agent and seen how its main pieces fit together.
+have used Flower Chat and seen how its main pieces fit together.
 
 ```{note}
 Flower Agent is experimental. Its APIs and runtime behavior may change between
@@ -53,26 +53,29 @@ Open the interactive Flower Agent chat:
 $ uvx flwr chat
 ```
 
-The command connects to SuperGrid and starts Flower's built-in AgentApp. When
-the `You>` prompt appears, try asking:
+The command connects to SuperGrid and opens Flower Chat. When the `❯` prompt
+appears, try asking:
 
 ```console
-You> Explain Flower Agent in one sentence.
+❯ Explain Flower Agent in one sentence.
 ```
 
-The reply appears after `Agent>` and streams directly to your terminal. You can
-keep chatting by entering another message at the next `You>` prompt.
+Flower's built-in AgentApp handles the prompt, and its reply streams directly
+into the chat. After it finishes, you can submit another prompt. Each prompt is
+handled independently, so include any context the AgentApp needs in the prompt.
 
-## Control the conversation
+## Use chat commands
 
-Your messages stay in the same conversation until you ask Flower to start a new
-one or leave the chat:
+Type `/` at the prompt to open the command menu. Flower Chat can autocomplete
+these commands:
 
-- Enter `/new` to make your next message the start of a fresh conversation.
+- Enter `/help` to list the available commands.
+- Enter `/new` to make your next prompt start a new run series.
 - Enter `/quit` to leave the chat.
 
 You can also press {kbd}`Ctrl+C`. If Flower Agent is replying, this stops the
-current run and returns you to the prompt. At the prompt, it leaves the chat.
+current run and returns you to the prompt. If you've started typing, it clears
+the prompt; from an empty prompt, it leaves the chat.
 
 ## What happened
 
@@ -87,10 +90,14 @@ Flower `Context`. The `AgentSession` is the app's interface to runtime-provided
 model and connector capabilities, while the `Context` contains its run
 configuration and state.
 
+The run series keeps related runs together in SuperGrid, but it doesn't provide
+conversation history to the model. The built-in AgentApp forwards only the
+current prompt, so repeat any details an answer should take into account.
+
 ## Final remarks
 
-Congratulations, you've had your first conversation with Flower Agent on
-SuperGrid! 🎉
+Congratulations, you've completed your first interactive Flower Agent session
+on SuperGrid! 🎉
 
 You ran Flower with `uvx`, authenticated with SuperGrid, and chatted with the
 built-in AgentApp from your terminal. The same runtime will also run AgentApps
