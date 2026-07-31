@@ -358,7 +358,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             if self.transcript_window.vertical_scroll < bottom_scroll:
                 return Point(
                     x=0,
-                    y=self.transcript_window.vertical_scroll,
+                    y=min(self.transcript_window.vertical_scroll, last_line_index),
                 )
 
         last_line_width = get_cwidth(lines[-1])
