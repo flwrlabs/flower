@@ -376,8 +376,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             )
 
         # Follow the newest transcript line while the view remains at the bottom.
-        last_line_width = get_cwidth(lines[-1])
-        return Point(x=last_line_width, y=last_line_index)
+        return Point(x=0, y=last_line_index)
 
 
 def parse_task_event(task_event: TaskEvent) -> tuple[str, JSONObject]:
