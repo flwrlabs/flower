@@ -223,20 +223,19 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             char="─",
             style="class:agent.separator",
         )
-        root = HSplit(
-            [
-                welcome,
-                chat_window,
-                agent_name,
-                agent_separator,
-                prompt,
-                completion_menu,
-            ]
-        )
         # Assemble the full-screen chat layout.
         return Application[None](
             layout=Layout(
-                root,
+                HSplit(
+                    [
+                        welcome,
+                        chat_window,
+                        agent_name,
+                        agent_separator,
+                        prompt,
+                        completion_menu,
+                    ]
+                ),
                 focused_element=prompt,
             ),
             key_bindings=key_bindings,
@@ -269,6 +268,9 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
     def _handle_command(self, event: KeyPressEvent, prompt: str) -> bool:
         """Handle a slash command and return whether the prompt was consumed."""
         command = prompt.lower()
+        if command == CHAT_HELP_COMMAND:
+            self._append_transcript("class:notice", format_chat_help())
+            return True
         if command == CHAT_EXIT_COMMAND:
             event.app.exit()
             return True
@@ -420,7 +422,7 @@ def parse_task_event(task_event: TaskEvent) -> tuple[str, JSONObject]:
 
 def format_chat_help() -> str:
     """Return formatted chat command help."""
-    lines = ["Available Command:s"]
+    lines = ["Available Commands:"]
     for command, description in CHAT_COMMANDS.items():
         lines.append(f"  {command:<5} {description}")
     return "\n".join(lines) + "\n\n"
