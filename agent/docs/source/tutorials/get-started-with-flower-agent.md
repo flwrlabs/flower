@@ -7,17 +7,16 @@ won't need to write any code or provide model credentials. By the end, you'll
 have used Flower Chat and seen how its main pieces fit together.
 
 ```{note}
-Flower Agent is experimental. Its APIs and runtime behavior may change between
-releases.
+Flower Agent is experimental. Its APIs and runtime behavior may change between releases.
 ```
 
 ## Prerequisites
 
 You need:
 
-- [uv](https://docs.astral.sh/uv/getting-started/installation/);
-- a Flower SuperGrid account with access to Flower Agent; and
-- a terminal where you can run the Flower CLI.
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- a Flower SuperGrid account with access to Flower Agent
+- a terminal where you can run the Flower CLI
 
 Let's get started! 🌼
 
@@ -70,7 +69,7 @@ Type `/` at the prompt to open the command menu. Flower Chat can autocomplete
 these commands:
 
 - Enter `/help` to list the available commands.
-- Enter `/new` to make your next prompt start a new run series.
+- Enter `/new` to start a new conversation.
 - Enter `/quit` to leave the chat.
 
 You can also press {kbd}`Ctrl+C`. If Flower Agent is replying, this stops the
@@ -81,9 +80,9 @@ the prompt; from an empty prompt, it leaves the chat.
 
 Each message starts an `AgentApp` run on SuperGrid. The `flwr chat` command:
 
-1. sends your message to the built-in AgentApp;
-1. groups successive runs into the same run series until you enter `/new`; and
-1. streams the AgentApp's reply back to your terminal.
+1. sends your message to the built-in AgentApp
+1. groups successive runs into the same run series until you enter `/new`
+1. streams the AgentApp's reply back to your terminal
 
 Behind the scenes, SuperGrid supplies the app with an `AgentSession` and a
 Flower `Context`. The `AgentSession` is the app's interface to runtime-provided
