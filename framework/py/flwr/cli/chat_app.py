@@ -388,7 +388,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 "Chat run ended before the agent response completed."
             )
 
-    def _handle_details_event(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def _handle_details_event(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
         self,
         event_type: str,
         payload: JSONObject,
@@ -398,10 +398,13 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
     ) -> _DetailsBlock | None:
         """Append streamed reasoning or web-search details."""
         if event_type == CHAT_REASONING_DELTA_EVENT:
+            delta = payload.get("delta")
+            if not isinstance(delta, str) or not delta:
+                return reasoning_block
             if reasoning_block is None:
                 reasoning_block = _DetailsBlock("Reasoning")
                 self.transcript.insert(response_start, reasoning_block)
-            reasoning_block.body += cast(str, payload["delta"])
+            reasoning_block.body += delta
         elif (
             event_type == CHAT_TOOL_CALL_STARTED_EVENT
             and payload.get("connector_ref") == CHAT_WEB_SEARCH_CONNECTOR_REF
@@ -420,10 +423,16 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         ):
             tool_call_id = cast(str, payload["tool_call_id"])
             output = cast(JSONObject, payload["output"])
-            results = cast(list[JSONObject], output["results"])
-            result_lines = []
-            for index, result in enumerate(results, start=1):
-                lines = [f"{index}. {result['title']}", f"   {result['url']}"]
+            results = cast(list[object], output["results"])
+            result_lines: list[str] = []
+            for result in results:
+                if not isinstance(result, dict):
+                    continue
+                title = result.get("title")
+                url = result.get("url")
+                if not isinstance(title, str) or not isinstance(url, str):
+                    continue
+                lines = [f"{len(result_lines) + 1}. {title}", f"   {url}"]
                 snippet = result.get("snippet")
                 if isinstance(snippet, str) and snippet:
                     lines.append(f"   {snippet}")
