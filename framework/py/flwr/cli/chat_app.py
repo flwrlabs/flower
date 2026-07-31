@@ -14,6 +14,7 @@
 # ==============================================================================
 """Flower command line interface `chat` application."""
 
+
 import asyncio
 import json
 from collections.abc import Iterable

@@ -14,6 +14,7 @@
 # ==============================================================================
 """Constants for CLI commands."""
 
+
 import os
 
 from flwr.supercore.constant import SUPERGRID_ADDRESS
@@ -91,7 +92,9 @@ CHAT_FLOWER_LOGO = r"""
 ██╔══╝  ██║     ██║   ██║██║███╗██║██╔══╝  ██╔══██╗
 ██║     ███████╗╚██████╔╝╚███╔███╔╝███████╗██║  ██║
 ╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝ ╚══════╝╚═╝  ╚═╝
-""".strip("\n")
+""".strip(
+    "\n"
+)
 
 
 class SuperLinkConnectionTomlKey:
