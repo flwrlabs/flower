@@ -22,6 +22,8 @@ from flwr.supercore.typing import JSONObject, JSONValue
 from . import (
     automation,
     browser_use,
+    github,
+    github_oauth,
     notion,
     notion_oauth,
     slack,
@@ -38,6 +40,7 @@ ConnectorToolFactory = Callable[[], JSONObject]
 OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthConnectorProvider, ...] = (
     *slack_oauth.get_configured_connector_oauth_providers(),
     *notion_oauth.get_configured_connector_oauth_providers(),
+    *github_oauth.get_configured_connector_oauth_providers(),
 )
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
@@ -50,14 +53,17 @@ _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
 _CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     **slack.SLACK_TOOL_HANDLERS,
     **notion.NOTION_TOOL_HANDLERS,
+    **github.GITHUB_TOOL_HANDLERS,
 }
 _CREDENTIAL_CONNECTOR_REFS: dict[str, str] = {
     **dict.fromkeys(slack.SLACK_TOOL_NAMES, slack.SLACK_CONNECTOR_REF),
     **dict.fromkeys(notion.NOTION_TOOL_NAMES, notion.NOTION_CONNECTOR_REF),
+    **dict.fromkeys(github.GITHUB_TOOL_NAMES, github.GITHUB_CONNECTOR_REF),
 }
 _CREDENTIAL_CONNECTOR_TOOL_FACTORIES: dict[str, Callable[[], list[JSONObject]]] = {
     slack.SLACK_CONNECTOR_REF: slack.make_slack_tools,
     notion.NOTION_CONNECTOR_REF: notion.make_notion_tools,
+    github.GITHUB_CONNECTOR_REF: github.make_github_tools,
 }
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     automation.START_AUTOMATION_TOOL_NAME: automation.make_start_automation_tool,
