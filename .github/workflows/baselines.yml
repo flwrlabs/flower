@@ -27,7 +27,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - shell: bash
+      - name: Build baseline path filters
+        shell: bash
         run: |
           # create a list of all directories in baselines
           {
@@ -55,7 +56,8 @@ jobs:
         with:
           filters: ${{ env.FILTER_PATHS }}
 
-      - if: ${{ github.event.pull_request.head.repo.fork }}
+      - name: Reject multi-baseline changes from forks
+        if: ${{ github.event.pull_request.head.repo.fork }}
         run: |
           CHANGES=$(echo "${{ toJson(steps.filter.outputs.changes) }}" | jq '. | length')
           if [ "$CHANGES" -gt 1 ]; then
