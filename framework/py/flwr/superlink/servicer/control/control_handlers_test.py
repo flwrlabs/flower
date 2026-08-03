@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for Control API handler functions."""
 
+
 import hashlib
 import unittest
 from unittest.mock import Mock, patch
