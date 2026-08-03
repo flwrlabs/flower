@@ -75,6 +75,7 @@ from flwr.supercore.state.schema.corestate_models import (
 from flwr.supercore.state.schema.corestate_models import SeriesRuns as SeriesRunsModel
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
+from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
@@ -1469,9 +1470,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session():
             self._cleanup_expired_task_tokens()
             self._cleanup_invalid_task_messages()
-            rows = self._claim_task_message_rows(dst_task_ids, order_by, limit)
-
-        return [_task_message_from_row(row) for row in rows]
+            rows = self._claim_task_message_models(dst_task_ids, order_by, limit)
+            return [_task_message_from_model(row) for row in rows]
 
     def store_task_events(
         self,
@@ -1530,62 +1530,50 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             rows = session.scalars(query).all()
             return [_task_event_from_model(row) for row in rows]
 
-    def _claim_task_message_rows(
+    def _claim_task_message_models(
         self,
         dst_task_ids: Sequence[int] | None,
         order_by: Literal["created_at"] | None,
         limit: int | None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[TaskMessageModel]:
         """Atomically claim eligible task Messages."""
-        conditions: list[str] = []
-        params: dict[str, Any] = {}
+        query = select(TaskMessageModel.message_id)
 
         # Filter by destination task IDs
         if dst_task_ids is not None:
             sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
-            placeholders, in_params = build_sql_in_params(sint64_dst_task_ids, "dtid")
-            conditions.append(f"dst_task_id IN ({placeholders})")
-            params.update(in_params)
-
-        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-        order_clause = f"ORDER BY {order_by}" if order_by else ""
-        limit_clause = "LIMIT :limit" if limit is not None else ""
-
+            query = query.where(TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids))
+        if order_by is not None:
+            query = query.order_by(TaskMessageModel.created_at.asc())
         if limit is not None:
-            params["limit"] = limit
+            query = query.limit(limit)
 
         if order_by is not None or limit is not None:
             # Materialize candidates before deleting. Some backends can otherwise
             # re-evaluate same-table subqueries while DELETE scans rows.
-            # `self.select_lock_sql` is an optional clause for backends that support
-            # row-locking while selecting candidates. Keep it before LIMIT so locked
-            # rows are skipped before limiting the result set.
-            query = f"""
-                WITH selected AS (
-                    SELECT message_id
-                    FROM task_message
-                    {where_clause} {order_clause}
-                    {self.select_lock_sql}
-                    {limit_clause}
-                )
-                DELETE FROM task_message
-                WHERE message_id IN (SELECT message_id FROM selected)
-                RETURNING *
-            """
+            if self.select_lock_sql:
+                query = query.with_for_update(skip_locked=True)
+            selected = query.subquery()
+            delete_query = delete(TaskMessageModel).where(
+                TaskMessageModel.message_id.in_(select(selected.c.message_id))
+            )
         else:
-            query = f"""
-                DELETE FROM task_message
-                {where_clause}
-                RETURNING *
-            """
+            delete_query = delete(TaskMessageModel)
+            if dst_task_ids is not None:
+                sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
+                delete_query = delete_query.where(
+                    TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids)
+                )
 
-        rows = self.query(query, params)
+        returning_query = delete_query.returning(TaskMessageModel)
+        with self.session() as session:
+            rows = list(session.scalars(returning_query))
 
-        # Sort claimed rows in-memory if requested
-        # `ORDER BY` in the CTE determines which rows are claimed, but SQL does not
-        # guarantee that `DELETE ... RETURNING` returns them in that order.
+        # Sort claimed rows in memory if requested. `ORDER BY` in the candidate
+        # query determines which rows are claimed, but SQL does not guarantee that
+        # `DELETE ... RETURNING` returns them in that order.
         if order_by is not None:
-            rows.sort(key=lambda row: row[order_by])
+            rows.sort(key=lambda row: row.created_at)
 
         return rows
 
@@ -1632,13 +1620,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def _cleanup_invalid_task_messages(self) -> None:
         """Remove expired Messages and Messages for invalid destination tasks."""
-        self.query(
-            """
-            DELETE FROM task_message
-            WHERE (created_at + ttl) <= :current
-            """,
-            {"current": now().timestamp()},
-        )
+        with self.session() as session:
+            session.execute(
+                delete(TaskMessageModel).where(
+                    (TaskMessageModel.created_at + TaskMessageModel.ttl)
+                    <= now().timestamp()
+                )
+            )
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Handle cleanup of expired task tokens.
@@ -1870,25 +1858,25 @@ def _task_message_to_row(message: Message) -> dict[str, Any]:
     }
 
 
-def _task_message_from_row(row: dict[str, Any]) -> Message:
-    """Convert a task_message row to a Message."""
+def _task_message_from_model(model: TaskMessageModel) -> Message:
+    """Convert a task_message ORM model to a Message."""
     content, error = None, None
-    if row["content"] is not None:
-        content = recorddict_from_proto(ProtoRecordDict.FromString(row["content"]))
-    if row["error"] is not None:
-        error = error_from_proto(ProtoError.FromString(row["error"]))
+    if model.content is not None:
+        content = recorddict_from_proto(ProtoRecordDict.FromString(model.content))
+    if model.error is not None:
+        error = error_from_proto(ProtoError.FromString(model.error))
 
     metadata = Metadata(
-        run_id=int64_to_uint64(row["run_id"]),
-        message_id=row["message_id"],
+        run_id=int64_to_uint64(model.run_id),
+        message_id=model.message_id,
         src_node_id=SUPERLINK_NODE_ID,
         dst_node_id=SUPERLINK_NODE_ID,
-        reply_to_message_id=row["reply_to_message_id"] or "",
+        reply_to_message_id=model.reply_to_message_id or "",
         group_id="",  # Task messages don't have this field for now
-        created_at=row["created_at"],
-        ttl=row["ttl"],
-        message_type=row["message_type"],
-        src_task_id=int64_to_uint64(row["src_task_id"]),
-        dst_task_id=int64_to_uint64(row["dst_task_id"]),
+        created_at=model.created_at,
+        ttl=model.ttl,
+        message_type=model.message_type,
+        src_task_id=int64_to_uint64(model.src_task_id),
+        dst_task_id=int64_to_uint64(model.dst_task_id),
     )
     return make_message(metadata=metadata, content=content, error=error)
