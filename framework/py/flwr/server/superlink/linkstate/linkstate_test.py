@@ -32,6 +32,7 @@ from typing import Any
 from unittest.mock import Mock, PropertyMock, patch
 from uuid import uuid4
 
+from google.protobuf.message import DecodeError
 from parameterized import parameterized
 
 from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
@@ -63,6 +64,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
+from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import get_object_tree
@@ -70,6 +72,7 @@ from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
 
 
@@ -2391,6 +2394,64 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         assert second is not None
         self.assertEqual(second.credentials_json, '{"token":"new"}')
         self.assertEqual(second.config_json, '{"calendar":"work"}')
+
+    def test_get_task_message_commits_claim_before_deserialization(self) -> None:
+        """Malformed claimed task Messages should not remain queued forever."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert src_task_id is not None and dst_task_id is not None
+
+        current = now().timestamp()
+        valid_message = create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            created_at=current + 1.0,
+        )
+        self.assertTrue(state.store_task_message(valid_message))
+        state.query(
+            """
+            INSERT INTO task_message (
+                message_id, run_id, src_task_id, dst_task_id,
+                reply_to_message_id, created_at, ttl, message_type, content, error
+            )
+            VALUES (
+                :message_id, :run_id, :src_task_id, :dst_task_id,
+                :reply_to_message_id, :created_at, :ttl, :message_type, :content,
+                :error
+            )
+            """,
+            {
+                "message_id": str(uuid4()),
+                "run_id": uint64_to_int64(run_id),
+                "src_task_id": uint64_to_int64(src_task_id),
+                "dst_task_id": uint64_to_int64(dst_task_id),
+                "reply_to_message_id": "",
+                "created_at": current,
+                "ttl": DEFAULT_TTL,
+                "message_type": valid_message.metadata.message_type,
+                "content": b"\xff",
+                "error": None,
+            },
+        )
+
+        with self.assertRaises(DecodeError):
+            state.get_task_message(
+                dst_task_ids=[dst_task_id], order_by="created_at", limit=2
+            )
+
+        rows = state.query(
+            """
+            SELECT COUNT(*) AS message_count
+            FROM task_message
+            WHERE dst_task_id = :dst_task_id
+            """,
+            {"dst_task_id": uint64_to_int64(dst_task_id)},
+        )
+        self.assertEqual(rows[0]["message_count"], 0)
+        self.assertEqual(state.get_task_message(dst_task_ids=[dst_task_id]), [])
 
     def test_run_series_distinguishes_missing_and_empty_descriptions(self) -> None:
         """Missing and explicitly empty descriptions remain distinct in SQL."""

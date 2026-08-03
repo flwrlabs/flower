@@ -1471,7 +1471,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             self._cleanup_expired_task_tokens()
             self._cleanup_invalid_task_messages()
             rows = self._claim_task_message_models(dst_task_ids, order_by, limit)
-            return [_task_message_from_model(row) for row in rows]
+            snapshots = [_task_message_snapshot_from_model(row) for row in rows]
+        return [_task_message_from_snapshot(row) for row in snapshots]
 
     def store_task_events(
         self,
@@ -1863,25 +1864,41 @@ def _task_message_to_row(message: Message) -> dict[str, Any]:
     }
 
 
-def _task_message_from_model(model: TaskMessageModel) -> Message:
-    """Convert a task_message ORM model to a Message."""
+def _task_message_snapshot_from_model(model: TaskMessageModel) -> dict[str, Any]:
+    """Snapshot a claimed task_message model before the transaction commits."""
+    return {
+        "message_id": model.message_id,
+        "run_id": model.run_id,
+        "src_task_id": model.src_task_id,
+        "dst_task_id": model.dst_task_id,
+        "reply_to_message_id": model.reply_to_message_id,
+        "created_at": model.created_at,
+        "ttl": model.ttl,
+        "message_type": model.message_type,
+        "content": model.content,
+        "error": model.error,
+    }
+
+
+def _task_message_from_snapshot(row: dict[str, Any]) -> Message:
+    """Convert a claimed task_message snapshot to a Message."""
     content, error = None, None
-    if model.content is not None:
-        content = recorddict_from_proto(ProtoRecordDict.FromString(model.content))
-    if model.error is not None:
-        error = error_from_proto(ProtoError.FromString(model.error))
+    if row["content"] is not None:
+        content = recorddict_from_proto(ProtoRecordDict.FromString(row["content"]))
+    if row["error"] is not None:
+        error = error_from_proto(ProtoError.FromString(row["error"]))
 
     metadata = Metadata(
-        run_id=int64_to_uint64(model.run_id),
-        message_id=model.message_id,
+        run_id=int64_to_uint64(row["run_id"]),
+        message_id=row["message_id"],
         src_node_id=SUPERLINK_NODE_ID,
         dst_node_id=SUPERLINK_NODE_ID,
-        reply_to_message_id=model.reply_to_message_id or "",
+        reply_to_message_id=row["reply_to_message_id"] or "",
         group_id="",  # Task messages don't have this field for now
-        created_at=model.created_at,
-        ttl=model.ttl,
-        message_type=model.message_type,
-        src_task_id=int64_to_uint64(model.src_task_id),
-        dst_task_id=int64_to_uint64(model.dst_task_id),
+        created_at=row["created_at"],
+        ttl=row["ttl"],
+        message_type=row["message_type"],
+        src_task_id=int64_to_uint64(row["src_task_id"]),
+        dst_task_id=int64_to_uint64(row["dst_task_id"]),
     )
     return make_message(metadata=metadata, content=content, error=error)
