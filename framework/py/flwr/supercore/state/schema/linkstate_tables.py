@@ -81,6 +81,7 @@ def create_linkstate_metadata() -> MetaData:
         Column("bytes_recv", BigInteger, server_default="0"),
         Column("clientapp_runtime", Float, server_default="0.0"),
         Index("idx_run_series_id", "series_id"),
+        Index("idx_run_fab_hash_federation_id", "fab_hash", "federation_id"),
     )
 
     # --------------------------------------------------------------------------
