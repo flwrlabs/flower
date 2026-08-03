@@ -1552,8 +1552,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             # Materialize candidates before deleting. Some backends can otherwise
             # re-evaluate same-table subqueries while DELETE scans rows.
             if self.select_lock_sql:
+                if self.select_lock_sql.strip().upper() != "FOR UPDATE SKIP LOCKED":
+                    raise NotImplementedError(
+                        "Custom select_lock_sql values are not supported for ORM "
+                        "task_message claims."
+                    )
                 query = query.with_for_update(skip_locked=True)
-            selected = query.subquery()
+            selected = query.cte("selected")
             delete_query = delete(TaskMessageModel).where(
                 TaskMessageModel.message_id.in_(select(selected.c.message_id))
             )
@@ -1619,7 +1624,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             self._on_task_tokens_expired([task_from_row(row) for row in rows])
 
     def _cleanup_invalid_task_messages(self) -> None:
-        """Remove expired Messages and Messages for invalid destination tasks."""
+        """Remove expired task Messages."""
         with self.session() as session:
             session.execute(
                 delete(TaskMessageModel).where(
