@@ -1701,18 +1701,16 @@ def _connector_oauth_session_from_model(
         state=row.state,
         redirect_uri=row.redirect_uri,
         pkce_verifier=row.pkce_verifier,
-        created_at=_utc_timestamp_to_iso(row.created_at),
-        expires_at=_utc_timestamp_to_iso(row.expires_at),
-        completed_at=_utc_timestamp_to_iso(row.completed_at) or None,
+        created_at=_timestamp_to_iso_assuming_utc(row.created_at),
+        expires_at=_timestamp_to_iso_assuming_utc(row.expires_at),
+        completed_at=_timestamp_to_iso_assuming_utc(row.completed_at) or None,
     )
 
 
-def _utc_timestamp_to_iso(value: datetime | str | None) -> str:
-    """Return an OAuth timestamp as a UTC ISO string."""
-    if isinstance(value, datetime):
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=UTC)
-        value = value.astimezone(UTC)
+def _timestamp_to_iso_assuming_utc(value: datetime | str | None) -> str:
+    """Return an ISO string, treating naïve SQLite timestamps as UTC."""
+    if isinstance(value, datetime) and value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
     return timestamp_to_iso(value)
 
 
