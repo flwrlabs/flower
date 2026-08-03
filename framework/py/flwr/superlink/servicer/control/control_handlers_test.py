@@ -15,6 +15,7 @@
 """Tests for Control API handler functions."""
 
 import hashlib
+import json
 import unittest
 from unittest.mock import Mock, patch
 
@@ -38,6 +39,7 @@ from flwr.supercore.fab import Fab
 from flwr.superlink.federation import NoOpFederationManager
 
 from .control_handlers import (
+    _get_remote_fab_by_hash,
     list_automations,
     start_automation,
     start_run,
@@ -72,12 +74,12 @@ class TestStartRunHandler(unittest.TestCase):
             TaskType.SERVER_APP,
         )
 
-    def test_start_run_reuses_source_run_fab(self) -> None:
-        """Test StartRun reuses a historical run's stored FAB."""
+    def test_start_run_reuses_federation_fab_by_hash(self) -> None:
+        """Test StartRun reuses a federation's stored FAB by hash."""
         fab_content = b"historical FAB"
         fab_hash = hashlib.sha256(fab_content).hexdigest()
         self.state.store_fab(Fab(fab_hash, fab_content, {}))
-        source_run_id = self._create_run(self.account.flwr_aid, fab_hash)
+        self._create_run(self.account.flwr_aid, fab_hash)
 
         with (
             patch(
@@ -89,12 +91,15 @@ class TestStartRunHandler(unittest.TestCase):
                 ".get_metadata_from_config",
                 return_value=("flwr/demo", "v0.0.1"),
             ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                "._get_remote_fab_by_hash"
+            ) as get_remote_fab,
         ):
+            request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+            request.fab.hash_str = fab_hash
             response = start_run(
-                StartRunRequest(
-                    source_run_id=source_run_id,
-                    federation=NOOP_FEDERATION_ID,
-                ),
+                request,
                 self.account,
                 self.state,
                 None,
@@ -102,20 +107,120 @@ class TestStartRunHandler(unittest.TestCase):
 
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
+        get_remote_fab.assert_not_called()
 
-    def test_start_run_rejects_source_run_from_another_account(self) -> None:
-        """Test StartRun requires ownership of the source run."""
-        source_run_id = self._create_run("other-account", "hash123")
+    def test_start_run_downloads_hash_unavailable_in_federation(self) -> None:
+        """Test StartRun falls back to Hub for a hash unavailable locally."""
+        fab_content = b"remote FAB"
+        fab_hash = hashlib.sha256(fab_content).hexdigest()
+        self.state.store_fab(Fab(fab_hash, fab_content, {}))
+        self.state.create_run(
+            "flwr/demo",
+            "v0.0.1",
+            fab_hash,
+            {},
+            "@me/other-federation",
+            None,
+            self.account.flwr_aid,
+            TaskType.SERVER_APP,
+        )
 
-        with self.assertRaises(FlowerError) as exc:
-            start_run(
-                StartRunRequest(source_run_id=source_run_id),
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                "._get_remote_fab_by_hash",
+                return_value=(fab_content, {}, None),
+            ) as get_remote_fab,
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/demo", "v0.0.1"),
+            ),
+        ):
+            request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+            request.fab.hash_str = fab_hash
+            response = start_run(
+                request,
                 self.account,
                 self.state,
                 None,
             )
 
-        self.assertEqual(exc.exception.code, ApiErrorCode.RUN_ID_NOT_BELONG_TO_ACCOUNT)
+        self.assertTrue(response.HasField("run_id"))
+        get_remote_fab.assert_called_once_with(None, fab_hash)
+
+    def test_start_run_rejects_invalid_fab_hash(self) -> None:
+        """Test StartRun rejects a malformed FAB hash before lookup."""
+        request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+        request.fab.hash_str = "not-a-sha256-hash"
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                "._get_remote_fab_by_hash"
+            ) as get_remote_fab,
+            self.assertRaises(FlowerError) as error,
+        ):
+            start_run(request, self.account, self.state, None)
+
+        self.assertEqual(error.exception.code, ApiErrorCode.FAB_DOWNLOAD_FAILURE)
+        get_remote_fab.assert_not_called()
+
+    def test_start_run_rejects_downloaded_fab_hash_mismatch(self) -> None:
+        """Test StartRun verifies a FAB downloaded by hash."""
+        request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+        request.fab.hash_str = hashlib.sha256(b"expected").hexdigest()
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                "._get_remote_fab_by_hash",
+                return_value=(b"different", {}, None),
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            start_run(request, self.account, self.state, None)
+
+        self.assertEqual(error.exception.code, ApiErrorCode.FAB_DOWNLOAD_FAILURE)
+        self.assertEqual(list(self.state.get_run_info()), [])
+
+    def test_start_run_rejects_conflicting_app_sources(self) -> None:
+        """Test StartRun rejects app_spec combined with a FAB reference."""
+        request = StartRunRequest(
+            app_spec="@flwragent/flwr-agent",
+            federation=NOOP_FEDERATION_ID,
+        )
+        request.fab.hash_str = hashlib.sha256(b"fab").hexdigest()
+
+        with self.assertRaises(FlowerError) as error:
+            start_run(request, self.account, self.state, None)
+
+        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_APP_SPEC)
+
+    @patch("flwr.superlink.servicer.control.control_handlers.requests.get")
+    @patch("flwr.superlink.servicer.control.control_handlers.requests.post")
+    def test_get_remote_fab_by_hash(self, post: Mock, get: Mock) -> None:
+        """Test Flower Hub receives a FAB hash and the FAB is downloaded."""
+        post.return_value.json.return_value = {
+            "fab_url": "https://example.invalid/fab",
+            "verifications": None,
+            "note": "Found exact revision.",
+        }
+        get.return_value.content = b"fab-content"
+
+        fab_file, verifications, note = _get_remote_fab_by_hash(None, "a" * 64)
+
+        self.assertEqual(fab_file, b"fab-content")
+        self.assertEqual(verifications, {"valid_license": ""})
+        self.assertEqual(note, "Found exact revision.")
+        self.assertEqual(
+            json.loads(post.call_args.kwargs["data"]),
+            {"fab_hash": "a" * 64},
+        )
 
 
 class TestAutomationHandlers(unittest.TestCase):

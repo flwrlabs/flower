@@ -138,6 +138,19 @@ class StateTest(CoreStateTest):
         state = self.state_factory()
         self.assertIsNone(state.get_fab("missing-fab-hash"))
 
+    def test_get_fab_can_be_scoped_to_federation(self) -> None:
+        """Test that scoped FAB retrieval requires a run in the federation."""
+        state = self.state_factory()
+        content = b"federation-fab"
+        fab_hash = state.store_fab(
+            Fab(hashlib.sha256(content).hexdigest(), content, {})
+        )
+        create_dummy_run(state, fab_hash=fab_hash, federation_id="@me/fed-a")
+
+        self.assertIsNotNone(state.get_fab(fab_hash, federation_id="@me/fed-a"))
+        self.assertIsNone(state.get_fab(fab_hash, federation_id="@me/fed-b"))
+        self.assertIsNotNone(state.get_fab(fab_hash))
+
     def test_store_fab_rejects_hash_mismatch(self) -> None:
         """Test storing a FAB fails when provided hash doesn't match content."""
         state = self.state_factory()

@@ -19,6 +19,7 @@
 import base64
 import hashlib
 import json
+import re
 import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
@@ -454,50 +455,8 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
 
     flwr_aid = account.flwr_aid
     account_name = account.account_name
-    source_run = None
-    if request.HasField("source_run_id"):
-        source_runs = state.get_run_info(run_ids=[request.source_run_id])
-        if not source_runs:
-            raise FlowerError(
-                ApiErrorCode.RUN_ID_NOT_FOUND,
-                f"Source run {request.source_run_id} not found.",
-            )
-        source_run = source_runs[0]
-        _check_flwr_aid_in_run(flwr_aid, source_run)
-
     verification_dict: dict[str, str] = {}
     note: str | None = None
-
-    if source_run is not None:
-        source_fab = state.get_fab(source_run.fab_hash)
-        if source_fab is None:
-            raise FlowerError(
-                ApiErrorCode.FAB_DOWNLOAD_FAILURE,
-                f"FAB for source run {source_run.run_id} not found.",
-            )
-        fab_file = source_fab.content
-        verification_dict = source_fab.verifications
-    else:
-        builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
-        if builtin_agent_fab is not None:
-            fab_file, verification_dict = builtin_agent_fab
-        elif request.app_spec:
-            fab_file, verification_dict, note = _get_remote_fab(
-                fleet_api_type, request.app_spec
-            )
-        else:
-            fab_file = request.fab.content
-
-    if len(fab_file) > FAB_MAX_SIZE:
-        log(
-            ERROR,
-            "FAB size exceeds maximum allowed size of %d bytes.",
-            FAB_MAX_SIZE,
-        )
-        return StartRunResponse()
-
-    override_config = user_config_from_proto(request.override_config)
-    connector_refs = validate_run_connector_refs(request.connector_refs, account, state)
 
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
 
@@ -519,6 +478,65 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
             f"Account with ID '{flwr_aid}' is not a member of the "
             f"federation '{federation_id}'.",
         )
+
+    has_fab_content = bool(request.fab.content)
+    has_fab_hash = bool(request.fab.hash_str)
+    if request.app_spec and (has_fab_content or has_fab_hash):
+        raise FlowerError(
+            ApiErrorCode.INVALID_APP_SPEC,
+            "Specify either app_spec or fab, not both.",
+        )
+
+    if has_fab_content:
+        fab_file = request.fab.content
+    elif has_fab_hash:
+        requested_fab_hash = request.fab.hash_str
+        if re.fullmatch(r"[0-9a-f]{64}", requested_fab_hash) is None:
+            raise FlowerError(
+                ApiErrorCode.FAB_DOWNLOAD_FAILURE,
+                "FAB hash must be a lowercase SHA-256 hex string.",
+            )
+        stored_fab = state.get_fab(
+            requested_fab_hash,
+            federation_id=federation_id,
+        )
+        if stored_fab is None:
+            fab_file, verification_dict, note = _get_remote_fab_by_hash(
+                fleet_api_type,
+                requested_fab_hash,
+            )
+        else:
+            fab_file = stored_fab.content
+            verification_dict = stored_fab.verifications
+    else:
+        builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
+        if builtin_agent_fab is not None:
+            fab_file, verification_dict = builtin_agent_fab
+        elif request.app_spec:
+            fab_file, verification_dict, note = _get_remote_fab(
+                fleet_api_type, request.app_spec
+            )
+        else:
+            fab_file = request.fab.content
+
+    if has_fab_hash:
+        actual_fab_hash = hashlib.sha256(fab_file).hexdigest()
+        if actual_fab_hash != request.fab.hash_str:
+            raise FlowerError(
+                ApiErrorCode.FAB_DOWNLOAD_FAILURE,
+                "Resolved FAB content does not match the requested hash.",
+            )
+
+    if len(fab_file) > FAB_MAX_SIZE:
+        log(
+            ERROR,
+            "FAB size exceeds maximum allowed size of %d bytes.",
+            FAB_MAX_SIZE,
+        )
+        return StartRunResponse()
+
+    override_config = user_config_from_proto(request.override_config)
+    connector_refs = validate_run_connector_refs(request.connector_refs, account, state)
 
     try:
         # Validate user config overrides matches keys in run config in FAB
@@ -1738,6 +1756,54 @@ def _format_verification(verifications: list[dict[str, str]]) -> dict[str, str]:
     verification_dict.update({"valid_license": "Valid"})
 
     return verification_dict
+
+
+def _get_remote_fab_by_hash(
+    fleet_api_type: str | None,
+    fab_hash: str,
+) -> tuple[bytes, dict[str, str], str | None]:
+    """Get a remote FAB from Flower Hub by its SHA-256 hash."""
+    if fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
+        raise FlowerError(
+            ApiErrorCode.UNSUPPORTED_FAB_HUB_TRANSPORT,
+            "The selected SuperLink transport type is not "
+            "supported for connecting to Flower Hub.",
+        )
+
+    url = f"{FLWR_SUPERGRID_API_URL}/hub/fetch-fab"
+    try:
+        response = requests.post(
+            url,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            data=json.dumps({"fab_hash": fab_hash}),
+            timeout=20,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        presigned_url = payload["fab_url"]
+    except (KeyError, TypeError, ValueError, requests.RequestException) as err:
+        raise FlowerError(
+            ApiErrorCode.FAB_DOWNLOAD_LINK_FAILURE,
+            f"Failed to request FAB download link for fab_hash={fab_hash}: {err}",
+        ) from err
+
+    verifications = payload.get("verifications")
+    verification_dict = (
+        _format_verification(verifications)
+        if isinstance(verifications, list)
+        else {"valid_license": ""}
+    )
+    note = payload.get("note")
+
+    try:
+        response = requests.get(presigned_url, timeout=60)
+        response.raise_for_status()
+    except requests.RequestException as err:
+        raise FlowerError(
+            ApiErrorCode.FAB_DOWNLOAD_FAILURE,
+            f"FAB download failed for fab_hash={fab_hash}: {err}",
+        ) from err
+    return response.content, verification_dict, note if isinstance(note, str) else None
 
 
 def _get_remote_fab(

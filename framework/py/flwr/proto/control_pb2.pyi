@@ -64,11 +64,9 @@ class StartRunRequest(google.protobuf.message.Message):
     FEDERATION_FIELD_NUMBER: builtins.int
     SERIES_ID_FIELD_NUMBER: builtins.int
     CONNECTOR_REFS_FIELD_NUMBER: builtins.int
-    SOURCE_RUN_ID_FIELD_NUMBER: builtins.int
     app_spec: builtins.str
     federation: builtins.str
     series_id: builtins.int
-    source_run_id: builtins.int
     @property
     def fab(self) -> flwr.proto.fab_pb2.Fab: ...
     @property
@@ -87,14 +85,10 @@ class StartRunRequest(google.protobuf.message.Message):
         federation: builtins.str = ...,
         series_id: builtins.int | None = ...,
         connector_refs: collections.abc.Iterable[builtins.str] | None = ...,
-        source_run_id: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_series_id", b"_series_id", "_source_run_id", b"_source_run_id", "fab", b"fab", "override_federation_config", b"override_federation_config", "series_id", b"series_id", "source_run_id", b"source_run_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_series_id", b"_series_id", "_source_run_id", b"_source_run_id", "app_spec", b"app_spec", "connector_refs", b"connector_refs", "fab", b"fab", "federation", b"federation", "override_config", b"override_config", "override_federation_config", b"override_federation_config", "series_id", b"series_id", "source_run_id", b"source_run_id"]) -> None: ...
-    @typing.overload
+    def HasField(self, field_name: typing.Literal["_series_id", b"_series_id", "fab", b"fab", "override_federation_config", b"override_federation_config", "series_id", b"series_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_series_id", b"_series_id", "app_spec", b"app_spec", "connector_refs", b"connector_refs", "fab", b"fab", "federation", b"federation", "override_config", b"override_config", "override_federation_config", b"override_federation_config", "series_id", b"series_id"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["_series_id", b"_series_id"]) -> typing.Literal["series_id"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_source_run_id", b"_source_run_id"]) -> typing.Literal["source_run_id"] | None: ...
 
 global___StartRunRequest = StartRunRequest
 

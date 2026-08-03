@@ -20,9 +20,9 @@ package flwr.proto;
 import "flwr/proto/node.proto";
 
 message Fab {
-  // This field is the hash of the data field. It is used to identify the data.
-  // The hash is calculated using the SHA-256 algorithm and is represented as a
-  // hex string (sha256hex).
+  // This field identifies FAB content using its SHA-256 hex digest. When
+  // `content` is empty in StartRunRequest, SuperLink uses this hash to resolve
+  // an existing FAB from the target federation or Flower Hub.
   string hash_str = 1;
   // This field contains the fab file contents a one bytes blob.
   bytes content = 2;
