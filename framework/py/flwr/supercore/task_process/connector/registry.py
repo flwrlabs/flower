@@ -32,6 +32,11 @@ _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
 }
+# Concrete OAuth connector implementations populate these static registries.
+# A provider can expose multiple tool names under one connector ref (for example,
+# ``slack_search_messages`` maps to ``slack``).
+_CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {}
+_CREDENTIAL_CONNECTOR_REFS: dict[str, str] = {}
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     automation.START_AUTOMATION_TOOL_NAME: automation.make_start_automation_tool,
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.make_web_search_tool,
@@ -44,12 +49,35 @@ def invoke_connector(
     name: str,
     arguments: JSONObject,
     usage_recorder: TaskUsageRecorder,
+    credentials: JSONObject | None = None,
+    config: JSONObject | None = None,
 ) -> JSONValue:
     """Invoke one connector by name."""
     handler = _CONNECTOR_HANDLERS.get(name)
+    if handler is not None:
+        return handler(**arguments, usage_recorder=usage_recorder)
+
+    handler = _CREDENTIAL_CONNECTOR_HANDLERS.get(name)
     if handler is None:
         raise ValueError(f"Unsupported connector '{name}'.")
-    return handler(**arguments, usage_recorder=usage_recorder)
+    if credentials is None or config is None:
+        raise RuntimeError("Connector credentials are required.")
+    return handler(
+        **arguments,
+        credentials=credentials,
+        config=config,
+        usage_recorder=usage_recorder,
+    )
+
+
+def requires_connector_credentials(name: str) -> bool:
+    """Return whether a connector uses account-scoped credentials."""
+    return name in _CREDENTIAL_CONNECTOR_HANDLERS
+
+
+def get_connector_ref(name: str) -> str:
+    """Resolve a connector tool name to its OAuth connector reference."""
+    return _CREDENTIAL_CONNECTOR_REFS.get(name, name)
 
 
 def get_builtin_connector_tools() -> list[JSONObject]:
