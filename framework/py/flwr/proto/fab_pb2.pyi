@@ -53,7 +53,7 @@ class Fab(google.protobuf.message.Message):
     hash_str: builtins.str
     """This field identifies FAB content using its SHA-256 hex digest. When
     `content` is empty in StartRunRequest, SuperLink uses this hash to resolve
-    an existing FAB from the target federation or Flower Hub.
+    an existing FAB from the target federation.
     """
     content: builtins.bytes
     """This field contains the fab file contents a one bytes blob."""
