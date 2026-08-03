@@ -1398,17 +1398,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def get_task_by_token(self, token: str) -> Task | None:
         """Return the task associated with the task token, if valid."""
+        current = now()
         with self.session() as session:
             row = session.scalars(
                 select(TaskModel)
                 .where(
                     TaskModel.token == token,
-                    TaskModel.active_until >= now(),
                     TaskModel.finished_at.is_(None),
                 )
                 .execution_options(populate_existing=True)
             ).first()
-            if row is None:
+            if row is None or row.active_until is None or row.active_until < current:
                 return None
             return task_from_model(row)
 
