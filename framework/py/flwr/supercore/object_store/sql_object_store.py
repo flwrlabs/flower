@@ -207,7 +207,10 @@ class SqlObjectStore(ObjectStore, SqlMixin):
         """Delete an object and its unreferenced descendants from the store."""
         with self._mutation_session():
             rows = self.query(
-                "SELECT 1 FROM objects WHERE object_id = :object_id AND ref_count = 0",
+                "SELECT 1 FROM objects "
+                "WHERE object_id = :object_id AND ref_count = 0 "
+                "AND (SELECT COUNT(*) FROM run_objects "
+                "WHERE object_id = :object_id) <= 1",
                 {"object_id": object_id},
             )
             if not rows:
@@ -222,6 +225,8 @@ class SqlObjectStore(ObjectStore, SqlMixin):
             rows = self.query(
                 "DELETE FROM objects "
                 "WHERE object_id = :object_id AND ref_count = 0 "
+                "AND (SELECT COUNT(*) FROM run_objects "
+                "WHERE object_id = :object_id) <= 1 "
                 "RETURNING object_id",
                 {"object_id": object_id},
             )
@@ -247,12 +252,12 @@ class SqlObjectStore(ObjectStore, SqlMixin):
                 "SELECT object_id FROM run_objects WHERE run_id = :run_id",
                 {"run_id": run_id_sint},
             )
+            for obj in objs:
+                self.delete(obj["object_id"])
             self.query(
                 "DELETE FROM run_objects WHERE run_id = :run_id",
                 {"run_id": run_id_sint},
             )
-            for obj in objs:
-                self.delete(obj["object_id"])
 
     def clear(self) -> None:
         """Clear the store."""

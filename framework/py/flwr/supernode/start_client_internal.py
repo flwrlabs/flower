@@ -71,7 +71,11 @@ from flwr.supercore.interceptors import (
     create_clientappio_superexec_auth_server_interceptor,
     create_clientappio_token_auth_server_interceptor,
 )
-from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
+from flwr.supercore.object_store import (
+    NoObjectInStoreError,
+    ObjectStore,
+    ObjectStoreFactory,
+)
 from flwr.supercore.primitives.asymmetric_ed25519 import (
     create_message_to_sign,
     decode_base64url,
@@ -533,11 +537,27 @@ def _push_messages(
                 # therefore we can yield it after casting it to bytes
                 yield tree.object_id, cast(bytes, content)
 
+        def wait_for_object_contents(_obj_tree: ObjectTree) -> None:
+            """Wait until all objects in a reply tree have been pushed locally."""
+            for tree in iterate_object_tree(_obj_tree):
+                while True:
+                    content = object_store.get(tree.object_id)
+                    if content is None:
+                        raise NoObjectInStoreError(
+                            f"Object with ID '{tree.object_id}' was not "
+                            "pre-registered."
+                        )
+                    if content != b"":
+                        break
+                    time.sleep(0.5)
+
         # Send the message
         try:
             clientapp_runtime = state.get_message_processing_duration(
                 message_id=message.metadata.reply_to_message_id,
             )
+            wait_for_object_contents(object_tree)
+
             # Send the reply message with its ObjectTree and ClientApp runtime
             # Get the IDs of objects to send
             ids_obj_to_send, session_id = send(message, object_tree, clientapp_runtime)
