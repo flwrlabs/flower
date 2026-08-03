@@ -22,7 +22,7 @@ import "flwr/proto/node.proto";
 message Fab {
   // This field identifies FAB content using its SHA-256 hex digest. When
   // `content` is empty in StartRunRequest, SuperLink uses this hash to resolve
-  // an existing FAB from the target federation.
+  // an existing FAB from the LinkState.
   string hash_str = 1;
   // This field contains the fab file contents a one bytes blob.
   bytes content = 2;
