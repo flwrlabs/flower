@@ -24,7 +24,7 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData, select
+from sqlalchemy import MetaData, delete, select, update
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Context, Message
@@ -480,28 +480,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Delete an account's connector if it exists."""
         if not flwr_aid or not connector_ref:
             return False
-        params = {"flwr_aid": flwr_aid, "connector_ref": connector_ref}
-        with self.session():
-            rows = self.query(
-                """
-                SELECT connector_ref
-                FROM connector
-                WHERE flwr_aid = :flwr_aid
-                  AND connector_ref = :connector_ref
-                """,
-                params,
+        with self.session() as session:
+            deleted_connector_ref = session.scalar(
+                delete(ConnectorModel)
+                .where(
+                    ConnectorModel.flwr_aid == flwr_aid,
+                    ConnectorModel.connector_ref == connector_ref,
+                )
+                .returning(ConnectorModel.connector_ref)
             )
-            if not rows:
-                return False
-            self.query(
-                """
-                DELETE FROM connector
-                WHERE flwr_aid = :flwr_aid
-                  AND connector_ref = :connector_ref
-                """,
-                params,
-            )
-        return True
+            return deleted_connector_ref is not None
 
     def bind_connectors_to_run(
         self, run_id: int, connector_refs: Sequence[str]
@@ -560,46 +548,24 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return None
         expires_at = expires_at.astimezone(UTC)
         created_at = now()
-        session = ConnectorOAuthSessionRecord(
+        model = ConnectorOAuthSessionModel(
             oauth_session_id=oauth_session_id,
             flwr_aid=flwr_aid,
             connector_ref=connector_ref,
             state=state,
             redirect_uri=redirect_uri,
             pkce_verifier=pkce_verifier,
-            created_at=created_at.isoformat(),
-            expires_at=expires_at.isoformat(),
+            created_at=created_at,
+            expires_at=expires_at,
             completed_at=None,
         )
         try:
-            self.query(
-                """
-                INSERT INTO connector_oauth_session (
-                    oauth_session_id, flwr_aid, connector_ref, state,
-                    redirect_uri, pkce_verifier, created_at, expires_at,
-                    completed_at
-                )
-                VALUES (
-                    :oauth_session_id, :flwr_aid, :connector_ref, :state,
-                    :redirect_uri, :pkce_verifier, :created_at, :expires_at,
-                    :completed_at
-                )
-                """,
-                {
-                    "oauth_session_id": session.oauth_session_id,
-                    "flwr_aid": session.flwr_aid,
-                    "connector_ref": session.connector_ref,
-                    "state": session.state,
-                    "redirect_uri": session.redirect_uri,
-                    "pkce_verifier": session.pkce_verifier,
-                    "created_at": created_at,
-                    "expires_at": expires_at,
-                    "completed_at": session.completed_at,
-                },
-            )
+            with self.session() as db_session:
+                db_session.add(model)
+                db_session.flush()
+                return _connector_oauth_session_from_model(model)
         except IntegrityError:
             return None
-        return session
 
     def get_connector_oauth_session(
         self, oauth_session_id: str, flwr_aid: str
@@ -625,23 +591,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if not oauth_session_id or not flwr_aid:
             return False
         completed_at = now()
-        updated = self.query(
-            """
-            UPDATE connector_oauth_session
-            SET completed_at = :completed_at
-            WHERE oauth_session_id = :oauth_session_id
-              AND flwr_aid = :flwr_aid
-              AND completed_at IS NULL
-              AND expires_at > :completed_at
-            RETURNING oauth_session_id
-            """,
-            {
-                "oauth_session_id": oauth_session_id,
-                "flwr_aid": flwr_aid,
-                "completed_at": completed_at,
-            },
-        )
-        return bool(updated)
+        with self.session() as session:
+            updated_oauth_session_id = session.scalar(
+                update(ConnectorOAuthSessionModel)
+                .where(
+                    ConnectorOAuthSessionModel.oauth_session_id == oauth_session_id,
+                    ConnectorOAuthSessionModel.flwr_aid == flwr_aid,
+                    ConnectorOAuthSessionModel.completed_at.is_(None),
+                    ConnectorOAuthSessionModel.expires_at > completed_at,
+                )
+                .values(completed_at=completed_at)
+                .returning(ConnectorOAuthSessionModel.oauth_session_id)
+            )
+            return updated_oauth_session_id is not None
 
     def get_run_series(  # pylint: disable=R0914
         self,
@@ -1739,10 +1701,17 @@ def _connector_oauth_session_from_model(
         state=row.state,
         redirect_uri=row.redirect_uri,
         pkce_verifier=row.pkce_verifier,
-        created_at=timestamp_to_iso(row.created_at),
-        expires_at=timestamp_to_iso(row.expires_at),
-        completed_at=timestamp_to_iso(row.completed_at) or None,
+        created_at=_timestamp_to_iso_assuming_utc(row.created_at),
+        expires_at=_timestamp_to_iso_assuming_utc(row.expires_at),
+        completed_at=_timestamp_to_iso_assuming_utc(row.completed_at) or None,
     )
+
+
+def _timestamp_to_iso_assuming_utc(value: datetime | str | None) -> str:
+    """Return an ISO string, treating naïve SQLite timestamps as UTC."""
+    if isinstance(value, datetime) and value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return timestamp_to_iso(value)
 
 
 def determine_task_status(row: dict[str, Any]) -> TaskStatus:

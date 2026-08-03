@@ -18,6 +18,7 @@
 import asyncio
 import json
 from collections.abc import Iterable
+from dataclasses import dataclass
 from time import monotonic
 from typing import cast
 
@@ -28,6 +29,7 @@ from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.data_structures import Point
 from prompt_toolkit.document import Document
 from prompt_toolkit.filters import Condition, has_completions, is_done
+from prompt_toolkit.formatted_text import StyleAndTextTuples
 from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
 from prompt_toolkit.layout import (
     BufferControl,
@@ -39,7 +41,9 @@ from prompt_toolkit.layout import (
     Window,
 )
 from prompt_toolkit.layout.menus import CompletionsMenuControl
+from prompt_toolkit.layout.mouse_handlers import MouseHandler
 from prompt_toolkit.layout.processors import BeforeInput
+from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 from prompt_toolkit.styles import Style
 from prompt_toolkit.utils import get_cwidth
 from prompt_toolkit.widgets import Frame
@@ -58,10 +62,14 @@ from flwr.cli.constant import (
     CHAT_HELP_COMMAND,
     CHAT_NEW_COMMAND,
     CHAT_NEW_CONVERSATION_MESSAGE,
+    CHAT_REASONING_DELTA_EVENT,
     CHAT_SPINNER_FRAMES,
     CHAT_TERMINAL_EVENTS,
     CHAT_TEXT_DELTA_EVENT,
+    CHAT_TOOL_CALL_COMPLETED_EVENT,
+    CHAT_TOOL_CALL_STARTED_EVENT,
     CHAT_USER_PROMPT,
+    CHAT_WEB_SEARCH_CONNECTOR_REF,
     CHAT_WELCOME_MESSAGE,
 )
 from flwr.common.serde import user_config_to_proto
@@ -75,6 +83,15 @@ from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.typing import JSONObject
 
 from .utils import flwr_cli_grpc_exc_handler
+
+
+@dataclass
+class _DetailsBlock:
+    """Collapsible details shown inside the chat transcript."""
+
+    title: str
+    body: str = ""
+    expanded: bool = False
 
 
 class _ChatCommandCompleter(Completer):
@@ -121,9 +138,10 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.run_id: int | None = None
         self.busy = False
         self.cancel_requested = False
-        self.transcript: list[tuple[str, str]] = []
-        self.wrapped_transcript: list[tuple[str, str]] = []
+        self.transcript: list[tuple[str, str] | _DetailsBlock] = []
+        self.wrapped_transcript: StyleAndTextTuples = []
         self.wrapped_transcript_key: tuple[int, int] | None = None
+        self.transcript_revision = 0
         self.follow_transcript = True
         self.status = ""
         self.input_buffer = Buffer(
@@ -335,8 +353,11 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
         response_started = False
         terminal_event_seen = False
+        response_start = len(self.transcript)
+        reasoning_block: _DetailsBlock | None = None
+        web_search_blocks: dict[str, _DetailsBlock] = {}
         req_events = StreamRunEventsRequest(run_id=self.run_id)
-        # Append streamed response text until the run reaches a terminal event.
+        # Append streamed response content until the run reaches a terminal event.
         with flwr_cli_grpc_exc_handler():
             for res_events in self.stub.StreamRunEvents(req_events):
                 event_type, payload = parse_task_event(res_events.task_event)
@@ -347,6 +368,18 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                             response_started = True
                             self.status = ""
                         self._append_transcript("", delta)
+                elif event_type in {
+                    CHAT_REASONING_DELTA_EVENT,
+                    CHAT_TOOL_CALL_STARTED_EVENT,
+                    CHAT_TOOL_CALL_COMPLETED_EVENT,
+                }:
+                    reasoning_block = self._handle_details_event(
+                        event_type,
+                        payload,
+                        response_start,
+                        reasoning_block,
+                        web_search_blocks,
+                    )
                 elif event_type in CHAT_FAILURE_EVENTS:
                     raise click.ClickException(format_failure_event(payload))
                 elif event_type in CHAT_TERMINAL_EVENTS:
@@ -358,6 +391,63 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             raise click.ClickException(
                 "Chat run ended before the agent response completed."
             )
+
+    def _handle_details_event(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+        self,
+        event_type: str,
+        payload: JSONObject,
+        response_start: int,
+        reasoning_block: _DetailsBlock | None,
+        web_search_blocks: dict[str, _DetailsBlock],
+    ) -> _DetailsBlock | None:
+        """Append streamed reasoning or web-search details."""
+        if event_type == CHAT_REASONING_DELTA_EVENT:
+            delta = payload.get("delta")
+            if not isinstance(delta, str) or not delta:
+                return reasoning_block
+            if reasoning_block is None:
+                reasoning_block = _DetailsBlock("Reasoning")
+                self.transcript.insert(response_start, reasoning_block)
+            reasoning_block.body += delta
+        elif (
+            event_type == CHAT_TOOL_CALL_STARTED_EVENT
+            and payload.get("connector_ref") == CHAT_WEB_SEARCH_CONNECTOR_REF
+        ):
+            # Reserve reasoning above web search before either block is populated.
+            if reasoning_block is None:
+                reasoning_block = _DetailsBlock("Reasoning")
+                self.transcript.insert(response_start, reasoning_block)
+            tool_call_id = cast(str, payload["tool_call_id"])
+            block = _DetailsBlock("Web search")
+            web_search_blocks[tool_call_id] = block
+            self.transcript.append(block)
+        elif (
+            event_type == CHAT_TOOL_CALL_COMPLETED_EVENT
+            and payload.get("connector_ref") == CHAT_WEB_SEARCH_CONNECTOR_REF
+        ):
+            tool_call_id = cast(str, payload["tool_call_id"])
+            output = cast(JSONObject, payload["output"])
+            results = cast(list[object], output["results"])
+            result_lines: list[str] = []
+            for result in results:
+                if not isinstance(result, dict):
+                    continue
+                title = result.get("title")
+                url = result.get("url")
+                if not isinstance(title, str) or not isinstance(url, str):
+                    continue
+                lines = [f"{len(result_lines) + 1}. {title}", f"   {url}"]
+                snippet = result.get("snippet")
+                if isinstance(snippet, str) and snippet:
+                    lines.append(f"   {snippet}")
+                result_lines.append("\n".join(lines))
+            web_search_blocks[tool_call_id].body = "\n\n".join(result_lines)
+        else:
+            return reasoning_block
+
+        self.transcript_revision += 1
+        self.application.invalidate()
+        return reasoning_block
 
     def _stop_run(self, run_id: int) -> None:
         """Stop the active run and report failures in the transcript."""
@@ -377,6 +467,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
     def _append_transcript(self, style: str, text: str) -> None:
         """Append text and request a screen redraw."""
         self.transcript.append((style, text))
+        self.transcript_revision += 1
         self.application.invalidate()
 
     def _append_user_message(self, prompt: str) -> None:
@@ -390,6 +481,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             )
             self.transcript.append(("class:user.message", f"{prefix}{line}\n"))
         self.transcript.append(("", "\n"))
+        self.transcript_revision += 1
         self.application.invalidate()
 
     def _get_terminal_width(self) -> int:
@@ -403,7 +495,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         frame = CHAT_SPINNER_FRAMES[int(monotonic() * 10) % len(CHAT_SPINNER_FRAMES)]
         return [("class:status", f"{frame} {self.status}")]
 
-    def _render_transcript(self) -> list[tuple[str, str]]:
+    def _render_transcript(self) -> StyleAndTextTuples:
         """Return transcript text wrapped to the current terminal width."""
         # Detect manual scrolling against the previous rendered transcript.
         render_info = self.transcript_window.render_info
@@ -416,17 +508,48 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             )
 
         width = self._get_terminal_width()
-        cache_key = (len(self.transcript), width)
-        # Rewrap only after transcript growth or a terminal resize.
+        cache_key = (self.transcript_revision, width)
+        # Rewrap only after a transcript change or terminal resize.
         if cache_key != self.wrapped_transcript_key:
-            self.wrapped_transcript = _wrap_transcript_fragments(self.transcript, width)
+            fragments: StyleAndTextTuples = []
+            for entry in self.transcript:
+                if isinstance(entry, _DetailsBlock):
+                    fragments.extend(self._render_details_block(entry, width))
+                else:
+                    fragments.append(entry)
+            self.wrapped_transcript = _wrap_transcript_fragments(fragments, width)
             self.wrapped_transcript_key = cache_key
         return self.wrapped_transcript
+
+    def _render_details_block(
+        self, block: _DetailsBlock, width: int
+    ) -> StyleAndTextTuples:
+        """Render one clickable transcript details block."""
+
+        def _toggle(mouse_event: MouseEvent) -> object:
+            if mouse_event.event_type != MouseEventType.MOUSE_UP:
+                return NotImplemented
+            block.expanded = not block.expanded
+            self.transcript_revision += 1
+            self.application.invalidate()
+            return None
+
+        marker = "▾" if block.expanded else "▸"
+        header = f" {marker} {block.title}"
+        header += " " * max(0, width - get_cwidth(header))
+        fragments: StyleAndTextTuples = [
+            ("class:details.header", f"{header}\n", _toggle)
+        ]
+        if block.expanded and block.body:
+            body = "\n".join(f"   {line}" for line in block.body.splitlines())
+            fragments.append(("class:details.body", f"{body}\n"))
+        fragments.append(("", "\n"))
+        return fragments
 
     def _transcript_cursor(self) -> Point:
         """Keep the transcript scrolled to its last line."""
         # Cursor rows must match the manually wrapped transcript lines.
-        wrapped_text = "".join(text for _, text in self.wrapped_transcript)
+        wrapped_text = "".join(fragment[1] for fragment in self.wrapped_transcript)
         lines = wrapped_text.split("\n")
         last_line_index = len(lines) - 1
         if not self.follow_transcript:
@@ -511,23 +634,37 @@ def format_failure_event(payload: JSONObject) -> str:
 
 
 def _wrap_transcript_fragments(
-    fragments: list[tuple[str, str]], width: int
-) -> list[tuple[str, str]]:
+    fragments: StyleAndTextTuples, width: int
+) -> StyleAndTextTuples:
     """Wrap formatted transcript fragments to the transcript width."""
-    wrapped_fragments: list[tuple[str, str]] = []
+    wrapped_fragments: StyleAndTextTuples = []
     current_width = 0
     # Track display-cell width across adjacent styled fragments.
-    for style, text in fragments:
+    for fragment in fragments:
+        style, text = fragment[:2]
+        mouse_handler = fragment[2] if len(fragment) == 3 else None
+
+        def append_fragment(
+            fragment_style: str,
+            fragment_text: str,
+            handler: MouseHandler | None = mouse_handler,
+        ) -> None:
+            wrapped_fragments.append(
+                (fragment_style, fragment_text, handler)
+                if handler is not None
+                else (fragment_style, fragment_text)
+            )
+
         chunk: list[str] = []
         for char in text:
             if char == "\n":
                 # Finish explicit lines and extend highlighted user rows.
                 if chunk:
-                    wrapped_fragments.append((style, "".join(chunk)))
+                    append_fragment(style, "".join(chunk))
                     chunk = []
                 if style == "class:user.message" and current_width < width:
-                    wrapped_fragments.append((style, " " * (width - current_width)))
-                wrapped_fragments.append((style, char))
+                    append_fragment(style, " " * (width - current_width))
+                append_fragment(style, char)
                 current_width = 0
                 continue
 
@@ -535,14 +672,14 @@ def _wrap_transcript_fragments(
             if current_width and current_width + char_width > width:
                 # Insert a visual line break before exceeding the terminal width.
                 if chunk:
-                    wrapped_fragments.append((style, "".join(chunk)))
+                    append_fragment(style, "".join(chunk))
                     chunk = []
                 if style == "class:user.message" and current_width < width:
-                    wrapped_fragments.append((style, " " * (width - current_width)))
+                    append_fragment(style, " " * (width - current_width))
                 wrapped_fragments.append(("", "\n"))
                 current_width = 0
             chunk.append(char)
             current_width += char_width
         if chunk:
-            wrapped_fragments.append((style, "".join(chunk)))
+            append_fragment(style, "".join(chunk))
     return wrapped_fragments
