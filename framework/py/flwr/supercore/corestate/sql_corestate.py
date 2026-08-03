@@ -24,7 +24,7 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData, select
+from sqlalchemy import MetaData, delete, select, update
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Context, Message
@@ -71,6 +71,8 @@ from flwr.supercore.state.schema.corestate_models import (
 from flwr.supercore.state.schema.corestate_models import (
     SeriesContext as SeriesContextModel,
 )
+from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
+from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import build_sql_in_params, int64_to_uint64, uint64_to_int64
@@ -478,28 +480,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Delete an account's connector if it exists."""
         if not flwr_aid or not connector_ref:
             return False
-        params = {"flwr_aid": flwr_aid, "connector_ref": connector_ref}
-        with self.session():
-            rows = self.query(
-                """
-                SELECT connector_ref
-                FROM connector
-                WHERE flwr_aid = :flwr_aid
-                  AND connector_ref = :connector_ref
-                """,
-                params,
+        with self.session() as session:
+            deleted_connector_ref = session.scalar(
+                delete(ConnectorModel)
+                .where(
+                    ConnectorModel.flwr_aid == flwr_aid,
+                    ConnectorModel.connector_ref == connector_ref,
+                )
+                .returning(ConnectorModel.connector_ref)
             )
-            if not rows:
-                return False
-            self.query(
-                """
-                DELETE FROM connector
-                WHERE flwr_aid = :flwr_aid
-                  AND connector_ref = :connector_ref
-                """,
-                params,
-            )
-        return True
+            return deleted_connector_ref is not None
 
     def bind_connectors_to_run(
         self, run_id: int, connector_refs: Sequence[str]
@@ -558,46 +548,24 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return None
         expires_at = expires_at.astimezone(UTC)
         created_at = now()
-        session = ConnectorOAuthSessionRecord(
+        model = ConnectorOAuthSessionModel(
             oauth_session_id=oauth_session_id,
             flwr_aid=flwr_aid,
             connector_ref=connector_ref,
             state=state,
             redirect_uri=redirect_uri,
             pkce_verifier=pkce_verifier,
-            created_at=created_at.isoformat(),
-            expires_at=expires_at.isoformat(),
+            created_at=created_at,
+            expires_at=expires_at,
             completed_at=None,
         )
         try:
-            self.query(
-                """
-                INSERT INTO connector_oauth_session (
-                    oauth_session_id, flwr_aid, connector_ref, state,
-                    redirect_uri, pkce_verifier, created_at, expires_at,
-                    completed_at
-                )
-                VALUES (
-                    :oauth_session_id, :flwr_aid, :connector_ref, :state,
-                    :redirect_uri, :pkce_verifier, :created_at, :expires_at,
-                    :completed_at
-                )
-                """,
-                {
-                    "oauth_session_id": session.oauth_session_id,
-                    "flwr_aid": session.flwr_aid,
-                    "connector_ref": session.connector_ref,
-                    "state": session.state,
-                    "redirect_uri": session.redirect_uri,
-                    "pkce_verifier": session.pkce_verifier,
-                    "created_at": created_at,
-                    "expires_at": expires_at,
-                    "completed_at": session.completed_at,
-                },
-            )
+            with self.session() as db_session:
+                db_session.add(model)
+                db_session.flush()
+                return _connector_oauth_session_from_model(model)
         except IntegrityError:
             return None
-        return session
 
     def get_connector_oauth_session(
         self, oauth_session_id: str, flwr_aid: str
@@ -623,23 +591,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if not oauth_session_id or not flwr_aid:
             return False
         completed_at = now()
-        updated = self.query(
-            """
-            UPDATE connector_oauth_session
-            SET completed_at = :completed_at
-            WHERE oauth_session_id = :oauth_session_id
-              AND flwr_aid = :flwr_aid
-              AND completed_at IS NULL
-              AND expires_at > :completed_at
-            RETURNING oauth_session_id
-            """,
-            {
-                "oauth_session_id": oauth_session_id,
-                "flwr_aid": flwr_aid,
-                "completed_at": completed_at,
-            },
-        )
-        return bool(updated)
+        with self.session() as session:
+            updated_oauth_session_id = session.scalar(
+                update(ConnectorOAuthSessionModel)
+                .where(
+                    ConnectorOAuthSessionModel.oauth_session_id == oauth_session_id,
+                    ConnectorOAuthSessionModel.flwr_aid == flwr_aid,
+                    ConnectorOAuthSessionModel.completed_at.is_(None),
+                    ConnectorOAuthSessionModel.expires_at > completed_at,
+                )
+                .values(completed_at=completed_at)
+                .returning(ConnectorOAuthSessionModel.oauth_session_id)
+            )
+            return updated_oauth_session_id is not None
 
     def get_run_series(  # pylint: disable=R0914
         self,
@@ -1309,36 +1273,23 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         task_ids: Sequence[int] | None = None,
     ) -> Sequence[TaskUsage]:
         """Retrieve task usage records based on the specified filters."""
-        conditions = []
-        params: dict[str, Any] = {}
+        query = select(TaskUsageModel).order_by(TaskUsageModel.id.asc())
 
         if run_ids is not None:
             if not run_ids:
                 return []
             sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            placeholders, in_params = build_sql_in_params(sint64_run_ids, "rid")
-            conditions.append(f"run_id IN ({placeholders})")
-            params.update(in_params)
+            query = query.where(TaskUsageModel.run_id.in_(sint64_run_ids))
 
         if task_ids is not None:
             if not task_ids:
                 return []
             sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            placeholders, in_params = build_sql_in_params(sint64_task_ids, "tid")
-            conditions.append(f"task_id IN ({placeholders})")
-            params.update(in_params)
+            query = query.where(TaskUsageModel.task_id.in_(sint64_task_ids))
 
-        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-
-        query = f"""
-            SELECT input_tokens, output_tokens, total_tokens, usage_type, provider
-            FROM task_usage
-            {where_clause}
-            ORDER BY id ASC
-        """
-
-        rows = self.query(query, params)
-        return [_task_usage_from_row(row) for row in rows]
+        with self.session() as session:
+            rows = session.scalars(query).all()
+            return [_task_usage_from_model(row) for row in rows]
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
@@ -1581,33 +1532,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
         cursor = after_task_event_id if after_task_event_id is not None else 0
-        conditions = ["id > :after_task_event_id"]
-        params = {"after_task_event_id": cursor}
-        if run_id is not None:
-            conditions.append("run_id = :run_id")
-            params["run_id"] = uint64_to_int64(run_id)
-
-        rows = self.query(
-            f"""
-            SELECT id, timestamp, run_id, task_id, event, data
-            FROM task_event
-            WHERE {" AND ".join(conditions)}
-            ORDER BY id ASC
-            """,
-            params,
+        query = (
+            select(TaskEventModel)
+            .where(TaskEventModel.id > cursor)
+            .order_by(TaskEventModel.id.asc())
         )
+        if run_id is not None:
+            query = query.where(TaskEventModel.run_id == uint64_to_int64(run_id))
 
-        return [
-            TaskEvent(
-                id=row["id"],
-                timestamp=timestamp_to_iso(row["timestamp"]),
-                run_id=int64_to_uint64(row["run_id"]),
-                task_id=int64_to_uint64(row["task_id"]),
-                event=row["event"],
-                data=row["data"],
-            )
-            for row in rows
-        ]
+        with self.session() as session:
+            rows = session.scalars(query).all()
+            return [_task_event_from_model(row) for row in rows]
 
     def _claim_task_message_rows(
         self,
@@ -1766,10 +1701,17 @@ def _connector_oauth_session_from_model(
         state=row.state,
         redirect_uri=row.redirect_uri,
         pkce_verifier=row.pkce_verifier,
-        created_at=timestamp_to_iso(row.created_at),
-        expires_at=timestamp_to_iso(row.expires_at),
-        completed_at=timestamp_to_iso(row.completed_at) or None,
+        created_at=_timestamp_to_iso_assuming_utc(row.created_at),
+        expires_at=_timestamp_to_iso_assuming_utc(row.expires_at),
+        completed_at=_timestamp_to_iso_assuming_utc(row.completed_at) or None,
     )
+
+
+def _timestamp_to_iso_assuming_utc(value: datetime | str | None) -> str:
+    """Return an ISO string, treating naïve SQLite timestamps as UTC."""
+    if isinstance(value, datetime) and value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return timestamp_to_iso(value)
 
 
 def determine_task_status(row: dict[str, Any]) -> TaskStatus:
@@ -1832,14 +1774,26 @@ def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:
     }
 
 
-def _task_usage_from_row(row: dict[str, Any]) -> TaskUsage:
-    """Convert a task_usage row to a TaskUsage proto."""
+def _task_usage_from_model(row: TaskUsageModel) -> TaskUsage:
+    """Convert a task_usage ORM model to a TaskUsage proto."""
     return TaskUsage(
-        usage_type=row["usage_type"],
-        provider=row["provider"],
-        input_tokens=row["input_tokens"],
-        output_tokens=row["output_tokens"],
-        total_tokens=row["total_tokens"],
+        usage_type=row.usage_type,
+        provider=row.provider,
+        input_tokens=row.input_tokens,
+        output_tokens=row.output_tokens,
+        total_tokens=row.total_tokens,
+    )
+
+
+def _task_event_from_model(row: TaskEventModel) -> TaskEvent:
+    """Convert a task_event ORM model to a TaskEvent proto."""
+    return TaskEvent(
+        id=row.id,
+        timestamp=timestamp_to_iso(row.timestamp),
+        run_id=int64_to_uint64(row.run_id),
+        task_id=int64_to_uint64(row.task_id),
+        event=row.event,
+        data=row.data,
     )
 
 

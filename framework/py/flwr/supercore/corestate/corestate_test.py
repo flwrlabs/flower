@@ -126,6 +126,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertIsNone(
             state.get_connector(flwr_aid="account-a", connector_ref="calendar")
         )
+        self.assertFalse(
+            state.delete_connector(flwr_aid="account-a", connector_ref="calendar")
+        )
 
     def test_bind_and_get_run_connectors(self) -> None:
         """Run connector bindings should be deterministic and idempotent."""
@@ -195,7 +198,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             session,
         )
         self.assertIsNone(
+            state.create_connector_oauth_session(
+                oauth_session_id="session-1",
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                state="oauth-state",
+                redirect_uri="https://example.test/callback",
+                pkce_verifier=None,
+                expires_at=expires_at,
+            )
+        )
+        self.assertIsNone(
             state.get_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-b"
+            )
+        )
+        self.assertFalse(
+            state.complete_connector_oauth_session(
                 oauth_session_id="session-1", flwr_aid="account-b"
             )
         )
@@ -212,6 +231,21 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(
             state.complete_connector_oauth_session(
                 oauth_session_id="session-1", flwr_aid="account-a"
+            )
+        )
+        expired = state.create_connector_oauth_session(
+            oauth_session_id="expired-session",
+            flwr_aid="account-a",
+            connector_ref="calendar",
+            state="oauth-state",
+            redirect_uri="https://example.test/callback",
+            pkce_verifier=None,
+            expires_at=now() - timedelta(minutes=10),
+        )
+        assert expired is not None
+        self.assertFalse(
+            state.complete_connector_oauth_session(
+                oauth_session_id="expired-session", flwr_aid="account-a"
             )
         )
 
@@ -885,9 +919,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_add_and_get_task_usage(self) -> None:
         """Task usage should round-trip and filter by task ID."""
         state = self.state_factory()
+        run_id = self.task_run_id(state)
         task_id = state.create_task(
             task_type=TaskType.MODEL,
-            run_id=self.task_run_id(state),
+            run_id=run_id,
         )
         assert task_id is not None
 
@@ -911,8 +946,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
 
         usages = state.get_task_usage(task_ids=[task_id])
+        usages_by_run = state.get_task_usage(run_ids=[run_id])
+        empty_by_task = state.get_task_usage(task_ids=[])
+        empty_by_run = state.get_task_usage(run_ids=[])
 
         self.assertEqual(len(usages), 2)
+        self.assertEqual(usages_by_run, usages)
+        self.assertEqual(empty_by_task, [])
+        self.assertEqual(empty_by_run, [])
         usage = usages[0]
         self.assertEqual(usage.input_tokens, 10)
         self.assertEqual(usage.output_tokens, 20)
