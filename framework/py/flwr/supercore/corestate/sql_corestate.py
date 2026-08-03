@@ -71,6 +71,8 @@ from flwr.supercore.state.schema.corestate_models import (
 from flwr.supercore.state.schema.corestate_models import (
     SeriesContext as SeriesContextModel,
 )
+from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
+from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import build_sql_in_params, int64_to_uint64, uint64_to_int64
@@ -1309,36 +1311,23 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         task_ids: Sequence[int] | None = None,
     ) -> Sequence[TaskUsage]:
         """Retrieve task usage records based on the specified filters."""
-        conditions = []
-        params: dict[str, Any] = {}
+        query = select(TaskUsageModel).order_by(TaskUsageModel.id.asc())
 
         if run_ids is not None:
             if not run_ids:
                 return []
             sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            placeholders, in_params = build_sql_in_params(sint64_run_ids, "rid")
-            conditions.append(f"run_id IN ({placeholders})")
-            params.update(in_params)
+            query = query.where(TaskUsageModel.run_id.in_(sint64_run_ids))
 
         if task_ids is not None:
             if not task_ids:
                 return []
             sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            placeholders, in_params = build_sql_in_params(sint64_task_ids, "tid")
-            conditions.append(f"task_id IN ({placeholders})")
-            params.update(in_params)
+            query = query.where(TaskUsageModel.task_id.in_(sint64_task_ids))
 
-        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-
-        query = f"""
-            SELECT input_tokens, output_tokens, total_tokens, usage_type, provider
-            FROM task_usage
-            {where_clause}
-            ORDER BY id ASC
-        """
-
-        rows = self.query(query, params)
-        return [_task_usage_from_row(row) for row in rows]
+        with self.session() as session:
+            rows = session.scalars(query).all()
+            return [_task_usage_from_model(row) for row in rows]
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
@@ -1581,33 +1570,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
         cursor = after_task_event_id if after_task_event_id is not None else 0
-        conditions = ["id > :after_task_event_id"]
-        params = {"after_task_event_id": cursor}
-        if run_id is not None:
-            conditions.append("run_id = :run_id")
-            params["run_id"] = uint64_to_int64(run_id)
-
-        rows = self.query(
-            f"""
-            SELECT id, timestamp, run_id, task_id, event, data
-            FROM task_event
-            WHERE {" AND ".join(conditions)}
-            ORDER BY id ASC
-            """,
-            params,
+        query = (
+            select(TaskEventModel)
+            .where(TaskEventModel.id > cursor)
+            .order_by(TaskEventModel.id.asc())
         )
+        if run_id is not None:
+            query = query.where(TaskEventModel.run_id == uint64_to_int64(run_id))
 
-        return [
-            TaskEvent(
-                id=row["id"],
-                timestamp=timestamp_to_iso(row["timestamp"]),
-                run_id=int64_to_uint64(row["run_id"]),
-                task_id=int64_to_uint64(row["task_id"]),
-                event=row["event"],
-                data=row["data"],
-            )
-            for row in rows
-        ]
+        with self.session() as session:
+            rows = session.scalars(query).all()
+            return [_task_event_from_model(row) for row in rows]
 
     def _claim_task_message_rows(
         self,
@@ -1832,14 +1805,26 @@ def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:
     }
 
 
-def _task_usage_from_row(row: dict[str, Any]) -> TaskUsage:
-    """Convert a task_usage row to a TaskUsage proto."""
+def _task_usage_from_model(row: TaskUsageModel) -> TaskUsage:
+    """Convert a task_usage ORM model to a TaskUsage proto."""
     return TaskUsage(
-        usage_type=row["usage_type"],
-        provider=row["provider"],
-        input_tokens=row["input_tokens"],
-        output_tokens=row["output_tokens"],
-        total_tokens=row["total_tokens"],
+        usage_type=row.usage_type,
+        provider=row.provider,
+        input_tokens=row.input_tokens,
+        output_tokens=row.output_tokens,
+        total_tokens=row.total_tokens,
+    )
+
+
+def _task_event_from_model(row: TaskEventModel) -> TaskEvent:
+    """Convert a task_event ORM model to a TaskEvent proto."""
+    return TaskEvent(
+        id=row.id,
+        timestamp=timestamp_to_iso(row.timestamp),
+        run_id=int64_to_uint64(row.run_id),
+        task_id=int64_to_uint64(row.task_id),
+        event=row.event,
+        data=row.data,
     )
 
 
