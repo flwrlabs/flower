@@ -42,6 +42,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
+    GetConnectorRequest,
+    GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     PullAppMessagesRequest,
@@ -315,6 +317,122 @@ def _claim_in_parallel(
     if exceptions:
         raise exceptions[0]
     return results
+
+
+class TestGetConnector(unittest.TestCase):
+    """Test connector credential authorization with mocked state."""
+
+    def setUp(self) -> None:
+        """Create a servicer backed by mocked state."""
+        self.state = Mock(spec=LinkState)
+        self.state_factory = Mock(spec=LinkStateFactory)
+        self.state_factory.state.return_value = self.state
+        self.servicer = ServerAppIoServicer(
+            self.state_factory,
+            Mock(spec=ObjectStoreFactory),
+        )
+
+    def test_returns_authenticated_task_credentials(self) -> None:
+        """GetConnector should return the run owner's matching credentials."""
+        task = Mock(type=TaskType.CONNECTOR, connector_ref="notion", run_id=123)
+        self.state.get_run_info.return_value = [Mock(flwr_aid="account-a")]
+        self.state.get_connector.return_value = Mock(
+            connector_ref="notion",
+            credentials_json='{"token":"secret"}',
+            config_json='{"workspace":"primary"}',
+        )
+
+        with patch(
+            "flwr.superlink.servicer.serverappio.serverappio_servicer."
+            "get_authenticated_task",
+            return_value=task,
+        ):
+            response = self.servicer.GetConnector(
+                GetConnectorRequest(),
+                Mock(),
+            )
+
+        self.assertEqual(
+            response,
+            GetConnectorResponse(
+                connector_ref="notion",
+                credentials_json='{"token":"secret"}',
+                config_json='{"workspace":"primary"}',
+            ),
+        )
+        self.state.get_connector.assert_called_once_with(
+            flwr_aid="account-a",
+            connector_ref="notion",
+        )
+
+    @parameterized.expand(  # type: ignore
+        [
+            ("wrong_task_type", TaskType.AGENT_APP, "notion"),
+            ("missing_ref", TaskType.CONNECTOR, ""),
+        ]
+    )
+    def test_rejects_wrong_task_identity(
+        self,
+        _name: str,
+        task_type: str,
+        connector_ref: str,
+    ) -> None:
+        """GetConnector should reject tasks without a connector identity."""
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "get_authenticated_task",
+                return_value=Mock(
+                    type=task_type,
+                    connector_ref=connector_ref,
+                    run_id=123,
+                ),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.GetConnector(
+                GetConnectorRequest(),
+                context,
+            )
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Connector credentials are not available to this task.",
+        )
+        self.state.get_connector.assert_not_called()
+
+    def test_hides_other_account_credentials(self) -> None:
+        """GetConnector should not fall back to another account's credentials."""
+        task = Mock(type=TaskType.CONNECTOR, connector_ref="notion", run_id=123)
+        self.state.get_run_info.return_value = [Mock(flwr_aid="account-b")]
+        self.state.get_connector.return_value = None
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "get_authenticated_task",
+                return_value=task,
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.GetConnector(
+                GetConnectorRequest(),
+                context,
+            )
+
+        self.state.get_connector.assert_called_once_with(
+            flwr_aid="account-b",
+            connector_ref="notion",
+        )
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.NOT_FOUND,
+            "Connector not found.",
+        )
 
 
 class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R0904

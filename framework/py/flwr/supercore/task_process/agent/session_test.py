@@ -104,8 +104,8 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     )
 
 
-def test_create_connector_response_canonicalizes_name() -> None:
-    """Task creation and its request message should use the canonical name."""
+def test_create_connector_response_resolves_canonical_name() -> None:
+    """Task creation should resolve the canonical tool name to its connector."""
     stub = Mock()
     stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
     responses = RuntimeAgentResponses(
@@ -117,26 +117,33 @@ def test_create_connector_response_canonicalizes_name() -> None:
     )
     reply = ConnectorResponse(
         dst_task_id=789,
-        name="notion",
+        name="notion_search",
         call_id="call-1",
         output="done",
         error=None,
         reply_to_message_id="request-message-id",
     )
 
-    with patch.object(
-        responses, "_send_and_receive", return_value=reply
-    ) as send_and_receive:
+    with (
+        patch(
+            "flwr.supercore.task_process.agent.session.get_connector_ref",
+            return_value="notion",
+        ) as get_connector_ref,
+        patch.object(
+            responses, "_send_and_receive", return_value=reply
+        ) as send_and_receive,
+    ):
         output = responses.create_connector_response(
-            name=" NoTiOn ",
+            name=" NoTiOn_Search ",
             call_id="call-1",
             arguments={},
         )
 
+    get_connector_ref.assert_called_once_with("notion_search")
     stub.CreateTask.assert_called_once_with(
         CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref="notion")
     )
     request = send_and_receive.call_args.args[0]
     assert isinstance(request, ConnectorRequest)
-    assert request.payload["name"] == "notion"
+    assert request.payload["name"] == "notion_search"
     assert output == "done"

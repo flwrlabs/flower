@@ -317,3 +317,33 @@ class ObjectPushSessionPending(FlwrBase):
         nullable=False,
     )
     object_id: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class TaskUsage(FlwrBase):
+    """Represent reported task usage."""
+
+    __tablename__ = "task_usage"
+    __table_args__ = (
+        Index("idx_task_usage_run_id", "run_id"),
+        Index("idx_task_usage_task_id", "task_id"),
+        Index("idx_task_usage_reported_at", "reported_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("task.task_id"), nullable=False
+    )
+    input_tokens: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    total_tokens: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    usage_type: Mapped[str] = mapped_column(String, nullable=False)
+    provider: Mapped[str] = mapped_column(
+        String, server_default="unknown", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False
+    )
+    reported_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )

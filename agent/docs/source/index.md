@@ -7,10 +7,11 @@ locally or on SuperGrid.
 
 This documentation shows you how to:
 
+- chat with Flower's built-in AgentApp on SuperGrid;
 - build and configure an `AgentApp`;
 - call models and connectors through an `AgentSession`;
 - understand what happens inside the AgentApp runtime;
-- run and observe your agents on SuperGrid; and
+- run and observe your own agents on SuperGrid; and
 - run an AgentApp with a local SuperLink.
 
 ```{note}
@@ -21,7 +22,7 @@ releases.
 ## Start here
 
 New to Flower Agent? Start with [Get started with Flower
-Agent](tutorials/get-started-with-flower-agent.md). You'll run the built-in
+Agent](tutorials/get-started-with-flower-agent.md). You'll chat with the built-in
 AgentApp without writing any code. When you're ready to build something of your
 own, continue with [Write your first
 AgentApp](tutorials/write-your-first-agentapp.md).
@@ -39,7 +40,7 @@ tutorials/write-your-first-agentapp
 :maxdepth: 1
 
 explanations/agentapp-runtime
-explanations/using-connectors
+explanations/use-connectors
 ```
 
 ```{toctree}

@@ -48,6 +48,7 @@ from flwr.supercore.json_message.model_message import ModelRequest, ModelRespons
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
     get_builtin_connector_tool,
+    get_connector_ref,
     has_builtin_connector,
 )
 from flwr.supercore.task_process.connector.web_fetch import WEB_FETCH_CONNECTOR_NAME
@@ -176,7 +177,9 @@ class RuntimeAgentResponses(AgentResponses):
         """Create one connector response through a child connector task."""
         name = name.strip().lower()
         create_res = self._stub.CreateTask(
-            CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=name)
+            CreateTaskRequest(
+                type=TaskType.CONNECTOR, connector_ref=get_connector_ref(name)
+            )
         )
         if not create_res.HasField("task_id"):
             raise RuntimeError("Connector task could not be created.")
