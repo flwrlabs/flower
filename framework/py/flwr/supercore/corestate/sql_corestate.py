@@ -1708,9 +1708,11 @@ def _connector_oauth_session_from_model(
 
 
 def _utc_timestamp_to_iso(value: datetime | str | None) -> str:
-    """Return an OAuth timestamp as an ISO string with UTC if omitted by SQLite."""
-    if isinstance(value, datetime) and value.tzinfo is None:
-        value = value.replace(tzinfo=UTC)
+    """Return an OAuth timestamp as a UTC ISO string."""
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        value = value.astimezone(UTC)
     return timestamp_to_iso(value)
 
 
