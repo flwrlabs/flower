@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower command line interface `chat` application."""
 
-
 import asyncio
 import json
 from collections.abc import Iterable
@@ -29,7 +28,7 @@ from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.data_structures import Point
 from prompt_toolkit.document import Document
 from prompt_toolkit.filters import Condition, has_completions, is_done
-from prompt_toolkit.formatted_text import StyleAndTextTuples
+from prompt_toolkit.formatted_text import OneStyleAndTextTuple, StyleAndTextTuples
 from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
 from prompt_toolkit.layout import (
     BufferControl,
@@ -41,7 +40,6 @@ from prompt_toolkit.layout import (
     Window,
 )
 from prompt_toolkit.layout.menus import CompletionsMenuControl
-from prompt_toolkit.layout.mouse_handlers import MouseHandler
 from prompt_toolkit.layout.processors import BeforeInput
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 from prompt_toolkit.styles import Style
@@ -140,8 +138,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.cancel_requested = False
         self.transcript: list[tuple[str, str] | _DetailsBlock] = []
         self.wrapped_transcript: StyleAndTextTuples = []
-        self.wrapped_transcript_key: tuple[int, int] | None = None
-        self.transcript_revision = 0
+        self.wrapped_transcript_width: int | None = None
         self.follow_transcript = True
         self.status = ""
         self.input_buffer = Buffer(
@@ -427,26 +424,19 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         ):
             tool_call_id = cast(str, payload["tool_call_id"])
             output = cast(JSONObject, payload["output"])
-            results = cast(list[object], output["results"])
+            results = cast(list[JSONObject], output["results"])
             result_lines: list[str] = []
-            for result in results:
-                if not isinstance(result, dict):
-                    continue
-                title = result.get("title")
-                url = result.get("url")
-                if not isinstance(title, str) or not isinstance(url, str):
-                    continue
-                lines = [f"{len(result_lines) + 1}. {title}", f"   {url}"]
+            for index, result in enumerate(results, start=1):
+                lines = [f"{index}. {result['title']}", f"   {result['url']}"]
                 snippet = result.get("snippet")
-                if isinstance(snippet, str) and snippet:
+                if snippet:
                     lines.append(f"   {snippet}")
                 result_lines.append("\n".join(lines))
             web_search_blocks[tool_call_id].body = "\n\n".join(result_lines)
         else:
             return reasoning_block
 
-        self.transcript_revision += 1
-        self.application.invalidate()
+        self._invalidate_transcript()
         return reasoning_block
 
     def _stop_run(self, run_id: int) -> None:
@@ -467,8 +457,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
     def _append_transcript(self, style: str, text: str) -> None:
         """Append text and request a screen redraw."""
         self.transcript.append((style, text))
-        self.transcript_revision += 1
-        self.application.invalidate()
+        self._invalidate_transcript()
 
     def _append_user_message(self, prompt: str) -> None:
         """Append a full-width highlighted user message."""
@@ -481,7 +470,11 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             )
             self.transcript.append(("class:user.message", f"{prefix}{line}\n"))
         self.transcript.append(("", "\n"))
-        self.transcript_revision += 1
+        self._invalidate_transcript()
+
+    def _invalidate_transcript(self) -> None:
+        """Invalidate cached transcript rendering and request a redraw."""
+        self.wrapped_transcript_width = None
         self.application.invalidate()
 
     def _get_terminal_width(self) -> int:
@@ -508,9 +501,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             )
 
         width = self._get_terminal_width()
-        cache_key = (self.transcript_revision, width)
         # Rewrap only after a transcript change or terminal resize.
-        if cache_key != self.wrapped_transcript_key:
+        if width != self.wrapped_transcript_width:
             fragments: StyleAndTextTuples = []
             for entry in self.transcript:
                 if isinstance(entry, _DetailsBlock):
@@ -518,7 +510,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 else:
                     fragments.append(entry)
             self.wrapped_transcript = _wrap_transcript_fragments(fragments, width)
-            self.wrapped_transcript_key = cache_key
+            self.wrapped_transcript_width = width
         return self.wrapped_transcript
 
     def _render_details_block(
@@ -530,8 +522,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             if mouse_event.event_type != MouseEventType.MOUSE_UP:
                 return NotImplemented
             block.expanded = not block.expanded
-            self.transcript_revision += 1
-            self.application.invalidate()
+            self._invalidate_transcript()
             return None
 
         marker = "▾" if block.expanded else "▸"
@@ -637,34 +628,32 @@ def _wrap_transcript_fragments(
     fragments: StyleAndTextTuples, width: int
 ) -> StyleAndTextTuples:
     """Wrap formatted transcript fragments to the transcript width."""
+
+    def replace_text(fragment: OneStyleAndTextTuple, text: str) -> OneStyleAndTextTuple:
+        return (
+            (fragment[0], text, fragment[2])
+            if len(fragment) == 3
+            else (fragment[0], text)
+        )
+
     wrapped_fragments: StyleAndTextTuples = []
     current_width = 0
     # Track display-cell width across adjacent styled fragments.
     for fragment in fragments:
         style, text = fragment[:2]
-        mouse_handler = fragment[2] if len(fragment) == 3 else None
-
-        def append_fragment(
-            fragment_style: str,
-            fragment_text: str,
-            handler: MouseHandler | None = mouse_handler,
-        ) -> None:
-            wrapped_fragments.append(
-                (fragment_style, fragment_text, handler)
-                if handler is not None
-                else (fragment_style, fragment_text)
-            )
 
         chunk: list[str] = []
         for char in text:
             if char == "\n":
                 # Finish explicit lines and extend highlighted user rows.
                 if chunk:
-                    append_fragment(style, "".join(chunk))
+                    wrapped_fragments.append(replace_text(fragment, "".join(chunk)))
                     chunk = []
                 if style == "class:user.message" and current_width < width:
-                    append_fragment(style, " " * (width - current_width))
-                append_fragment(style, char)
+                    wrapped_fragments.append(
+                        replace_text(fragment, " " * (width - current_width))
+                    )
+                wrapped_fragments.append(replace_text(fragment, char))
                 current_width = 0
                 continue
 
@@ -672,14 +661,16 @@ def _wrap_transcript_fragments(
             if current_width and current_width + char_width > width:
                 # Insert a visual line break before exceeding the terminal width.
                 if chunk:
-                    append_fragment(style, "".join(chunk))
+                    wrapped_fragments.append(replace_text(fragment, "".join(chunk)))
                     chunk = []
                 if style == "class:user.message" and current_width < width:
-                    append_fragment(style, " " * (width - current_width))
+                    wrapped_fragments.append(
+                        replace_text(fragment, " " * (width - current_width))
+                    )
                 wrapped_fragments.append(("", "\n"))
                 current_width = 0
             chunk.append(char)
             current_width += char_width
         if chunk:
-            append_fragment(style, "".join(chunk))
+            wrapped_fragments.append(replace_text(fragment, "".join(chunk)))
     return wrapped_fragments
