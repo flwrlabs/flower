@@ -85,7 +85,11 @@ class _ChatCommandCompleter(Completer):
     ) -> Iterable[Completion]:
         """Yield matching slash commands."""
         text = document.text_before_cursor
-        if not text.startswith("/") or any(char.isspace() for char in text):
+        if (
+            document.text_after_cursor
+            or not text.startswith("/")
+            or any(char.isspace() for char in text)
+        ):
             return
 
         command_width = max(len(command) for command in CHAT_COMMANDS)
