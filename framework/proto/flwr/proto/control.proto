@@ -152,9 +152,6 @@ service Control {
 }
 
 message StartRunRequest {
-  reserved 8;
-  reserved "source_run_id";
-
   Fab fab = 1;
   map<string, Scalar> override_config = 2;
   SimulationConfig override_federation_config = 3;
