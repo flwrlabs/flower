@@ -658,6 +658,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 SeriesRunsModel.series_id == RunSeriesModel.series_id,
             )
             .order_by(RunSeriesModel.updated_at.desc())
+            .execution_options(populate_existing=True)
         )
 
         # Fold the joined rows back into one RunSeries per series.
@@ -1218,6 +1219,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             query = query.order_by(order_column)
         if limit is not None:
             query = query.limit(limit)
+        query = query.execution_options(populate_existing=True)
 
         with self.session() as session:
             # Clean up expired task tokens before querying tasks

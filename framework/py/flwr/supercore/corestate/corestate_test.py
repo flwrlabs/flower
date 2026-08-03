@@ -1334,6 +1334,25 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].starting_at, "")
         self.assertEqual(tasks[0].finished_at, "")
 
+    def test_get_tasks_refreshes_cached_task_in_shared_session(self) -> None:
+        """Task reads should reflect raw-SQL status changes in a shared session."""
+        state = self.state_factory()
+        if not hasattr(state, "session"):
+            self.skipTest("SQL session test")
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert task_id is not None
+
+        with state.session():
+            tasks = state.get_tasks(task_ids=[task_id])
+            self.assertEqual(tasks[0].status.status, Status.PENDING)
+
+            assert state.claim_task(task_id) is not None
+            refreshed_tasks = state.get_tasks(task_ids=[task_id])
+
+        self.assertEqual(refreshed_tasks[0].status.status, Status.STARTING)
+        self.assertTrue(refreshed_tasks[0].starting_at)
+
     def test_expired_starting_task_token_does_not_call_expiry_hook(self) -> None:
         """Revived STARTING tasks should not be passed to expiry hooks."""
         state = self.state_factory()
