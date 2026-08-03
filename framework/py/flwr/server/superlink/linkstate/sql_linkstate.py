@@ -47,7 +47,6 @@ from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.sql_corestate import SqlCoreState, determine_task_status
 from flwr.supercore.corestate.utils import timestamp_to_iso
 from flwr.supercore.date import now
-from flwr.supercore.fab import Fab
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
@@ -97,34 +96,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         super().__init__(database_path, object_store)
         federation_manager.linkstate = self
         self._federation_manager = federation_manager
-
-    def get_fab(self, fab_hash: str, federation_id: str | None = None) -> Fab | None:
-        """Return a FAB by hash, optionally scoped to a federation."""
-        if federation_id is None:
-            return SqlCoreState.get_fab(self, fab_hash)
-        query = """
-            SELECT f.fab_hash, f.content, f.verifications
-            FROM fab AS f
-            WHERE f.fab_hash = :fab_hash
-              AND EXISTS (
-                  SELECT 1
-                  FROM run AS r
-                  WHERE r.fab_hash = f.fab_hash
-                    AND r.federation_id = :federation_id
-              )
-        """
-        rows = self.query(
-            query,
-            {"fab_hash": fab_hash, "federation_id": federation_id},
-        )
-        if not rows:
-            return None
-        row = rows[0]
-        return Fab(
-            hash_str=row["fab_hash"],
-            content=row["content"],
-            verifications=json.loads(row["verifications"]),
-        )
 
     def get_metadata(self) -> MetaData:
         """Return combined SQLAlchemy MetaData for LinkState and CoreState tables."""

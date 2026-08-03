@@ -25,7 +25,6 @@ from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
-from flwr.supercore.fab import Fab
 from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
 
@@ -37,10 +36,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
     @abc.abstractmethod
     def federation_manager(self) -> FederationManager:
         """Return the FederationManager instance."""
-
-    @abc.abstractmethod
-    def get_fab(self, fab_hash: str, federation_id: str | None = None) -> Fab | None:
-        """Return a FAB by hash, optionally scoped to a federation."""
 
     @abc.abstractmethod
     def store_message_ins(self, message: Message) -> str | None:

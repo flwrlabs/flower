@@ -452,37 +452,11 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")
 
-    flwr_aid = account.flwr_aid
-    account_name = account.account_name
     verification_dict: dict[str, str] = {}
     note: str | None = None
 
-    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
-
-    # Check (1) federation exists and (2) the flwr_aid is a member
-    federation_id = _resolve_federation_id(state, account_name, request.federation)
-    if not state.federation_manager.exists(federation_id):
-        if request.federation:
-            raise FlowerError(
-                ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
-                f"Federation '{federation_id}' not found or has been archived.",
-            )
-        raise FlowerError(
-            ApiErrorCode.FEDERATION_NOT_SPECIFIED, "No federation specified."
-        )
-
-    if not state.federation_manager.has_member(flwr_aid, federation_id):
-        raise FlowerError(
-            ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
-            f"Account with ID '{flwr_aid}' is not a member of the "
-            f"federation '{federation_id}'.",
-        )
-
     if request.fab.hash_str and not request.fab.content:
-        stored_fab = state.get_fab(
-            request.fab.hash_str,
-            federation_id=federation_id,
-        )
+        stored_fab = state.get_fab(request.fab.hash_str)
         if stored_fab is None:
             raise FlowerError(
                 ApiErrorCode.FAB_DOWNLOAD_FAILURE,
@@ -509,8 +483,31 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         )
         return StartRunResponse()
 
+    flwr_aid = account.flwr_aid
+    account_name = account.account_name
     override_config = user_config_from_proto(request.override_config)
     connector_refs = validate_run_connector_refs(request.connector_refs, account, state)
+
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+
+    # Check (1) federation exists and (2) the flwr_aid is a member
+    federation_id = _resolve_federation_id(state, account_name, request.federation)
+    if not state.federation_manager.exists(federation_id):
+        if request.federation:
+            raise FlowerError(
+                ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
+                f"Federation '{federation_id}' not found or has been archived.",
+            )
+        raise FlowerError(
+            ApiErrorCode.FEDERATION_NOT_SPECIFIED, "No federation specified."
+        )
+
+    if not state.federation_manager.has_member(flwr_aid, federation_id):
+        raise FlowerError(
+            ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
+            f"Account with ID '{flwr_aid}' is not a member of the "
+            f"federation '{federation_id}'.",
+        )
 
     try:
         # Validate user config overrides matches keys in run config in FAB

@@ -63,13 +63,9 @@ class TestControlHandlers(unittest.TestCase):
         """Test StartRun reuses a stored FAB by hash."""
         fab_content = b"stored FAB"
         fab_hash = hashlib.sha256(fab_content).hexdigest()
+        self.state.store_fab(Fab(fab_hash, fab_content, {}))
 
         with (
-            patch.object(
-                self.state,
-                "get_fab",
-                return_value=Fab(fab_hash, fab_content, {}),
-            ) as get_fab,
             patch(
                 "flwr.superlink.servicer.control.control_handlers.get_fab_config",
                 return_value={"tool": {"flwr": {"app": {}}}},
@@ -86,14 +82,10 @@ class TestControlHandlers(unittest.TestCase):
 
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
-        get_fab.assert_called_once_with(
-            fab_hash,
-            federation_id=NOOP_FEDERATION_ID,
-        )
 
     def test_start_run_rejects_unknown_fab_hash(self) -> None:
         """Test StartRun rejects an unknown FAB hash."""
-        request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+        request = StartRunRequest()
         request.fab.hash_str = "unknown"
 
         with self.assertRaises(FlowerError) as error:

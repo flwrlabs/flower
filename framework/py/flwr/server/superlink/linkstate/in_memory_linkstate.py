@@ -45,7 +45,6 @@ from flwr.server.utils import validate_message
 from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.date import now
-from flwr.supercore.fab import Fab
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
@@ -102,18 +101,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
     def federation_manager(self) -> FederationManager:
         """Get the FederationManager instance."""
         return self._federation_manager
-
-    def get_fab(self, fab_hash: str, federation_id: str | None = None) -> Fab | None:
-        """Return a FAB by hash, optionally scoped to a federation."""
-        if federation_id is not None:
-            with self.lock:
-                if not any(
-                    record.run.fab_hash == fab_hash
-                    and record.run.federation_id == federation_id
-                    for record in self.run_ids.values()
-                ):
-                    return None
-        return InMemoryCoreState.get_fab(self, fab_hash)
 
     def _get_run(self, run_id: int) -> Run:
         """Return run metadata with lifecycle fields from its primary task."""
