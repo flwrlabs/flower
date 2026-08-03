@@ -443,7 +443,7 @@ def validate_run_connector_refs(
     return canonical_refs
 
 
-def start_run(  # pylint: disable=too-many-locals, too-many-statements
+def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
     state: LinkState,
