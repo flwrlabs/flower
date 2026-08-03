@@ -50,8 +50,14 @@ FEDERATION_CONFIG_HELP_MESSAGE = CONFIG_HELP_MESSAGE.format(
 CHAT_FLOWER_AGENT_APP_SPEC = "@flwrlabs/flwr-agent"
 CHAT_SUPERGRID_CONNECTION_NAME = "supergrid"
 CHAT_AGENT_INPUT_KEY = "agent.input"
+CHAT_HELP_COMMAND = "/help"
 CHAT_EXIT_COMMAND = "/quit"
 CHAT_NEW_COMMAND = "/new"
+CHAT_COMMANDS = {
+    CHAT_HELP_COMMAND: "Show available commands.",
+    CHAT_NEW_COMMAND: "Start a new conversation.",
+    CHAT_EXIT_COMMAND: "Exit Flower Chat.",
+}
 CHAT_TEXT_DELTA_EVENT = "response.output_text.delta"
 CHAT_TERMINAL_EVENTS = {"response.completed", "response.incomplete"}
 CHAT_FAILURE_EVENTS = {"error", "response.failed"}
@@ -65,6 +71,9 @@ CHAT_APP_STYLE = {
     "prompt.background": "fg:#ffffff bg:#404040",
     "content": "noinherit",
     "status": "#dc8400",
+    "completion-menu": "fg:#ffffff bg:#404040",
+    "completion-menu.completion": "fg:#ffffff bg:#404040",
+    "completion-menu.completion.current": "#ffffff bg:#dc8400 noreverse",
     "notice": "bold #111827 bg:#dc8400",
     "error": "bold ansibrightred",
     "logo": "bold #dc8400",
