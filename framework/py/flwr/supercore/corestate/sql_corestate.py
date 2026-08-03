@@ -1677,19 +1677,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
 
 def _connector_oauth_session_from_model(
-    row: ConnectorOAuthSessionModel,
+    model: ConnectorOAuthSessionModel,
 ) -> ConnectorOAuthSessionRecord:
     """Convert a connector OAuth session model to its persistence record."""
     return ConnectorOAuthSessionRecord(
-        oauth_session_id=row.oauth_session_id,
-        flwr_aid=row.flwr_aid,
-        connector_ref=row.connector_ref,
-        state=row.state,
-        redirect_uri=row.redirect_uri,
-        pkce_verifier=row.pkce_verifier,
-        created_at=_timestamp_to_iso_assuming_utc(row.created_at),
-        expires_at=_timestamp_to_iso_assuming_utc(row.expires_at),
-        completed_at=_timestamp_to_iso_assuming_utc(row.completed_at) or None,
+        oauth_session_id=model.oauth_session_id,
+        flwr_aid=model.flwr_aid,
+        connector_ref=model.connector_ref,
+        state=model.state,
+        redirect_uri=model.redirect_uri,
+        pkce_verifier=model.pkce_verifier,
+        created_at=_timestamp_to_iso_assuming_utc(model.created_at),
+        expires_at=_timestamp_to_iso_assuming_utc(model.expires_at),
+        completed_at=_timestamp_to_iso_assuming_utc(model.completed_at) or None,
     )
 
 
@@ -1718,21 +1718,21 @@ def determine_task_status(row: dict[str, Any]) -> TaskStatus:
     raise ValueError(f"The task {task_id} does not have a valid status.")
 
 
-def _determine_task_model_status(row: TaskModel) -> TaskStatus:
+def _determine_task_model_status(model: TaskModel) -> TaskStatus:
     """Determine the status of the task based on timestamp fields."""
-    if row.pending_at:
-        if row.finished_at:
+    if model.pending_at:
+        if model.finished_at:
             return TaskStatus(
                 status=Status.FINISHED,
-                sub_status=row.sub_status,
-                details=row.details,
+                sub_status=model.sub_status,
+                details=model.details,
             )
-        if row.starting_at:
-            if row.running_at:
+        if model.starting_at:
+            if model.running_at:
                 return TaskStatus(status=Status.RUNNING, sub_status="", details="")
             return TaskStatus(status=Status.STARTING, sub_status="", details="")
         return TaskStatus(status=Status.PENDING, sub_status="", details="")
-    task_id = int64_to_uint64(row.task_id)
+    task_id = int64_to_uint64(model.task_id)
     raise ValueError(f"The task {task_id} does not have a valid status.")
 
 
@@ -1770,20 +1770,20 @@ def task_from_row(row: dict[str, Any]) -> Task:
     )
 
 
-def task_from_model(row: TaskModel) -> Task:
+def task_from_model(model: TaskModel) -> Task:
     """Convert a task ORM model to a Task object."""
     return Task(
-        task_id=int64_to_uint64(row.task_id),
-        type=row.type,
-        run_id=int64_to_uint64(row.run_id),
-        pending_at=timestamp_to_iso(row.pending_at),
-        starting_at=timestamp_to_iso(row.starting_at),
-        running_at=timestamp_to_iso(row.running_at),
-        finished_at=timestamp_to_iso(row.finished_at),
-        status=_determine_task_model_status(row),
-        fab_hash=row.fab_hash,
-        model_ref=row.model_ref,
-        connector_ref=row.connector_ref,
+        task_id=int64_to_uint64(model.task_id),
+        type=model.type,
+        run_id=int64_to_uint64(model.run_id),
+        pending_at=timestamp_to_iso(model.pending_at),
+        starting_at=timestamp_to_iso(model.starting_at),
+        running_at=timestamp_to_iso(model.running_at),
+        finished_at=timestamp_to_iso(model.finished_at),
+        status=_determine_task_model_status(model),
+        fab_hash=model.fab_hash,
+        model_ref=model.model_ref,
+        connector_ref=model.connector_ref,
     )
 
 
@@ -1798,14 +1798,14 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     )
 
 
-def _run_series_from_model(row: RunSeriesModel) -> RunSeries:
+def _run_series_from_model(model: RunSeriesModel) -> RunSeries:
     """Convert a run series ORM model to a RunSeries object."""
     return RunSeries(
-        series_id=int64_to_uint64(row.series_id),
-        federation=row.federation_id,
-        description=row.description or "",
-        created_at=timestamp_to_iso(row.created_at),
-        updated_at=timestamp_to_iso(row.updated_at),
+        series_id=int64_to_uint64(model.series_id),
+        federation=model.federation_id,
+        description=model.description or "",
+        created_at=timestamp_to_iso(model.created_at),
+        updated_at=timestamp_to_iso(model.updated_at),
     )
 
 
@@ -1823,26 +1823,26 @@ def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:
     }
 
 
-def _task_usage_from_model(row: TaskUsageModel) -> TaskUsage:
+def _task_usage_from_model(model: TaskUsageModel) -> TaskUsage:
     """Convert a task_usage ORM model to a TaskUsage proto."""
     return TaskUsage(
-        usage_type=row.usage_type,
-        provider=row.provider,
-        input_tokens=row.input_tokens,
-        output_tokens=row.output_tokens,
-        total_tokens=row.total_tokens,
+        usage_type=model.usage_type,
+        provider=model.provider,
+        input_tokens=model.input_tokens,
+        output_tokens=model.output_tokens,
+        total_tokens=model.total_tokens,
     )
 
 
-def _task_event_from_model(row: TaskEventModel) -> TaskEvent:
+def _task_event_from_model(model: TaskEventModel) -> TaskEvent:
     """Convert a task_event ORM model to a TaskEvent proto."""
     return TaskEvent(
-        id=row.id,
-        timestamp=timestamp_to_iso(row.timestamp),
-        run_id=int64_to_uint64(row.run_id),
-        task_id=int64_to_uint64(row.task_id),
-        event=row.event,
-        data=row.data,
+        id=model.id,
+        timestamp=timestamp_to_iso(model.timestamp),
+        run_id=int64_to_uint64(model.run_id),
+        task_id=int64_to_uint64(model.task_id),
+        event=model.event,
+        data=model.data,
     )
 
 
