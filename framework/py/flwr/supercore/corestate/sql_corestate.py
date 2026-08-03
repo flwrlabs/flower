@@ -24,7 +24,7 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData, select, update
+from sqlalchemy import MetaData, delete, select, update
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Context, Message
@@ -481,15 +481,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if not flwr_aid or not connector_ref:
             return False
         with self.session() as session:
-            row = session.get(
-                ConnectorModel,
-                (flwr_aid, connector_ref),
-                populate_existing=True,
+            deleted_connector_ref = session.scalar(
+                delete(ConnectorModel)
+                .where(
+                    ConnectorModel.flwr_aid == flwr_aid,
+                    ConnectorModel.connector_ref == connector_ref,
+                )
+                .returning(ConnectorModel.connector_ref)
             )
-            if row is None:
-                return False
-            session.delete(row)
-        return True
+            return deleted_connector_ref is not None
 
     def bind_connectors_to_run(
         self, run_id: int, connector_refs: Sequence[str]
@@ -548,36 +548,24 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return None
         expires_at = expires_at.astimezone(UTC)
         created_at = now()
-        session = ConnectorOAuthSessionRecord(
+        model = ConnectorOAuthSessionModel(
             oauth_session_id=oauth_session_id,
             flwr_aid=flwr_aid,
             connector_ref=connector_ref,
             state=state,
             redirect_uri=redirect_uri,
             pkce_verifier=pkce_verifier,
-            created_at=created_at.isoformat(),
-            expires_at=expires_at.isoformat(),
+            created_at=created_at,
+            expires_at=expires_at,
             completed_at=None,
         )
         try:
             with self.session() as db_session:
-                db_session.add(
-                    ConnectorOAuthSessionModel(
-                        oauth_session_id=session.oauth_session_id,
-                        flwr_aid=session.flwr_aid,
-                        connector_ref=session.connector_ref,
-                        state=session.state,
-                        redirect_uri=session.redirect_uri,
-                        pkce_verifier=session.pkce_verifier,
-                        created_at=created_at,
-                        expires_at=expires_at,
-                        completed_at=None,
-                    )
-                )
+                db_session.add(model)
                 db_session.flush()
+                return _connector_oauth_session_from_model(model)
         except IntegrityError:
             return None
-        return session
 
     def get_connector_oauth_session(
         self, oauth_session_id: str, flwr_aid: str
