@@ -26,17 +26,6 @@ from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
 ATTIO_CONNECTOR_REF = "attio"
-ATTIO_SEARCH_RECORDS_TOOL = "attio_search_records"
-ATTIO_LIST_MEETINGS_TOOL = "attio_list_meetings"
-ATTIO_LIST_CALL_RECORDINGS_TOOL = "attio_list_call_recordings"
-ATTIO_GET_CALL_TRANSCRIPT_TOOL = "attio_get_call_transcript"
-ATTIO_TOOL_NAMES = (
-    ATTIO_SEARCH_RECORDS_TOOL,
-    ATTIO_LIST_MEETINGS_TOOL,
-    ATTIO_LIST_CALL_RECORDINGS_TOOL,
-    ATTIO_GET_CALL_TRANSCRIPT_TOOL,
-)
-
 ATTIO_API_BASE_URL = "https://api.attio.com/v2"
 
 _REQUEST_TIMEOUT = 30.0
@@ -60,7 +49,7 @@ def make_attio_tools() -> list[JSONObject]:
     }
     return [
         _tool(
-            ATTIO_SEARCH_RECORDS_TOOL,
+            "attio_search_records",
             "Search records in Attio.",
             {
                 "query": {"type": "string"},
@@ -70,7 +59,7 @@ def make_attio_tools() -> list[JSONObject]:
             required=("query", "objects"),
         ),
         _tool(
-            ATTIO_LIST_MEETINGS_TOOL,
+            "attio_list_meetings",
             "List meetings in Attio.",
             {
                 **page,
@@ -80,13 +69,13 @@ def make_attio_tools() -> list[JSONObject]:
             },
         ),
         _tool(
-            ATTIO_LIST_CALL_RECORDINGS_TOOL,
+            "attio_list_call_recordings",
             "List call recordings for an Attio meeting.",
             {"meeting_id": {"type": "string"}, **page},
             required=("meeting_id",),
         ),
         _tool(
-            ATTIO_GET_CALL_TRANSCRIPT_TOOL,
+            "attio_get_call_transcript",
             "Read a call transcript from Attio.",
             {
                 "meeting_id": {"type": "string"},
@@ -185,10 +174,10 @@ def get_call_transcript(
 
 
 ATTIO_TOOL_HANDLERS: dict[str, Callable[..., JSONValue]] = {
-    ATTIO_SEARCH_RECORDS_TOOL: search_records,
-    ATTIO_LIST_MEETINGS_TOOL: list_meetings,
-    ATTIO_LIST_CALL_RECORDINGS_TOOL: list_call_recordings,
-    ATTIO_GET_CALL_TRANSCRIPT_TOOL: get_call_transcript,
+    "attio_search_records": search_records,
+    "attio_list_meetings": list_meetings,
+    "attio_list_call_recordings": list_call_recordings,
+    "attio_get_call_transcript": get_call_transcript,
 }
 
 

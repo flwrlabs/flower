@@ -18,11 +18,10 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from . import registry
+from . import attio, registry
 from .attio import (
     ATTIO_API_BASE_URL,
     ATTIO_CONNECTOR_REF,
-    ATTIO_TOOL_NAMES,
     AttioApiError,
     make_attio_tools,
     search_records,
@@ -42,7 +41,7 @@ def test_attio_tools_are_registered_as_read_only_credentials() -> None:
     """Attio tools should resolve through the shared connector registry."""
     tools = registry.get_connector_tools(ATTIO_CONNECTOR_REF)
 
-    assert [tool["name"] for tool in tools] == list(ATTIO_TOOL_NAMES)
+    assert [tool["name"] for tool in tools] == list(attio.ATTIO_TOOL_HANDLERS)
     assert tools == make_attio_tools()
     for tool in tools:
         name = str(tool["name"])
