@@ -22,7 +22,7 @@ import os
 import tempfile
 import threading
 import unittest
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock, patch
 
 import grpc
@@ -30,6 +30,7 @@ from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import (
+    NOOP_FLWR_AID,
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,
     Status,
@@ -41,10 +42,14 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
+    GetConnectorRequest,
+    GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullPendingTasksRequest,
+    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
@@ -53,6 +58,11 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
+)
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
+    StartRunRequest,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -64,11 +74,17 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.utils import _STATUS_TO_MSG
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, TaskType
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION_ID,
+    AutomationStatus,
+    TaskType,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
@@ -303,6 +319,122 @@ def _claim_in_parallel(
     return results
 
 
+class TestGetConnector(unittest.TestCase):
+    """Test connector credential authorization with mocked state."""
+
+    def setUp(self) -> None:
+        """Create a servicer backed by mocked state."""
+        self.state = Mock(spec=LinkState)
+        self.state_factory = Mock(spec=LinkStateFactory)
+        self.state_factory.state.return_value = self.state
+        self.servicer = ServerAppIoServicer(
+            self.state_factory,
+            Mock(spec=ObjectStoreFactory),
+        )
+
+    def test_returns_authenticated_task_credentials(self) -> None:
+        """GetConnector should return the run owner's matching credentials."""
+        task = Mock(type=TaskType.CONNECTOR, connector_ref="notion", run_id=123)
+        self.state.get_run_info.return_value = [Mock(flwr_aid="account-a")]
+        self.state.get_connector.return_value = Mock(
+            connector_ref="notion",
+            credentials_json='{"token":"secret"}',
+            config_json='{"workspace":"primary"}',
+        )
+
+        with patch(
+            "flwr.superlink.servicer.serverappio.serverappio_servicer."
+            "get_authenticated_task",
+            return_value=task,
+        ):
+            response = self.servicer.GetConnector(
+                GetConnectorRequest(),
+                Mock(),
+            )
+
+        self.assertEqual(
+            response,
+            GetConnectorResponse(
+                connector_ref="notion",
+                credentials_json='{"token":"secret"}',
+                config_json='{"workspace":"primary"}',
+            ),
+        )
+        self.state.get_connector.assert_called_once_with(
+            flwr_aid="account-a",
+            connector_ref="notion",
+        )
+
+    @parameterized.expand(  # type: ignore
+        [
+            ("wrong_task_type", TaskType.AGENT_APP, "notion"),
+            ("missing_ref", TaskType.CONNECTOR, ""),
+        ]
+    )
+    def test_rejects_wrong_task_identity(
+        self,
+        _name: str,
+        task_type: str,
+        connector_ref: str,
+    ) -> None:
+        """GetConnector should reject tasks without a connector identity."""
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "get_authenticated_task",
+                return_value=Mock(
+                    type=task_type,
+                    connector_ref=connector_ref,
+                    run_id=123,
+                ),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.GetConnector(
+                GetConnectorRequest(),
+                context,
+            )
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Connector credentials are not available to this task.",
+        )
+        self.state.get_connector.assert_not_called()
+
+    def test_hides_other_account_credentials(self) -> None:
+        """GetConnector should not fall back to another account's credentials."""
+        task = Mock(type=TaskType.CONNECTOR, connector_ref="notion", run_id=123)
+        self.state.get_run_info.return_value = [Mock(flwr_aid="account-b")]
+        self.state.get_connector.return_value = None
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "get_authenticated_task",
+                return_value=task,
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.GetConnector(
+                GetConnectorRequest(),
+                context,
+            )
+
+        self.state.get_connector.assert_called_once_with(
+            flwr_aid="account-b",
+            connector_ref="notion",
+        )
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.NOT_FOUND,
+            "Connector not found.",
+        )
+
+
 class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
     """ServerAppIoServicer tests for allowed RunStatuses."""
 
@@ -396,6 +528,11 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=PullTaskInputRequest.SerializeToString,
             response_deserializer=PullTaskInputResponse.FromString,
         )
+        self._pull_pending_tasks = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PullPendingTasks",
+            request_serializer=PullPendingTasksRequest.SerializeToString,
+            response_deserializer=PullPendingTasksResponse.FromString,
+        )
         self._create_task = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/CreateTask",
             request_serializer=CreateTaskRequest.SerializeToString,
@@ -419,6 +556,40 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             assert self.state.activate_task(task_id)
         if num_transitions > 2:
             assert self.state.finish_task(task_id, "", "")
+
+    def test_pull_pending_tasks_processes_due_automations(self) -> None:
+        """A SuperExec poll should create and return a due automation's task."""
+        series_id = self.state.get_run_info(run_ids=[self._auth_run_id])[0].series_id
+        automation = self.state.store_automation(
+            federation_id=NOOP_FEDERATION_ID,
+            flwr_aid=NOOP_FLWR_AID,
+            start_run_request=StartRunRequest(
+                app_spec="@flwragent/flwr-agent",
+                federation=NOOP_FEDERATION_ID,
+                series_id=series_id,
+            ),
+            series_id=series_id,
+            next_run_at=datetime.now(tz=UTC).isoformat(),
+            max_runs=1,
+        )
+
+        response = self._pull_pending_tasks(PullPendingTasksRequest())
+
+        self.assertEqual(len(response.tasks), 1)
+        run = self.state.get_run_info(run_ids=[response.tasks[0].run_id])[0]
+        self.assertEqual(run.series_id, automation.series_id)
+        completed = self.state.list_automations(
+            automation_ids=[automation.automation_id],
+            statuses=[AutomationStatus.COMPLETED],
+            order_by="updated_at",
+        )
+        self.assertEqual(len(completed), 1)
+        active = self.state.list_automations(
+            automation_ids=[automation.automation_id],
+            statuses=[AutomationStatus.ACTIVE],
+            order_by="updated_at",
+        )
+        self.assertEqual(active, [])
 
     def _create_dummy_run(self, running: bool = True, *, fab_hash: str = "") -> int:
         run_id = self.state.create_run(
@@ -446,6 +617,68 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert task.run_id == self._auth_run_id
         assert task.type == TaskType.MODEL
         assert task.model_ref == "models/abc"
+
+    def test_start_automation_enriches_connector_refs(self) -> None:
+        """Enrich connector refs and delegate automation creation."""
+        # Prepare
+        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+        request = StartAutomationRequest(
+            start_run_request=StartRunRequest(connector_refs=["untrusted"])
+        )
+        expected = StartAutomationResponse(automation_id=1)
+
+        # Execute
+        with (
+            patch(
+                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "get_authenticated_task",
+                return_value=Task(
+                    run_id=self._auth_run_id,
+                    type=TaskType.SERVER_APP,
+                ),
+            ),
+            patch(
+                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "start_automation",
+                return_value=expected,
+            ) as start_automation_mock,
+            patch.object(
+                self.state, "get_run_connector_refs", return_value=["calendar"]
+            ),
+        ):
+            response = servicer.StartAutomation(request, Mock())
+
+        # Assert
+        assert response is expected
+        assert list(request.start_run_request.connector_refs) == ["calendar"]
+        assert start_automation_mock.call_args.args[0] is request
+
+    def test_start_automation_rejects_clientapp_task(self) -> None:
+        """ClientApp tasks cannot create automations through ServerAppIo."""
+        # Prepare
+        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+        context = Mock()
+        context.abort.side_effect = RuntimeError("aborted")
+
+        # Execute
+        with (
+            patch(
+                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "get_authenticated_task",
+                return_value=Task(
+                    run_id=self._auth_run_id,
+                    type=TaskType.CLIENT_APP,
+                ),
+            ),
+            self.assertRaisesRegex(RuntimeError, "aborted"),
+        ):
+            servicer.StartAutomation(StartAutomationRequest(), context)
+
+        # Assert
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Only AgentApp and ServerApp tasks can create automations.",
+        )
 
     def test_push_task_output_stores_simulation_runtime(self) -> None:
         """PushTaskOutput should persist Simulation Runtime usage."""

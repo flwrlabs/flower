@@ -47,7 +47,7 @@ jobs:
   prepare-docker-build-matrix:
     if: ${{ github.repository_owner == 'flwrlabs' }}
     name: Collect docker build parameters
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
       pip-version: ${{ steps.versions.outputs.pip-version }}

@@ -69,10 +69,27 @@ else
   echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:9093\"\nroot-certificates = \"certificates/ca.crt\"" >> pyproject.toml
 fi
 
-timeout 5m flower-superlink \
+background_pids=()
+cleanup() {
+  local exit_code=$?
+  trap - EXIT
+
+  if [ "${#background_pids[@]}" -gt 0 ]; then
+    kill "${background_pids[@]}" 2>/dev/null || true
+    sleep 1
+    kill -9 "${background_pids[@]}" 2>/dev/null || true
+    wait "${background_pids[@]}" 2>/dev/null || true
+  fi
+
+  exit "$exit_code"
+}
+trap cleanup EXIT
+
+flower-superlink \
   $server_arg $db_arg $server_auth \
   $runtime_dependency_install_arg &
-sl_pid=$(pgrep -f "flower-superlink")
+sl_pid=$!
+background_pids+=("$sl_pid")
 sleep 3
 
 # Trigger migration
@@ -84,55 +101,73 @@ if [ "$2" = "client-auth" ]; then
   flwr supernode register keys/client_credentials_2.pub e2e
 fi
 
-timeout 5m flower-supernode $client_arg \
+flower-supernode $client_arg \
   --superlink $server_address $client_auth_1 \
   --clientappio-api-address "localhost:9094" \
   --max-retries 0 &
 cl1_pid=$!
+background_pids+=("$cl1_pid")
 sleep 3
 
-timeout 5m flower-supernode $client_arg \
+flower-supernode $client_arg \
   --superlink $server_address $client_auth_2 \
   --clientappio-api-address "localhost:9096" \
   --max-retries 0 &
 cl2_pid=$!
+background_pids+=("$cl2_pid")
 sleep 3
 
 timeout 1m flwr run "." e2e
 
-# Initialize a flag to track if training is successful
-found_success=false
-timeout=240  # Timeout after 240 seconds
-elapsed=0
+training_timeout=240
+deadline=$((SECONDS + training_timeout))
+status_query_timeout=10
 
-# Define a cleanup function
-cleanup_and_exit() {
-    kill $cl1_pid; kill $cl2_pid;
-    sleep 1; kill $sl_pid;
-    exit $1
+check_process() {
+  local pid=$1
+  local name=$2
+  if ! kill -0 "$pid" 2>/dev/null; then
+    echo "$name exited before training completed."
+    return 1
+  fi
 }
 
-# Check for "finished:completed" status in a loop with a timeout
-while [ "$found_success" = false ] && [ $elapsed -lt $timeout ]; do
+while [ "$SECONDS" -lt "$deadline" ]; do
+    check_process "$sl_pid" "SuperLink"
+    check_process "$cl1_pid" "SuperNode 1"
+    check_process "$cl2_pid" "SuperNode 2"
+
     # Run the command and capture output
-    output=$(flwr ls e2e --format=json)
+    if ! output=$(timeout "${status_query_timeout}s" flwr ls e2e --format=json); then
+      echo "flwr ls failed or timed out after ${status_query_timeout} seconds."
+      exit 1
+    fi
 
     # Extract status from the first run (or loop over all if needed)
     status=$(echo "$output" | jq -r '.runs[0].status')
 
     echo "Current status: $status"
 
-    if [ "$status" == "finished:completed" ]; then
-      found_success=true
-      echo "Training worked correctly!"
-      cleanup_and_exit 0
-    else
-      echo "⏳ Not completed yet, retrying in 2s..."
-      sleep 2
-    fi
+    case "$status" in
+      finished:completed)
+        echo "Training worked correctly!"
+        exit 0
+        ;;
+      finished:*)
+        status_details=$(echo "$output" | jq -r '.runs[0]["status-details"] // empty')
+        if [ -n "$status_details" ]; then
+          echo "Training failed: ${status_details}"
+        else
+          echo "Training failed with status ${status}:"
+          echo "$output"
+        fi
+        exit 1
+        ;;
+    esac
+
+    echo "⏳ Not completed yet, retrying in 2s..."
+    sleep 2
 done
 
-if [ "$found_success" = false ]; then
-    echo "Training had an issue and timed out."
-    cleanup_and_exit 1
-fi
+echo "Training did not complete within ${training_timeout} seconds."
+exit 1

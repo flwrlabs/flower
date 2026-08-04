@@ -61,27 +61,21 @@ def _create_app_with_linkstate_factory(
 ) -> FastAPI:
     """Create a FastAPI app for either SuperLink HTTP mode."""
     linkstate_factory = cast(LinkStateFactory, state_factory_mock)
-    authn_plugin = Mock()
-    authz_plugin = Mock()
-    if not start_legacy_grpc:
-        return create_app(
-            linkstate_factory=linkstate_factory,
-            authn_plugin=authn_plugin,
-            authz_plugin=authz_plugin,
-        )
-
-    superlink_lifespan = Mock()
-    superlink_lifespan.state_factory = None
-    superlink_lifespan.startup.side_effect = lambda: setattr(
-        superlink_lifespan, "state_factory", linkstate_factory
-    )
-    return create_app(
-        linkstate_factory=linkstate_factory,
-        authn_plugin=authn_plugin,
-        authz_plugin=authz_plugin,
-        superlink_lifespan=cast(Any, superlink_lifespan),
-        start_legacy_grpc=True,
-    )
+    config = Mock()
+    config.simulation = False
+    config.database = ":flwr-in-memory:"
+    config.disable_grpc_api = not start_legacy_grpc
+    config.authn_plugin = Mock()
+    config.authz_plugin = Mock()
+    with (
+        patch("flwr.superlink.main.get_federation_manager"),
+        patch(
+            "flwr.superlink.main.get_objectstore_linkstate_factories",
+            return_value=(Mock(), linkstate_factory),
+        ),
+    ):
+        lifespan_class = cast(Any, Mock()) if start_legacy_grpc else None
+        return create_app(cast(Any, config), lifespan_class)
 
 
 @pytest.mark.parametrize("start_legacy_grpc", [False, True])

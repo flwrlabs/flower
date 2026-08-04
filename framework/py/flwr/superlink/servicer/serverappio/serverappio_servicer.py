@@ -33,16 +33,24 @@ from flwr.common.serde import (
 )
 from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetConnectorRequest,
+    GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullPendingTasksRequest,
+    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+)
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -56,7 +64,8 @@ from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.utils.validator import validate_message
-from flwr.supercore.constant import TaskType
+from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
@@ -65,6 +74,10 @@ from flwr.supercore.inflatable.inflatable_object import (
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supercore.servicer.appio import AppIoServicer
+from flwr.superlink.servicer.control.control_handlers import (
+    process_due_automations,
+    start_automation,
+)
 
 SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE = (
     "Some ServerAppIo API endpoints are only available for Deployment Runtime runs."
@@ -85,6 +98,14 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
     def state(self) -> LinkState:
         """Return the LinkState instance."""
         return self.state_factory.state()
+
+    def PullPendingTasks(
+        self, request: PullPendingTasksRequest, context: grpc.ServicerContext
+    ) -> PullPendingTasksResponse:
+        """Process due automations, then pull pending tasks."""
+        state = self.state()
+        process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
+        return super().PullPendingTasks(request, context)
 
     def GetNodes(
         self, request: GetNodesRequest, context: grpc.ServicerContext
@@ -236,6 +257,41 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
         return GetRunResponse(run=run_to_proto(runs[0]))
 
+    def GetConnector(
+        self, request: GetConnectorRequest, context: grpc.ServicerContext
+    ) -> GetConnectorResponse:
+        """Return credentials authorized for the authenticated connector task."""
+        log(DEBUG, "ServerAppIoServicer.GetConnector")
+
+        task = get_authenticated_task()
+        if task.type != TaskType.CONNECTOR or not task.connector_ref:
+            context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                "Connector credentials are not available to this task.",
+            )
+        connector_ref = task.connector_ref
+
+        state = self.state_factory.state()
+        runs = state.get_run_info(run_ids=[task.run_id])
+        run = runs[0] if runs else None
+        if run is None or not run.flwr_aid:
+            context.abort(grpc.StatusCode.NOT_FOUND, "Connector not found.")
+            raise RuntimeError("This line should never be reached.")
+
+        connector = state.get_connector(
+            flwr_aid=run.flwr_aid,
+            connector_ref=connector_ref,
+        )
+        if connector is None:
+            context.abort(grpc.StatusCode.NOT_FOUND, "Connector not found.")
+            raise RuntimeError("This line should never be reached.")
+
+        return GetConnectorResponse(
+            connector_ref=connector.connector_ref,
+            credentials_json=connector.credentials_json,
+            config_json=connector.config_json,
+        )
+
     def PullTaskInput(
         self, request: PullTaskInputRequest, context: grpc.ServicerContext
     ) -> PullTaskInputResponse:
@@ -308,6 +364,34 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushTaskOutputResponse()
+
+    def StartAutomation(
+        self,
+        request: StartAutomationRequest,
+        context: grpc.ServicerContext,
+    ) -> StartAutomationResponse:
+        """Start an automation."""
+        task = get_authenticated_task()
+        if task.type not in (TaskType.AGENT_APP, TaskType.SERVER_APP):
+            context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                "Only AgentApp and ServerApp tasks can create automations.",
+            )
+
+        state = self.state_factory.state()
+        run = state.get_run_info(run_ids=[task.run_id])[0]
+        del request.start_run_request.connector_refs[:]
+        request.start_run_request.connector_refs.extend(
+            state.get_run_connector_refs(run_id=run.run_id)
+        )
+        return start_automation(
+            request,
+            AccountInfo(
+                flwr_aid=run.flwr_aid,
+                account_name=run.account_name,
+            ),
+            state,
+        )
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext
