@@ -398,14 +398,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError(
                 f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
             )
-        params = {
-            "fab_hash": fab_hash,
-            "content": fab.content,
-            "verifications": json.dumps(fab.verifications),
-        }
         # Keep launch behavior: last write wins for metadata under the same
         # content hash.
-        stmt = sqlite_insert(FabModel).values(**params)
+        stmt = sqlite_insert(FabModel).values(
+            fab_hash=fab_hash,
+            content=fab.content,
+            verifications=json.dumps(fab.verifications),
+        )
         stmt = stmt.on_conflict_do_update(
             index_elements=[FabModel.fab_hash],
             set_={
@@ -441,13 +440,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Create or update a connector for an account."""
         if not flwr_aid or not connector_ref:
             return False
-        params = {
-            "flwr_aid": flwr_aid,
-            "connector_ref": connector_ref,
-            "credentials_json": credentials_json,
-            "config_json": config_json,
-        }
-        stmt = sqlite_insert(ConnectorModel).values(**params)
+        stmt = sqlite_insert(ConnectorModel).values(
+            flwr_aid=flwr_aid,
+            connector_ref=connector_ref,
+            credentials_json=credentials_json,
+            config_json=config_json,
+        )
         stmt = stmt.on_conflict_do_update(
             index_elements=[ConnectorModel.flwr_aid, ConnectorModel.connector_ref],
             set_={
@@ -503,17 +501,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return False
         stored_run_id = uint64_to_int64(run_id)
         bound_refs = set(self.get_run_connector_refs(run_id))
-        data = [
-            {
-                "run_id": stored_run_id,
-                "connector_ref": connector_ref,
-            }
+        run_connectors = [
+            RunConnectorModel(run_id=stored_run_id, connector_ref=connector_ref)
             for connector_ref in dict.fromkeys(connector_refs)
             if connector_ref not in bound_refs
         ]
-        if data:
+        if run_connectors:
             with self.session() as session:
-                session.add_all(RunConnectorModel(**row) for row in data)
+                session.add_all(run_connectors)
         return True
 
     def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
