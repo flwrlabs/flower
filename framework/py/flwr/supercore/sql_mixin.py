@@ -99,17 +99,18 @@ class SqlMixin(ABC):
             database_path = ":memory:"
 
         self.database_url = self._normalize_database_url(database_path)
-        self.database_backend = make_url(self.database_url).get_backend_name()
+        parsed_database_url = make_url(self.database_url)
+        self.database_backend = parsed_database_url.get_backend_name()
         self._validate_allowed_dialects(self.database_backend)
+        self._is_in_memory_sqlite = (
+            self.database_backend == "sqlite"
+            and parsed_database_url.database in (None, "", ":memory:")
+        )
 
         # Persistent SQL states using the same database URL may share one
         # transaction. In-memory SQLite engines are independent per instance, so
         # they must not share sessions.
-        self._session_scope = (
-            self
-            if self.database_url == FLWR_IN_MEMORY_SQLITE_DB_URL
-            else self.database_url
-        )
+        self._session_scope = self if self._is_in_memory_sqlite else self.database_url
 
         self._engine: Engine | None = None
         self._session_factory: sessionmaker[Session] | None = None
@@ -230,7 +231,7 @@ class SqlMixin(ABC):
             engine_kwargs["connect_args"] = {"check_same_thread": False}
         # In-memory SQLite databases are per-connection; use StaticPool to ensure
         # all threads share the same database instance.
-        if self.database_url == FLWR_IN_MEMORY_SQLITE_DB_URL:
+        if self._is_in_memory_sqlite:
             engine_kwargs["poolclass"] = StaticPool
         self._engine = create_engine(self.database_url, **engine_kwargs)
 
@@ -247,7 +248,7 @@ class SqlMixin(ABC):
 
         # Create database
         metadata: MetaData | None = self.get_metadata()
-        if metadata and self.database_url == FLWR_IN_MEMORY_SQLITE_DB_URL:
+        if metadata and self._is_in_memory_sqlite:
             # In-memory databases: create tables directly from SQLAlchemy metadata
             metadata.create_all(self._engine)
         else:
