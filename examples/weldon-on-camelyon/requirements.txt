@@ -1,0 +1,5 @@
+flwr[simulation]>=1.0, <2.0
+torch==2.1.1
+substrafl==0.42.0
+datasets==2.17.1
+scikit-learn==1.4.1
