@@ -52,7 +52,7 @@ def _create_app(
     app = superlink_main.create_app()
     app.state.control_event_log_plugin = event_log_plugin
 
-    @app.get("/control/get-login-details")
+    @app.get("/v1/control/get-login-details")
     def control_route() -> dict[str, bool]:
         """Return a successful Control response."""
         return {"ok": True}
@@ -78,7 +78,7 @@ def _post_get_login_details(client: TestClient) -> HTTPResponse:
     return cast(
         HTTPResponse,
         client.post(
-            "/control/get-login-details",
+            "/v1/control/get-login-details",
             content=GetLoginDetailsRequest().SerializeToString(),
             headers={"content-type": PROTOBUF_MEDIA_TYPE},
         ),
@@ -95,7 +95,7 @@ def test_license_middleware_passes_through_without_ee_plugin(
         cast(type[object], middleware.cls).__name__
         for middleware in app.user_middleware
     }
-    assert client.get("/control/get-login-details").status_code == 200
+    assert client.get("/v1/control/get-login-details").status_code == 200
 
 
 def test_license_middleware_allows_valid_license(monkeypatch: MonkeyPatch) -> None:
@@ -104,7 +104,7 @@ def test_license_middleware_allows_valid_license(monkeypatch: MonkeyPatch) -> No
     license_plugin.check_license.return_value = True
     _, client = _create_app(monkeypatch, license_plugin)
 
-    response = client.get("/control/get-login-details")
+    response = client.get("/v1/control/get-login-details")
 
     assert response.status_code == 200
     license_plugin.check_license.assert_called_once_with()
@@ -118,7 +118,7 @@ def test_license_middleware_rejects_invalid_license(
     license_plugin.check_license.return_value = False
     _, client = _create_app(monkeypatch, license_plugin)
 
-    response = client.get("/control/get-login-details")
+    response = client.get("/v1/control/get-login-details")
 
     assert response.status_code == 403
     assert response.json() == {
@@ -214,7 +214,7 @@ def test_event_log_middleware_writes_before_and_after_events(
     assert before_kwargs["request"] == GetLoginDetailsRequest()
     assert isinstance(before_kwargs["context"], Request)
     assert before_kwargs["account_info"] is None
-    assert before_kwargs["method_name"] == "/control/get-login-details"
+    assert before_kwargs["method_name"] == "/v1/control/get-login-details"
     after_kwargs = event_log_plugin.compose_log_after_event.call_args.kwargs
     assert after_kwargs["response"] == expected_response
     assert event_log_plugin.write_log.call_count == 2
