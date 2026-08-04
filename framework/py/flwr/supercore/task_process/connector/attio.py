@@ -136,13 +136,13 @@ def list_meetings(
         "GET",
         "/meetings",
         credentials,
-        params=_params(
-            limit=limit,
-            cursor=cursor,
-            linked_object=linked_object,
-            linked_record_id=linked_record_id,
-            participants=participants,
-        ),
+        params={
+            "limit": limit,
+            "cursor": cursor,
+            "linked_object": linked_object,
+            "linked_record_id": linked_record_id,
+            "participants": participants,
+        },
     )
 
 
@@ -161,7 +161,7 @@ def list_call_recordings(
         "GET",
         f"/meetings/{_path_segment(meeting_id, 'meeting_id')}/call_recordings",
         credentials,
-        params=_params(limit=limit, cursor=cursor),
+        params={"limit": limit, "cursor": cursor},
     )
 
 
@@ -181,7 +181,7 @@ def get_call_transcript(
         f"/call_recordings/{_path_segment(call_recording_id, 'call_recording_id')}"
         "/transcript"
     )
-    return _call_attio_api("GET", path, credentials, params=_params(cursor=cursor))
+    return _call_attio_api("GET", path, credentials, params={"cursor": cursor})
 
 
 ATTIO_TOOL_HANDLERS: dict[str, Callable[..., JSONValue]] = {
@@ -217,7 +217,7 @@ def _call_attio_api(
     path: str,
     credentials: JSONObject,
     *,
-    params: dict[str, str | int | bool] | None = None,
+    params: dict[str, str | int | None] | None = None,
     json_body: JSONObject | None = None,
 ) -> JSONObject:
     """Call one Attio REST endpoint without exposing credentials."""
@@ -248,10 +248,6 @@ def _call_attio_api(
     if not isinstance(payload, dict):
         raise AttioApiError("invalid_response")
     return cast(JSONObject, payload)
-
-
-def _params(**values: str | int | bool | None) -> dict[str, str | int | bool]:
-    return {key: value for key, value in values.items() if value is not None}
 
 
 def _path_segment(value: object, name: str) -> str:
