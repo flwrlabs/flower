@@ -33,12 +33,6 @@ def _provider() -> AttioOAuthProvider:
     )
 
 
-def _response(payload: object, *, status_code: int = 200) -> Mock:
-    response = Mock(status_code=status_code)
-    response.json.return_value = payload
-    return response
-
-
 def test_authorization_url_validates_redirect_uri() -> None:
     """Authorization should use the configured Attio redirect URI."""
     url = _provider().build_authorization_url(
@@ -60,13 +54,16 @@ def test_authorization_url_validates_redirect_uri() -> None:
         _provider().resolve_redirect_uri("https://attacker.example/callback")
 
 
-def test_exchange_returns_credentials_and_workspace_config() -> None:
-    """OAuth exchange should separate the token from public workspace metadata."""
+def test_exchange_returns_credentials() -> None:
+    """OAuth exchange should return credentials separately from config."""
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "access_token": "attio-access",
+        "token_type": "Bearer",
+    }
     with patch(
         "flwr.supercore.task_process.connector.attio_oauth.requests.post",
-        return_value=_response(
-            {"access_token": "attio-access", "token_type": "Bearer"}
-        ),
+        return_value=response,
     ) as post:
         credentials, config = _provider().exchange_code(
             code="authorization-code",
