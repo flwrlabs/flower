@@ -14,7 +14,7 @@ authors = [
     { name = "Alan Yi", email = "yi161@purdue.edu" }
 ]
 dependencies = [
-    "flwr[simulation]>=1.28.0",
+    "flwr[simulation]>=1.33.0",
     "flwr-datasets[vision]>=0.6.0",
     "torch==2.10.0",
     "torchvision==0.25.0",
