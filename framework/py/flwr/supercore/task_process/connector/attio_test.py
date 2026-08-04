@@ -76,7 +76,12 @@ def test_search_records_calls_attio() -> None:
             "Content-Type": "application/json",
         },
         params=None,
-        json={"query": "Flower", "objects": ["companies"], "limit": 25},
+        json={
+            "query": "Flower",
+            "objects": ["companies"],
+            "request_as": {"type": "workspace"},
+            "limit": 25,
+        },
         timeout=30.0,
     )
     assert result == {"data": []}

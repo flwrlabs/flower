@@ -104,7 +104,12 @@ def search_records(
         "POST",
         "/objects/records/search",
         credentials,
-        json_body={"query": query, "objects": objects, "limit": limit},
+        json_body={
+            "query": query,
+            "objects": objects,
+            "request_as": {"type": "workspace"},
+            "limit": limit,
+        },
     )
 
 
