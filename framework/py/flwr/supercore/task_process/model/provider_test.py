@@ -115,18 +115,18 @@ def test_invoke_model_provider_keeps_auth_when_key_is_set(
 
 
 @pytest.mark.parametrize(
-    ("request_payload", "expected_usage_type"),
+    ("request_payload", "expected_provider"),
     [
         ({"model": "openai/gpt-test", "input": []}, "openai/gpt-test"),
-        ({"input": []}, "token"),
+        ({"input": []}, "unknown"),
     ],
 )
-def test_invoke_model_provider_records_usage_type_from_request(
+def test_invoke_model_provider_records_static_usage_type_and_provider(
     monkeypatch: pytest.MonkeyPatch,
     request_payload: JSONObject,
-    expected_usage_type: str,
+    expected_provider: str,
 ) -> None:
-    """Usage type should come from request model, falling back to token."""
+    """Model usage should include its static type and requested provider."""
     monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "http://proxy/v1/responses")
     _patch_post(
         monkeypatch,
@@ -147,7 +147,8 @@ def test_invoke_model_provider_records_usage_type_from_request(
 
     assert result["id"] == "resp_1"
     usage = usage_recorder.record.call_args.args[0]
-    assert usage.usage_type == expected_usage_type
+    assert usage.usage_type == "model_inference"
+    assert usage.provider == expected_provider
 
 
 def test_invoke_model_provider_collects_stream_events(
