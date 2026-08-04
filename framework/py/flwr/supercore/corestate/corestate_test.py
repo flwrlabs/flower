@@ -46,6 +46,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.date import now
 from flwr.supercore.typing import ConnectorRecord
+from flwr.supercore.utils import uint64_to_int64
 
 from . import CoreState
 from .utils_test import create_task_message
@@ -460,6 +461,48 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             self.assertEqual(state.get_object(1, "unavailable"), b"")
 
         self.assertEqual(load_object.call_count, 3)
+        cleanup_session.assert_not_called()
+
+    def test_get_object_preserves_old_format_unexpired_session(self) -> None:
+        """Old SQLite timestamp text remains comparable during cleanup checks."""
+        state = self.state_factory()
+        if not hasattr(state, "query"):
+            self.skipTest("SQL-only timestamp storage regression")
+        sql_state = cast(Any, state)
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        session_id = "session-old-format"
+        current = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
+        expires_at = datetime(2026, 1, 1, 13, 0, tzinfo=UTC)
+        sql_state.query(
+            """
+            INSERT INTO object_push_sessions (
+                session_id, run_id, expires_at, pending_count
+            )
+            VALUES (:session_id, :run_id, :expires_at, 1)
+            """,
+            {
+                "session_id": session_id,
+                "run_id": uint64_to_int64(run_id),
+                "expires_at": expires_at.isoformat(sep=" "),
+            },
+        )
+        sql_state.query(
+            """
+            INSERT INTO object_push_session_pending (session_id, object_id)
+            VALUES (:session_id, :object_id)
+            """,
+            {"session_id": session_id, "object_id": object_id},
+        )
+
+        with (
+            patch("flwr.supercore.date.datetime.datetime") as mock_datetime,
+            patch.object(state.object_store, "get", return_value=b""),
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            mock_datetime.now.return_value = current
+            self.assertEqual(state.get_object(run_id, object_id), b"")
+
         cleanup_session.assert_not_called()
 
     def test_get_object_cleans_up_expired_sessions_and_reloads(self) -> None:

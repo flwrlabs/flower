@@ -1638,12 +1638,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
 
 def _timestamp_bind(name: str, value: datetime) -> Any:
-    """Bind a timestamp as text for SQLite-compatible timestamp storage."""
+    """Bind a timestamp as text matching SQLite's previous representation."""
     return bindparam(name, _timestamp_to_sqlite_text(value), type_=String())
 
 
 def _timestamp_to_sqlite_text(value: datetime) -> str:
-    """Return the SQLite timestamp text format used by the legacy SQL path."""
+    """Return SQLite-compatible timestamp text without changing ordering."""
     if value.tzinfo is None:
         value = value.replace(tzinfo=UTC)
     else:
