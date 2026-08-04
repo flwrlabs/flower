@@ -16,6 +16,7 @@
 
 
 import unittest
+from tempfile import TemporaryDirectory
 
 from sqlalchemy import Column, Integer, MetaData, Table
 from sqlalchemy.exc import IntegrityError
@@ -131,6 +132,44 @@ class TestSqlMixin(unittest.TestCase):
         self.assertEqual(rows[0]["value"], 101)
         self.assertEqual(rows[1]["value"], 201)
         self.assertEqual(rows[2]["value"], 301)
+
+    def test_nested_sessions_are_scoped_to_database(self) -> None:
+        """Test that nested sessions reuse only the matching database session."""
+        other_db = DummyDbSqlAlchemy(":memory:")
+        other_db.initialize()
+
+        with self.db.session() as outer_session:
+            with other_db.session() as other_session:
+                self.assertIsNot(other_session, outer_session)
+
+                with self.db.session() as reentered_session:
+                    self.assertIs(reentered_session, outer_session)
+
+    def test_in_memory_url_instances_do_not_share_session(self) -> None:
+        """Test that equivalent in-memory URL forms remain instance-scoped."""
+        for database_url in ("sqlite://", "sqlite+pysqlite:///:memory:"):
+            with self.subTest(database_url=database_url):
+                first_db = DummyDbSqlAlchemy(database_url)
+                second_db = DummyDbSqlAlchemy(database_url)
+                first_db.initialize()
+                second_db.initialize()
+
+                with first_db.session() as first_session:
+                    with second_db.session() as second_session:
+                        self.assertIsNot(second_session, first_session)
+
+    def test_instances_for_same_database_share_session(self) -> None:
+        """Test that instances for the same persistent database share a session."""
+        with TemporaryDirectory() as temp_dir:
+            database_path = f"{temp_dir}/state.db"
+            first_db = DummyDbSqlAlchemy(database_path)
+            second_db = DummyDbSqlAlchemy(database_path)
+            first_db.initialize()
+            second_db.initialize()
+
+            with first_db.session() as first_session:
+                with second_db.session() as second_session:
+                    self.assertIs(second_session, first_session)
 
     def test_query_without_session(self) -> None:
         """Test that query() works independently when not in a session context."""
