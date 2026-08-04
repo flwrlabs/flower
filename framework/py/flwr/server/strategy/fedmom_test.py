@@ -167,3 +167,20 @@ def test_aggregate_fit_server_learning_rate_and_momentum() -> None:
         parameters_to_ndarrays(actual_r2), expected_r2, strict=True
     ):
         assert_almost_equal(w_act, w_exp)
+
+
+def test_configure_fit_records_initial_parameters() -> None:
+    """Test that configure_fit captures client-provided initial parameters."""
+    strategy = FedMom(server_learning_rate=1.0, server_momentum=0.0)
+    assert strategy.initial_parameters is None
+
+    initial_weights: NDArrays = [array([1.0, 2.0, 3.0], dtype=float32)]
+    initial_params = ndarrays_to_parameters(initial_weights)
+
+    client_manager = MagicMock()
+    client_manager.num_available.return_value = 2
+    client_manager.sample.return_value = []
+
+    strategy.configure_fit(1, initial_params, client_manager)
+
+    assert strategy.initial_parameters is initial_params

@@ -65,7 +65,7 @@ class FedMom(FedAvg):
         average using the provided weight factor key.
     evaluate_metrics_aggr_fn : Optional[callable] (default: None)
         Function with signature (list[RecordDict], str) -> MetricRecord,
-        used to aggregate MetricRecords from training round replies.
+        used to aggregate MetricRecords from evaluation round replies.
         If `None`, defaults to `aggregate_metricrecords`, which performs a weighted
         average using the provided weight factor key.
     server_learning_rate: float (default: 1.0)
@@ -142,11 +142,16 @@ class FedMom(FedAvg):
                     "No initial parameters set for FedMom. "
                     "Ensure that `configure_train` has been called before aggregation."
                 )
-            ndarrays = self.current_arrays.to_numpy_ndarrays()
-            aggregated_ndarrays = aggregated_arrays.to_numpy_ndarrays()
 
-            # Preserve keys for arrays in ArrayRecord
             array_keys = list(aggregated_arrays.keys())
+            if set(array_keys) != set(self.current_arrays.keys()):
+                raise AggregationError(
+                    "Keys of the aggregated arrays do not match "
+                    "those stored in current_arrays."
+                )
+
+            ndarrays = [self.current_arrays[k].numpy() for k in array_keys]
+            aggregated_ndarrays = [aggregated_arrays[k].numpy() for k in array_keys]
             aggregated_arrays.clear()
 
             # Compute pseudo-gradient: g_t = w_t - w_{avg, t+1}

@@ -21,6 +21,7 @@ from collections.abc import Callable
 from logging import WARNING
 
 from flwr.common import (
+    FitIns,
     FitRes,
     MetricsAggregationFn,
     NDArrays,
@@ -128,6 +129,13 @@ class FedMom(FedAvg):
         """Initialize global model parameters."""
         return self.initial_parameters
 
+    def configure_fit(
+        self, server_round: int, parameters: Parameters, client_manager: ClientManager
+    ) -> list[tuple[ClientProxy, FitIns]]:
+        """Configure the next round of training."""
+        self.initial_parameters = parameters
+        return super().configure_fit(server_round, parameters, client_manager)
+
     def aggregate_fit(
         self,
         server_round: int,
@@ -173,11 +181,11 @@ class FedMom(FedAvg):
             for vn, vp in zip(v_next, v_prev, strict=True)
         ]
 
+        parameters_aggregated = ndarrays_to_parameters(w_next)
+
         # Update internal state
         self.v_vector = v_next
-        self.initial_parameters = ndarrays_to_parameters(w_next)
-
-        parameters_aggregated = ndarrays_to_parameters(w_next)
+        self.initial_parameters = parameters_aggregated
 
         # Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {}
