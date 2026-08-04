@@ -65,6 +65,7 @@ from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.corestate_models import NonceStore as NonceStoreModel
 from flwr.supercore.state.schema.corestate_models import (
     RunConnector as RunConnectorModel,
 )
@@ -403,14 +404,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         }
         # Keep launch behavior: last write wins for metadata under the same
         # content hash.
-        query = """
-            INSERT INTO fab (fab_hash, content, verifications)
-            VALUES (:fab_hash, :content, :verifications)
-            ON CONFLICT(fab_hash) DO UPDATE SET
-                content = excluded.content,
-                verifications = excluded.verifications
-        """
-        self.query(query, params)
+        with self.session() as session:
+            session.merge(FabModel(**params))
         return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
@@ -443,20 +438,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             "credentials_json": credentials_json,
             "config_json": config_json,
         }
-        self.query(
-            """
-            INSERT INTO connector (
-                flwr_aid, connector_ref, credentials_json, config_json
-            )
-            VALUES (
-                :flwr_aid, :connector_ref, :credentials_json, :config_json
-            )
-            ON CONFLICT(flwr_aid, connector_ref) DO UPDATE SET
-                credentials_json = excluded.credentials_json,
-                config_json = excluded.config_json
-            """,
-            params,
-        )
+        with self.session() as session:
+            session.merge(ConnectorModel(**params))
         return True
 
     def get_connector(
@@ -512,13 +495,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if connector_ref not in bound_refs
         ]
         if data:
-            self.query(
-                """
-                INSERT INTO run_connector (run_id, connector_ref)
-                VALUES (:run_id, :connector_ref)
-                """,
-                data,
-            )
+            with self.session() as session:
+                session.add_all(RunConnectorModel(**row) for row in data)
         return True
 
     def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
@@ -691,15 +669,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Set the shared Context for the specified RunSeries."""
         sint_series_id = uint64_to_int64(series_id)
         context_bytes = context_to_bytes(context)
-        with self.session():
-            self.query(
-                """
-                INSERT INTO series_context (series_id, context)
-                VALUES (:series_id, :context)
-                ON CONFLICT(series_id) DO UPDATE SET
-                    context = excluded.context
-                """,
-                {"series_id": sint_series_id, "context": context_bytes},
+        with self.session() as session:
+            session.merge(
+                SeriesContextModel(series_id=sint_series_id, context=context_bytes)
             )
 
     def store_run_in_series(
@@ -1649,20 +1621,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Atomically reserve a nonce in a namespace."""
         if namespace == "" or nonce == "":
             return False
-        cleanup_query = """
-            DELETE FROM nonce_store
-            WHERE expires_at < :current;
-        """
-        insert_query = """
-            INSERT INTO nonce_store (namespace, nonce, expires_at)
-            VALUES (:namespace, :nonce, :expires_at);
-        """
-        self.query(cleanup_query, {"current": now().timestamp()})
         try:
-            self.query(
-                insert_query,
-                {"namespace": namespace, "nonce": nonce, "expires_at": expires_at},
-            )
+            with self.session() as session:
+                session.execute(
+                    delete(NonceStoreModel).where(
+                        NonceStoreModel.expires_at < now().timestamp()
+                    )
+                )
+                session.add(
+                    NonceStoreModel(
+                        namespace=namespace,
+                        nonce=nonce,
+                        expires_at=expires_at,
+                    )
+                )
             return True
         # Duplicate nonce detected, treated as a replay attempt.
         # IntegrityError can only arise from (namespace, nonce) uniqueness.
