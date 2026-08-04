@@ -1643,12 +1643,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Atomically reserve a nonce in a namespace."""
         if namespace == "" or nonce == "":
             return False
-        with self.session() as session:
-            session.execute(
-                delete(NonceStoreModel).where(
-                    NonceStoreModel.expires_at < now().timestamp()
-                )
-            )
         stmt = sqlite_insert(NonceStoreModel).values(
             namespace=namespace, nonce=nonce, expires_at=expires_at
         )
@@ -1656,6 +1650,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             index_elements=[NonceStoreModel.namespace, NonceStoreModel.nonce]
         )
         with self.session() as session:
+            session.execute(
+                delete(NonceStoreModel).where(
+                    NonceStoreModel.expires_at < now().timestamp()
+                )
+            )
             inserted_nonce = session.scalar(stmt.returning(NonceStoreModel.nonce))
             return inserted_nonce is not None
 
