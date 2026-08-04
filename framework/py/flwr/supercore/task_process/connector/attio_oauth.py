@@ -105,8 +105,15 @@ class AttioOAuthProvider:
             raise AttioOAuthError("Attio OAuth exchange failed.") from None
         if response.status_code >= 400:
             raise AttioOAuthError("Attio OAuth exchange failed.")
-        payload = _response_object(response, "Attio OAuth response is invalid.")
-        access_token = _required_string(payload, "access_token")
+        try:
+            payload = response.json()
+        except ValueError:
+            raise AttioOAuthError("Attio OAuth response is invalid.") from None
+        if not isinstance(payload, dict):
+            raise AttioOAuthError("Attio OAuth response is invalid.")
+        access_token = payload.get("access_token")
+        if not isinstance(access_token, str) or not access_token:
+            raise AttioOAuthError("Attio OAuth response is missing credentials.")
         credentials: JSONObject = {"access_token": access_token}
         refresh_token = payload.get("refresh_token")
         if isinstance(refresh_token, str) and refresh_token:
@@ -137,20 +144,3 @@ def get_configured_connector_oauth_providers() -> list[OAuthConnectorProvider]:
             redirect_uri=values[ATTIO_REDIRECT_URI_ENV],
         )
     ]
-
-
-def _response_object(response: requests.Response, error: str) -> JSONObject:
-    try:
-        payload = response.json()
-    except ValueError:
-        raise AttioOAuthError(error) from None
-    if not isinstance(payload, dict):
-        raise AttioOAuthError(error)
-    return payload
-
-
-def _required_string(payload: JSONObject, key: str) -> str:
-    value = payload.get(key)
-    if not isinstance(value, str) or not value:
-        raise AttioOAuthError("Attio OAuth response is missing credentials.")
-    return value
