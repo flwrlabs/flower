@@ -25,6 +25,7 @@ from typing import Any, Literal, cast
 from uuid import uuid4
 
 from sqlalchemy import MetaData, delete, or_, select, update
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Context, Message
@@ -404,8 +405,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         }
         # Keep launch behavior: last write wins for metadata under the same
         # content hash.
+        stmt = sqlite_insert(FabModel).values(**params)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[FabModel.fab_hash],
+            set_={
+                "content": stmt.excluded.content,
+                "verifications": stmt.excluded.verifications,
+            },
+        )
         with self.session() as session:
-            session.merge(FabModel(**params))
+            session.execute(stmt)
         return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
@@ -438,8 +447,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             "credentials_json": credentials_json,
             "config_json": config_json,
         }
+        stmt = sqlite_insert(ConnectorModel).values(**params)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[ConnectorModel.flwr_aid, ConnectorModel.connector_ref],
+            set_={
+                "credentials_json": stmt.excluded.credentials_json,
+                "config_json": stmt.excluded.config_json,
+            },
+        )
         with self.session() as session:
-            session.merge(ConnectorModel(**params))
+            session.execute(stmt)
         return True
 
     def get_connector(
@@ -669,10 +686,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Set the shared Context for the specified RunSeries."""
         sint_series_id = uint64_to_int64(series_id)
         context_bytes = context_to_bytes(context)
+        stmt = sqlite_insert(SeriesContextModel).values(
+            series_id=sint_series_id, context=context_bytes
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[SeriesContextModel.series_id],
+            set_={"context": stmt.excluded.context},
+        )
         with self.session() as session:
-            session.merge(
-                SeriesContextModel(series_id=sint_series_id, context=context_bytes)
-            )
+            session.execute(stmt)
 
     def store_run_in_series(
         self,
@@ -1621,13 +1643,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Atomically reserve a nonce in a namespace."""
         if namespace == "" or nonce == "":
             return False
+        with self.session() as session:
+            session.execute(
+                delete(NonceStoreModel).where(
+                    NonceStoreModel.expires_at < now().timestamp()
+                )
+            )
         try:
             with self.session() as session:
-                session.execute(
-                    delete(NonceStoreModel).where(
-                        NonceStoreModel.expires_at < now().timestamp()
-                    )
-                )
                 session.add(
                     NonceStoreModel(
                         namespace=namespace,
