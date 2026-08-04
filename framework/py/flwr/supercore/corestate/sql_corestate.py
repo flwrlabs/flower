@@ -1649,20 +1649,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     NonceStoreModel.expires_at < now().timestamp()
                 )
             )
-        try:
-            with self.session() as session:
-                session.add(
-                    NonceStoreModel(
-                        namespace=namespace,
-                        nonce=nonce,
-                        expires_at=expires_at,
-                    )
-                )
-            return True
-        # Duplicate nonce detected, treated as a replay attempt.
-        # IntegrityError can only arise from (namespace, nonce) uniqueness.
-        except IntegrityError:
-            return False
+        stmt = sqlite_insert(NonceStoreModel).values(
+            namespace=namespace, nonce=nonce, expires_at=expires_at
+        )
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=[NonceStoreModel.namespace, NonceStoreModel.nonce]
+        )
+        with self.session() as session:
+            inserted_nonce = session.scalar(stmt.returning(NonceStoreModel.nonce))
+            return inserted_nonce is not None
 
 
 def _connector_oauth_session_from_model(
