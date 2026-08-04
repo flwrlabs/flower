@@ -169,7 +169,7 @@ class ConfigRecord(TypedDict[str, ConfigRecordValues], InflatableObject):
                 if isinstance(v[0], (bytes | str)):
                     # not all str are of equal length necessarily
                     # for both the footprint of each element is 1 Byte
-                    num_bytes += int(sum(len(s) for s in v))  # type: ignore
+                    num_bytes += int(sum(len(s) for s in v))
                 else:
                     num_bytes += get_var_bytes(v[0]) * len(v)
             else:

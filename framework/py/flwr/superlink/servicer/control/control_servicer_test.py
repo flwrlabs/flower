@@ -406,6 +406,81 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(run_context.run_id, response.run_id)
         self.assertEqual(run_context.series_id, response.series_id)
 
+    def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
+        """StartRun should bind canonical connected OAuth connector refs."""
+        provider = _OAuthProvider()
+        self.state.upsert_connector(
+            flwr_aid=self.aid,
+            connector_ref="slack",
+            credentials_json="{}",
+            config_json="{}",
+        )
+        request = StartRunRequest(
+            federation=NOOP_FEDERATION_ID,
+            connector_refs=[" Slack ", "slack"],
+        )
+        request.fab.content = b"test FAB content with connector refs"
+
+        with (
+            patch.object(
+                connector_registry,
+                "OAUTH_CONNECTOR_PROVIDERS",
+                (provider,),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers."
+                "get_metadata_from_config",
+                return_value=("flwr/demo", "1.0.0"),
+            ),
+        ):
+            response = self.servicer.StartRun(request, Mock())
+
+        self.assertEqual(
+            list(self.state.get_run_connector_refs(run_id=response.run_id)),
+            ["slack"],
+        )
+
+    @parameterized.expand(  # type: ignore
+        [
+            ("unknown", "unknown", ApiErrorCode.CONNECTOR_NOT_FOUND),
+            ("empty", "  ", ApiErrorCode.INVALID_CONNECTOR_REQUEST),
+            ("other_account", "slack", ApiErrorCode.CONNECTOR_NOT_FOUND),
+        ]
+    )
+    def test_start_run_rejects_unavailable_oauth_connector(
+        self,
+        _name: str,
+        connector_ref: str,
+        expected_code: ApiErrorCode,
+    ) -> None:
+        """StartRun should reject invalid, unknown, and other-account refs."""
+        provider = _OAuthProvider()
+        if connector_ref == "slack":
+            self.state.upsert_connector(
+                flwr_aid="other-account",
+                connector_ref="slack",
+                credentials_json="{}",
+                config_json="{}",
+            )
+        request = StartRunRequest(connector_refs=[connector_ref])
+
+        with (
+            patch.object(
+                connector_registry,
+                "OAUTH_CONNECTOR_PROVIDERS",
+                (provider,),
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            self.servicer.StartRun(request, Mock())
+
+        self.assertEqual(error.exception.code, expected_code)
+        self.assertEqual(list(self.state.get_run_info()), [])
+
     def test_start_run_defaults_to_account_simulation_federation(self) -> None:
         """Test StartRun uses the account default simulation federation."""
         self.account_info.account_name = "test_account"
@@ -1617,6 +1692,32 @@ class TestControlServicerAuth(unittest.TestCase):
             self.assertEqual(msgs[0].log_output, "log1")
             self.assertEqual(msgs[0].latest_timestamp, 1.0)
 
+    def test_streamlogs_stops_when_grpc_context_is_inactive(self) -> None:
+        """Test StreamLogs retains gRPC cancellation behavior after delegation."""
+        run_id = 789
+        request = StreamLogsRequest(run_id=run_id, after_timestamp=0)
+        ctx = self.make_context()
+        mock_run = Mock(
+            federation_id=NOOP_FEDERATION_ID,
+            primary_task_id=456,
+            status=RunStatus(Status.RUNNING, "", ""),
+        )
+
+        with (
+            patch.object(self.state, "get_run_info", return_value=[mock_run]),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                return_value=SimpleNamespace(flwr_aid="user-123"),
+            ),
+        ):
+            msgs = list(self.servicer.StreamLogs(request, ctx))
+
+        self.assertEqual(msgs, [])
+        ctx.is_active.assert_called_once_with()
+
     def test_streamrunevents_yields_events(self) -> None:
         """Test StreamRunEvents streams task events for an accessible run."""
         # Prepare
@@ -1670,6 +1771,31 @@ class TestControlServicerAuth(unittest.TestCase):
         self.assertEqual(msgs[0].task_event.data, '{"delta":"Hel"}')
         self.assertEqual(msgs[1].task_event.id, 6)
         self.assertEqual(msgs[1].task_event.event, "response.completed")
+
+    def test_streamrunevents_stops_when_grpc_context_is_inactive(self) -> None:
+        """Test StreamRunEvents retains gRPC cancellation after delegation."""
+        run_id = 789
+        request = StreamRunEventsRequest(run_id=run_id)
+        ctx = self.make_context()
+        mock_run = Mock(
+            federation_id=NOOP_FEDERATION_ID,
+            status=RunStatus(Status.RUNNING, "", ""),
+        )
+
+        with (
+            patch.object(self.state, "get_run_info", return_value=[mock_run]),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                return_value=SimpleNamespace(flwr_aid="user-123"),
+            ),
+        ):
+            msgs = list(self.servicer.StreamRunEvents(request, ctx))
+
+        self.assertEqual(msgs, [])
+        ctx.is_active.assert_called_once_with()
 
     def test_stoprun_auth_unsuccessful_when_not_federation_member(self) -> None:
         """Test StopRun raises when requester is not a federation member."""

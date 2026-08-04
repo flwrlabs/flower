@@ -45,7 +45,7 @@ class AccountAccessDependency:
 
     def __call__(
         self,
-        request: Request,  # type: ignore[type-arg]
+        request: Request,
         response: Response,
     ) -> AccountInfo:
         """Return the authenticated and authorized account for a request."""
@@ -104,26 +104,25 @@ class AccountAccessDependency:
 
 
 def get_account(
-    request: Request,  # type: ignore[type-arg]
-    response: Response,
+    request: Request,
 ) -> AccountInfo:
-    """Return the authenticated account for the current request.
+    """Return the account authenticated by the Control API middleware.
 
-    The application must configure ``app.state.account_access_dep`` with an
-    ``AccountAccessDependency`` instance during application setup.
+    Control routes authenticate requests before dependency resolution and store
+    the resulting account on the request state.
     """
-    account_access = getattr(request.app.state, "account_access_dep", None)
-    if not isinstance(account_access, AccountAccessDependency):
+    account = getattr(request.state, "account", None)
+    if not isinstance(account, AccountInfo):
         raise FlowerError(
             ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED,
-            "SuperLink account authentication is not initialized: expected "
-            f"AccountAccessDependency, got {type(account_access).__name__}.",
+            "SuperLink account authentication is not initialized: expected an "
+            f"authenticated account, got {type(account).__name__}.",
         )
-    return account_access(request, response)
+    return account
 
 
 def get_authn_plugin(
-    request: Request,  # type: ignore[type-arg]
+    request: Request,
 ) -> ControlAuthnPlugin:
     """Return the configured Control authentication plugin."""
     account_access = getattr(request.app.state, "account_access_dep", None)

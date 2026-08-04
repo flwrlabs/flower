@@ -336,7 +336,9 @@ class TestArrayRecord(unittest.TestCase):
             ([np.array(5), np.array(5)],),  # Same array twice
         ]
     )
-    def test_inflation_deflation(self, array_content) -> None:
+    def test_inflation_deflation(
+        self, array_content: list[np.ndarray[Any, Any]]
+    ) -> None:
         """Test inflation and deflation of ArrayRecord."""
         arr_rec = ArrayRecord(array_content)
 

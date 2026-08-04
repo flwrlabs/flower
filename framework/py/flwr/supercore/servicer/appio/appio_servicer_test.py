@@ -26,6 +26,7 @@ from flwr.common.serde import message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     CreateTaskRequest,
+    CreateTaskResponse,
     PullPendingTasksRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
@@ -46,6 +47,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
 from flwr.supercore.corestate.utils_test import create_task_message
+from flwr.supercore.task_process.connector import registry as connector_registry
 
 from .appio_servicer import AppIoServicer
 
@@ -61,13 +63,30 @@ class _TestAppIoServicer(AppIoServicer):
         return self._state
 
 
-class TestAppIoServicer(unittest.TestCase):
+class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
     """Tests for shared AppIoServicer task RPCs."""
 
     def setUp(self) -> None:
         """Set up test fixture."""
         self.state = Mock()
+        self.state.get_tasks.return_value = []
         self.servicer = _TestAppIoServicer(self.state)
+
+    def _create_connector_task(
+        self, connector_ref: str, context: grpc.ServicerContext | None = None
+    ) -> CreateTaskResponse:
+        """Create a connector task as an authenticated AgentApp task."""
+        with patch(
+            "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+            return_value=Mock(task_id=789, run_id=123, type=TaskType.AGENT_APP),
+        ):
+            return self.servicer.CreateTask(
+                CreateTaskRequest(
+                    type=TaskType.CONNECTOR,
+                    connector_ref=connector_ref,
+                ),
+                context if context is not None else Mock(),
+            )
 
     def test_pull_pending_tasks_returns_pending_tasks(self) -> None:
         """PullPendingTasks should return pending tasks from state."""
@@ -187,6 +206,70 @@ class TestAppIoServicer(unittest.TestCase):
                     requesting_task_id=789,
                 )
                 self.assertEqual(response.task_id, 456)
+
+    def test_create_task_allows_bound_oauth_connector(self) -> None:
+        """CreateTask should allow an OAuth connector bound to the run."""
+        self.state.get_run_connector_refs.return_value = ["notion"]
+        self.state.create_task.return_value = 456
+
+        with patch.object(
+            connector_registry,
+            "OAUTH_CONNECTOR_PROVIDERS",
+            (Mock(connector_ref="notion"),),
+        ):
+            response = self._create_connector_task("notion")
+
+        self.state.get_run_connector_refs.assert_called_once_with(run_id=123)
+        self.assertEqual(
+            self.state.create_task.call_args.kwargs["connector_ref"], "notion"
+        )
+        self.assertEqual(response.task_id, 456)
+
+    def test_create_task_rejects_unbound_oauth_connector(self) -> None:
+        """CreateTask should reject OAuth credentials unavailable to the run."""
+        self.state.get_run_connector_refs.return_value = []
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch.object(
+                connector_registry,
+                "OAUTH_CONNECTOR_PROVIDERS",
+                (Mock(connector_ref="notion"),),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self._create_connector_task("notion", context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Connector is not available to this run.",
+        )
+        self.state.create_task.assert_not_called()
+
+    def test_create_task_rejects_unknown_connector(self) -> None:
+        """CreateTask should reject names absent from the connector registry."""
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        with self.assertRaises(grpc.RpcError):
+            self._create_connector_task("unknown", context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.NOT_FOUND,
+            "Unsupported OAuth connector 'unknown'.",
+        )
+        self.state.get_run_connector_refs.assert_not_called()
+        self.state.create_task.assert_not_called()
+
+    def test_create_task_preserves_builtin_connector_access(self) -> None:
+        """CreateTask should keep credential-free built-in connectors available."""
+        self.state.create_task.return_value = 456
+
+        response = self._create_connector_task("web_search")
+
+        self.state.get_run_connector_refs.assert_not_called()
+        self.assertEqual(response.task_id, 456)
 
     def test_create_task_propagates_state_error(self) -> None:
         """CreateTask should let state-layer run validation errors propagate."""
@@ -415,7 +498,8 @@ class TestAppIoServicer(unittest.TestCase):
     ) -> None:
         """RecordTaskUsage should store usage for model and connector tasks."""
         usage = TaskUsage(
-            usage_type="token",
+            usage_type="model_inference",
+            provider="openai/gpt-test",
             input_tokens=10,
             output_tokens=20,
             total_tokens=30,

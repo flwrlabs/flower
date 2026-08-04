@@ -13,12 +13,7 @@
 // limitations under the License.
 // =============================================================================
 
-import {
-  type ChatCompletionMessageParam,
-  CreateMLCEngine,
-  type InitProgressReport,
-  type MLCEngineInterface,
-} from '@mlc-ai/web-llm';
+import { CreateMLCEngine, type InitProgressReport, type MLCEngineInterface } from '@mlc-ai/web-llm';
 
 import { getAvailableRAM } from '../env';
 import {
@@ -54,7 +49,7 @@ async function runQuery(
   if (stream && onStreamEvent) {
     const reply = await engine.chat.completions.create({
       stream: true,
-      messages: messages as ChatCompletionMessageParam[],
+      messages: messages,
       temperature,
       top_p: topP,
       max_tokens: maxTokens,
@@ -70,7 +65,7 @@ async function runQuery(
     return await engine.getMessage();
   } else {
     const reply = await engine.chat.completions.create({
-      messages: messages as ChatCompletionMessageParam[],
+      messages: messages,
       temperature,
       top_p: topP,
       max_tokens: maxTokens,

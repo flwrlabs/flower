@@ -37,8 +37,8 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.state.alembic.utils import run_migrations
 
-_current_session: ContextVar[Session | None] = ContextVar(
-    "current_sqlalchemy_session",
+_current_sessions: ContextVar[dict[object, Session] | None] = ContextVar(
+    "current_sqlalchemy_sessions",
     default=None,
 )
 
@@ -68,7 +68,7 @@ class SqlMixin(ABC):
 
     # Subclasses can restrict supported SQLAlchemy dialects.
     # Flower Framework SQL backend currently allows only the SQLite dialect.
-    allowed_dialects: frozenset[str] = SQL_ALLOWED_DIALECTS
+    allowed_dialects: frozenset[str] | None = SQL_ALLOWED_DIALECTS
 
     def __init__(self, database_path: str) -> None:
         """Initialize the SqlMixin.
@@ -99,8 +99,18 @@ class SqlMixin(ABC):
             database_path = ":memory:"
 
         self.database_url = self._normalize_database_url(database_path)
-        self.database_backend = make_url(self.database_url).get_backend_name()
+        parsed_database_url = make_url(self.database_url)
+        self.database_backend = parsed_database_url.get_backend_name()
         self._validate_allowed_dialects(self.database_backend)
+        self._is_in_memory_sqlite = (
+            self.database_backend == "sqlite"
+            and parsed_database_url.database in (None, "", ":memory:")
+        )
+
+        # Persistent SQL states using the same database URL may share one
+        # transaction. In-memory SQLite engines are independent per instance, so
+        # they must not share sessions.
+        self._session_scope = self if self._is_in_memory_sqlite else self.database_url
 
         self._engine: Engine | None = None
         self._session_factory: sessionmaker[Session] | None = None
@@ -141,8 +151,9 @@ class SqlMixin(ABC):
         """Provide a transactional database session context.
 
         Yields a SQLAlchemy Session that automatically commits on success or rolls
-        back on exceptions. Re-entrant: nested calls reuse the same session. Use for
-        multi-statement transactions; prefer `query()` for single statements.
+        back on exceptions. Re-entrant for the same database scope: nested calls
+        reuse that scope's session. Use for multi-statement transactions; prefer
+        `query()` for single statements.
 
         Yields
         ------
@@ -155,9 +166,15 @@ class SqlMixin(ABC):
                 session.execute(text("DELETE FROM t WHERE id = :id"), {"id": 1})
                 session.execute(text("INSERT INTO t2 SELECT * FROM t"))
         """
-        existing = _current_session.get()
+        current_sessions = _current_sessions.get()
+        existing = (
+            current_sessions.get(self._session_scope)
+            if current_sessions is not None
+            else None
+        )
 
-        # Re-entrant: reuse the session if in a session context, no begin()
+        # Re-entrant: reuse the active session for this database scope, even when
+        # another database scope was entered more recently.
         if existing is not None:
             yield existing
             return
@@ -167,13 +184,15 @@ class SqlMixin(ABC):
 
         # Create new session; outermost scope owns the transaction
         session = self._session_factory()
-        token = _current_session.set(session)
+        token = _current_sessions.set(
+            {**(current_sessions or {}), self._session_scope: session}
+        )
 
         try:
             with session.begin():
                 yield session
         finally:
-            _current_session.reset(token)
+            _current_sessions.reset(token)
             session.close()
 
     def get_metadata(self) -> MetaData | None:
@@ -212,7 +231,7 @@ class SqlMixin(ABC):
             engine_kwargs["connect_args"] = {"check_same_thread": False}
         # In-memory SQLite databases are per-connection; use StaticPool to ensure
         # all threads share the same database instance.
-        if self.database_url == FLWR_IN_MEMORY_SQLITE_DB_URL:
+        if self._is_in_memory_sqlite:
             engine_kwargs["poolclass"] = StaticPool
         self._engine = create_engine(self.database_url, **engine_kwargs)
 
@@ -229,7 +248,7 @@ class SqlMixin(ABC):
 
         # Create database
         metadata: MetaData | None = self.get_metadata()
-        if metadata and self.database_url == FLWR_IN_MEMORY_SQLITE_DB_URL:
+        if metadata and self._is_in_memory_sqlite:
             # In-memory databases: create tables directly from SQLAlchemy metadata
             metadata.create_all(self._engine)
         else:
@@ -253,8 +272,9 @@ class SqlMixin(ABC):
         isolated transaction that is automatically committed. This is suitable for
         single SQL statements.
 
-        If called within a session() context, query() reuses the existing session
-        and transaction. This enables atomic multi-query operations:
+        If called within a session() context for the same database scope, query()
+        reuses the existing session and transaction. This enables atomic multi-query
+        operations:
 
             with self.session() as session:
                 self.query("UPDATE ...", {...})    # Shares same transaction

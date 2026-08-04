@@ -83,8 +83,9 @@ def prep(
         client_resources=client_resources,
     )
 
-    # Create 373 client proxies
-    num_proxies = 373  # a prime number
+    # Create enough proxies to exercise queueing and shuffled result retrieval while
+    # keeping this per-test integration workload small enough for pull requests.
+    num_proxies = 37  # a prime number
     mapping = _create_node_id_to_partition_mapping(num_proxies)
     proxies = [
         RayActorClientProxy(
