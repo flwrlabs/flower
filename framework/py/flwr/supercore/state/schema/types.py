@@ -35,13 +35,13 @@ class UTCDateTime(
         return datetime
 
     def process_bind_param(
-        self, value: datetime | None, dialect: Any
+        self, value: datetime | None, _dialect: Any
     ) -> datetime | None:
         """Pass through non-SQLite bind values to the wrapped timestamp type."""
         return value
 
     def process_result_value(
-        self, value: datetime | None, dialect: Any
+        self, value: datetime | None, _dialect: Any
     ) -> datetime | None:
         """Pass through non-SQLite result values from the wrapped timestamp type."""
         return value
