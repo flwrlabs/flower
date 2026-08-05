@@ -25,6 +25,8 @@ from google.protobuf.message import Message as GrpcMessage
 
 from flwr.proto.appio_pb2 import PullPendingTasksRequest  # pylint: disable=E0611
 from flwr.supercore.auth import (
+    CLIENTAPPIO_METHOD_AUTH_POLICY,
+    SERVERAPPIO_METHOD_AUTH_POLICY,
     compute_request_body_sha256,
     compute_superexec_signature,
     derive_auth_secret,
@@ -43,7 +45,8 @@ from flwr.supercore.interceptors import (
     create_serverappio_superexec_auth_server_interceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
-    SERVERAPPIO_SUPEREXEC_METHODS as _SERVERAPPIO_SUPEREXEC_METHODS,
+    CLIENTAPPIO_SUPEREXEC_METHODS,
+    SERVERAPPIO_SUPEREXEC_METHODS,
 )
 
 _ClientCallDetails = namedtuple(
@@ -89,7 +92,7 @@ class TestSuperExecAuthClientInterceptor(TestCase):
         """Protected SuperExec methods should receive signed metadata."""
         interceptor = SuperExecAuthClientInterceptor(
             master_secret=b"secret",
-            protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
+            protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
         )
         details = _ClientCallDetails(
             method="/flwr.proto.ServerAppIo/PullPendingTasks",
@@ -122,6 +125,39 @@ class TestSuperExecAuthClientInterceptor(TestCase):
             SUPEREXEC_AUTH_SIGNATURE_HEADER,
         ):
             self.assertIn(header, md)
+
+
+class TestSuperExecMethodPolicies(TestCase):
+    """Lock the SuperExec HMAC method policies for both AppIo services."""
+
+    _BOOTSTRAP_METHODS = {"PullPendingTasks", "ClaimTask", "GetRun"}
+
+    def test_service_method_paths(self) -> None:
+        """Both services should protect exactly the bootstrap methods."""
+        self.assertEqual(
+            SERVERAPPIO_SUPEREXEC_METHODS,
+            {f"/flwr.proto.ServerAppIo/{method}" for method in self._BOOTSTRAP_METHODS},
+        )
+        self.assertEqual(
+            CLIENTAPPIO_SUPEREXEC_METHODS,
+            {f"/flwr.proto.ClientAppIo/{method}" for method in self._BOOTSTRAP_METHODS},
+        )
+
+    def test_hmac_methods_match_task_token_exempt_methods(self) -> None:
+        """HMAC and task-token policies should partition methods consistently."""
+        for hmac_methods, token_policy in (
+            (SERVERAPPIO_SUPEREXEC_METHODS, SERVERAPPIO_METHOD_AUTH_POLICY),
+            (CLIENTAPPIO_SUPEREXEC_METHODS, CLIENTAPPIO_METHOD_AUTH_POLICY),
+        ):
+            hmac_method_names = {
+                method.rsplit("/", maxsplit=1)[-1] for method in hmac_methods
+            }
+            token_exempt_names = {
+                method.rsplit("/", maxsplit=1)[-1]
+                for method, policy in token_policy.items()
+                if not policy.requires_token
+            }
+            self.assertEqual(hmac_method_names, token_exempt_names)
 
 
 class TestSuperExecAuthServerInterceptor(TestCase):
