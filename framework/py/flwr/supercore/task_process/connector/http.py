@@ -14,6 +14,7 @@
 # ==============================================================================
 """Secret-safe JSON HTTP handling for connectors."""
 
+
 from collections.abc import Callable, Mapping
 from typing import cast
 

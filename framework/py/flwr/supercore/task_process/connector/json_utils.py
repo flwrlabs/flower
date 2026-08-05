@@ -14,6 +14,7 @@
 # ==============================================================================
 """Validation helpers shared by account-scoped connectors."""
 
+
 from collections.abc import Callable
 from typing import cast
 

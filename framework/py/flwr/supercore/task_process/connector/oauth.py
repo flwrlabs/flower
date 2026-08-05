@@ -14,6 +14,7 @@
 # ==============================================================================
 """Provider-facing types and shared infrastructure for OAuth connector flows."""
 
+
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
@@ -58,28 +59,17 @@ OAuthProviderT = TypeVar("OAuthProviderT", bound="BaseOAuthProvider")
 
 
 def load_oauth_provider(
-    provider_name: str,
     provider_type: type[OAuthProviderT],
     *,
     client_id_env: str,
     client_secret_env: str,
     redirect_uri_env: str,
-) -> OAuthProviderT | None:
-    """Construct a provider from complete environment configuration."""
-    names = (client_id_env, client_secret_env, redirect_uri_env)
-    values = {name: os.getenv(name, "").strip() for name in names}
-    if not any(values.values()):
-        return None
-    missing = [name for name, value in values.items() if not value]
-    if missing:
-        raise RuntimeError(
-            f"{provider_name} OAuth configuration requires environment variables: "
-            f"{', '.join(missing)}."
-        )
+) -> OAuthProviderT:
+    """Construct a provider from its environment configuration."""
     return provider_type(
-        client_id=values[client_id_env],
-        client_secret=values[client_secret_env],
-        redirect_uri=values[redirect_uri_env],
+        client_id=os.getenv(client_id_env, ""),
+        client_secret=os.getenv(client_secret_env, ""),
+        redirect_uri=os.getenv(redirect_uri_env, ""),
     )
 
 

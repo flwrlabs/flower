@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for shared connector infrastructure."""
 
+
 from collections.abc import Mapping
 from unittest.mock import Mock, patch
 
@@ -89,7 +90,7 @@ class ExampleOAuthProvider(BaseOAuthProvider):
 
 
 def test_oauth_flow_and_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """OAuth should parse tokens and reject partial environment configuration."""
+    """OAuth should parse tokens and reject invalid environment configuration."""
     response = Mock(status_code=200)
     response.json.return_value = {"access_token": "token"}
     provider = ExampleOAuthProvider(
@@ -107,9 +108,8 @@ def test_oauth_flow_and_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("EXAMPLE_CLIENT_ID", "client")
     monkeypatch.delenv("EXAMPLE_CLIENT_SECRET", raising=False)
     monkeypatch.delenv("EXAMPLE_REDIRECT_URI", raising=False)
-    with pytest.raises(RuntimeError, match="EXAMPLE_CLIENT_SECRET"):
+    with pytest.raises(ValueError, match="configuration is incomplete"):
         load_oauth_provider(
-            "Example",
             ExampleOAuthProvider,
             client_id_env="EXAMPLE_CLIENT_ID",
             client_secret_env="EXAMPLE_CLIENT_SECRET",
