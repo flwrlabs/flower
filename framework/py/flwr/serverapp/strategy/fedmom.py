@@ -23,7 +23,7 @@ from logging import INFO
 import numpy as np
 
 from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
-from flwr.common import NDArrays, log
+from flwr.common import NDArray, log
 
 from ..exception import AggregationError
 from ..grid import Grid
@@ -108,7 +108,7 @@ class FedMom(FedAvg):
         self.server_learning_rate = server_learning_rate
         self.server_momentum = server_momentum
         self.current_arrays: ArrayRecord | None = None
-        self.v_vector: NDArrays | None = None
+        self.v_dict: dict[str, NDArray] | None = None
 
     def summary(self) -> None:
         """Log summary configuration of the strategy."""
@@ -150,37 +150,34 @@ class FedMom(FedAvg):
                     "those stored in current_arrays."
                 )
 
-            ndarrays = [self.current_arrays[k].numpy() for k in array_keys]
-            aggregated_ndarrays = [aggregated_arrays[k].numpy() for k in array_keys]
+            current_dict = {k: self.current_arrays[k].numpy() for k in array_keys}
+            aggregated_dict = {k: aggregated_arrays[k].numpy() for k in array_keys}
             aggregated_arrays.clear()
 
-            # Compute pseudo-gradient: g_t = w_t - w_{avg, t+1}
-            pseudo_gradient = [
-                old - new
-                for new, old in zip(aggregated_ndarrays, ndarrays, strict=True)
-            ]
-
-            # Update momentum vector: v_{t+1} = w_t - eta * g_t
-            v_next = [
-                old - self.server_learning_rate * pg
-                for old, pg in zip(ndarrays, pseudo_gradient, strict=True)
-            ]
-
             # Determine previous momentum vector v_t (v_0 = w_0 for first round)
-            v_prev = ndarrays if self.v_vector is None else self.v_vector
+            if self.v_dict is None:
+                self.v_dict = current_dict
 
-            # Update global model parameters: w_{t+1} = v_{t+1} + beta * (v_{t+1} - v_t)
-            w_next = [
-                vn + self.server_momentum * (vn - vp)
-                for vn, vp in zip(v_next, v_prev, strict=True)
-            ]
+            v_next_dict: dict[str, NDArray] = {}
+            w_next_dict: dict[str, Array] = {}
 
-            # Update internal state
-            self.v_vector = v_next
-            updated_array_list = [Array(np.asarray(w)) for w in w_next]
-            aggregated_arrays = ArrayRecord(
-                dict(zip(array_keys, updated_array_list, strict=True))
-            )
+            for k in array_keys:
+                old = current_dict[k]
+                new = aggregated_dict[k]
+                # Compute pseudo-gradient: g_t = w_t - w_{avg, t+1}
+                pg = old - new
+                # Update momentum vector: v_{t+1} = w_t - eta * g_t
+                v_next = old - self.server_learning_rate * pg
+                v_prev = self.v_dict[k]
+                # Update global model parameters:
+                # w_{t+1} = v_{t+1} + beta * (v_{t+1} - v_t)
+                w_next = v_next + self.server_momentum * (v_next - v_prev)
+
+                v_next_dict[k] = v_next
+                w_next_dict[k] = Array(np.asarray(w_next))
+
+            self.v_dict = v_next_dict
+            aggregated_arrays = ArrayRecord(w_next_dict)
             self.current_arrays = aggregated_arrays
 
         return aggregated_arrays, aggregated_metrics
