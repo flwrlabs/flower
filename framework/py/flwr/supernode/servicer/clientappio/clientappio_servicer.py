@@ -32,6 +32,8 @@ from flwr.common.serde import (
 # pylint: disable=E0611
 from flwr.proto import clientappio_pb2_grpc
 from flwr.proto.appio_pb2 import (
+    GetConnectorRequest,
+    GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     PullAppMessagesRequest,
@@ -42,6 +44,10 @@ from flwr.proto.appio_pb2 import (
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+)
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
 )
 from flwr.proto.message_pb2 import (
     ConfirmMessageReceivedRequest,
@@ -267,8 +273,32 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         """Get available nodes."""
         log(DEBUG, "ClientAppIo.GetNodes")
         context.abort(
-            grpc.StatusCode.UNIMPLEMENTED,
-            "GetNodes is not available on ClientAppIo.",
+            grpc.StatusCode.PERMISSION_DENIED,
+            "This endpoint is only available to ServerApp tasks.",
+        )
+        raise RuntimeError("Unreachable code")  # for mypy
+
+    def StartAutomation(
+        self,
+        request: StartAutomationRequest,
+        context: grpc.ServicerContext,
+    ) -> StartAutomationResponse:
+        """Reject automation requests from ClientApp tasks."""
+        log(DEBUG, "ClientAppIo.StartAutomation")
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Only AgentApp and ServerApp tasks can create automations.",
+        )
+        raise RuntimeError("Unreachable code")  # for mypy
+
+    def GetConnector(
+        self, request: GetConnectorRequest, context: grpc.ServicerContext
+    ) -> GetConnectorResponse:
+        """Reject connector credential requests from ClientApp tasks."""
+        log(DEBUG, "ClientAppIo.GetConnector")
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Connector credentials are not available to this task.",
         )
         raise RuntimeError("Unreachable code")  # for mypy
 

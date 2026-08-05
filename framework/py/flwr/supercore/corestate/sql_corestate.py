@@ -75,6 +75,7 @@ from flwr.supercore.state.schema.corestate_models import (
 from flwr.supercore.state.schema.corestate_models import SeriesRuns as SeriesRunsModel
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
+from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
@@ -395,21 +396,22 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError(
                 f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
             )
-        params = {
-            "fab_hash": fab_hash,
-            "content": fab.content,
-            "verifications": json.dumps(fab.verifications),
-        }
         # Keep launch behavior: last write wins for metadata under the same
         # content hash.
-        query = """
+        self.query(
+            """
             INSERT INTO fab (fab_hash, content, verifications)
             VALUES (:fab_hash, :content, :verifications)
             ON CONFLICT(fab_hash) DO UPDATE SET
                 content = excluded.content,
                 verifications = excluded.verifications
-        """
-        self.query(query, params)
+            """,
+            {
+                "fab_hash": fab_hash,
+                "content": fab.content,
+                "verifications": json.dumps(fab.verifications),
+            },
+        )
         return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
@@ -436,12 +438,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Create or update a connector for an account."""
         if not flwr_aid or not connector_ref:
             return False
-        params = {
-            "flwr_aid": flwr_aid,
-            "connector_ref": connector_ref,
-            "credentials_json": credentials_json,
-            "config_json": config_json,
-        }
         self.query(
             """
             INSERT INTO connector (
@@ -454,7 +450,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 credentials_json = excluded.credentials_json,
                 config_json = excluded.config_json
             """,
-            params,
+            {
+                "flwr_aid": flwr_aid,
+                "connector_ref": connector_ref,
+                "credentials_json": credentials_json,
+                "config_json": config_json,
+            },
         )
         return True
 
@@ -502,22 +503,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return False
         stored_run_id = uint64_to_int64(run_id)
         bound_refs = set(self.get_run_connector_refs(run_id))
-        data = [
-            {
-                "run_id": stored_run_id,
-                "connector_ref": connector_ref,
-            }
+        run_connectors = [
+            RunConnectorModel(run_id=stored_run_id, connector_ref=connector_ref)
             for connector_ref in dict.fromkeys(connector_refs)
             if connector_ref not in bound_refs
         ]
-        if data:
-            self.query(
-                """
-                INSERT INTO run_connector (run_id, connector_ref)
-                VALUES (:run_id, :connector_ref)
-                """,
-                data,
-            )
+        if run_connectors:
+            with self.session() as session:
+                session.add_all(run_connectors)
         return True
 
     def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
@@ -690,16 +683,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Set the shared Context for the specified RunSeries."""
         sint_series_id = uint64_to_int64(series_id)
         context_bytes = context_to_bytes(context)
-        with self.session():
-            self.query(
-                """
-                INSERT INTO series_context (series_id, context)
-                VALUES (:series_id, :context)
-                ON CONFLICT(series_id) DO UPDATE SET
-                    context = excluded.context
-                """,
-                {"series_id": sint_series_id, "context": context_bytes},
-            )
+        self.query(
+            """
+            INSERT INTO series_context (series_id, context)
+            VALUES (:series_id, :context)
+            ON CONFLICT(series_id) DO UPDATE SET
+                context = excluded.context
+            """,
+            {"series_id": sint_series_id, "context": context_bytes},
+        )
 
     def store_run_in_series(
         self,
@@ -1469,9 +1461,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session():
             self._cleanup_expired_task_tokens()
             self._cleanup_invalid_task_messages()
-            rows = self._claim_task_message_rows(dst_task_ids, order_by, limit)
-
-        return [_task_message_from_row(row) for row in rows]
+            rows = self._claim_task_message_models(dst_task_ids, order_by, limit)
+            snapshots = [_task_message_snapshot_from_model(row) for row in rows]
+        return [_task_message_from_snapshot(row) for row in snapshots]
 
     def store_task_events(
         self,
@@ -1530,62 +1522,55 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             rows = session.scalars(query).all()
             return [_task_event_from_model(row) for row in rows]
 
-    def _claim_task_message_rows(
+    def _claim_task_message_models(
         self,
         dst_task_ids: Sequence[int] | None,
         order_by: Literal["created_at"] | None,
         limit: int | None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[TaskMessageModel]:
         """Atomically claim eligible task Messages."""
-        conditions: list[str] = []
-        params: dict[str, Any] = {}
+        query = select(TaskMessageModel.message_id)
 
         # Filter by destination task IDs
         if dst_task_ids is not None:
             sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
-            placeholders, in_params = build_sql_in_params(sint64_dst_task_ids, "dtid")
-            conditions.append(f"dst_task_id IN ({placeholders})")
-            params.update(in_params)
-
-        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-        order_clause = f"ORDER BY {order_by}" if order_by else ""
-        limit_clause = "LIMIT :limit" if limit is not None else ""
-
+            query = query.where(TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids))
+        if order_by is not None:
+            query = query.order_by(TaskMessageModel.created_at.asc())
         if limit is not None:
-            params["limit"] = limit
+            query = query.limit(limit)
 
         if order_by is not None or limit is not None:
             # Materialize candidates before deleting. Some backends can otherwise
             # re-evaluate same-table subqueries while DELETE scans rows.
-            # `self.select_lock_sql` is an optional clause for backends that support
-            # row-locking while selecting candidates. Keep it before LIMIT so locked
-            # rows are skipped before limiting the result set.
-            query = f"""
-                WITH selected AS (
-                    SELECT message_id
-                    FROM task_message
-                    {where_clause} {order_clause}
-                    {self.select_lock_sql}
-                    {limit_clause}
-                )
-                DELETE FROM task_message
-                WHERE message_id IN (SELECT message_id FROM selected)
-                RETURNING *
-            """
+            if self.select_lock_sql:
+                if self.select_lock_sql.strip().upper() != "FOR UPDATE SKIP LOCKED":
+                    raise NotImplementedError(
+                        "Custom select_lock_sql values are not supported for ORM "
+                        "task_message claims."
+                    )
+                query = query.with_for_update(skip_locked=True)
+            selected = query.cte("selected")
+            delete_query = delete(TaskMessageModel).where(
+                TaskMessageModel.message_id.in_(select(selected.c.message_id))
+            )
         else:
-            query = f"""
-                DELETE FROM task_message
-                {where_clause}
-                RETURNING *
-            """
+            delete_query = delete(TaskMessageModel)
+            if dst_task_ids is not None:
+                sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
+                delete_query = delete_query.where(
+                    TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids)
+                )
 
-        rows = self.query(query, params)
+        returning_query = delete_query.returning(TaskMessageModel)
+        with self.session() as session:
+            rows = list(session.scalars(returning_query))
 
-        # Sort claimed rows in-memory if requested
-        # `ORDER BY` in the CTE determines which rows are claimed, but SQL does not
-        # guarantee that `DELETE ... RETURNING` returns them in that order.
+        # Sort claimed rows in memory if requested. `ORDER BY` in the candidate
+        # query determines which rows are claimed, but SQL does not guarantee that
+        # `DELETE ... RETURNING` returns them in that order.
         if order_by is not None:
-            rows.sort(key=lambda row: row[order_by])
+            rows.sort(key=lambda row: row.created_at)
 
         return rows
 
@@ -1631,14 +1616,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             self._on_task_tokens_expired([task_from_row(row) for row in rows])
 
     def _cleanup_invalid_task_messages(self) -> None:
-        """Remove expired Messages and Messages for invalid destination tasks."""
-        self.query(
-            """
-            DELETE FROM task_message
-            WHERE (created_at + ttl) <= :current
-            """,
-            {"current": now().timestamp()},
-        )
+        """Remove expired task Messages."""
+        with self.session() as session:
+            session.execute(
+                delete(TaskMessageModel).where(
+                    (TaskMessageModel.created_at + TaskMessageModel.ttl)
+                    <= now().timestamp()
+                )
+            )
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Handle cleanup of expired task tokens.
@@ -1655,25 +1640,28 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Atomically reserve a nonce in a namespace."""
         if namespace == "" or nonce == "":
             return False
-        cleanup_query = """
-            DELETE FROM nonce_store
-            WHERE expires_at < :current;
-        """
-        insert_query = """
-            INSERT INTO nonce_store (namespace, nonce, expires_at)
-            VALUES (:namespace, :nonce, :expires_at);
-        """
-        self.query(cleanup_query, {"current": now().timestamp()})
-        try:
+        with self.session():
             self.query(
-                insert_query,
-                {"namespace": namespace, "nonce": nonce, "expires_at": expires_at},
+                """
+                DELETE FROM nonce_store
+                WHERE expires_at < :current
+                """,
+                {"current": now().timestamp()},
             )
-            return True
-        # Duplicate nonce detected, treated as a replay attempt.
-        # IntegrityError can only arise from (namespace, nonce) uniqueness.
-        except IntegrityError:
-            return False
+            rows = self.query(
+                """
+                INSERT INTO nonce_store (namespace, nonce, expires_at)
+                VALUES (:namespace, :nonce, :expires_at)
+                ON CONFLICT(namespace, nonce) DO NOTHING
+                RETURNING nonce
+                """,
+                {
+                    "namespace": namespace,
+                    "nonce": nonce,
+                    "expires_at": expires_at,
+                },
+            )
+            return bool(rows)
 
 
 def _connector_oauth_session_from_model(
@@ -1870,8 +1858,24 @@ def _task_message_to_row(message: Message) -> dict[str, Any]:
     }
 
 
-def _task_message_from_row(row: dict[str, Any]) -> Message:
-    """Convert a task_message row to a Message."""
+def _task_message_snapshot_from_model(model: TaskMessageModel) -> dict[str, Any]:
+    """Snapshot a claimed task_message model before the transaction commits."""
+    return {
+        "message_id": model.message_id,
+        "run_id": model.run_id,
+        "src_task_id": model.src_task_id,
+        "dst_task_id": model.dst_task_id,
+        "reply_to_message_id": model.reply_to_message_id,
+        "created_at": model.created_at,
+        "ttl": model.ttl,
+        "message_type": model.message_type,
+        "content": model.content,
+        "error": model.error,
+    }
+
+
+def _task_message_from_snapshot(row: dict[str, Any]) -> Message:
+    """Convert a claimed task_message snapshot to a Message."""
     content, error = None, None
     if row["content"] is not None:
         content = recorddict_from_proto(ProtoRecordDict.FromString(row["content"]))

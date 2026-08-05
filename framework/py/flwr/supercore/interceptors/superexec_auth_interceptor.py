@@ -43,25 +43,18 @@ from flwr.supercore.utils import get_metadata_str
 
 from .appio_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
 
-SERVERAPPIO_SUPEREXEC_METHODS: frozenset[str] = frozenset(
-    {
-        "/flwr.proto.ServerAppIo/ListAppsToLaunch",
-        "/flwr.proto.ServerAppIo/RequestToken",
-        "/flwr.proto.ServerAppIo/PullPendingTasks",
-        "/flwr.proto.ServerAppIo/ClaimTask",
-        "/flwr.proto.ServerAppIo/GetRun",
-    }
-)
+_SUPEREXEC_METHOD_NAMES = frozenset({"PullPendingTasks", "ClaimTask", "GetRun"})
 
-CLIENTAPPIO_SUPEREXEC_METHODS: frozenset[str] = frozenset(
-    {
-        "/flwr.proto.ClientAppIo/ListAppsToLaunch",
-        "/flwr.proto.ClientAppIo/RequestToken",
-        "/flwr.proto.ClientAppIo/PullPendingTasks",
-        "/flwr.proto.ClientAppIo/ClaimTask",
-        "/flwr.proto.ClientAppIo/GetRun",
-    }
-)
+
+def _build_superexec_methods(service_name: str) -> frozenset[str]:
+    """Build the SuperExec method paths for an AppIo service."""
+    return frozenset(
+        f"/flwr.proto.{service_name}/{method}" for method in _SUPEREXEC_METHOD_NAMES
+    )
+
+
+SERVERAPPIO_SUPEREXEC_METHODS = _build_superexec_methods("ServerAppIo")
+CLIENTAPPIO_SUPEREXEC_METHODS = _build_superexec_methods("ClientAppIo")
 
 
 class _NonceState(Protocol):
