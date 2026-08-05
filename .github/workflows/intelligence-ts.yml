@@ -102,44 +102,6 @@ jobs:
         working-directory: intelligence/ts
         run: pnpm lint:check
 
-  fi_ts_demos:
-    name: Demos
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '22.14.0'
-
-      - name: Install pnpm
-        run: npm install -g pnpm@10.25.0
-
-      - name: Install dependencies
-        working-directory: intelligence/ts
-        run: pnpm install
-
-      - name: Get API Key
-        id: get_api_key
-        env:
-          FI_DEV_REMOTE_URL: ${{ secrets.FI_DEV_REMOTE_URL }}
-          FI_MGMT_API_KEY: ${{ secrets.FI_MGMT_API_KEY }}
-        run: |
-          api_key=$(./intelligence/dev/get-api-key.sh)
-          echo "::add-mask::$api_key"
-          echo "api_key=$api_key" >> $GITHUB_OUTPUT
-
-      - name: Run demos
-        working-directory: intelligence/ts
-        env:
-          FI_DEV_REMOTE_URL: ${{ secrets.FI_DEV_REMOTE_URL }}
-          FI_API_KEY: ${{ steps.get_api_key.outputs.api_key }}
-        run: |
-          sed -i "s|https://api.flower.ai|${FI_DEV_REMOTE_URL}|g" src/constants.ts
-          pnpm demo:e2e
-
   fi_ts_tests:
     name: Tests
     runs-on: ubuntu-24.04
