@@ -24,7 +24,7 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData, String, bindparam, delete, func, or_, select, update
+from sqlalchemy import MetaData, delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Context, Message
@@ -135,7 +135,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = self.dialect_insert(ObjectPushSessionModel).values(
             session_id=session_id,
             run_id=uint64_to_int64(run_id),
-            expires_at=_timestamp_bind("expires_at", expires_at),
+            expires_at=expires_at,
             pending_count=0,
         )
         with self.session() as session:
@@ -243,9 +243,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .where(ObjectPushSessionModel.session_id == claimed_session_id)
                 .execution_options(populate_existing=True)
             )
-            if expires_at is None:
-                return None
-            return _datetime_assuming_utc(expires_at)
+            return expires_at
 
     def store_object(
         self,
@@ -288,7 +286,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     .where(ObjectPushSessionModel.session_id == session_id)
                     .values(
                         pending_count=ObjectPushSessionModel.pending_count - 1,
-                        expires_at=_timestamp_bind("expires_at", refreshed_expires_at),
+                        expires_at=refreshed_expires_at,
                     )
                     .returning(ObjectPushSessionModel.pending_count)
                 )
@@ -323,8 +321,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     .where(
                         ObjectPushSessionPendingModel.object_id == object_id,
                         ObjectPushSessionModel.run_id == uint64_to_int64(run_id),
-                        ObjectPushSessionModel.expires_at
-                        <= _timestamp_bind("current", now()),
+                        ObjectPushSessionModel.expires_at <= now(),
                     )
                 )
             )
@@ -1636,29 +1633,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 },
             )
             return bool(rows)
-
-
-def _timestamp_bind(name: str, value: datetime) -> Any:
-    """Bind a timestamp as text matching SQLite's previous representation."""
-    return bindparam(name, _timestamp_to_sqlite_text(value), type_=String())
-
-
-def _timestamp_to_sqlite_text(value: datetime) -> str:
-    """Return SQLite-compatible timestamp text without changing ordering."""
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=UTC)
-    else:
-        value = value.astimezone(UTC)
-    return value.isoformat(sep=" ")
-
-
-def _datetime_assuming_utc(value: datetime | str) -> datetime:
-    """Return a UTC-aware datetime, treating SQLite strings/naive values as UTC."""
-    if isinstance(value, str):
-        value = datetime.fromisoformat(value)
-    if value.tzinfo is None:
-        return value.replace(tzinfo=UTC)
-    return value.astimezone(UTC)
 
 
 def _connector_oauth_session_from_model(
