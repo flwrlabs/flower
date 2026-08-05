@@ -29,8 +29,6 @@ ConnectorToolFactory = Callable[[], JSONObject]
 
 CONNECTORS: tuple[ConnectorDefinition, ...] = ()
 _CONNECTORS_BY_REF = {connector.ref: connector for connector in CONNECTORS}
-if len(_CONNECTORS_BY_REF) != len(CONNECTORS):
-    raise ValueError("Connector references must be unique.")
 
 OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthConnectorProvider, ...] = tuple(
     connector.oauth_provider
@@ -47,10 +45,6 @@ _CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     for connector in CONNECTORS
     for name, handler in connector.handlers.items()
 }
-if len(_CREDENTIAL_CONNECTOR_HANDLERS) != sum(
-    len(connector.handlers) for connector in CONNECTORS
-):
-    raise ValueError("Connector tool names must be unique.")
 _CREDENTIAL_CONNECTOR_REFS: dict[str, str] = {
     name: connector.ref for connector in CONNECTORS for name in connector.handlers
 }
