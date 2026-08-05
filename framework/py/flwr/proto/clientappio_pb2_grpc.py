@@ -4,6 +4,7 @@ import grpc
 import warnings
 
 from flwr.proto import appio_pb2 as flwr_dot_proto_dot_appio__pb2
+from flwr.proto import control_pb2 as flwr_dot_proto_dot_control__pb2
 from flwr.proto import log_pb2 as flwr_dot_proto_dot_log__pb2
 from flwr.proto import message_pb2 as flwr_dot_proto_dot_message__pb2
 from flwr.proto import run_pb2 as flwr_dot_proto_dot_run__pb2
@@ -87,6 +88,11 @@ class ClientAppIoStub(object):
                 request_serializer=flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.FromString,
                 _registered_method=True)
+        self.StartAutomation = channel.unary_unary(
+                '/flwr.proto.ClientAppIo/StartAutomation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.StartAutomationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.StartAutomationResponse.FromString,
+                _registered_method=True)
         self.PushTaskMessage = channel.unary_unary(
                 '/flwr.proto.ClientAppIo/PushTaskMessage',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageRequest.SerializeToString,
@@ -106,6 +112,11 @@ class ClientAppIoStub(object):
                 '/flwr.proto.ClientAppIo/RecordTaskUsage',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageResponse.FromString,
+                _registered_method=True)
+        self.GetConnector = channel.unary_unary(
+                '/flwr.proto.ClientAppIo/GetConnector',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.GetConnectorRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.GetConnectorResponse.FromString,
                 _registered_method=True)
         self.PushLogs = channel.unary_unary(
                 '/flwr.proto.ClientAppIo/PushLogs',
@@ -214,6 +225,13 @@ class ClientAppIoServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def StartAutomation(self, request, context):
+        """Start an automation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def PushTaskMessage(self, request, context):
         """Push task message
         """
@@ -237,6 +255,13 @@ class ClientAppIoServicer(object):
 
     def RecordTaskUsage(self, request, context):
         """Record task usage
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetConnector(self, request, context):
+        """Resolve credentials for the authenticated connector task
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -327,6 +352,11 @@ def add_ClientAppIoServicer_to_server(servicer, server):
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.SerializeToString,
             ),
+            'StartAutomation': grpc.unary_unary_rpc_method_handler(
+                    servicer.StartAutomation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.StartAutomationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.StartAutomationResponse.SerializeToString,
+            ),
             'PushTaskMessage': grpc.unary_unary_rpc_method_handler(
                     servicer.PushTaskMessage,
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageRequest.FromString,
@@ -346,6 +376,11 @@ def add_ClientAppIoServicer_to_server(servicer, server):
                     servicer.RecordTaskUsage,
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageResponse.SerializeToString,
+            ),
+            'GetConnector': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetConnector,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.GetConnectorRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.GetConnectorResponse.SerializeToString,
             ),
             'PushLogs': grpc.unary_unary_rpc_method_handler(
                     servicer.PushLogs,
@@ -649,6 +684,33 @@ class ClientAppIo(object):
             _registered_method=True)
 
     @staticmethod
+    def StartAutomation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ClientAppIo/StartAutomation',
+            flwr_dot_proto_dot_control__pb2.StartAutomationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.StartAutomationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def PushTaskMessage(request,
             target,
             options=(),
@@ -746,6 +808,33 @@ class ClientAppIo(object):
             '/flwr.proto.ClientAppIo/RecordTaskUsage',
             flwr_dot_proto_dot_appio__pb2.RecordTaskUsageRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.RecordTaskUsageResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetConnector(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ClientAppIo/GetConnector',
+            flwr_dot_proto_dot_appio__pb2.GetConnectorRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.GetConnectorResponse.FromString,
             options,
             channel_credentials,
             insecure,
