@@ -642,8 +642,13 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         series_id: int | None = None,
         series_description: str | None = None,
         initial_context_item: JSONObject | None = None,
+        connector_refs: Sequence[str] = (),
     ) -> int:
         """Create a new run."""
+        if isinstance(connector_refs, str) or any(
+            not connector_ref for connector_ref in connector_refs
+        ):
+            return 0
         with self.lock_task_store, self.lock:
             run_id = generate_rand_int_from_bytes(
                 RUN_ID_NUM_BYTES,
@@ -714,53 +719,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 model_ref=None,
                 connector_ref=None,
             )
+            self.bind_connectors_to_run(
+                run_id=run_id,
+                connector_refs=connector_refs,
+            )
 
             return run_id
-
-    def dispatch_automation(
-        self,
-        automation_id: int,
-        *,
-        previous_next_run_at: str,
-        next_run_at: str | None,
-    ) -> int | None:
-        """Create a run from a due automation and advance the automation."""
-        with self.lock_automation_store:
-            record = self.automation_store.get(automation_id)
-            if record is None:
-                return None
-
-            fab_id = record.fab_id
-            fab_version = record.fab_version
-            fab_hash = record.fab_hash
-            override_config = dict(record.override_config)
-            federation_id = record.automation.federation
-            federation_config = record.federation_config
-            flwr_aid = record.automation.flwr_aid
-            primary_task_type = record.primary_task_type
-            series_id = record.automation.series_id
-
-        if not self.advance_automation(
-            automation_id,
-            previous_next_run_at=previous_next_run_at,
-            next_run_at=next_run_at,
-        ):
-            return None
-
-        run_id = self.create_run(
-            fab_id=fab_id,
-            fab_version=fab_version,
-            fab_hash=fab_hash,
-            override_config=override_config,
-            federation_id=federation_id,
-            federation_config=federation_config,
-            flwr_aid=flwr_aid,
-            primary_task_type=primary_task_type,
-            series_id=series_id,
-        )
-        if run_id == 0:
-            return None
-        return run_id
 
     def get_run_info(
         self,

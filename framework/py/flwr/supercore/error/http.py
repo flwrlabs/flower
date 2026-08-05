@@ -19,6 +19,7 @@ from logging import ERROR
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import JSONResponse
 from starlette.datastructures import State
 from starlette.middleware.base import RequestResponseEndpoint
 
@@ -33,7 +34,14 @@ INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error."
 async def http_error_translator(
     request: Request[State], call_next: RequestResponseEndpoint
 ) -> Response:
-    """Translate FlowerError into a sanitized HTTP response."""
+    """Translate exceptions from downstream HTTP handling into safe responses.
+
+    Let successful responses pass through unchanged. Convert ``FlowerError``
+    instances into their catalog-defined public JSON contract, preserve
+    FastAPI's response contract for ``HTTPException``, and translate every
+    unexpected exception into a generic JSON 500 response. Internal exception
+    details are logged for diagnostics but are never exposed to the client.
+    """
     try:
         return await call_next(request)
     except FlowerError as err:
@@ -60,7 +68,7 @@ async def http_error_translator(
         # Log unexpected exceptions and translate into INTERNAL
         msg = f"[{request.url.path}][UnexpectedError:{type(err).__name__}] {err}"
         log(ERROR, msg)
-        return Response(
+        return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=INTERNAL_SERVER_ERROR_MESSAGE,
+            content={"detail": INTERNAL_SERVER_ERROR_MESSAGE},
         )

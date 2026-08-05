@@ -37,6 +37,15 @@ def _run_translator(exception: Exception) -> Response:
     return asyncio.run(http_error_translator(request, call_next))
 
 
+def _assert_json_response(
+    response: Response, status_code: int, body: dict[str, object]
+) -> None:
+    """Assert the complete JSON response contract."""
+    assert response.status_code == status_code
+    assert response.headers["content-type"] == "application/json"
+    assert json.loads(bytes(response.body)) == body
+
+
 def test_http_error_translator_mapped_flower_error() -> None:
     """Translate a mapped FlowerError into its configured HTTP contract."""
     response = _run_translator(
@@ -47,24 +56,32 @@ def test_http_error_translator_mapped_flower_error() -> None:
     )
 
     spec = API_ERROR_MAP[ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT]
-    assert response.status_code == spec.http_status_code
-    assert json.loads(response.body) == {
-        "code": ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
-        "public_message": spec.public_message,
-        "public_details": None,
-    }
+    _assert_json_response(
+        response,
+        spec.http_status_code,
+        {
+            "code": ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
+            "public_message": spec.public_message,
+            "public_details": None,
+        },
+    )
+    assert b"internal diagnostic message" not in response.body
 
 
 def test_http_error_translator_unmapped_flower_error() -> None:
     """Translate an unmapped FlowerError into INTERNAL."""
     response = _run_translator(FlowerError(999, "internal diagnostic message"))
 
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert json.loads(response.body) == {
-        "code": 999,
-        "public_message": INTERNAL_SERVER_ERROR_MESSAGE,
-        "public_details": None,
-    }
+    _assert_json_response(
+        response,
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        {
+            "code": 999,
+            "public_message": INTERNAL_SERVER_ERROR_MESSAGE,
+            "public_details": None,
+        },
+    )
+    assert b"internal diagnostic message" not in response.body
 
 
 def test_http_error_translator_entitlement_error_preserves_error_message() -> None:
@@ -81,13 +98,17 @@ def test_http_error_translator_entitlement_error_preserves_error_message() -> No
     )
 
     spec = API_ERROR_MAP[ApiErrorCode.ENTITLEMENT_ERROR]
-    assert response.status_code == spec.http_status_code
-    assert json.loads(response.body) == {
-        "code": ApiErrorCode.ENTITLEMENT_ERROR,
-        "public_message": spec.public_message,
-        "public_details": error_message,
-        "entitlement_code": entitlement_code,
-    }
+    _assert_json_response(
+        response,
+        spec.http_status_code,
+        {
+            "code": ApiErrorCode.ENTITLEMENT_ERROR,
+            "public_message": spec.public_message,
+            "public_details": error_message,
+            "entitlement_code": entitlement_code,
+        },
+    )
+    assert b"internal diagnostic message" not in response.body
 
 
 def test_http_error_translator_http_exception() -> None:
@@ -99,13 +120,20 @@ def test_http_error_translator_http_exception() -> None:
 
     response = _run_translator(http_error)
 
-    assert response.status_code == status.HTTP_418_IM_A_TEAPOT
-    assert json.loads(response.body) == {"detail": {"message": "short and stout"}}
+    _assert_json_response(
+        response,
+        status.HTTP_418_IM_A_TEAPOT,
+        {"detail": {"message": "short and stout"}},
+    )
 
 
 def test_http_error_translator_unexpected_error() -> None:
     """Translate unexpected errors into INTERNAL."""
     response = _run_translator(RuntimeError("unexpected failure"))
 
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert response.body == INTERNAL_SERVER_ERROR_MESSAGE.encode()
+    _assert_json_response(
+        response,
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        {"detail": INTERNAL_SERVER_ERROR_MESSAGE},
+    )
+    assert b"unexpected failure" not in response.body
