@@ -25,6 +25,8 @@ from typing import Any, Literal, cast
 from uuid import uuid4
 
 from sqlalchemy import MetaData, delete, func, or_, select, update
+from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Context, Message
@@ -118,6 +120,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         super().__init__(database_path)
         self._object_store = object_store
 
+    def dialect_insert(self, table: Any) -> SQLiteInsert:
+        """Return a SQLite insert statement for CoreState upserts."""
+        if self.database_backend == "sqlite":
+            return sqlite_insert(table)
+
+        raise NotImplementedError(
+            f"No dialect-specific insert configured for {self.database_backend!r}."
+        )
+
     @property
     def select_lock_sql(self) -> str:
         """Return the SQL clause for row-locking selected candidates."""
@@ -186,9 +197,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
             # Record the objects that still need to be pushed.
             if missing_objects:
-                stmt = cast(
-                    Any, self.dialect_insert(ObjectPushSessionPendingModel)
-                ).values(
+                stmt = self.dialect_insert(ObjectPushSessionPendingModel).values(
                     [
                         {"session_id": session_id, "object_id": object_id}
                         for object_id in missing_objects
