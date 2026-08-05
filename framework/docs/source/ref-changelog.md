@@ -1,7 +1,5 @@
 # Changelog
 
-## Unreleased
-
 ## v1.33.0 (2026-08-05)
 
 ### Thanks to our contributors
