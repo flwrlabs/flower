@@ -241,6 +241,14 @@ message GetAuthTokensResponse {
   string refresh_token = 2;
 }
 
+// HTTP-only request and response for POST /v1/auth/token-refresh. This is not
+// part of the legacy Control gRPC service.
+message RefreshAuthTokensRequest { string refresh_token = 1; }
+message RefreshAuthTokensResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
 message ListConnectorsRequest {}
 message Connector {
   string connector_ref = 1;

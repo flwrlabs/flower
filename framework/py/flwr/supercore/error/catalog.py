@@ -224,6 +224,16 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         public_message="Authentication is not initialized.",
     ),
+    ApiErrorCode.ACCOUNT_NOT_PROVISIONED: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="The authenticated account has not been provisioned.",
+    ),
+    ApiErrorCode.ACCOUNT_AUTHENTICATION_UNAVAILABLE: ApiErrorSpec(
+        status_code=StatusCode.UNAVAILABLE,
+        http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        public_message="Authentication is temporarily unavailable.",
+    ),
     ApiErrorCode.INVALID_CONNECTOR_REQUEST: ApiErrorSpec(
         status_code=StatusCode.INVALID_ARGUMENT,
         http_status_code=status.HTTP_400_BAD_REQUEST,

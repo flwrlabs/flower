@@ -82,6 +82,11 @@ RUN_SERIES_DESCRIPTION_MAX_LENGTH = 80
 UNAUTHENTICATED_PATHS = {
     "/v1/control/get-login-details",
     "/v1/control/get-auth-tokens",
+    "/v1/auth/token-refresh",
+}
+REDACTED_AUTH_AUDIT_PATHS = {
+    "/v1/control/get-auth-tokens",
+    "/v1/auth/token-refresh",
 }
 
 # Specification for app publishing

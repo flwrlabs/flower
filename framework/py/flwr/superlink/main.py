@@ -43,6 +43,7 @@ from flwr.superlink.config_loader import (
     load_control_event_log_plugin,
 )
 from flwr.superlink.dependencies.account import AccountAccessDependency
+from flwr.superlink.routers.control import auth_router
 from flwr.superlink.routers.control import router as control_router
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
@@ -182,6 +183,7 @@ def create_app(
 
     # SuperLink APIs
     fastapi_app.include_router(control_router)
+    fastapi_app.include_router(auth_router)
     # fastapi_app.include_router(runtime.router)
 
     # Extension hooks

@@ -16,7 +16,7 @@
 
 
 from datetime import datetime
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from fastapi import FastAPI, Request, Response
 from fastapi.routing import APIRoute
@@ -29,10 +29,17 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     ListRunsRequest,
     ListRunsResponse,
+    RefreshAuthTokensRequest,
+    RefreshAuthTokensResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
-from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.auth.typing import (
+    AccountAuthCredentials,
+    AccountAuthLoginDetails,
+    AccountInfo,
+)
+from flwr.supercore.auth.user_auth import UserAuthenticationService
+from flwr.supercore.error import ApiErrorCode, FlowerError, http_error_translator
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import (
     PROTOBUF_REQUEST_TYPES,
@@ -40,26 +47,32 @@ from flwr.supercore.protobuf.translation import (
     get_protobuf_request,
 )
 from flwr.supercore.run import Run
+from flwr.superlink.auth_plugin.noop_auth_plugin import NoOpControlAuthnPlugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
-from flwr.superlink.routers.control.router import router
+from flwr.superlink.routers.control.router import auth_router, router
 from flwr.superlink.servicer.control import control_handlers
 
 _ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
 
 
 def _create_app(
-    authn_plugin: Mock | None = None, authz_plugin: Mock | None = None
+    authn_plugin: Mock | None = None,
+    authz_plugin: Mock | None = None,
+    user_authentication_service: Mock | None = None,
 ) -> FastAPI:
     """Create a minimal app containing the Control API stack."""
-    authn_plugin = authn_plugin or Mock()
+    authn_plugin = authn_plugin or Mock(spec=NoOpControlAuthnPlugin)
     authz_plugin = authz_plugin or Mock()
     authn_plugin.validate_tokens_in_metadata.return_value = (True, _ACCOUNT)
     authz_plugin.authorize.return_value = True
     app = FastAPI()
     app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
+    if user_authentication_service is not None:
+        app.state.user_authentication_service = user_authentication_service
     app.include_router(router)
+    app.include_router(auth_router)
     app.add_middleware(ProtobufTranslationMiddleware)
     app.add_middleware(ControlAuthenticationMiddleware)
     app.middleware("http")(http_error_translator)
@@ -75,7 +88,19 @@ def test_all_control_routes_have_protobuf_request_types() -> None:
         for method in (route.methods or set())
     }
 
-    assert route_keys == set(PROTOBUF_REQUEST_TYPES)
+    assert route_keys == {
+        key for key in PROTOBUF_REQUEST_TYPES if key[1].startswith("/v1/control/")
+    }
+
+    auth_route_keys = {
+        (method, route.path)
+        for route in auth_router.routes
+        if isinstance(route, APIRoute)
+        for method in (route.methods or set())
+    }
+    assert auth_route_keys == {
+        key for key in PROTOBUF_REQUEST_TYPES if key[1].startswith("/v1/auth/")
+    }
 
 
 def test_protobuf_request_without_handler_response_returns_internal_error() -> None:
@@ -147,27 +172,30 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     )
 
 
-def test_list_runs_preserves_refreshed_authentication_tokens() -> None:
-    """The authentication middleware adds refreshed tokens to protobuf responses."""
+def test_list_runs_rejects_invalid_shared_http_token() -> None:
+    """HTTP resource authentication never refreshes an invalid access token."""
     linkstate = Mock(spec=LinkState)
-    authn_plugin = Mock()
     linkstate.get_run_info.return_value = []
-    app = _create_app(authn_plugin=authn_plugin)
-    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
-    authn_plugin.refresh_tokens.return_value = (
-        [("x-access-token", "new-access-token")],
-        _ACCOUNT,
+    service = Mock(spec=UserAuthenticationService)
+    service.authenticate_user = AsyncMock(
+        side_effect=FlowerError(
+            ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED, "invalid token"
+        )
     )
+    app = _create_app(user_authentication_service=service)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     response = TestClient(app).post(
         "/v1/control/list-runs",
         content=ListRunsRequest().SerializeToString(),
-        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+        headers={
+            "content-type": PROTOBUF_MEDIA_TYPE,
+            "Authorization": "Bearer invalid-token",
+        },
     )
 
-    assert response.status_code == 200
-    assert response.headers["x-access-token"] == "new-access-token"
-    assert response.headers.get_list("content-length") == [str(len(response.content))]
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"] == "Bearer"
+    service.authenticate_user.assert_awaited_once_with("invalid-token")
 
 
 def test_list_runs_rejects_non_protobuf_payload() -> None:
@@ -206,3 +234,59 @@ def test_get_login_details_does_not_require_authentication(
     assert response.status_code == 200
     assert GetLoginDetailsResponse.FromString(response.content) == expected
     authn_plugin.validate_tokens_in_metadata.assert_not_called()
+
+
+def test_get_login_details_uses_shared_service(monkeypatch: MonkeyPatch) -> None:
+    """Use issuer-discovered device authorization when the service is installed."""
+    service = Mock(spec=UserAuthenticationService)
+    service.start_device_authorization = AsyncMock(
+        return_value=AccountAuthLoginDetails(
+            authn_type="oidc",
+            device_code="device-code",
+            verification_uri_complete="https://oidc.example.com/activate",
+            expires_in=300,
+            interval=5,
+        )
+    )
+    authn_plugin = Mock()
+    legacy_handler = Mock()
+    monkeypatch.setattr(control_handlers, "get_login_details", legacy_handler)
+    app = _create_app(authn_plugin=authn_plugin, user_authentication_service=service)
+
+    response = TestClient(app).post(
+        "/v1/control/get-login-details",
+        content=GetLoginDetailsRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 200
+    assert GetLoginDetailsResponse.FromString(response.content).device_code == (
+        "device-code"
+    )
+    service.start_device_authorization.assert_awaited_once_with()
+    legacy_handler.assert_not_called()
+
+
+def test_refresh_auth_tokens_uses_shared_service() -> None:
+    """Expose explicit token refresh without authenticating an access token."""
+    service = Mock(spec=UserAuthenticationService)
+    service.refresh_tokens = AsyncMock(
+        return_value=AccountAuthCredentials("new-access", "new-refresh")
+    )
+    app = _create_app(user_authentication_service=service)
+
+    response = TestClient(app).post(
+        "/v1/auth/token-refresh",
+        content=RefreshAuthTokensRequest(
+            refresh_token="old-refresh"
+        ).SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 200
+    assert RefreshAuthTokensResponse.FromString(response.content) == (
+        RefreshAuthTokensResponse(
+            access_token="new-access", refresh_token="new-refresh"
+        )
+    )
+    service.refresh_tokens.assert_awaited_once_with("old-refresh")

@@ -68,6 +68,16 @@ def test_http_error_translator_mapped_flower_error() -> None:
     assert b"internal diagnostic message" not in response.body
 
 
+def test_http_error_translator_adds_bearer_challenge_for_auth_failure() -> None:
+    """Challenge the Bearer scheme on user-authentication failures."""
+    response = _run_translator(
+        FlowerError(ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED, "invalid token")
+    )
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.headers["WWW-Authenticate"] == "Bearer"
+
+
 def test_http_error_translator_unmapped_flower_error() -> None:
     """Translate an unmapped FlowerError into INTERNAL."""
     response = _run_translator(FlowerError(999, "internal diagnostic message"))

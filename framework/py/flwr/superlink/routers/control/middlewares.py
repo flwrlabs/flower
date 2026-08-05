@@ -24,10 +24,15 @@ from starlette.types import ASGIApp
 
 from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.constant import UNAUTHENTICATED_PATHS
+from flwr.supercore.auth.user_auth import get_bearer_token
+from flwr.supercore.constant import REDACTED_AUTH_AUDIT_PATHS, UNAUTHENTICATED_PATHS
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.superlink.auth_plugin.noop_auth_plugin import NoOpControlAuthnPlugin
 from flwr.superlink.config_loader import get_license_plugin
-from flwr.superlink.dependencies.account import AccountAccessDependency
+from flwr.superlink.dependencies.account import (
+    AccountAccessDependency,
+    get_optional_user_authentication_service,
+)
 
 
 class ControlEventLogMiddleware(BaseHTTPMiddleware):
@@ -45,6 +50,11 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
         protobuf_request = getattr(request.state, "protobuf_request", None)
         if event_log_plugin is None or not isinstance(protobuf_request, Message):
             return await call_next(request)
+        event_request = (
+            type(protobuf_request)()
+            if request.url.path in REDACTED_AUTH_AUDIT_PATHS
+            else protobuf_request
+        )
 
         # Authentication runs before event logging and stores the account, except for
         # unauthenticated Control routes where the actor remains unknown.
@@ -56,7 +66,7 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
             """Compose and write the event preceding handler execution."""
             event_log_plugin.write_log(
                 event_log_plugin.compose_log_before_event(
-                    request=protobuf_request,
+                    request=event_request,
                     context=request,
                     account_info=account_info,
                     method_name=request.url.path,
@@ -69,7 +79,7 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
             """Compose and write the event following handler execution."""
             event_log_plugin.write_log(
                 event_log_plugin.compose_log_after_event(
-                    request=protobuf_request,
+                    request=event_request,
                     context=request,
                     account_info=account_info,
                     method_name=request.url.path,
@@ -92,7 +102,12 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
         # A protobuf Message is a unary response and must be checked before the
         # iterable protocols, following ProtobufTranslationMiddleware's dispatch.
         if isinstance(result, Message):
-            await run_in_threadpool(write_after_event, result)
+            event_result = (
+                type(result)()
+                if request.url.path in REDACTED_AUTH_AUDIT_PATHS
+                else result
+            )
+            await run_in_threadpool(write_after_event, event_result)
         else:
             # Not yet implemented
             pass
@@ -134,7 +149,7 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        """Authenticate the request and preserve any refreshed token headers."""
+        """Authenticate the request and store its authorized account."""
         if (
             not _is_control_path(request.url.path)
             or request.url.path in UNAUTHENTICATED_PATHS
@@ -149,14 +164,22 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
                 f"AccountAccessDependency, got {type(account_access).__name__}.",
             )
 
-        authentication_response = Response()
-        # ``Response`` adds a default Content-Length header. This temporary
-        # response only collects refreshed token headers, so it must not affect
-        # the protobuf response returned by the endpoint.
-        authentication_response.headers.raw.clear()
-        request.state.account = await run_in_threadpool(
-            account_access, request, authentication_response
-        )
-        response = await call_next(request)
-        response.headers.raw.extend(authentication_response.headers.raw)
-        return response
+        user_authentication_service = get_optional_user_authentication_service(request)
+        if user_authentication_service is None:
+            # Preserve the no-extension path used by open-source/no-op deployments.
+            if not isinstance(account_access.authn_plugin, NoOpControlAuthnPlugin):
+                raise FlowerError(
+                    ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED,
+                    "Shared user authentication service is required for authenticated "
+                    "Control HTTP requests.",
+                )
+            request.state.account = await run_in_threadpool(
+                account_access, request, Response()
+            )
+        else:
+            access_token = get_bearer_token(request.headers.get("authorization"))
+            account = await user_authentication_service.authenticate_user(access_token)
+            request.state.account = await run_in_threadpool(
+                account_access.authorize, account
+            )
+        return await call_next(request)

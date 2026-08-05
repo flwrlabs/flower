@@ -15,6 +15,6 @@
 """Control API router."""
 
 
-from .router import router
+from .router import auth_router, router
 
-__all__ = ["router"]
+__all__ = ["auth_router", "router"]

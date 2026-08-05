@@ -22,7 +22,13 @@ from fastapi import FastAPI, Request, Response
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, FlowerError
 
-from .account import AccountAccessDependency, get_account, get_authn_plugin
+from .account import (
+    AccountAccessDependency,
+    get_account,
+    get_authn_plugin,
+    get_optional_user_authentication_service,
+    get_user_authentication_service,
+)
 
 
 def _make_request() -> Request:
@@ -68,35 +74,11 @@ def test_account_access_dependency_returns_authorized_account() -> None:
     authz_plugin.authorize.assert_called_once_with(account)
 
 
-def test_account_access_dependency_refreshes_tokens_and_sets_response_headers() -> None:
-    """AccountAccessDependency returns an authorized account after token refresh."""
-    authn_plugin = Mock()
-    authz_plugin = Mock()
-    account = AccountInfo(flwr_aid="aid", account_name="account")
-    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
-    authn_plugin.refresh_tokens.return_value = (
-        [("x-access-token", "new-token"), ("x-refresh-token", b"new-refresh")],
-        account,
-    )
-    authz_plugin.authorize.return_value = True
-    response = Response()
-
-    result = AccountAccessDependency(authn_plugin, authz_plugin)(
-        _make_request(), response
-    )
-
-    assert result is account
-    assert response.headers.get("x-access-token") == "new-token"
-    assert response.headers.get("x-refresh-token") == "new-refresh"
-    authz_plugin.authorize.assert_called_once_with(account)
-
-
 @pytest.mark.parametrize(
-    ("valid_tokens", "tokens", "account", "detail"),
+    ("valid_tokens", "account", "detail"),
     [
         (
             True,
-            None,
             None,
             "Tokens validated, but account info not found: authentication plugin "
             "returned no account.",
@@ -104,21 +86,12 @@ def test_account_access_dependency_refreshes_tokens_and_sets_response_headers() 
         (
             False,
             None,
-            None,
-            "Token refresh failed: authentication plugin returned no tokens.",
-        ),
-        (
-            False,
-            [("x-access-token", "new-token")],
-            None,
-            "Tokens refreshed, but account info not found: authentication plugin "
-            "returned no account.",
+            "Authentication plugin rejected the request tokens.",
         ),
     ],
 )
 def test_account_access_dependency_rejects_unauthenticated_requests(
     valid_tokens: bool,
-    tokens: list[tuple[str, str]] | None,
     account: AccountInfo | None,
     detail: str,
 ) -> None:
@@ -126,13 +99,13 @@ def test_account_access_dependency_rejects_unauthenticated_requests(
     authn_plugin = Mock()
     authz_plugin = Mock()
     authn_plugin.validate_tokens_in_metadata.return_value = (valid_tokens, account)
-    authn_plugin.refresh_tokens.return_value = (tokens, account)
 
     with pytest.raises(FlowerError) as exc_info:
         AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(), Response())
 
     assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED
     assert exc_info.value.message == detail
+    authn_plugin.refresh_tokens.assert_not_called()
     authz_plugin.authorize.assert_not_called()
 
 
@@ -185,3 +158,25 @@ def test_get_account_raises_when_authentication_middleware_did_not_run() -> None
         == "SuperLink account authentication is not initialized: expected an "
         "authenticated account, got NoneType."
     )
+
+
+def test_user_authentication_service_dependencies() -> None:
+    """Return an injected structural service and reject a missing one."""
+    app = FastAPI()
+    service = Mock()
+    service.authenticate_user = Mock()
+    service.authenticate_for_bootstrap = Mock()
+    service.refresh_tokens = Mock()
+    service.start_device_authorization = Mock()
+    service.exchange_device_code = Mock()
+    app.state.user_authentication_service = service
+    request = _make_app_request(app)
+
+    assert get_user_authentication_service(request) is service
+    assert get_optional_user_authentication_service(request) is service
+
+    missing_request = _make_app_request(FastAPI())
+    assert get_optional_user_authentication_service(missing_request) is None
+    with pytest.raises(FlowerError) as exc_info:
+        get_user_authentication_service(missing_request)
+    assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED

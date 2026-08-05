@@ -49,6 +49,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
+    RefreshAuthTokensRequest,
+    RefreshAuthTokensResponse,
     RegisterNodeRequest,
     RegisterNodeResponse,
     RejectInvitationRequest,
@@ -74,18 +76,34 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.user_auth import UserAuthenticationService
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import get_protobuf_request
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
-from flwr.superlink.dependencies.account import get_account, get_authn_plugin
+from flwr.superlink.dependencies.account import (
+    get_account,
+    get_authn_plugin,
+    get_optional_user_authentication_service,
+    get_user_authentication_service,
+)
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.servicer.control import control_handlers
 
 router = APIRouter(prefix="/v1/control", tags=["Control"], route_class=ProtobufRoute)
+auth_router = APIRouter(
+    prefix="/v1/auth", tags=["Authentication"], route_class=ProtobufRoute
+)
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
 AuthnPluginDependency = Annotated[ControlAuthnPlugin, Depends(get_authn_plugin)]
+UserAuthServiceDependency = Annotated[
+    UserAuthenticationService, Depends(get_user_authentication_service)
+]
+OptionalUserAuthServiceDependency = Annotated[
+    UserAuthenticationService | None,
+    Depends(get_optional_user_authentication_service),
+]
 
 
 @router.post("/start-run")
@@ -170,21 +188,55 @@ def stop_automation(
 
 
 @router.post("/get-login-details")
-def get_login_details(
+async def get_login_details(
     request: Annotated[GetLoginDetailsRequest, Depends(get_protobuf_request)],
     authn_plugin: AuthnPluginDependency,
+    user_authentication_service: OptionalUserAuthServiceDependency,
 ) -> GetLoginDetailsResponse:
     """Get login details."""
+    if user_authentication_service is not None:
+        details = await user_authentication_service.start_device_authorization()
+        return GetLoginDetailsResponse(
+            authn_type=details.authn_type,
+            device_code=details.device_code,
+            verification_uri_complete=details.verification_uri_complete,
+            expires_in=details.expires_in,
+            interval=details.interval,
+        )
     return control_handlers.get_login_details(request, authn_plugin)
 
 
 @router.post("/get-auth-tokens")
-def get_auth_tokens(
+async def get_auth_tokens(
     request: Annotated[GetAuthTokensRequest, Depends(get_protobuf_request)],
     authn_plugin: AuthnPluginDependency,
+    user_authentication_service: OptionalUserAuthServiceDependency,
 ) -> GetAuthTokensResponse:
     """Get authentication tokens."""
+    if user_authentication_service is not None:
+        credentials = await user_authentication_service.exchange_device_code(
+            request.device_code
+        )
+        return GetAuthTokensResponse(
+            access_token=credentials.access_token,
+            refresh_token=credentials.refresh_token,
+        )
     return control_handlers.get_auth_tokens(request, authn_plugin)
+
+
+@auth_router.post("/token-refresh")
+async def refresh_auth_tokens(
+    request: Annotated[RefreshAuthTokensRequest, Depends(get_protobuf_request)],
+    user_authentication_service: UserAuthServiceDependency,
+) -> RefreshAuthTokensResponse:
+    """Exchange a refresh token for a new OIDC token pair."""
+    credentials = await user_authentication_service.refresh_tokens(
+        request.refresh_token
+    )
+    return RefreshAuthTokensResponse(
+        access_token=credentials.access_token,
+        refresh_token=credentials.refresh_token,
+    )
 
 
 @router.post("/register-node")

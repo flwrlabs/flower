@@ -15,7 +15,7 @@
 """Flower account authentication type definitions."""
 
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -43,3 +43,5 @@ class AccountInfo:
 
     flwr_aid: str
     account_name: str
+    email: str | None = None
+    roles: frozenset[str] = field(default_factory=frozenset)

@@ -14,11 +14,10 @@
 # ==============================================================================
 """FastAPI dependency for Control API account authentication."""
 
-from collections.abc import Sequence
-
 from fastapi import Request, Response
 
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.user_auth import UserAuthenticationService
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
 
@@ -46,30 +45,24 @@ class AccountAccessDependency:
     def __call__(
         self,
         request: Request,
-        response: Response,
+        _response: Response,
     ) -> AccountInfo:
         """Return the authenticated and authorized account for a request."""
         metadata = request.headers.items()
         valid_tokens, account = self.authn_plugin.validate_tokens_in_metadata(metadata)
-        if valid_tokens:
-            return self._authorize(
-                account,
-                "Tokens validated, but account info not found",
-            )
-
-        tokens, account = self.authn_plugin.refresh_tokens(metadata)
-        if tokens is None:
+        if not valid_tokens:
             raise FlowerError(
                 ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-                "Token refresh failed: authentication plugin returned no tokens.",
+                "Authentication plugin rejected the request tokens.",
             )
-
-        account = self._authorize(
+        return self._authorize(
             account,
-            "Tokens refreshed, but account info not found",
+            "Tokens validated, but account info not found",
         )
-        self._set_response_headers(response, tokens)
-        return account
+
+    def authorize(self, account: AccountInfo) -> AccountInfo:
+        """Apply the configured Control authorization plugin to an account."""
+        return self._authorize(account, "Authenticated account info not found")
 
     def _authorize(
         self,
@@ -90,17 +83,6 @@ class AccountAccessDependency:
                 f"account_name={account.account_name!r}.",
             )
         return account
-
-    @staticmethod
-    def _set_response_headers(
-        response: Response,
-        tokens: Sequence[tuple[str, str | bytes]],
-    ) -> None:
-        """Add refreshed authentication tokens to the HTTP response."""
-        for key, value in tokens:
-            response.headers[key] = (
-                value.decode("latin-1") if isinstance(value, bytes) else value
-            )
 
 
 def get_account(
@@ -133,3 +115,22 @@ def get_authn_plugin(
             "got None.",
         )
     return account_access.authn_plugin
+
+
+def get_user_authentication_service(request: Request) -> UserAuthenticationService:
+    """Return the shared HTTP user-authentication service."""
+    service = get_optional_user_authentication_service(request)
+    if service is None:
+        raise FlowerError(
+            ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED,
+            "Shared user authentication service is not initialized.",
+        )
+    return service
+
+
+def get_optional_user_authentication_service(
+    request: Request,
+) -> UserAuthenticationService | None:
+    """Return the shared service when an extension installed it."""
+    service = getattr(request.app.state, "user_authentication_service", None)
+    return service if isinstance(service, UserAuthenticationService) else None

@@ -25,7 +25,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 
 from flwr.common.logger import log
 
-from .base import FlowerError
+from .base import ApiErrorCode, FlowerError
 from .catalog import API_ERROR_MAP
 
 INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error."
@@ -57,10 +57,14 @@ async def http_error_translator(
         msg = f"[{request.url.path}][ApiError:{err.code}] {err.message}"
         log(ERROR, msg)
         # Return sanitized error to client
+        headers = None
+        if err.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED:
+            headers = {"WWW-Authenticate": "Bearer"}
         return Response(
             status_code=http_status,
             content=err.to_json(public_message),
             media_type="application/json",
+            headers=headers,
         )
     except HTTPException as err:
         return await http_exception_handler(request, err)
