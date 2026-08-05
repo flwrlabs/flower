@@ -16,14 +16,28 @@
 
 
 import numpy as np
+import pytest
 
 from .aggregate import (
     _aggregate_n_closest_weights,
     _check_weights_equality,
     _find_reference_weights,
     aggregate,
+    aggregate_qffl,
     weighted_loss_avg,
 )
+
+
+def test_aggregate_qffl_zero_denominator() -> None:
+    """Test aggregate_qffl raises when the h values sum to zero."""
+    # Prepare: every client reports a zero h value, so their sum is zero
+    parameters = [np.array([1.0, 2.0])]
+    deltas = [[np.array([0.1, 0.2])]]
+    hs_fll = [np.array([0.0])]
+
+    # Execute & Assert: must raise rather than divide by zero and return NaN weights
+    with pytest.raises(ValueError):
+        aggregate_qffl(parameters, deltas, hs_fll)
 
 
 def test_aggregate() -> None:
