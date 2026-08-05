@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Engine, MetaData, create_engine, event, inspect, make_url, text
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -194,6 +195,15 @@ class SqlMixin(ABC):
         finally:
             _current_sessions.reset(token)
             session.close()
+
+    def dialect_insert(self, table: Any) -> Any:
+        """Return a dialect-specific insert statement for the active backend."""
+        if self.database_backend == "sqlite":
+            return sqlite_insert(table)
+
+        raise NotImplementedError(
+            f"No dialect-specific insert configured for {self.database_backend!r}."
+        )
 
     def get_metadata(self) -> MetaData | None:
         """Return the MetaData object for this class.

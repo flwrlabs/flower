@@ -25,7 +25,6 @@ from typing import Any, Literal, cast
 from uuid import uuid4
 
 from sqlalchemy import MetaData, String, bindparam, delete, func, or_, select, update
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Context, Message
@@ -133,7 +132,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Start a run-scoped object push session."""
         session_id = str(uuid4())
         expires_at = now() + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS)
-        stmt = sqlite_insert(ObjectPushSessionModel).values(
+        stmt = self.dialect_insert(ObjectPushSessionModel).values(
             session_id=session_id,
             run_id=uint64_to_int64(run_id),
             expires_at=_timestamp_bind("expires_at", expires_at),
@@ -187,7 +186,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
             # Record the objects that still need to be pushed.
             if missing_objects:
-                stmt = sqlite_insert(ObjectPushSessionPendingModel).values(
+                stmt = self.dialect_insert(ObjectPushSessionPendingModel).values(
                     [
                         {"session_id": session_id, "object_id": object_id}
                         for object_id in missing_objects
