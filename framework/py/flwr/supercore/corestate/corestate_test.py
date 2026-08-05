@@ -515,9 +515,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         object_id = "a" * 64
         created_at = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
         store_at = created_at + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1)
-        refreshed_expires_at = store_at + timedelta(
-            seconds=OBJECT_PUSH_SESSION_TTL_SECONDS
-        )
 
         with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
             mock_datetime.now.return_value = created_at
@@ -545,7 +542,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
                         """,
                         {
                             "session_id": session_id,
-                            "expires_at": refreshed_expires_at.isoformat(sep=" "),
+                            "expires_at": (
+                                store_at
+                                + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS)
+                            ).isoformat(sep=" "),
                         },
                     )
                 return result
