@@ -128,6 +128,8 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    AUTOMATION_MAX_ACTIVE_PER_USER,
+    AUTOMATION_MIN_FIXED_INTERVAL,
     DEFAULT_FEDERATION_SIMULATION,
     FLWR_SUPERGRID_API_URL,
     NOOP_FEDERATION_ID,
@@ -760,11 +762,18 @@ def start_automation(  # pylint: disable=too-many-locals
             "`max_runs` must be greater than zero.",
             public_details="`max_runs` must be greater than zero.",
         )
-    if fixed_interval is not None and fixed_interval < 1:
+    if (
+        fixed_interval is not None
+        and fixed_interval < AUTOMATION_MIN_FIXED_INTERVAL
+    ):
         raise FlowerError(
             ApiErrorCode.INVALID_AUTOMATION_REQUEST,
-            "`fixed_interval` must be greater than zero.",
-            public_details="`fixed_interval` must be greater than zero.",
+            "`fixed_interval` must be at least "
+            f"{AUTOMATION_MIN_FIXED_INTERVAL} seconds.",
+            public_details=(
+                "`fixed_interval` must be at least "
+                f"{AUTOMATION_MIN_FIXED_INTERVAL} seconds."
+            ),
         )
     if fixed_interval is not None and fixed_interval >= 2**63:
         raise FlowerError(
@@ -783,6 +792,22 @@ def start_automation(  # pylint: disable=too-many-locals
 
     # Resolve the account-scoped federation and run configuration.
     flwr_aid = account.flwr_aid
+    active_automations = state.list_automations(
+        flwr_aids=[flwr_aid],
+        statuses=[AutomationStatus.ACTIVE],
+        order_by="updated_at",
+        limit=AUTOMATION_MAX_ACTIVE_PER_USER,
+    )
+    if len(active_automations) >= AUTOMATION_MAX_ACTIVE_PER_USER:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            f"Account {flwr_aid} has reached the active automation limit of "
+            f"{AUTOMATION_MAX_ACTIVE_PER_USER}.",
+            public_details=(
+                "You can have at most "
+                f"{AUTOMATION_MAX_ACTIVE_PER_USER} active automations."
+            ),
+        )
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     federation_id = _resolve_federation_id(
         state, account.account_name, start_run_request.federation

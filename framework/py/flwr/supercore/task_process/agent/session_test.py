@@ -27,7 +27,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationResponse,
     StartRunRequest,
 )
-from flwr.supercore.constant import TaskType
+from flwr.supercore.constant import AUTOMATION_MIN_FIXED_INTERVAL, TaskType
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
@@ -52,6 +52,7 @@ def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
     properties = parameters["properties"]
     assert isinstance(properties, dict)
     assert set(properties) == expected_properties
+    assert properties["fixed_interval"]["minimum"] == AUTOMATION_MIN_FIXED_INTERVAL
     assert parameters["required"] == ["input", "start_at"]
 
 
@@ -76,7 +77,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     arguments: JSONObject = {
         "input": "Do work",
         "start_at": "2026-07-28T12:00:00Z",
-        "fixed_interval": 60,
+        "fixed_interval": AUTOMATION_MIN_FIXED_INTERVAL,
         "max_runs": 3,
     }
 
@@ -91,7 +92,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     request = stub.StartAutomation.call_args.args[0]
     assert request == StartAutomationRequest(
         start_at="2026-07-28T12:00:00Z",
-        fixed_interval=60,
+        fixed_interval=AUTOMATION_MIN_FIXED_INTERVAL,
         max_runs=3,
         start_run_request=StartRunRequest(
             app_spec="example/app",

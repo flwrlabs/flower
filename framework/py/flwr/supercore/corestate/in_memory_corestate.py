@@ -607,6 +607,7 @@ class InMemoryCoreState(
         self,
         *,
         automation_ids: Sequence[int] | None = None,
+        flwr_aids: Sequence[str] | None = None,
         federations: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
@@ -619,12 +620,14 @@ class InMemoryCoreState(
         if (
             limit == 0
             or (automation_ids is not None and not automation_ids)
+            or (flwr_aids is not None and not flwr_aids)
             or (federations is not None and not federations)
             or (statuses is not None and not statuses)
         ):
             return []
 
         status_set = set(statuses) if statuses is not None else None
+        flwr_aid_set = set(flwr_aids) if flwr_aids is not None else None
         federation_set = set(federations) if federations is not None else None
         cutoff = due_before.isoformat() if due_before is not None else None
         with self.lock_automation_store:
@@ -640,6 +643,13 @@ class InMemoryCoreState(
             automations: list[Automation] = []
             for record in records:
                 automation = record.automation
+
+                # Apply account filter.
+                if (
+                    flwr_aid_set is not None
+                    and automation.flwr_aid not in flwr_aid_set
+                ):
+                    continue
 
                 # Apply federation filter.
                 if (

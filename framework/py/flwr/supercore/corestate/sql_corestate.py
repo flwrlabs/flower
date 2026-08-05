@@ -854,6 +854,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         *,
         automation_ids: Sequence[int] | None = None,
+        flwr_aids: Sequence[str] | None = None,
         federations: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
@@ -866,6 +867,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if (
             limit == 0
             or (automation_ids is not None and not automation_ids)
+            or (flwr_aids is not None and not flwr_aids)
             or (federations is not None and not federations)
             or (statuses is not None and not statuses)
         ):
@@ -881,6 +883,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 sint64_automation_ids, "automation_id"
             )
             conditions.append(f"automation_id IN ({placeholders})")
+            params.update(in_params)
+        if flwr_aids is not None:
+            placeholders, in_params = build_sql_in_params(flwr_aids, "flwr_aid")
+            conditions.append(f"flwr_aid IN ({placeholders})")
             params.update(in_params)
         if federations is not None:
             placeholders, in_params = build_sql_in_params(federations, "federation_id")
