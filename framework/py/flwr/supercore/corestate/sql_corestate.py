@@ -396,21 +396,22 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError(
                 f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
             )
-        params = {
-            "fab_hash": fab_hash,
-            "content": fab.content,
-            "verifications": json.dumps(fab.verifications),
-        }
         # Keep launch behavior: last write wins for metadata under the same
         # content hash.
-        query = """
+        self.query(
+            """
             INSERT INTO fab (fab_hash, content, verifications)
             VALUES (:fab_hash, :content, :verifications)
             ON CONFLICT(fab_hash) DO UPDATE SET
                 content = excluded.content,
                 verifications = excluded.verifications
-        """
-        self.query(query, params)
+            """,
+            {
+                "fab_hash": fab_hash,
+                "content": fab.content,
+                "verifications": json.dumps(fab.verifications),
+            },
+        )
         return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
@@ -437,12 +438,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Create or update a connector for an account."""
         if not flwr_aid or not connector_ref:
             return False
-        params = {
-            "flwr_aid": flwr_aid,
-            "connector_ref": connector_ref,
-            "credentials_json": credentials_json,
-            "config_json": config_json,
-        }
         self.query(
             """
             INSERT INTO connector (
@@ -455,7 +450,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 credentials_json = excluded.credentials_json,
                 config_json = excluded.config_json
             """,
-            params,
+            {
+                "flwr_aid": flwr_aid,
+                "connector_ref": connector_ref,
+                "credentials_json": credentials_json,
+                "config_json": config_json,
+            },
         )
         return True
 
@@ -503,22 +503,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return False
         stored_run_id = uint64_to_int64(run_id)
         bound_refs = set(self.get_run_connector_refs(run_id))
-        data = [
-            {
-                "run_id": stored_run_id,
-                "connector_ref": connector_ref,
-            }
+        run_connectors = [
+            RunConnectorModel(run_id=stored_run_id, connector_ref=connector_ref)
             for connector_ref in dict.fromkeys(connector_refs)
             if connector_ref not in bound_refs
         ]
-        if data:
-            self.query(
-                """
-                INSERT INTO run_connector (run_id, connector_ref)
-                VALUES (:run_id, :connector_ref)
-                """,
-                data,
-            )
+        if run_connectors:
+            with self.session() as session:
+                session.add_all(run_connectors)
         return True
 
     def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
@@ -691,16 +683,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Set the shared Context for the specified RunSeries."""
         sint_series_id = uint64_to_int64(series_id)
         context_bytes = context_to_bytes(context)
-        with self.session():
-            self.query(
-                """
-                INSERT INTO series_context (series_id, context)
-                VALUES (:series_id, :context)
-                ON CONFLICT(series_id) DO UPDATE SET
-                    context = excluded.context
-                """,
-                {"series_id": sint_series_id, "context": context_bytes},
-            )
+        self.query(
+            """
+            INSERT INTO series_context (series_id, context)
+            VALUES (:series_id, :context)
+            ON CONFLICT(series_id) DO UPDATE SET
+                context = excluded.context
+            """,
+            {"series_id": sint_series_id, "context": context_bytes},
+        )
 
     def store_run_in_series(
         self,
@@ -1649,25 +1640,28 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Atomically reserve a nonce in a namespace."""
         if namespace == "" or nonce == "":
             return False
-        cleanup_query = """
-            DELETE FROM nonce_store
-            WHERE expires_at < :current;
-        """
-        insert_query = """
-            INSERT INTO nonce_store (namespace, nonce, expires_at)
-            VALUES (:namespace, :nonce, :expires_at);
-        """
-        self.query(cleanup_query, {"current": now().timestamp()})
-        try:
+        with self.session():
             self.query(
-                insert_query,
-                {"namespace": namespace, "nonce": nonce, "expires_at": expires_at},
+                """
+                DELETE FROM nonce_store
+                WHERE expires_at < :current
+                """,
+                {"current": now().timestamp()},
             )
-            return True
-        # Duplicate nonce detected, treated as a replay attempt.
-        # IntegrityError can only arise from (namespace, nonce) uniqueness.
-        except IntegrityError:
-            return False
+            rows = self.query(
+                """
+                INSERT INTO nonce_store (namespace, nonce, expires_at)
+                VALUES (:namespace, :nonce, :expires_at)
+                ON CONFLICT(namespace, nonce) DO NOTHING
+                RETURNING nonce
+                """,
+                {
+                    "namespace": namespace,
+                    "nonce": nonce,
+                    "expires_at": expires_at,
+                },
+            )
+            return bool(rows)
 
 
 def _connector_oauth_session_from_model(

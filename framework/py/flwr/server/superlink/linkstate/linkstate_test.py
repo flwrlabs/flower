@@ -2395,6 +2395,68 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         self.assertEqual(second.credentials_json, '{"token":"new"}')
         self.assertEqual(second.config_json, '{"calendar":"work"}')
 
+    def test_reserve_nonce_cleans_expired_rows_on_duplicate(self) -> None:
+        """Expired nonce cleanup commits even when reservation is duplicate."""
+        state = self.state_factory()
+        current = now().timestamp()
+
+        self.assertTrue(state.reserve_nonce("namespace", "duplicate", current + 100.0))
+        state.query(
+            """
+            INSERT INTO nonce_store (namespace, nonce, expires_at)
+            VALUES (:namespace, :nonce, :expires_at)
+            """,
+            {
+                "namespace": "namespace",
+                "nonce": "expired",
+                "expires_at": current - 100.0,
+            },
+        )
+
+        self.assertFalse(state.reserve_nonce("namespace", "duplicate", current + 100.0))
+        rows = state.query(
+            """
+            SELECT nonce
+            FROM nonce_store
+            ORDER BY nonce
+            """,
+            {},
+        )
+        self.assertEqual([row["nonce"] for row in rows], ["duplicate"])
+
+    def test_reserve_nonce_duplicate_returns_false_in_shared_session(self) -> None:
+        """Duplicate nonce reservation is handled before outer commit."""
+        state = self.state_factory()
+        current = now().timestamp()
+
+        self.assertTrue(state.reserve_nonce("namespace", "duplicate", current + 100.0))
+        state.query(
+            """
+            INSERT INTO nonce_store (namespace, nonce, expires_at)
+            VALUES (:namespace, :nonce, :expires_at)
+            """,
+            {
+                "namespace": "namespace",
+                "nonce": "expired",
+                "expires_at": current - 100.0,
+            },
+        )
+
+        with state.session():
+            self.assertFalse(
+                state.reserve_nonce("namespace", "duplicate", current + 100.0)
+            )
+
+        rows = state.query(
+            """
+            SELECT nonce
+            FROM nonce_store
+            ORDER BY nonce
+            """,
+            {},
+        )
+        self.assertEqual([row["nonce"] for row in rows], ["duplicate"])
+
     def test_get_task_message_commits_claim_before_deserialization(self) -> None:
         """Malformed claimed task Messages should not remain queued forever."""
         state = self.state_factory()
