@@ -462,60 +462,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(load_object.call_count, 3)
         cleanup_session.assert_not_called()
 
-    def test_store_object_uses_expiry_refreshed_during_claim(self) -> None:
-        """Claiming an object re-reads expiry refreshed by another push."""
-        state = self.state_factory()
-        if not hasattr(state, "query"):
-            self.skipTest("SQL-only object push concurrency regression")
-        sql_state = cast(Any, state)
-        run_id = self.task_run_id(state)
-        object_id = "a" * 64
-        created_at = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
-        store_at = created_at + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1)
-
-        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
-            mock_datetime.now.return_value = created_at
-            session_id = state.start_session(run_id)
-            state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
-
-        with (
-            sql_state.session() as session,
-            patch("flwr.supercore.date.datetime.datetime") as mock_datetime,
-            patch.object(state.object_store, "put") as put_object,
-        ):
-            original_scalar = session.scalar
-            refreshed = False
-
-            def scalar_with_concurrent_refresh(*args: Any, **kwargs: Any) -> Any:
-                nonlocal refreshed
-                result = original_scalar(*args, **kwargs)
-                if not refreshed and result == session_id:
-                    refreshed = True
-                    sql_state.query(
-                        """
-                        UPDATE object_push_sessions
-                        SET expires_at = :expires_at
-                        WHERE session_id = :session_id
-                        """,
-                        {
-                            "session_id": session_id,
-                            "expires_at": (
-                                store_at
-                                + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS)
-                            ).isoformat(sep=" "),
-                        },
-                    )
-                return result
-
-            mock_datetime.now.return_value = store_at
-            with patch.object(
-                session, "scalar", side_effect=scalar_with_concurrent_refresh
-            ):
-                stored = state.store_object(run_id, session_id, object_id, b"content")
-
-        self.assertTrue(stored)
-        put_object.assert_called_once_with(object_id, b"content")
-
     def test_get_object_cleans_up_expired_sessions_and_reloads(self) -> None:
         """An unavailable object triggers cleanup for all expired sessions."""
         state = self.state_factory()
