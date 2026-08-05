@@ -14,6 +14,7 @@
 # ==============================================================================
 """Definition of one account-scoped connector."""
 
+
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 

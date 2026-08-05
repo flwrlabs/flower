@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for connector definitions."""
 
+
 import pytest
 
 from flwr.supercore.typing import JSONObject
