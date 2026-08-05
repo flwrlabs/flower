@@ -156,9 +156,10 @@ class FedMom(FedAvg):
 
         fedavg_result = aggregate(weights_results)
 
-        assert self.initial_parameters is not None, (
-            "Model initial parameters need to be set."
-        )
+        if self.initial_parameters is None:
+            raise ValueError(
+                "When using server-side optimization, model needs to be initialized."
+            )
         w_t = parameters_to_ndarrays(self.initial_parameters)
 
         # Compute pseudo-gradient: g_t = w_t - w_{avg, t+1}
