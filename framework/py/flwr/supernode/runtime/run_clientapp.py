@@ -15,6 +15,7 @@
 """Flower ClientApp process."""
 
 
+import time
 from logging import DEBUG, ERROR
 
 import grpc
@@ -76,6 +77,8 @@ from flwr.supercore.superexec.dependency_installer import (
     install_app_dependencies,
 )
 from flwr.supercore.telemetry import EventType, event
+
+_MESSAGE_POLL_INTERVAL_SECONDS = 0.5
 
 
 def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
@@ -243,7 +246,22 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
     fab = fab_from_proto(res.fab)
 
     # Pull and inflate the message
-    pull_msg_res: PullAppMessagesResponse = stub.PullMessages(PullAppMessagesRequest())
+    while True:
+        pull_msg_res: PullAppMessagesResponse = stub.PullMessages(
+            PullAppMessagesRequest()
+        )
+        message_count = len(pull_msg_res.messages_list)
+        tree_count = len(pull_msg_res.message_object_trees)
+        if message_count == 0 and tree_count == 0:
+            time.sleep(_MESSAGE_POLL_INTERVAL_SECONDS)
+            continue
+        if message_count == 1 and tree_count == 1:
+            break
+        raise RuntimeError(
+            "Runtime communication error: PullMessages must return either an empty "
+            "response or exactly one message/object-tree pair."
+        )
+
     run_id = context.run_id
     node = Node(node_id=context.node_id)
     object_tree = pull_msg_res.message_object_trees[0]

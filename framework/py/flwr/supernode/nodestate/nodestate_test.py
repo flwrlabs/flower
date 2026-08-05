@@ -131,6 +131,19 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         result = self.state.get_messages()
         self.assertEqual(len(result), 0)
 
+    def test_get_message_limit_leaves_later_messages_unretrieved(self) -> None:
+        """Retrieving one message should leave later messages available."""
+        first = make_dummy_message(msg_id="first")
+        second = make_dummy_message(msg_id="second")
+        self.state.store_message(first)
+        self.state.store_message(second)
+
+        first_result = self.state.get_messages(limit=1)
+        second_result = self.state.get_messages(limit=1)
+
+        self.assertEqual(first_result, [first])
+        self.assertEqual(second_result, [second])
+
     def test_store_message_and_object_tree(self) -> None:
         """Test storing a message and preregistering its object tree."""
         # Prepare

@@ -74,6 +74,11 @@ from flwr.supercore.inflatable.inflatable_object import (
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supercore.servicer.appio import AppIoServicer
+from flwr.supercore.servicer.appio.error_details import (
+    RUN_ID_MISMATCH,
+    malformed_request,
+    task_transition_failed,
+)
 from flwr.superlink.servicer.control.control_handlers import (
     process_due_automations,
     start_automation,
@@ -133,30 +138,14 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
         run_id = _get_authenticated_serverapp_run_id(context)
 
-        # Validate request and insert in State
-        _raise_if(
-            validation_error=len(request.messages_list) == 0,
-            request_name="PushMessages",
-            detail="`messages_list` must not be empty",
-        )
+        messages = _validate_push_messages_request(request, context, run_id)
+
         session_id = state.start_session(run_id)
         message_ids: list[str] = []
         missing_objects_lists: list[list[str]] = []
-        for message_proto, object_tree in zip(
-            request.messages_list, request.message_object_trees, strict=True
+        for message, object_tree in zip(
+            messages, request.message_object_trees, strict=True
         ):
-            message = message_from_proto(message_proto=message_proto)
-            validation_errors = validate_message(message, is_reply_message=False)
-            _raise_if(
-                validation_error=bool(validation_errors),
-                request_name="PushMessages",
-                detail=", ".join(validation_errors),
-            )
-            _raise_if(
-                validation_error=run_id != message.metadata.run_id,
-                request_name="PushMessages",
-                detail="`Message.metadata` has mismatched `run_id`",
-            )
             # Store message and register in ObjectStore
             stored, missing_objects = state.store_message_and_object_tree(
                 message, object_tree, session_id
@@ -343,26 +332,26 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         # Init state and store
         state = self.state_factory.state()
 
-        # Store Simulation Runtime usage before finishing the primary task.
-        # This ensures usage is captured even if the task fails to finish properly.
-        if request.HasField("clientapp_runtime"):
-            state.add_clientapp_runtime(run_id, request.clientapp_runtime)
-
         # Finish the task
-        if state.finish_task(
+        if not state.finish_task(
             task.task_id, sub_status=request.sub_status, details=request.details
         ):
-            log(INFO, "Finished task %d of run %d", task.task_id, run_id)
-            if request.HasField("context"):
-                runs = state.get_run_info(run_ids=[run_id])
-                run = runs[0] if runs else None
-                if run and run.series_id and run.primary_task_id == task.task_id:
-                    state.set_run_series_context(
-                        run.series_id,
-                        context_from_proto(request.context),
-                    )
-        else:
-            log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                task_transition_failed(task.task_id),
+            )
+
+        log(INFO, "Finished task %d of run %d", task.task_id, run_id)
+        if request.HasField("clientapp_runtime"):
+            state.add_clientapp_runtime(run_id, request.clientapp_runtime)
+        if request.HasField("context"):
+            runs = state.get_run_info(run_ids=[run_id])
+            run = runs[0] if runs else None
+            if run and run.series_id and run.primary_task_id == task.task_id:
+                state.set_run_series_context(
+                    run.series_id,
+                    context_from_proto(request.context),
+                )
         return PushTaskOutputResponse()
 
     def StartAutomation(
@@ -470,6 +459,56 @@ def _get_authenticated_serverapp_run_id(context: grpc.ServicerContext) -> int:
             SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE,
         )
     return task.run_id
+
+
+def _validate_push_messages_request(
+    request: PushAppMessagesRequest,
+    context: grpc.ServicerContext,
+    run_id: int,
+) -> list[Message]:
+    """Validate and deserialize PushMessages without mutating state."""
+    message_count = len(request.messages_list)
+    if message_count == 0:
+        context.abort(
+            grpc.StatusCode.INVALID_ARGUMENT,
+            malformed_request("PushMessages", "messages_list must not be empty"),
+        )
+    if message_count != len(request.message_object_trees):
+        context.abort(
+            grpc.StatusCode.INVALID_ARGUMENT,
+            malformed_request(
+                "PushMessages",
+                "messages_list and message_object_trees must contain the same number "
+                "of entries",
+            ),
+        )
+
+    messages: list[Message] = []
+    for index, (message_proto, object_tree) in enumerate(
+        zip(request.messages_list, request.message_object_trees, strict=True)
+    ):
+        message = message_from_proto(message_proto=message_proto)
+        validation_errors = validate_message(message, is_reply_message=False)
+        if validation_errors:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                malformed_request(
+                    "PushMessages",
+                    f"message at index {index}: {', '.join(validation_errors)}",
+                ),
+            )
+        if run_id != message.metadata.run_id:
+            context.abort(grpc.StatusCode.PERMISSION_DENIED, RUN_ID_MISMATCH)
+        if object_tree.object_id != message.metadata.message_id:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                malformed_request(
+                    "PushMessages",
+                    f"object tree at index {index} does not match the message ID",
+                ),
+            )
+        messages.append(message)
+    return messages
 
 
 def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:

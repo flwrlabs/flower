@@ -58,9 +58,15 @@ from flwr.proto.message_pb2 import (
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
+from flwr.server.utils.validator import validate_message
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.servicer.appio import AppIoServicer
+from flwr.supercore.servicer.appio.error_details import (
+    RUN_ID_MISMATCH,
+    malformed_request,
+    task_transition_failed,
+)
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 
 
@@ -169,22 +175,24 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         state = self.state_factory.state()
 
         # Flag task as finished
-        if state.finish_task(
+        if not state.finish_task(
             task_id=task.task_id,
             sub_status=request.sub_status,
             details=request.details,
         ):
-            log(DEBUG, "Finished task %d of run %s", task.task_id, run_id)
-            # Save the context to the state
-            if request.HasField("context"):
-                run = state.get_run(run_id)
-                if run is not None:
-                    state.set_run_series_context(
-                        run.series_id,
-                        context_from_proto(request.context),
-                    )
-        else:
-            log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                task_transition_failed(task.task_id),
+            )
+
+        log(DEBUG, "Finished task %d of run %s", task.task_id, run_id)
+        if request.HasField("context"):
+            run = state.get_run(run_id)
+            if run is not None:
+                state.set_run_series_context(
+                    run.series_id,
+                    context_from_proto(request.context),
+                )
 
         return PushTaskOutputResponse()
 
@@ -203,13 +211,9 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         store = self.objectstore_factory.store()
 
         # Retrieve message for this run
-        messages = state.get_messages(run_ids=[run_id], is_reply=False)
+        messages = state.get_messages(run_ids=[run_id], is_reply=False, limit=1)
         if not messages:
-            context.abort(
-                grpc.StatusCode.NOT_FOUND,
-                f"No message found for run {run_id} in NodeState.",
-            )
-            raise RuntimeError("Unreachable code")  # for mypy
+            return PullAppMessagesResponse()
         message = messages[0]
 
         # Record message processing start time
@@ -233,26 +237,42 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         task = get_authenticated_task()
         run_id = task.run_id
 
-        # Initialize state connection
-        state = self.state_factory.state()
-
         if len(request.messages_list) != 1 or len(request.message_object_trees) != 1:
             context.abort(
                 grpc.StatusCode.INVALID_ARGUMENT,
-                "ClientAppIo.PushMessages expects exactly one message and "
-                "one object tree.",
+                malformed_request(
+                    "PushMessages",
+                    "messages_list and message_object_trees must each contain exactly "
+                    "one entry",
+                ),
             )
-            raise RuntimeError("Unreachable code")  # for mypy
 
-        if run_id != request.messages_list[0].metadata.run_id:
+        message = message_from_proto(request.messages_list[0])
+        validation_errors = validate_message(message, is_reply_message=True)
+        if validation_errors:
             context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Run ID in message does not match authenticated task's run ID.",
+                grpc.StatusCode.INVALID_ARGUMENT,
+                malformed_request(
+                    "PushMessages",
+                    f"message at index 0: {', '.join(validation_errors)}",
+                ),
             )
-            raise RuntimeError("Unreachable code")  # for mypy
+        if run_id != message.metadata.run_id:
+            context.abort(grpc.StatusCode.PERMISSION_DENIED, RUN_ID_MISMATCH)
+        object_tree = request.message_object_trees[0]
+        if object_tree.object_id != message.metadata.message_id:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                malformed_request(
+                    "PushMessages",
+                    "object tree at index 0 does not match the message ID",
+                ),
+            )
+
+        # Initialize state only after validating the complete request
+        state = self.state_factory.state()
 
         # Record message processing end time
-        message = message_from_proto(request.messages_list[0])
         state.record_message_processing_end(
             message_id=message.metadata.reply_to_message_id
         )
@@ -260,7 +280,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         # Save the message to the state and preregister its objects
         session_id = state.start_session(run_id)
         _, objects_to_push = state.store_message_and_object_tree(
-            message, request.message_object_trees[0], session_id
+            message, object_tree, session_id
         )
 
         return PushAppMessagesResponse(

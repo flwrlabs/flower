@@ -16,14 +16,14 @@
 
 
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import grpc
 from parameterized import parameterized
 
-from flwr.app import Context
+from flwr.app import Context, Message, Metadata, RecordDict
 from flwr.app.message import make_message
-from flwr.common.constant import SubStatus
+from flwr.common.constant import SUPERLINK_NODE_ID, SubStatus
 from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
@@ -43,12 +43,14 @@ from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
 from flwr.proto.control_pb2 import StartAutomationRequest  # pylint:disable=E0611
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint:disable=E0611
 from flwr.proto.message_pb2 import (  # pylint:disable=E0611
+    ObjectTree,
     PullObjectRequest,
     PullObjectResponse,
     PushObjectRequest,
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
+from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -63,6 +65,27 @@ from flwr.supernode.runtime.run_clientapp import (
 )
 
 from .clientappio_servicer import ClientAppIoServicer
+
+
+def _make_reply_message(run_id: int = 61016) -> Message:
+    """Create a valid ClientApp reply message."""
+    message = make_message(
+        metadata=Metadata(
+            run_id=run_id,
+            message_id="",
+            src_node_id=123,
+            dst_node_id=SUPERLINK_NODE_ID,
+            reply_to_message_id="instruction-id",
+            group_id="",
+            created_at=now().timestamp(),
+            ttl=60.0,
+            message_type="query",
+        ),
+        content=RecordDict(),
+    )
+    # pylint: disable-next=protected-access
+    message.metadata._message_id = message.object_id  # type: ignore
+    return message
 
 
 class TestClientAppIoServicer(unittest.TestCase):
@@ -94,10 +117,14 @@ class TestClientAppIoServicer(unittest.TestCase):
             run=ProtoRun(run_id=61016, fab_id="mock/mock", fab_version="v1.0.0"),
             fab=fab_to_proto(mock_fab),
         )
-        self.mock_stub.PullMessages.return_value = PullAppMessagesResponse(
-            messages_list=[message_to_proto(mock_message)],
-            message_object_trees=[get_object_tree(mock_message)],
-        )
+        self.mock_stub.PullMessages.side_effect = [
+            PullAppMessagesResponse(),
+            PullAppMessagesResponse(),
+            PullAppMessagesResponse(
+                messages_list=[message_to_proto(mock_message)],
+                message_object_trees=[get_object_tree(mock_message)],
+            ),
+        ]
         # Create series of responses for PullObject
         # Adding responses for objects in a post-order traversal of object tree order
         all_objects = get_all_nested_objects(mock_message)
@@ -116,7 +143,8 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PullTaskInput.return_value = mock_response
 
         # Execute
-        message, context, run, fab = pull_task_input(self.mock_stub)
+        with patch("flwr.supernode.runtime.run_clientapp.time.sleep") as mock_sleep:
+            message, context, run, fab = pull_task_input(self.mock_stub)
 
         # Assert
         self.mock_stub.PullTaskInput.assert_called_once()
@@ -129,6 +157,33 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.assertEqual(run.fab_version, "v1.0.0")
         self.assertEqual(fab.hash_str, mock_fab.hash_str)
         self.assertEqual(fab.content, mock_fab.content)
+        self.assertEqual(self.mock_stub.PullMessages.call_count, 3)
+        self.assertEqual(mock_sleep.call_args_list, [call(0.5)] * 2)
+
+    @parameterized.expand([(1, 0), (0, 1), (2, 2)])  # type: ignore
+    def test_pull_task_input_rejects_invalid_message_response_shape(
+        self, message_count: int, object_tree_count: int
+    ) -> None:
+        """ClientApp polling should reject non-empty, non-paired responses."""
+        message = make_message(
+            metadata=self.maker.metadata(),
+            content=self.maker.recorddict(1, 0, 0),
+        )
+        self.mock_stub.PullTaskInput.return_value = PullTaskInputResponse(
+            context=ProtoContext(node_id=123),
+            run=ProtoRun(run_id=61016),
+            fab=fab_to_proto(Fab("hash", b"content", {})),
+        )
+        self.mock_stub.PullMessages.return_value = PullAppMessagesResponse(
+            messages_list=[message_to_proto(message)] * message_count,
+            message_object_trees=[get_object_tree(message)] * object_tree_count,
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Runtime communication error: PullMessages must return",
+        ):
+            pull_task_input(self.mock_stub)
 
     def test_push_task_output(self) -> None:
         """Test pushing messages to SuperNode."""
@@ -263,11 +318,38 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.assertEqual(finish_task_kwargs["task_id"], task_id)
         self.assertEqual(finish_task_kwargs["sub_status"], request.sub_status)
 
-    def test_servicer_pull_messages_aborts_when_no_message_found(self) -> None:
-        """PullMessages should abort cleanly when no message is available."""
-        run_id = 61016
+    def test_servicer_push_task_output_rejects_failed_transition(self) -> None:
+        """PushTaskOutput should expose a failed finish transition."""
+        task_id = 123
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
+        self.mock_state.finish_task.return_value = False
+        request = PushTaskOutputRequest(
+            context=ProtoContext(run_id=61016),
+            sub_status=SubStatus.COMPLETED,
+        )
+
+        with (
+            patch(
+                "flwr.supernode.servicer.clientappio.clientappio_servicer."
+                "get_authenticated_task",
+                return_value=Mock(task_id=task_id, run_id=61016),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.PushTaskOutput(request, context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Task {task_id} cannot transition to FINISHED.",
+        )
+        self.mock_state.set_run_series_context.assert_not_called()
+
+    def test_servicer_pull_messages_returns_empty_response_when_no_message(
+        self,
+    ) -> None:
+        """PullMessages should treat an empty queue as a successful poll."""
+        run_id = 61016
         self.mock_state.get_messages.return_value = []
 
         with patch(
@@ -275,12 +357,12 @@ class TestClientAppIoServicer(unittest.TestCase):
             "get_authenticated_task",
             return_value=Mock(run_id=run_id),
         ):
-            with self.assertRaises(grpc.RpcError):
-                self.servicer.PullMessages(PullAppMessagesRequest(), context)
+            response = self.servicer.PullMessages(PullAppMessagesRequest(), Mock())
 
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.NOT_FOUND,
-            f"No message found for run {run_id} in NodeState.",
+        self.assertEqual(list(response.messages_list), [])
+        self.assertEqual(list(response.message_object_trees), [])
+        self.mock_state.get_messages.assert_called_once_with(
+            run_ids=[run_id], is_reply=False, limit=1
         )
         self.mock_state.record_message_processing_start.assert_not_called()
 
@@ -311,17 +393,16 @@ class TestClientAppIoServicer(unittest.TestCase):
 
         context.abort.assert_called_once_with(
             grpc.StatusCode.INVALID_ARGUMENT,
-            "ClientAppIo.PushMessages expects exactly one message and one object tree.",
+            "Malformed PushMessages request: messages_list and "
+            "message_object_trees must each contain exactly one entry.",
         )
+        self.mock_state.start_session.assert_not_called()
         self.mock_state.record_message_processing_end.assert_not_called()
         self.mock_state.store_message_and_object_tree.assert_not_called()
 
     def test_servicer_push_messages_stores_message_and_object_tree(self) -> None:
         """PushMessages should store the message and preregister its object tree."""
-        message = make_message(
-            metadata=self.maker.metadata(),
-            content=self.maker.recorddict(1, 1, 1),
-        )
+        message = _make_reply_message()
         object_tree = get_object_tree(message)
         request = PushAppMessagesRequest(
             messages_list=[message_to_proto(message)],
@@ -332,14 +413,16 @@ class TestClientAppIoServicer(unittest.TestCase):
             ["object-id"],
         )
         self.mock_state.start_session.return_value = "session-id"
+        context = Mock()
 
         with patch(
             "flwr.supernode.servicer.clientappio.clientappio_servicer."
             "get_authenticated_task",
             return_value=Mock(run_id=message.metadata.run_id),
         ):
-            response = self.servicer.PushMessages(request, Mock())
+            response = self.servicer.PushMessages(request, context)
 
+        context.abort.assert_not_called()
         self.mock_state.record_message_processing_end.assert_called_once_with(
             message_id=message.metadata.reply_to_message_id
         )
@@ -355,6 +438,93 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.assertEqual(session_id, "session-id")
         self.assertEqual(list(response.objects_to_push), ["object-id"])
         self.assertEqual(response.session_id, "session-id")
+
+    def test_servicer_push_messages_rejects_instruction_message(self) -> None:
+        """ClientApp PushMessages should reject instruction direction."""
+        message = _make_reply_message()
+        message.metadata.__dict__["_reply_to_message_id"] = ""
+        request = PushAppMessagesRequest(
+            messages_list=[message_to_proto(message)],
+            message_object_trees=[get_object_tree(message)],
+        )
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.supernode.servicer.clientappio.clientappio_servicer."
+                "get_authenticated_task",
+                return_value=Mock(run_id=message.metadata.run_id),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.PushMessages(request, context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.INVALID_ARGUMENT,
+            "Malformed PushMessages request: message at index 0: "
+            "`metadata.reply_to_message_id` MUST be set.",
+        )
+        self.mock_state.start_session.assert_not_called()
+        self.mock_state.record_message_processing_end.assert_not_called()
+        self.mock_state.store_message_and_object_tree.assert_not_called()
+
+    def test_servicer_push_messages_rejects_run_mismatch(self) -> None:
+        """ClientApp PushMessages should reject an authenticated run mismatch."""
+        message = _make_reply_message()
+        request = PushAppMessagesRequest(
+            messages_list=[message_to_proto(message)],
+            message_object_trees=[get_object_tree(message)],
+        )
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.supernode.servicer.clientappio.clientappio_servicer."
+                "get_authenticated_task",
+                return_value=Mock(run_id=message.metadata.run_id + 1),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.PushMessages(request, context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Run ID does not match the authenticated task.",
+        )
+        self.mock_state.start_session.assert_not_called()
+        self.mock_state.record_message_processing_end.assert_not_called()
+        self.mock_state.store_message_and_object_tree.assert_not_called()
+
+    def test_servicer_push_messages_rejects_object_tree_mismatch(self) -> None:
+        """ClientApp PushMessages should reject an unpaired object tree."""
+        message = _make_reply_message()
+        request = PushAppMessagesRequest(
+            messages_list=[message_to_proto(message)],
+            message_object_trees=[ObjectTree(object_id="different-message-id")],
+        )
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.supernode.servicer.clientappio.clientappio_servicer."
+                "get_authenticated_task",
+                return_value=Mock(run_id=message.metadata.run_id),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.PushMessages(request, context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.INVALID_ARGUMENT,
+            "Malformed PushMessages request: object tree at index 0 does not "
+            "match the message ID.",
+        )
+        self.mock_state.start_session.assert_not_called()
+        self.mock_state.record_message_processing_end.assert_not_called()
+        self.mock_state.store_message_and_object_tree.assert_not_called()
 
     def test_push_object_uses_state(self) -> None:
         """PushObject should delegate session validation and storage to state."""

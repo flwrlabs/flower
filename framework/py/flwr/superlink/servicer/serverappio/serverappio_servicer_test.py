@@ -548,6 +548,29 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert run.primary_task_id is not None
         return run.primary_task_id
 
+    def _assert_push_messages_rejected(
+        self,
+        request: PushAppMessagesRequest,
+        code: grpc.StatusCode,
+        details: str,
+    ) -> None:
+        """Assert PushMessages rejects a request before starting a session."""
+        message_ins_count = self.state.num_message_ins()
+        message_res_count = self.state.num_message_res()
+        with (
+            patch.object(
+                self.state, "start_session", wraps=self.state.start_session
+            ) as start_session,
+            self.assertRaises(grpc.RpcError) as exc,
+        ):
+            self._push_messages(request)
+
+        self.assertEqual(exc.exception.code(), code)
+        self.assertEqual(exc.exception.details(), details)
+        start_session.assert_not_called()
+        self.assertEqual(self.state.num_message_ins(), message_ins_count)
+        self.assertEqual(self.state.num_message_res(), message_res_count)
+
     def _transition_run_status(self, run_id: int, num_transitions: int) -> None:
         task_id = self._primary_task_id(run_id)
         if num_transitions > 0:
@@ -698,6 +721,39 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
         assert run.clientapp_runtime == 7.89
 
+    def test_push_task_output_rejects_failed_transition(self) -> None:
+        """PushTaskOutput should expose a failed finish transition."""
+        task_id = self._primary_task_id(self._auth_run_id)
+        request = PushTaskOutputRequest(
+            sub_status=SubStatus.COMPLETED,
+            clientapp_runtime=7.89,
+            context=context_to_proto(
+                Context(
+                    run_id=self._auth_run_id,
+                    node_id=SUPERLINK_NODE_ID,
+                    node_config={},
+                    state=RecordDict(),
+                    run_config={},
+                )
+            ),
+        )
+
+        with (
+            patch.object(self.state, "finish_task", return_value=False),
+            patch.object(self.state, "add_clientapp_runtime") as add_runtime,
+            patch.object(self.state, "set_run_series_context") as set_context,
+            self.assertRaises(grpc.RpcError) as exc,
+        ):
+            self._push_task_output(request)
+
+        self.assertEqual(exc.exception.code(), grpc.StatusCode.FAILED_PRECONDITION)
+        self.assertEqual(
+            exc.exception.details(),
+            f"Task {task_id} cannot transition to FINISHED.",
+        )
+        add_runtime.assert_not_called()
+        set_context.assert_not_called()
+
     def test_push_task_output_stores_run_series_context(self) -> None:
         """PushTaskOutput should persist context in the authenticated run series."""
         # Prepare
@@ -737,6 +793,83 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert
         assert isinstance(response, GetNodesResponse)
         assert grpc.StatusCode.OK == call.code()
+
+    def test_push_messages_rejects_empty_request(self) -> None:
+        """PushMessages should reject an empty request as malformed."""
+        self._assert_push_messages_rejected(
+            PushAppMessagesRequest(),
+            grpc.StatusCode.INVALID_ARGUMENT,
+            "Malformed PushMessages request: messages_list must not be empty.",
+        )
+
+    def test_push_messages_rejects_mismatched_cardinality(self) -> None:
+        """PushMessages should reject unpaired repeated fields."""
+        message = create_ins_message(
+            src_node_id=SUPERLINK_NODE_ID,
+            dst_node_id=self.node_id,
+            run_id=self._auth_run_id,
+        )
+        self._assert_push_messages_rejected(
+            PushAppMessagesRequest(messages_list=[message]),
+            grpc.StatusCode.INVALID_ARGUMENT,
+            "Malformed PushMessages request: messages_list and "
+            "message_object_trees must contain the same number of entries.",
+        )
+
+    def test_push_messages_rejects_invalid_direction(self) -> None:
+        """PushMessages should reject a message sent in the wrong direction."""
+        message = create_ins_message(
+            src_node_id=self.node_id,
+            dst_node_id=self.node_id,
+            run_id=self._auth_run_id,
+        )
+        self._assert_push_messages_rejected(
+            PushAppMessagesRequest(
+                messages_list=[message],
+                message_object_trees=[
+                    ObjectTree(object_id=message.metadata.message_id)
+                ],
+            ),
+            grpc.StatusCode.INVALID_ARGUMENT,
+            "Malformed PushMessages request: message at index 0: "
+            f"`metadata.src_node_id` is not {SUPERLINK_NODE_ID} "
+            "(SuperLink node ID).",
+        )
+
+    def test_push_messages_rejects_run_mismatch(self) -> None:
+        """PushMessages should reject an authenticated run mismatch."""
+        message = create_ins_message(
+            src_node_id=SUPERLINK_NODE_ID,
+            dst_node_id=self.node_id,
+            run_id=self._auth_run_id + 1,
+        )
+        self._assert_push_messages_rejected(
+            PushAppMessagesRequest(
+                messages_list=[message],
+                message_object_trees=[
+                    ObjectTree(object_id=message.metadata.message_id)
+                ],
+            ),
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Run ID does not match the authenticated task.",
+        )
+
+    def test_push_messages_rejects_object_tree_mismatch(self) -> None:
+        """PushMessages should reject an unpaired object tree."""
+        message = create_ins_message(
+            src_node_id=SUPERLINK_NODE_ID,
+            dst_node_id=self.node_id,
+            run_id=self._auth_run_id,
+        )
+        self._assert_push_messages_rejected(
+            PushAppMessagesRequest(
+                messages_list=[message],
+                message_object_trees=[ObjectTree(object_id="different-message-id")],
+            ),
+            grpc.StatusCode.INVALID_ARGUMENT,
+            "Malformed PushMessages request: object tree at index 0 does not "
+            "match the message ID.",
+        )
 
     def test_push_messages_keeps_shared_upload_hint_after_rejection(self) -> None:
         """PushMessages should keep accepted-message upload hints."""
