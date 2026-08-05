@@ -102,7 +102,7 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
 
 def _is_control_path(path: str) -> bool:
     """Return whether the path belongs to a Control API endpoint."""
-    return path.startswith("/control/")
+    return path.startswith("/v1/control/")
 
 
 class ControlLicenseMiddleware(BaseHTTPMiddleware):
@@ -154,7 +154,9 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
         # response only collects refreshed token headers, so it must not affect
         # the protobuf response returned by the endpoint.
         authentication_response.headers.raw.clear()
-        request.state.account = account_access(request, authentication_response)
+        request.state.account = await run_in_threadpool(
+            account_access, request, authentication_response
+        )
         response = await call_next(request)
         response.headers.raw.extend(authentication_response.headers.raw)
         return response

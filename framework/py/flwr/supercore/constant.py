@@ -80,8 +80,8 @@ SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "supergrid.flower.ai")
 OAUTH_SESSION_TTL = timedelta(minutes=10)
 RUN_SERIES_DESCRIPTION_MAX_LENGTH = 80
 UNAUTHENTICATED_PATHS = {
-    "/control/get-login-details",
-    "/control/get-auth-tokens",
+    "/v1/control/get-login-details",
+    "/v1/control/get-auth-tokens",
 }
 
 # Specification for app publishing
@@ -195,6 +195,9 @@ class InvitationStatus(StrEnum):
     REJECTED = "rejected"
     REVOKED = "revoked"
     EXPIRED = "expired"
+
+
+AUTOMATION_BATCH_LIMIT = 1
 
 
 class AutomationStatus(StrEnum):

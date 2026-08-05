@@ -83,7 +83,7 @@ def test_protobuf_request_without_handler_response_returns_internal_error() -> N
     app = FastAPI()
 
     # See this route doesn't return a protobuf object
-    @app.post("/control/list-runs")
+    @app.post("/v1/control/list-runs")
     def list_runs() -> Response:
         return Response()
 
@@ -91,7 +91,7 @@ def test_protobuf_request_without_handler_response_returns_internal_error() -> N
     app.middleware("http")(http_error_translator)
 
     response = TestClient(app).post(
-        "/control/list-runs",
+        "/v1/control/list-runs",
         content=ListRunsRequest().SerializeToString(),
         headers={"content-type": PROTOBUF_MEDIA_TYPE},
     )
@@ -104,7 +104,7 @@ def test_non_protobuf_request_in_state_returns_internal_error() -> None:
     """The protobuf request dependency rejects a non-protobuf state value."""
     app = FastAPI()
 
-    @app.post("/control/list-runs")
+    @app.post("/v1/control/list-runs")
     def list_runs(request: Request) -> Response:
         request.state.protobuf_request = object()
         _ = get_protobuf_request(request)
@@ -112,7 +112,7 @@ def test_non_protobuf_request_in_state_returns_internal_error() -> None:
 
     app.middleware("http")(http_error_translator)
 
-    response = TestClient(app).post("/control/list-runs")
+    response = TestClient(app).post("/v1/control/list-runs")
 
     assert response.status_code == 500
     assert response.json()["code"] == ApiErrorCode.INVALID_PROTOBUF_REQUEST
@@ -129,7 +129,7 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     client = TestClient(app)
 
     response = client.post(
-        "/control/list-runs",
+        "/v1/control/list-runs",
         content=ListRunsRequest(limit=1).SerializeToString(),
         headers={"content-type": PROTOBUF_MEDIA_TYPE},
     )
@@ -160,7 +160,7 @@ def test_list_runs_preserves_refreshed_authentication_tokens() -> None:
     )
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     response = TestClient(app).post(
-        "/control/list-runs",
+        "/v1/control/list-runs",
         content=ListRunsRequest().SerializeToString(),
         headers={"content-type": PROTOBUF_MEDIA_TYPE},
     )
@@ -176,7 +176,7 @@ def test_list_runs_rejects_non_protobuf_payload() -> None:
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     response = TestClient(app).post(
-        "/control/list-runs",
+        "/v1/control/list-runs",
         content=b"{}",
         headers={"content-type": "application/json"},
     )
@@ -198,7 +198,7 @@ def test_get_login_details_does_not_require_authentication(
     )
     app = _create_app(authn_plugin=authn_plugin)
     response = TestClient(app).post(
-        "/control/get-login-details",
+        "/v1/control/get-login-details",
         content=GetLoginDetailsRequest().SerializeToString(),
         headers={"content-type": PROTOBUF_MEDIA_TYPE},
     )

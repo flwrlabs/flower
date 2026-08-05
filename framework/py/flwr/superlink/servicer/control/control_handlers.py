@@ -20,9 +20,11 @@ import base64
 import hashlib
 import json
 import secrets
-from collections.abc import Sequence
-from datetime import datetime
+import time
+from collections.abc import Callable, Generator, Sequence
+from datetime import UTC, datetime, timedelta
 from logging import ERROR, INFO
+from typing import cast
 
 import requests
 
@@ -38,6 +40,8 @@ from flwr.common.config import (
 from flwr.common.constant import (
     FAB_MAX_SIZE,
     HEARTBEAT_DEFAULT_INTERVAL,
+    LOG_STREAM_INTERVAL,
+    RUN_EVENTS_STREAM_INTERVAL,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
 )
@@ -74,6 +78,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAutomationsRequest,
+    ListAutomationsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
     ListFederationsRequest,
@@ -100,10 +106,18 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RevokeInvitationResponse,
     ShowFederationRequest,
     ShowFederationResponse,
+    StartAutomationRequest,
+    StartAutomationResponse,
     StartRunRequest,
     StartRunResponse,
+    StopAutomationRequest,
+    StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StreamLogsRequest,
+    StreamLogsResponse,
+    StreamRunEventsRequest,
+    StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
 )
@@ -120,6 +134,7 @@ from flwr.supercore.constant import (
     OAUTH_SESSION_TTL,
     RUN_SERIES_DESCRIPTION_MAX_LENGTH,
     ActionType,
+    AutomationStatus,
     RunTime,
     TaskType,
 )
@@ -428,7 +443,7 @@ def validate_run_connector_refs(
     return canonical_refs
 
 
-def start_run(  # pylint: disable=too-many-locals, too-many-statements
+def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
     state: LinkState,
@@ -440,15 +455,25 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     verification_dict: dict[str, str] = {}
     note: str | None = None
 
-    builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
-    if builtin_agent_fab is not None:
-        fab_file, verification_dict = builtin_agent_fab
-    elif request.app_spec:
-        fab_file, verification_dict, note = _get_remote_fab(
-            fleet_api_type, request.app_spec
-        )
+    if request.fab.hash_str and not request.fab.content:
+        stored_fab = state.get_fab(request.fab.hash_str)
+        if stored_fab is None:
+            raise FlowerError(
+                ApiErrorCode.FAB_DOWNLOAD_FAILURE,
+                f"FAB with hash {request.fab.hash_str} not found.",
+            )
+        fab_file = stored_fab.content
+        verification_dict = stored_fab.verifications
     else:
-        fab_file = request.fab.content
+        builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
+        if builtin_agent_fab is not None:
+            fab_file, verification_dict = builtin_agent_fab
+        elif request.app_spec:
+            fab_file, verification_dict, note = _get_remote_fab(
+                fleet_api_type, request.app_spec
+            )
+        else:
+            fab_file = request.fab.content
 
     if len(fab_file) > FAB_MAX_SIZE:
         log(
@@ -572,6 +597,336 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     return StartRunResponse(
         run_id=run_id, note=note, series_id=series_id, federation=run.federation_id
     )
+
+
+def stream_logs(
+    request: StreamLogsRequest,
+    account: AccountInfo,
+    state: LinkState,
+    is_active: Callable[[], bool] | None = None,
+) -> Generator[StreamLogsResponse, None, None]:
+    """Stream logs for a run."""
+    log(INFO, "ControlServicer.StreamLogs")
+
+    run_id = request.run_id
+    runs = state.get_run_info(run_ids=[run_id])
+    if not runs:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND,
+            f"Run {run_id} not found while streaming logs.",
+        )
+    run = runs[0]
+    task_id = cast(int, run.primary_task_id)
+
+    _validate_federation_membership_in_request(
+        state, account.flwr_aid, run.federation_id
+    )
+
+    after_timestamp = request.after_timestamp + 1e-6
+    while is_active is None or is_active():
+        log_msg, latest_timestamp = state.get_task_log(task_id, after_timestamp)
+        if log_msg:
+            yield StreamLogsResponse(
+                log_output=log_msg,
+                latest_timestamp=latest_timestamp,
+            )
+            # Add a small epsilon to the latest timestamp to avoid getting
+            # the same log
+            after_timestamp = max(latest_timestamp + 1e-6, after_timestamp)
+
+        # Wait for and continue to yield more log responses only if the
+        # run isn't completed yet. If the run is finished, the entire log
+        # is returned at this point and the server ends the stream.
+        run = state.get_run_info(run_ids=[run_id])[0]
+        if run.status.status == Status.FINISHED:
+            log(INFO, "All logs for run ID `%s` returned", run_id)
+            state.cleanup_run(run_id)
+            break
+
+        time.sleep(LOG_STREAM_INTERVAL)
+
+
+def stream_run_events(
+    request: StreamRunEventsRequest,
+    account: AccountInfo,
+    state: LinkState,
+    is_active: Callable[[], bool] | None = None,
+) -> Generator[StreamRunEventsResponse, None, None]:
+    """Stream task events for a run."""
+    log(INFO, "ControlServicer.StreamRunEvents")
+
+    run_id = request.run_id
+    runs = state.get_run_info(run_ids=[run_id])
+    if not runs:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND,
+            f"Run {run_id} not found while streaming run events.",
+        )
+    run = runs[0]
+
+    _validate_federation_membership_in_request(
+        state, account.flwr_aid, run.federation_id
+    )
+
+    after_task_event_id = None
+    if request.HasField("after_task_event_id"):
+        after_task_event_id = request.after_task_event_id
+    while is_active is None or is_active():
+        should_break = run.status.status == Status.FINISHED
+
+        # Retrieve and yield all task events generated after the latest
+        # streamed task event
+        events = state.get_task_events(
+            run_id=run_id,
+            after_task_event_id=after_task_event_id,
+        )
+        for event in events:
+            after_task_event_id = event.id
+            yield StreamRunEventsResponse(task_event=event)
+
+        # If the run was already finished before fetching this batch, all
+        # events are returned at this point and the server ends the stream.
+        if should_break:
+            log(INFO, "All events for run ID `%s` returned", run_id)
+            break
+
+        # Refresh status after yielding. If streaming this batch raced with
+        # run completion, continue immediately and fetch one final batch.
+        run = state.get_run_info(run_ids=[run_id])[0]
+        if run.status.status == Status.FINISHED:
+            continue
+
+        time.sleep(RUN_EVENTS_STREAM_INTERVAL)
+
+
+def start_automation(  # pylint: disable=too-many-locals
+    request: StartAutomationRequest,
+    account: AccountInfo,
+    state: LinkState,
+) -> StartAutomationResponse:
+    """Create automation."""
+    log(INFO, "ControlServicer.StartAutomation")
+
+    # Validate the run series shared by all runs in this automation.
+    start_run_request = request.start_run_request
+    if not start_run_request.HasField("series_id"):
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "StartAutomation requires start_run_request.series_id.",
+            public_details="The run `series_id` is required to start an automation.",
+        )
+    if len(start_run_request.fab.content) > FAB_MAX_SIZE:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "StartAutomation FAB size exceeds the maximum allowed size of "
+            f"{FAB_MAX_SIZE} bytes.",
+            public_details=(
+                f"The FAB must not exceed {FAB_MAX_SIZE} bytes when starting "
+                "an automation."
+            ),
+        )
+
+    # Resolve the first scheduled run time.
+    if request.HasField("start_at"):
+        try:
+            start_at = datetime.fromisoformat(request.start_at)
+            if start_at.tzinfo is None:
+                raise ValueError("Timezone is required.")
+            next_run_at = start_at.astimezone(UTC).isoformat()
+        except ValueError as e:
+            raise FlowerError(
+                ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+                f"Invalid automation start_at value: {request.start_at}",
+                public_details=(
+                    "The automation start_at value must be a valid ISO 8601 "
+                    "timestamp with a timezone."
+                ),
+            ) from e
+    else:
+        next_run_at = now().isoformat()
+
+    # Resolve recurrence settings and the default one-shot behavior.
+    fixed_interval = (
+        request.fixed_interval if request.HasField("fixed_interval") else None
+    )
+    max_runs = (
+        request.max_runs
+        if request.HasField("max_runs")
+        else 1 if fixed_interval is None else None
+    )
+    if max_runs is not None and max_runs < 1:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`max_runs` must be greater than zero.",
+            public_details="`max_runs` must be greater than zero.",
+        )
+    if fixed_interval is not None and fixed_interval < 1:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`fixed_interval` must be greater than zero.",
+            public_details="`fixed_interval` must be greater than zero.",
+        )
+    if fixed_interval is not None and fixed_interval >= 2**63:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`fixed_interval` must be less than 2**63.",
+            public_details="`fixed_interval` must be less than 2**63.",
+        )
+    if fixed_interval is None and (max_runs is None or max_runs > 1):
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "`fixed_interval` is required for automations with multiple runs.",
+            public_details=(
+                "`fixed_interval` is required for automations with multiple runs."
+            ),
+        )
+
+    # Resolve the account-scoped federation and run configuration.
+    flwr_aid = account.flwr_aid
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+    federation_id = _resolve_federation_id(
+        state, account.account_name, start_run_request.federation
+    )
+    stored_start_run_request = StartRunRequest()
+    stored_start_run_request.CopyFrom(start_run_request)
+    stored_start_run_request.federation = federation_id
+
+    # Persist the unresolved run request so dispatch uses the StartRun workflow.
+    try:
+        automation = state.store_automation(
+            federation_id=federation_id,
+            flwr_aid=flwr_aid,
+            start_run_request=stored_start_run_request,
+            series_id=start_run_request.series_id,
+            next_run_at=next_run_at,
+            fixed_interval=fixed_interval,
+            max_runs=max_runs,
+        )
+    except ValueError as e:
+        raise FlowerError(
+            ApiErrorCode.FAILED_TO_CREATE_RUN,
+            "Failed to create automation for "
+            f"flwr_aid={flwr_aid}, federation_id={federation_id}, "
+            f"series_id={start_run_request.series_id}.",
+        ) from e
+
+    return StartAutomationResponse(
+        automation_id=automation.automation_id,
+        series_id=automation.series_id,
+        next_run_at=automation.next_run_at,
+    )
+
+
+def dispatch_automation(
+    state: LinkState,
+    automation_id: int,
+    *,
+    previous_next_run_at: str,
+    next_run_at: str | None,
+) -> None:
+    """Claim an automation occurrence and execute it through StartRun."""
+    claimed = state.claim_automation(
+        automation_id,
+        previous_next_run_at=previous_next_run_at,
+        next_run_at=next_run_at,
+    )
+    if claimed is None:
+        return
+
+    request, flwr_aid = claimed
+    try:
+        response = start_run(
+            request,
+            AccountInfo(flwr_aid=flwr_aid, account_name=""),
+            state,
+            None,
+        )
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        state.finish_automation(
+            automation_id,
+            status=AutomationStatus.FAILED,
+        )
+        log(ERROR, "Failing automation %d: %s", automation_id, exc)
+        return
+
+    state.finish_automation(
+        automation_id,
+        status=(
+            AutomationStatus.COMPLETED
+            if response.HasField("run_id")
+            else AutomationStatus.FAILED
+        ),
+    )
+
+
+def process_due_automations(
+    state: LinkState,
+    *,
+    limit: int,
+) -> None:
+    """Dispatch due automations."""
+    due_automations = state.list_automations(
+        statuses=[AutomationStatus.ACTIVE],
+        due_before=now(),
+        order_by="next_run_at",
+        limit=limit,
+    )
+
+    for automation in due_automations:
+        next_run_at = (
+            datetime.fromisoformat(automation.next_run_at)
+            + timedelta(seconds=automation.fixed_interval)
+        ).isoformat()
+
+        dispatch_automation(
+            state,
+            automation.automation_id,
+            previous_next_run_at=automation.next_run_at,
+            next_run_at=next_run_at,
+        )
+
+
+def list_automations(
+    request: ListAutomationsRequest, account: AccountInfo, state: LinkState
+) -> ListAutomationsResponse:
+    """List automations."""
+    log(INFO, "ControlServicer.ListAutomations")
+
+    flwr_aid = account.flwr_aid
+    if request.federation:
+        _validate_federation_membership_in_request(state, flwr_aid, request.federation)
+        federations = [request.federation]
+    else:
+        federations = [
+            federation.id
+            for federation in state.federation_manager.get_federations(flwr_aid)
+        ]
+
+    return ListAutomationsResponse(
+        automations=state.list_automations(
+            federations=federations,
+            order_by="updated_at",
+        )
+    )
+
+
+def stop_automation(
+    request: StopAutomationRequest, account: AccountInfo, state: LinkState
+) -> StopAutomationResponse:
+    """Stop an automation."""
+    log(INFO, "ControlServicer.StopAutomation")
+
+    automations = state.list_automations(
+        automation_ids=[request.automation_id],
+        order_by="updated_at",
+    )
+    if automations:
+        _validate_federation_membership_in_request(
+            state, account.flwr_aid, automations[0].federation
+        )
+
+    state.stop_automation(request.automation_id)
+    return StopAutomationResponse()
 
 
 def list_runs(

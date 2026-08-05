@@ -20,6 +20,7 @@ limitations under the License.
 import abc
 import collections.abc
 import flwr.proto.appio_pb2
+import flwr.proto.control_pb2
 import flwr.proto.log_pb2
 import flwr.proto.message_pb2
 import flwr.proto.run_pb2
@@ -111,6 +112,12 @@ class ServerAppIoStub:
     ]
     """Create a task"""
 
+    StartAutomation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StartAutomationRequest,
+        flwr.proto.control_pb2.StartAutomationResponse,
+    ]
+    """Start an automation"""
+
     PushTaskMessage: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushTaskMessageRequest,
         flwr.proto.appio_pb2.PushTaskMessageResponse,
@@ -134,6 +141,12 @@ class ServerAppIoStub:
         flwr.proto.appio_pb2.RecordTaskUsageResponse,
     ]
     """Record task usage"""
+
+    GetConnector: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.GetConnectorRequest,
+        flwr.proto.appio_pb2.GetConnectorResponse,
+    ]
+    """Resolve credentials for the authenticated connector task"""
 
     PushLogs: grpc.UnaryUnaryMultiCallable[
         flwr.proto.log_pb2.PushLogsRequest,
@@ -240,6 +253,12 @@ class ServerAppIoAsyncStub:
     ]
     """Create a task"""
 
+    StartAutomation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StartAutomationRequest,
+        flwr.proto.control_pb2.StartAutomationResponse,
+    ]
+    """Start an automation"""
+
     PushTaskMessage: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushTaskMessageRequest,
         flwr.proto.appio_pb2.PushTaskMessageResponse,
@@ -263,6 +282,12 @@ class ServerAppIoAsyncStub:
         flwr.proto.appio_pb2.RecordTaskUsageResponse,
     ]
     """Record task usage"""
+
+    GetConnector: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.GetConnectorRequest,
+        flwr.proto.appio_pb2.GetConnectorResponse,
+    ]
+    """Resolve credentials for the authenticated connector task"""
 
     PushLogs: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.log_pb2.PushLogsRequest,
@@ -390,6 +415,14 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         """Create a task"""
 
     @abc.abstractmethod
+    def StartAutomation(
+        self,
+        request: flwr.proto.control_pb2.StartAutomationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.StartAutomationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.StartAutomationResponse]]:
+        """Start an automation"""
+
+    @abc.abstractmethod
     def PushTaskMessage(
         self,
         request: flwr.proto.appio_pb2.PushTaskMessageRequest,
@@ -420,6 +453,14 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.RecordTaskUsageResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.RecordTaskUsageResponse]]:
         """Record task usage"""
+
+    @abc.abstractmethod
+    def GetConnector(
+        self,
+        request: flwr.proto.appio_pb2.GetConnectorRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.GetConnectorResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.GetConnectorResponse]]:
+        """Resolve credentials for the authenticated connector task"""
 
     @abc.abstractmethod
     def PushLogs(

@@ -6,6 +6,7 @@ type = ["ci", "docs", "feat", "fix", "refactor", "break"]
 project = [
     "devtool",
     "framework",
+    "agent",
     "baselines",
     "datasets",
     "examples",

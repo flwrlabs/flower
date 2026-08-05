@@ -362,6 +362,39 @@ class RecordTaskUsageResponse(google.protobuf.message.Message):
 global___RecordTaskUsageResponse = RecordTaskUsageResponse
 
 @typing.final
+class GetConnectorRequest(google.protobuf.message.Message):
+    """GetConnector messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetConnectorRequest = GetConnectorRequest
+
+@typing.final
+class GetConnectorResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONNECTOR_REF_FIELD_NUMBER: builtins.int
+    CREDENTIALS_JSON_FIELD_NUMBER: builtins.int
+    CONFIG_JSON_FIELD_NUMBER: builtins.int
+    connector_ref: builtins.str
+    credentials_json: builtins.str
+    config_json: builtins.str
+    def __init__(
+        self,
+        *,
+        connector_ref: builtins.str = ...,
+        credentials_json: builtins.str = ...,
+        config_json: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["config_json", b"config_json", "connector_ref", b"connector_ref", "credentials_json", b"credentials_json"]) -> None: ...
+
+global___GetConnectorResponse = GetConnectorResponse
+
+@typing.final
 class PullTaskInputRequest(google.protobuf.message.Message):
     """PullTaskInput messages"""
 

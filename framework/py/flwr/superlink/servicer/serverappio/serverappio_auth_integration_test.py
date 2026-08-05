@@ -25,6 +25,8 @@ from parameterized import parameterized
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    GetConnectorRequest,
+    GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     PullAppMessagesRequest,
@@ -105,6 +107,11 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
+        self._get_connector_no_auth = self._base_channel.unary_unary(
+            "/flwr.proto.ServerAppIo/GetConnector",
+            request_serializer=GetConnectorRequest.SerializeToString,
+            response_deserializer=GetConnectorResponse.FromString,
+        )
         auth_channel = grpc.intercept_channel(
             self._base_channel,
             AppIoTokenClientInterceptor(token=auth_token),
@@ -143,6 +150,51 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             self._get_nodes_no_auth.with_call(request=GetNodesRequest())
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
+
+    def test_get_connector_requires_and_uses_connector_task_token(self) -> None:
+        """GetConnector should derive credential access from its task token."""
+        with self.assertRaises(grpc.RpcError) as unauthenticated:
+            self._get_connector_no_auth.with_call(request=GetConnectorRequest())
+        assert unauthenticated.exception.code() == grpc.StatusCode.UNAUTHENTICATED
+
+        run_id = self.state.create_run(
+            "",
+            "",
+            "",
+            {},
+            NOOP_FEDERATION_ID,
+            None,
+            "account-a",
+            TaskType.AGENT_APP,
+            connector_refs=["notion"],
+        )
+        task_id = self.state.create_task(
+            TaskType.CONNECTOR,
+            run_id,
+            connector_ref="notion",
+        )
+        assert task_id is not None
+        token = self.state.claim_task(task_id)
+        assert token is not None
+        assert self.state.activate_task(task_id)
+        assert self.state.upsert_connector(
+            flwr_aid="account-a",
+            connector_ref="notion",
+            credentials_json='{"token":"secret"}',
+            config_json="{}",
+        )
+
+        response, call = self._get_connector_no_auth.with_call(
+            request=GetConnectorRequest(),
+            metadata=((TASK_TOKEN_HEADER, token),),
+        )
+
+        assert call.code() == grpc.StatusCode.OK
+        assert response == GetConnectorResponse(
+            connector_ref="notion",
+            credentials_json='{"token":"secret"}',
+            config_json="{}",
+        )
 
     def test_get_nodes_denied_with_invalid_metadata_token(self) -> None:
         """Protected RPC should deny requests with invalid metadata token."""
