@@ -21,11 +21,30 @@ from sqlalchemy import TIMESTAMP
 from sqlalchemy.types import TypeDecorator
 
 
-class UTCDateTime(TypeDecorator[datetime]):  # pylint: disable=too-many-ancestors
+class UTCDateTime(
+    TypeDecorator[datetime]
+):  # pylint: disable=too-many-ancestors,abstract-method
     """Store timezone-aware datetimes consistently across supported dialects."""
 
     impl = TIMESTAMP(timezone=True)
     cache_ok = True
+
+    @property
+    def python_type(self) -> type[datetime]:
+        """Return the Python type represented by this column type."""
+        return datetime
+
+    def process_bind_param(
+        self, value: datetime | None, dialect: Any
+    ) -> datetime | None:
+        """Pass through non-SQLite bind values to the wrapped timestamp type."""
+        return value
+
+    def process_result_value(
+        self, value: datetime | None, dialect: Any
+    ) -> datetime | None:
+        """Pass through non-SQLite result values from the wrapped timestamp type."""
+        return value
 
     def bind_processor(self, dialect: Any) -> Any:
         """Return a bind processor preserving the previous SQLite text format."""
