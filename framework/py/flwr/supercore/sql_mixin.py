@@ -29,6 +29,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.sql.dml import Insert
 
 from flwr.common.logger import log
 from flwr.supercore.constant import (
@@ -196,7 +197,7 @@ class SqlMixin(ABC):
             _current_sessions.reset(token)
             session.close()
 
-    def dialect_insert(self, table: Any) -> Any:
+    def dialect_insert(self, table: Any) -> Insert:
         """Return a dialect-specific insert statement for the active backend."""
         if self.database_backend == "sqlite":
             return sqlite_insert(table)

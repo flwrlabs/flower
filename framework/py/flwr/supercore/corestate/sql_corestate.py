@@ -186,7 +186,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
             # Record the objects that still need to be pushed.
             if missing_objects:
-                stmt = self.dialect_insert(ObjectPushSessionPendingModel).values(
+                stmt = cast(
+                    Any, self.dialect_insert(ObjectPushSessionPendingModel)
+                ).values(
                     [
                         {"session_id": session_id, "object_id": object_id}
                         for object_id in missing_objects
