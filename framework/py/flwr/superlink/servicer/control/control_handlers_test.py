@@ -14,8 +14,10 @@
 # ==============================================================================
 """Tests for Control API handler functions."""
 
+
+import hashlib
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -32,13 +34,19 @@ from flwr.supercore.constant import (
     AutomationStatus,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.fab import Fab
 from flwr.superlink.federation import NoOpFederationManager
 
-from .control_handlers import list_automations, start_automation, stop_automation
+from .control_handlers import (
+    list_automations,
+    start_automation,
+    start_run,
+    stop_automation,
+)
 
 
-class TestAutomationHandlers(unittest.TestCase):
-    """Test automation Control handlers."""
+class TestControlHandlers(unittest.TestCase):
+    """Test Control API handlers."""
 
     def setUp(self) -> None:
         """Create an in-memory LinkState and account."""
@@ -51,6 +59,40 @@ class TestAutomationHandlers(unittest.TestCase):
             flwr_aid=NOOP_FLWR_AID,
             account_name=NOOP_ACCOUNT_NAME,
         )
+
+    def test_start_run_reuses_fab_by_hash(self) -> None:
+        """Test StartRun reuses a stored FAB by hash."""
+        fab_content = b"stored FAB"
+        fab_hash = hashlib.sha256(fab_content).hexdigest()
+        self.state.store_fab(Fab(fab_hash, fab_content, {}))
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/demo", "v0.0.1"),
+            ),
+        ):
+            request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+            request.fab.hash_str = fab_hash
+            response = start_run(request, self.account, self.state, None)
+
+        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        self.assertEqual(run.fab_hash, fab_hash)
+
+    def test_start_run_rejects_unknown_fab_hash(self) -> None:
+        """Test StartRun rejects an unknown FAB hash."""
+        request = StartRunRequest()
+        request.fab.hash_str = "unknown"
+
+        with self.assertRaises(FlowerError) as error:
+            start_run(request, self.account, self.state, None)
+
+        self.assertEqual(error.exception.code, ApiErrorCode.FAB_DOWNLOAD_FAILURE)
 
     def test_start_automation_normalizes_start_at_to_utc(self) -> None:
         """Normalize the automation start time to UTC."""

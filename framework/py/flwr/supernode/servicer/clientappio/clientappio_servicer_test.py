@@ -27,6 +27,7 @@ from flwr.common.constant import SubStatus
 from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
+    GetConnectorRequest,
     GetNodesRequest,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
@@ -39,6 +40,7 @@ from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.proto.control_pb2 import StartAutomationRequest  # pylint:disable=E0611
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint:disable=E0611
 from flwr.proto.message_pb2 import (  # pylint:disable=E0611
     PullObjectRequest,
@@ -393,17 +395,41 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.assertTrue(response.object_available)
         self.assertEqual(response.object_content, b"content")
 
-    def test_get_nodes_unimplemented(self) -> None:
-        """GetNodes should be unavailable on ClientAppIo."""
+    @parameterized.expand(  # type: ignore
+        [
+            (
+                "start_automation",
+                "StartAutomation",
+                StartAutomationRequest(),
+                "Only AgentApp and ServerApp tasks can create automations.",
+            ),
+            (
+                "get_connector",
+                "GetConnector",
+                GetConnectorRequest(),
+                "Connector credentials are not available to this task.",
+            ),
+            (
+                "get_nodes",
+                "GetNodes",
+                GetNodesRequest(),
+                "This endpoint is only available to ServerApp tasks.",
+            ),
+        ]
+    )
+    def test_server_side_endpoint_permission_denied(
+        self, _case_name: str, method_name: str, request: object, detail: str
+    ) -> None:
+        """Server-side endpoints should be unavailable to ClientApp tasks."""
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
 
         with self.assertRaises(grpc.RpcError):
-            self.servicer.GetNodes(GetNodesRequest(), context)
+            getattr(self.servicer, method_name)(request, context)
 
         context.abort.assert_called_once_with(
-            grpc.StatusCode.UNIMPLEMENTED,
-            "GetNodes is not available on ClientAppIo.",
+            grpc.StatusCode.PERMISSION_DENIED,
+            detail,
         )
 
     @parameterized.expand([(True,), (False,)])  # type: ignore

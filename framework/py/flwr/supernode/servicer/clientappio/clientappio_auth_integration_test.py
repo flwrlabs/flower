@@ -151,13 +151,16 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         assert isinstance(response, PullPendingTasksResponse)
         assert call.code() == grpc.StatusCode.OK
 
-    def test_get_nodes_allows_auth_then_returns_unimplemented(self) -> None:
-        """GetNodes should authenticate, then report that it is unavailable."""
+    def test_get_nodes_allows_auth_then_returns_permission_denied(self) -> None:
+        """GetNodes should authenticate, then reject ClientApp tasks."""
         with self.assertRaises(grpc.RpcError) as err:
             self._get_nodes.with_call(request=GetNodesRequest())
 
-        assert err.exception.code() == grpc.StatusCode.UNIMPLEMENTED
-        assert err.exception.details() == "GetNodes is not available on ClientAppIo."
+        assert err.exception.code() == grpc.StatusCode.PERMISSION_DENIED
+        assert (
+            err.exception.details()
+            == "This endpoint is only available to ServerApp tasks."
+        )
 
 
 class TestClientAppIoAuthIntegrationWithoutSuperExecSecret(unittest.TestCase):
