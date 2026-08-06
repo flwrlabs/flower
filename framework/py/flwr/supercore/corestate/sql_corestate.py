@@ -1200,21 +1200,35 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
         """Record usage for the specified task."""
-        with self.session():
-            self.query(
-                """
-                INSERT INTO task_usage (
-                    run_id, task_id, input_tokens, output_tokens, total_tokens,
-                    usage_type, provider, created_at, reported_at
-                )
-                SELECT
-                    run_id, task_id, :input_tokens, :output_tokens,
-                    :total_tokens, :usage_type, :provider, :created_at, :reported_at
-                FROM task
-                WHERE task_id = :task_id
-                """,
-                _task_usage_to_row(task_id, usage),
-            )
+        stored_task_id = uint64_to_int64(task_id)
+        usage_values = select(
+            TaskModel.run_id,
+            TaskModel.task_id,
+            literal(usage.input_tokens, type_=TaskUsageModel.input_tokens.type),
+            literal(usage.output_tokens, type_=TaskUsageModel.output_tokens.type),
+            literal(usage.total_tokens, type_=TaskUsageModel.total_tokens.type),
+            literal(usage.usage_type, type_=TaskUsageModel.usage_type.type),
+            literal(usage.provider, type_=TaskUsageModel.provider.type),
+            literal(now(), type_=TaskUsageModel.created_at.type),
+            literal(None, type_=TaskUsageModel.reported_at.type),
+        ).where(TaskModel.task_id == stored_task_id)
+        stmt = insert(TaskUsageModel).from_select(
+            [
+                TaskUsageModel.run_id,
+                TaskUsageModel.task_id,
+                TaskUsageModel.input_tokens,
+                TaskUsageModel.output_tokens,
+                TaskUsageModel.total_tokens,
+                TaskUsageModel.usage_type,
+                TaskUsageModel.provider,
+                TaskUsageModel.created_at,
+                TaskUsageModel.reported_at,
+            ],
+            usage_values,
+        )
+
+        with self.session() as session:
+            session.execute(stmt)
 
     def get_task_usage(
         self,
@@ -1434,25 +1448,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return False
 
         current = now()
-        params = [
-            {
-                "timestamp": current,
-                "run_id": uint64_to_int64(event.run_id),
-                "task_id": uint64_to_int64(event.task_id),
-                "event": event.event,
-                "data": event.data,
-            }
+        event_models = [
+            TaskEventModel(
+                timestamp=current,
+                run_id=uint64_to_int64(event.run_id),
+                task_id=uint64_to_int64(event.task_id),
+                event=event.event,
+                data=event.data,
+            )
             for event in events
         ]
 
-        with self.session():
-            self.query(
-                """
-                INSERT INTO task_event (timestamp, run_id, task_id, event, data)
-                VALUES (:timestamp, :run_id, :task_id, :event, :data)
-                """,
-                params,
-            )
+        with self.session() as session:
+            session.add_all(event_models)
 
         return True
 
@@ -1757,20 +1765,6 @@ def _run_series_from_model(model: RunSeriesModel) -> RunSeries:
         created_at=timestamp_to_iso(model.created_at),
         updated_at=timestamp_to_iso(model.updated_at),
     )
-
-
-def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:
-    """Convert a TaskUsage proto to database row values."""
-    return {
-        "task_id": uint64_to_int64(task_id),
-        "input_tokens": usage.input_tokens,
-        "output_tokens": usage.output_tokens,
-        "total_tokens": usage.total_tokens,
-        "usage_type": usage.usage_type,
-        "provider": usage.provider,
-        "created_at": now(),
-        "reported_at": None,
-    }
 
 
 def _task_usage_from_model(model: TaskUsageModel) -> TaskUsage:
