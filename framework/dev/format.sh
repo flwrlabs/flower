@@ -5,6 +5,7 @@ cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../
 taplo fmt
 
 # Python
+python -m dev.generate_connector
 python -m devtool.check_copyright py/flwr
 python -m devtool.init_py_fix py/flwr
 python -m isort --skip py/flwr/proto py

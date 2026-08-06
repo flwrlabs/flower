@@ -16,6 +16,12 @@
 
 
 from .registry import CONNECTORS
+from .providers.loader import validate_provider_packages
+
+
+def test_provider_packages_satisfy_contract() -> None:
+    """Every generated provider should have valid actions and executors."""
+    validate_provider_packages()
 
 
 def test_connector_references_are_unique() -> None:

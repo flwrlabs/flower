@@ -21,13 +21,15 @@ from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
 from . import automation, browser_use, web_fetch, web_search
-from .definition import ConnectorDefinition, ConnectorHandler
+from .http import ConnectorHttpClient
 from .oauth import OAuthConnectorProvider
+from .providers.loader import load_connectors
+from .runtime import ConnectorContext, ConnectorDefinition, ConnectorExecutor
 
 ConnectorToolFactory = Callable[[], JSONObject]
 
 
-CONNECTORS: tuple[ConnectorDefinition, ...] = ()
+CONNECTORS: tuple[ConnectorDefinition, ...] = load_connectors()
 _CONNECTORS_BY_REF = {connector.ref: connector for connector in CONNECTORS}
 
 OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthConnectorProvider, ...] = tuple(
@@ -35,18 +37,21 @@ OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthConnectorProvider, ...] = tuple(
     for connector in CONNECTORS
     if connector.oauth_provider is not None
 )
-_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
+_CONNECTOR_HANDLERS: dict[str, Callable[..., JSONValue]] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
 }
-_CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
+_CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorExecutor] = {
     name: handler
     for connector in CONNECTORS
     for name, handler in connector.handlers.items()
 }
 _CREDENTIAL_CONNECTOR_REFS: dict[str, str] = {
     name: connector.ref for connector in CONNECTORS for name in connector.handlers
+}
+_CREDENTIAL_CONNECTORS = {
+    name: connector for connector in CONNECTORS for name in connector.handlers
 }
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     automation.START_AUTOMATION_TOOL_NAME: automation.make_start_automation_tool,
@@ -73,11 +78,23 @@ def invoke_connector(
         raise ValueError(f"Unsupported connector '{name}'.")
     if credentials is None or config is None:
         raise RuntimeError("Connector credentials are required.")
+    connector = _CREDENTIAL_CONNECTORS.get(name)
+    http = None
+    if connector is not None and connector.provider.api_base_url is not None:
+        http = ConnectorHttpClient(
+            provider=connector.provider.display_name,
+            base_url=connector.provider.api_base_url,
+            credentials=credentials,
+            headers=connector.provider.api_headers,
+        )
     return handler(
-        **arguments,
-        credentials=credentials,
-        config=config,
-        usage_recorder=usage_recorder,
+        arguments,
+        ConnectorContext(
+            credentials=credentials,
+            config=config,
+            usage_recorder=usage_recorder,
+            http=http,
+        ),
     )
 
 

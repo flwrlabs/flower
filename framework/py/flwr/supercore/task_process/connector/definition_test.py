@@ -12,27 +12,73 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for connector definitions."""
-
+"""Tests for declarative connector definitions."""
 
 import pytest
 
-from flwr.supercore.typing import JSONObject
+from .definition import (
+    ActionAccess,
+    ActionDefinition,
+    OAuth2Definition,
+    ProviderDefinition,
+)
+from .runtime import ConnectorDefinition
 
-from .definition import ConnectorDefinition
-from .tool_schema import function_tool
 
-
-def _handler() -> JSONObject:
-    return {}
-
-
-def test_connector_definition_rejects_handler_drift() -> None:
-    """Every tool should have exactly one matching handler."""
-    tool = function_tool("example_read", "Read an example.", properties={})
-    ConnectorDefinition(
-        ref="example", tools=(tool,), handlers={"example_read": _handler}
+def _action(*, scopes: tuple[str, ...] = ()) -> ActionDefinition:
+    return ActionDefinition(
+        name="read",
+        description="Read an example.",
+        access=ActionAccess.READ,
+        input_schema={"type": "object", "properties": {}},
+        required_scopes=scopes,
     )
 
-    with pytest.raises(ValueError, match="schemas and handlers do not match"):
-        ConnectorDefinition(ref="example", tools=(tool,), handlers={})
+
+def _provider(*, scopes: tuple[str, ...] = ()) -> ProviderDefinition:
+    return ProviderDefinition(
+        ref="example",
+        display_name="Example",
+        description="Example provider.",
+        actions=(_action(scopes=scopes),),
+        oauth=OAuth2Definition(
+            authorization_url="https://example.com/authorize",
+            token_url="https://example.com/token",
+            client_id_env="EXAMPLE_CLIENT_ID",
+            client_secret_env="EXAMPLE_CLIENT_SECRET",
+            redirect_uri_env="EXAMPLE_REDIRECT_URI",
+            scopes=scopes,
+        ),
+    )
+
+
+def test_provider_definition_builds_tools() -> None:
+    """Provider actions should generate globally unique function tools."""
+    connector = ConnectorDefinition(
+        provider=_provider(scopes=("read:items",)),
+        executors={"read": lambda arguments, context: {}},
+    )
+
+    assert connector.tools == (
+        {
+            "type": "function",
+            "name": "example_read",
+            "description": "Read an example.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    )
+    assert connector.provider.actions[0].access is ActionAccess.READ
+
+
+def test_definitions_reject_drift() -> None:
+    """Definitions should reject undeclared scopes and missing executors."""
+    with pytest.raises(ValueError, match="undeclared OAuth scopes"):
+        _provider(scopes=("read:items",)).__class__(
+            ref="example",
+            display_name="Example",
+            description="Example provider.",
+            actions=(_action(scopes=("write:items",)),),
+            oauth=_provider(scopes=("read:items",)).oauth,
+        )
+    with pytest.raises(ValueError, match="actions and executors do not match"):
+        ConnectorDefinition(provider=_provider(), executors={})

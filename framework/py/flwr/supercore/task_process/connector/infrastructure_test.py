@@ -23,8 +23,19 @@ import requests
 
 from flwr.supercore.typing import JSONObject
 
-from .http import ConnectorApiError, request_json_object
-from .oauth import BaseOAuthProvider, load_oauth_provider
+from .definition import (
+    ActionAccess,
+    ActionDefinition,
+    OAuth2Definition,
+    ProviderDefinition,
+)
+from .http import ConnectorApiError, ConnectorHttpClient, request_json_object
+from .oauth import (
+    BaseOAuthProvider,
+    DeclarativeOAuthProvider,
+    load_declarative_oauth_provider,
+    load_oauth_provider,
+)
 
 
 class ExampleApiError(ConnectorApiError):
@@ -47,6 +58,29 @@ def test_json_request_failure_is_secret_safe() -> None:
 
     assert exc_info.value.code == "request_failed"
     assert "secret" not in str(exc_info.value)
+
+
+def test_connector_http_client_adds_credentials() -> None:
+    """Provider executors should receive a configured HTTP client."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"items": []}
+    client = ConnectorHttpClient(
+        provider="Example",
+        base_url="https://api.example.com/v1",
+        credentials={"access_token": "secret"},
+        headers={"X-Api-Version": "1"},
+    )
+    with patch(
+        "flwr.supercore.task_process.connector.http.requests.request",
+        return_value=response,
+    ) as request:
+        assert client.request("GET", "/items") == {"items": []}
+
+    assert request.call_args.args == ("GET", "https://api.example.com/v1/items")
+    assert request.call_args.kwargs["headers"] == {
+        "Authorization": "Bearer secret",
+        "X-Api-Version": "1",
+    }
 
 
 class ExampleOAuthProvider(BaseOAuthProvider):
@@ -115,3 +149,60 @@ def test_oauth_flow_and_environment(monkeypatch: pytest.MonkeyPatch) -> None:
             client_secret_env="EXAMPLE_CLIENT_SECRET",
             redirect_uri_env="EXAMPLE_REDIRECT_URI",
         )
+
+
+def test_declarative_oauth_flow(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Standard providers should configure OAuth without a custom subclass."""
+    provider = ProviderDefinition(
+        ref="example",
+        display_name="Example",
+        description="Example provider.",
+        actions=(
+            ActionDefinition(
+                name="read",
+                description="Read an example.",
+                access=ActionAccess.READ,
+                input_schema={"type": "object", "properties": {}},
+                required_scopes=("items:read",),
+            ),
+        ),
+        oauth=OAuth2Definition(
+            authorization_url="https://example.com/authorize",
+            token_url="https://example.com/token",
+            client_id_env="EXAMPLE_CLIENT_ID",
+            client_secret_env="EXAMPLE_CLIENT_SECRET",
+            redirect_uri_env="EXAMPLE_REDIRECT_URI",
+            scopes=("items:read",),
+            token_auth_method="client_secret_post",
+            config_fields=("account_id",),
+        ),
+    )
+    monkeypatch.setenv("EXAMPLE_CLIENT_ID", "client")
+    monkeypatch.setenv("EXAMPLE_CLIENT_SECRET", "secret")
+    monkeypatch.setenv("EXAMPLE_REDIRECT_URI", "https://example.com/callback")
+    oauth = load_declarative_oauth_provider(provider)
+    assert isinstance(oauth, DeclarativeOAuthProvider)
+    assert "scope=items%3Aread" in oauth.build_authorization_url(
+        redirect_uri="https://example.com/callback",
+        state="state",
+        pkce_challenge=None,
+    )
+    response = Mock(status_code=200)
+    response.json.return_value = {
+        "access_token": "access",
+        "refresh_token": "refresh",
+        "account_id": "account",
+    }
+    with patch(
+        "flwr.supercore.task_process.connector.oauth.requests.post",
+        return_value=response,
+    ) as post:
+        credentials, config = oauth.exchange_code(
+            code="code",
+            redirect_uri="https://example.com/callback",
+            pkce_verifier=None,
+        )
+
+    assert post.call_args.kwargs["data"]["client_id"] == "client"
+    assert credentials == {"access_token": "access", "refresh_token": "refresh"}
+    assert config == {"account_id": "account"}

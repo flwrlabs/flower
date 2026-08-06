@@ -97,12 +97,11 @@ class TestHandleTask(unittest.TestCase):
         handle_task(stub=self.stub, task_id=22, run_id=7)
 
         self.stub.GetConnector.assert_called_once_with(GetConnectorRequest())
-        self.provider.assert_called_once_with(
-            query="release notes",
-            credentials={"token": "secret"},
-            config={"workspace": "primary"},
-            usage_recorder=ANY,
-        )
+        self.provider.assert_called_once_with({"query": "release notes"}, ANY)
+        context = self.provider.call_args.args[1]
+        assert context.credentials == {"token": "secret"}
+        assert context.config == {"workspace": "primary"}
+        assert context.usage_recorder is not None
         assert _pushed_response(self.stub).payload == {
             "name": tool_name,
             "call_id": "call-1",

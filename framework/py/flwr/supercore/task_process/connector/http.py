@@ -29,13 +29,67 @@ HttpErrorCode = Callable[[requests.Response], str]
 class ConnectorApiError(RuntimeError):
     """Base class for secret-safe connector API failures."""
 
-    provider: str
+    provider = "Connector"
 
-    def __init__(self, code: str, status_code: int | None = None) -> None:
+    def __init__(
+        self,
+        code: str,
+        status_code: int | None = None,
+        *,
+        provider: str | None = None,
+    ) -> None:
         self.code = code
         self.status_code = status_code
         detail = code if status_code is None else f"{code} ({status_code})"
-        super().__init__(f"{self.provider} API request failed: {detail}.")
+        super().__init__(f"{provider or self.provider} API request failed: {detail}.")
+
+
+class ConnectorHttpClient:
+    """Make authenticated, secret-safe requests to one provider API."""
+
+    def __init__(
+        self,
+        *,
+        provider: str,
+        base_url: str,
+        credentials: JSONObject,
+        headers: Mapping[str, str] | None = None,
+    ) -> None:
+        if not base_url.startswith("https://"):
+            raise ValueError("Connector API base URL must use HTTPS.")
+        token = credentials.get("access_token")
+        if not isinstance(token, str) or not token:
+            raise ConnectorApiError("invalid_credentials", provider=provider)
+        self._provider = provider
+        self._base_url = base_url.rstrip("/")
+        self._headers = {
+            "Authorization": f"Bearer {token}",
+            **dict(headers or {}),
+        }
+
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Mapping[str, str] | None = None,
+        json: JSONObject | None = None,
+    ) -> JSONObject:
+        """Request one provider-relative JSON object endpoint."""
+        if not path.startswith("/") or path.startswith("//"):
+            raise ValueError("Connector API path must be provider-relative.")
+        return request_json_object(
+            method,
+            f"{self._base_url}{path}",
+            error=self._error,
+            headers=self._headers,
+            params=params,
+            json=json,
+        )
+
+    def _error(self, code: str, status_code: int | None) -> ConnectorApiError:
+        """Build a provider-labelled, secret-safe error."""
+        return ConnectorApiError(code, status_code, provider=self._provider)
 
 
 # pylint: disable-next=too-many-arguments
