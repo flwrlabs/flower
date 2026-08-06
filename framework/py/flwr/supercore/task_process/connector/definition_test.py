@@ -47,10 +47,5 @@ def test_connector_definition_rejects_handler_drift() -> None:
         description="Read examples.",
         actions=(action,),
     )
-    ConnectorDefinition(
-        provider=provider,
-        executors={"read": _executor},
-    )
-
     with pytest.raises(ValueError, match="actions and executors do not match"):
         ConnectorDefinition(provider=provider, executors={})

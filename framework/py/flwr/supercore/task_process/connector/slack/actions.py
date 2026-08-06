@@ -99,5 +99,3 @@ ACTIONS = (
         },
     ),
 )
-
-SLACK_TOOL_NAMES = tuple(action.tool_name("slack") for action in ACTIONS)

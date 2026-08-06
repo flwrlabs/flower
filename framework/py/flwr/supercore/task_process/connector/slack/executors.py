@@ -46,11 +46,7 @@ def search_messages(
         context.credentials,
         {
             "query": require_string(arguments.get("query"), "Slack", "query"),
-            "count": str(
-                require_int_range(
-                    arguments.get("limit", 5), "Slack", "limit", maximum=15
-                )
-            ),
+            "count": _limit(arguments, default=5, maximum=15),
         },
     )
 
@@ -75,11 +71,7 @@ def list_conversations(
         "conversations.list",
         context.credentials,
         {
-            "limit": str(
-                require_int_range(
-                    arguments.get("limit", 10), "Slack", "limit", maximum=50
-                )
-            ),
+            "limit": _limit(arguments, default=10, maximum=50),
             "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
             "types": ",".join(dict.fromkeys(selected_types)),
             "exclude_archived": str(
@@ -157,8 +149,15 @@ def _conversation_params(arguments: JSONObject) -> dict[str, str | None]:
         "channel": require_string(
             arguments.get("conversation_id"), "Slack", "conversation_id"
         ),
-        "limit": str(
-            require_int_range(arguments.get("limit", 10), "Slack", "limit", maximum=15)
-        ),
+        "limit": _limit(arguments, default=10, maximum=15),
         "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
     }
+
+
+def _limit(arguments: JSONObject, *, default: int, maximum: int) -> str:
+    """Return one validated Slack page limit."""
+    return str(
+        require_int_range(
+            arguments.get("limit", default), "Slack", "limit", maximum=maximum
+        )
+    )

@@ -16,7 +16,6 @@
 
 
 from collections.abc import Callable, Mapping
-from copy import deepcopy
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -44,15 +43,6 @@ class ActionDefinition:
     access: ActionAccess
     input_schema: JSONObject
 
-    def __post_init__(self) -> None:
-        """Reject invalid action definitions."""
-        if not _is_identifier(self.name) or not self.description.strip():
-            raise ValueError("Connector action metadata is invalid.")
-        if not isinstance(self.access, ActionAccess):
-            raise ValueError(f"Action '{self.name}' has invalid access metadata.")
-        if self.input_schema.get("type") != "object":
-            raise ValueError(f"Action '{self.name}' input schema must be an object.")
-
     def tool_name(self, provider_ref: str) -> str:
         """Return the globally unique model-facing action name."""
         return f"{provider_ref}_{self.name}"
@@ -63,7 +53,7 @@ class ActionDefinition:
             "type": "function",
             "name": self.tool_name(provider_ref),
             "description": self.description,
-            "parameters": deepcopy(self.input_schema),
+            "parameters": self.input_schema,
         }
 
 
@@ -75,18 +65,6 @@ class ProviderDefinition:
     display_name: str
     description: str
     actions: tuple[ActionDefinition, ...]
-
-    def __post_init__(self) -> None:
-        """Reject incomplete provider definitions."""
-        if (
-            not _is_identifier(self.ref)
-            or not self.display_name.strip()
-            or not self.description.strip()
-        ):
-            raise ValueError("Connector provider metadata must not be empty.")
-        names = [action.name for action in self.actions]
-        if not names or len(names) != len(set(names)):
-            raise ValueError(f"Provider '{self.ref}' has invalid action names.")
 
 
 @dataclass(frozen=True)
@@ -116,14 +94,6 @@ class ConnectorDefinition:
             raise ValueError(
                 f"Provider '{self.ref}' actions and executors do not match."
             )
-        if (
-            self.oauth_provider is not None
-            and self.oauth_provider.connector_ref != self.ref
-        ):
-            raise ValueError(
-                f"Connector '{self.ref}' has an OAuth provider for "
-                f"'{self.oauth_provider.connector_ref}'."
-            )
 
     @property
     def ref(self) -> str:
@@ -142,8 +112,3 @@ class ConnectorDefinition:
             action.tool_name(self.ref): self.executors[action.name]
             for action in self.provider.actions
         }
-
-
-def _is_identifier(value: str) -> bool:
-    """Return whether a value is a lowercase connector identifier."""
-    return bool(value) and value.isidentifier() and value.lower() == value
