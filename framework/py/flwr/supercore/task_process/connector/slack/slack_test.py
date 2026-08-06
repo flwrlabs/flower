@@ -19,18 +19,30 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from . import registry
-from .slack import SLACK_CONNECTOR_REF, SLACK_TOOL_NAMES, SLACK_TOOLS, SlackApiError
-from .slack_oauth import SLACK_USER_SCOPES, SlackOAuthError, SlackOAuthProvider
+from .. import registry
+from ..definition import ActionAccess
+from .actions import ACTIONS, SLACK_TOOL_NAMES
+from .definition import (
+    SLACK_CONNECTOR_REF,
+    SLACK_USER_SCOPES,
+    SlackOAuthError,
+    SlackOAuthProvider,
+)
+from .executors import SlackApiError
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
-_OAUTH_REQUEST = "flwr.supercore.task_process.connector.slack_oauth.requests.post"
+_OAUTH_REQUEST = "flwr.supercore.task_process.connector.slack.definition.requests.post"
 
 
 def test_slack_definition_is_registered() -> None:
     """Slack schemas and handlers should form one account-scoped connector."""
-    assert [tool["name"] for tool in SLACK_TOOLS] == list(SLACK_TOOL_NAMES)
-    assert registry.get_connector_tools(SLACK_CONNECTOR_REF) == list(SLACK_TOOLS)
+    assert [action.tool_name(SLACK_CONNECTOR_REF) for action in ACTIONS] == list(
+        SLACK_TOOL_NAMES
+    )
+    assert all(action.access is ActionAccess.READ for action in ACTIONS)
+    assert registry.get_connector_tools(SLACK_CONNECTOR_REF) == [
+        action.tool(SLACK_CONNECTOR_REF) for action in ACTIONS
+    ]
     assert all(
         registry.requires_connector_credentials(name) for name in SLACK_TOOL_NAMES
     )

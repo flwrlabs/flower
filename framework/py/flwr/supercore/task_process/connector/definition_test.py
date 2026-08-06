@@ -19,20 +19,38 @@ import pytest
 
 from flwr.supercore.typing import JSONObject
 
-from .definition import ConnectorDefinition
-from .tool_schema import function_tool
+from .definition import (
+    ActionAccess,
+    ActionDefinition,
+    ConnectorDefinition,
+    ConnectorExecutionContext,
+    ProviderDefinition,
+)
 
 
-def _handler() -> JSONObject:
+def _executor(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObject:
+    del arguments, context
     return {}
 
 
 def test_connector_definition_rejects_handler_drift() -> None:
     """Every tool should have exactly one matching handler."""
-    tool = function_tool("example_read", "Read an example.", properties={})
+    action = ActionDefinition(
+        name="read",
+        description="Read an example.",
+        access=ActionAccess.READ,
+        input_schema={"type": "object", "properties": {}},
+    )
+    provider = ProviderDefinition(
+        ref="example",
+        display_name="Example",
+        description="Read examples.",
+        actions=(action,),
+    )
     ConnectorDefinition(
-        ref="example", tools=(tool,), handlers={"example_read": _handler}
+        provider=provider,
+        executors={"read": _executor},
     )
 
-    with pytest.raises(ValueError, match="schemas and handlers do not match"):
-        ConnectorDefinition(ref="example", tools=(tool,), handlers={})
+    with pytest.raises(ValueError, match="actions and executors do not match"):
+        ConnectorDefinition(provider=provider, executors={})

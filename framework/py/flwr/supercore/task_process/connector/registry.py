@@ -20,21 +20,19 @@ from copy import deepcopy
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from . import automation, browser_use, slack, slack_oauth, web_fetch, web_search
-from .definition import ConnectorDefinition, ConnectorHandler
+from . import automation, browser_use, slack, web_fetch, web_search
+from .definition import (
+    ConnectorDefinition,
+    ConnectorExecutionContext,
+    ConnectorExecutor,
+    ConnectorHandler,
+)
 from .oauth import OAuthConnectorProvider
 
 ConnectorToolFactory = Callable[[], JSONObject]
 
 
-CONNECTORS: tuple[ConnectorDefinition, ...] = (
-    ConnectorDefinition(
-        ref=slack.SLACK_CONNECTOR_REF,
-        tools=slack.SLACK_TOOLS,
-        handlers=slack.SLACK_TOOL_HANDLERS,
-        oauth_provider=slack_oauth.get_configured_oauth_provider(),
-    ),
-)
+CONNECTORS: tuple[ConnectorDefinition, ...] = (slack.CONNECTOR,)
 _CONNECTORS_BY_REF = {connector.ref: connector for connector in CONNECTORS}
 
 OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthConnectorProvider, ...] = tuple(
@@ -47,7 +45,7 @@ _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
 }
-_CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
+_CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorExecutor] = {
     name: handler
     for connector in CONNECTORS
     for name, handler in connector.handlers.items()
@@ -81,10 +79,12 @@ def invoke_connector(
     if credentials is None or config is None:
         raise RuntimeError("Connector credentials are required.")
     return handler(
-        **arguments,
-        credentials=credentials,
-        config=config,
-        usage_recorder=usage_recorder,
+        arguments,
+        ConnectorExecutionContext(
+            credentials=credentials,
+            config=config,
+            usage_recorder=usage_recorder,
+        ),
     )
 
 

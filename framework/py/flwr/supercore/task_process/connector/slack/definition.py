@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Slack OAuth provider."""
+"""Slack provider definition and OAuth provider."""
 
 import os
 from collections.abc import Mapping
@@ -21,14 +21,18 @@ import requests
 
 from flwr.supercore.typing import JSONObject
 
-from .json_utils import object_field, required_string_field, string_field
-from .oauth import BaseOAuthProvider, load_oauth_provider
-from .slack import SLACK_CONNECTOR_REF
+from ..definition import ConnectorDefinition, ProviderDefinition
+from ..json_utils import object_field, required_string_field, string_field
+from ..oauth import BaseOAuthProvider, load_oauth_provider
+from .actions import ACTIONS
+from .executors import EXECUTORS
 
+SLACK_CONNECTOR_REF = "slack"
 SLACK_CLIENT_ID_ENV = "FLWR_SLACK_CLIENT_ID"
 SLACK_CLIENT_SECRET_ENV = "FLWR_SLACK_CLIENT_SECRET"
 SLACK_REDIRECT_URI_ENV = "FLWR_SLACK_REDIRECT_URI"
 
+_SLACK_AUTHORIZE_URL = "https://slack.com/oauth/v2/authorize"
 _SLACK_TOKEN_URL = "https://slack.com/api/oauth.v2.access"
 
 # `search.messages` requires the legacy user-token `search:read` scope. The
@@ -56,7 +60,7 @@ class SlackOAuthProvider(BaseOAuthProvider):
     connector_ref = SLACK_CONNECTOR_REF
     display_name = "Slack"
     description = "Search and read messages, conversations, and threads."
-    authorize_url = "https://slack.com/oauth/v2/authorize"
+    authorize_url = _SLACK_AUTHORIZE_URL
     error_type = SlackOAuthError
 
     def authorization_parameters(
@@ -147,3 +151,17 @@ def _parse_scopes(value: object) -> list[str]:
     if not isinstance(value, str):
         return []
     return [scope.strip() for scope in value.split(",") if scope.strip()]
+
+
+PROVIDER = ProviderDefinition(
+    ref=SLACK_CONNECTOR_REF,
+    display_name="Slack",
+    description="Search and read messages, conversations, and threads.",
+    actions=ACTIONS,
+)
+
+CONNECTOR = ConnectorDefinition(
+    provider=PROVIDER,
+    executors=EXECUTORS,
+    oauth_provider=get_configured_oauth_provider(),
+)

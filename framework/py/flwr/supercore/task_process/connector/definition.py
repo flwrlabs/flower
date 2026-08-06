@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Definition of one account-scoped connector."""
+"""Definitions for account-scoped connectors."""
 
 
 from collections.abc import Callable, Mapping
+from copy import deepcopy
 from dataclasses import dataclass
+from enum import StrEnum
 
+from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
 from .oauth import OAuthConnectorProvider
@@ -25,27 +28,93 @@ from .oauth import OAuthConnectorProvider
 ConnectorHandler = Callable[..., JSONValue]
 
 
+class ActionAccess(StrEnum):
+    """Classify whether a connector action reads or writes provider data."""
+
+    READ = "read"
+    WRITE = "write"
+
+
 @dataclass(frozen=True)
-class ConnectorDefinition:
-    """Describe all runtime components of one account-scoped connector."""
+class ActionDefinition:
+    """Describe one provider action independently of its execution."""
+
+    name: str
+    description: str
+    access: ActionAccess
+    input_schema: JSONObject
+
+    def __post_init__(self) -> None:
+        """Reject invalid action definitions."""
+        if not _is_identifier(self.name) or not self.description.strip():
+            raise ValueError("Connector action metadata is invalid.")
+        if not isinstance(self.access, ActionAccess):
+            raise ValueError(f"Action '{self.name}' has invalid access metadata.")
+        if self.input_schema.get("type") != "object":
+            raise ValueError(f"Action '{self.name}' input schema must be an object.")
+
+    def tool_name(self, provider_ref: str) -> str:
+        """Return the globally unique model-facing action name."""
+        return f"{provider_ref}_{self.name}"
+
+    def tool(self, provider_ref: str) -> JSONObject:
+        """Return the model-facing function tool for this action."""
+        return {
+            "type": "function",
+            "name": self.tool_name(provider_ref),
+            "description": self.description,
+            "parameters": deepcopy(self.input_schema),
+        }
+
+
+@dataclass(frozen=True)
+class ProviderDefinition:
+    """Describe one account-scoped connector provider."""
 
     ref: str
-    tools: tuple[JSONObject, ...]
-    handlers: Mapping[str, ConnectorHandler]
+    display_name: str
+    description: str
+    actions: tuple[ActionDefinition, ...]
+
+    def __post_init__(self) -> None:
+        """Reject incomplete provider definitions."""
+        if (
+            not _is_identifier(self.ref)
+            or not self.display_name.strip()
+            or not self.description.strip()
+        ):
+            raise ValueError("Connector provider metadata must not be empty.")
+        names = [action.name for action in self.actions]
+        if not names or len(names) != len(set(names)):
+            raise ValueError(f"Provider '{self.ref}' has invalid action names.")
+
+
+@dataclass(frozen=True)
+class ConnectorExecutionContext:
+    """Infrastructure supplied to one connector action execution."""
+
+    credentials: JSONObject
+    config: JSONObject
+    usage_recorder: TaskUsageRecorder
+
+
+ConnectorExecutor = Callable[[JSONObject, ConnectorExecutionContext], JSONValue]
+
+
+@dataclass(frozen=True)
+class ConnectorDefinition:
+    """Combine one provider definition with its action executors."""
+
+    provider: ProviderDefinition
+    executors: Mapping[str, ConnectorExecutor]
     oauth_provider: OAuthConnectorProvider | None = None
 
     def __post_init__(self) -> None:
         """Reject incomplete definitions when the connector is imported."""
-        if not self.ref:
-            raise ValueError("Connector reference must not be empty.")
-        tool_names = [tool.get("name") for tool in self.tools]
-        if not all(isinstance(name, str) and name for name in tool_names):
-            raise ValueError(f"Connector '{self.ref}' has an invalid tool name.")
-        if len(tool_names) != len(set(tool_names)):
-            raise ValueError(f"Connector '{self.ref}' has duplicate tool names.")
-        if set(tool_names) != set(self.handlers):
+        action_names = {action.name for action in self.provider.actions}
+        if action_names != set(self.executors):
             raise ValueError(
-                f"Connector '{self.ref}' tool schemas and handlers do not match."
+                f"Provider '{self.ref}' actions and executors do not match."
             )
         if (
             self.oauth_provider is not None
@@ -55,3 +124,26 @@ class ConnectorDefinition:
                 f"Connector '{self.ref}' has an OAuth provider for "
                 f"'{self.oauth_provider.connector_ref}'."
             )
+
+    @property
+    def ref(self) -> str:
+        """Return the provider reference."""
+        return self.provider.ref
+
+    @property
+    def tools(self) -> tuple[JSONObject, ...]:
+        """Return model-facing tools for this connector."""
+        return tuple(action.tool(self.ref) for action in self.provider.actions)
+
+    @property
+    def handlers(self) -> Mapping[str, ConnectorExecutor]:
+        """Return executors keyed by globally unique tool name."""
+        return {
+            action.tool_name(self.ref): self.executors[action.name]
+            for action in self.provider.actions
+        }
+
+
+def _is_identifier(value: str) -> bool:
+    """Return whether a value is a lowercase connector identifier."""
+    return bool(value) and value.isidentifier() and value.lower() == value
