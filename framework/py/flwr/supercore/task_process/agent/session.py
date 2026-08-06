@@ -80,7 +80,7 @@ class RuntimeAgentSession(AgentSession):
 
 
 class RuntimeAgentConnectors(AgentConnectors):
-    """AgentConnectors implementation for built-in model tools."""
+    """AgentConnectors implementation for model tools."""
 
     def __init__(self, responses: RuntimeAgentResponses) -> None:
         self._responses = responses

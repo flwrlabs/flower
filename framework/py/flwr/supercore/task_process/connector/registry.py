@@ -15,49 +15,45 @@
 """Connector registry."""
 
 from collections.abc import Callable
+from copy import deepcopy
 
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from . import (
-    automation,
-    browser_use,
-    notion,
-    notion_oauth,
-    slack,
-    slack_oauth,
-    web_fetch,
-    web_search,
-)
+from . import automation, browser_use, notion, notion_oauth, web_fetch, web_search
+from .definition import ConnectorDefinition, ConnectorHandler
 from .oauth import OAuthConnectorProvider
 
-ConnectorHandler = Callable[..., JSONValue]
 ConnectorToolFactory = Callable[[], JSONObject]
 
 
-OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthConnectorProvider, ...] = (
-    *slack_oauth.get_configured_connector_oauth_providers(),
-    *notion_oauth.get_configured_connector_oauth_providers(),
+CONNECTORS: tuple[ConnectorDefinition, ...] = (
+    ConnectorDefinition(
+        ref=notion.NOTION_CONNECTOR_REF,
+        tools=notion.NOTION_TOOLS,
+        handlers=notion.NOTION_TOOL_HANDLERS,
+        oauth_provider=notion_oauth.get_configured_oauth_provider(),
+    ),
+)
+_CONNECTORS_BY_REF = {connector.ref: connector for connector in CONNECTORS}
+
+OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthConnectorProvider, ...] = tuple(
+    connector.oauth_provider
+    for connector in CONNECTORS
+    if connector.oauth_provider is not None
 )
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
 }
-# Concrete OAuth connector implementations populate these static registries.
-# A provider can expose multiple tool names under one connector ref (for example,
-# ``slack_search_messages`` maps to ``slack``).
 _CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
-    **slack.SLACK_TOOL_HANDLERS,
-    **notion.NOTION_TOOL_HANDLERS,
+    name: handler
+    for connector in CONNECTORS
+    for name, handler in connector.handlers.items()
 }
 _CREDENTIAL_CONNECTOR_REFS: dict[str, str] = {
-    **dict.fromkeys(slack.SLACK_TOOL_NAMES, slack.SLACK_CONNECTOR_REF),
-    **dict.fromkeys(notion.NOTION_TOOL_NAMES, notion.NOTION_CONNECTOR_REF),
-}
-_CREDENTIAL_CONNECTOR_TOOL_FACTORIES: dict[str, Callable[[], list[JSONObject]]] = {
-    slack.SLACK_CONNECTOR_REF: slack.make_slack_tools,
-    notion.NOTION_CONNECTOR_REF: notion.make_notion_tools,
+    name: connector.ref for connector in CONNECTORS for name in connector.handlers
 }
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     automation.START_AUTOMATION_TOOL_NAME: automation.make_start_automation_tool,
@@ -107,10 +103,10 @@ def get_connector_tools(connector_ref: str) -> list[JSONObject]:
     make_builtin_tool = _BUILTIN_CONNECTOR_TOOL_FACTORIES.get(connector_ref)
     if make_builtin_tool is not None:
         return [make_builtin_tool()]
-    make_tools = _CREDENTIAL_CONNECTOR_TOOL_FACTORIES.get(connector_ref)
-    if make_tools is None:
+    connector = _CONNECTORS_BY_REF.get(connector_ref)
+    if connector is None:
         raise ValueError(f"Unsupported connector '{connector_ref}'.")
-    return make_tools()
+    return list(deepcopy(connector.tools))
 
 
 def get_builtin_connector_tools() -> list[JSONObject]:

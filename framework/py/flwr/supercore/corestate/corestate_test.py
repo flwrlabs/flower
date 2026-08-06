@@ -126,6 +126,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertIsNone(
             state.get_connector(flwr_aid="account-a", connector_ref="calendar")
         )
+        self.assertFalse(
+            state.delete_connector(flwr_aid="account-a", connector_ref="calendar")
+        )
 
     def test_bind_and_get_run_connectors(self) -> None:
         """Run connector bindings should be deterministic and idempotent."""
@@ -195,7 +198,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             session,
         )
         self.assertIsNone(
+            state.create_connector_oauth_session(
+                oauth_session_id="session-1",
+                flwr_aid="account-a",
+                connector_ref="calendar",
+                state="oauth-state",
+                redirect_uri="https://example.test/callback",
+                pkce_verifier=None,
+                expires_at=expires_at,
+            )
+        )
+        self.assertIsNone(
             state.get_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-b"
+            )
+        )
+        self.assertFalse(
+            state.complete_connector_oauth_session(
                 oauth_session_id="session-1", flwr_aid="account-b"
             )
         )
@@ -212,6 +231,21 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(
             state.complete_connector_oauth_session(
                 oauth_session_id="session-1", flwr_aid="account-a"
+            )
+        )
+        expired = state.create_connector_oauth_session(
+            oauth_session_id="expired-session",
+            flwr_aid="account-a",
+            connector_ref="calendar",
+            state="oauth-state",
+            redirect_uri="https://example.test/callback",
+            pkce_verifier=None,
+            expires_at=now() - timedelta(minutes=10),
+        )
+        assert expired is not None
+        self.assertFalse(
+            state.complete_connector_oauth_session(
+                oauth_session_id="expired-session", flwr_aid="account-a"
             )
         )
 
@@ -1299,6 +1333,25 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(tasks[0].starting_at, "")
         self.assertEqual(tasks[0].finished_at, "")
+
+    def test_get_tasks_refreshes_cached_task_in_shared_session(self) -> None:
+        """Task reads should reflect raw-SQL status changes in a shared session."""
+        state = self.state_factory()
+        if not hasattr(state, "session"):
+            self.skipTest("SQL session test")
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert task_id is not None
+
+        with state.session():
+            tasks = state.get_tasks(task_ids=[task_id])
+            self.assertEqual(tasks[0].status.status, Status.PENDING)
+
+            assert state.claim_task(task_id) is not None
+            refreshed_tasks = state.get_tasks(task_ids=[task_id])
+
+        self.assertEqual(refreshed_tasks[0].status.status, Status.STARTING)
+        self.assertTrue(refreshed_tasks[0].starting_at)
 
     def test_expired_starting_task_token_does_not_call_expiry_hook(self) -> None:
         """Revived STARTING tasks should not be passed to expiry hooks."""

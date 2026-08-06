@@ -19,9 +19,10 @@ package flwr.proto;
 
 import "flwr/proto/heartbeat.proto";
 import "flwr/proto/log.proto";
-import "flwr/proto/run.proto";
 import "flwr/proto/message.proto";
+import "flwr/proto/run.proto";
 import "flwr/proto/appio.proto";
+import "flwr/proto/control.proto";
 
 service ClientAppIo {
 
@@ -70,6 +71,10 @@ service ClientAppIo {
   // Create a task
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
 
+  // Start an automation
+  rpc StartAutomation(StartAutomationRequest)
+      returns (StartAutomationResponse) {}
+
   // Push task message
   rpc PushTaskMessage(PushTaskMessageRequest)
       returns (PushTaskMessageResponse) {}
@@ -84,6 +89,9 @@ service ClientAppIo {
   // Record task usage
   rpc RecordTaskUsage(RecordTaskUsageRequest)
       returns (RecordTaskUsageResponse) {}
+
+  // Resolve credentials for the authenticated connector task
+  rpc GetConnector(GetConnectorRequest) returns (GetConnectorResponse) {}
 
   // Push task logs
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}

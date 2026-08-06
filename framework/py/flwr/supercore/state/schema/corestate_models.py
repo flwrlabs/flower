@@ -17,7 +17,6 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    TIMESTAMP,
     BigInteger,
     Float,
     ForeignKey,
@@ -30,6 +29,8 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from flwr.supercore.state.schema.types import UTCDateTime
 
 
 class FlwrBase(DeclarativeBase):
@@ -67,12 +68,8 @@ class RunSeries(FlwrBase):
     series_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
     federation_id: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
 class SeriesContext(FlwrBase):
@@ -117,20 +114,12 @@ class Automation(FlwrBase):
     series_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
     start_run_request: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False
-    )
-    next_run_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    next_run_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     fixed_interval: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     remaining_runs: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    stopped_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=True
-    )
+    stopped_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
 
 class Connector(FlwrBase):
@@ -157,15 +146,9 @@ class ConnectorOAuthSession(FlwrBase):
     state: Mapped[str] = mapped_column(String, nullable=False)
     redirect_uri: Mapped[str] = mapped_column(String, nullable=False)
     pkce_verifier: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False
-    )
-    expires_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False
-    )
-    completed_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=True
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
 
 class RunConnector(FlwrBase):
@@ -194,21 +177,11 @@ class Task(FlwrBase):
     model_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     connector_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     token: Mapped[str | None] = mapped_column(String, nullable=True)
-    active_until: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=True
-    )
-    pending_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False
-    )
-    starting_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=True
-    )
-    running_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=True
-    )
-    finished_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=True
-    )
+    active_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    pending_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    starting_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    running_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     sub_status: Mapped[str] = mapped_column(
         String, nullable=False, server_default=text("''")
     )
@@ -229,9 +202,7 @@ class TaskEvent(FlwrBase):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False
-    )
+    timestamp: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     task_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("task.task_id"), nullable=False
@@ -276,9 +247,7 @@ class ObjectPushSession(FlwrBase):
 
     session_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False
-    )
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     pending_count: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
@@ -341,9 +310,5 @@ class TaskUsage(FlwrBase):
     provider: Mapped[str] = mapped_column(
         String, server_default="unknown", nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False
-    )
-    reported_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=True
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    reported_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)

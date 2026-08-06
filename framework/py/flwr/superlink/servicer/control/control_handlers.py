@@ -443,7 +443,7 @@ def validate_run_connector_refs(
     return canonical_refs
 
 
-def start_run(  # pylint: disable=too-many-locals, too-many-statements
+def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
     state: LinkState,
@@ -455,15 +455,25 @@ def start_run(  # pylint: disable=too-many-locals, too-many-statements
     verification_dict: dict[str, str] = {}
     note: str | None = None
 
-    builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
-    if builtin_agent_fab is not None:
-        fab_file, verification_dict = builtin_agent_fab
-    elif request.app_spec:
-        fab_file, verification_dict, note = _get_remote_fab(
-            fleet_api_type, request.app_spec
-        )
+    if request.fab.hash_str and not request.fab.content:
+        stored_fab = state.get_fab(request.fab.hash_str)
+        if stored_fab is None:
+            raise FlowerError(
+                ApiErrorCode.FAB_DOWNLOAD_FAILURE,
+                f"FAB with hash {request.fab.hash_str} not found.",
+            )
+        fab_file = stored_fab.content
+        verification_dict = stored_fab.verifications
     else:
-        fab_file = request.fab.content
+        builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
+        if builtin_agent_fab is not None:
+            fab_file, verification_dict = builtin_agent_fab
+        elif request.app_spec:
+            fab_file, verification_dict, note = _get_remote_fab(
+                fleet_api_type, request.app_spec
+            )
+        else:
+            fab_file = request.fab.content
 
     if len(fab_file) > FAB_MAX_SIZE:
         log(

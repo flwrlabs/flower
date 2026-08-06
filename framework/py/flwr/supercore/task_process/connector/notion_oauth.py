@@ -15,178 +15,112 @@
 """Notion OAuth provider."""
 
 import os
-from urllib.parse import urlencode
+from collections.abc import Mapping
 
 import requests
 
 from flwr.supercore.typing import JSONObject
 
+from .json_utils import required_string_field, string_field
 from .notion import NOTION_API_VERSION, NOTION_CONNECTOR_REF
-from .oauth import OAuthConnectorProvider
+from .oauth import BaseOAuthProvider, load_oauth_provider
 
 NOTION_CLIENT_ID_ENV = "FLWR_NOTION_CLIENT_ID"
 NOTION_CLIENT_SECRET_ENV = "FLWR_NOTION_CLIENT_SECRET"
 NOTION_REDIRECT_URI_ENV = "FLWR_NOTION_REDIRECT_URI"
-
-_NOTION_AUTHORIZE_URL = "https://api.notion.com/v1/oauth/authorize"
-_NOTION_TOKEN_URL = "https://api.notion.com/v1/oauth/token"
-_REQUEST_TIMEOUT = 30.0
 
 
 class NotionOAuthError(RuntimeError):
     """Secret-safe Notion OAuth failure."""
 
 
-class NotionOAuthProvider:
+class NotionOAuthProvider(BaseOAuthProvider):
     """Notion implementation of the OAuth provider contract."""
 
     connector_ref = NOTION_CONNECTOR_REF
     display_name = "Notion"
     description = "Search and read pages and data sources."
+    authorize_url = "https://api.notion.com/v1/oauth/authorize"
+    error_type = NotionOAuthError
 
-    def __init__(
-        self, *, client_id: str, client_secret: str, redirect_uri: str
-    ) -> None:
-        client_id = client_id.strip()
-        client_secret = client_secret.strip()
-        redirect_uri = redirect_uri.strip()
-        if not client_id or not client_secret or not redirect_uri:
-            raise ValueError("Notion OAuth configuration is incomplete.")
-        self._client_id = client_id
-        self._client_secret = client_secret
-        self._redirect_uri = redirect_uri
-
-    def resolve_redirect_uri(self, requested_redirect_uri: str) -> str:
-        """Require the redirect URI configured for the Notion connection."""
-        if requested_redirect_uri.strip() != self._redirect_uri:
-            raise ValueError("Notion redirect URI is not allowed.")
-        return self._redirect_uri
-
-    def build_authorization_url(
+    def authorization_parameters(
         self,
         *,
         redirect_uri: str,
         state: str,
         pkce_challenge: str | None,
-    ) -> str:
-        """Build a Notion public-connection authorization URL."""
-        # Notion's public REST OAuth flow does not document PKCE parameters.
+    ) -> Mapping[str, str]:
+        """Return Notion public-connection authorization parameters."""
         del pkce_challenge
-        params = {
+        return {
             "client_id": self._client_id,
             "redirect_uri": redirect_uri,
             "response_type": "code",
             "owner": "user",
             "state": state,
         }
-        return f"{_NOTION_AUTHORIZE_URL}?{urlencode(params)}"
 
-    def exchange_code(
+    def request_token(
         self,
         *,
         code: str,
         redirect_uri: str,
         pkce_verifier: str | None,
-    ) -> tuple[JSONObject, JSONObject]:
-        """Exchange a Notion authorization code for connection credentials."""
-        # Notion's public REST OAuth flow does not document PKCE parameters.
+    ) -> requests.Response:
+        """Exchange a Notion authorization code for a token response."""
         del pkce_verifier
-        if not code:
-            raise NotionOAuthError("Notion OAuth exchange failed.")
-        try:
-            response = requests.post(
-                _NOTION_TOKEN_URL,
-                auth=(self._client_id, self._client_secret),
-                headers={
-                    "Accept": "application/json",
-                    "Notion-Version": NOTION_API_VERSION,
-                },
-                json={
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "redirect_uri": redirect_uri,
-                },
-                timeout=_REQUEST_TIMEOUT,
-            )
-        except requests.RequestException:
-            raise NotionOAuthError("Notion OAuth exchange failed.") from None
-        if response.status_code >= 400:
-            raise NotionOAuthError("Notion OAuth exchange failed.")
+        return requests.post(
+            "https://api.notion.com/v1/oauth/token",
+            auth=(self._client_id, self._client_secret),
+            headers={"Notion-Version": NOTION_API_VERSION},
+            json={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": redirect_uri,
+            },
+            timeout=30.0,
+        )
 
-        try:
-            payload = response.json()
-        except ValueError:
-            raise NotionOAuthError(
-                "Notion OAuth returned an invalid response."
-            ) from None
-        if not isinstance(payload, dict):
-            raise NotionOAuthError("Notion OAuth returned an invalid response.")
+    def parse_token_response(
+        self, payload: JSONObject
+    ) -> tuple[JSONObject, JSONObject]:
+        """Extract Notion credentials and workspace configuration."""
         if "error" in payload:
-            raise NotionOAuthError("Notion OAuth exchange failed.")
-
-        access_token = _required_token(payload, "access_token")
-        credentials: JSONObject = {"access_token": access_token}
-        refresh_token = _optional_string(payload.get("refresh_token"))
-        if refresh_token is not None:
-            credentials["refresh_token"] = refresh_token
-        expires_in = payload.get("expires_in")
-        if isinstance(expires_in, int) and not isinstance(expires_in, bool):
-            credentials["expires_in"] = expires_in
+            raise self._error("exchange failed")
+        credentials: JSONObject = {
+            "access_token": required_string_field(
+                payload, "access_token", error=self._error
+            )
+        }
+        for key in ("refresh_token", "expires_in"):
+            value = payload.get(key)
+            if isinstance(value, (str, int)) and not isinstance(value, bool):
+                credentials[key] = value
 
         config: JSONObject = {}
         for key in ("workspace_id", "workspace_name", "bot_id"):
-            value = _optional_string(payload.get(key))
-            if value is not None:
+            if value := string_field(payload, key):
                 config[key] = value
-        owner_user_id = _owner_user_id(payload.get("owner"))
-        if owner_user_id is not None:
-            config["owner_user_id"] = owner_user_id
+        owner = payload.get("owner")
+        user = owner.get("user") if isinstance(owner, dict) else None
+        if isinstance(user, dict):
+            if owner_id := string_field(user, "id"):
+                config["owner_user_id"] = owner_id
         return credentials, config
 
 
-def get_configured_connector_oauth_providers() -> list[OAuthConnectorProvider]:
+def get_configured_oauth_provider() -> NotionOAuthProvider | None:
     """Return the configured Notion OAuth provider, if available."""
-    values = {
-        NOTION_CLIENT_ID_ENV: os.getenv(NOTION_CLIENT_ID_ENV, "").strip(),
-        NOTION_CLIENT_SECRET_ENV: os.getenv(NOTION_CLIENT_SECRET_ENV, "").strip(),
-        NOTION_REDIRECT_URI_ENV: os.getenv(NOTION_REDIRECT_URI_ENV, "").strip(),
-    }
-    if not any(values.values()):
-        return []
-    missing = [name for name, value in values.items() if not value]
-    if missing:
-        raise RuntimeError(
-            "Notion OAuth configuration requires environment variables: "
-            + ", ".join(missing)
-            + "."
-        )
-    return [
-        NotionOAuthProvider(
-            client_id=values[NOTION_CLIENT_ID_ENV],
-            client_secret=values[NOTION_CLIENT_SECRET_ENV],
-            redirect_uri=values[NOTION_REDIRECT_URI_ENV],
-        )
-    ]
-
-
-def _required_token(payload: dict[object, object], key: str) -> str:
-    """Read a required token without including its value in errors."""
-    value = payload.get(key)
-    if not isinstance(value, str) or not value:
-        raise NotionOAuthError("Notion OAuth response is missing credentials.")
-    return value
-
-
-def _optional_string(value: object) -> str | None:
-    """Return a non-empty string or None."""
-    return value if isinstance(value, str) and value else None
-
-
-def _owner_user_id(value: object) -> str | None:
-    """Extract the stable authorizing user ID from Notion owner metadata."""
-    if not isinstance(value, dict):
+    env_names = (
+        NOTION_CLIENT_ID_ENV,
+        NOTION_CLIENT_SECRET_ENV,
+        NOTION_REDIRECT_URI_ENV,
+    )
+    if not any(os.getenv(name, "").strip() for name in env_names):
         return None
-    user = value.get("user")
-    if not isinstance(user, dict):
-        return None
-    return _optional_string(user.get("id"))
+    return load_oauth_provider(
+        NotionOAuthProvider,
+        client_id_env=NOTION_CLIENT_ID_ENV,
+        client_secret_env=NOTION_CLIENT_SECRET_ENV,
+        redirect_uri_env=NOTION_REDIRECT_URI_ENV,
+    )
