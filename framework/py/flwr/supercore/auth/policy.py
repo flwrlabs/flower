@@ -47,15 +47,17 @@ _RUNTIME_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "PushObject": MethodTokenPolicy.token_required(),
     "PullObject": MethodTokenPolicy.token_required(),
     "ConfirmMessageReceived": MethodTokenPolicy.token_required(),
-    "PushLogs": MethodTokenPolicy.token_required(),
-    "PushMessages": MethodTokenPolicy.token_required(),
-    "PullMessages": MethodTokenPolicy.token_required(),
-    "GetNodes": MethodTokenPolicy.token_required(),
     "CreateTask": MethodTokenPolicy.token_required(),
+    "StartAutomation": MethodTokenPolicy.token_required(),
     "PushTaskMessage": MethodTokenPolicy.token_required(),
     "PushTaskEvents": MethodTokenPolicy.token_required(),
     "PullTaskMessage": MethodTokenPolicy.token_required(),
     "RecordTaskUsage": MethodTokenPolicy.token_required(),
+    "GetConnector": MethodTokenPolicy.token_required(),
+    "PushLogs": MethodTokenPolicy.token_required(),
+    "PushMessages": MethodTokenPolicy.token_required(),
+    "PullMessages": MethodTokenPolicy.token_required(),
+    "GetNodes": MethodTokenPolicy.token_required(),
 }
 
 

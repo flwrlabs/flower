@@ -93,7 +93,7 @@ def test_search_messages_returns_normalized_matches() -> None:
         },
     }
     with patch(
-        "flwr.supercore.task_process.connector.slack.requests.get",
+        "flwr.supercore.task_process.connector.http.requests.request",
         return_value=response,
     ) as get:
         result = search_messages(
@@ -105,12 +105,14 @@ def test_search_messages_returns_normalized_matches() -> None:
         )
 
     get.assert_called_once_with(
+        "GET",
         "https://slack.com/api/search.messages",
         headers={
             "Authorization": "Bearer xoxp-secret",
             "Content-Type": "application/x-www-form-urlencoded",
         },
         params={"query": "release notes", "count": "5"},
+        json=None,
         timeout=30.0,
     )
     assert result == {
@@ -150,7 +152,7 @@ def test_list_conversations_normalizes_results_and_cursor() -> None:
         "response_metadata": {"next_cursor": "next-page"},
     }
     with patch(
-        "flwr.supercore.task_process.connector.slack.requests.get",
+        "flwr.supercore.task_process.connector.http.requests.request",
         return_value=response,
     ) as get:
         result = list_conversations(
@@ -232,7 +234,7 @@ def test_conversation_reads_normalize_messages_and_pagination(
         "response_metadata": {"next_cursor": "next-page"},
     }
     with patch(
-        "flwr.supercore.task_process.connector.slack.requests.get",
+        "flwr.supercore.task_process.connector.http.requests.request",
         return_value=response,
     ) as get:
         result = function(
@@ -245,7 +247,7 @@ def test_conversation_reads_normalize_messages_and_pagination(
             **extra_arguments,
         )
 
-    assert get.call_args.args[0] == f"https://slack.com/api/{method}"
+    assert get.call_args.args == ("GET", f"https://slack.com/api/{method}")
     assert get.call_args.kwargs["params"] == {
         "channel": "C123",
         "limit": "15",
@@ -288,7 +290,7 @@ def test_slack_api_errors_are_stable_and_secret_safe() -> None:
     }
     with (
         patch(
-            "flwr.supercore.task_process.connector.slack.requests.get",
+            "flwr.supercore.task_process.connector.http.requests.request",
             return_value=response,
         ),
         pytest.raises(SlackApiError) as error,
@@ -325,7 +327,7 @@ def test_slack_transport_failures_are_mapped_without_details(
     """Transport, HTTP, and decoding failures should use stable error codes."""
     with (
         patch(
-            "flwr.supercore.task_process.connector.slack.requests.get",
+            "flwr.supercore.task_process.connector.http.requests.request",
             return_value=response,
             side_effect=side_effect,
         ),
@@ -358,7 +360,9 @@ def test_slack_tool_inputs_are_validated(
 ) -> None:
     """Invalid tool inputs should fail before making an HTTP request."""
     with (
-        patch("flwr.supercore.task_process.connector.slack.requests.get") as get,
+        patch(
+            "flwr.supercore.task_process.connector.http.requests.request"
+        ) as get,
         pytest.raises(ValueError),
     ):
         function(

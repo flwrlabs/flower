@@ -15,13 +15,14 @@
 """Slack OAuth provider."""
 
 import os
-from urllib.parse import urlencode
+from collections.abc import Mapping
 
 import requests
 
 from flwr.supercore.typing import JSONObject
 
-from .oauth import OAuthConnectorProvider
+from .json_utils import object_field, required_string_field, string_field
+from .oauth import BaseOAuthProvider, OAuthConnectorProvider, load_oauth_provider
 from .slack import SLACK_CONNECTOR_REF
 
 SLACK_CLIENT_ID_ENV = "FLWR_SLACK_CLIENT_ID"
@@ -51,87 +52,61 @@ class SlackOAuthError(RuntimeError):
     """Secret-safe Slack OAuth failure."""
 
 
-class SlackOAuthProvider:
+class SlackOAuthProvider(BaseOAuthProvider):
     """Slack implementation of the OAuth provider contract."""
 
     connector_ref = SLACK_CONNECTOR_REF
     display_name = "Slack"
     description = "Search and read messages, conversations, and threads."
+    authorize_url = _SLACK_AUTHORIZE_URL
+    error_type = SlackOAuthError
 
-    def __init__(
-        self, *, client_id: str, client_secret: str, redirect_uri: str
-    ) -> None:
-        client_id = client_id.strip()
-        client_secret = client_secret.strip()
-        redirect_uri = redirect_uri.strip()
-        if not client_id or not client_secret or not redirect_uri:
-            raise ValueError("Slack OAuth configuration is incomplete.")
-        self._client_id = client_id
-        self._client_secret = client_secret
-        self._redirect_uri = redirect_uri
-
-    def resolve_redirect_uri(self, requested_redirect_uri: str) -> str:
-        """Require the redirect URI configured for the Slack application."""
-        if requested_redirect_uri.strip() != self._redirect_uri:
-            raise ValueError("Slack redirect URI is not allowed.")
-        return self._redirect_uri
-
-    def build_authorization_url(
+    def authorization_parameters(
         self,
         *,
         redirect_uri: str,
         state: str,
         pkce_challenge: str | None,
-    ) -> str:
-        """Build a Slack user-token authorization URL."""
+    ) -> Mapping[str, str]:
+        """Return Slack user-token authorization parameters."""
         if pkce_challenge is not None:
             raise ValueError("Slack PKCE is not enabled for this provider.")
-        params = {
+        return {
             "client_id": self._client_id,
             "redirect_uri": redirect_uri,
             "state": state,
             "user_scope": ",".join(SLACK_USER_SCOPES),
         }
-        return f"{_SLACK_AUTHORIZE_URL}?{urlencode(params)}"
 
-    def exchange_code(
+    def request_token(
         self,
         *,
         code: str,
         redirect_uri: str,
         pkce_verifier: str | None,
-    ) -> tuple[JSONObject, JSONObject]:
-        """Exchange a Slack authorization code for user-token credentials."""
+    ) -> requests.Response:
+        """Exchange a Slack authorization code for a token response."""
         data = {"code": code, "redirect_uri": redirect_uri}
         if pkce_verifier is not None:
             data["code_verifier"] = pkce_verifier
-        try:
-            response = requests.post(
-                _SLACK_TOKEN_URL,
-                auth=(self._client_id, self._client_secret),
-                data=data,
-                timeout=_REQUEST_TIMEOUT,
-            )
-        except requests.RequestException:
-            raise SlackOAuthError("Slack OAuth exchange failed.") from None
-        if response.status_code >= 400:
-            raise SlackOAuthError("Slack OAuth exchange failed.")
+        return requests.post(
+            _SLACK_TOKEN_URL,
+            auth=(self._client_id, self._client_secret),
+            data=data,
+            timeout=_REQUEST_TIMEOUT,
+        )
 
-        try:
-            payload = response.json()
-        except ValueError:
-            raise SlackOAuthError("Slack OAuth returned an invalid response.") from None
-        if not isinstance(payload, dict):
-            raise SlackOAuthError("Slack OAuth returned an invalid response.")
+    def parse_token_response(
+        self, payload: JSONObject
+    ) -> tuple[JSONObject, JSONObject]:
+        """Extract Slack user credentials and workspace configuration."""
         if payload.get("ok") is not True:
             raise SlackOAuthError("Slack OAuth exchange failed.")
 
-        authed_user = payload.get("authed_user")
-        if not isinstance(authed_user, dict):
-            raise SlackOAuthError("Slack OAuth response has no authorized user.")
-        access_token = authed_user.get("access_token")
-        if not isinstance(access_token, str) or not access_token:
-            raise SlackOAuthError("Slack OAuth response has no user access token.")
+        authed_user = object_field(payload, "authed_user", error=self._error)
+        access_token = required_string_field(
+            authed_user, "access_token", error=self._error
+        )
 
         credentials: JSONObject = {"access_token": access_token}
         refresh_token = authed_user.get("refresh_token")
@@ -142,16 +117,16 @@ class SlackOAuthProvider:
             credentials["expires_in"] = expires_in
 
         config: JSONObject = {
-            "user_id": _optional_string(authed_user.get("id")),
+            "user_id": string_field(authed_user, "id") or None,
             "scopes": _parse_scopes(authed_user.get("scope")),
         }
         team = payload.get("team")
         if isinstance(team, dict):
-            config["team_id"] = _optional_string(team.get("id"))
-            config["team_name"] = _optional_string(team.get("name"))
+            config["team_id"] = string_field(team, "id") or None
+            config["team_name"] = string_field(team, "name") or None
         enterprise = payload.get("enterprise")
         if isinstance(enterprise, dict):
-            config["enterprise_id"] = _optional_string(enterprise.get("id"))
+            config["enterprise_id"] = string_field(enterprise, "id") or None
 
         return credentials, config
 
@@ -173,17 +148,13 @@ def get_configured_connector_oauth_providers() -> list[OAuthConnectorProvider]:
             + "."
         )
     return [
-        SlackOAuthProvider(
-            client_id=values[SLACK_CLIENT_ID_ENV],
-            client_secret=values[SLACK_CLIENT_SECRET_ENV],
-            redirect_uri=values[SLACK_REDIRECT_URI_ENV],
+        load_oauth_provider(
+            SlackOAuthProvider,
+            client_id_env=SLACK_CLIENT_ID_ENV,
+            client_secret_env=SLACK_CLIENT_SECRET_ENV,
+            redirect_uri_env=SLACK_REDIRECT_URI_ENV,
         )
     ]
-
-
-def _optional_string(value: object) -> str | None:
-    """Return a non-empty string or None."""
-    return value if isinstance(value, str) and value else None
 
 
 def _parse_scopes(value: object) -> list[str]:

@@ -14,14 +14,23 @@
 # ==============================================================================
 """Read-only Slack connector tools."""
 
-import re
 from collections.abc import Callable
-from typing import cast
-
-import requests
 
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
+
+from .http import ConnectorApiError, request_json_object
+from .json_utils import (
+    integer_field,
+    object_field,
+    object_list_field,
+    optional_string,
+    require_bool,
+    require_int_range,
+    require_string,
+    string_field,
+)
+from .tool_schema import function_tool, integer_property, string_property
 
 SLACK_CONNECTOR_REF = "slack"
 SLACK_SEARCH_MESSAGES_TOOL = "slack_search_messages"
@@ -37,136 +46,85 @@ SLACK_TOOL_NAMES = (
 )
 
 _SLACK_API_BASE_URL = "https://slack.com/api"
-_REQUEST_TIMEOUT = 30.0
-_SAFE_ERROR_CODE = re.compile(r"^[a-z0-9_]+$")
-
-
-class SlackApiError(RuntimeError):
+class SlackApiError(ConnectorApiError):
     """Secret-safe Slack Web API failure."""
 
-    def __init__(self, code: str, status_code: int | None = None) -> None:
-        self.code = code
-        self.status_code = status_code
-        detail = code if status_code is None else f"{code} ({status_code})"
-        super().__init__(f"Slack API request failed: {detail}.")
+    provider = "Slack"
 
 
 def make_slack_tools() -> list[JSONObject]:
     """Return model-facing schemas for Slack's read-only v1 operations."""
-    cursor: JSONObject = {
-        "cursor": {
-            "type": "string",
-            "description": "Cursor returned by the previous Slack response.",
-        }
-    }
+    cursor = string_property("Cursor returned by the previous Slack response.")
     return [
-        {
-            "type": "function",
-            "name": SLACK_SEARCH_MESSAGES_TOOL,
-            "description": "Search messages visible to the connected Slack user.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Slack message search query.",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 15,
-                        "description": "Maximum number of matches to return.",
-                    },
-                },
-                "required": ["query"],
-                "additionalProperties": False,
+        function_tool(
+            SLACK_SEARCH_MESSAGES_TOOL,
+            "Search messages visible to the connected Slack user.",
+            properties={
+                "query": string_property("Slack message search query."),
+                "limit": integer_property(
+                    "Maximum number of matches to return.", minimum=1, maximum=15
+                ),
             },
-        },
-        {
-            "type": "function",
-            "name": SLACK_LIST_CONVERSATIONS_TOOL,
-            "description": "List Slack channels and direct-message conversations.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "limit": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 50,
-                        "description": "Maximum number of conversations to return.",
-                    },
-                    **cursor,
-                    "types": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "enum": [
-                                "public_channel",
-                                "private_channel",
-                                "mpim",
-                                "im",
-                            ],
-                        },
-                        "description": "Conversation types to include.",
-                    },
-                    "exclude_archived": {
-                        "type": "boolean",
-                        "description": "Whether to exclude archived conversations.",
-                    },
-                },
-                "additionalProperties": False,
-            },
-        },
-        {
-            "type": "function",
-            "name": SLACK_GET_CONVERSATION_HISTORY_TOOL,
-            "description": "Read recent messages from one Slack conversation.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "conversation_id": {
+            required=("query",),
+        ),
+        function_tool(
+            SLACK_LIST_CONVERSATIONS_TOOL,
+            "List Slack channels and direct-message conversations.",
+            properties={
+                "limit": integer_property(
+                    "Maximum number of conversations to return.",
+                    minimum=1,
+                    maximum=50,
+                ),
+                "cursor": cursor,
+                "types": {
+                    "type": "array",
+                    "items": {
                         "type": "string",
-                        "description": "Slack conversation ID.",
+                        "enum": [
+                            "public_channel",
+                            "private_channel",
+                            "mpim",
+                            "im",
+                        ],
                     },
-                    "limit": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 15,
-                        "description": "Maximum number of messages to return.",
-                    },
-                    **cursor,
+                    "description": "Conversation types to include.",
                 },
-                "required": ["conversation_id"],
-                "additionalProperties": False,
-            },
-        },
-        {
-            "type": "function",
-            "name": SLACK_GET_THREAD_REPLIES_TOOL,
-            "description": "Read a Slack thread's parent message and replies.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "conversation_id": {
-                        "type": "string",
-                        "description": "Slack conversation ID containing the thread.",
-                    },
-                    "thread_ts": {
-                        "type": "string",
-                        "description": "Timestamp of the thread's parent message.",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 15,
-                        "description": "Maximum number of messages to return.",
-                    },
-                    **cursor,
+                "exclude_archived": {
+                    "type": "boolean",
+                    "description": "Whether to exclude archived conversations.",
                 },
-                "required": ["conversation_id", "thread_ts"],
-                "additionalProperties": False,
             },
-        },
+        ),
+        function_tool(
+            SLACK_GET_CONVERSATION_HISTORY_TOOL,
+            "Read recent messages from one Slack conversation.",
+            properties={
+                "conversation_id": string_property("Slack conversation ID."),
+                "limit": integer_property(
+                    "Maximum number of messages to return.", minimum=1, maximum=15
+                ),
+                "cursor": cursor,
+            },
+            required=("conversation_id",),
+        ),
+        function_tool(
+            SLACK_GET_THREAD_REPLIES_TOOL,
+            "Read a Slack thread's parent message and replies.",
+            properties={
+                "conversation_id": string_property(
+                    "Slack conversation ID containing the thread."
+                ),
+                "thread_ts": string_property(
+                    "Timestamp of the thread's parent message."
+                ),
+                "limit": integer_property(
+                    "Maximum number of messages to return.", minimum=1, maximum=15
+                ),
+                "cursor": cursor,
+            },
+            required=("conversation_id", "thread_ts"),
+        ),
     ]
 
 
@@ -184,12 +142,12 @@ def search_messages(
         "search.messages",
         credentials,
         {
-            "query": _non_empty_string(query, "query"),
-            "count": str(_bounded_int(limit, "limit", maximum=15)),
+            "query": require_string(query, "Slack", "query"),
+            "count": str(require_int_range(limit, "Slack", "limit", maximum=15)),
         },
     )
-    messages = _required_object(payload, "messages")
-    matches = _required_object_list(messages, "matches")
+    messages = object_field(payload, "messages", error=SlackApiError)
+    matches = object_list_field(messages, "matches", error=SlackApiError)
     return {"results": [_normalize_search_match(match) for match in matches[:limit]]}
 
 
@@ -206,21 +164,21 @@ def list_conversations(
 ) -> JSONObject:
     """List conversations visible to the connected Slack user."""
     del config, usage_recorder
-    limit = _bounded_int(limit, "limit", maximum=50)
+    limit = require_int_range(limit, "Slack", "limit", maximum=50)
     selected_types = _conversation_types(types)
     payload = _call_slack_api(
         "conversations.list",
         credentials,
         {
             "limit": str(limit),
-            "cursor": _optional_non_empty_string(cursor, "cursor"),
+            "cursor": optional_string(cursor, "Slack", "cursor"),
             "types": ",".join(selected_types),
             "exclude_archived": str(
-                _boolean(exclude_archived, "exclude_archived")
+                require_bool(exclude_archived, "Slack", "exclude_archived")
             ).lower(),
         },
     )
-    channels = _required_object_list(payload, "channels")
+    channels = object_list_field(payload, "channels", error=SlackApiError)
     return {
         "conversations": [
             _normalize_conversation(channel) for channel in channels[:limit]
@@ -266,7 +224,7 @@ def get_thread_replies(
 ) -> JSONObject:
     """Read one page of replies from a Slack thread."""
     del config, usage_recorder
-    thread_ts = _non_empty_string(thread_ts, "thread_ts")
+    thread_ts = require_string(thread_ts, "Slack", "thread_ts")
     params = _conversation_params(
         conversation_id=conversation_id,
         limit=limit,
@@ -294,38 +252,24 @@ def _call_slack_api(
     access_token = credentials.get("access_token")
     if not isinstance(access_token, str) or not access_token:
         raise SlackApiError("invalid_credentials")
-    request_params = {key: value for key, value in params.items() if value is not None}
-    try:
-        response = requests.get(
-            f"{_SLACK_API_BASE_URL}/{method}",
-            headers={
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            params=request_params,
-            timeout=_REQUEST_TIMEOUT,
-        )
-    except requests.RequestException:
-        raise SlackApiError("request_failed") from None
-    if response.status_code == 429:
-        raise SlackApiError("rate_limited", status_code=429)
-    if response.status_code >= 400:
-        raise SlackApiError("http_error", status_code=response.status_code)
-    try:
-        payload = response.json()
-    except ValueError:
-        raise SlackApiError("invalid_response") from None
-    if not isinstance(payload, dict):
-        raise SlackApiError("invalid_response")
+    payload = request_json_object(
+        "GET",
+        f"{_SLACK_API_BASE_URL}/{method}",
+        error=SlackApiError,
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        params={key: value for key, value in params.items() if value is not None},
+        http_error_code=lambda response: (
+            "rate_limited" if response.status_code == 429 else "http_error"
+        ),
+    )
     if payload.get("ok") is not True:
         error = payload.get("error")
-        code = (
-            error
-            if isinstance(error, str) and _SAFE_ERROR_CODE.fullmatch(error)
-            else "api_error"
-        )
+        code = error if isinstance(error, str) and error.isidentifier() else "api_error"
         raise SlackApiError(code)
-    return cast(JSONObject, payload)
+    return payload
 
 
 def _conversation_params(
@@ -333,9 +277,9 @@ def _conversation_params(
 ) -> dict[str, str | None]:
     """Build validated shared parameters for Slack conversation reads."""
     return {
-        "channel": _non_empty_string(conversation_id, "conversation_id"),
-        "limit": str(_bounded_int(limit, "limit", maximum=15)),
-        "cursor": _optional_non_empty_string(cursor, "cursor"),
+        "channel": require_string(conversation_id, "Slack", "conversation_id"),
+        "limit": str(require_int_range(limit, "Slack", "limit", maximum=15)),
+        "cursor": optional_string(cursor, "Slack", "cursor"),
     }
 
 
@@ -353,52 +297,6 @@ def _conversation_types(types: object) -> list[str]:
         if item not in selected:
             selected.append(item)
     return selected
-
-
-def _non_empty_string(value: object, name: str) -> str:
-    """Validate and normalize a required string argument."""
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"Slack {name} must be a non-empty string.")
-    return value.strip()
-
-
-def _optional_non_empty_string(value: object, name: str) -> str | None:
-    """Validate and normalize an optional string argument."""
-    if value is None:
-        return None
-    return _non_empty_string(value, name)
-
-
-def _bounded_int(value: object, name: str, *, maximum: int) -> int:
-    """Validate an integer argument with inclusive bounds."""
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"Slack {name} must be an integer.")
-    if value < 1 or value > maximum:
-        raise ValueError(f"Slack {name} must be between 1 and {maximum}.")
-    return value
-
-
-def _boolean(value: object, name: str) -> bool:
-    """Validate a boolean argument."""
-    if not isinstance(value, bool):
-        raise ValueError(f"Slack {name} must be a boolean.")
-    return value
-
-
-def _required_object(payload: JSONObject, key: str) -> JSONObject:
-    """Read a required JSON object from a Slack response."""
-    value = payload.get(key)
-    if not isinstance(value, dict):
-        raise SlackApiError("invalid_response")
-    return value
-
-
-def _required_object_list(payload: JSONObject, key: str) -> list[JSONObject]:
-    """Read a required list of JSON objects from a Slack response."""
-    value = payload.get(key)
-    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
-        raise SlackApiError("invalid_response")
-    return cast(list[JSONObject], value)
 
 
 def _next_cursor(payload: JSONObject) -> str:
@@ -423,8 +321,8 @@ def _normalize_search_match(message: JSONObject) -> JSONObject:
     channel_name = ""
     channel_type = ""
     if isinstance(channel, dict):
-        channel_id = _string_field(channel, "id")
-        channel_name = _string_field(channel, "name") or _string_field(channel, "user")
+        channel_id = string_field(channel, "id")
+        channel_name = string_field(channel, "name") or string_field(channel, "user")
         if channel.get("is_channel") is True:
             channel_type = "public_channel"
         elif channel.get("is_group") is True:
@@ -437,10 +335,10 @@ def _normalize_search_match(message: JSONObject) -> JSONObject:
         "conversation_id": channel_id,
         "conversation_name": channel_name,
         "conversation_type": channel_type,
-        "user": _string_field(message, "username") or _string_field(message, "user"),
-        "ts": _string_field(message, "ts"),
-        "text": _string_field(message, "text"),
-        "permalink": _string_field(message, "permalink"),
+        "user": string_field(message, "username") or string_field(message, "user"),
+        "ts": string_field(message, "ts"),
+        "text": string_field(message, "text"),
+        "permalink": string_field(message, "permalink"),
     }
 
 
@@ -449,24 +347,24 @@ def _normalize_conversation(channel: JSONObject) -> JSONObject:
     topic = channel.get("topic")
     purpose = channel.get("purpose")
     return {
-        "id": _string_field(channel, "id"),
-        "name": _string_field(channel, "name") or _string_field(channel, "user"),
+        "id": string_field(channel, "id"),
+        "name": string_field(channel, "name") or string_field(channel, "user"),
         "is_channel": channel.get("is_channel") is True,
         "is_private": channel.get("is_private") is True,
         "is_im": channel.get("is_im") is True,
         "is_mpim": channel.get("is_mpim") is True,
         "is_archived": channel.get("is_archived") is True,
-        "num_members": _int_field(channel, "num_members"),
-        "topic": _string_field(topic, "value") if isinstance(topic, dict) else "",
+        "num_members": integer_field(channel, "num_members"),
+        "topic": string_field(topic, "value") if isinstance(topic, dict) else "",
         "purpose": (
-            _string_field(purpose, "value") if isinstance(purpose, dict) else ""
+            string_field(purpose, "value") if isinstance(purpose, dict) else ""
         ),
     }
 
 
 def _normalize_message_page(payload: JSONObject, *, limit: int) -> JSONObject:
     """Normalize a Slack message page and cursor metadata."""
-    messages = _required_object_list(payload, "messages")
+    messages = object_list_field(payload, "messages", error=SlackApiError)
     return {
         "messages": [_normalize_message(message) for message in messages[:limit]],
         "has_more": payload.get("has_more") is True,
@@ -477,24 +375,12 @@ def _normalize_message_page(payload: JSONObject, *, limit: int) -> JSONObject:
 def _normalize_message(message: JSONObject) -> JSONObject:
     """Return the stable subset of a Slack message."""
     return {
-        "type": _string_field(message, "type"),
-        "subtype": _string_field(message, "subtype"),
-        "user": _string_field(message, "user"),
-        "text": _string_field(message, "text"),
-        "ts": _string_field(message, "ts"),
-        "thread_ts": _string_field(message, "thread_ts"),
-        "parent_user_id": _string_field(message, "parent_user_id"),
-        "reply_count": _int_field(message, "reply_count"),
+        "type": string_field(message, "type"),
+        "subtype": string_field(message, "subtype"),
+        "user": string_field(message, "user"),
+        "text": string_field(message, "text"),
+        "ts": string_field(message, "ts"),
+        "thread_ts": string_field(message, "thread_ts"),
+        "parent_user_id": string_field(message, "parent_user_id"),
+        "reply_count": integer_field(message, "reply_count"),
     }
-
-
-def _string_field(payload: JSONObject, key: str) -> str:
-    """Return a string field or an empty string."""
-    value = payload.get(key)
-    return value if isinstance(value, str) else ""
-
-
-def _int_field(payload: JSONObject, key: str) -> int | None:
-    """Return an integer field or None."""
-    value = payload.get(key)
-    return value if isinstance(value, int) and not isinstance(value, bool) else None

@@ -24,7 +24,9 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData, select
+from sqlalchemy import MetaData, delete, func, or_, select, update
+from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Context, Message
@@ -66,12 +68,25 @@ from flwr.supercore.state.schema.corestate_models import (
 )
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
+    ObjectPushSession as ObjectPushSessionModel,
+)
+from flwr.supercore.state.schema.corestate_models import (
+    ObjectPushSessionPending as ObjectPushSessionPendingModel,
+)
+from flwr.supercore.state.schema.corestate_models import (
+    ObjectPushSessionRoot as ObjectPushSessionRootModel,
+)
+from flwr.supercore.state.schema.corestate_models import (
     RunConnector as RunConnectorModel,
 )
+from flwr.supercore.state.schema.corestate_models import RunSeries as RunSeriesModel
 from flwr.supercore.state.schema.corestate_models import (
     SeriesContext as SeriesContextModel,
 )
+from flwr.supercore.state.schema.corestate_models import SeriesRuns as SeriesRunsModel
+from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
+from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
@@ -105,6 +120,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         super().__init__(database_path)
         self._object_store = object_store
 
+    def dialect_insert(self, table: Any) -> SQLiteInsert:
+        """Return a SQLite insert statement for CoreState upserts."""
+        if self.database_backend == "sqlite":
+            return sqlite_insert(table)
+
+        raise NotImplementedError(
+            f"No dialect-specific insert configured for {self.database_backend!r}."
+        )
+
     @property
     def select_lock_sql(self) -> str:
         """Return the SQL clause for row-locking selected candidates."""
@@ -118,109 +142,82 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def start_session(self, run_id: int) -> str:
         """Start a run-scoped object push session."""
         session_id = str(uuid4())
-        self.query(
-            """
-            INSERT INTO object_push_sessions (
-                session_id, run_id, expires_at, pending_count
-            )
-            VALUES (:session_id, :run_id, :expires_at, 0)
-            """,
-            {
-                "session_id": session_id,
-                "run_id": uint64_to_int64(run_id),
-                "expires_at": now()
-                + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS),
-            },
+        expires_at = now() + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS)
+        stmt = self.dialect_insert(ObjectPushSessionModel).values(
+            session_id=session_id,
+            run_id=uint64_to_int64(run_id),
+            expires_at=expires_at,
+            pending_count=0,
         )
+        with self.session() as session:
+            session.execute(stmt)
         return session_id
 
     def delete_sessions_in_run(self, run_id: int) -> None:
         """Delete all object push session bookkeeping for a run."""
-        self.query(
-            """
-            DELETE FROM object_push_sessions
-            WHERE run_id = :run_id
-            """,
-            {"run_id": uint64_to_int64(run_id)},
-        )
+        with self.session() as session:
+            session.execute(
+                delete(ObjectPushSessionModel).where(
+                    ObjectPushSessionModel.run_id == uint64_to_int64(run_id)
+                )
+            )
 
     def preregister_object_tree(
         self, object_tree: ObjectTree, session_id: str
     ) -> list[str]:
         """Preregister an object tree and record its missing objects."""
-        with self.session():
-            # Load the run associated with the session
-            rows = self.query(
-                """
-                SELECT run_id
-                FROM object_push_sessions
-                WHERE session_id = :session_id
-                """,
-                {"session_id": session_id},
+        with self.session() as session:
+            # Load the run associated with the session.
+            push_session = session.get(
+                ObjectPushSessionModel, session_id, populate_existing=True
             )
-            if not rows:
+            if push_session is None:
                 raise ValueError(f"Unknown object push session: {session_id}")
-            run_id = int64_to_uint64(rows[0]["run_id"])
+            run_id = int64_to_uint64(push_session.run_id)
 
-            # Preregister the tree and collect its currently missing objects
+            # Preregister the tree and collect its currently missing objects.
             missing_objects = self.object_store.preregister(run_id, object_tree)
 
-            # Remove bookkeeping for an older session owning the same root
-            rows = self.query(
-                """
-                SELECT session_id
-                FROM object_push_session_roots
-                WHERE root_object_id = :root_object_id AND session_id != :session_id
-                """,
-                {
-                    "root_object_id": object_tree.object_id,
-                    "session_id": session_id,
-                },
-            )
-            if rows:
-                self._cleanup_push_session(
-                    rows[0]["session_id"], cleanup_messages=False
+            # Remove bookkeeping for an older session owning the same root.
+            old_session_id = session.scalar(
+                select(ObjectPushSessionRootModel.session_id).where(
+                    ObjectPushSessionRootModel.root_object_id == object_tree.object_id,
+                    ObjectPushSessionRootModel.session_id != session_id,
                 )
+            )
+            if old_session_id is not None:
+                self._cleanup_push_session(old_session_id, cleanup_messages=False)
 
-            # Record ownership of the root
-            self.query(
-                """
-                INSERT INTO object_push_session_roots (session_id, root_object_id)
-                VALUES (:session_id, :root_object_id)
-                """,
-                {
-                    "session_id": session_id,
-                    "root_object_id": object_tree.object_id,
-                },
+            # Record ownership of the root.
+            session.add(
+                ObjectPushSessionRootModel(
+                    session_id=session_id, root_object_id=object_tree.object_id
+                )
             )
 
-            # Record the objects that still need to be pushed
+            # Record the objects that still need to be pushed.
             if missing_objects:
-                self.query(
-                    """
-                    INSERT INTO object_push_session_pending (session_id, object_id)
-                    VALUES (:session_id, :object_id)
-                    ON CONFLICT(session_id, object_id) DO NOTHING
-                    """,
+                stmt = self.dialect_insert(ObjectPushSessionPendingModel).values(
                     [
                         {"session_id": session_id, "object_id": object_id}
                         for object_id in missing_objects
-                    ],
+                    ]
                 )
+                stmt = stmt.on_conflict_do_nothing(
+                    index_elements=[
+                        ObjectPushSessionPendingModel.session_id,
+                        ObjectPushSessionPendingModel.object_id,
+                    ]
+                )
+                session.execute(stmt)
 
             # Synchronize the materialized pending count.
-            self.query(
-                """
-                UPDATE object_push_sessions
-                SET pending_count = (
-                    SELECT COUNT(*)
-                    FROM object_push_session_pending
-                    WHERE session_id = :session_id
+            pending_count = session.scalar(
+                select(func.count()).where(  # pylint: disable=not-callable
+                    ObjectPushSessionPendingModel.session_id == session_id
                 )
-                WHERE session_id = :session_id
-                """,
-                {"session_id": session_id},
             )
+            push_session.pending_count = int(pending_count or 0)
             return missing_objects
 
     def _claim_pending_object(
@@ -229,37 +226,33 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         session_id: str,
         object_id: str,
     ) -> datetime | None:
-        """Claim a pending object and return the push session expiry."""
-        rows = self.query(
-            """
-            DELETE FROM object_push_session_pending AS pending
-            WHERE pending.session_id = :session_id
-              AND pending.object_id = :object_id
-              AND EXISTS (
-                  SELECT 1
-                  FROM object_push_sessions AS session
-                  WHERE session.session_id = :session_id
-                    AND session.run_id = :run_id
-              )
-            RETURNING (
-                SELECT expires_at
-                FROM object_push_sessions
-                WHERE session_id = :session_id
-            ) AS expires_at
-            """,
-            {
-                "session_id": session_id,
-                "object_id": object_id,
-                "run_id": uint64_to_int64(run_id),
-            },
-        )
-        if not rows:
-            return None
+        """Claim a pending object and return the refreshed push session expiry."""
+        with self.session() as session:
+            claimed_session_id = session.scalar(
+                delete(ObjectPushSessionPendingModel)
+                .where(
+                    ObjectPushSessionPendingModel.session_id == session_id,
+                    ObjectPushSessionPendingModel.object_id == object_id,
+                    select(ObjectPushSessionModel.session_id)
+                    .where(
+                        ObjectPushSessionModel.session_id == session_id,
+                        ObjectPushSessionModel.run_id == uint64_to_int64(run_id),
+                    )
+                    .exists(),
+                )
+                .returning(ObjectPushSessionPendingModel.session_id)
+            )
+            if claimed_session_id is None:
+                return None
 
-        expires_at = rows[0]["expires_at"]
-        if isinstance(expires_at, str):  # SQLite returns string for TIMESTAMP column
-            return datetime.fromisoformat(expires_at)
-        return cast(datetime, expires_at)
+            # Re-read after the successful claim. Another push can refresh the
+            # session while this request waits to delete the pending row.
+            expires_at = session.scalar(
+                select(ObjectPushSessionModel.expires_at)
+                .where(ObjectPushSessionModel.session_id == claimed_session_id)
+                .execution_options(populate_existing=True)
+            )
+            return expires_at
 
     def store_object(
         self,
@@ -270,50 +263,46 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     ) -> bool:
         """Store an object if it is pending for an active push session."""
         try:
-            with self.session():
-                # Support legacy SuperNodes that do not send a session ID
+            with self.session() as session:
+                # Support legacy SuperNodes that do not send a session ID.
                 if not session_id:
-                    rows = self.query(
-                        """
-                        SELECT session_id
-                        FROM object_push_session_pending
-                        WHERE object_id = :object_id
-                        """,
-                        {"object_id": object_id},
+                    resolved_session_id = session.scalar(
+                        select(ObjectPushSessionPendingModel.session_id).where(
+                            ObjectPushSessionPendingModel.object_id == object_id
+                        )
                     )
-                    if not rows:
+                    if resolved_session_id is None:
                         return False
-                    session_id = rows[0]["session_id"]
+                    session_id = resolved_session_id
 
-                # Atomically validate the session and claim its pending object
+                # Atomically validate the session and claim its pending object.
                 expires_at = self._claim_pending_object(run_id, session_id, object_id)
                 if expires_at is None:
                     return False
 
-                # Reject expired sessions and clean up their messages and objects
+                # Reject expired sessions and clean up their messages and objects.
                 if expires_at <= now():
                     self._cleanup_push_session(session_id, cleanup_messages=True)
                     return False
 
-                # Store the object, decrement pending work, and refresh the session TTL
+                # Store the object, decrement pending work, and refresh the session TTL.
                 self.object_store.put(object_id, object_content)
-                rows = self.query(
-                    """
-                    UPDATE object_push_sessions
-                    SET pending_count = pending_count - 1,
-                        expires_at = :expires_at
-                    WHERE session_id = :session_id
-                    RETURNING pending_count
-                    """,
-                    {
-                        "session_id": session_id,
-                        "expires_at": now()
-                        + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS),
-                    },
+                refreshed_expires_at = now() + timedelta(
+                    seconds=OBJECT_PUSH_SESSION_TTL_SECONDS
                 )
-                pending_count = rows[0]["pending_count"]
+                pending_count = session.scalar(
+                    update(ObjectPushSessionModel)
+                    .where(ObjectPushSessionModel.session_id == session_id)
+                    .values(
+                        pending_count=ObjectPushSessionModel.pending_count - 1,
+                        expires_at=refreshed_expires_at,
+                    )
+                    .returning(ObjectPushSessionModel.pending_count)
+                )
+                if pending_count is None:
+                    raise RuntimeError("Object push session disappeared after claim")
 
-                # Remove session bookkeeping once every pending object is stored
+                # Remove session bookkeeping once every pending object is stored.
                 if pending_count == 0:
                     self._cleanup_push_session(session_id, cleanup_messages=False)
                 return True
@@ -323,66 +312,61 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def get_object(self, run_id: int, object_id: str) -> bytes | None:
         """Get an object and clean up expired push sessions when needed."""
-        with self.session():
-            # Return immediately unless the object is known but unavailable
+        with self.session() as session:
+            # Return immediately unless the object is known but unavailable.
             content = self.object_store.get(object_id)
             if content != b"":
                 return content
 
-            # Find expired sessions in this run that are waiting for the object
-            rows = self.query(
-                """
-                SELECT session.session_id
-                FROM object_push_session_pending AS pending
-                INNER JOIN object_push_sessions AS session
-                    ON pending.session_id = session.session_id
-                WHERE pending.object_id = :object_id
-                  AND session.run_id = :run_id
-                  AND session.expires_at <= :current
-                """,
-                {
-                    "object_id": object_id,
-                    "run_id": uint64_to_int64(run_id),
-                    "current": now(),
-                },
+            # Find expired sessions in this run that are waiting for the object.
+            expired_session_ids = list(
+                session.scalars(
+                    select(ObjectPushSessionModel.session_id)
+                    .join(
+                        ObjectPushSessionPendingModel,
+                        ObjectPushSessionPendingModel.session_id
+                        == ObjectPushSessionModel.session_id,
+                    )
+                    .where(
+                        ObjectPushSessionPendingModel.object_id == object_id,
+                        ObjectPushSessionModel.run_id == uint64_to_int64(run_id),
+                        ObjectPushSessionModel.expires_at <= now(),
+                    )
+                )
             )
-            if not rows:
+            if not expired_session_ids:
                 return content
 
-            # Clean up every expired session, then return the resulting object state
-            for row in rows:
-                self._cleanup_push_session(row["session_id"], cleanup_messages=True)
+            # Clean up every expired session, then return the resulting object state.
+            for expired_session_id in expired_session_ids:
+                self._cleanup_push_session(expired_session_id, cleanup_messages=True)
             return self.object_store.get(object_id)
 
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
         """Remove an object push session and optionally its messages."""
-        with self.session():
-            # Load message roots only when their data must also be cleaned up
+        with self.session() as session:
+            # Load message roots only when their data must also be cleaned up.
             message_object_ids: set[str] = set()
             if cleanup_messages:
-                rows = self.query(
-                    """
-                    SELECT root_object_id
-                    FROM object_push_session_roots
-                    WHERE session_id = :session_id
-                    """,
-                    {"session_id": session_id},
+                message_object_ids = set(
+                    session.scalars(
+                        select(ObjectPushSessionRootModel.root_object_id).where(
+                            ObjectPushSessionRootModel.session_id == session_id
+                        )
+                    )
                 )
-                message_object_ids = {row["root_object_id"] for row in rows}
 
-            # Delete the session and its cascaded root and pending rows
-            self.query(
-                """
-                DELETE FROM object_push_sessions
-                WHERE session_id = :session_id
-                """,
-                {"session_id": session_id},
+            # Delete the session and its cascaded root and pending rows.
+            session.execute(
+                delete(ObjectPushSessionModel).where(
+                    ObjectPushSessionModel.session_id == session_id
+                )
             )
 
             # Delete expired object trees and their message metadata.
             if message_object_ids:
-                for object_id in message_object_ids:
-                    self.object_store.delete(object_id)
+                for message_object_id in message_object_ids:
+                    self.object_store.delete(message_object_id)
                 self._on_push_session_expired(message_object_ids)
 
     def store_fab(self, fab: Fab) -> str:
@@ -392,21 +376,22 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError(
                 f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
             )
-        params = {
-            "fab_hash": fab_hash,
-            "content": fab.content,
-            "verifications": json.dumps(fab.verifications),
-        }
         # Keep launch behavior: last write wins for metadata under the same
         # content hash.
-        query = """
+        self.query(
+            """
             INSERT INTO fab (fab_hash, content, verifications)
             VALUES (:fab_hash, :content, :verifications)
             ON CONFLICT(fab_hash) DO UPDATE SET
                 content = excluded.content,
                 verifications = excluded.verifications
-        """
-        self.query(query, params)
+            """,
+            {
+                "fab_hash": fab_hash,
+                "content": fab.content,
+                "verifications": json.dumps(fab.verifications),
+            },
+        )
         return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
@@ -433,12 +418,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Create or update a connector for an account."""
         if not flwr_aid or not connector_ref:
             return False
-        params = {
-            "flwr_aid": flwr_aid,
-            "connector_ref": connector_ref,
-            "credentials_json": credentials_json,
-            "config_json": config_json,
-        }
         self.query(
             """
             INSERT INTO connector (
@@ -451,7 +430,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 credentials_json = excluded.credentials_json,
                 config_json = excluded.config_json
             """,
-            params,
+            {
+                "flwr_aid": flwr_aid,
+                "connector_ref": connector_ref,
+                "credentials_json": credentials_json,
+                "config_json": config_json,
+            },
         )
         return True
 
@@ -480,28 +464,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Delete an account's connector if it exists."""
         if not flwr_aid or not connector_ref:
             return False
-        params = {"flwr_aid": flwr_aid, "connector_ref": connector_ref}
-        with self.session():
-            rows = self.query(
-                """
-                SELECT connector_ref
-                FROM connector
-                WHERE flwr_aid = :flwr_aid
-                  AND connector_ref = :connector_ref
-                """,
-                params,
+        with self.session() as session:
+            deleted_connector_ref = session.scalar(
+                delete(ConnectorModel)
+                .where(
+                    ConnectorModel.flwr_aid == flwr_aid,
+                    ConnectorModel.connector_ref == connector_ref,
+                )
+                .returning(ConnectorModel.connector_ref)
             )
-            if not rows:
-                return False
-            self.query(
-                """
-                DELETE FROM connector
-                WHERE flwr_aid = :flwr_aid
-                  AND connector_ref = :connector_ref
-                """,
-                params,
-            )
-        return True
+            return deleted_connector_ref is not None
 
     def bind_connectors_to_run(
         self, run_id: int, connector_refs: Sequence[str]
@@ -511,22 +483,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return False
         stored_run_id = uint64_to_int64(run_id)
         bound_refs = set(self.get_run_connector_refs(run_id))
-        data = [
-            {
-                "run_id": stored_run_id,
-                "connector_ref": connector_ref,
-            }
+        run_connectors = [
+            RunConnectorModel(run_id=stored_run_id, connector_ref=connector_ref)
             for connector_ref in dict.fromkeys(connector_refs)
             if connector_ref not in bound_refs
         ]
-        if data:
-            self.query(
-                """
-                INSERT INTO run_connector (run_id, connector_ref)
-                VALUES (:run_id, :connector_ref)
-                """,
-                data,
-            )
+        if run_connectors:
+            with self.session() as session:
+                session.add_all(run_connectors)
         return True
 
     def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
@@ -560,46 +524,24 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return None
         expires_at = expires_at.astimezone(UTC)
         created_at = now()
-        session = ConnectorOAuthSessionRecord(
+        model = ConnectorOAuthSessionModel(
             oauth_session_id=oauth_session_id,
             flwr_aid=flwr_aid,
             connector_ref=connector_ref,
             state=state,
             redirect_uri=redirect_uri,
             pkce_verifier=pkce_verifier,
-            created_at=created_at.isoformat(),
-            expires_at=expires_at.isoformat(),
+            created_at=created_at,
+            expires_at=expires_at,
             completed_at=None,
         )
         try:
-            self.query(
-                """
-                INSERT INTO connector_oauth_session (
-                    oauth_session_id, flwr_aid, connector_ref, state,
-                    redirect_uri, pkce_verifier, created_at, expires_at,
-                    completed_at
-                )
-                VALUES (
-                    :oauth_session_id, :flwr_aid, :connector_ref, :state,
-                    :redirect_uri, :pkce_verifier, :created_at, :expires_at,
-                    :completed_at
-                )
-                """,
-                {
-                    "oauth_session_id": session.oauth_session_id,
-                    "flwr_aid": session.flwr_aid,
-                    "connector_ref": session.connector_ref,
-                    "state": session.state,
-                    "redirect_uri": session.redirect_uri,
-                    "pkce_verifier": session.pkce_verifier,
-                    "created_at": created_at,
-                    "expires_at": expires_at,
-                    "completed_at": session.completed_at,
-                },
-            )
+            with self.session() as db_session:
+                db_session.add(model)
+                db_session.flush()
+                return _connector_oauth_session_from_model(model)
         except IntegrityError:
             return None
-        return session
 
     def get_connector_oauth_session(
         self, oauth_session_id: str, flwr_aid: str
@@ -625,23 +567,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if not oauth_session_id or not flwr_aid:
             return False
         completed_at = now()
-        updated = self.query(
-            """
-            UPDATE connector_oauth_session
-            SET completed_at = :completed_at
-            WHERE oauth_session_id = :oauth_session_id
-              AND flwr_aid = :flwr_aid
-              AND completed_at IS NULL
-              AND expires_at > :completed_at
-            RETURNING oauth_session_id
-            """,
-            {
-                "oauth_session_id": oauth_session_id,
-                "flwr_aid": flwr_aid,
-                "completed_at": completed_at,
-            },
-        )
-        return bool(updated)
+        with self.session() as session:
+            updated_oauth_session_id = session.scalar(
+                update(ConnectorOAuthSessionModel)
+                .where(
+                    ConnectorOAuthSessionModel.oauth_session_id == oauth_session_id,
+                    ConnectorOAuthSessionModel.flwr_aid == flwr_aid,
+                    ConnectorOAuthSessionModel.completed_at.is_(None),
+                    ConnectorOAuthSessionModel.expires_at > completed_at,
+                )
+                .values(completed_at=completed_at)
+                .returning(ConnectorOAuthSessionModel.oauth_session_id)
+            )
+            return updated_oauth_session_id is not None
 
     def get_run_series(  # pylint: disable=R0914
         self,
@@ -662,57 +600,51 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         ):
             return []
 
-        # Build optional filters for the run-series page.
-        conditions: list[str] = []
-        params: dict[str, Any] = {}
+        page_query = select(RunSeriesModel.series_id)
         if series_ids is not None:
             sint64_series_ids = [uint64_to_int64(series_id) for series_id in series_ids]
-            placeholders, in_params = build_sql_in_params(sint64_series_ids, "sid")
-            conditions.append(f"series_id IN ({placeholders})")
-            params.update(in_params)
+            page_query = page_query.where(
+                RunSeriesModel.series_id.in_(sint64_series_ids)
+            )
         if federation_ids is not None:
-            placeholders, in_params = build_sql_in_params(federation_ids, "fed")
-            conditions.append(f"federation_id IN ({placeholders})")
-            params.update(in_params)
+            page_query = page_query.where(
+                RunSeriesModel.federation_id.in_(federation_ids)
+            )
         if updated_before is not None:
-            conditions.append("updated_at < :updated_before")
-            params["updated_before"] = datetime.fromisoformat(updated_before)
-
-        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        limit_clause = ""
+            page_query = page_query.where(
+                RunSeriesModel.updated_at < datetime.fromisoformat(updated_before)
+            )
+        page_query = page_query.order_by(RunSeriesModel.updated_at.desc())
         if limit is not None:
-            limit_clause = "LIMIT :limit"
-            params["limit"] = limit
+            page_query = page_query.limit(limit)
 
         # Select the requested page before joining run IDs so limit applies to series.
-        run_series_cte = f"""
-            run_series_cte AS (
-                SELECT series_id, federation_id, description, created_at, updated_at
-                FROM run_series
-                {where_clause}
-                ORDER BY updated_at DESC
-                {self.select_lock_sql}
-                {limit_clause}
+        selected_series = page_query.subquery()
+        query = (
+            select(RunSeriesModel, SeriesRunsModel.run_id)
+            .join(
+                selected_series,
+                RunSeriesModel.series_id == selected_series.c.series_id,
             )
-        """
-        query = f"""
-            WITH {run_series_cte}
-            SELECT
-                run_series_cte.*,
-                series_runs.run_id
-            FROM run_series_cte
-            LEFT JOIN series_runs
-                ON series_runs.series_id = run_series_cte.series_id
-        """
-        rows = self.query(query, params)
+            .outerjoin(
+                SeriesRunsModel,
+                SeriesRunsModel.series_id == RunSeriesModel.series_id,
+            )
+            .order_by(RunSeriesModel.updated_at.desc())
+            .execution_options(populate_existing=True)
+        )
+
         # Fold the joined rows back into one RunSeries per series.
         series_by_id: dict[int, RunSeries] = {}
-        for row in rows:
-            series_id = row["series_id"]
-            if series_id not in series_by_id:
-                series_by_id[series_id] = _run_series_from_row(row)
-            if row["run_id"] is not None:
-                series_by_id[series_id].run_ids.append(int64_to_uint64(row["run_id"]))
+        with self.session() as session:
+            for series_model, stored_run_id in session.execute(query):
+                series_id = series_model.series_id
+                if series_id not in series_by_id:
+                    series_by_id[series_id] = _run_series_from_model(series_model)
+                if stored_run_id is not None:
+                    series_by_id[series_id].run_ids.append(
+                        int64_to_uint64(stored_run_id)
+                    )
         return list(series_by_id.values())
 
     def get_run_series_context(self, series_id: int) -> Context | None:
@@ -731,16 +663,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Set the shared Context for the specified RunSeries."""
         sint_series_id = uint64_to_int64(series_id)
         context_bytes = context_to_bytes(context)
-        with self.session():
-            self.query(
-                """
-                INSERT INTO series_context (series_id, context)
-                VALUES (:series_id, :context)
-                ON CONFLICT(series_id) DO UPDATE SET
-                    context = excluded.context
-                """,
-                {"series_id": sint_series_id, "context": context_bytes},
-            )
+        self.query(
+            """
+            INSERT INTO series_context (series_id, context)
+            VALUES (:series_id, :context)
+            ON CONFLICT(series_id) DO UPDATE SET
+                context = excluded.context
+            """,
+            {"series_id": sint_series_id, "context": context_bytes},
+        )
 
     def store_run_in_series(
         self,
@@ -1228,59 +1159,45 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if isinstance(statuses, str):
             raise ValueError("`statuses` must be a sequence of strings")
 
-        conditions = []
-        params: dict[str, Any] = {}
+        query = select(TaskModel)
 
         if task_ids is not None:
             if not task_ids:
                 return []
             sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            placeholders, in_params = build_sql_in_params(sint64_task_ids, "tid")
-            conditions.append(f"task_id IN ({placeholders})")
-            params.update(in_params)
+            query = query.where(TaskModel.task_id.in_(sint64_task_ids))
 
         if run_ids is not None:
             if not run_ids:
                 return []
             sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            placeholders, in_params = build_sql_in_params(sint64_run_ids, "rid")
-            conditions.append(f"run_id IN ({placeholders})")
-            params.update(in_params)
+            query = query.where(TaskModel.run_id.in_(sint64_run_ids))
 
         if statuses is not None:
             if not statuses:
                 return []
             status_conditions = []
-            for status, condition in STATUS_CONDITIONS.items():
+            for status in STATUS_CONDITIONS:
                 if status in statuses:
-                    status_conditions.append(condition)
+                    status_conditions.append(_task_status_filter(status))
             if not status_conditions:
                 return []
-            conditions.append(f"({' OR '.join(status_conditions)})")
+            query = query.where(or_(*status_conditions))
 
-        query = """
-            SELECT task_id, type, run_id, fab_hash, model_ref, connector_ref,
-                   pending_at, starting_at, running_at, finished_at,
-                   sub_status, details
-            FROM task
-        """
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
         if order_by is not None:
-            query += f" ORDER BY {order_by} {'ASC' if ascending else 'DESC'}"
+            order_column = (
+                TaskModel.pending_at.asc() if ascending else TaskModel.pending_at.desc()
+            )
+            query = query.order_by(order_column)
         if limit is not None:
-            query += " LIMIT :limit"
-            params["limit"] = limit
+            query = query.limit(limit)
+        query = query.execution_options(populate_existing=True)
 
-        with self.session():
+        with self.session() as session:
             # Clean up expired task tokens before querying tasks
             self._cleanup_expired_task_tokens()
-            rows = self.query(query, params)
-
-        result: list[Task] = []
-        for row in rows:
-            result.append(task_from_row(row))
-        return result
+            rows = session.scalars(query).all()
+            return [task_from_model(row) for row in rows]
 
     def get_metadata(self) -> MetaData:
         """Return SQLAlchemy MetaData needed for CoreState tables."""
@@ -1455,16 +1372,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def get_task_by_token(self, token: str) -> Task | None:
         """Return the task associated with the task token, if valid."""
-        rows = self.query(
-            """
-            SELECT * FROM task
-            WHERE token = :token AND active_until >= :current AND finished_at IS NULL
-            """,
-            {"token": token, "current": now()},
-        )
-        if not rows:
-            return None
-        return task_from_row(rows[0])
+        current = now()
+        with self.session() as session:
+            row = session.scalars(
+                select(TaskModel)
+                .where(
+                    TaskModel.token == token,
+                    TaskModel.finished_at.is_(None),
+                )
+                .execution_options(populate_existing=True)
+            ).first()
+            if row is None or row.active_until is None or row.active_until < current:
+                return None
+            return task_from_model(row)
 
     def store_task_message(self, message: Message) -> bool:
         """Store one task-addressed Message."""
@@ -1521,9 +1441,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session():
             self._cleanup_expired_task_tokens()
             self._cleanup_invalid_task_messages()
-            rows = self._claim_task_message_rows(dst_task_ids, order_by, limit)
-
-        return [_task_message_from_row(row) for row in rows]
+            rows = self._claim_task_message_models(dst_task_ids, order_by, limit)
+            snapshots = [_task_message_snapshot_from_model(row) for row in rows]
+        return [_task_message_from_snapshot(row) for row in snapshots]
 
     def store_task_events(
         self,
@@ -1582,62 +1502,55 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             rows = session.scalars(query).all()
             return [_task_event_from_model(row) for row in rows]
 
-    def _claim_task_message_rows(
+    def _claim_task_message_models(
         self,
         dst_task_ids: Sequence[int] | None,
         order_by: Literal["created_at"] | None,
         limit: int | None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[TaskMessageModel]:
         """Atomically claim eligible task Messages."""
-        conditions: list[str] = []
-        params: dict[str, Any] = {}
+        query = select(TaskMessageModel.message_id)
 
         # Filter by destination task IDs
         if dst_task_ids is not None:
             sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
-            placeholders, in_params = build_sql_in_params(sint64_dst_task_ids, "dtid")
-            conditions.append(f"dst_task_id IN ({placeholders})")
-            params.update(in_params)
-
-        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-        order_clause = f"ORDER BY {order_by}" if order_by else ""
-        limit_clause = "LIMIT :limit" if limit is not None else ""
-
+            query = query.where(TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids))
+        if order_by is not None:
+            query = query.order_by(TaskMessageModel.created_at.asc())
         if limit is not None:
-            params["limit"] = limit
+            query = query.limit(limit)
 
         if order_by is not None or limit is not None:
             # Materialize candidates before deleting. Some backends can otherwise
             # re-evaluate same-table subqueries while DELETE scans rows.
-            # `self.select_lock_sql` is an optional clause for backends that support
-            # row-locking while selecting candidates. Keep it before LIMIT so locked
-            # rows are skipped before limiting the result set.
-            query = f"""
-                WITH selected AS (
-                    SELECT message_id
-                    FROM task_message
-                    {where_clause} {order_clause}
-                    {self.select_lock_sql}
-                    {limit_clause}
-                )
-                DELETE FROM task_message
-                WHERE message_id IN (SELECT message_id FROM selected)
-                RETURNING *
-            """
+            if self.select_lock_sql:
+                if self.select_lock_sql.strip().upper() != "FOR UPDATE SKIP LOCKED":
+                    raise NotImplementedError(
+                        "Custom select_lock_sql values are not supported for ORM "
+                        "task_message claims."
+                    )
+                query = query.with_for_update(skip_locked=True)
+            selected = query.cte("selected")
+            delete_query = delete(TaskMessageModel).where(
+                TaskMessageModel.message_id.in_(select(selected.c.message_id))
+            )
         else:
-            query = f"""
-                DELETE FROM task_message
-                {where_clause}
-                RETURNING *
-            """
+            delete_query = delete(TaskMessageModel)
+            if dst_task_ids is not None:
+                sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
+                delete_query = delete_query.where(
+                    TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids)
+                )
 
-        rows = self.query(query, params)
+        returning_query = delete_query.returning(TaskMessageModel)
+        with self.session() as session:
+            rows = list(session.scalars(returning_query))
 
-        # Sort claimed rows in-memory if requested
-        # `ORDER BY` in the CTE determines which rows are claimed, but SQL does not
-        # guarantee that `DELETE ... RETURNING` returns them in that order.
+        # Sort claimed rows in memory if requested. `ORDER BY` in the candidate
+        # query determines which rows are claimed, but SQL does not guarantee that
+        # `DELETE ... RETURNING` returns them in that order.
         if order_by is not None:
-            rows.sort(key=lambda row: row[order_by])
+            rows.sort(key=lambda row: row.created_at)
 
         return rows
 
@@ -1683,14 +1596,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             self._on_task_tokens_expired([task_from_row(row) for row in rows])
 
     def _cleanup_invalid_task_messages(self) -> None:
-        """Remove expired Messages and Messages for invalid destination tasks."""
-        self.query(
-            """
-            DELETE FROM task_message
-            WHERE (created_at + ttl) <= :current
-            """,
-            {"current": now().timestamp()},
-        )
+        """Remove expired task Messages."""
+        with self.session() as session:
+            session.execute(
+                delete(TaskMessageModel).where(
+                    (TaskMessageModel.created_at + TaskMessageModel.ttl)
+                    <= now().timestamp()
+                )
+            )
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Handle cleanup of expired task tokens.
@@ -1707,42 +1620,52 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Atomically reserve a nonce in a namespace."""
         if namespace == "" or nonce == "":
             return False
-        cleanup_query = """
-            DELETE FROM nonce_store
-            WHERE expires_at < :current;
-        """
-        insert_query = """
-            INSERT INTO nonce_store (namespace, nonce, expires_at)
-            VALUES (:namespace, :nonce, :expires_at);
-        """
-        self.query(cleanup_query, {"current": now().timestamp()})
-        try:
+        with self.session():
             self.query(
-                insert_query,
-                {"namespace": namespace, "nonce": nonce, "expires_at": expires_at},
+                """
+                DELETE FROM nonce_store
+                WHERE expires_at < :current
+                """,
+                {"current": now().timestamp()},
             )
-            return True
-        # Duplicate nonce detected, treated as a replay attempt.
-        # IntegrityError can only arise from (namespace, nonce) uniqueness.
-        except IntegrityError:
-            return False
+            rows = self.query(
+                """
+                INSERT INTO nonce_store (namespace, nonce, expires_at)
+                VALUES (:namespace, :nonce, :expires_at)
+                ON CONFLICT(namespace, nonce) DO NOTHING
+                RETURNING nonce
+                """,
+                {
+                    "namespace": namespace,
+                    "nonce": nonce,
+                    "expires_at": expires_at,
+                },
+            )
+            return bool(rows)
 
 
 def _connector_oauth_session_from_model(
-    row: ConnectorOAuthSessionModel,
+    model: ConnectorOAuthSessionModel,
 ) -> ConnectorOAuthSessionRecord:
     """Convert a connector OAuth session model to its persistence record."""
     return ConnectorOAuthSessionRecord(
-        oauth_session_id=row.oauth_session_id,
-        flwr_aid=row.flwr_aid,
-        connector_ref=row.connector_ref,
-        state=row.state,
-        redirect_uri=row.redirect_uri,
-        pkce_verifier=row.pkce_verifier,
-        created_at=timestamp_to_iso(row.created_at),
-        expires_at=timestamp_to_iso(row.expires_at),
-        completed_at=timestamp_to_iso(row.completed_at) or None,
+        oauth_session_id=model.oauth_session_id,
+        flwr_aid=model.flwr_aid,
+        connector_ref=model.connector_ref,
+        state=model.state,
+        redirect_uri=model.redirect_uri,
+        pkce_verifier=model.pkce_verifier,
+        created_at=_timestamp_to_iso_assuming_utc(model.created_at),
+        expires_at=_timestamp_to_iso_assuming_utc(model.expires_at),
+        completed_at=_timestamp_to_iso_assuming_utc(model.completed_at) or None,
     )
+
+
+def _timestamp_to_iso_assuming_utc(value: datetime | str | None) -> str:
+    """Return an ISO string, treating naïve SQLite timestamps as UTC."""
+    if isinstance(value, datetime) and value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return timestamp_to_iso(value)
 
 
 def determine_task_status(row: dict[str, Any]) -> TaskStatus:
@@ -1763,6 +1686,41 @@ def determine_task_status(row: dict[str, Any]) -> TaskStatus:
     raise ValueError(f"The task {task_id} does not have a valid status.")
 
 
+def _determine_task_model_status(model: TaskModel) -> TaskStatus:
+    """Determine the status of the task based on timestamp fields."""
+    if model.pending_at:
+        if model.finished_at:
+            return TaskStatus(
+                status=Status.FINISHED,
+                sub_status=model.sub_status,
+                details=model.details,
+            )
+        if model.starting_at:
+            if model.running_at:
+                return TaskStatus(status=Status.RUNNING, sub_status="", details="")
+            return TaskStatus(status=Status.STARTING, sub_status="", details="")
+        return TaskStatus(status=Status.PENDING, sub_status="", details="")
+    task_id = int64_to_uint64(model.task_id)
+    raise ValueError(f"The task {task_id} does not have a valid status.")
+
+
+def _task_status_filter(status: str) -> Any:
+    """Return the ORM filter expression for a task status."""
+    if status == Status.PENDING:
+        return TaskModel.starting_at.is_(None) & TaskModel.finished_at.is_(None)
+    if status == Status.STARTING:
+        return (
+            TaskModel.starting_at.is_not(None)
+            & TaskModel.running_at.is_(None)
+            & TaskModel.finished_at.is_(None)
+        )
+    if status == Status.RUNNING:
+        return TaskModel.running_at.is_not(None) & TaskModel.finished_at.is_(None)
+    if status == Status.FINISHED:
+        return TaskModel.finished_at.is_not(None)
+    raise ValueError(f"Unsupported task status {status!r}.")
+
+
 def task_from_row(row: dict[str, Any]) -> Task:
     """Convert a database row to a Task object."""
     return Task(
@@ -1780,6 +1738,23 @@ def task_from_row(row: dict[str, Any]) -> Task:
     )
 
 
+def task_from_model(model: TaskModel) -> Task:
+    """Convert a task ORM model to a Task object."""
+    return Task(
+        task_id=int64_to_uint64(model.task_id),
+        type=model.type,
+        run_id=int64_to_uint64(model.run_id),
+        pending_at=timestamp_to_iso(model.pending_at),
+        starting_at=timestamp_to_iso(model.starting_at),
+        running_at=timestamp_to_iso(model.running_at),
+        finished_at=timestamp_to_iso(model.finished_at),
+        status=_determine_task_model_status(model),
+        fab_hash=model.fab_hash,
+        model_ref=model.model_ref,
+        connector_ref=model.connector_ref,
+    )
+
+
 def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     """Convert a database row to a RunSeries object."""
     return RunSeries(
@@ -1788,6 +1763,17 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
         description=row["description"] or "",
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
+    )
+
+
+def _run_series_from_model(model: RunSeriesModel) -> RunSeries:
+    """Convert a run series ORM model to a RunSeries object."""
+    return RunSeries(
+        series_id=int64_to_uint64(model.series_id),
+        federation=model.federation_id,
+        description=model.description or "",
+        created_at=timestamp_to_iso(model.created_at),
+        updated_at=timestamp_to_iso(model.updated_at),
     )
 
 
@@ -1805,26 +1791,26 @@ def _task_usage_to_row(task_id: int, usage: TaskUsage) -> dict[str, Any]:
     }
 
 
-def _task_usage_from_model(row: TaskUsageModel) -> TaskUsage:
+def _task_usage_from_model(model: TaskUsageModel) -> TaskUsage:
     """Convert a task_usage ORM model to a TaskUsage proto."""
     return TaskUsage(
-        usage_type=row.usage_type,
-        provider=row.provider,
-        input_tokens=row.input_tokens,
-        output_tokens=row.output_tokens,
-        total_tokens=row.total_tokens,
+        usage_type=model.usage_type,
+        provider=model.provider,
+        input_tokens=model.input_tokens,
+        output_tokens=model.output_tokens,
+        total_tokens=model.total_tokens,
     )
 
 
-def _task_event_from_model(row: TaskEventModel) -> TaskEvent:
+def _task_event_from_model(model: TaskEventModel) -> TaskEvent:
     """Convert a task_event ORM model to a TaskEvent proto."""
     return TaskEvent(
-        id=row.id,
-        timestamp=timestamp_to_iso(row.timestamp),
-        run_id=int64_to_uint64(row.run_id),
-        task_id=int64_to_uint64(row.task_id),
-        event=row.event,
-        data=row.data,
+        id=model.id,
+        timestamp=timestamp_to_iso(model.timestamp),
+        run_id=int64_to_uint64(model.run_id),
+        task_id=int64_to_uint64(model.task_id),
+        event=model.event,
+        data=model.data,
     )
 
 
@@ -1852,8 +1838,24 @@ def _task_message_to_row(message: Message) -> dict[str, Any]:
     }
 
 
-def _task_message_from_row(row: dict[str, Any]) -> Message:
-    """Convert a task_message row to a Message."""
+def _task_message_snapshot_from_model(model: TaskMessageModel) -> dict[str, Any]:
+    """Snapshot a claimed task_message model before the transaction commits."""
+    return {
+        "message_id": model.message_id,
+        "run_id": model.run_id,
+        "src_task_id": model.src_task_id,
+        "dst_task_id": model.dst_task_id,
+        "reply_to_message_id": model.reply_to_message_id,
+        "created_at": model.created_at,
+        "ttl": model.ttl,
+        "message_type": model.message_type,
+        "content": model.content,
+        "error": model.error,
+    }
+
+
+def _task_message_from_snapshot(row: dict[str, Any]) -> Message:
+    """Convert a claimed task_message snapshot to a Message."""
     content, error = None, None
     if row["content"] is not None:
         content = recorddict_from_proto(ProtoRecordDict.FromString(row["content"]))
