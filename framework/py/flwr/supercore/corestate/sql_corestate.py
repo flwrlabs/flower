@@ -24,7 +24,7 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData, delete, func, or_, select, update
+from sqlalchemy import MetaData, delete, func, insert, literal, or_, select, update
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
@@ -1091,51 +1091,61 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         sint64_task_id = uint64_to_int64(task_id)
 
-        insert_query = """
-            INSERT INTO task
-            (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
-             active_until, pending_at, starting_at, running_at, finished_at,
-             sub_status, details)
-            SELECT
-             :task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
-             :active_until, :pending_at, :starting_at, :running_at, :finished_at,
-             :sub_status, :details
-            WHERE CAST(:requesting_task_id AS BIGINT) IS NULL
-            OR EXISTS (
-                SELECT 1
-                FROM task
-                WHERE task_id = CAST(:requesting_task_id AS BIGINT)
-                AND finished_at IS NULL
+        pending_at = now()
+        task_values = select(
+            literal(sint64_task_id, type_=TaskModel.task_id.type),
+            literal(task_type, type_=TaskModel.type.type),
+            literal(uint64_to_int64(run_id), type_=TaskModel.run_id.type),
+            literal(fab_hash, type_=TaskModel.fab_hash.type),
+            literal(model_ref, type_=TaskModel.model_ref.type),
+            literal(connector_ref, type_=TaskModel.connector_ref.type),
+            literal(None, type_=TaskModel.token.type),
+            literal(None, type_=TaskModel.active_until.type),
+            literal(pending_at, type_=TaskModel.pending_at.type),
+            literal(None, type_=TaskModel.starting_at.type),
+            literal(None, type_=TaskModel.running_at.type),
+            literal(None, type_=TaskModel.finished_at.type),
+            literal("", type_=TaskModel.sub_status.type),
+            literal("", type_=TaskModel.details.type),
+        )
+        if requesting_task_id is not None:
+            sint64_requesting_task_id = uint64_to_int64(requesting_task_id)
+            task_values = task_values.where(
+                select(TaskModel.task_id)
+                .where(
+                    TaskModel.task_id == sint64_requesting_task_id,
+                    TaskModel.finished_at.is_(None),
+                )
+                .exists()
             )
-            RETURNING task_id;
-        """
 
-        params = {
-            "task_id": sint64_task_id,
-            "type": task_type,
-            "run_id": uint64_to_int64(run_id),
-            "fab_hash": fab_hash,
-            "model_ref": model_ref,
-            "connector_ref": connector_ref,
-            "token": None,
-            "active_until": None,
-            "pending_at": now(),
-            "starting_at": None,
-            "running_at": None,
-            "finished_at": None,
-            "sub_status": "",
-            "details": "",
-            "requesting_task_id": (
-                uint64_to_int64(requesting_task_id)
-                if requesting_task_id is not None
-                else None
-            ),
-        }
+        insert_stmt = (
+            insert(TaskModel)
+            .from_select(
+                [
+                    TaskModel.task_id,
+                    TaskModel.type,
+                    TaskModel.run_id,
+                    TaskModel.fab_hash,
+                    TaskModel.model_ref,
+                    TaskModel.connector_ref,
+                    TaskModel.token,
+                    TaskModel.active_until,
+                    TaskModel.pending_at,
+                    TaskModel.starting_at,
+                    TaskModel.running_at,
+                    TaskModel.finished_at,
+                    TaskModel.sub_status,
+                    TaskModel.details,
+                ],
+                task_values,
+            )
+            .returning(TaskModel.task_id)
+        )
 
-        with self.session():
+        with self.session() as session:
             try:
-                rows = self.query(insert_query, params)
-                return task_id if rows else None
+                return task_id if session.scalar(insert_stmt) is not None else None
             except IntegrityError:
                 return None
 
@@ -1255,24 +1265,22 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         try:
             # The conditional UPDATE is the atomic claim: exactly one caller can
             # move a pending, unclaimed task to STARTING and attach a token.
-            rows = self.query(
-                f"""
-                UPDATE task
-                SET token = :token,
-                    active_until = :active_until,
-                    starting_at = :starting_at
-                WHERE task_id = :task_id AND token IS NULL
-                AND {STATUS_CONDITIONS[Status.PENDING]}
-                RETURNING task_id
-                """,
-                {
-                    "task_id": sint64_task_id,
-                    "token": token,
-                    "active_until": active_until,
-                    "starting_at": claimed_at,
-                },
-            )
-            if not rows:
+            with self.session() as session:
+                claimed_task_id = session.scalar(
+                    update(TaskModel)
+                    .where(
+                        TaskModel.task_id == sint64_task_id,
+                        TaskModel.token.is_(None),
+                        _task_status_filter(Status.PENDING),
+                    )
+                    .values(
+                        token=token,
+                        active_until=active_until,
+                        starting_at=claimed_at,
+                    )
+                    .returning(TaskModel.task_id)
+                )
+            if claimed_task_id is None:
                 return None
 
             return token
@@ -1284,7 +1292,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Move a task from starting to running."""
         # Expire non-responsive tasks before transitioning task status.
 
-        with self.session():
+        with self.session() as session:
             self._cleanup_expired_task_tokens()
             activated_at = now()
             active_until = activated_at + timedelta(
@@ -1292,20 +1300,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
 
             # Activation is a strict STARTING -> RUNNING transition.
-            rows = self.query(
-                f"""
-                UPDATE task
-                SET running_at = :running_at, active_until = :active_until
-                WHERE task_id = :task_id AND {STATUS_CONDITIONS[Status.STARTING]}
-                RETURNING task_id
-                """,
-                {
-                    "task_id": uint64_to_int64(task_id),
-                    "running_at": activated_at,
-                    "active_until": active_until,
-                },
+            activated_task_id = session.scalar(
+                update(TaskModel)
+                .where(
+                    TaskModel.task_id == uint64_to_int64(task_id),
+                    _task_status_filter(Status.STARTING),
+                )
+                .values(running_at=activated_at, active_until=active_until)
+                .returning(TaskModel.task_id)
             )
-        return len(rows) > 0
+        return activated_task_id is not None
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
@@ -1315,60 +1319,45 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return False
 
         sint64_task_id = uint64_to_int64(task_id)
-        with self.session():
+        with self.session() as session:
             self._cleanup_expired_task_tokens()
-            # FINISHED:COMPLETED is only valid from RUNNING.
-            completion_constraint = ""
-            if sub_status == SubStatus.COMPLETED:
-                completion_constraint = "AND running_at IS NOT NULL"
-
-            rows = self.query(
-                f"""
-                UPDATE task
-                SET finished_at = :finished_at,
-                    sub_status = :sub_status,
-                    details = :details,
-                    active_until = NULL,
-                    token = NULL
-                WHERE task_id = :task_id
-                AND finished_at IS NULL {completion_constraint}
-                RETURNING task_id
-                """,
-                {
-                    "task_id": sint64_task_id,
-                    "finished_at": now(),
-                    "sub_status": sub_status,
-                    "details": details,
-                },
+            query = update(TaskModel).where(
+                TaskModel.task_id == sint64_task_id,
+                TaskModel.finished_at.is_(None),
             )
-            if not rows:
-                return False
+            # FINISHED:COMPLETED is only valid from RUNNING.
+            if sub_status == SubStatus.COMPLETED:
+                query = query.where(TaskModel.running_at.is_not(None))
 
-            return True
+            finished_task_id = session.scalar(
+                query.values(
+                    finished_at=now(),
+                    sub_status=sub_status,
+                    details=details,
+                    active_until=None,
+                    token=None,
+                ).returning(TaskModel.task_id)
+            )
+            return finished_task_id is not None
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
         """Extend heartbeat state for the claimed task."""
         # Heartbeats are accepted only for active, unexpired task claims.
-        with self.session():
+        with self.session() as session:
             current = now()
             ttl = timedelta(seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL)
             self._cleanup_expired_task_tokens()
-            rows = self.query(
-                """
-                UPDATE task
-                SET active_until = :active_until
-                WHERE task_id = :task_id
-                AND active_until >= :current
-                AND finished_at IS NULL
-                RETURNING task_id
-                """,
-                {
-                    "task_id": uint64_to_int64(task_id),
-                    "current": current,
-                    "active_until": current + ttl,
-                },
+            acknowledged_task_id = session.scalar(
+                update(TaskModel)
+                .where(
+                    TaskModel.task_id == uint64_to_int64(task_id),
+                    TaskModel.active_until >= current,
+                    TaskModel.finished_at.is_(None),
+                )
+                .values(active_until=current + ttl)
+                .returning(TaskModel.task_id)
             )
-        return len(rows) > 0
+        return acknowledged_task_id is not None
 
     def get_task_by_token(self, token: str) -> Task | None:
         """Return the task associated with the task token, if valid."""
@@ -1562,38 +1551,46 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         cases.
         """
         expired_at = now()
-        # Claims that never reached RUNNING are retryable launch failures.
-        self.query(
-            f"""
-            UPDATE task
-            SET token = NULL, active_until = NULL, starting_at = NULL,
-                sub_status = '', details = ''
-            WHERE token IS NOT NULL AND active_until < :current
-            AND {STATUS_CONDITIONS[Status.STARTING]}
-            """,
-            {"current": expired_at},
-        )
+        with self.session() as session:
+            # Claims that never reached RUNNING are retryable launch failures.
+            session.execute(
+                update(TaskModel)
+                .where(
+                    TaskModel.token.is_not(None),
+                    TaskModel.active_until < expired_at,
+                    _task_status_filter(Status.STARTING),
+                )
+                .values(
+                    token=None,
+                    active_until=None,
+                    starting_at=None,
+                    sub_status="",
+                    details="",
+                )
+            )
 
-        # Expired running task claims are terminal failures and lose their token.
-        rows = self.query(
-            f"""
-            UPDATE task
-            SET token = NULL, finished_at = active_until, active_until = NULL,
-                sub_status = :sub_status, details = :details
-            WHERE token IS NOT NULL AND active_until < :current
-            AND {STATUS_CONDITIONS[Status.RUNNING]}
-            RETURNING task_id, type, run_id, fab_hash, model_ref, connector_ref,
-                      pending_at, starting_at, running_at, finished_at,
-                      sub_status, details
-            """,
-            {
-                "current": expired_at,
-                "sub_status": SubStatus.FAILED,
-                "details": "No heartbeat received from the task",
-            },
-        )
-        if rows:
-            self._on_task_tokens_expired([task_from_row(row) for row in rows])
+            # Expired running task claims are terminal failures and lose their token.
+            expired_tasks = [
+                task_from_model(row)
+                for row in session.scalars(
+                    update(TaskModel)
+                    .where(
+                        TaskModel.token.is_not(None),
+                        TaskModel.active_until < expired_at,
+                        _task_status_filter(Status.RUNNING),
+                    )
+                    .values(
+                        token=None,
+                        finished_at=TaskModel.active_until,
+                        active_until=None,
+                        sub_status=SubStatus.FAILED,
+                        details="No heartbeat received from the task",
+                    )
+                    .returning(TaskModel)
+                ).all()
+            ]
+        if expired_tasks:
+            self._on_task_tokens_expired(expired_tasks)
 
     def _cleanup_invalid_task_messages(self) -> None:
         """Remove expired task Messages."""
