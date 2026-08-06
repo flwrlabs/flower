@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared AppIo API servicer."""
+"""Shared Runtime API servicer implementation."""
 
 
 from abc import ABC, abstractmethod
@@ -60,7 +60,7 @@ from flwr.supercore.task_process.connector import registry as connector_registry
 
 # pylint: disable=invalid-name, unused-argument
 class AppIoServicer(ABC):
-    """Shared scaffolding for task-based AppIo RPCs."""
+    """Shared scaffolding for task-based Runtime RPCs."""
 
     @abstractmethod
     def state(self) -> CoreState:
@@ -70,7 +70,7 @@ class AppIoServicer(ABC):
         self, request: PullPendingTasksRequest, context: grpc.ServicerContext
     ) -> PullPendingTasksResponse:
         """Pull pending tasks."""
-        log(DEBUG, "AppIoServicer.PullPendingTasks")
+        log(DEBUG, "Runtime.PullPendingTasks")
 
         tasks = self.state().get_tasks(
             statuses=[Status.PENDING], order_by="pending_at", ascending=True
@@ -81,7 +81,7 @@ class AppIoServicer(ABC):
         self, request: ClaimTaskRequest, context: grpc.ServicerContext
     ) -> ClaimTaskResponse:
         """Claim a pending task."""
-        log(DEBUG, "AppIoServicer.ClaimTask")
+        log(DEBUG, "Runtime.ClaimTask")
 
         token = self.state().claim_task(request.task_id)
         return ClaimTaskResponse(token=token)
@@ -90,7 +90,7 @@ class AppIoServicer(ABC):
         self, request: SendTaskHeartbeatRequest, context: grpc.ServicerContext
     ) -> SendTaskHeartbeatResponse:
         """Handle a heartbeat for a claimed task."""
-        log(DEBUG, "AppIoServicer.SendTaskHeartbeat")
+        log(DEBUG, "Runtime.SendTaskHeartbeat")
 
         task = get_authenticated_task()
         success = self.state().acknowledge_task_heartbeat(task.task_id)
@@ -100,7 +100,7 @@ class AppIoServicer(ABC):
         self, request: CreateTaskRequest, context: grpc.ServicerContext
     ) -> CreateTaskResponse:
         """Create a task."""
-        log(DEBUG, "AppIoServicer.CreateTask")
+        log(DEBUG, "Runtime.CreateTask")
 
         # Get authenticated task and associated run ID
         task = get_authenticated_task()
@@ -128,7 +128,7 @@ class AppIoServicer(ABC):
         self, request: PushTaskMessageRequest, context: grpc.ServicerContext
     ) -> PushTaskMessageResponse:
         """Push a task message."""
-        log(DEBUG, "AppIoServicer.PushTaskMessage")
+        log(DEBUG, "Runtime.PushTaskMessage")
 
         task = get_authenticated_task()
 
@@ -153,7 +153,7 @@ class AppIoServicer(ABC):
         self, request: PushTaskEventsRequest, context: grpc.ServicerContext
     ) -> PushTaskEventsResponse:
         """Push task events."""
-        log(DEBUG, "AppIoServicer.PushTaskEvents")
+        log(DEBUG, "Runtime.PushTaskEvents")
 
         task = get_authenticated_task()
         if not request.events:
@@ -177,7 +177,7 @@ class AppIoServicer(ABC):
         self, request: RecordTaskUsageRequest, context: grpc.ServicerContext
     ) -> RecordTaskUsageResponse:
         """Record task usage."""
-        log(DEBUG, "AppIoServicer.RecordTaskUsage")
+        log(DEBUG, "Runtime.RecordTaskUsage")
 
         task = get_authenticated_task()
         self.state().add_task_usage(task.task_id, request.task_usage)
@@ -187,7 +187,7 @@ class AppIoServicer(ABC):
         self, request: PullTaskMessageRequest, context: grpc.ServicerContext
     ) -> PullTaskMessageResponse:
         """Pull task messages."""
-        log(DEBUG, "AppIoServicer.PullTaskMessage")
+        log(DEBUG, "Runtime.PullTaskMessage")
 
         task = get_authenticated_task()
         limit = request.limit if request.HasField("limit") else None
@@ -204,7 +204,7 @@ class AppIoServicer(ABC):
         self, request: PushLogsRequest, context: grpc.ServicerContext
     ) -> PushLogsResponse:
         """Push logs."""
-        log(DEBUG, "AppIoServicer.PushLogs")
+        log(DEBUG, "Runtime.PushLogs")
         state = self.state()
 
         task = get_authenticated_task()

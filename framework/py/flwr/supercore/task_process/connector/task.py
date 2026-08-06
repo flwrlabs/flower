@@ -25,7 +25,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskMessageRequest,
     PushTaskMessageRequest,
 )
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
@@ -42,7 +42,7 @@ from .registry import (
 
 
 def handle_task(
-    stub: ServerAppIoStub,
+    stub: RuntimeStub,
     task_id: int,
     run_id: int,
 ) -> None:
@@ -108,7 +108,7 @@ def handle_task(
         raise RuntimeError("Credential-backed connector execution failed.")
 
 
-def _pull_connector_request(stub: ServerAppIoStub) -> ConnectorRequest:
+def _pull_connector_request(stub: RuntimeStub) -> ConnectorRequest:
     """Pull one connector request, waiting until it becomes available."""
     # Keep polling until flwr-agentapp produces a request. If it exits, cleanup
     # forces flwr-connector to stop, with auth handling revoked tokens.

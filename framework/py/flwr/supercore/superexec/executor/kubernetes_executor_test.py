@@ -1199,7 +1199,7 @@ def test_execution_spec_rejects_invalid_task_id() -> None:
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
-        ("appio_api_address", "", "AppIo API address"),
+        ("appio_api_address", "", "Runtime API address"),
         ("token", "", "task token"),
     ],
 )

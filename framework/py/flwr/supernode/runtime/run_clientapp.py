@@ -43,8 +43,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesRequest,
     PushTaskOutputRequest,
 )
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.fab import Fab
@@ -103,7 +103,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         ],
     )
     channel.subscribe(on_channel_state_change)
-    stub = ClientAppIoStub(channel)
+    stub = RuntimeStub(channel)
     retry_invoker = make_simple_grpc_retry_invoker()
     wrap_stub(stub, retry_invoker)
 
@@ -234,7 +234,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     )
 
 
-def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
+def pull_task_input(stub: RuntimeStub) -> tuple[Message, Context, Run, Fab]:
     """Pull TaskInput from SuperNode."""
     # Pull Context, Run and FAB
     res: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
@@ -262,7 +262,7 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
     return message, context, run, fab
 
 
-def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> None:
+def push_message(stub: RuntimeStub, message: Message, context: Context) -> None:
     """Push reply message to SuperNode."""
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
@@ -300,7 +300,7 @@ def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> N
 
 
 def push_task_output(  # pylint: disable=R0913, R0917
-    stub: ClientAppIoStub,
+    stub: RuntimeStub,
     context: Context | None,
     sub_status: str,
     details: str,

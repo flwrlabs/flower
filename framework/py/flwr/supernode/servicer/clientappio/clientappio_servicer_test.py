@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Test the ClientAppIo API servicer."""
+"""Test the SuperNode Runtime API servicer implementation."""
 
 
 import unittest
@@ -311,7 +311,7 @@ class TestClientAppIoServicer(unittest.TestCase):
 
         context.abort.assert_called_once_with(
             grpc.StatusCode.INVALID_ARGUMENT,
-            "ClientAppIo.PushMessages expects exactly one message and one object tree.",
+            "Runtime.PushMessages expects exactly one message and one object tree.",
         )
         self.mock_state.record_message_processing_end.assert_not_called()
         self.mock_state.store_message_and_object_tree.assert_not_called()

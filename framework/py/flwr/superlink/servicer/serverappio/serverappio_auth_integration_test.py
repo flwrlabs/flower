@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""ServerAppIo auth interceptor integration tests."""
+"""SuperLink Runtime API auth interceptor integration tests."""
 
 
 import tempfile
@@ -57,7 +57,7 @@ from flwr.supercore.interceptors import (
     SuperExecAuthClientInterceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
-    SERVERAPPIO_SUPEREXEC_METHODS,
+    RUNTIME_SUPEREXEC_METHODS,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
@@ -69,10 +69,10 @@ _SUPEREXEC_SECRET = b"test-superexec-secret"
 
 
 class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R0902
-    """Integration tests for ServerAppIo token-auth interceptor behavior."""
+    """Integration tests for SuperLink Runtime token-auth behavior."""
 
     def setUp(self) -> None:
-        """Start the ServerAppIo gRPC API without client-side auth helpers."""
+        """Start the Runtime API without client-side auth helpers."""
         self.temp_dir = tempfile.TemporaryDirectory()  # pylint: disable=R1732
         self.addCleanup(self.temp_dir.cleanup)
 
@@ -103,12 +103,12 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         # Create a single base channel and wrap it for authenticated calls.
         self._base_channel = grpc.insecure_channel("localhost:9091")
         self._get_nodes_no_auth = self._base_channel.unary_unary(
-            "/flwr.proto.ServerAppIo/GetNodes",
+            "/flwr.proto.Runtime/GetNodes",
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
         self._get_connector_no_auth = self._base_channel.unary_unary(
-            "/flwr.proto.ServerAppIo/GetConnector",
+            "/flwr.proto.Runtime/GetConnector",
             request_serializer=GetConnectorRequest.SerializeToString,
             response_deserializer=GetConnectorResponse.FromString,
         )
@@ -117,11 +117,11 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             AppIoTokenClientInterceptor(token=auth_token),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
-                protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
+                protected_methods=RUNTIME_SUPEREXEC_METHODS,
             ),
         )
         self._get_nodes = auth_channel.unary_unary(
-            "/flwr.proto.ServerAppIo/GetNodes",
+            "/flwr.proto.Runtime/GetNodes",
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
@@ -217,37 +217,37 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         [
             (
                 "get_nodes",
-                "/flwr.proto.ServerAppIo/GetNodes",
+                "/flwr.proto.Runtime/GetNodes",
                 GetNodesRequest(),
                 GetNodesResponse.FromString,
             ),
             (
                 "push_messages",
-                "/flwr.proto.ServerAppIo/PushMessages",
+                "/flwr.proto.Runtime/PushMessages",
                 PushAppMessagesRequest(),
                 PushAppMessagesResponse.FromString,
             ),
             (
                 "pull_messages",
-                "/flwr.proto.ServerAppIo/PullMessages",
+                "/flwr.proto.Runtime/PullMessages",
                 PullAppMessagesRequest(),
                 PullAppMessagesResponse.FromString,
             ),
             (
                 "push_object",
-                "/flwr.proto.ServerAppIo/PushObject",
+                "/flwr.proto.Runtime/PushObject",
                 PushObjectRequest(),
                 PushObjectResponse.FromString,
             ),
             (
                 "pull_object",
-                "/flwr.proto.ServerAppIo/PullObject",
+                "/flwr.proto.Runtime/PullObject",
                 PullObjectRequest(),
                 PullObjectResponse.FromString,
             ),
             (
                 "confirm_message_received",
-                "/flwr.proto.ServerAppIo/ConfirmMessageReceived",
+                "/flwr.proto.Runtime/ConfirmMessageReceived",
                 ConfirmMessageReceivedRequest(),
                 ConfirmMessageReceivedResponse.FromString,
             ),
@@ -277,13 +277,13 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         [
             (
                 "send_task_heartbeat",
-                "/flwr.proto.ServerAppIo/SendTaskHeartbeat",
+                "/flwr.proto.Runtime/SendTaskHeartbeat",
                 SendTaskHeartbeatRequest(),
                 SendTaskHeartbeatResponse.FromString,
             ),
             (
                 "push_logs",
-                "/flwr.proto.ServerAppIo/PushLogs",
+                "/flwr.proto.Runtime/PushLogs",
                 PushLogsRequest(logs=["hello"]),
                 PushLogsResponse.FromString,
             ),

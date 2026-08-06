@@ -104,9 +104,9 @@ Flower Components APIs
 
 All Flower components — SuperLink, SuperNode, SuperExec, ``ServerApp`` process, and
 ``ClientApp`` process — expose APIs to interact with other Flower components. The
-SuperLink component includes three such APIs: the ServerAppIo API, Fleet API, and the
-Control API. Similarly, the SuperNode component includes the ClientAppIo API. Each of
-these APIs serves a distinct purpose when running a Flower app using the deployment
+SuperLink component includes three such APIs: the Runtime API, Fleet API, and the
+Control API. The SuperNode component independently hosts the same Runtime API contract.
+Each API serves a distinct purpose when running a Flower app using the deployment
 runtime, as summarized in the table below.
 
 .. list-table::
@@ -119,7 +119,7 @@ runtime, as summarized in the table below.
       - Purpose
     - - SuperLink
       - 9091
-      - ServerAppIo API
+      - Runtime API
       - Used by the SuperExec and the ``ServerApp`` processes
     - -
       - 9092
@@ -132,14 +132,14 @@ runtime, as summarized in the table below.
         <ref-api-cli.html>`_
     - - SuperNode
       - 9094
-      - ClientAppIo API
+      - Runtime API
       - Used by the SuperExec and the ``ClientApp`` processes
 
 .. note::
 
-    AppIo APIs enforce runtime version compatibility between the API server and its
+    Runtime APIs enforce runtime version compatibility between the API server and their
     callers. By default, requests from callers using an incompatible major.minor runtime
-    version are rejected before AppIo communication proceeds. Older callers without
+    version are rejected before Runtime API communication proceeds. Older callers without
     runtime metadata are currently accepted by this compatibility check for backward
     compatibility. Keep the SuperLink, SuperNode, SuperExec, ``ServerApp``, and
     ``ClientApp`` runtime components on compatible Flower versions.
@@ -163,31 +163,31 @@ When using the ``process`` isolation mode, additional network connections are ne
 to allow the external process running the SuperExec, ``ServerApp``, or ``ClientApp`` to
 communicate with the SuperLink or SuperNode:
 
-- **SuperExec/ServerApp process to SuperLink (ServerAppIO API)**: Both the SuperExec for
+- **SuperExec/ServerApp process to SuperLink (Runtime API)**: Both the SuperExec for
   ``ServerApp``\s and the ``ServerApp`` processes act as gRPC clients and connect to the
-  SuperLink's ServerAppIO API. This connection enables the SuperExec to discover runs to
+  SuperLink's Runtime API. This connection enables the SuperExec to discover runs to
   launch and the ``ServerApp`` process to pull the necessary inputs to execute the
   ``ServerApp``. It also allows the ``ServerApp``, once running, to do typical things
   like sending/receiving messages to/from available SuperNodes (via the SuperLink).
-- **SuperExec/ClientApp process to SuperNode (ClientAppIO API)**: Both the SuperExec for
+- **SuperExec/ClientApp process to SuperNode (Runtime API)**: Both the SuperExec for
   ``ClientApp``\s and the ``ClientApp`` processes act as gRPC clients and connect to the
-  SuperNode's ClientAppIO API. This connection enables the SuperExec to discover runs to
+  SuperNode's Runtime API. This connection enables the SuperExec to discover runs to
   launch and the ``ClientApp`` process to pull the necessary details (e.g., FAB file) to
   execute the ``ClientApp``, execute the ``ClientApp`` (e.g., local model training), and
   return the execution results (e.g., locally update model parameters) to the SuperNode.
 
 .. note::
 
-    The AppIo links above can run with plaintext communication or with
+    The Runtime API links above can run with plaintext communication or with
     server-authenticated TLS. Without the ``--appio-ssl-*`` options, these links remain
     unencrypted and should stay inside a trusted network:
 
     - SuperLink + SuperExec + ``ServerApp`` process
     - SuperNode + SuperExec + ``ClientApp`` process
 
-    To secure these links, configure the ServerAppIo and ClientAppIo API servers with
+    To secure these links, configure the SuperLink and SuperNode Runtime API servers with
     ``--appio-ssl-certfile``, ``--appio-ssl-keyfile``, and ``--appio-ssl-ca-certfile``.
-    AppIo clients verify server certificates with ``--root-certificates``. In
+    Runtime API clients verify server certificates with ``--root-certificates``. In
     ``subprocess`` isolation mode, the SuperLink and SuperNode pass the CA path to the
     SuperExec processes they launch. This is not mTLS. See
     :doc:`how-to-enable-tls-connections` for concrete commands.
@@ -246,11 +246,11 @@ model used between the Flower components:
 - **SuperLink ↔ SuperNode (Fleet API)**: The SuperNode pulls/pushes Messages from/to the
   SuperLink via the Fleet API. The SuperNode also pulls the FAB if a new run is being
   executed.
-- **SuperLink ↔ ServerApp (ServerAppIo API)**: The ``ServerApp`` process pulls/pushes
-  Messages from/to the SuperLink via the ServerAppIo API. The ``ServerApp`` also pulls
+- **SuperLink ↔ ServerApp (Runtime API)**: The ``ServerApp`` process pulls/pushes
+  Messages from/to the SuperLink via its Runtime API. The ``ServerApp`` also pulls
   the FAB as part of the first interaction with the SuperLink, and at the end of the
   execution it pushes the Context back to the SuperLink.
-- **SuperNode ↔ ClientApp (ClientAppIo API)**: The ``ClientApp`` process pulls/pushes
-  Messages from/to the SuperNode via the ClientAppIo API. The ``ClientApp`` also pulls
+- **SuperNode ↔ ClientApp (Runtime API)**: The ``ClientApp`` process pulls/pushes
+  Messages from/to the SuperNode via its Runtime API. The ``ClientApp`` also pulls
   the FAB as part of the first interaction with the SuperNode, and at the end of the
   execution it pushes the Context back to the SuperNode.

@@ -30,7 +30,7 @@ from flwr.supercore.run import Run
 
 
 class InMemoryGrid(Grid):
-    """`InMemoryGrid` class provides an interface to the ServerAppIo API.
+    """`InMemoryGrid` class provides an interface to the Runtime API.
 
     Parameters
     ----------

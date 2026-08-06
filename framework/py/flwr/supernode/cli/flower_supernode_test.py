@@ -52,7 +52,7 @@ def test_parse_supernode_version_flag(
 
 
 def test_parse_supernode_appio_tls_args() -> None:
-    """SuperNode should parse AppIO-specific TLS args for ClientAppIo."""
+    """SuperNode should parse AppIO-named TLS args for its Runtime API."""
     args = _parse_args_run_supernode().parse_args(
         [
             "--appio-ssl-certfile",

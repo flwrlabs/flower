@@ -200,27 +200,27 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     parser.add_argument(
         "--clientappio-api-address",
         default=CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
-        help="ClientAppIo API (gRPC) server address (IPv4, IPv6, or a domain name). "
+        help="Runtime API (gRPC) server address (IPv4, IPv6, or a domain name). "
         f"By default, it is set to {CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS}.",
     )
     parser.add_argument(
         "--appio-ssl-certfile",
-        help="ClientAppIo API server TLS certificate file (as a path str) "
+        help="Runtime API server TLS certificate file (as a path str) "
         "to create a secure connection. The certificate must include SANs for "
-        "the AppIO API address used by SuperExec.",
+        "the Runtime API address used by SuperExec.",
         type=str,
         default=None,
     )
     parser.add_argument(
         "--appio-ssl-keyfile",
-        help="ClientAppIo API server TLS private key file (as a path str) "
+        help="Runtime API server TLS private key file (as a path str) "
         "to create a secure connection.",
         type=str,
     )
     parser.add_argument(
         "--appio-ssl-ca-certfile",
         help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
-        "the ClientAppIo API server certificate. This is not a client certificate "
+        "the Runtime API server certificate. This is not a client certificate "
         "for mTLS.",
         type=str,
     )

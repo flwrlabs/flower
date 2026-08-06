@@ -30,7 +30,7 @@ class TestSimulationIoConnection(unittest.TestCase):
     """Tests for `SimulationIoConnection`."""
 
     @patch("flwr.simulation.simulationio_connection.wrap_stub")
-    @patch("flwr.simulation.simulationio_connection.ServerAppIoStub")
+    @patch("flwr.simulation.simulationio_connection.RuntimeStub")
     @patch("flwr.simulation.simulationio_connection.create_channel")
     def test_connect_adds_client_interceptors(
         self,
