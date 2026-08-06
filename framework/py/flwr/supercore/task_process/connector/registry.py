@@ -27,13 +27,12 @@ from .oauth import OAuthConnectorProvider
 ConnectorToolFactory = Callable[[], JSONObject]
 
 
-_slack_oauth_providers = slack_oauth.get_configured_connector_oauth_providers()
 CONNECTORS: tuple[ConnectorDefinition, ...] = (
     ConnectorDefinition(
         ref=slack.SLACK_CONNECTOR_REF,
-        tools=tuple(slack.make_slack_tools()),
+        tools=slack.SLACK_TOOLS,
         handlers=slack.SLACK_TOOL_HANDLERS,
-        oauth_provider=_slack_oauth_providers[0] if _slack_oauth_providers else None,
+        oauth_provider=slack_oauth.get_configured_oauth_provider(),
     ),
 )
 _CONNECTORS_BY_REF = {connector.ref: connector for connector in CONNECTORS}

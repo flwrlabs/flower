@@ -22,16 +22,14 @@ import requests
 from flwr.supercore.typing import JSONObject
 
 from .json_utils import object_field, required_string_field, string_field
-from .oauth import BaseOAuthProvider, OAuthConnectorProvider, load_oauth_provider
+from .oauth import BaseOAuthProvider, load_oauth_provider
 from .slack import SLACK_CONNECTOR_REF
 
 SLACK_CLIENT_ID_ENV = "FLWR_SLACK_CLIENT_ID"
 SLACK_CLIENT_SECRET_ENV = "FLWR_SLACK_CLIENT_SECRET"
 SLACK_REDIRECT_URI_ENV = "FLWR_SLACK_REDIRECT_URI"
 
-_SLACK_AUTHORIZE_URL = "https://slack.com/oauth/v2/authorize"
 _SLACK_TOKEN_URL = "https://slack.com/api/oauth.v2.access"
-_REQUEST_TIMEOUT = 30.0
 
 # `search.messages` requires the legacy user-token `search:read` scope. The
 # remaining scopes grant read-only access to Slack conversations.
@@ -58,7 +56,7 @@ class SlackOAuthProvider(BaseOAuthProvider):
     connector_ref = SLACK_CONNECTOR_REF
     display_name = "Slack"
     description = "Search and read messages, conversations, and threads."
-    authorize_url = _SLACK_AUTHORIZE_URL
+    authorize_url = "https://slack.com/oauth/v2/authorize"
     error_type = SlackOAuthError
 
     def authorization_parameters(
@@ -93,7 +91,7 @@ class SlackOAuthProvider(BaseOAuthProvider):
             _SLACK_TOKEN_URL,
             auth=(self._client_id, self._client_secret),
             data=data,
-            timeout=_REQUEST_TIMEOUT,
+            timeout=30.0,
         )
 
     def parse_token_response(
@@ -131,30 +129,17 @@ class SlackOAuthProvider(BaseOAuthProvider):
         return credentials, config
 
 
-def get_configured_connector_oauth_providers() -> list[OAuthConnectorProvider]:
-    """Return configured built-in OAuth connector providers."""
-    values = {
-        SLACK_CLIENT_ID_ENV: os.getenv(SLACK_CLIENT_ID_ENV, "").strip(),
-        SLACK_CLIENT_SECRET_ENV: os.getenv(SLACK_CLIENT_SECRET_ENV, "").strip(),
-        SLACK_REDIRECT_URI_ENV: os.getenv(SLACK_REDIRECT_URI_ENV, "").strip(),
-    }
-    if not any(values.values()):
-        return []
-    missing = [name for name, value in values.items() if not value]
-    if missing:
-        raise RuntimeError(
-            "Slack OAuth configuration requires environment variables: "
-            + ", ".join(missing)
-            + "."
-        )
-    return [
-        load_oauth_provider(
-            SlackOAuthProvider,
-            client_id_env=SLACK_CLIENT_ID_ENV,
-            client_secret_env=SLACK_CLIENT_SECRET_ENV,
-            redirect_uri_env=SLACK_REDIRECT_URI_ENV,
-        )
-    ]
+def get_configured_oauth_provider() -> SlackOAuthProvider | None:
+    """Return the configured Slack OAuth provider, if available."""
+    env_names = (SLACK_CLIENT_ID_ENV, SLACK_CLIENT_SECRET_ENV, SLACK_REDIRECT_URI_ENV)
+    if not any(os.getenv(name, "").strip() for name in env_names):
+        return None
+    return load_oauth_provider(
+        SlackOAuthProvider,
+        client_id_env=SLACK_CLIENT_ID_ENV,
+        client_secret_env=SLACK_CLIENT_SECRET_ENV,
+        redirect_uri_env=SLACK_REDIRECT_URI_ENV,
+    )
 
 
 def _parse_scopes(value: object) -> list[str]:
