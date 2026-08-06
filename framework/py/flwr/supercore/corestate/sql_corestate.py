@@ -976,9 +976,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             "previous_next_run_at": previous_next_run_at,
             "next_run_at": next_run_at,
         }
+        terminal_occurrence_condition = (
+            "AND remaining_runs <= 1" if next_run_at is None else ""
+        )
 
         rows = self.query(
-            """
+            f"""
             UPDATE automation
             SET updated_at = :updated_at,
                 next_run_at = CASE
@@ -997,7 +1000,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             AND status = :active_status
             AND next_run_at = :previous_next_run_at
             AND (remaining_runs IS NULL OR remaining_runs > 0)
-            AND (:next_run_at IS NOT NULL OR remaining_runs <= 1)
+            {terminal_occurrence_condition}
             RETURNING automation_id
             """,
             params,
