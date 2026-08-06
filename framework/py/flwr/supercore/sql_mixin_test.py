@@ -306,6 +306,13 @@ class TestSqlMixin(unittest.TestCase):
         self.assertTrue(db.database_url.startswith("sqlite:///"))
         self.assertEqual(db.database_backend, "sqlite")
 
+    def test_dialect_insert_returns_sqlite_insert(self) -> None:
+        """Dialect insert should expose SQLite conflict helpers for SQLite state."""
+        metadata = self.db.get_metadata()
+        stmt = self.db.dialect_insert(metadata.tables["test"])
+
+        self.assertTrue(hasattr(stmt, "on_conflict_do_nothing"))
+
     def test_sqlite_allowlist_rejects_non_sqlite_url(self) -> None:
         """SQLite-only classes should reject non-SQLite URLs."""
         with self.assertRaisesRegex(

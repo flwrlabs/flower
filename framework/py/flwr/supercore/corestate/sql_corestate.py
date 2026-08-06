@@ -24,7 +24,9 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData, delete, or_, select, update
+from sqlalchemy import MetaData, delete, func, or_, select, update
+from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Context, Message
@@ -65,6 +67,15 @@ from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.corestate_models import (
+    ObjectPushSession as ObjectPushSessionModel,
+)
+from flwr.supercore.state.schema.corestate_models import (
+    ObjectPushSessionPending as ObjectPushSessionPendingModel,
+)
+from flwr.supercore.state.schema.corestate_models import (
+    ObjectPushSessionRoot as ObjectPushSessionRootModel,
+)
 from flwr.supercore.state.schema.corestate_models import (
     RunConnector as RunConnectorModel,
 )
@@ -109,6 +120,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         super().__init__(database_path)
         self._object_store = object_store
 
+    def dialect_insert(self, table: Any) -> SQLiteInsert:
+        """Return a SQLite insert statement for CoreState upserts."""
+        if self.database_backend == "sqlite":
+            return sqlite_insert(table)
+
+        raise NotImplementedError(
+            f"No dialect-specific insert configured for {self.database_backend!r}."
+        )
+
     @property
     def select_lock_sql(self) -> str:
         """Return the SQL clause for row-locking selected candidates."""
@@ -122,109 +142,82 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def start_session(self, run_id: int) -> str:
         """Start a run-scoped object push session."""
         session_id = str(uuid4())
-        self.query(
-            """
-            INSERT INTO object_push_sessions (
-                session_id, run_id, expires_at, pending_count
-            )
-            VALUES (:session_id, :run_id, :expires_at, 0)
-            """,
-            {
-                "session_id": session_id,
-                "run_id": uint64_to_int64(run_id),
-                "expires_at": now()
-                + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS),
-            },
+        expires_at = now() + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS)
+        stmt = self.dialect_insert(ObjectPushSessionModel).values(
+            session_id=session_id,
+            run_id=uint64_to_int64(run_id),
+            expires_at=expires_at,
+            pending_count=0,
         )
+        with self.session() as session:
+            session.execute(stmt)
         return session_id
 
     def delete_sessions_in_run(self, run_id: int) -> None:
         """Delete all object push session bookkeeping for a run."""
-        self.query(
-            """
-            DELETE FROM object_push_sessions
-            WHERE run_id = :run_id
-            """,
-            {"run_id": uint64_to_int64(run_id)},
-        )
+        with self.session() as session:
+            session.execute(
+                delete(ObjectPushSessionModel).where(
+                    ObjectPushSessionModel.run_id == uint64_to_int64(run_id)
+                )
+            )
 
     def preregister_object_tree(
         self, object_tree: ObjectTree, session_id: str
     ) -> list[str]:
         """Preregister an object tree and record its missing objects."""
-        with self.session():
-            # Load the run associated with the session
-            rows = self.query(
-                """
-                SELECT run_id
-                FROM object_push_sessions
-                WHERE session_id = :session_id
-                """,
-                {"session_id": session_id},
+        with self.session() as session:
+            # Load the run associated with the session.
+            push_session = session.get(
+                ObjectPushSessionModel, session_id, populate_existing=True
             )
-            if not rows:
+            if push_session is None:
                 raise ValueError(f"Unknown object push session: {session_id}")
-            run_id = int64_to_uint64(rows[0]["run_id"])
+            run_id = int64_to_uint64(push_session.run_id)
 
-            # Preregister the tree and collect its currently missing objects
+            # Preregister the tree and collect its currently missing objects.
             missing_objects = self.object_store.preregister(run_id, object_tree)
 
-            # Remove bookkeeping for an older session owning the same root
-            rows = self.query(
-                """
-                SELECT session_id
-                FROM object_push_session_roots
-                WHERE root_object_id = :root_object_id AND session_id != :session_id
-                """,
-                {
-                    "root_object_id": object_tree.object_id,
-                    "session_id": session_id,
-                },
-            )
-            if rows:
-                self._cleanup_push_session(
-                    rows[0]["session_id"], cleanup_messages=False
+            # Remove bookkeeping for an older session owning the same root.
+            old_session_id = session.scalar(
+                select(ObjectPushSessionRootModel.session_id).where(
+                    ObjectPushSessionRootModel.root_object_id == object_tree.object_id,
+                    ObjectPushSessionRootModel.session_id != session_id,
                 )
+            )
+            if old_session_id is not None:
+                self._cleanup_push_session(old_session_id, cleanup_messages=False)
 
-            # Record ownership of the root
-            self.query(
-                """
-                INSERT INTO object_push_session_roots (session_id, root_object_id)
-                VALUES (:session_id, :root_object_id)
-                """,
-                {
-                    "session_id": session_id,
-                    "root_object_id": object_tree.object_id,
-                },
+            # Record ownership of the root.
+            session.add(
+                ObjectPushSessionRootModel(
+                    session_id=session_id, root_object_id=object_tree.object_id
+                )
             )
 
-            # Record the objects that still need to be pushed
+            # Record the objects that still need to be pushed.
             if missing_objects:
-                self.query(
-                    """
-                    INSERT INTO object_push_session_pending (session_id, object_id)
-                    VALUES (:session_id, :object_id)
-                    ON CONFLICT(session_id, object_id) DO NOTHING
-                    """,
+                stmt = self.dialect_insert(ObjectPushSessionPendingModel).values(
                     [
                         {"session_id": session_id, "object_id": object_id}
                         for object_id in missing_objects
-                    ],
+                    ]
                 )
+                stmt = stmt.on_conflict_do_nothing(
+                    index_elements=[
+                        ObjectPushSessionPendingModel.session_id,
+                        ObjectPushSessionPendingModel.object_id,
+                    ]
+                )
+                session.execute(stmt)
 
             # Synchronize the materialized pending count.
-            self.query(
-                """
-                UPDATE object_push_sessions
-                SET pending_count = (
-                    SELECT COUNT(*)
-                    FROM object_push_session_pending
-                    WHERE session_id = :session_id
+            pending_count = session.scalar(
+                select(func.count()).where(  # pylint: disable=not-callable
+                    ObjectPushSessionPendingModel.session_id == session_id
                 )
-                WHERE session_id = :session_id
-                """,
-                {"session_id": session_id},
             )
+            push_session.pending_count = int(pending_count or 0)
             return missing_objects
 
     def _claim_pending_object(
@@ -233,37 +226,33 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         session_id: str,
         object_id: str,
     ) -> datetime | None:
-        """Claim a pending object and return the push session expiry."""
-        rows = self.query(
-            """
-            DELETE FROM object_push_session_pending AS pending
-            WHERE pending.session_id = :session_id
-              AND pending.object_id = :object_id
-              AND EXISTS (
-                  SELECT 1
-                  FROM object_push_sessions AS session
-                  WHERE session.session_id = :session_id
-                    AND session.run_id = :run_id
-              )
-            RETURNING (
-                SELECT expires_at
-                FROM object_push_sessions
-                WHERE session_id = :session_id
-            ) AS expires_at
-            """,
-            {
-                "session_id": session_id,
-                "object_id": object_id,
-                "run_id": uint64_to_int64(run_id),
-            },
-        )
-        if not rows:
-            return None
+        """Claim a pending object and return the refreshed push session expiry."""
+        with self.session() as session:
+            claimed_session_id = session.scalar(
+                delete(ObjectPushSessionPendingModel)
+                .where(
+                    ObjectPushSessionPendingModel.session_id == session_id,
+                    ObjectPushSessionPendingModel.object_id == object_id,
+                    select(ObjectPushSessionModel.session_id)
+                    .where(
+                        ObjectPushSessionModel.session_id == session_id,
+                        ObjectPushSessionModel.run_id == uint64_to_int64(run_id),
+                    )
+                    .exists(),
+                )
+                .returning(ObjectPushSessionPendingModel.session_id)
+            )
+            if claimed_session_id is None:
+                return None
 
-        expires_at = rows[0]["expires_at"]
-        if isinstance(expires_at, str):  # SQLite returns string for TIMESTAMP column
-            return datetime.fromisoformat(expires_at)
-        return cast(datetime, expires_at)
+            # Re-read after the successful claim. Another push can refresh the
+            # session while this request waits to delete the pending row.
+            expires_at = session.scalar(
+                select(ObjectPushSessionModel.expires_at)
+                .where(ObjectPushSessionModel.session_id == claimed_session_id)
+                .execution_options(populate_existing=True)
+            )
+            return expires_at
 
     def store_object(
         self,
@@ -274,50 +263,46 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     ) -> bool:
         """Store an object if it is pending for an active push session."""
         try:
-            with self.session():
-                # Support legacy SuperNodes that do not send a session ID
+            with self.session() as session:
+                # Support legacy SuperNodes that do not send a session ID.
                 if not session_id:
-                    rows = self.query(
-                        """
-                        SELECT session_id
-                        FROM object_push_session_pending
-                        WHERE object_id = :object_id
-                        """,
-                        {"object_id": object_id},
+                    resolved_session_id = session.scalar(
+                        select(ObjectPushSessionPendingModel.session_id).where(
+                            ObjectPushSessionPendingModel.object_id == object_id
+                        )
                     )
-                    if not rows:
+                    if resolved_session_id is None:
                         return False
-                    session_id = rows[0]["session_id"]
+                    session_id = resolved_session_id
 
-                # Atomically validate the session and claim its pending object
+                # Atomically validate the session and claim its pending object.
                 expires_at = self._claim_pending_object(run_id, session_id, object_id)
                 if expires_at is None:
                     return False
 
-                # Reject expired sessions and clean up their messages and objects
+                # Reject expired sessions and clean up their messages and objects.
                 if expires_at <= now():
                     self._cleanup_push_session(session_id, cleanup_messages=True)
                     return False
 
-                # Store the object, decrement pending work, and refresh the session TTL
+                # Store the object, decrement pending work, and refresh the session TTL.
                 self.object_store.put(object_id, object_content)
-                rows = self.query(
-                    """
-                    UPDATE object_push_sessions
-                    SET pending_count = pending_count - 1,
-                        expires_at = :expires_at
-                    WHERE session_id = :session_id
-                    RETURNING pending_count
-                    """,
-                    {
-                        "session_id": session_id,
-                        "expires_at": now()
-                        + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS),
-                    },
+                refreshed_expires_at = now() + timedelta(
+                    seconds=OBJECT_PUSH_SESSION_TTL_SECONDS
                 )
-                pending_count = rows[0]["pending_count"]
+                pending_count = session.scalar(
+                    update(ObjectPushSessionModel)
+                    .where(ObjectPushSessionModel.session_id == session_id)
+                    .values(
+                        pending_count=ObjectPushSessionModel.pending_count - 1,
+                        expires_at=refreshed_expires_at,
+                    )
+                    .returning(ObjectPushSessionModel.pending_count)
+                )
+                if pending_count is None:
+                    raise RuntimeError("Object push session disappeared after claim")
 
-                # Remove session bookkeeping once every pending object is stored
+                # Remove session bookkeeping once every pending object is stored.
                 if pending_count == 0:
                     self._cleanup_push_session(session_id, cleanup_messages=False)
                 return True
@@ -327,66 +312,61 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def get_object(self, run_id: int, object_id: str) -> bytes | None:
         """Get an object and clean up expired push sessions when needed."""
-        with self.session():
-            # Return immediately unless the object is known but unavailable
+        with self.session() as session:
+            # Return immediately unless the object is known but unavailable.
             content = self.object_store.get(object_id)
             if content != b"":
                 return content
 
-            # Find expired sessions in this run that are waiting for the object
-            rows = self.query(
-                """
-                SELECT session.session_id
-                FROM object_push_session_pending AS pending
-                INNER JOIN object_push_sessions AS session
-                    ON pending.session_id = session.session_id
-                WHERE pending.object_id = :object_id
-                  AND session.run_id = :run_id
-                  AND session.expires_at <= :current
-                """,
-                {
-                    "object_id": object_id,
-                    "run_id": uint64_to_int64(run_id),
-                    "current": now(),
-                },
+            # Find expired sessions in this run that are waiting for the object.
+            expired_session_ids = list(
+                session.scalars(
+                    select(ObjectPushSessionModel.session_id)
+                    .join(
+                        ObjectPushSessionPendingModel,
+                        ObjectPushSessionPendingModel.session_id
+                        == ObjectPushSessionModel.session_id,
+                    )
+                    .where(
+                        ObjectPushSessionPendingModel.object_id == object_id,
+                        ObjectPushSessionModel.run_id == uint64_to_int64(run_id),
+                        ObjectPushSessionModel.expires_at <= now(),
+                    )
+                )
             )
-            if not rows:
+            if not expired_session_ids:
                 return content
 
-            # Clean up every expired session, then return the resulting object state
-            for row in rows:
-                self._cleanup_push_session(row["session_id"], cleanup_messages=True)
+            # Clean up every expired session, then return the resulting object state.
+            for expired_session_id in expired_session_ids:
+                self._cleanup_push_session(expired_session_id, cleanup_messages=True)
             return self.object_store.get(object_id)
 
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
         """Remove an object push session and optionally its messages."""
-        with self.session():
-            # Load message roots only when their data must also be cleaned up
+        with self.session() as session:
+            # Load message roots only when their data must also be cleaned up.
             message_object_ids: set[str] = set()
             if cleanup_messages:
-                rows = self.query(
-                    """
-                    SELECT root_object_id
-                    FROM object_push_session_roots
-                    WHERE session_id = :session_id
-                    """,
-                    {"session_id": session_id},
+                message_object_ids = set(
+                    session.scalars(
+                        select(ObjectPushSessionRootModel.root_object_id).where(
+                            ObjectPushSessionRootModel.session_id == session_id
+                        )
+                    )
                 )
-                message_object_ids = {row["root_object_id"] for row in rows}
 
-            # Delete the session and its cascaded root and pending rows
-            self.query(
-                """
-                DELETE FROM object_push_sessions
-                WHERE session_id = :session_id
-                """,
-                {"session_id": session_id},
+            # Delete the session and its cascaded root and pending rows.
+            session.execute(
+                delete(ObjectPushSessionModel).where(
+                    ObjectPushSessionModel.session_id == session_id
+                )
             )
 
             # Delete expired object trees and their message metadata.
             if message_object_ids:
-                for object_id in message_object_ids:
-                    self.object_store.delete(object_id)
+                for message_object_id in message_object_ids:
+                    self.object_store.delete(message_object_id)
                 self._on_push_session_expired(message_object_ids)
 
     def store_fab(self, fab: Fab) -> str:
