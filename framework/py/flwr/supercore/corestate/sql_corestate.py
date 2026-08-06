@@ -67,6 +67,7 @@ from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.corestate_models import NonceStore as NonceStoreModel
 from flwr.supercore.state.schema.corestate_models import (
     ObjectPushSession as ObjectPushSessionModel,
 )
@@ -378,20 +379,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         # Keep launch behavior: last write wins for metadata under the same
         # content hash.
-        self.query(
-            """
-            INSERT INTO fab (fab_hash, content, verifications)
-            VALUES (:fab_hash, :content, :verifications)
-            ON CONFLICT(fab_hash) DO UPDATE SET
-                content = excluded.content,
-                verifications = excluded.verifications
-            """,
-            {
-                "fab_hash": fab_hash,
-                "content": fab.content,
-                "verifications": json.dumps(fab.verifications),
+        stmt = self.dialect_insert(FabModel).values(
+            fab_hash=fab_hash,
+            content=fab.content,
+            verifications=json.dumps(fab.verifications),
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[FabModel.fab_hash],
+            set_={
+                "content": stmt.excluded.content,
+                "verifications": stmt.excluded.verifications,
             },
         )
+        with self.session() as session:
+            session.execute(stmt)
         return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
@@ -418,25 +419,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Create or update a connector for an account."""
         if not flwr_aid or not connector_ref:
             return False
-        self.query(
-            """
-            INSERT INTO connector (
-                flwr_aid, connector_ref, credentials_json, config_json
-            )
-            VALUES (
-                :flwr_aid, :connector_ref, :credentials_json, :config_json
-            )
-            ON CONFLICT(flwr_aid, connector_ref) DO UPDATE SET
-                credentials_json = excluded.credentials_json,
-                config_json = excluded.config_json
-            """,
-            {
-                "flwr_aid": flwr_aid,
-                "connector_ref": connector_ref,
-                "credentials_json": credentials_json,
-                "config_json": config_json,
+        stmt = self.dialect_insert(ConnectorModel).values(
+            flwr_aid=flwr_aid,
+            connector_ref=connector_ref,
+            credentials_json=credentials_json,
+            config_json=config_json,
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[ConnectorModel.flwr_aid, ConnectorModel.connector_ref],
+            set_={
+                "credentials_json": stmt.excluded.credentials_json,
+                "config_json": stmt.excluded.config_json,
             },
         )
+        with self.session() as session:
+            session.execute(stmt)
         return True
 
     def get_connector(
@@ -663,15 +660,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Set the shared Context for the specified RunSeries."""
         sint_series_id = uint64_to_int64(series_id)
         context_bytes = context_to_bytes(context)
-        self.query(
-            """
-            INSERT INTO series_context (series_id, context)
-            VALUES (:series_id, :context)
-            ON CONFLICT(series_id) DO UPDATE SET
-                context = excluded.context
-            """,
-            {"series_id": sint_series_id, "context": context_bytes},
+        stmt = self.dialect_insert(SeriesContextModel).values(
+            series_id=sint_series_id,
+            context=context_bytes,
         )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[SeriesContextModel.series_id],
+            set_={"context": stmt.excluded.context},
+        )
+        with self.session() as session:
+            session.execute(stmt)
 
     def store_run_in_series(
         self,
@@ -1610,28 +1608,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Atomically reserve a nonce in a namespace."""
         if namespace == "" or nonce == "":
             return False
-        with self.session():
-            self.query(
-                """
-                DELETE FROM nonce_store
-                WHERE expires_at < :current
-                """,
-                {"current": now().timestamp()},
+        with self.session() as session:
+            session.execute(
+                delete(NonceStoreModel).where(
+                    NonceStoreModel.expires_at < now().timestamp()
+                )
             )
-            rows = self.query(
-                """
-                INSERT INTO nonce_store (namespace, nonce, expires_at)
-                VALUES (:namespace, :nonce, :expires_at)
-                ON CONFLICT(namespace, nonce) DO NOTHING
-                RETURNING nonce
-                """,
-                {
-                    "namespace": namespace,
-                    "nonce": nonce,
-                    "expires_at": expires_at,
-                },
+            stmt = (
+                self.dialect_insert(NonceStoreModel)
+                .values(namespace=namespace, nonce=nonce, expires_at=expires_at)
+                .on_conflict_do_nothing(
+                    index_elements=[NonceStoreModel.namespace, NonceStoreModel.nonce]
+                )
+                .returning(NonceStoreModel.nonce)
             )
-            return bool(rows)
+            return session.scalar(stmt) is not None
 
 
 def _connector_oauth_session_from_model(

@@ -174,6 +174,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(retrieved.run_config, context.run_config)
         self.assertEqual(retrieved.series_id, context.series_id)
 
+        updated_context = Context(
+            run_id=456,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={"node": "updated"},
+            state=RecordDict(),
+            run_config={"run": "updated"},
+            series_id=42,
+        )
+        state.set_run_series_context(series_id=42, context=updated_context)
+
+        updated = state.get_run_series_context(series_id=42)
+
+        assert updated is not None
+        self.assertEqual(updated.run_id, updated_context.run_id)
+        self.assertEqual(updated.node_config, updated_context.node_config)
+        self.assertEqual(updated.run_config, updated_context.run_config)
+
     def test_connector_oauth_session_lifecycle(self) -> None:
         """An OAuth session can be created, retrieved, and completed once."""
         state = self.state_factory()
