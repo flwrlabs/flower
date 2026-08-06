@@ -820,9 +820,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         next_run_at: str | None,
     ) -> tuple[StartRunRequest, str] | None:
         """Claim an automation occurrence and return its unresolved run request."""
+        terminal_occurrence_condition = (
+            "AND remaining_runs <= 1" if next_run_at is None else ""
+        )
         with self.session():
             rows = self.query(
-                """
+                f"""
                 SELECT start_run_request, flwr_aid
                 FROM automation
                 WHERE automation_id = :automation_id
@@ -830,13 +833,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 AND start_run_request IS NOT NULL
                 AND next_run_at = :previous_next_run_at
                 AND (remaining_runs IS NULL OR remaining_runs > 0)
-                AND (:next_run_at IS NOT NULL OR remaining_runs <= 1)
+                {terminal_occurrence_condition}
                 """,
                 {
                     "automation_id": automation_id,
                     "active_status": AutomationStatus.ACTIVE,
                     "previous_next_run_at": previous_next_run_at,
-                    "next_run_at": next_run_at,
                 },
             )
             if not rows or not self.advance_automation(
