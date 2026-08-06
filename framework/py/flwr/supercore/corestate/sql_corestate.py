@@ -1200,7 +1200,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
         """Record usage for the specified task."""
-        stored_task_id = uint64_to_int64(task_id)
+        sint64_task_id = uint64_to_int64(task_id)
         usage_values = select(
             TaskModel.run_id,
             TaskModel.task_id,
@@ -1210,8 +1210,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             literal(usage.usage_type, type_=TaskUsageModel.usage_type.type),
             literal(usage.provider, type_=TaskUsageModel.provider.type),
             literal(now(), type_=TaskUsageModel.created_at.type),
-            literal(None, type_=TaskUsageModel.reported_at.type),
-        ).where(TaskModel.task_id == stored_task_id)
+        ).where(TaskModel.task_id == sint64_task_id)
         stmt = insert(TaskUsageModel).from_select(
             [
                 TaskUsageModel.run_id,
@@ -1222,7 +1221,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 TaskUsageModel.usage_type,
                 TaskUsageModel.provider,
                 TaskUsageModel.created_at,
-                TaskUsageModel.reported_at,
             ],
             usage_values,
         )
@@ -1448,19 +1446,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return False
 
         current = now()
-        event_models = [
-            TaskEventModel(
-                timestamp=current,
-                run_id=uint64_to_int64(event.run_id),
-                task_id=uint64_to_int64(event.task_id),
-                event=event.event,
-                data=event.data,
-            )
+        event_rows = [
+            {
+                "timestamp": current,
+                "run_id": uint64_to_int64(event.run_id),
+                "task_id": uint64_to_int64(event.task_id),
+                "event": event.event,
+                "data": event.data,
+            }
             for event in events
         ]
 
         with self.session() as session:
-            session.add_all(event_models)
+            session.execute(insert(TaskEventModel), event_rows)
 
         return True
 
