@@ -1091,30 +1091,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         sint64_task_id = uint64_to_int64(task_id)
 
-        insert_columns = [
-            TaskModel.task_id,
-            TaskModel.type,
-            TaskModel.run_id,
-            TaskModel.pending_at,
-        ]
-        select_values = [
+        task_values = select(
             literal(sint64_task_id, type_=TaskModel.task_id.type),
             literal(task_type, type_=TaskModel.type.type),
             literal(uint64_to_int64(run_id), type_=TaskModel.run_id.type),
+            literal(fab_hash, type_=TaskModel.fab_hash.type),
+            literal(model_ref, type_=TaskModel.model_ref.type),
+            literal(connector_ref, type_=TaskModel.connector_ref.type),
             literal(now(), type_=TaskModel.pending_at.type),
-        ]
-        if fab_hash is not None:
-            insert_columns.append(TaskModel.fab_hash)
-            select_values.append(literal(fab_hash, type_=TaskModel.fab_hash.type))
-        if model_ref is not None:
-            insert_columns.append(TaskModel.model_ref)
-            select_values.append(literal(model_ref, type_=TaskModel.model_ref.type))
-        if connector_ref is not None:
-            insert_columns.append(TaskModel.connector_ref)
-            select_values.append(
-                literal(connector_ref, type_=TaskModel.connector_ref.type)
-            )
-        task_values = select(*select_values)
+        )
         if requesting_task_id is not None:
             sint64_requesting_task_id = uint64_to_int64(requesting_task_id)
             task_values = task_values.where(
@@ -1129,7 +1114,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         insert_stmt = (
             insert(TaskModel)
             .from_select(
-                insert_columns,
+                [
+                    TaskModel.task_id,
+                    TaskModel.type,
+                    TaskModel.run_id,
+                    TaskModel.fab_hash,
+                    TaskModel.model_ref,
+                    TaskModel.connector_ref,
+                    TaskModel.pending_at,
+                ],
                 task_values,
             )
             .returning(TaskModel.task_id)
