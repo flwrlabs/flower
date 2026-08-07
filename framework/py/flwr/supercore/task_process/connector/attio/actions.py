@@ -34,6 +34,7 @@ ACTIONS = (
                 "objects": {
                     "type": "array",
                     "items": {"type": "string"},
+                    "minItems": 1,
                     "description": "Attio object types to search.",
                 },
                 "limit": integer_property(
