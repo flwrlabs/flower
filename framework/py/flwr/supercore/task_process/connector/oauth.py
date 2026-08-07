@@ -69,6 +69,7 @@ class OAuthFlow:
         params = {
             "client_id": self._client_id,
             "redirect_uri": redirect_uri,
+            "response_type": "code",
             "state": state,
         }
         if self._oauth.scopes:
@@ -94,7 +95,11 @@ class OAuthFlow:
         """Exchange a code and extract standard credentials."""
         if not code:
             raise self._error("exchange failed")
-        data = {"code": code, "redirect_uri": redirect_uri}
+        data = {
+            "code": code,
+            "grant_type": "authorization_code",
+            "redirect_uri": redirect_uri,
+        }
         if self._oauth.use_pkce:
             if not pkce_verifier:
                 raise self._error("exchange failed")
@@ -153,8 +158,8 @@ class OAuthFlow:
                 for item in scope.split(self._oauth.scope_separator)
                 if item.strip()
             }
-            if not granted.issubset(self._oauth.scopes):
-                raise self._error("returned unsupported permissions")
+            if not set(self._oauth.scopes).issubset(granted):
+                raise self._error("returned insufficient permissions")
         credentials: JSONObject = {
             "access_token": required_string_field(
                 token_payload, "access_token", error=self._error

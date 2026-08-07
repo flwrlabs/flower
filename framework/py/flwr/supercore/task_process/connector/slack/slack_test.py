@@ -57,19 +57,33 @@ def test_slack_oauth_flow() -> None:
     url = flow.build_authorization_url(
         redirect_uri=redirect_uri, state="state", pkce_challenge="ignored"
     )
-    assert parse_qs(urlparse(url).query)["user_scope"] == [",".join(SLACK_USER_SCOPES)]
+    query = parse_qs(urlparse(url).query)
+    assert query["response_type"] == ["code"]
+    assert query["user_scope"] == [",".join(SLACK_USER_SCOPES)]
     response = Mock(status_code=200)
     response.json.return_value = {
         "ok": True,
-        "authed_user": {"access_token": "token", "scope": "search:read"},
+        "authed_user": {
+            "access_token": "token",
+            "scope": ", ".join(SLACK_USER_SCOPES),
+        },
     }
-    with patch(_OAUTH_REQUEST, return_value=response):
+    with patch(_OAUTH_REQUEST, return_value=response) as post:
         assert flow.exchange_code(
             code="code", redirect_uri=redirect_uri, pkce_verifier="ignored"
         )[0] == {"access_token": "token"}
+    assert post.call_args.kwargs["data"]["grant_type"] == "authorization_code"
 
-    response.json.return_value["authed_user"]["scope"] = "chat:write"
+    response.json.return_value["authed_user"]["scope"] = "search:read"
     with patch(_OAUTH_REQUEST, return_value=response), pytest.raises(RuntimeError):
+        flow.exchange_code(
+            code="code", redirect_uri=redirect_uri, pkce_verifier="ignored"
+        )
+
+    response.json.return_value["authed_user"][
+        "scope"
+    ] = f"{','.join(SLACK_USER_SCOPES)},chat:write"
+    with patch(_OAUTH_REQUEST, return_value=response):
         flow.exchange_code(
             code="code", redirect_uri=redirect_uri, pkce_verifier="ignored"
         )
