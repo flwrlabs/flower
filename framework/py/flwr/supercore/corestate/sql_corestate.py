@@ -861,8 +861,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
 
         if order_by == "next_run_at":
+            next_run_order: Any = AutomationModel.next_run_at
+            if self.database_backend == "sqlite":
+                next_run_order = _timestamp_order_legacy_text(
+                    AutomationModel.next_run_at
+                )
             query = query.order_by(
-                AutomationModel.next_run_at.asc(), AutomationModel.automation_id.asc()
+                next_run_order.asc(), AutomationModel.automation_id.asc()
             )
         else:
             query = query.order_by(
@@ -1772,6 +1777,11 @@ def _timestamp_le_legacy_text(column: Any, value: datetime) -> Any:
         column <= value,
         and_(text_column.like("%T%"), text_column <= value.isoformat()),
     )
+
+
+def _timestamp_order_legacy_text(column: Any) -> Any:
+    """Normalize legacy SQLite timestamp text for chronological ordering."""
+    return func.replace(sql_cast(column, String), "T", " ")
 
 
 def _automation_from_model(model: AutomationModel) -> Automation:

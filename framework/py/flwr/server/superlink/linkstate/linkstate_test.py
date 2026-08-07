@@ -2402,6 +2402,46 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         self.assertEqual(updated[0].remaining_runs, 1)
         self.assertEqual(updated[0].next_run_at, next_run_at)
 
+    def test_legacy_automation_timestamp_ordering_is_chronological(self) -> None:
+        """Mixed timestamp encodings are ordered by time, not raw text."""
+        state = self.state_factory()
+        legacy_next_run_at = datetime(2026, 1, 1, 10, tzinfo=UTC).isoformat()
+        new_next_run_at = datetime(2026, 1, 1, 11, tzinfo=UTC).isoformat()
+        due_before = datetime(2026, 1, 1, 12, tzinfo=UTC)
+        legacy = self.store_automation(
+            state,
+            series_id=123,
+            next_run_at=legacy_next_run_at,
+        )
+        newer = self.store_automation(
+            state,
+            series_id=124,
+            next_run_at=new_next_run_at,
+        )
+        state.query(
+            """
+            UPDATE automation
+            SET next_run_at = :next_run_at
+            WHERE automation_id = :automation_id
+            """,
+            {
+                "automation_id": uint64_to_int64(legacy.automation_id),
+                "next_run_at": legacy_next_run_at,
+            },
+        )
+
+        due = state.list_automations(
+            statuses=[AutomationStatus.ACTIVE],
+            due_before=due_before,
+            order_by="next_run_at",
+            limit=1,
+        )
+
+        self.assertEqual(
+            [automation.automation_id for automation in due], [legacy.automation_id]
+        )
+        self.assertNotEqual(due[0].automation_id, newer.automation_id)
+
     def test_get_fab_refreshes_cached_row_in_shared_session(self) -> None:
         """Test get_fab observes raw SQL updates in a shared session."""
         state = self.state_factory()
