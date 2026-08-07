@@ -41,10 +41,10 @@ This command:
 The generator does not loop over migration files itself. The ``alembic upgrade heads``
 command asks Alembic to traverse the revision graph. Each revision identifies its
 predecessor through ``down_revision``, so Alembic applies every pending revision in
-dependency order until all configured branch heads have been reached. Once the
-temporary database is current, the generator runs ``alembic revision --autogenerate``
-with ``--head flwr@head``. This makes the new revision extend the Flower branch instead
-of leaving the parent revision ambiguous when multiple heads exist. To target another
+dependency order until all configured branch heads have been reached. Once the temporary
+database is current, the generator runs ``alembic revision --autogenerate`` with
+``--head flwr@head``. This makes the new revision extend the Flower branch instead of
+leaving the parent revision ambiguous when multiple heads exist. To target another
 configured branch, pass its branch head explicitly with ``--head <branch>@head``.
 
 *****************************
