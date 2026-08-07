@@ -29,6 +29,7 @@ from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import aliased
 
 from flwr.app import Context, Message
 from flwr.app.message import make_message
@@ -1370,35 +1371,78 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if validate_task_message(message):
             return False
 
-        with self.session():
+        with self.session() as session:
             self._cleanup_expired_task_tokens()
             message_dict = _task_message_to_row(message)
-            try:
-                inserted = self.query(
-                    """
-                    INSERT INTO task_message (
-                        message_id, run_id, src_task_id, dst_task_id,
-                        reply_to_message_id, created_at, ttl, message_type,
-                        content, error
-                    )
-                    SELECT
-                        :message_id, :run_id, :src_task_id, :dst_task_id,
-                        :reply_to_message_id, :created_at, :ttl, :message_type,
-                        :content, :error
-                    FROM task AS src
-                    JOIN task AS dst
-                        ON dst.task_id = :dst_task_id
-                    WHERE src.task_id = :src_task_id
-                        AND src.run_id = :run_id
-                        AND dst.run_id = :run_id
-                        AND dst.finished_at IS NULL
-                    RETURNING message_id
-                    """,
-                    message_dict,
+            src_task = aliased(TaskModel)
+            dst_task = aliased(TaskModel)
+            task_message_values = (
+                select(
+                    literal(
+                        message_dict["message_id"],
+                        type_=TaskMessageModel.message_id.type,
+                    ),
+                    literal(message_dict["run_id"], type_=TaskMessageModel.run_id.type),
+                    literal(
+                        message_dict["src_task_id"],
+                        type_=TaskMessageModel.src_task_id.type,
+                    ),
+                    literal(
+                        message_dict["dst_task_id"],
+                        type_=TaskMessageModel.dst_task_id.type,
+                    ),
+                    literal(
+                        message_dict["reply_to_message_id"],
+                        type_=TaskMessageModel.reply_to_message_id.type,
+                    ),
+                    literal(
+                        message_dict["created_at"],
+                        type_=TaskMessageModel.created_at.type,
+                    ),
+                    literal(message_dict["ttl"], type_=TaskMessageModel.ttl.type),
+                    literal(
+                        message_dict["message_type"],
+                        type_=TaskMessageModel.message_type.type,
+                    ),
+                    literal(
+                        message_dict["content"],
+                        type_=TaskMessageModel.content.type,
+                    ),
+                    literal(message_dict["error"], type_=TaskMessageModel.error.type),
                 )
+                .select_from(src_task)
+                .join(dst_task, dst_task.task_id == message_dict["dst_task_id"])
+                .where(
+                    src_task.task_id == message_dict["src_task_id"],
+                    src_task.run_id == message_dict["run_id"],
+                    dst_task.run_id == message_dict["run_id"],
+                    dst_task.finished_at.is_(None),
+                )
+            )
+            stmt = (
+                insert(TaskMessageModel)
+                .from_select(
+                    [
+                        TaskMessageModel.message_id,
+                        TaskMessageModel.run_id,
+                        TaskMessageModel.src_task_id,
+                        TaskMessageModel.dst_task_id,
+                        TaskMessageModel.reply_to_message_id,
+                        TaskMessageModel.created_at,
+                        TaskMessageModel.ttl,
+                        TaskMessageModel.message_type,
+                        TaskMessageModel.content,
+                        TaskMessageModel.error,
+                    ],
+                    task_message_values,
+                )
+                .returning(TaskMessageModel.message_id)
+            )
+            try:
+                inserted_message_id = session.scalar(stmt)
             except IntegrityError:
                 return False
-            return bool(inserted)
+            return inserted_message_id is not None
 
     def get_task_message(
         self,
