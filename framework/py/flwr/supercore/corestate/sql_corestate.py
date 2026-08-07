@@ -24,7 +24,17 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData, delete, func, insert, literal, or_, select, update
+from sqlalchemy import (
+    MetaData,
+    delete,
+    exists,
+    func,
+    insert,
+    literal,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -1370,35 +1380,72 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if validate_task_message(message):
             return False
 
-        with self.session():
+        with self.session() as session:
             self._cleanup_expired_task_tokens()
-            message_dict = _task_message_to_row(message)
-            try:
-                inserted = self.query(
-                    """
-                    INSERT INTO task_message (
-                        message_id, run_id, src_task_id, dst_task_id,
-                        reply_to_message_id, created_at, ttl, message_type,
-                        content, error
-                    )
-                    SELECT
-                        :message_id, :run_id, :src_task_id, :dst_task_id,
-                        :reply_to_message_id, :created_at, :ttl, :message_type,
-                        :content, :error
-                    FROM task AS src
-                    JOIN task AS dst
-                        ON dst.task_id = :dst_task_id
-                    WHERE src.task_id = :src_task_id
-                        AND src.run_id = :run_id
-                        AND dst.run_id = :run_id
-                        AND dst.finished_at IS NULL
-                    RETURNING message_id
-                    """,
-                    message_dict,
+            metadata = message.metadata
+            stored_run_id = uint64_to_int64(metadata.run_id)
+            stored_src_task_id = uint64_to_int64(cast(int, metadata.src_task_id))
+            stored_dst_task_id = uint64_to_int64(cast(int, metadata.dst_task_id))
+            serialized_content = (
+                recorddict_to_proto(message.content).SerializeToString()
+                if message.has_content()
+                else None
+            )
+            serialized_error = (
+                error_to_proto(message.error).SerializeToString()
+                if message.has_error()
+                else None
+            )
+            src_task_exists = exists().where(
+                TaskModel.task_id == stored_src_task_id,
+                TaskModel.run_id == stored_run_id,
+            )
+            dst_task_exists = exists().where(
+                TaskModel.task_id == stored_dst_task_id,
+                TaskModel.run_id == stored_run_id,
+                TaskModel.finished_at.is_(None),
+            )
+            task_message_values = select(
+                literal(metadata.message_id, type_=TaskMessageModel.message_id.type),
+                literal(stored_run_id, type_=TaskMessageModel.run_id.type),
+                literal(stored_src_task_id, type_=TaskMessageModel.src_task_id.type),
+                literal(stored_dst_task_id, type_=TaskMessageModel.dst_task_id.type),
+                literal(
+                    metadata.reply_to_message_id,
+                    type_=TaskMessageModel.reply_to_message_id.type,
+                ),
+                literal(metadata.created_at, type_=TaskMessageModel.created_at.type),
+                literal(metadata.ttl, type_=TaskMessageModel.ttl.type),
+                literal(
+                    metadata.message_type, type_=TaskMessageModel.message_type.type
+                ),
+                literal(serialized_content, type_=TaskMessageModel.content.type),
+                literal(serialized_error, type_=TaskMessageModel.error.type),
+            ).where(src_task_exists, dst_task_exists)
+            stmt = (
+                insert(TaskMessageModel)
+                .from_select(
+                    [
+                        TaskMessageModel.message_id,
+                        TaskMessageModel.run_id,
+                        TaskMessageModel.src_task_id,
+                        TaskMessageModel.dst_task_id,
+                        TaskMessageModel.reply_to_message_id,
+                        TaskMessageModel.created_at,
+                        TaskMessageModel.ttl,
+                        TaskMessageModel.message_type,
+                        TaskMessageModel.content,
+                        TaskMessageModel.error,
+                    ],
+                    task_message_values,
                 )
+                .returning(TaskMessageModel.message_id)
+            )
+            try:
+                inserted_message_id = session.scalar(stmt)
             except IntegrityError:
                 return False
-            return bool(inserted)
+            return inserted_message_id is not None
 
     def get_task_message(
         self,
@@ -1772,30 +1819,6 @@ def _task_event_from_model(model: TaskEventModel) -> TaskEvent:
         event=model.event,
         data=model.data,
     )
-
-
-def _task_message_to_row(message: Message) -> dict[str, Any]:
-    """Convert a task-addressed Message to database row values."""
-    return {
-        "message_id": message.metadata.message_id,
-        "run_id": uint64_to_int64(message.metadata.run_id),
-        "src_task_id": uint64_to_int64(cast(int, message.metadata.src_task_id)),
-        "dst_task_id": uint64_to_int64(cast(int, message.metadata.dst_task_id)),
-        "reply_to_message_id": message.metadata.reply_to_message_id,
-        "created_at": message.metadata.created_at,
-        "ttl": message.metadata.ttl,
-        "message_type": message.metadata.message_type,
-        "content": (
-            recorddict_to_proto(message.content).SerializeToString()
-            if message.has_content()
-            else None
-        ),
-        "error": (
-            error_to_proto(message.error).SerializeToString()
-            if message.has_error()
-            else None
-        ),
-    }
 
 
 def _task_message_snapshot_from_model(model: TaskMessageModel) -> dict[str, Any]:

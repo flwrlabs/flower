@@ -42,7 +42,7 @@ class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
         if not isinstance(self.task_id, int) or self.task_id <= 0:
             raise ValueError("ExecutionSpec requires a positive integer task_id.")
         if not self.appio_api_address.strip():
-            raise ValueError("ExecutionSpec requires an AppIo API address.")
+            raise ValueError("ExecutionSpec requires a Runtime API address.")
         if not self.token.strip():
             raise ValueError("ExecutionSpec requires a task token.")
 

@@ -23,7 +23,7 @@ example, to launch your ``SuperLink`` with ``DEBUG`` logs, use:
     WARNING 2025-08-20 17:13:30,391:   DEBUG logs enabled. Do not use this in production, as it may expose sensitive details.
     INFO 2025-08-20 17:13:31,360:      Starting Flower SuperLink
     INFO 2025-08-20 17:13:31,378:      Flower Deployment Runtime: Starting Control API on 0.0.0.0:9093
-    INFO 2025-08-20 17:13:31,381:      Flower Deployment Runtime: Starting ServerAppIo API on 0.0.0.0:9091
+    INFO 2025-08-20 17:13:31,381:      Flower Deployment Runtime: Starting Runtime API on 0.0.0.0:9091
     DEBUG 2025-08-20 17:13:31,382:     Automatic node authentication enabled
     INFO 2025-08-20 17:13:31,382:      Flower Deployment Runtime: Starting Fleet API (gRPC-rere) on 0.0.0.0:9092
     WARNING 2025-08-20 17:13:31,515:   DEBUG logs enabled. Do not use this in production, as it may expose sensitive details.

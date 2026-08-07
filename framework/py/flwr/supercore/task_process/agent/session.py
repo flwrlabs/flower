@@ -37,7 +37,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
     StartRunRequest,
 )
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
+from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
@@ -112,12 +112,12 @@ class RuntimeAgentConnectors(AgentConnectors):
 
 
 class RuntimeAgentResponses(AgentResponses):
-    """AgentResponses implementation backed by AppIo task messages."""
+    """AgentResponses implementation backed by Runtime task messages."""
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
-        stub: ServerAppIoStub,
+        stub: RuntimeStub,
         run_id: int,
         task_id: int,
         context: Context,

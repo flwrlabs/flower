@@ -34,7 +34,7 @@ class TestSuperExecAuthPrimitives(TestCase):
     def test_canonicalize_superexec_auth_input(self) -> None:
         """Canonicalization should produce deterministic UTF-8 bytes."""
         canonical = canonicalize_superexec_auth_input(
-            method="/flwr.proto.ServerAppIo/RequestToken",
+            method="/flwr.proto.Runtime/RequestToken",
             timestamp=123,
             nonce="nonce-1",
             body_sha256="abc",
@@ -43,7 +43,7 @@ class TestSuperExecAuthPrimitives(TestCase):
         self.assertEqual(
             canonical,
             (
-                b"method=/flwr.proto.ServerAppIo/RequestToken\n"
+                b"method=/flwr.proto.Runtime/RequestToken\n"
                 b"ts=123\n"
                 b"nonce=nonce-1\n"
                 b"body_sha256=abc"
@@ -81,7 +81,7 @@ class TestSuperExecAuthPrimitives(TestCase):
         auth_secret = derive_auth_secret(b"master-secret")
         good_signature = compute_superexec_signature(
             auth_secret=auth_secret,
-            method="/flwr.proto.ServerAppIo/ClaimTask",
+            method="/flwr.proto.Runtime/ClaimTask",
             timestamp=456,
             nonce="nonce-2",
             body_sha256="f" * 64,

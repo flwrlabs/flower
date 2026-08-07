@@ -28,9 +28,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     PullPendingTasksRequest,
 )
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import ExecutorType
@@ -42,8 +41,7 @@ from flwr.supercore.interceptors import (
     SuperExecAuthClientInterceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
-    CLIENTAPPIO_SUPEREXEC_METHODS,
-    SERVERAPPIO_SUPEREXEC_METHODS,
+    RUNTIME_SUPEREXEC_METHODS,
 )
 from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.supercore.run import Run
@@ -105,7 +103,7 @@ def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     plugin_class: type[ExecPlugin],
-    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
+    stub_class: type[RuntimeStub],
     appio_api_address: str,
     insecure: bool,
     root_certificates_path: str | None = None,
@@ -123,12 +121,12 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     ----------
     plugin_class : type[ExecPlugin]
         The class of the SuperExec plugin to use.
-    stub_class : type[ClientAppIoStub] | type[ServerAppIoStub]
-        The gRPC stub class for the AppIO API.
+    stub_class : type[RuntimeStub]
+        The gRPC stub class for the Runtime API.
     appio_api_address : str
-        The address of the AppIO API.
+        The address of the Runtime API.
     insecure : bool
-        Whether to connect to the AppIO API without TLS.
+        Whether to connect to the Runtime API without TLS.
     root_certificates_path : Optional[str] (default: None)
         The path to the PEM-encoded root certificate file used for secure TLS
         connections.
@@ -160,13 +158,9 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     ]
     auth_interceptor: SuperExecAuthClientInterceptor | None = None
     if superexec_auth_secret:
-        if stub_class is ServerAppIoStub:
-            protected_methods = SERVERAPPIO_SUPEREXEC_METHODS
-        else:
-            protected_methods = CLIENTAPPIO_SUPEREXEC_METHODS
         auth_interceptor = SuperExecAuthClientInterceptor(
             master_secret=superexec_auth_secret,
-            protected_methods=protected_methods,
+            protected_methods=RUNTIME_SUPEREXEC_METHODS,
         )
         interceptors.append(auth_interceptor)
 
@@ -180,7 +174,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
         health_server = run_health_server_grpc_no_tls(health_server_address)
         grpc_servers.append(health_server)
 
-    # Create the channel to the AppIO API
+    # Create the channel to the Runtime API
     channel = create_channel(
         server_address=appio_api_address,
         insecure=insecure,
@@ -199,7 +193,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
         exit_handlers=[lambda: channel.close()],  # pylint: disable=W0108
     )
 
-    # Create the gRPC stub for the AppIO API
+    # Create the gRPC stub for the Runtime API
     stub = stub_class(channel)
     wrap_stub(stub, make_simple_grpc_retry_invoker())
 

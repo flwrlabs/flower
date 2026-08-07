@@ -30,14 +30,10 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesRequest,
     PushTaskOutputRequest,
 )
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoServicer
 from flwr.proto.message_pb2 import PushObjectRequest  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoServicer
+from flwr.proto.runtime_pb2_grpc import RuntimeServicer
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
-from flwr.supercore.auth import (
-    CLIENTAPPIO_METHOD_AUTH_POLICY,
-    SERVERAPPIO_METHOD_AUTH_POLICY,
-)
+from flwr.supercore.auth import RUNTIME_METHOD_AUTH_POLICY
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     TASK_TOKEN_HEADER,
@@ -96,7 +92,7 @@ class TestAppIoTokenClientInterceptor(TestCase):
         """The interceptor should attach task-token metadata."""
         interceptor = AppIoTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
-            method="/flwr.proto.ServerAppIo/GetNodes",
+            method="/flwr.proto.Runtime/GetNodes",
             timeout=None,
             metadata=(("x-test", "value"),),
             credentials=None,
@@ -130,7 +126,7 @@ class TestAppIoTokenClientInterceptor(TestCase):
         """The interceptor should reject duplicate task-token metadata."""
         interceptor = AppIoTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
-            method="/flwr.proto.ServerAppIo/GetNodes",
+            method="/flwr.proto.Runtime/GetNodes",
             timeout=None,
             metadata=(("x-test", "value"), (TASK_TOKEN_HEADER, "old-token")),
             credentials=None,
@@ -156,10 +152,10 @@ class TestAppIoTokenServerInterceptor(TestCase):
         return create_serverappio_token_auth_server_interceptor(lambda: state)
 
     @staticmethod
-    def _find_serverappio_method(*, requires_token: bool) -> str | None:
+    def _find_runtime_method(*, requires_token: bool) -> str | None:
         methods = [
             method
-            for method, policy in SERVERAPPIO_METHOD_AUTH_POLICY.items()
+            for method, policy in RUNTIME_METHOD_AUTH_POLICY.items()
             if policy.requires_token is requires_token
         ]
         return sorted(methods)[0] if methods else None
@@ -167,9 +163,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
     def test_no_auth_method_allows_call_without_token(self) -> None:
         """No-auth methods should pass through without metadata token."""
         interceptor = self._new_interceptor(token_to_task={})
-        method = self._find_serverappio_method(requires_token=False)
+        method = self._find_runtime_method(requires_token=False)
         if method is None:
-            self.skipTest("No no-auth ServerAppIo method found in policy table.")
+            self.skipTest("No no-auth Runtime method found in policy table.")
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
@@ -187,9 +183,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
         interceptor = self._new_interceptor(
             token_to_task={"valid": Task(task_id=1, run_id=7)}
         )
-        method = self._find_serverappio_method(requires_token=True)
+        method = self._find_runtime_method(requires_token=True)
         if method is None:
-            self.skipTest("No token-required ServerAppIo method found in policy table.")
+            self.skipTest("No token-required Runtime method found in policy table.")
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
 
@@ -212,9 +208,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
         interceptor = self._new_interceptor(
             token_to_task={"valid": Task(task_id=1, run_id=7)}
         )
-        method = self._find_serverappio_method(requires_token=True)
+        method = self._find_runtime_method(requires_token=True)
         if method is None:
-            self.skipTest("No token-required ServerAppIo method found in policy table.")
+            self.skipTest("No token-required Runtime method found in policy table.")
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
 
@@ -237,9 +233,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
         interceptor = self._new_interceptor(
             token_to_task={"valid": Task(task_id=1, run_id=7)}
         )
-        method = self._find_serverappio_method(requires_token=True)
+        method = self._find_runtime_method(requires_token=True)
         if method is None:
-            self.skipTest("No token-required ServerAppIo method found in policy table.")
+            self.skipTest("No token-required Runtime method found in policy table.")
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
@@ -257,9 +253,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
         state = Mock()
         state.get_task_by_token.return_value = Task(task_id=123, run_id=7)
         interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
-        method = self._find_serverappio_method(requires_token=True)
+        method = self._find_runtime_method(requires_token=True)
         if method is None:
-            self.skipTest("No token-required ServerAppIo method found in policy table.")
+            self.skipTest("No token-required Runtime method found in policy table.")
         captured_task = None
 
         def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
@@ -290,7 +286,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/PushTaskOutput",
+                "/flwr.proto.Runtime/PushTaskOutput",
                 invocation_metadata=((TASK_TOKEN_HEADER, "metadata-token"),),
             ),
         )
@@ -307,7 +303,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/PushMessages",
+                "/flwr.proto.Runtime/PushMessages",
                 invocation_metadata=((TASK_TOKEN_HEADER, "metadata-token"),),
             ),
         )
@@ -326,7 +322,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/PushTaskOutput",
+                "/flwr.proto.Runtime/PushTaskOutput",
                 invocation_metadata=(),
             ),
         )
@@ -349,7 +345,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
         intercepted = interceptor.intercept_service(
             continuation,
             _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/UnknownMethod",
+                "/flwr.proto.Runtime/UnknownMethod",
                 invocation_metadata=((TASK_TOKEN_HEADER, "valid"),),
             ),
         )
@@ -366,9 +362,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
         interceptor = self._new_interceptor(
             token_to_task={"valid": Task(task_id=1, run_id=7)}
         )
-        method = self._find_serverappio_method(requires_token=True)
+        method = self._find_runtime_method(requires_token=True)
         if method is None:
-            self.skipTest("No token-required ServerAppIo method found in policy table.")
+            self.skipTest("No token-required Runtime method found in policy table.")
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
 
@@ -397,45 +393,23 @@ class TestMethodPolicyMaps(TestCase):
     }
 
     @staticmethod
-    def _serverappio_rpc_methods() -> set[str]:
+    def _runtime_rpc_methods() -> set[str]:
         return {
-            f"/flwr.proto.ServerAppIo/{name}"
-            for name, ref in inspect.getmembers(ServerAppIoServicer)
+            f"/flwr.proto.Runtime/{name}"
+            for name, ref in inspect.getmembers(RuntimeServicer)
             if inspect.isfunction(ref) and not name.startswith("_")
         }
 
-    @staticmethod
-    def _clientappio_rpc_methods() -> set[str]:
-        return {
-            f"/flwr.proto.ClientAppIo/{name}"
-            for name, ref in inspect.getmembers(ClientAppIoServicer)
-            if inspect.isfunction(ref) and not name.startswith("_")
-        }
-
-    def test_serverappio_policy_has_full_coverage(self) -> None:
-        """ServerAppIo policy map should cover all RPC methods exactly."""
-        expected_methods = self._serverappio_rpc_methods()
-        self.assertEqual(set(SERVERAPPIO_METHOD_AUTH_POLICY), expected_methods)
+    def test_runtime_policy_has_full_coverage(self) -> None:
+        """Runtime policy map should cover all RPC methods exactly."""
+        expected_methods = self._runtime_rpc_methods()
+        self.assertEqual(set(RUNTIME_METHOD_AUTH_POLICY), expected_methods)
 
     def test_only_expected_no_auth_methods_exist(self) -> None:
         """Only bootstrap methods should be marked no-auth in the policy table."""
         no_auth_methods = {
             method.rsplit("/", maxsplit=1)[-1]
-            for method, policy in SERVERAPPIO_METHOD_AUTH_POLICY.items()
-            if not policy.requires_token
-        }
-        self.assertEqual(no_auth_methods, self.NO_AUTH_BOOTSTRAP_METHODS)
-
-    def test_clientappio_policy_has_full_coverage(self) -> None:
-        """ClientAppIo policy map should cover all RPC methods exactly."""
-        expected_methods = self._clientappio_rpc_methods()
-        self.assertEqual(set(CLIENTAPPIO_METHOD_AUTH_POLICY), expected_methods)
-
-    def test_clientappio_only_expected_no_auth_methods_exist(self) -> None:
-        """ClientAppIo should only mark bootstrap methods as no-auth."""
-        no_auth_methods = {
-            method.rsplit("/", maxsplit=1)[-1]
-            for method, policy in CLIENTAPPIO_METHOD_AUTH_POLICY.items()
+            for method, policy in RUNTIME_METHOD_AUTH_POLICY.items()
             if not policy.requires_token
         }
         self.assertEqual(no_auth_methods, self.NO_AUTH_BOOTSTRAP_METHODS)
@@ -445,14 +419,14 @@ class TestFactoryFunctions(TestCase):
     """Validate interceptor factory behavior."""
 
     def test_serverappio_factory_uses_server_policy(self) -> None:
-        """ServerAppIo factory should enforce ServerAppIo policy semantics."""
+        """SuperLink factory should enforce Runtime policy semantics."""
         state = _TokenState({"valid-token": Task(task_id=1, run_id=1)})
         interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/GetNodes",
+                "/flwr.proto.Runtime/GetNodes",
                 invocation_metadata=((TASK_TOKEN_HEADER, "valid-token"),),
             ),
         )
@@ -461,14 +435,14 @@ class TestFactoryFunctions(TestCase):
         self.assertEqual(response, "ok")
 
     def test_clientappio_factory_uses_client_policy(self) -> None:
-        """ClientAppIo factory should enforce ClientAppIo policy semantics."""
+        """SuperNode factory should enforce Runtime policy semantics."""
         state = _TokenState({"valid-token": Task(task_id=1, run_id=1)})
         interceptor = create_clientappio_token_auth_server_interceptor(lambda: state)
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
-                "/flwr.proto.ClientAppIo/PushObject",
+                "/flwr.proto.Runtime/PushObject",
                 invocation_metadata=((TASK_TOKEN_HEADER, "valid-token"),),
             ),
         )

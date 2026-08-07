@@ -73,7 +73,7 @@ def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
 
 
 def test_call_automation_embeds_input_in_control_request() -> None:
-    """Embed model input in the Control request sent to ServerAppIo."""
+    """Embed model input in the Control request sent to the Runtime API."""
     # Prepare
     stub = Mock()
     stub.StartAutomation.return_value = StartAutomationResponse()

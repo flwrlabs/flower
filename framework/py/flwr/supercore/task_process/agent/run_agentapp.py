@@ -81,7 +81,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
 
-    # Initialize the ServerAppIo connection.
+    # Initialize the Runtime API connection.
     grid = GrpcGrid(
         serverappio_service_address=serverappio_api_address,
         insecure=insecure,

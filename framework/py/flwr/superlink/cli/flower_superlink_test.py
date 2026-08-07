@@ -138,7 +138,7 @@ def test_parse_superlink_log_rotation_args_custom_values() -> None:
 
 
 def test_parse_superlink_appio_tls_args() -> None:
-    """SuperLink should parse AppIO-specific TLS args for ServerAppIo."""
+    """SuperLink should parse AppIO-named TLS args for its Runtime API."""
     args = _parse_args_run_superlink().parse_args(
         [
             "--appio-ssl-certfile",
@@ -308,7 +308,7 @@ def test_obtain_superlink_certificates_keeps_appio_separate(
 def test_obtain_superlink_certificates_allows_plaintext_appio_when_secure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SuperLink should allow plaintext ServerAppIo with secure Fleet/Control APIs."""
+    """SuperLink should allow plaintext Runtime with secure Fleet/Control APIs."""
     fleet_certificates = (b"fleet-ca", b"fleet-cert", b"fleet-key")
     monkeypatch.setattr(
         app_module, "try_obtain_server_certificates", lambda _args: fleet_certificates
