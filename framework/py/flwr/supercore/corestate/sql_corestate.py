@@ -123,7 +123,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self._object_store = object_store
 
     def dialect_insert(self, table: Any) -> SQLiteInsert | PostgresInsert:
-        """Return a SQLite insert statement for CoreState upserts."""
+        """Return a dialect-specific insert statement for CoreState upserts."""
         if self.database_backend == "sqlite":
             return sqlite_insert(table)
 
