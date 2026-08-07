@@ -34,7 +34,7 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 @typing.final
 class PullPendingTasksRequest(google.protobuf.message.Message):
-    """These messages are used by both ServerAppIo and ClientAppIo services
+    """These messages are used by the Runtime service
 
     PullPendingTasks messages
     """

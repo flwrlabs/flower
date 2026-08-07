@@ -8,7 +8,7 @@
 
 Transport Layer Security (TLS) ensures the communication between endpoints is encrypted.
 This guide describes how to establish secure TLS SuperLink ↔ SuperNodes as well as User
-↔ SuperLink connections. It also explains how to enable TLS on the internal AppIo
+↔ SuperLink connections. It also explains how to enable TLS on the internal Runtime API
 connections used by SuperExec, ``ServerApp`` processes, and ``ClientApp`` processes.
 
 .. note::
@@ -34,7 +34,7 @@ Using TLS-enabled connections expects some certificates generated and passed whe
 launching the SuperLink, the SuperNodes and when a user (e.g. a data scientist that
 wants to submit a ``Run``) interacts with the federation via the `flwr CLI
 <ref-api-cli.html>`_. The same certificates can be used for local prototyping when
-enabling TLS on internal AppIo connections.
+enabling TLS on internal Runtime API connections.
 
 We have prepared a script that can be used to generate such set of certificates. While
 using these is fine for prototyping, we advise you to follow the standards set in your
@@ -61,8 +61,8 @@ new``).
     certificates generated using the scripts mentioned in this guide. In production, do
     not reuse the same server certificate and private key for multiple services. A
     better practice is to use a unique key pair for each service, for example the
-    SuperLink Fleet API, the SuperLink ServerAppIo API, and each SuperNode ClientAppIo
-    API.
+    SuperLink Fleet API, the SuperLink-hosted Runtime API, and each SuperNode-hosted
+    Runtime API.
 
 .. _launching-the-superlink-with-tls:
 
@@ -75,8 +75,8 @@ The code snippet below assumes the `certificates/` directory is in the same dire
 where you execute the command from. Edit the paths accordingly if that is not the case.
 When providing certificates for the Fleet API and Control API, the SuperLink expects a
 tuple of three certificates paths: CA certificate, server certificate and server private
-key. The same command can also provide AppIo certificates for the internal ServerAppIo
-API.
+key. The same command can also provide AppIo-named certificates for the SuperLink's
+Runtime API.
 
 .. code-block:: bash
     :emphasize-lines: 2,3,4,5,6,7
@@ -94,12 +94,12 @@ API.
     * ``--ssl-ca-certfile``: Specify the location of the CA certificate file in your file. This file is a certificate that is used to verify the identity of the SuperLink.
     * | ``--ssl-certfile``: Specify the location of the SuperLink's TLS certificate file. This file is used to identify the SuperLink and to encrypt the packages that are transmitted over the network.
     * | ``--ssl-keyfile``: Specify the location of the SuperLink's TLS private key file. This file is used to decrypt the packages that are transmitted over the network.
-    * | ``--appio-ssl-ca-certfile``: Specify the location of the CA certificate file used by SuperExec to verify the SuperLink's ServerAppIo API server certificate.
-    * | ``--appio-ssl-certfile``: Specify the location of the ServerAppIo API server TLS certificate file.
-        The certificate must include Subject Alternative Names (SANs) for the AppIo API address used by
+    * | ``--appio-ssl-ca-certfile``: Specify the location of the CA certificate file used by SuperExec to verify the SuperLink's Runtime API server certificate.
+    * | ``--appio-ssl-certfile``: Specify the location of the Runtime API server TLS certificate file.
+        The certificate must include Subject Alternative Names (SANs) for the Runtime API address used by
         SuperExec. When using an IP address such as ``127.0.0.1``, the certificate must include a
         matching IP SAN.
-    * | ``--appio-ssl-keyfile``: Specify the location of the ServerAppIo API server TLS private key file.
+    * | ``--appio-ssl-keyfile``: Specify the location of the Runtime API server TLS private key file.
 
 .. _connecting-the-supernodes-with-tls:
 
@@ -111,7 +111,7 @@ This section describes how to launch a SuperNode that works on TLS-enabled conne
 The code snippet below assumes the `certificates/` directory is in the same directory
 where you execute the command from. To secure the SuperNode ↔ SuperLink connection,
 replace ``--insecure`` with ``--root-certificates``. The same command can also provide
-AppIo certificates for the internal ClientAppIo API.
+AppIo-named certificates for the SuperNode's Runtime API.
 
 .. code-block:: bash
     :emphasize-lines: 2,3,4,5
@@ -128,12 +128,12 @@ AppIo certificates for the internal ClientAppIo API.
 .. dropdown:: Understand the command
 
     * ``--root-certificates``: This specifies the location of the CA certificate file. The ``ca.crt`` file is used to verify the identity of the SuperLink.
-    * | ``--appio-ssl-ca-certfile``: Specify the location of the CA certificate file used by SuperExec to verify the SuperNode's ClientAppIo API server certificate.
-    * | ``--appio-ssl-certfile``: Specify the location of the ClientAppIo API server TLS certificate file.
-        The certificate must include Subject Alternative Names (SANs) for the AppIo API address used by
+    * | ``--appio-ssl-ca-certfile``: Specify the location of the CA certificate file used by SuperExec to verify the SuperNode's Runtime API server certificate.
+    * | ``--appio-ssl-certfile``: Specify the location of the Runtime API server TLS certificate file.
+        The certificate must include Subject Alternative Names (SANs) for the Runtime API address used by
         SuperExec. When using an IP address such as ``127.0.0.1``, the certificate must include a
         matching IP SAN.
-    * | ``--appio-ssl-keyfile``: Specify the location of the ClientAppIo API server TLS private key file.
+    * | ``--appio-ssl-keyfile``: Specify the location of the Runtime API server TLS private key file.
 
 Follow the same procedure, i.e. replacing ``--insecure`` with ``--root-certificates``,
 to launch the second SuperNode.
@@ -155,32 +155,32 @@ TLS-enabled connections.
 
 .. note::
 
-    The AppIo TLS options configure server-authenticated TLS. They do not configure
-    mutual TLS. The ``--appio-ssl-ca-certfile`` file is used by SuperExec and app
-    processes to verify the AppIo server certificate, not as a client certificate. If
-    AppIo TLS is not configured, internal AppIo connections remain unencrypted and
-    should stay inside a trusted network.
+    The ``--appio-ssl-*`` Runtime API TLS options configure server-authenticated TLS.
+    They do not configure mutual TLS. The ``--appio-ssl-ca-certfile`` file is used by
+    SuperExec and app processes to verify the Runtime API server certificate, not as a
+    client certificate. If Runtime API TLS is not configured, internal Runtime API
+    connections remain unencrypted and should stay inside a trusted network.
 
-*******************************************************
- TLS for AppIo Connections in "Process" Isolation Mode
-*******************************************************
+*************************************************************
+ TLS for Runtime API Connections in "Process" Isolation Mode
+*************************************************************
 
 For details about SuperExec, "process" isolation mode, and "subprocess" isolation mode,
 see :doc:`ref-flower-network-communication`.
 
-So far, we've been showing you how to enable TLS for AppIo connections when using the
-default "subprocess" isolation mode. In this mode, SuperLink and SuperNode automatically
-start their SuperExecs with the correct AppIo TLS options. However, if you want to run
-SuperExec separately in "process" isolation mode, you need to do a few things
-differently to enable TLS for the AppIo connections.
+So far, we've been showing you how to enable TLS for Runtime API connections when using
+the default "subprocess" isolation mode. In this mode, SuperLink and SuperNode
+automatically start their SuperExecs with the correct Runtime API TLS options. However,
+if you want to run SuperExec separately in "process" isolation mode, you need to do a
+few things differently to enable TLS for the Runtime API connections.
 
 First, we need to launch the SuperLink and SuperNode with ``--isolation=process`` and
-with the AppIo TLS options. This tells the SuperLink and SuperNode that the SuperExecs
-will be launched separately, e.g. by an operator or orchestration system. Next, in order
-for the SuperExecs to establish TLS connections to the AppIo APIs, we need to provide
-the AppIo TLS options when launching the SuperExecs. Below is an example command to
-launch a SuperExec that can establish TLS connections to the ServerAppIo API of the
-SuperLink:
+with the Runtime API TLS options. This tells the SuperLink and SuperNode that the
+SuperExecs will be launched separately, e.g. by an operator or orchestration system.
+Next, in order for the SuperExecs to establish TLS connections to the Runtime APIs, we
+need to provide the Runtime API TLS options when launching the SuperExecs. Below is an
+example command to launch a SuperExec that can establish TLS connections to the Runtime
+API hosted by the SuperLink:
 
 .. code-block:: bash
     :emphasize-lines: 2
@@ -192,19 +192,19 @@ SuperLink:
 
 .. dropdown:: Understand the command
 
-    * ``--root-certificates``: Specify the location of the CA certificate file. The ``ca.crt`` file is used by SuperExec to verify the AppIo API server certificate.
-    * | ``--appio-api-address``: Specify the address of the AppIo API that SuperExec should connect to. In this example, ``127.0.0.1:9091`` is the SuperLink's ServerAppIo API.
+    * ``--root-certificates``: Specify the location of the CA certificate file. The ``ca.crt`` file is used by SuperExec to verify the Runtime API server certificate.
+    * | ``--appio-api-address``: Specify the address of the Runtime API that SuperExec should connect to. In this example, ``127.0.0.1:9091`` is the SuperLink's Runtime API.
     * | ``--plugin-type``: Specify the type of app process SuperExec should launch. Use ``serverapp`` for a ``ServerApp`` SuperExec.
 
 Next, use the same procedure for a ``ClientApp`` SuperExec, but pass the SuperNode's
-ClientAppIo API address, e.g. ``127.0.0.1:9094``, and set ``--plugin-type clientapp``.
+Runtime API address, e.g. ``127.0.0.1:9094``, and set ``--plugin-type clientapp``.
 
 Now your SuperLink-side SuperExec and SuperNode-side SuperExec can establish TLS
-connections to their respective AppIo APIs. When using "process" isolation mode, it is
+connections to their respective Runtime APIs. When using "process" isolation mode, it is
 the responsibility of the process launcher (e.g. user or orchestrator) to launch the
-SuperExecs with the correct AppIo TLS options. If you use an orchestration system to
-launch the SuperExecs, make sure to include the AppIo TLS options in the commands or
-configuration used by your orchestration system.
+SuperExecs with the correct Runtime API TLS options. If you use an orchestration system
+to launch the SuperExecs, make sure to include the Runtime API TLS options in the
+commands or configuration used by your orchestration system.
 
 ************************
  TLS-enabled Flower CLI
@@ -246,8 +246,8 @@ Now, you can run the example by executing ``flwr run``:
 You should now have learned how to generate self-signed certificates using the given
 script, start a TLS-enabled server and have two clients establish secure connections to
 it. You should also have learned how to run your Flower project using ``flwr run`` with
-TLS enabled and how to secure internal AppIo connections. All other commands in the
-`Flower CLI <ref-api-cli.html>`_ will also be TLS-enabled.
+TLS enabled and how to secure internal Runtime API connections. All other commands in
+the `Flower CLI <ref-api-cli.html>`_ will also be TLS-enabled.
 
 .. note::
 

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""ServerAppIo API servicer."""
+"""Runtime API servicer hosted by SuperLink."""
 
 
 from itertools import chain
@@ -31,7 +31,7 @@ from flwr.common.serde import (
     message_to_proto,
     run_to_proto,
 )
-from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
+from flwr.proto import runtime_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     GetConnectorRequest,
     GetConnectorResponse,
@@ -79,13 +79,13 @@ from flwr.superlink.servicer.control.control_handlers import (
     start_automation,
 )
 
-SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE = (
-    "Some ServerAppIo API endpoints are only available for Deployment Runtime runs."
+RUNTIME_ENDPOINT_UNAVAILABLE_MESSAGE = (
+    "Some Runtime API endpoints are only available for Deployment Runtime runs."
 )
 
 
-class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoServicer):
-    """ServerAppIo API servicer."""
+class ServerAppIoServicer(AppIoServicer, runtime_pb2_grpc.RuntimeServicer):
+    """Runtime API servicer hosted by SuperLink."""
 
     def __init__(
         self,
@@ -111,7 +111,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         self, request: GetNodesRequest, context: grpc.ServicerContext
     ) -> GetNodesResponse:
         """Get available nodes."""
-        log(DEBUG, "ServerAppIoServicer.GetNodes")
+        log(DEBUG, "Runtime.GetNodes")
 
         # Init state
         state = self.state_factory.state()
@@ -126,7 +126,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         self, request: PushAppMessagesRequest, context: grpc.ServicerContext
     ) -> PushAppMessagesResponse:
         """Push a set of Messages."""
-        log(DEBUG, "ServerAppIoServicer.PushMessages")
+        log(DEBUG, "Runtime.PushMessages")
 
         # Init state
         state = self.state_factory.state()
@@ -180,7 +180,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         self, request: PullAppMessagesRequest, context: grpc.ServicerContext
     ) -> PullAppMessagesResponse:
         """Pull a set of Messages."""
-        log(DEBUG, "ServerAppIoServicer.PullMessages")
+        log(DEBUG, "Runtime.PullMessages")
 
         # Init state and store
         state = self.state_factory.state()
@@ -244,7 +244,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         self, request: GetRunRequest, context: grpc.ServicerContext
     ) -> GetRunResponse:
         """Get run information."""
-        log(DEBUG, "ServerAppIoServicer.GetRun")
+        log(DEBUG, "Runtime.GetRun")
 
         # Init state
         state: LinkState = self.state_factory.state()
@@ -261,7 +261,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         self, request: GetConnectorRequest, context: grpc.ServicerContext
     ) -> GetConnectorResponse:
         """Return credentials authorized for the authenticated connector task."""
-        log(DEBUG, "ServerAppIoServicer.GetConnector")
+        log(DEBUG, "Runtime.GetConnector")
 
         task = get_authenticated_task()
         if task.type != TaskType.CONNECTOR or not task.connector_ref:
@@ -296,7 +296,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         self, request: PullTaskInputRequest, context: grpc.ServicerContext
     ) -> PullTaskInputResponse:
         """Pull ServerApp process inputs."""
-        log(DEBUG, "ServerAppIoServicer.PullTaskInput")
+        log(DEBUG, "Runtime.PullTaskInput")
         # Init access to LinkState
         state = self.state_factory.state()
 
@@ -334,7 +334,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         self, request: PushTaskOutputRequest, context: grpc.ServicerContext
     ) -> PushTaskOutputResponse:
         """Push ServerApp process outputs."""
-        log(DEBUG, "ServerAppIoServicer.PushTaskOutput")
+        log(DEBUG, "Runtime.PushTaskOutput")
 
         # Get the authenticated task and associated run ID
         task = get_authenticated_task()
@@ -397,7 +397,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         self, request: PushObjectRequest, context: grpc.ServicerContext
     ) -> PushObjectResponse:
         """Push an object to the ObjectStore."""
-        log(DEBUG, "ServerAppIoServicer.PushObject")
+        log(DEBUG, "Runtime.PushObject")
 
         # Init state
         state = self.state_factory.state()
@@ -422,7 +422,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         self, request: PullObjectRequest, context: grpc.ServicerContext
     ) -> PullObjectResponse:
         """Pull an object from the ObjectStore."""
-        log(DEBUG, "ServerAppIoServicer.PullObject")
+        log(DEBUG, "Runtime.PullObject")
 
         # Init state
         state = self.state_factory.state()
@@ -448,7 +448,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         self, request: ConfirmMessageReceivedRequest, context: grpc.ServicerContext
     ) -> ConfirmMessageReceivedResponse:
         """Confirm message received."""
-        log(DEBUG, "ServerAppIoServicer.ConfirmMessageReceived")
+        log(DEBUG, "Runtime.ConfirmMessageReceived")
 
         # Init store
         store = self.objectstore_factory.store()
@@ -462,12 +462,12 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
 
 def _get_authenticated_serverapp_run_id(context: grpc.ServicerContext) -> int:
-    """Return the authenticated run ID if it can use ServerAppIo endpoints."""
+    """Return the authenticated run ID if it can use these Runtime endpoints."""
     task = get_authenticated_task()
     if task.type != TaskType.SERVER_APP:
         context.abort(
             grpc.StatusCode.PERMISSION_DENIED,
-            SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE,
+            RUNTIME_ENDPOINT_UNAVAILABLE_MESSAGE,
         )
     return task.run_id
 

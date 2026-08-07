@@ -114,8 +114,8 @@ mode:
 
 .. note::
 
-    To enable TLS also for the SuperLink AppIo API, please refer to :ref:`Launching the
-    SuperLink with TLS <launching-the-superlink-with-tls>`.
+    To enable TLS also for the SuperLink Runtime API, please refer to :ref:`Launching
+    the SuperLink with TLS <launching-the-superlink-with-tls>`.
 
 Start two Flower SuperNodes
 ===========================
@@ -171,8 +171,8 @@ need two terminals for this step.
 
 .. note::
 
-    To enable TLS also for the SuperNode AppIo API, please refer to :ref:`Connecting the
-    SuperNodes with TLS <connecting-the-supernodes-with-tls>`.
+    To enable TLS also for the SuperNode Runtime API, please refer to :ref:`Connecting
+    the SuperNodes with TLS <connecting-the-supernodes-with-tls>`.
 
 ********************************************
  Step 3: Run a Flower App on the Federation

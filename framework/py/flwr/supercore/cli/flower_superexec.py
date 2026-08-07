@@ -25,8 +25,7 @@ import yaml
 from flwr.common.args import add_args_runtime_dependency_install
 from flwr.common.constant import ExecPluginType
 from flwr.common.logger import log
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
     load_superexec_auth_secret,
@@ -153,7 +152,10 @@ def _parse_args() -> argparse.ArgumentParser:
         version=f"Flower version: {package_version}",
     )
     parser.add_argument(
-        "--appio-api-address", type=str, required=True, help="Address of the AppIO API"
+        "--appio-api-address",
+        type=str,
+        required=True,
+        help="Address of the Runtime API",
     )
     parser.add_argument(
         "--plugin-type",
@@ -165,7 +167,7 @@ def _parse_args() -> argparse.ArgumentParser:
     parser.add_argument(
         "--insecure",
         action="store_true",
-        help="Connect to the AppIO API without TLS. "
+        help="Connect to the Runtime API without TLS. "
         "Data transmitted between the client and server is not encrypted. "
         "Use this flag only if you understand the risks.",
     )
@@ -221,11 +223,11 @@ def _get_plugin_and_stub_class(
 ) -> tuple[type[ExecPlugin], type[object]]:
     """Get the plugin class and stub class based on the plugin type."""
     mapping: dict[str, tuple[type[ExecPlugin], type[object]]] = {
-        ExecPluginType.CLIENT_APP: (ClientAppExecPlugin, ClientAppIoStub),
-        ExecPluginType.SERVER_APP: (ServerAppExecPlugin, ServerAppIoStub),
+        ExecPluginType.CLIENT_APP: (ClientAppExecPlugin, RuntimeStub),
+        ExecPluginType.SERVER_APP: (ServerAppExecPlugin, RuntimeStub),
         ExecPluginType.SERVER_APP_EPHEMERAL: (
             ServerAppEphemeralExecPlugin,
-            ServerAppIoStub,
+            RuntimeStub,
         ),
     }
     if plugin_type in mapping:

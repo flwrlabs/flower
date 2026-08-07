@@ -60,7 +60,7 @@ deployment runtime.
         communicates in-memory with workers.
       - ``ServerApp`` `process or subprocess <ref-flower-network-communication.html>`_
         runs independently from the SuperLink and communicates with it over gRPC via the
-        ServerAppIO API.
+        Runtime API.
     - - **Client-side Infrastructure**
       - No user-managed client-side infrastructure is required. For local CLI workflows,
         the managed local SuperLink and simulation runtime remain self-contained.
@@ -72,5 +72,5 @@ deployment runtime.
         ``ClientApps`` are stateless.
       - Initialized as a ``ClientApp`` `process or subprocess
         <ref-flower-network-communication.html>`_, it runs independently from the
-        SuperNode and communicates with it over gRPC via the ClientAppIo API.
-        ``ClientApps`` are stateless.
+        SuperNode and communicates with it over gRPC via the Runtime API. ``ClientApps``
+        are stateless.

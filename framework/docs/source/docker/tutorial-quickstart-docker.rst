@@ -84,7 +84,7 @@ Open your terminal and run:
     * ``--rm``: Remove the container once it is stopped or the command exits.
     * ``-p 9091:9091 -p 9092:9092 -p 9093:9093``: Map port ``9091``, ``9092`` and ``9093`` of the
       container to the same port of the host machine, allowing other services to access the
-      ServerAppIO API on ``http://localhost:9091``, the Fleet API on ``http://localhost:9092`` and
+      Runtime API on ``http://localhost:9091``, the Fleet API on ``http://localhost:9092`` and
       the Control API on ``http://localhost:9093``.
     * ``--network flwr-network``: Make the container join the network named ``flwr-network``.
     * ``--name superlink``: Assign the name ``superlink`` to the container.
@@ -172,7 +172,7 @@ behavior (ServerApps vs ClientApps) at runtime via the ``--plugin-type`` flag. S
 spawns the corresponding processes on demand.
 
 When using SuperExec with the *serverapp* plugin, pass ``--appio-api-address`` pointing
-to the SuperLink's **ServerAppIO API** endpoint.
+to the SuperLink's **Runtime API** endpoint.
 
 1. Create a Dockerfile called ``superexec.Dockerfile`` and paste the following:
 
@@ -249,7 +249,7 @@ to the SuperLink's **ServerAppIO API** endpoint.
          unencrypted communication. Secure connections will be added in future releases.
        * ``--plugin-type serverapp``: Load the *serverapp* plugin. SuperExec will spawn
          ServerApp processes as needed.
-       * ``--appio-api-address superlink:9091``: Connect to the SuperLink's ServerAppIO API
+       * ``--appio-api-address superlink:9091``: Connect to the SuperLink's Runtime API
          at the address ``superlink:9091``.
 
 ***************************************************
@@ -258,7 +258,7 @@ to the SuperLink's **ServerAppIO API** endpoint.
 
 For ClientApps, reuse the **same** image and change the plugin and API address. When
 using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the SuperNode's
-**ClientAppIO API** endpoint.
+**Runtime API** endpoint.
 
 1. (No new Dockerfile is needed; reuse ``flwr_superexec:0.0.1``.)
 2. Start the first **SuperExec for ClientApps** container:
@@ -287,7 +287,7 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
          unencrypted communication. Secure connections will be added in future releases.
        * ``--plugin-type clientapp``: Load the *clientapp* plugin. SuperExec will spawn
          ClientApp processes as needed.
-       * ``--appio-api-address supernode-1:9094``: Connect to the SuperNode's ClientAppIO API
+       * ``--appio-api-address supernode-1:9094``: Connect to the SuperNode's Runtime API
          at the address ``supernode-1:9094``.
 
 3. Start the second **SuperExec for ClientApps** container:

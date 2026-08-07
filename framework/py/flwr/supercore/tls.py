@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""TLS helpers for SuperExec/AppIO-style gRPC connections."""
+"""TLS helpers for Runtime API gRPC connections."""
 
 
 import argparse
@@ -38,7 +38,7 @@ def get_client_tls_args(
 def try_obtain_optional_appio_server_certificates(
     args: argparse.Namespace,
 ) -> ServerCertificates | None:
-    """Load AppIO server certificates from `appio_ssl_*` args when provided."""
+    """Load Runtime server certificates from `appio_ssl_*` args when provided."""
     if (
         args.appio_ssl_certfile
         and args.appio_ssl_keyfile
@@ -72,7 +72,7 @@ def try_obtain_optional_appio_server_certificates(
             ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID,
             "You need to provide valid file paths to `--appio-ssl-certfile`, "
             "`--appio-ssl-keyfile`, and `--appio-ssl-ca-certfile` to create a "
-            "secure AppIO connection.",
+            "secure Runtime API connection.",
         )
     return None
 

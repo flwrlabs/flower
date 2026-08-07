@@ -35,7 +35,7 @@ from rich.console import Console
 
 from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
+from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 
 from .constant import LOG_UPLOAD_INTERVAL
 
@@ -380,7 +380,7 @@ def redirect_output(output_buffer: StringIO) -> None:
 
 
 def _log_uploader(
-    log_queue: Queue[str | None], node_id: int, run_id: int, stub: ServerAppIoStub
+    log_queue: Queue[str | None], node_id: int, run_id: int, stub: RuntimeStub
 ) -> None:
     """Upload logs to the SuperLink."""
     exit_flag = False
@@ -426,7 +426,7 @@ def start_log_uploader(
     log_queue: Queue[str | None],
     node_id: int,
     run_id: int,
-    stub: ServerAppIoStub,
+    stub: RuntimeStub,
 ) -> threading.Thread:
     """Start the log uploader thread and return it."""
     thread = threading.Thread(

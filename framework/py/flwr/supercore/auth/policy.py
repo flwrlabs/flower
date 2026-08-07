@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Token auth policy definitions for AppIo interfaces."""
+"""Token auth policy definitions for the Runtime interface."""
 
 
 from __future__ import annotations
@@ -64,12 +64,11 @@ _RUNTIME_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
 def _build_runtime_method_auth_policy(
     service_name: str,
 ) -> dict[str, MethodTokenPolicy]:
-    """Build the token policy map for an AppIo service."""
+    """Build the token policy map for a Runtime service."""
     return {
         f"/flwr.proto.{service_name}/{method}": policy
         for method, policy in _RUNTIME_METHOD_AUTH_POLICY.items()
     }
 
 
-SERVERAPPIO_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy("ServerAppIo")
-CLIENTAPPIO_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy("ClientAppIo")
+RUNTIME_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy("Runtime")
