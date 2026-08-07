@@ -17,18 +17,18 @@ commands that interact with the SuperLink.
 
 .. important::
 
-    Account authentication does not replace resource-level access checks. Run
-    ownership, federation membership and roles, and entitlements continue to constrain
-    what an authenticated account can access.
+    Account authentication does not replace resource-level access checks. Run ownership,
+    federation membership and roles, and entitlements continue to constrain what an
+    authenticated account can access.
 
 ***************
  Prerequisites
 ***************
 
-To enable account authentication, the SuperLink must be deployed with an `OpenID
-Connect (OIDC) <https://openid.net/developers/how-connect-works/>`_ provider. The OIDC
-provider verifies account identity and supplies the account information used by
-SuperLink's ownership, federation, and entitlement checks.
+To enable account authentication, the SuperLink must be deployed with an `OpenID Connect
+(OIDC) <https://openid.net/developers/how-connect-works/>`_ provider. The OIDC provider
+verifies account identity and supplies the account information used by SuperLink's
+ownership, federation, and entitlement checks.
 
 Enable Account Authentication on the SuperLink
 ==============================================
@@ -109,9 +109,9 @@ SuperLink will be stored locally. The tokens will be sent transparently with eac
 subsequent ``flwr`` CLI request to the SuperLink, and it will relay them to the OIDC
 provider to perform the authentication checks.
 
-****************************************
+*****************************************
  Run authenticated ``flwr`` CLI commands
-****************************************
+*****************************************
 
 With the above steps completed, you can now run ``flwr`` CLI commands against a
 SuperLink setup with account authentication. For example, you can run the ``flwr run``
