@@ -2441,6 +2441,15 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
             [automation.automation_id for automation in due], [legacy.automation_id]
         )
         self.assertNotEqual(due[0].automation_id, newer.automation_id)
+        rows = state.query(
+            """
+            SELECT next_run_at
+            FROM automation
+            WHERE automation_id = :automation_id
+            """,
+            {"automation_id": uint64_to_int64(legacy.automation_id)},
+        )
+        self.assertNotIn("T", rows[0]["next_run_at"])
 
     def test_get_fab_refreshes_cached_row_in_shared_session(self) -> None:
         """Test get_fab observes raw SQL updates in a shared session."""

@@ -124,6 +124,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
         super().__init__(database_path)
         self._object_store = object_store
+        self._automation_timestamp_legacy_text_normalized = False
 
     def dialect_insert(self, table: Any) -> SQLiteInsert | PostgresInsert:
         """Return a dialect-specific insert statement for CoreState upserts."""
@@ -786,6 +787,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         next_run_at: str | None,
     ) -> tuple[StartRunRequest, str] | None:
         """Claim an automation occurrence and return its unresolved run request."""
+        self._normalize_legacy_automation_timestamp_text()
         stored_automation_id = uint64_to_int64(automation_id)
         query = select(
             AutomationModel.start_run_request,
@@ -830,6 +832,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         limit: int | None = None,
     ) -> Sequence[Automation]:
         """Return automations matching the given filters."""
+        self._normalize_legacy_automation_timestamp_text()
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
         if (
@@ -861,13 +864,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
 
         if order_by == "next_run_at":
-            next_run_order: Any = AutomationModel.next_run_at
-            if self.database_backend == "sqlite":
-                next_run_order = _timestamp_order_legacy_text(
-                    AutomationModel.next_run_at
-                )
             query = query.order_by(
-                next_run_order.asc(), AutomationModel.automation_id.asc()
+                AutomationModel.next_run_at.asc(), AutomationModel.automation_id.asc()
             )
         else:
             query = query.order_by(
@@ -909,6 +907,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         next_run_at: str | None,
     ) -> bool:
         """Advance an active automation occurrence."""
+        self._normalize_legacy_automation_timestamp_text()
         timestamp = now()
         next_run_at_dt = (
             datetime.fromisoformat(next_run_at) if next_run_at is not None else None
@@ -954,6 +953,22 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         with self.session() as session:
             return session.scalar(stmt) is not None
+
+    def _normalize_legacy_automation_timestamp_text(self) -> None:
+        """Normalize legacy SQLite automation timestamps for indexed comparisons."""
+        if (
+            self.database_backend != "sqlite"
+            or self._automation_timestamp_legacy_text_normalized
+        ):
+            return
+
+        with self.session() as session:
+            session.execute(
+                update(AutomationModel)
+                .where(sql_cast(AutomationModel.next_run_at, String).like("%T%"))
+                .values(next_run_at=func.replace(AutomationModel.next_run_at, "T", " "))
+            )
+        self._automation_timestamp_legacy_text_normalized = True
 
     def finish_automation(
         self,
@@ -1777,11 +1792,6 @@ def _timestamp_le_legacy_text(column: Any, value: datetime) -> Any:
         column <= value,
         and_(text_column.like("%T%"), text_column <= value.isoformat()),
     )
-
-
-def _timestamp_order_legacy_text(column: Any) -> Any:
-    """Normalize legacy SQLite timestamp text for chronological ordering."""
-    return func.replace(sql_cast(column, String), "T", " ")
 
 
 def _automation_from_model(model: AutomationModel) -> Automation:
