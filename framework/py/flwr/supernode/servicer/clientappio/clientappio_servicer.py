@@ -203,13 +203,9 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         store = self.objectstore_factory.store()
 
         # Retrieve message for this run
-        messages = state.get_messages(run_ids=[run_id], is_reply=False)
+        messages = state.get_messages(run_ids=[run_id], is_reply=False, limit=1)
         if not messages:
-            context.abort(
-                grpc.StatusCode.NOT_FOUND,
-                f"No message found for run {run_id} in NodeState.",
-            )
-            raise RuntimeError("Unreachable code")  # for mypy
+            return PullAppMessagesResponse()
         message = messages[0]
 
         # Record message processing start time

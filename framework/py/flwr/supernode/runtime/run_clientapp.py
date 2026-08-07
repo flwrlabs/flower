@@ -244,6 +244,8 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
 
     # Pull and inflate the message
     pull_msg_res: PullAppMessagesResponse = stub.PullMessages(PullAppMessagesRequest())
+    if not pull_msg_res.messages_list:
+        raise RuntimeError("No messages received from ClientAppIo")
     run_id = context.run_id
     node = Node(node_id=context.node_id)
     object_tree = pull_msg_res.message_object_trees[0]

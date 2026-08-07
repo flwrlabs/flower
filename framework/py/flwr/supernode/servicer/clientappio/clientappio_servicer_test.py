@@ -263,11 +263,10 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.assertEqual(finish_task_kwargs["task_id"], task_id)
         self.assertEqual(finish_task_kwargs["sub_status"], request.sub_status)
 
-    def test_servicer_pull_messages_aborts_when_no_message_found(self) -> None:
-        """PullMessages should abort cleanly when no message is available."""
+    def test_servicer_pull_messages_returns_empty_response(self) -> None:
+        """PullMessages should return an empty response when no message is available."""
         run_id = 61016
         context = Mock()
-        context.abort.side_effect = grpc.RpcError()
         self.mock_state.get_messages.return_value = []
 
         with patch(
@@ -275,13 +274,11 @@ class TestClientAppIoServicer(unittest.TestCase):
             "get_authenticated_task",
             return_value=Mock(run_id=run_id),
         ):
-            with self.assertRaises(grpc.RpcError):
-                self.servicer.PullMessages(PullAppMessagesRequest(), context)
+            response = self.servicer.PullMessages(PullAppMessagesRequest(), context)
 
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.NOT_FOUND,
-            f"No message found for run {run_id} in NodeState.",
-        )
+        self.assertEqual(list(response.messages_list), [])
+        self.assertEqual(list(response.message_object_trees), [])
+        context.abort.assert_not_called()
         self.mock_state.record_message_processing_start.assert_not_called()
 
     @parameterized.expand([(0, 0), (1, 0), (0, 1), (2, 1), (1, 2)])  # type: ignore
