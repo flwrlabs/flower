@@ -1411,11 +1411,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     literal(message_dict["error"], type_=TaskMessageModel.error.type),
                 )
                 .select_from(src_task)
-                .join(dst_task, dst_task.task_id == message_dict["dst_task_id"])
+                .join(
+                    dst_task,
+                    (dst_task.task_id == message_dict["dst_task_id"])
+                    & (dst_task.run_id == src_task.run_id),
+                )
                 .where(
                     src_task.task_id == message_dict["src_task_id"],
                     src_task.run_id == message_dict["run_id"],
-                    dst_task.run_id == message_dict["run_id"],
                     dst_task.finished_at.is_(None),
                 )
             )
