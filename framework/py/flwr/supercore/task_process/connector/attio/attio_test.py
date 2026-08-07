@@ -123,7 +123,7 @@ def test_oauth_builds_url_and_exchanges_code() -> None:
         )
 
     assert credentials == {"access_token": "attio-access"}
-    assert config == {}
+    assert not config
     assert post.call_args.kwargs["data"] == {
         "client_id": "client-id",
         "client_secret": "client-secret",
