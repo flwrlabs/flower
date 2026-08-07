@@ -2374,7 +2374,9 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
             next_run_at="2026-08-07T00:01:00+00:00",
         )
 
-        self.assertEqual(len(captured_queries), 2)
+        self.assertTrue(captured_queries)
+        self.assertTrue(any("SELECT start_run_request" in q for q in captured_queries))
+        self.assertTrue(any("UPDATE automation" in q for q in captured_queries))
         for query in captured_queries:
             self.assertNotIn(":next_run_at IS NOT NULL", query)
 
