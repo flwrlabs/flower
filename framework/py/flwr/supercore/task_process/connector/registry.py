@@ -20,20 +20,21 @@ from copy import deepcopy
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from . import automation, browser_use, notion, notion_oauth, web_fetch, web_search
-from .definition import ConnectorDefinition, ConnectorHandler
+from . import automation, browser_use, notion, slack, web_fetch, web_search
+from .definition import (
+    ConnectorDefinition,
+    ConnectorExecutionContext,
+    ConnectorExecutor,
+    ConnectorHandler,
+)
 from .oauth import OAuthConnectorProvider
 
 ConnectorToolFactory = Callable[[], JSONObject]
 
 
 CONNECTORS: tuple[ConnectorDefinition, ...] = (
-    ConnectorDefinition(
-        ref=notion.NOTION_CONNECTOR_REF,
-        tools=notion.NOTION_TOOLS,
-        handlers=notion.NOTION_TOOL_HANDLERS,
-        oauth_provider=notion_oauth.get_configured_oauth_provider(),
-    ),
+    slack.CONNECTOR,
+    notion.CONNECTOR,
 )
 _CONNECTORS_BY_REF = {connector.ref: connector for connector in CONNECTORS}
 
@@ -47,7 +48,7 @@ _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
     browser_use.BROWSER_USE_CONNECTOR_NAME: browser_use.invoke_browser_use_provider,
 }
-_CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
+_CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorExecutor] = {
     name: handler
     for connector in CONNECTORS
     for name, handler in connector.handlers.items()
@@ -81,10 +82,12 @@ def invoke_connector(
     if credentials is None or config is None:
         raise RuntimeError("Connector credentials are required.")
     return handler(
-        **arguments,
-        credentials=credentials,
-        config=config,
-        usage_recorder=usage_recorder,
+        arguments,
+        ConnectorExecutionContext(
+            credentials=credentials,
+            config=config,
+            usage_recorder=usage_recorder,
+        ),
     )
 
 

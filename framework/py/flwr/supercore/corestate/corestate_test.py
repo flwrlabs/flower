@@ -174,6 +174,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(retrieved.run_config, context.run_config)
         self.assertEqual(retrieved.series_id, context.series_id)
 
+        updated_context = Context(
+            run_id=456,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={"node": "updated"},
+            state=RecordDict(),
+            run_config={"run": "updated"},
+            series_id=42,
+        )
+        state.set_run_series_context(series_id=42, context=updated_context)
+
+        updated = state.get_run_series_context(series_id=42)
+
+        assert updated is not None
+        self.assertEqual(updated.run_id, updated_context.run_id)
+        self.assertEqual(updated.node_config, updated_context.node_config)
+        self.assertEqual(updated.run_config, updated_context.run_config)
+
     def test_connector_oauth_session_lifecycle(self) -> None:
         """An OAuth session can be created, retrieved, and completed once."""
         state = self.state_factory()
@@ -771,6 +788,60 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [failing.automation_id],
         )
         self.assertEqual(failed[0].next_run_at, failed_previous_next_run_at)
+
+    def test_claim_automation(self) -> None:
+        """Claiming should return the request and advance one occurrence."""
+        state = self.state_factory()
+        current = now()
+        first_run_at = current.isoformat()
+        second_run_at = (current + timedelta(seconds=60)).isoformat()
+        automation = self.store_automation(
+            state,
+            series_id=123,
+            flwr_aid="aid-claim",
+            next_run_at=first_run_at,
+            fixed_interval=60,
+            max_runs=2,
+        )
+        self.assertIsNone(
+            state.claim_automation(
+                automation.automation_id,
+                previous_next_run_at=first_run_at,
+                next_run_at=None,
+            )
+        )
+
+        claimed = state.claim_automation(
+            automation.automation_id,
+            previous_next_run_at=first_run_at,
+            next_run_at=second_run_at,
+        )
+
+        self.assertIsNotNone(claimed)
+        assert claimed is not None
+        request, flwr_aid = claimed
+        self.assertEqual(request.series_id, 123)
+        self.assertEqual(flwr_aid, "aid-claim")
+        self.assertIsNone(
+            state.claim_automation(
+                automation.automation_id,
+                previous_next_run_at=first_run_at,
+                next_run_at=second_run_at,
+            )
+        )
+
+        final_claim = state.claim_automation(
+            automation.automation_id,
+            previous_next_run_at=second_run_at,
+            next_run_at=None,
+        )
+
+        self.assertIsNotNone(final_claim)
+        updated = state.list_automations(
+            automation_ids=[automation.automation_id],
+            order_by="updated_at",
+        )
+        self.assertEqual(updated[0].remaining_runs, 0)
 
     def test_store_automation_preserves_series_id_without_validation(self) -> None:
         """Automation storage should preserve caller-provided series IDs."""
