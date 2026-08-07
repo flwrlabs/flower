@@ -106,9 +106,11 @@ def test_oauth_builds_url_and_exchanges_code() -> None:
     url = _provider().build_authorization_url(
         redirect_uri=_REDIRECT_URI,
         state="oauth-state",
-        pkce_challenge=None,
+        pkce_challenge="shared-pkce-challenge",
     )
-    assert parse_qs(urlparse(url).query)["redirect_uri"] == [_REDIRECT_URI]
+    query = parse_qs(urlparse(url).query)
+    assert query["redirect_uri"] == [_REDIRECT_URI]
+    assert "code_challenge" not in query
     with pytest.raises(ValueError):
         _provider().resolve_redirect_uri("https://attacker.example/callback")
 
@@ -117,7 +119,7 @@ def test_oauth_builds_url_and_exchanges_code() -> None:
         credentials, config = _provider().exchange_code(
             code="authorization-code",
             redirect_uri=_REDIRECT_URI,
-            pkce_verifier=None,
+            pkce_verifier="shared-pkce-verifier",
         )
 
     assert credentials == {"access_token": "attio-access"}
@@ -133,5 +135,5 @@ def test_oauth_builds_url_and_exchanges_code() -> None:
         _provider().exchange_code(
             code="authorization-code",
             redirect_uri="https://attacker.example/callback",
-            pkce_verifier=None,
+            pkce_verifier="shared-pkce-verifier",
         )

@@ -51,8 +51,7 @@ class AttioOAuthProvider(BaseOAuthProvider):
         pkce_challenge: str | None,
     ) -> Mapping[str, str]:
         """Return Attio authorization parameters."""
-        if pkce_challenge is not None:
-            raise ValueError("Attio PKCE is not enabled for this provider.")
+        del pkce_challenge
         return {
             "response_type": "code",
             "client_id": self._client_id,
