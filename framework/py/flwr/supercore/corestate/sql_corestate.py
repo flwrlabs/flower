@@ -25,6 +25,7 @@ from typing import Any, Literal, cast
 from uuid import uuid4
 
 from sqlalchemy import MetaData, String, case
+from sqlalchemy import event as sqlalchemy_event
 from sqlalchemy import cast as sql_cast
 from sqlalchemy import delete, exists, func, insert, literal, or_, select, update
 from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
@@ -965,7 +966,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .where(sql_cast(AutomationModel.next_run_at, String).like("%T%"))
                 .values(next_run_at=func.replace(AutomationModel.next_run_at, "T", " "))
             )
-        self._automation_timestamp_legacy_text_normalized = True
+
+            def mark_normalized(_session: Any) -> None:
+                self._automation_timestamp_legacy_text_normalized = True
+
+            sqlalchemy_event.listen(session, "after_commit", mark_normalized, once=True)
 
     def finish_automation(
         self,
