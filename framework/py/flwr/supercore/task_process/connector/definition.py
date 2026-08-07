@@ -22,7 +22,7 @@ from typing import Literal
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from .oauth import OAuthProvider
+from .oauth import OAuthFlow
 
 ConnectorHandler = Callable[..., JSONValue]
 
@@ -107,7 +107,7 @@ class ConnectorDefinition:
 
     provider: ProviderDefinition
     executors: Mapping[str, ConnectorExecutor]
-    oauth_provider: OAuthProvider | None = None
+    oauth_flow: OAuthFlow | None = None
 
     def __post_init__(self) -> None:
         """Reject incomplete definitions when the connector is imported."""

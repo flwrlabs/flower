@@ -21,7 +21,7 @@ import pytest
 
 from .. import registry
 from ..definition import ActionAccess
-from ..oauth import OAuthProvider
+from ..oauth import OAuthFlow
 from .actions import ACTIONS
 from .definition import PROVIDER, SLACK_CONNECTOR_REF, SLACK_USER_SCOPES
 
@@ -51,10 +51,10 @@ def test_slack_actions_are_registered_and_executable() -> None:
 def test_slack_oauth_flow() -> None:
     """Slack OAuth should request read scopes and extract user credentials."""
     redirect_uri = "https://example.com/callback"
-    provider = OAuthProvider(
+    flow = OAuthFlow(
         PROVIDER, client_id="client", client_secret="secret", redirect_uri=redirect_uri
     )
-    url = provider.build_authorization_url(
+    url = flow.build_authorization_url(
         redirect_uri=redirect_uri, state="state", pkce_challenge="ignored"
     )
     assert parse_qs(urlparse(url).query)["user_scope"] == [",".join(SLACK_USER_SCOPES)]
@@ -64,12 +64,12 @@ def test_slack_oauth_flow() -> None:
         "authed_user": {"access_token": "token", "scope": "search:read"},
     }
     with patch(_OAUTH_REQUEST, return_value=response):
-        assert provider.exchange_code(
+        assert flow.exchange_code(
             code="code", redirect_uri=redirect_uri, pkce_verifier="ignored"
         )[0] == {"access_token": "token"}
 
     response.json.return_value["authed_user"]["scope"] = "chat:write"
     with patch(_OAUTH_REQUEST, return_value=response), pytest.raises(RuntimeError):
-        provider.exchange_code(
+        flow.exchange_code(
             code="code", redirect_uri=redirect_uri, pkce_verifier="ignored"
         )

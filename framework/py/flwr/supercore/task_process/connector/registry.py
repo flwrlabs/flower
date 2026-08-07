@@ -27,7 +27,7 @@ from .definition import (
     ConnectorExecutor,
     ConnectorHandler,
 )
-from .oauth import OAuthProvider
+from .oauth import OAuthFlow
 
 ConnectorToolFactory = Callable[[], JSONObject]
 
@@ -35,10 +35,8 @@ ConnectorToolFactory = Callable[[], JSONObject]
 CONNECTORS: tuple[ConnectorDefinition, ...] = (slack.CONNECTOR,)
 _CONNECTORS_BY_REF = {connector.ref: connector for connector in CONNECTORS}
 
-OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthProvider, ...] = tuple(
-    connector.oauth_provider
-    for connector in CONNECTORS
-    if connector.oauth_provider is not None
+OAUTH_FLOWS: tuple[OAuthFlow, ...] = tuple(
+    connector.oauth_flow for connector in CONNECTORS if connector.oauth_flow is not None
 )
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
@@ -122,11 +120,11 @@ def get_builtin_connector_tool(name: str) -> JSONObject:
     return make_tool()
 
 
-def get_oauth_connector_provider(connector_ref: str) -> OAuthProvider:
-    """Return the OAuth provider registered for a connector reference."""
-    for provider in OAUTH_CONNECTOR_PROVIDERS:
-        if provider.connector_ref == connector_ref:
-            return provider
+def get_oauth_flow(connector_ref: str) -> OAuthFlow:
+    """Return the OAuth flow registered for a connector reference."""
+    for flow in OAUTH_FLOWS:
+        if flow.connector_ref == connector_ref:
+            return flow
     raise ValueError(f"Unsupported OAuth connector '{connector_ref}'.")
 
 

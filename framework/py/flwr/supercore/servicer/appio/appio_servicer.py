@@ -260,7 +260,7 @@ def _validate_create_task_request(
             return
 
         try:
-            connector_registry.get_oauth_connector_provider(connector_ref)
+            connector_registry.get_oauth_flow(connector_ref)
         except ValueError as err:
             context.abort(grpc.StatusCode.NOT_FOUND, str(err))
 

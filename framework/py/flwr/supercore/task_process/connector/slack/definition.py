@@ -15,7 +15,7 @@
 """Slack connector definition."""
 
 from ..definition import ConnectorDefinition, OAuth2Definition, ProviderDefinition
-from ..oauth import load_oauth_provider
+from ..oauth import load_oauth_flow
 from .actions import ACTIONS
 from .executors import EXECUTORS
 
@@ -54,5 +54,5 @@ PROVIDER = ProviderDefinition(
 CONNECTOR = ConnectorDefinition(
     provider=PROVIDER,
     executors=EXECUTORS,
-    oauth_provider=load_oauth_provider(PROVIDER),
+    oauth_flow=load_oauth_flow(PROVIDER),
 )

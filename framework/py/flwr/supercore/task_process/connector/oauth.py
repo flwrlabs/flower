@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from .definition import ProviderDefinition
 
 
-class OAuthProvider:
+class OAuthFlow:
     """Run OAuth from a provider's declarative configuration."""
 
     def __init__(
@@ -171,15 +171,15 @@ class OAuthProvider:
         return RuntimeError(f"{self.display_name} OAuth {detail}.")
 
 
-def load_oauth_provider(provider: ProviderDefinition) -> OAuthProvider | None:
-    """Return a provider loaded from its environment, if configured."""
+def load_oauth_flow(provider: ProviderDefinition) -> OAuthFlow | None:
+    """Return an OAuth flow loaded from its environment, if configured."""
     if provider.oauth is None:
         return None
     oauth = provider.oauth
     names = (oauth.client_id_env, oauth.client_secret_env, oauth.redirect_uri_env)
     if not any(os.getenv(name, "").strip() for name in names):
         return None
-    return OAuthProvider(
+    return OAuthFlow(
         provider,
         client_id=os.getenv(names[0], ""),
         client_secret=os.getenv(names[1], ""),
