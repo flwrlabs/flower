@@ -186,16 +186,16 @@ def list_connectors(
     account: AccountInfo,
     state: LinkState,
 ) -> ListConnectorsResponse:
-    """List user-connectable OAuth connectors and account connection status."""
+    """List user-connectable OAuth providers and account connection status."""
     log(INFO, "ControlServicer.ListConnectors")
     _ = request
 
     connectors: list[Connector] = []
-    for flow in sorted(
-        connector_registry.OAUTH_FLOWS,
+    for provider in sorted(
+        connector_registry.OAUTH_CONNECTOR_PROVIDERS,
         key=lambda item: item.connector_ref,
     ):
-        connector_ref = flow.connector_ref
+        connector_ref = provider.connector_ref
         connected = (
             state.get_connector(flwr_aid=account.flwr_aid, connector_ref=connector_ref)
             is not None
@@ -203,8 +203,8 @@ def list_connectors(
         connectors.append(
             Connector(
                 connector_ref=connector_ref,
-                display_name=flow.display_name,
-                description=flow.description,
+                display_name=provider.display_name,
+                description=provider.description,
                 connected=connected,
             )
         )
@@ -222,11 +222,11 @@ def disconnect_connector(
     if not connector_ref:
         raise InvalidConnectorRequestError("connector_ref is required")
     try:
-        connector_registry.get_oauth_flow(connector_ref)
+        connector_registry.get_oauth_connector_provider(connector_ref)
     except ValueError:
         raise FlowerError(
             ApiErrorCode.CONNECTOR_NOT_FOUND,
-            f"OAuth flow for connector '{connector_ref}' was not found.",
+            f"OAuth provider for connector '{connector_ref}' was not found.",
         ) from None
 
     deleted = state.delete_connector(
@@ -254,19 +254,19 @@ def begin_connector_oauth(
     if not redirect_uri:
         raise InvalidConnectorRequestError("redirect_uri is required")
     try:
-        flow = connector_registry.get_oauth_flow(connector_ref)
+        provider = connector_registry.get_oauth_connector_provider(connector_ref)
     except ValueError:
         raise FlowerError(
             ApiErrorCode.CONNECTOR_NOT_FOUND,
-            f"OAuth flow for connector '{connector_ref}' was not found.",
+            f"OAuth provider for connector '{connector_ref}' was not found.",
         ) from None
     try:
-        redirect_uri = flow.resolve_redirect_uri(redirect_uri)
+        redirect_uri = provider.resolve_redirect_uri(redirect_uri)
     except ValueError as err:
         raise InvalidConnectorRequestError(
             "redirect_uri is not allowed for this connector"
         ) from err
-    # OAuth flows can raise arbitrary exceptions; sanitize them.
+    # Provider implementations can raise arbitrary exceptions; sanitize them.
     except Exception as err:  # pylint: disable=broad-exception-caught
         raise ConnectorFailureError(
             f"Connector '{connector_ref}' failed to resolve redirect URI "
@@ -285,12 +285,12 @@ def begin_connector_oauth(
     pkce_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
     expires_at = now() + OAUTH_SESSION_TTL
     try:
-        authorization_url = flow.build_authorization_url(
+        authorization_url = provider.build_authorization_url(
             redirect_uri=redirect_uri,
             state=oauth_state,
             pkce_challenge=pkce_challenge,
         )
-    # OAuth flows can raise arbitrary exceptions; sanitize them.
+    # Provider implementations can raise arbitrary exceptions; sanitize them.
     except Exception as err:  # pylint: disable=broad-exception-caught
         raise ConnectorFailureError(
             f"Connector '{connector_ref}' failed to build authorization URL "
@@ -367,11 +367,11 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
 
     connector_ref = session.connector_ref.strip().lower()
     try:
-        flow = connector_registry.get_oauth_flow(connector_ref)
+        provider = connector_registry.get_oauth_connector_provider(connector_ref)
     except ValueError:
         raise FlowerError(
             ApiErrorCode.CONNECTOR_NOT_FOUND,
-            f"OAuth flow for connector '{connector_ref}' was not found.",
+            f"OAuth provider for connector '{connector_ref}' was not found.",
         ) from None
     claimed = state.complete_connector_oauth_session(
         oauth_session_id=session.oauth_session_id,
@@ -384,12 +384,12 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
         )
 
     try:
-        credentials, config = flow.exchange_code(
+        credentials, config = provider.exchange_code(
             code=authorization_code,
             redirect_uri=session.redirect_uri,
             pkce_verifier=session.pkce_verifier,
         )
-    # OAuth flows can raise arbitrary exceptions; sanitize them.
+    # Provider implementations can raise arbitrary exceptions; sanitize them.
     except Exception as err:  # pylint: disable=broad-exception-caught
         raise ConnectorFailureError(
             f"Connector '{connector_ref}' failed to exchange authorization code "
@@ -428,11 +428,11 @@ def validate_run_connector_refs(
         raise InvalidConnectorRequestError("connector_ref is required")
     for connector_ref in canonical_refs:
         try:
-            connector_registry.get_oauth_flow(connector_ref)
+            connector_registry.get_oauth_connector_provider(connector_ref)
         except ValueError:
             raise FlowerError(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
-                f"OAuth flow for connector '{connector_ref}' was not found.",
+                f"OAuth provider for connector '{connector_ref}' was not found.",
             ) from None
         connector = state.get_connector(account.flwr_aid, connector_ref)
         if connector is None:
