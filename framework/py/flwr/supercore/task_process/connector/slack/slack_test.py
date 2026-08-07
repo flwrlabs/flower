@@ -20,11 +20,7 @@ from urllib.parse import parse_qs, urlparse
 from .. import registry
 from ..definition import ActionAccess
 from .actions import ACTIONS
-from .oauth import (
-    SLACK_CONNECTOR_REF,
-    SLACK_USER_SCOPES,
-    SlackOAuthProvider,
-)
+from .oauth import SLACK_CONNECTOR_REF, SLACK_USER_SCOPES, SlackOAuthProvider
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
 _OAUTH_REQUEST = "flwr.supercore.task_process.connector.slack.oauth.requests.post"
