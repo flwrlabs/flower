@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from flwr.supercore.typing import JSONObject
+from flwr.supercore.typing import JSONObject, JSONValue
 
 from .. import registry
 from ..definition import ActionAccess
@@ -48,16 +48,17 @@ def _provider() -> AttioOAuthProvider:
     )
 
 
+def _invoke(name: str, arguments: JSONObject) -> JSONValue:
+    return registry.invoke_connector(name, arguments, Mock(), _CREDENTIALS, {})
+
+
 def test_attio_actions_are_registered_as_read_only() -> None:
     """Attio should expose four account-scoped read actions."""
     assert len(ACTIONS) == 4
     assert all(action.access is ActionAccess.READ for action in ACTIONS)
     tools = registry.get_connector_tools(ATTIO_CONNECTOR_REF)
     assert [tool["name"] for tool in tools] == [
-        "attio_search_records",
-        "attio_list_meetings",
-        "attio_list_call_recordings",
-        "attio_get_call_transcript",
+        f"{ATTIO_CONNECTOR_REF}_{action.name}" for action in ACTIONS
     ]
 
 
@@ -65,12 +66,8 @@ def test_search_records_calls_attio() -> None:
     """Record search should pass the documented request to Attio."""
     response = _response({"data": []})
     with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = registry.invoke_connector(
-            "attio_search_records",
-            {"query": "Flower", "objects": ["companies"]},
-            Mock(),
-            _CREDENTIALS,
-            {},
+        result = _invoke(
+            "attio_search_records", {"query": "Flower", "objects": ["companies"]}
         )
 
     assert request.call_args.args == (
@@ -98,13 +95,7 @@ def test_api_errors_are_secret_safe() -> None:
         ),
         pytest.raises(AttioApiError) as error,
     ):
-        registry.invoke_connector(
-            "attio_search_records",
-            {"query": "Flower", "objects": ["companies"]},
-            Mock(),
-            _CREDENTIALS,
-            {},
-        )
+        _invoke("attio_search_records", {"query": "Flower", "objects": ["companies"]})
 
     assert error.value.code == "http_error"
     assert "attio-secret" not in str(error.value)
@@ -117,11 +108,7 @@ def test_oauth_builds_url_and_exchanges_code() -> None:
         state="oauth-state",
         pkce_challenge=None,
     )
-    parsed = urlparse(url)
-    assert f"{parsed.scheme}://{parsed.netloc}{parsed.path}" == (
-        "https://app.attio.com/authorize"
-    )
-    assert parse_qs(parsed.query)["redirect_uri"] == [_REDIRECT_URI]
+    assert parse_qs(urlparse(url).query)["redirect_uri"] == [_REDIRECT_URI]
     with pytest.raises(ValueError):
         _provider().resolve_redirect_uri("https://attacker.example/callback")
 

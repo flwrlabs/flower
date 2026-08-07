@@ -46,9 +46,7 @@ def search_records(
             "query": require_string(arguments.get("query"), "Attio", "query"),
             "objects": [require_string(item, "Attio", "object") for item in objects],
             "request_as": {"type": "workspace"},
-            "limit": require_int_range(
-                arguments.get("limit", 25), "Attio", "limit", maximum=25
-            ),
+            "limit": _limit(arguments, default=25, maximum=25),
         },
     )
 
@@ -62,21 +60,11 @@ def list_meetings(
         "/meetings",
         context.credentials,
         params={
-            "limit": str(
-                require_int_range(
-                    arguments.get("limit", 50), "Attio", "limit", maximum=50
-                )
-            ),
-            "cursor": optional_string(arguments.get("cursor"), "Attio", "cursor"),
-            "linked_object": optional_string(
-                arguments.get("linked_object"), "Attio", "linked_object"
-            ),
-            "linked_record_id": optional_string(
-                arguments.get("linked_record_id"), "Attio", "linked_record_id"
-            ),
-            "participants": optional_string(
-                arguments.get("participants"), "Attio", "participants"
-            ),
+            "limit": str(_limit(arguments, default=50, maximum=50)),
+            "cursor": _optional(arguments, "cursor"),
+            "linked_object": _optional(arguments, "linked_object"),
+            "linked_record_id": _optional(arguments, "linked_record_id"),
+            "participants": _optional(arguments, "participants"),
         },
     )
 
@@ -91,12 +79,8 @@ def list_call_recordings(
         f"/meetings/{meeting_id}/call_recordings",
         context.credentials,
         params={
-            "limit": str(
-                require_int_range(
-                    arguments.get("limit", 50), "Attio", "limit", maximum=200
-                )
-            ),
-            "cursor": optional_string(arguments.get("cursor"), "Attio", "cursor"),
+            "limit": str(_limit(arguments, default=50, maximum=200)),
+            "cursor": _optional(arguments, "cursor"),
         },
     )
 
@@ -113,7 +97,7 @@ def get_call_transcript(
         "GET",
         f"/meetings/{meeting_id}/call_recordings/{recording_id}/transcript",
         context.credentials,
-        params={"cursor": optional_string(arguments.get("cursor"), "Attio", "cursor")},
+        params={"cursor": _optional(arguments, "cursor")},
     )
 
 
@@ -145,9 +129,7 @@ def _call_attio_api(
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         },
-        params={
-            key: value for key, value in (params or {}).items() if value is not None
-        },
+        params={k: v for k, v in (params or {}).items() if v is not None},
         json=json_body,
         http_error_code=lambda response: (
             "rate_limited" if response.status_code == 429 else "http_error"
@@ -158,3 +140,15 @@ def _call_attio_api(
 def _path_segment(value: object, name: str) -> str:
     """Validate and encode one Attio path segment."""
     return quote(require_string(value, "Attio", name), safe="")
+
+
+def _limit(arguments: JSONObject, *, default: int, maximum: int) -> int:
+    """Return one validated Attio page limit."""
+    return require_int_range(
+        arguments.get("limit", default), "Attio", "limit", maximum=maximum
+    )
+
+
+def _optional(arguments: JSONObject, name: str) -> str | None:
+    """Return one optional Attio string argument."""
+    return optional_string(arguments.get(name), "Attio", name)
