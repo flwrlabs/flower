@@ -25,9 +25,10 @@ from typing import Any, Literal, cast
 from uuid import uuid4
 
 from sqlalchemy import MetaData, String, case
-from sqlalchemy import event as sqlalchemy_event
 from sqlalchemy import cast as sql_cast
-from sqlalchemy import delete, exists, func, insert, literal, or_, select, update
+from sqlalchemy import delete
+from sqlalchemy import event as sqlalchemy_event
+from sqlalchemy import exists, func, insert, literal, or_, select, update
 from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
