@@ -29,7 +29,6 @@ from .oauth import GITHUB_CONNECTOR_REF, GitHubOAuthError, GitHubOAuthProvider
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
 _TOKEN_REQUEST = "flwr.supercore.task_process.connector.github.oauth.requests.post"
-_ACCOUNT_REQUEST = "flwr.supercore.task_process.connector.github.oauth.requests.get"
 _CREDENTIALS: JSONObject = {"access_token": "gho-secret"}
 
 
@@ -47,24 +46,9 @@ def test_github_actions_are_registered_as_read_only() -> None:
     assert len(registry.get_connector_tools(GITHUB_CONNECTOR_REF)) == len(ACTIONS)
 
 
-def test_search_code_calls_api_and_normalizes_results() -> None:
-    """Code search should remain repository-scoped and return stable fields."""
-    response = _response(
-        {
-            "total_count": 1,
-            "incomplete_results": False,
-            "items": [
-                {
-                    "name": "app.py",
-                    "path": "src/app.py",
-                    "sha": "abc",
-                    "html_url": "https://github.com/acme/repo/blob/main/src/app.py",
-                    "repository": {"full_name": "acme/repo"},
-                    "text_matches": [{"fragment": "def hello():"}],
-                }
-            ],
-        }
-    )
+def test_search_code_calls_api() -> None:
+    """Code search should remain repository-scoped."""
+    response = _response({"total_count": 0, "items": []})
     with patch(_HTTP_REQUEST, return_value=response) as request:
         result = registry.invoke_connector(
             "github_search_code",
@@ -74,17 +58,7 @@ def test_search_code_calls_api_and_normalizes_results() -> None:
             {},
         )
     assert request.call_args.args == ("GET", "https://api.github.com/search/code")
-    assert isinstance(result, dict)
-    assert result["results"] == [
-        {
-            "name": "app.py",
-            "path": "src/app.py",
-            "sha": "abc",
-            "url": "https://github.com/acme/repo/blob/main/src/app.py",
-            "repository_full_name": "acme/repo",
-            "fragments": ["def hello():"],
-        }
-    ]
+    assert result == response.json.return_value
 
 
 def test_get_file_content_decodes_utf8() -> None:
@@ -109,8 +83,8 @@ def test_get_file_content_decodes_utf8() -> None:
     assert result["content"] == 'print("hi")\n'
 
 
-def test_github_oauth_verifies_scope_and_account() -> None:
-    """OAuth should request no scope and record the authenticated account."""
+def test_github_oauth_requests_no_scope() -> None:
+    """OAuth should request and accept only scope-free credentials."""
     provider = GitHubOAuthProvider(
         client_id="client",
         client_secret="secret",
@@ -125,18 +99,14 @@ def test_github_oauth_verifies_scope_and_account() -> None:
     token_response = _response(
         {"access_token": "token", "token_type": "bearer", "scope": ""}
     )
-    account_response = _response({"id": 123, "login": "octocat"})
-    with (
-        patch(_TOKEN_REQUEST, return_value=token_response),
-        patch(_ACCOUNT_REQUEST, return_value=account_response),
-    ):
+    with patch(_TOKEN_REQUEST, return_value=token_response):
         credentials, config = provider.exchange_code(
             code="code",
             redirect_uri="https://example.com/callback",
             pkce_verifier="verifier",
         )
     assert credentials == {"access_token": "token"}
-    assert config["login"] == "octocat"
+    assert not config
 
     token_response.json.return_value["scope"] = "repo"
     with (

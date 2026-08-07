@@ -23,17 +23,10 @@ from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
 from ..http import ConnectorApiError, request_json_object
-from ..json_utils import (
-    integer_field,
-    object_list_field,
-    optional_string,
-    require_int_range,
-    require_string,
-    string_field,
-)
-from .oauth import GITHUB_API_VERSION
+from ..json_utils import optional_string, require_int_range, require_string
 
 _API_BASE_URL = "https://api.github.com"
+_API_VERSION = "2026-03-10"
 _JSON_ACCEPT = "application/vnd.github+json"
 _TEXT_MATCH_ACCEPT = "application/vnd.github.text-match+json"
 _OWNER = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
@@ -56,24 +49,12 @@ def search_code(
     if _REPOSITORY_QUALIFIER.search(query) is not None:
         raise ValueError("GitHub query must not contain a repo qualifier.")
     limit = require_int_range(arguments.get("limit", 5), "GitHub", "limit", maximum=10)
-    payload = _call_api(
+    return _call_api(
         "/search/code",
         context.credentials,
         params={"q": f"{query} repo:{owner}/{repo}", "per_page": str(limit)},
         accept=_TEXT_MATCH_ACCEPT,
     )
-    results = object_list_field(payload, "items", error=GitHubApiError)
-    total_count = payload.get("total_count")
-    incomplete = payload.get("incomplete_results")
-    if isinstance(total_count, bool) or not isinstance(total_count, int):
-        raise GitHubApiError("invalid_response")
-    if not isinstance(incomplete, bool):
-        raise GitHubApiError("invalid_response")
-    return {
-        "results": [_normalize_result(item) for item in results[:limit]],
-        "total_count": total_count,
-        "incomplete_results": incomplete,
-    }
 
 
 def get_file_content(
@@ -102,18 +83,8 @@ def get_file_content(
         raise GitHubApiError("unsupported_content") from None
     except (ValueError, binascii.Error):
         raise GitHubApiError("invalid_response") from None
-    return {
-        "owner": owner,
-        "repo": repo,
-        "path": string_field(payload, "path"),
-        "name": string_field(payload, "name"),
-        "sha": string_field(payload, "sha"),
-        "size": integer_field(payload, "size"),
-        "url": string_field(payload, "html_url"),
-        "download_url": string_field(payload, "download_url"),
-        "ref": ref or "",
-        "content": content,
-    }
+    payload["content"] = content
+    return payload
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
@@ -140,35 +111,10 @@ def _call_api(
         headers={
             "Accept": accept,
             "Authorization": f"Bearer {token}",
-            "X-GitHub-Api-Version": GITHUB_API_VERSION,
+            "X-GitHub-Api-Version": _API_VERSION,
         },
         params=params,
-        http_error_code=lambda response: _http_error_code(response.status_code),
     )
-
-
-def _normalize_result(item: JSONObject) -> JSONObject:
-    """Return stable fields from one code search result."""
-    repository = item.get("repository")
-    matches = item.get("text_matches")
-    fragments: list[str] = []
-    if isinstance(matches, list):
-        for match in matches:
-            fragment = match.get("fragment") if isinstance(match, dict) else None
-            if isinstance(fragment, str) and fragment:
-                fragments.append(fragment)
-    return {
-        "name": string_field(item, "name"),
-        "path": string_field(item, "path"),
-        "sha": string_field(item, "sha"),
-        "url": string_field(item, "html_url"),
-        "repository_full_name": (
-            string_field(repository, "full_name")
-            if isinstance(repository, dict)
-            else ""
-        ),
-        "fragments": fragments,
-    }
 
 
 def _repository_ref(owner: object, repo: object) -> tuple[str, str]:
@@ -188,14 +134,3 @@ def _repository_path(value: object) -> str:
     if not path or any(part in {"", ".", ".."} for part in path.split("/")):
         raise ValueError("GitHub path must point to a file.")
     return path
-
-
-def _http_error_code(status_code: int) -> str:
-    """Map GitHub status codes to stable errors."""
-    return {
-        401: "unauthorized",
-        403: "forbidden",
-        404: "not_found",
-        422: "invalid_request",
-        429: "rate_limited",
-    }.get(status_code, "http_error")

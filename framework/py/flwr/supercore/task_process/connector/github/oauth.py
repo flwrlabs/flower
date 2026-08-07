@@ -25,7 +25,6 @@ from ..json_utils import required_string_field
 from ..oauth import BaseOAuthProvider, load_oauth_provider
 
 GITHUB_CONNECTOR_REF = "github"
-GITHUB_API_VERSION = "2026-03-10"
 
 
 class GitHubOAuthError(RuntimeError):
@@ -87,26 +86,16 @@ class GitHubOAuthProvider(BaseOAuthProvider):
     def parse_token_response(
         self, payload: JSONObject
     ) -> tuple[JSONObject, JSONObject]:
-        """Validate a scope-free token and load its public account identity."""
+        """Extract a scope-free GitHub access token."""
         if "error" in payload:
             raise self._error("exchange failed")
         access_token = required_string_field(payload, "access_token", error=self._error)
         token_type = required_string_field(
             payload, "token_type", error=self._error
         ).lower()
-        if token_type != "bearer" or _parse_scopes(payload.get("scope")):
+        if token_type != "bearer" or payload.get("scope") not in (None, ""):
             raise self._error("returned unsupported permissions")
-        account = _get_account(access_token)
-        account_id = account.get("id")
-        if isinstance(account_id, bool) or not isinstance(account_id, int):
-            raise self._error("returned an invalid account")
-        login = required_string_field(account, "login", error=self._error)
-        return {"access_token": access_token}, {
-            "account_id": account_id,
-            "login": login,
-            "scopes": [],
-            "token_type": token_type,
-        }
+        return {"access_token": access_token}, {}
 
 
 def get_configured_oauth_provider() -> GitHubOAuthProvider | None:
@@ -124,35 +113,3 @@ def get_configured_oauth_provider() -> GitHubOAuthProvider | None:
         client_secret_env=names[1],
         redirect_uri_env=names[2],
     )
-
-
-def _get_account(access_token: str) -> JSONObject:
-    """Load the authenticated GitHub account."""
-    try:
-        response = requests.get(
-            "https://api.github.com/user",
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {access_token}",
-                "X-GitHub-Api-Version": GITHUB_API_VERSION,
-            },
-            timeout=30.0,
-        )
-    except requests.RequestException:
-        raise GitHubOAuthError("GitHub account lookup failed.") from None
-    if response.status_code >= 400:
-        raise GitHubOAuthError("GitHub account lookup failed.")
-    try:
-        payload = response.json()
-    except ValueError:
-        raise GitHubOAuthError("GitHub account lookup failed.") from None
-    if not isinstance(payload, dict):
-        raise GitHubOAuthError("GitHub account lookup failed.")
-    return payload
-
-
-def _parse_scopes(value: object) -> list[str]:
-    """Parse GitHub's comma-delimited scopes."""
-    if not isinstance(value, str):
-        return []
-    return [scope.strip() for scope in value.split(",") if scope.strip()]
