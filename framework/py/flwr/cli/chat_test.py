@@ -23,6 +23,8 @@ import pytest
 
 from flwr.cli.constant import CHAT_SUPERGRID_CONNECTION_NAME
 from flwr.cli.typing import SuperLinkConnection
+from flwr.proto.control_pb2 import ListFederationsResponse
+from flwr.proto.federation_pb2 import Federation
 
 chat_module = importlib.import_module("flwr.cli.chat")
 
@@ -50,6 +52,7 @@ def test_chat_requires_login_before_interactive_application() -> None:
             "init_channel_from_connection",
             return_value=channel,
         ),
+        patch.object(chat_module, "load_cli_auth_plugin_from_connection"),
         patch.object(chat_module, "ControlStub", return_value=stub),
         patch.object(chat_module, "ChatApplication") as mock_chat_application,
     ):
@@ -68,7 +71,10 @@ def test_chat_runs_interactive_application() -> None:
     )
     channel = Mock()
     stub = Mock()
-    stub.ListFederations.return_value = Mock()
+    stub.ListFederations.return_value = ListFederationsResponse(
+        federations=[Federation(name="@flower/workspace")]
+    )
+    auth_plugin = Mock()
 
     with (
         patch.object(
@@ -80,6 +86,11 @@ def test_chat_runs_interactive_application() -> None:
             chat_module,
             "init_channel_from_connection",
             return_value=channel,
+        ) as mock_init_channel,
+        patch.object(
+            chat_module,
+            "load_cli_auth_plugin_from_connection",
+            return_value=auth_plugin,
         ),
         patch.object(chat_module, "ControlStub", return_value=stub),
         patch.object(chat_module, "ChatApplication") as mock_chat_application,
@@ -87,6 +98,9 @@ def test_chat_runs_interactive_application() -> None:
         chat_module.chat()
 
     stub.ListFederations.assert_called_once()
-    mock_chat_application.assert_called_once_with(stub, None)
+    mock_init_channel.assert_called_once_with(superlink_connection, auth_plugin)
+    mock_chat_application.assert_called_once_with(
+        stub, "@flower/workspace", auth_plugin
+    )
     mock_chat_application.return_value.run.assert_called_once_with()
     channel.close.assert_called_once()
