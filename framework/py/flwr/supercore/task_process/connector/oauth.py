@@ -67,6 +67,7 @@ class OAuthFlow:
     ) -> str:
         """Build an authorization URL from the provider definition."""
         params = {
+            **self._oauth.authorization_params,
             "client_id": self._client_id,
             "redirect_uri": redirect_uri,
             "response_type": "code",
@@ -113,12 +114,22 @@ class OAuthFlow:
                 client_secret=self._client_secret,
             )
         try:
-            response = requests.post(
-                self._oauth.token_url,
-                auth=auth,
-                data=data,
-                timeout=30.0,
-            )
+            if self._oauth.token_request_format == "json":
+                response = requests.post(
+                    self._oauth.token_url,
+                    auth=auth,
+                    headers=self._oauth.token_headers,
+                    json=data,
+                    timeout=30.0,
+                )
+            else:
+                response = requests.post(
+                    self._oauth.token_url,
+                    auth=auth,
+                    headers=self._oauth.token_headers,
+                    data=data,
+                    timeout=30.0,
+                )
         except requests.RequestException:
             raise self._error("exchange failed") from None
         if response.status_code >= 400:
@@ -169,7 +180,12 @@ class OAuthFlow:
             value = token_payload.get(key)
             if isinstance(value, (str, int)) and not isinstance(value, bool):
                 credentials[key] = value
-        return credentials, {}
+        config: JSONObject = {}
+        for key in self._oauth.config_fields:
+            value = token_payload.get(key)
+            if isinstance(value, (str, int, float, bool)):
+                config[key] = value
+        return credentials, config
 
     def _error(self, detail: str) -> RuntimeError:
         """Build a provider-labelled, secret-safe OAuth error."""
