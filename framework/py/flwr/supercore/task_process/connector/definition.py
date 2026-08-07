@@ -16,12 +16,13 @@
 
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
+from .http import ConnectorHttpClient
 from .oauth import OAuthConnectorProvider
 
 ConnectorHandler = Callable[..., JSONValue]
@@ -65,6 +66,8 @@ class ProviderDefinition:
     display_name: str
     description: str
     actions: tuple[ActionDefinition, ...]
+    api_base_url: str | None = None
+    api_headers: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -74,6 +77,7 @@ class ConnectorExecutionContext:
     credentials: JSONObject
     config: JSONObject
     usage_recorder: TaskUsageRecorder
+    http: ConnectorHttpClient | None = None
 
 
 ConnectorExecutor = Callable[[JSONObject, ConnectorExecutionContext], JSONValue]

@@ -17,13 +17,19 @@
 from ..definition import ConnectorDefinition, ProviderDefinition
 from .actions import ACTIONS
 from .executors import EXECUTORS
-from .oauth import NOTION_CONNECTOR_REF, get_configured_oauth_provider
+from .oauth import (
+    NOTION_API_VERSION,
+    NOTION_CONNECTOR_REF,
+    get_configured_oauth_provider,
+)
 
 PROVIDER = ProviderDefinition(
     ref=NOTION_CONNECTOR_REF,
     display_name="Notion",
     description="Search and read pages and data sources.",
     actions=ACTIONS,
+    api_base_url="https://api.notion.com/v1",
+    api_headers={"Notion-Version": NOTION_API_VERSION},
 )
 
 CONNECTOR = ConnectorDefinition(

@@ -24,6 +24,7 @@ PROVIDER = ProviderDefinition(
     display_name="Slack",
     description="Search and read messages, conversations, and threads.",
     actions=ACTIONS,
+    api_base_url="https://slack.com/api",
 )
 
 CONNECTOR = ConnectorDefinition(

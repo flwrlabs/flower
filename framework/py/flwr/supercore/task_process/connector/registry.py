@@ -27,6 +27,7 @@ from .definition import (
     ConnectorExecutor,
     ConnectorHandler,
 )
+from .http import ConnectorHttpClient
 from .oauth import OAuthConnectorProvider
 
 ConnectorToolFactory = Callable[[], JSONObject]
@@ -56,6 +57,9 @@ _CREDENTIAL_CONNECTOR_HANDLERS: dict[str, ConnectorExecutor] = {
 _CREDENTIAL_CONNECTOR_REFS: dict[str, str] = {
     name: connector.ref for connector in CONNECTORS for name in connector.handlers
 }
+_CREDENTIAL_CONNECTORS = {
+    name: connector for connector in CONNECTORS for name in connector.handlers
+}
 _BUILTIN_CONNECTOR_TOOL_FACTORIES: dict[str, ConnectorToolFactory] = {
     automation.START_AUTOMATION_TOOL_NAME: automation.make_start_automation_tool,
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.make_web_search_tool,
@@ -81,12 +85,22 @@ def invoke_connector(
         raise ValueError(f"Unsupported connector '{name}'.")
     if credentials is None or config is None:
         raise RuntimeError("Connector credentials are required.")
+    connector = _CREDENTIAL_CONNECTORS.get(name)
+    http = None
+    if connector is not None and connector.provider.api_base_url is not None:
+        http = ConnectorHttpClient(
+            provider=connector.provider.display_name,
+            base_url=connector.provider.api_base_url,
+            credentials=credentials,
+            headers=connector.provider.api_headers,
+        )
     return handler(
         arguments,
         ConnectorExecutionContext(
             credentials=credentials,
             config=config,
             usage_recorder=usage_recorder,
+            http=http,
         ),
     )
 

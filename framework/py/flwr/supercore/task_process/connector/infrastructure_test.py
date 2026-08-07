@@ -23,7 +23,7 @@ import requests
 
 from flwr.supercore.typing import JSONObject
 
-from .http import ConnectorApiError, request_json_object
+from .http import ConnectorApiError, ConnectorHttpClient, request_json_object
 from .oauth import BaseOAuthProvider, load_oauth_provider
 
 
@@ -47,6 +47,29 @@ def test_json_request_failure_is_secret_safe() -> None:
 
     assert exc_info.value.code == "request_failed"
     assert "secret" not in str(exc_info.value)
+
+
+def test_connector_http_client_adds_credentials() -> None:
+    """Connector HTTP clients should add credentials and provider headers."""
+    response = Mock(status_code=200)
+    response.json.return_value = {"items": []}
+    client = ConnectorHttpClient(
+        provider="Example",
+        base_url="https://api.example.com/v1",
+        credentials={"access_token": "secret"},
+        headers={"X-Api-Version": "1"},
+    )
+    with patch(
+        "flwr.supercore.task_process.connector.http.requests.request",
+        return_value=response,
+    ) as request:
+        assert client.request("GET", "/items") == {"items": []}
+
+    assert request.call_args.args == ("GET", "https://api.example.com/v1/items")
+    assert request.call_args.kwargs["headers"] == {
+        "Authorization": "Bearer secret",
+        "X-Api-Version": "1",
+    }
 
 
 class ExampleOAuthProvider(BaseOAuthProvider):
