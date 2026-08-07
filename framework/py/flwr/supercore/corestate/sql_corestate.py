@@ -24,7 +24,7 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData, String, and_, case
+from sqlalchemy import MetaData, String, case
 from sqlalchemy import cast as sql_cast
 from sqlalchemy import delete, exists, func, insert, literal, or_, select, update
 from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
@@ -796,9 +796,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             AutomationModel.automation_id == stored_automation_id,
             AutomationModel.status == AutomationStatus.ACTIVE,
             AutomationModel.start_run_request.is_not(None),
-            _timestamp_eq_legacy_text(
-                AutomationModel.next_run_at, previous_next_run_at
-            ),
+            AutomationModel.next_run_at == datetime.fromisoformat(previous_next_run_at),
             or_(
                 AutomationModel.remaining_runs.is_(None),
                 AutomationModel.remaining_runs > 0,
@@ -856,7 +854,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             query = query.where(AutomationModel.status.in_(statuses))
         if due_before is not None:
             query = query.where(
-                _timestamp_le_legacy_text(AutomationModel.next_run_at, due_before),
+                AutomationModel.next_run_at <= due_before,
                 or_(
                     AutomationModel.remaining_runs.is_(None),
                     AutomationModel.remaining_runs > 0,
@@ -917,9 +915,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .where(
                 AutomationModel.automation_id == uint64_to_int64(automation_id),
                 AutomationModel.status == AutomationStatus.ACTIVE,
-                _timestamp_eq_legacy_text(
-                    AutomationModel.next_run_at, previous_next_run_at
-                ),
+                AutomationModel.next_run_at
+                == datetime.fromisoformat(previous_next_run_at),
                 or_(
                     AutomationModel.remaining_runs.is_(None),
                     AutomationModel.remaining_runs > 0,
@@ -1773,24 +1770,6 @@ def _task_event_from_model(model: TaskEventModel) -> TaskEvent:
         task_id=int64_to_uint64(model.task_id),
         event=model.event,
         data=model.data,
-    )
-
-
-def _timestamp_eq_legacy_text(column: Any, value: str) -> Any:
-    """Compare timestamp column against typed and legacy SQLite text formats."""
-    text_column = sql_cast(column, String)
-    return or_(
-        column == datetime.fromisoformat(value),
-        and_(text_column.like("%T%"), text_column == value),
-    )
-
-
-def _timestamp_le_legacy_text(column: Any, value: datetime) -> Any:
-    """Compare timestamp column range against typed and legacy SQLite text formats."""
-    text_column = sql_cast(column, String)
-    return or_(
-        column <= value,
-        and_(text_column.like("%T%"), text_column <= value.isoformat()),
     )
 
 
