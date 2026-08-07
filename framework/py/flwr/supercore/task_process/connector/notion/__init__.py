@@ -14,6 +14,8 @@
 # ==============================================================================
 """Notion connector."""
 
-from .definition import CONNECTOR as CONNECTOR
+from .definition import CONNECTOR
 
-__all__ = ["CONNECTOR"]
+__all__ = [
+    "CONNECTOR",
+]
