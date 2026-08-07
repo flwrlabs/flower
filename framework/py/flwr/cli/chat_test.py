@@ -23,8 +23,8 @@ import pytest
 
 from flwr.cli.constant import CHAT_SUPERGRID_CONNECTION_NAME
 from flwr.cli.typing import SuperLinkConnection
-from flwr.proto.control_pb2 import ListFederationsResponse
-from flwr.proto.federation_pb2 import Federation
+from flwr.proto.control_pb2 import ListFederationsResponse  # pylint: disable=E0611
+from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 
 chat_module = importlib.import_module("flwr.cli.chat")
 
