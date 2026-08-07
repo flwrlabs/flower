@@ -72,5 +72,5 @@ deployment runtime.
         ``ClientApps`` are stateless.
       - Initialized as a ``ClientApp`` `process or subprocess
         <ref-flower-network-communication.html>`_, it runs independently from the
-        SuperNode and communicates with it over gRPC via the Runtime API.
-        ``ClientApps`` are stateless.
+        SuperNode and communicates with it over gRPC via the Runtime API. ``ClientApps``
+        are stateless.

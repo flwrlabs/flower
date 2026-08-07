@@ -139,9 +139,9 @@ runtime, as summarized in the table below.
 
     Runtime APIs enforce runtime version compatibility between the API server and their
     callers. By default, requests from callers using an incompatible major.minor runtime
-    version are rejected before Runtime API communication proceeds. Older callers without
-    runtime metadata are currently accepted by this compatibility check for backward
-    compatibility. Keep the SuperLink, SuperNode, SuperExec, ``ServerApp``, and
+    version are rejected before Runtime API communication proceeds. Older callers
+    without runtime metadata are currently accepted by this compatibility check for
+    backward compatibility. Keep the SuperLink, SuperNode, SuperExec, ``ServerApp``, and
     ``ClientApp`` runtime components on compatible Flower versions.
 
 Isolation Mode
@@ -185,12 +185,12 @@ communicate with the SuperLink or SuperNode:
     - SuperLink + SuperExec + ``ServerApp`` process
     - SuperNode + SuperExec + ``ClientApp`` process
 
-    To secure these links, configure the SuperLink and SuperNode Runtime API servers with
-    ``--appio-ssl-certfile``, ``--appio-ssl-keyfile``, and ``--appio-ssl-ca-certfile``.
-    Runtime API clients verify server certificates with ``--root-certificates``. In
-    ``subprocess`` isolation mode, the SuperLink and SuperNode pass the CA path to the
-    SuperExec processes they launch. This is not mTLS. See
-    :doc:`how-to-enable-tls-connections` for concrete commands.
+    To secure these links, configure the SuperLink and SuperNode Runtime API servers
+    with ``--appio-ssl-certfile``, ``--appio-ssl-keyfile``, and
+    ``--appio-ssl-ca-certfile``. Runtime API clients verify server certificates with
+    ``--root-certificates``. In ``subprocess`` isolation mode, the SuperLink and
+    SuperNode pass the CA path to the SuperExec processes they launch. This is not mTLS.
+    See :doc:`how-to-enable-tls-connections` for concrete commands.
 
 .. warning::
 
@@ -247,10 +247,10 @@ model used between the Flower components:
   SuperLink via the Fleet API. The SuperNode also pulls the FAB if a new run is being
   executed.
 - **SuperLink ↔ ServerApp (Runtime API)**: The ``ServerApp`` process pulls/pushes
-  Messages from/to the SuperLink via its Runtime API. The ``ServerApp`` also pulls
-  the FAB as part of the first interaction with the SuperLink, and at the end of the
+  Messages from/to the SuperLink via its Runtime API. The ``ServerApp`` also pulls the
+  FAB as part of the first interaction with the SuperLink, and at the end of the
   execution it pushes the Context back to the SuperLink.
 - **SuperNode ↔ ClientApp (Runtime API)**: The ``ClientApp`` process pulls/pushes
-  Messages from/to the SuperNode via its Runtime API. The ``ClientApp`` also pulls
-  the FAB as part of the first interaction with the SuperNode, and at the end of the
+  Messages from/to the SuperNode via its Runtime API. The ``ClientApp`` also pulls the
+  FAB as part of the first interaction with the SuperNode, and at the end of the
   execution it pushes the Context back to the SuperNode.
