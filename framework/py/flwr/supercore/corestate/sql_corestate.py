@@ -25,6 +25,7 @@ from typing import Any, Literal, cast
 from uuid import uuid4
 
 from sqlalchemy import MetaData, delete, func, insert, literal, or_, select, update
+from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
@@ -121,8 +122,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         super().__init__(database_path)
         self._object_store = object_store
 
-    def dialect_insert(self, table: Any) -> SQLiteInsert:
-        """Return a SQLite insert statement for CoreState upserts."""
+    def dialect_insert(self, table: Any) -> SQLiteInsert | PostgresInsert:
+        """Return a dialect-specific insert statement for CoreState upserts."""
         if self.database_backend == "sqlite":
             return sqlite_insert(table)
 
