@@ -29,6 +29,7 @@ from flwr.supercore.json_message.connector_message import (
 )
 
 from . import registry
+from .definition import ConnectorExecutionContext
 from .task import handle_task
 
 
@@ -97,8 +98,9 @@ class TestHandleTask(unittest.TestCase):
         handle_task(stub=self.stub, task_id=22, run_id=7)
 
         self.stub.GetConnector.assert_called_once_with(GetConnectorRequest())
-        self.provider.assert_called_once_with(
-            query="release notes",
+        arguments, context = self.provider.call_args.args
+        assert arguments == {"query": "release notes"}
+        assert context == ConnectorExecutionContext(
             credentials={"token": "secret"},
             config={"workspace": "primary"},
             usage_recorder=ANY,

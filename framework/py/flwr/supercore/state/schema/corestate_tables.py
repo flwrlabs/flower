@@ -16,7 +16,6 @@
 
 
 from sqlalchemy import (
-    TIMESTAMP,
     BigInteger,
     Column,
     Float,
@@ -30,6 +29,8 @@ from sqlalchemy import (
     Table,
     text,
 )
+
+from flwr.supercore.state.schema.types import UTCDateTime
 
 
 def create_corestate_metadata() -> MetaData:
@@ -68,8 +69,8 @@ def create_corestate_metadata() -> MetaData:
         Column("series_id", BigInteger, primary_key=True, nullable=False),
         Column("federation_id", String, nullable=False),
         Column("description", String, nullable=True),
-        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
-        Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("created_at", UTCDateTime(), nullable=False),
+        Column("updated_at", UTCDateTime(), nullable=False),
     )
 
     # --------------------------------------------------------------------------
@@ -117,12 +118,12 @@ def create_corestate_metadata() -> MetaData:
         Column("series_id", BigInteger, nullable=False),
         Column("status", String, nullable=False),
         Column("start_run_request", LargeBinary, nullable=True),
-        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
-        Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
-        Column("next_run_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("created_at", UTCDateTime(), nullable=False),
+        Column("updated_at", UTCDateTime(), nullable=False),
+        Column("next_run_at", UTCDateTime(), nullable=False),
         Column("fixed_interval", BigInteger, nullable=True),
         Column("remaining_runs", Integer, nullable=True),
-        Column("stopped_at", TIMESTAMP(timezone=True), nullable=True),
+        Column("stopped_at", UTCDateTime(), nullable=True),
     )
     Index(
         "idx_automation_status_next_run_at",
@@ -160,9 +161,9 @@ def create_corestate_metadata() -> MetaData:
         Column("state", String, nullable=False),
         Column("redirect_uri", String, nullable=False),
         Column("pkce_verifier", String, nullable=True),
-        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
-        Column("expires_at", TIMESTAMP(timezone=True), nullable=False),
-        Column("completed_at", TIMESTAMP(timezone=True), nullable=True),
+        Column("created_at", UTCDateTime(), nullable=False),
+        Column("expires_at", UTCDateTime(), nullable=False),
+        Column("completed_at", UTCDateTime(), nullable=True),
     )
 
     # --------------------------------------------------------------------------
@@ -188,11 +189,11 @@ def create_corestate_metadata() -> MetaData:
         Column("model_ref", String, nullable=True),
         Column("connector_ref", String, nullable=True),
         Column("token", String, nullable=True),
-        Column("active_until", TIMESTAMP(timezone=True), nullable=True),
-        Column("pending_at", TIMESTAMP(timezone=True), nullable=False),
-        Column("starting_at", TIMESTAMP(timezone=True), nullable=True),
-        Column("running_at", TIMESTAMP(timezone=True), nullable=True),
-        Column("finished_at", TIMESTAMP(timezone=True), nullable=True),
+        Column("active_until", UTCDateTime(), nullable=True),
+        Column("pending_at", UTCDateTime(), nullable=False),
+        Column("starting_at", UTCDateTime(), nullable=True),
+        Column("running_at", UTCDateTime(), nullable=True),
+        Column("finished_at", UTCDateTime(), nullable=True),
         Column("sub_status", String, nullable=False, server_default=text("''")),
         Column("details", String, nullable=False, server_default=text("''")),
     )
@@ -207,7 +208,7 @@ def create_corestate_metadata() -> MetaData:
         "task_event",
         metadata,
         Column("id", Integer, primary_key=True, autoincrement=True),
-        Column("timestamp", TIMESTAMP(timezone=True), nullable=False),
+        Column("timestamp", UTCDateTime(), nullable=False),
         Column("run_id", BigInteger, nullable=False),
         Column("task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
         Column("event", String, nullable=False),
@@ -248,7 +249,7 @@ def create_corestate_metadata() -> MetaData:
         metadata,
         Column("session_id", String, primary_key=True, nullable=False),
         Column("run_id", BigInteger, nullable=False),
-        Column("expires_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("expires_at", UTCDateTime(), nullable=False),
         Column("pending_count", Integer, nullable=False),
     )
     Index("idx_object_push_sessions_run_id", object_push_sessions.c.run_id)
@@ -325,8 +326,8 @@ def create_corestate_metadata() -> MetaData:
         Column("total_tokens", BigInteger, nullable=True),
         Column("usage_type", String, nullable=False),
         Column("provider", String, server_default="unknown", nullable=False),
-        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
-        Column("reported_at", TIMESTAMP(timezone=True), nullable=True),
+        Column("created_at", UTCDateTime(), nullable=False),
+        Column("reported_at", UTCDateTime(), nullable=True),
     )
     Index("idx_task_usage_run_id", task_usage.c.run_id)
     Index("idx_task_usage_task_id", task_usage.c.task_id)

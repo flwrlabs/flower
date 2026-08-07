@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Token auth policy definitions for AppIo interfaces."""
+"""Token auth policy definitions for the Runtime interface."""
 
 
 from __future__ import annotations
@@ -47,33 +47,28 @@ _RUNTIME_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "PushObject": MethodTokenPolicy.token_required(),
     "PullObject": MethodTokenPolicy.token_required(),
     "ConfirmMessageReceived": MethodTokenPolicy.token_required(),
-    "PushLogs": MethodTokenPolicy.token_required(),
-    "PushMessages": MethodTokenPolicy.token_required(),
-    "PullMessages": MethodTokenPolicy.token_required(),
-    "GetNodes": MethodTokenPolicy.token_required(),
     "CreateTask": MethodTokenPolicy.token_required(),
+    "StartAutomation": MethodTokenPolicy.token_required(),
     "PushTaskMessage": MethodTokenPolicy.token_required(),
     "PushTaskEvents": MethodTokenPolicy.token_required(),
     "PullTaskMessage": MethodTokenPolicy.token_required(),
     "RecordTaskUsage": MethodTokenPolicy.token_required(),
+    "GetConnector": MethodTokenPolicy.token_required(),
+    "PushLogs": MethodTokenPolicy.token_required(),
+    "PushMessages": MethodTokenPolicy.token_required(),
+    "PullMessages": MethodTokenPolicy.token_required(),
+    "GetNodes": MethodTokenPolicy.token_required(),
 }
 
 
 def _build_runtime_method_auth_policy(
     service_name: str,
 ) -> dict[str, MethodTokenPolicy]:
-    """Build the token policy map for an AppIo service."""
+    """Build the token policy map for a Runtime service."""
     return {
         f"/flwr.proto.{service_name}/{method}": policy
         for method, policy in _RUNTIME_METHOD_AUTH_POLICY.items()
     }
 
 
-SERVERAPPIO_METHOD_AUTH_POLICY = {
-    **_build_runtime_method_auth_policy("ServerAppIo"),
-    "/flwr.proto.ServerAppIo/GetConnector": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/StartAutomation": MethodTokenPolicy.token_required(),
-}
-
-
-CLIENTAPPIO_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy("ClientAppIo")
+RUNTIME_METHOD_AUTH_POLICY = _build_runtime_method_auth_policy("Runtime")

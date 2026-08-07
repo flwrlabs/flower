@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""ClientAppIo API servicer."""
+"""Runtime API servicer hosted by SuperNode."""
 
 
 from logging import DEBUG, ERROR
@@ -30,8 +30,10 @@ from flwr.common.serde import (
 )
 
 # pylint: disable=E0611
-from flwr.proto import clientappio_pb2_grpc
+from flwr.proto import runtime_pb2_grpc
 from flwr.proto.appio_pb2 import (
+    GetConnectorRequest,
+    GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     PullAppMessagesRequest,
@@ -42,6 +44,10 @@ from flwr.proto.appio_pb2 import (
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+)
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
 )
 from flwr.proto.message_pb2 import (
     ConfirmMessageReceivedRequest,
@@ -59,8 +65,8 @@ from flwr.supernode.nodestate import NodeState, NodeStateFactory
 
 
 # pylint: disable=C0103,W0613,W0201
-class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoServicer):
-    """ClientAppIo API servicer."""
+class ClientAppIoServicer(AppIoServicer, runtime_pb2_grpc.RuntimeServicer):
+    """Runtime API servicer hosted by SuperNode."""
 
     def __init__(
         self,
@@ -78,7 +84,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         self, request: GetRunRequest, context: grpc.ServicerContext
     ) -> GetRunResponse:
         """Get run information."""
-        log(DEBUG, "ClientAppIo.GetRun")
+        log(DEBUG, "Runtime.GetRun")
 
         # Initialize state connection
         state = self.state_factory.state()
@@ -95,7 +101,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         self, request: PullTaskInputRequest, context: grpc.ServicerContext
     ) -> PullTaskInputResponse:
         """Pull Message, Context, and Run."""
-        log(DEBUG, "ClientAppIo.PullTaskInput")
+        log(DEBUG, "Runtime.PullTaskInput")
 
         # Get the authenticated task and associated run ID
         task = get_authenticated_task()
@@ -153,7 +159,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         self, request: PushTaskOutputRequest, context: grpc.ServicerContext
     ) -> PushTaskOutputResponse:
         """Push Message and Context."""
-        log(DEBUG, "ClientAppIo.PushTaskOutput")
+        log(DEBUG, "Runtime.PushTaskOutput")
 
         # Get the authenticated task and associated run ID
         task = get_authenticated_task()
@@ -186,7 +192,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         self, request: PullAppMessagesRequest, context: grpc.ServicerContext
     ) -> PullAppMessagesResponse:
         """Pull messages for ClientApp; currently returns exactly one message."""
-        log(DEBUG, "ClientAppIo.PullMessages")
+        log(DEBUG, "Runtime.PullMessages")
 
         # Get the authenticated task and associated run ID
         task = get_authenticated_task()
@@ -197,13 +203,9 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         store = self.objectstore_factory.store()
 
         # Retrieve message for this run
-        messages = state.get_messages(run_ids=[run_id], is_reply=False)
+        messages = state.get_messages(run_ids=[run_id], is_reply=False, limit=1)
         if not messages:
-            context.abort(
-                grpc.StatusCode.NOT_FOUND,
-                f"No message found for run {run_id} in NodeState.",
-            )
-            raise RuntimeError("Unreachable code")  # for mypy
+            return PullAppMessagesResponse()
         message = messages[0]
 
         # Record message processing start time
@@ -221,7 +223,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         self, request: PushAppMessagesRequest, context: grpc.ServicerContext
     ) -> PushAppMessagesResponse:
         """Push messages for ClientApp; currently accepts exactly one message."""
-        log(DEBUG, "ClientAppIo.PushMessages")
+        log(DEBUG, "Runtime.PushMessages")
 
         # Get the authenticated task and associated run ID
         task = get_authenticated_task()
@@ -233,7 +235,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         if len(request.messages_list) != 1 or len(request.message_object_trees) != 1:
             context.abort(
                 grpc.StatusCode.INVALID_ARGUMENT,
-                "ClientAppIo.PushMessages expects exactly one message and "
+                "Runtime.PushMessages expects exactly one message and "
                 "one object tree.",
             )
             raise RuntimeError("Unreachable code")  # for mypy
@@ -265,10 +267,34 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         self, request: GetNodesRequest, context: grpc.ServicerContext
     ) -> GetNodesResponse:
         """Get available nodes."""
-        log(DEBUG, "ClientAppIo.GetNodes")
+        log(DEBUG, "Runtime.GetNodes")
         context.abort(
-            grpc.StatusCode.UNIMPLEMENTED,
-            "GetNodes is not available on ClientAppIo.",
+            grpc.StatusCode.PERMISSION_DENIED,
+            "This endpoint is only available to ServerApp tasks.",
+        )
+        raise RuntimeError("Unreachable code")  # for mypy
+
+    def StartAutomation(
+        self,
+        request: StartAutomationRequest,
+        context: grpc.ServicerContext,
+    ) -> StartAutomationResponse:
+        """Reject automation requests from ClientApp tasks."""
+        log(DEBUG, "Runtime.StartAutomation")
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Only AgentApp and ServerApp tasks can create automations.",
+        )
+        raise RuntimeError("Unreachable code")  # for mypy
+
+    def GetConnector(
+        self, request: GetConnectorRequest, context: grpc.ServicerContext
+    ) -> GetConnectorResponse:
+        """Reject connector credential requests from ClientApp tasks."""
+        log(DEBUG, "Runtime.GetConnector")
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Connector credentials are not available to this task.",
         )
         raise RuntimeError("Unreachable code")  # for mypy
 
@@ -276,7 +302,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         self, request: PushObjectRequest, context: grpc.ServicerContext
     ) -> PushObjectResponse:
         """Push an object to the ObjectStore."""
-        log(DEBUG, "ClientAppIoServicer.PushObject")
+        log(DEBUG, "Runtime.PushObject")
 
         # Init state
         state = self.state_factory.state()
@@ -296,7 +322,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         self, request: PullObjectRequest, context: grpc.ServicerContext
     ) -> PullObjectResponse:
         """Pull an object from the ObjectStore."""
-        log(DEBUG, "ClientAppIoServicer.PullObject")
+        log(DEBUG, "Runtime.PullObject")
 
         # Init state
         state = self.state_factory.state()
@@ -317,7 +343,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         self, request: ConfirmMessageReceivedRequest, context: grpc.ServicerContext
     ) -> ConfirmMessageReceivedResponse:
         """Confirm message received."""
-        log(DEBUG, "ClientAppIoServicer.ConfirmMessageReceived")
+        log(DEBUG, "Runtime.ConfirmMessageReceived")
 
         # Init state and store
         store = self.objectstore_factory.store()

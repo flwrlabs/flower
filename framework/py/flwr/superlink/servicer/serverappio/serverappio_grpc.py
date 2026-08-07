@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""ServerAppIo gRPC API."""
+"""Runtime gRPC API hosted by SuperLink."""
 
 
 from logging import INFO, WARNING
@@ -20,8 +20,8 @@ from logging import INFO, WARNING
 import grpc
 
 from flwr.common.logger import log
-from flwr.proto.serverappio_pb2_grpc import (  # pylint: disable=E0611
-    add_ServerAppIoServicer_to_server,
+from flwr.proto.runtime_pb2_grpc import (  # pylint: disable=E0611
+    add_RuntimeServicer_to_server,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
@@ -42,15 +42,15 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
     certificates: tuple[bytes, bytes, bytes] | None,
     superexec_auth_secret: bytes | None = None,
 ) -> grpc.Server:
-    """Run ServerAppIo API (gRPC, request-response)."""
+    """Run the Runtime API (gRPC, request-response)."""
     if superexec_auth_secret is not None and certificates is None:
         log(
             WARNING,
-            "SuperExec auth is enabled on insecure ServerAppIo transport. "
+            "SuperExec auth is enabled on insecure Runtime API transport. "
             "Request metadata confidentiality is not guaranteed without TLS.",
         )
 
-    # Create ServerAppIo API gRPC server
+    # Create Runtime API gRPC server
     serverappio_servicer: grpc.Server = ServerAppIoServicer(
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
@@ -70,7 +70,7 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
             )
         )
     interceptors.append(create_serverappio_runtime_version_server_interceptor())
-    serverappio_add_servicer_to_server_fn = add_ServerAppIoServicer_to_server
+    serverappio_add_servicer_to_server_fn = add_RuntimeServicer_to_server
     serverappio_grpc_server = generic_create_grpc_server(
         servicer_and_add_fn=(
             serverappio_servicer,
@@ -83,7 +83,7 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
     )
 
     address = serverappio_grpc_server.bound_address
-    log(INFO, "Flower Deployment Runtime: Starting ServerAppIo API on %s", address)
+    log(INFO, "Flower Deployment Runtime: Starting Runtime API on %s", address)
     serverappio_grpc_server.start()
 
     return serverappio_grpc_server

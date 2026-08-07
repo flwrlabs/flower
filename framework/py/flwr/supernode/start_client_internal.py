@@ -48,8 +48,8 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.logger import log
-from flwr.proto.clientappio_pb2_grpc import add_ClientAppIoServicer_to_server
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.proto.runtime_pb2_grpc import add_RuntimeServicer_to_server
 from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.constant import TaskType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
@@ -160,10 +160,10 @@ def start_client_internal(
         The SuperNode gRPC server address.
     clientappio_certificates : Optional[Tuple[bytes, bytes, bytes]] (default: None)
         Tuple containing CA certificate, server certificate, and private key used to
-        start a secure ClientAppIo gRPC server.
+        start a secure Runtime API gRPC server.
     clientappio_root_certificates_path : Optional[str] (default: None)
         Path to the CA certificate file passed to subprocess SuperExec instances so
-        they can verify the ClientAppIo server certificate.
+        they can verify the Runtime API server certificate.
     health_server_address : Optional[str] (default: None)
         The address of the health server. If `None` is provided, the health server will
         NOT be started.
@@ -172,7 +172,7 @@ def start_client_internal(
         Only apps verified by at least one of these
         entities can run on a supernode.
     superexec_auth_secret : Optional[bytes] (default: None)
-        Secret used by ClientAppIo SuperExec metadata auth.
+        Secret used by Runtime API SuperExec metadata auth.
     runtime_dependency_install : bool (default: False)
         Whether runtime dependency installation is allowed.
     """
@@ -200,12 +200,12 @@ def start_client_internal(
         if superexec_auth_secret is not None:
             log(
                 WARN,
-                "SuperExec auth is disabled for ClientAppIo in subprocess isolation "
-                "mode. Provided SuperExec auth secret is ignored.",
+                "SuperExec auth is disabled for the Runtime API in subprocess "
+                "isolation mode. Provided SuperExec auth secret is ignored.",
             )
         superexec_auth_secret = None
 
-    # Launch ClientAppIo API server
+    # Launch Runtime API server
     grpc_servers = []
     clientappio_server = run_clientappio_api_grpc(
         address=clientappio_api_address,
@@ -670,11 +670,11 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
     certificates: tuple[bytes, bytes, bytes] | None,
     superexec_auth_secret: bytes | None,
 ) -> grpc.Server:
-    """Run ClientAppIo API gRPC server."""
+    """Run the Runtime API gRPC server."""
     if certificates is None and superexec_auth_secret is not None:
         log(
             WARN,
-            "SuperExec auth is enabled on insecure ClientAppIo transport. "
+            "SuperExec auth is enabled on insecure Runtime API transport. "
             "Request metadata confidentiality is not guaranteed without TLS.",
         )
 
@@ -694,7 +694,7 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
             )
         )
     interceptors.append(create_clientappio_runtime_version_server_interceptor())
-    clientappio_add_servicer_to_server_fn = add_ClientAppIoServicer_to_server
+    clientappio_add_servicer_to_server_fn = add_RuntimeServicer_to_server
     clientappio_grpc_server = generic_create_grpc_server(
         servicer_and_add_fn=(
             clientappio_servicer,
@@ -706,7 +706,7 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
         interceptors=interceptors,
     )
     address = clientappio_grpc_server.bound_address
-    log(INFO, "Flower Deployment Runtime: Starting ClientAppIo API on %s", address)
+    log(INFO, "Flower Deployment Runtime: Starting Runtime API on %s", address)
     clientappio_grpc_server.start()
     return clientappio_grpc_server
 

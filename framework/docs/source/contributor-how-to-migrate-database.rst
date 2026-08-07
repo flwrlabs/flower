@@ -32,10 +32,20 @@ migration revision:
 This command:
 
 1. Creates a temporary SQLite database
-2. Upgrades it to the current ``head`` revision
-3. Runs autogenerate to detect your schema changes
-4. Generates a new migration file in ``py/flwr/supercore/state/alembic/versions/``
+2. Upgrades it to all current ``heads``
+3. Runs autogenerate to detect your schema changes, targeting ``flwr@head`` by default
+4. Generates a new migration file that extends the current ``flwr`` branch head in
+   ``py/flwr/supercore/state/alembic/versions/``
 5. Automatically cleans up the temporary database
+
+The generator does not loop over migration files itself. The ``alembic upgrade heads``
+command asks Alembic to traverse the revision graph. Each revision identifies its
+predecessor through ``down_revision``, so Alembic applies every pending revision in
+dependency order until all configured branch heads have been reached. Once the temporary
+database is current, the generator runs ``alembic revision --autogenerate`` with
+``--head flwr@head``. This makes the new revision extend the Flower branch instead of
+leaving the parent revision ambiguous when multiple heads exist. To target another
+configured branch, pass its branch head explicitly with ``--head <branch>@head``.
 
 *****************************
  Review Generated Migrations
@@ -56,10 +66,13 @@ If you prefer using the Alembic CLI directly:
 .. code-block:: shell
 
     cd framework
-    alembic upgrade head
-    alembic revision --autogenerate -m "Descriptive message about the schema change"
+    alembic upgrade heads
+    alembic revision --autogenerate --head flwr@head \
+      -m "Descriptive message about the schema change"
     rm state.db  # Clean up the generated database file
 
 .. admonition:: Important
 
-    The manual workflow creates a ``state.db`` file that should not be committed to git.
+    Use ``heads`` when upgrading so every configured migration branch is current, and
+    explicitly select ``flwr@head`` when creating a Flower revision. The manual workflow
+    creates a ``state.db`` file that should not be committed to git.
