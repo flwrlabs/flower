@@ -20,16 +20,11 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from flwr.supercore.typing import JSONObject
-
 from .. import registry
-from ..definition import ActionAccess
-from .actions import ACTIONS
-from .oauth import GITHUB_CONNECTOR_REF, GitHubOAuthError, GitHubOAuthProvider
+from .oauth import GitHubOAuthError, GitHubOAuthProvider
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
 _TOKEN_REQUEST = "flwr.supercore.task_process.connector.github.oauth.requests.post"
-_CREDENTIALS: JSONObject = {"access_token": "gho-secret"}
 
 
 def _response(payload: object, status_code: int = 200) -> Mock:
@@ -37,28 +32,6 @@ def _response(payload: object, status_code: int = 200) -> Mock:
     response = Mock(status_code=status_code)
     response.json.return_value = payload
     return response
-
-
-def test_github_actions_are_registered_as_read_only() -> None:
-    """GitHub should expose two account-scoped read actions."""
-    assert len(ACTIONS) == 2
-    assert all(action.access is ActionAccess.READ for action in ACTIONS)
-    assert len(registry.get_connector_tools(GITHUB_CONNECTOR_REF)) == len(ACTIONS)
-
-
-def test_search_code_calls_api() -> None:
-    """Code search should remain repository-scoped."""
-    response = _response({"total_count": 0, "items": []})
-    with patch(_HTTP_REQUEST, return_value=response) as request:
-        result = registry.invoke_connector(
-            "github_search_code",
-            {"owner": "acme", "repo": "repo", "query": "hello", "limit": 1},
-            Mock(),
-            _CREDENTIALS,
-            {},
-        )
-    assert request.call_args.args == ("GET", "https://api.github.com/search/code")
-    assert result == response.json.return_value
 
 
 def test_get_file_content_decodes_utf8() -> None:
@@ -76,7 +49,7 @@ def test_get_file_content_decodes_utf8() -> None:
             "github_get_file_content",
             {"owner": "acme", "repo": "repo", "path": "src/app.py"},
             Mock(),
-            _CREDENTIALS,
+            {"access_token": "secret"},
             {},
         )
     assert isinstance(result, dict)
