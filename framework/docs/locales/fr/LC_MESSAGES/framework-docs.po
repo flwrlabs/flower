@@ -7369,125 +7369,6 @@ msgstr ""
 "Notez que le secret existant doit contenir la clé `account-auth-"
 "config.yml`: "
 
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:229
-msgid "Configuring OpenFGA"
-msgstr "Configuration d'OpenFGA"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:231
-msgid ""
-"The Flower server chart component supports OpenFGA as a fine-grained "
-"authorization service, but it is disabled by default."
-msgstr ""
-"Le composant de chart Flower Server prend en charge OpenFGA comme service"
-" d'autorisation fine-grainée, mais il est désactivé par défaut."
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:234
-msgid "To enable OpenFGA change the following value in your `values.yml` file:"
-msgstr ""
-"Pour activer OpenFGA, modifiez la valeur suivante dans votre fichier "
-"`values.yml`: "
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:241
-msgid ""
-"By default, OpenFGA will run with an in-memory store, which is non-"
-"persistent and suitable only for testing or development."
-msgstr ""
-"Par défaut, OpenFGA exécutera avec un stockage en mémoire, qui n'est pas "
-"persistant et convient uniquement pour les tests ou le développement."
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:244
-msgid "OpenFGA supports persistent storage using PostgreSQL or MySQL:"
-msgstr ""
-"OpenFGA prend en charge le stockage persistant à l'aide de PostgreSQL ou "
-"MySQL:"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:246
-msgid ""
-"To deploy OpenFGA with a new PostgreSQL/MySQL instance, enable the "
-"bundled chart configuration."
-msgstr ""
-"Pour déployer OpenFGA avec une nouvelle instance PostgreSQL/MySQL, "
-"activez la configuration de chart bundlée."
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:247
-msgid ""
-"To connect to an existing database, provide the appropriate connection "
-"details via Helm values (e.g., `openfga.datastore.uri`)."
-msgstr ""
-"Pour se connecter à une base de données existante, fournez les détails de"
-" connexion appropriés via les valeurs Helm (par exemple, "
-"`openfga.datastore.uri`)."
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:250
-msgid ""
-"For more information visit the official [OpenFGA Helm Chart "
-"Documentation](https://artifacthub.io/packages/helm/openfga/openfga/0.2.30)."
-msgstr ""
-"Pour en savoir plus, visitez la documentation officielle du [Chart Helm "
-"d'OpenFGA](https://artifacthub.io/packages/helm/openfga/openfga/0.2.30)."
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:252
-msgid ""
-"The following commands set up a store, authorization model, and inserts "
-"users (using tuples) into OpenFGA. Run these once the OpenFGA instance is"
-" deployed."
-msgstr ""
-"Les commandes suivantes configureraient un stockage, un modèle "
-"d'autorisation et insèrent des utilisateurs (en utilisant des tuples) "
-"dans OpenFGA. Exécutez-les une fois l'instance OpenFGA déployée."
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:254
-msgid "Setup the authorization model and tuples:"
-msgstr "Configurez le modèle d'autorisation et les tuples:"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md
-msgid "Authorization model file `model.fga`"
-msgstr "Fichier de modèle `model.fga`"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md
-msgid "User permissions file `tuples.yaml`"
-msgstr "Fichier de permissions utilisateur `tuples.yaml`"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:288
-msgid "Create store:"
-msgstr "Créer un stockage:"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:298
-msgid ""
-"The response will include an `id` field, which is the OpenFGA store ID "
-"associated with the `OPENFGA_STORE_NAME` that was created."
-msgstr ""
-"La réponse inclura un champ `id`, qui est l'ID du stockage OpenFGA "
-"associé à la valeur `OPENFGA_STORE_NAME` créée."
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:300
-msgid "Get store ID (alternative way):"
-msgstr "Obtenir l'ID du stockage (méthode alternative):"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:307
-msgid "Set OpenFGA store ID from previous step and write model:"
-msgstr ""
-"Définissez l'ID du stockage OpenFGA de l'étape précédente et écrivez le "
-"modèle:"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:317
-msgid "Set OpenFGA model ID from previous step and write tuples:"
-msgstr ""
-"Définissez l'ID du modèle OpenFGA de l'étape précédente et écrivez les "
-"tuples:"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:328
-msgid ""
-"Add a new `authorization` section under your existing `global.userAuth` "
-"configuration or directly within your existing secret, depending on your "
-"setup. Set the `OPENFGA_STORE_ID` and `OPENFGA_MODEL_ID` from the "
-"previous steps in the file:"
-msgstr ""
-"Ajoutez une nouvelle section `authorization` sous votre configuration "
-"`global.userAuth` existante ou directement dans votre secret existant, en"
-" fonction de votre configuration. Définissez la valeur `OPENFGA_STORE_ID`"
-" et `OPENFGA_MODEL_ID` des étapes précédentes dans le fichier:"
-
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:340
 msgid "Change Isolation Mode"
 msgstr "Changer la mode d'isolement"
@@ -8699,10 +8580,6 @@ msgid "`superlink.service.servicePortServerAppIoName`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Prefix of the SuperLink ServerAppIo API port"
-msgstr "Préfixe du port API ServerAppIo SuperLink"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`serverappio`"
 msgstr ""
 
@@ -8711,20 +8588,12 @@ msgid "`superlink.service.servicePortServerAppIo`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Port to expose for the SuperLink ServerAppIo API"
-msgstr "Port à exposer pour l'API ServerAppIo SuperLink"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`9091`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.nodePortServerAppIo`"
 msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Node port for SuperLink ServerAppIo API"
-msgstr "Port node pour l'API ServerAppIo SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.service.servicePortFleetName`"
@@ -8770,10 +8639,6 @@ msgstr "Port du conteneur pour l'API de contrôle SuperLink"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.containerPorts.serverAppIo`"
 msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Container port for SuperLink ServerAppIo API"
-msgstr "Port du conteneur pour l'API ServerAppIo SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.containerPorts.fleet`"
@@ -8832,23 +8697,11 @@ msgid "`superlink.appioTls.enabled`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Enable TLS on the SuperLink ServerAppIo API."
-msgstr "Activer TLS sur l'API ServerAppIo du SuperLink."
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.appioTls.existingSecret`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Existing Kubernetes Secret for ServerAppIo TLS."
-msgstr "Secret Kubernetes existant pour le TLS ServerAppIo."
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.appioTls.mountPath`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Mount path used when AppIO uses a separate TLS Secret."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
@@ -8857,10 +8710,6 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.appioTls.caCertfile`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Path to the CA certificate used by SuperExec to verify ServerAppIo."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
@@ -8873,20 +8722,12 @@ msgid "`superlink.appioTls.certfile`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Path to the ServerAppIo server certificate."
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`/app/cert/tls.crt`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.appioTls.keyfile`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Path to the ServerAppIo server private key."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
@@ -8899,24 +8740,12 @@ msgid "`superlink.appioTls.certificate.enabled`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Enable automatic creation of a cert-manager Certificate for ServerAppIo."
-msgstr ""
-"Activer la création automatique d'un certificat cert-manager pour "
-"ServerAppIo."
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.appioTls.certificate.annotations`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.appioTls.certificate.secretName`"
 msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid ""
-"Name of the Kubernetes Secret storing the ServerAppIo TLS key and "
-"certificate."
-msgstr "Nom du Secret Kubernetes stockant la clé TLS ServerAppIo et le certificat."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.appioTls.certificate.issuerGroup`"
@@ -8937,10 +8766,6 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.appioTls.certificate.dnsNames`"
 msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "DNS names for the ServerAppIo certificate."
-msgstr "Noms DNS du certificat ServerAppIo."
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.appioTls.certificate.duration`"
@@ -9300,16 +9125,8 @@ msgid "`superlink.ingress.serverAppIo.enabled`"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Enable an ingress resource for SuperLink ServerAppIo API"
-msgstr "Activer une ressource Ingress pour l'API ServerAppIo SuperLink"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.serverAppIo.hostname`"
 msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Ingress hostname for the SuperLink ServerAppIo API ingress"
-msgstr "Hôte Ingress pour l'ingress API ServerAppIo SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`serverappio.example.com`"
@@ -9318,10 +9135,6 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.serverAppIo.path`"
 msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "SuperLink ServerAppIo API ingress path"
-msgstr "Chemin d'accès de l'ingress API ServerAppIo SuperLink"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.serverAppIo.pathType`"
@@ -9639,11 +9452,6 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-msgid "Path to a PEM-encoded root CA certificate used to verify AppIO."
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.allowRuntimeDependencyInstallation`"
 msgstr ""
 
@@ -9738,13 +9546,6 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.executor.kubernetes.appioRootCertificatesPath`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-msgid ""
-"Path to a PEM-encoded AppIO root CA file to copy into TaskExecutor "
-"credential Secrets."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
@@ -10400,28 +10201,6 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "`superexec.taskExecutorNetworkPolicy.extraEgress`"
 msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
-msgid ""
-"Add egress rules from TaskExecutor Pods to AppIO, proxies, registries, or"
-" other required services (ignored if allowExternalEgress=true)."
-msgstr ""
-"Ajouter des règles egress depuis les pods TaskExecutor vers AppIO, les "
-"proxies, les registres ou d'autres services requis (ignorées si "
-"allowExternalEgress=true)."
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:954
-msgid "Component OpenFGA"
-msgstr "Composant OpenFGA"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`openfga.enabled`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Enable the openfga subchart and deploy OpenFGA"
-msgstr "Activer le sous-chart openfga et déployer OpenFGA"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md
 msgid ""
@@ -11337,15 +11116,6 @@ msgstr ""
 "exemple, la fonction ci-dessous extrait et renvoie la valeur minimale "
 "pour chaque clé de métrique sur tous les |message_link|_:"
 
-#: ../../source/how-to-authenticate-accounts.rst:-1
-msgid ""
-"Configure SuperLink for account authentication and authorization. "
-"Private-by-default runs securely with OpenID Connect and OpenFGA."
-msgstr ""
-"Configurez SuperLink pour l'authentification et l'autorisation des "
-"comptes. Les exécutions privées par défaut sont sécurisées avec OpenID "
-"Connect et OpenFGA."
-
 #: ../../source/how-to-authenticate-accounts.rst:7
 msgid "Authenticate Accounts via OpenID Connect"
 msgstr "Authentifier les comptes via OpenID Connect"
@@ -11358,59 +11128,6 @@ msgstr ""
 "L'authentification OpenID Connect est une fonctionnalité d'entreprise "
 "Flower. Voir `Flower Enterprise <https://flower.ai/enterprise>`_ pour "
 "plus de détails."
-
-#: ../../source/how-to-authenticate-accounts.rst:14
-msgid ""
-"In this guide, you'll learn how to configure SuperLink with account-level"
-" authentication and authorization, and how to log in using the ``flwr`` "
-"CLI. Once logged in, any Flower accounts that are authorized on the "
-"SuperLink can run Flower CLI commands that interact with the SuperLink."
-msgstr ""
-"Dans ce guide, vous apprendrez à configurer SuperLink avec "
-"l'authentification et l'autorisation des comptes au niveau du compte, et "
-"comment vous connecter en utilisant la CLI ``flwr``. Une fois connecté, "
-"tout compte Flower autorisé sur le SuperLink peut exécuter les commandes "
-"de la CLI qui interagissent avec le SuperLink."
-
-#: ../../source/how-to-authenticate-accounts.rst:21
-msgid ""
-"With account authentication and authorization enabled, only accounts that"
-" have submitted the ``flwr run`` command can view and interact with their"
-" runs. This means that your runs are **private by default**, ensuring "
-"that only authorized accounts can access them."
-msgstr ""
-"Avec l'authentification et l'autorisation de compte activées, seuls les "
-"comptes qui ont soumis la commande ``flwr run`` peuvent visualiser et "
-"interagir avec leurs exécutions. Cela signifie que vos exécutions sont "
-"**privées par défaut**, garantissant que seuls les comptes autorisés "
-"puissent y accéder."
-
-#: ../../source/how-to-authenticate-accounts.rst:30
-msgid ""
-"To enable account authentication and authorization, the SuperLink must be"
-" deployed with an `OpenID Connect (OIDC) <https://openid.net/developers"
-"/how-connect-works/>`_ provider and an `OpenFGA <https://openfga.dev/>`_ "
-"server. The OIDC provider is used for account authentication, while "
-"OpenFGA is used for fine-grained access control. This means an "
-"authenticated account can only run ``flwr`` CLI commands on the SuperLink"
-" if they have been granted the necessary permissions by the SuperLink "
-"administrator. When enabled, both account authentication and "
-"authorization must be configured on the SuperLink."
-msgstr ""
-"Pour activer l'authentification et l'autorisation de compte, le SuperLink"
-" doit être déployé avec un fournisseur `OpenID Connect (OIDC) "
-"<https://openid.net/developers/how-connect-works/>`_ et un serveur "
-"`OpenFGA <https://openfga.dev/>`_. Le fournisseur OIDC est utilisé pour "
-"l'authentification des comptes, tandis que OpenFGA est utilisé pour la "
-"contrôle d'accès fin. Cela signifie qu'un compte authentifié peut "
-"uniquement exécuter les commandes ``flwr`` CLI sur le SuperLink si ils "
-"ont été autorisés par l'administrateur SuperLink. Lorsque cela est "
-"activé, l'authentification et l'autorisation de compte doivent être "
-"configurées sur le SuperLink."
-
-#: ../../source/how-to-authenticate-accounts.rst:39
-msgid "Enable Account Authentication and Authorization on the SuperLink"
-msgstr "Activer l'authentification et l'autorisation des comptes sur le SuperLink"
 
 #: ../../source/how-to-authenticate-accounts.rst:41
 msgid "Create a YAML configuration file with the following content:"
@@ -11425,16 +11142,6 @@ msgstr ""
 "Enregistrez ce fichier sous le nom ``account-auth-config.yaml``. Puis "
 "passez-le au SuperLink via la flag ``--account-auth-config`` lors du "
 "déploiement du SuperLink:"
-
-#: ../../source/how-to-authenticate-accounts.rst:76
-msgid ""
-"To authorize an account, the SuperLink administrator must add the "
-"account's OIDC ``sub`` claim to the OpenFGA store with the appropriate "
-"relation."
-msgstr ""
-"Pour autoriser un compte, l'administrateur du SuperLink doit ajouter la "
-"revendication OIDC ``sub`` du compte à l'OpenFGA avec la relation "
-"appropriée."
 
 #: ../../source/how-to-authenticate-accounts.rst:81
 msgid ""
@@ -11461,29 +11168,6 @@ msgstr ""
 #: ../../source/how-to-authenticate-accounts.rst:89
 msgid "Login to the SuperLink"
 msgstr "Connectez-vous au SuperLink"
-
-#: ../../source/how-to-authenticate-accounts.rst:91
-msgid ""
-"Once a SuperLink with account authentication and authorization is up and "
-"running, an account can interface with it after installing the ``flwr`` "
-"PyPI package via the Flower CLI. Configure the SuperLink connection in "
-"your Flower Configuration file (typically located at "
-"``$HOME/.flwr/config.toml``):"
-msgstr ""
-"Une fois que le SuperLink avec authentification et autorisation "
-"d'utilisateur est en cours d'exécution, un utilisateur peut s'y connecter"
-" après avoir installé le paquet PyPI ``flwr`` via l'interface de ligne de"
-" commande Flower. Configurez la connexion SuperLink dans votre fichier de"
-" configuration Flower (généralement situé à ``$HOME/.flwr/config.toml``) "
-":"
-
-#: ../../source/how-to-authenticate-accounts.rst:108
-msgid ""
-"Account authentication and authorization is only supported with TLS "
-"connections."
-msgstr ""
-"L'authentification et l'autorisation des utilisateurs ne sont prises en "
-"charge que avec les connexions TLS."
 
 #: ../../source/how-to-authenticate-accounts.rst:109
 msgid ""
@@ -11531,31 +11215,6 @@ msgstr ""
 "demande ``flwr`` CLI ultérieure vers le SuperLink, et il transmettra "
 "ceux-ci au fournisseur OIDC pour effectuer les contrôles "
 "d'authentification."
-
-#: ../../source/how-to-authenticate-accounts.rst:136
-msgid "Run authorized ``flwr`` CLI commands"
-msgstr "Exécutez les commandes autorisées ``flwr`` CLI"
-
-#: ../../source/how-to-authenticate-accounts.rst:138
-msgid ""
-"With the above steps completed, you can now run ``flwr`` CLI commands "
-"against a SuperLink setup with account authentication and authorization. "
-"For example, as an authorized account, you can run the ``flwr run`` "
-"command to start a Flower app:"
-msgstr ""
-"Une fois ces étapes terminées, vous pouvez maintenant exécuter les "
-"commandes ``flwr`` CLI contre un ensemble de configuration avec "
-"l'authentification et l'autorisation de compte. Par exemple, en tant que "
-"compte autorisé, vous pouvez exécuter la commande ``flwr run`` pour "
-"démarrer une application Flower:"
-
-#: ../../source/how-to-authenticate-accounts.rst:147
-msgid ""
-"If the account does not have the necessary permissions to run the "
-"command, an error will be returned:"
-msgstr ""
-"Si l'utilisateur n'a pas les autorisations nécessaires pour exécuter la "
-"commande, une erreur sera renvoyée :"
 
 #: ../../source/how-to-authenticate-supernodes.rst:-1
 msgid ""
@@ -62991,4 +62650,3 @@ msgstr ""
 #~ "connector names are reserved for "
 #~ "runtime-managed tools."
 #~ msgstr ""
-
