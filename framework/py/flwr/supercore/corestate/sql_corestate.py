@@ -1382,48 +1382,45 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         with self.session() as session:
             self._cleanup_expired_task_tokens()
-            message_dict = _task_message_to_row(message)
+            metadata = message.metadata
+            stored_run_id = uint64_to_int64(metadata.run_id)
+            stored_src_task_id = uint64_to_int64(cast(int, metadata.src_task_id))
+            stored_dst_task_id = uint64_to_int64(cast(int, metadata.dst_task_id))
+            serialized_content = (
+                recorddict_to_proto(message.content).SerializeToString()
+                if message.has_content()
+                else None
+            )
+            serialized_error = (
+                error_to_proto(message.error).SerializeToString()
+                if message.has_error()
+                else None
+            )
             src_task_exists = exists().where(
-                TaskModel.task_id == message_dict["src_task_id"],
-                TaskModel.run_id == message_dict["run_id"],
+                TaskModel.task_id == stored_src_task_id,
+                TaskModel.run_id == stored_run_id,
             )
             dst_task_exists = exists().where(
-                TaskModel.task_id == message_dict["dst_task_id"],
-                TaskModel.run_id == message_dict["run_id"],
+                TaskModel.task_id == stored_dst_task_id,
+                TaskModel.run_id == stored_run_id,
                 TaskModel.finished_at.is_(None),
             )
             task_message_values = select(
+                literal(metadata.message_id, type_=TaskMessageModel.message_id.type),
+                literal(stored_run_id, type_=TaskMessageModel.run_id.type),
+                literal(stored_src_task_id, type_=TaskMessageModel.src_task_id.type),
+                literal(stored_dst_task_id, type_=TaskMessageModel.dst_task_id.type),
                 literal(
-                    message_dict["message_id"],
-                    type_=TaskMessageModel.message_id.type,
-                ),
-                literal(message_dict["run_id"], type_=TaskMessageModel.run_id.type),
-                literal(
-                    message_dict["src_task_id"],
-                    type_=TaskMessageModel.src_task_id.type,
-                ),
-                literal(
-                    message_dict["dst_task_id"],
-                    type_=TaskMessageModel.dst_task_id.type,
-                ),
-                literal(
-                    message_dict["reply_to_message_id"],
+                    metadata.reply_to_message_id,
                     type_=TaskMessageModel.reply_to_message_id.type,
                 ),
+                literal(metadata.created_at, type_=TaskMessageModel.created_at.type),
+                literal(metadata.ttl, type_=TaskMessageModel.ttl.type),
                 literal(
-                    message_dict["created_at"],
-                    type_=TaskMessageModel.created_at.type,
+                    metadata.message_type, type_=TaskMessageModel.message_type.type
                 ),
-                literal(message_dict["ttl"], type_=TaskMessageModel.ttl.type),
-                literal(
-                    message_dict["message_type"],
-                    type_=TaskMessageModel.message_type.type,
-                ),
-                literal(
-                    message_dict["content"],
-                    type_=TaskMessageModel.content.type,
-                ),
-                literal(message_dict["error"], type_=TaskMessageModel.error.type),
+                literal(serialized_content, type_=TaskMessageModel.content.type),
+                literal(serialized_error, type_=TaskMessageModel.error.type),
             ).where(src_task_exists, dst_task_exists)
             stmt = (
                 insert(TaskMessageModel)
@@ -1822,30 +1819,6 @@ def _task_event_from_model(model: TaskEventModel) -> TaskEvent:
         event=model.event,
         data=model.data,
     )
-
-
-def _task_message_to_row(message: Message) -> dict[str, Any]:
-    """Convert a task-addressed Message to database row values."""
-    return {
-        "message_id": message.metadata.message_id,
-        "run_id": uint64_to_int64(message.metadata.run_id),
-        "src_task_id": uint64_to_int64(cast(int, message.metadata.src_task_id)),
-        "dst_task_id": uint64_to_int64(cast(int, message.metadata.dst_task_id)),
-        "reply_to_message_id": message.metadata.reply_to_message_id,
-        "created_at": message.metadata.created_at,
-        "ttl": message.metadata.ttl,
-        "message_type": message.metadata.message_type,
-        "content": (
-            recorddict_to_proto(message.content).SerializeToString()
-            if message.has_content()
-            else None
-        ),
-        "error": (
-            error_to_proto(message.error).SerializeToString()
-            if message.has_error()
-            else None
-        ),
-    }
 
 
 def _task_message_snapshot_from_model(model: TaskMessageModel) -> dict[str, Any]:
