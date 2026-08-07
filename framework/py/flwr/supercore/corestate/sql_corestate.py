@@ -680,51 +680,43 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         description: str | None = None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
-        insert_query = """
-            INSERT INTO run_series
-            (series_id, federation_id, description, created_at, updated_at)
-            VALUES
-            (:series_id, :federation_id, :description, :created_at, :updated_at)
-            ON CONFLICT(series_id) DO NOTHING
-            RETURNING series_id
-        """
-
         try:
-            with self.session():
+            with self.session() as session:
                 if series_id is None:
                     # No series was provided, so create one before linking the run.
                     candidate = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
                     timestamp = now()
-                    rows = self.query(
-                        insert_query,
-                        {
-                            "series_id": uint64_to_int64(candidate),
-                            "federation_id": federation_id,
-                            "description": description,
-                            "created_at": timestamp,
-                            "updated_at": timestamp,
-                        },
+                    stmt = (
+                        self.dialect_insert(RunSeriesModel)
+                        .values(
+                            series_id=uint64_to_int64(candidate),
+                            federation_id=federation_id,
+                            description=description,
+                            created_at=timestamp,
+                            updated_at=timestamp,
+                        )
+                        .on_conflict_do_nothing(
+                            index_elements=[RunSeriesModel.series_id]
+                        )
+                        .returning(RunSeriesModel.series_id)
                     )
-                    if rows:
-                        resolved_series_id = candidate
-                    else:
+                    resolved_series_id = (
+                        candidate if session.scalar(stmt) is not None else None
+                    )
+                    if resolved_series_id is None:
                         return None
 
                 else:
-                    rows = self.query(
-                        """
-                        UPDATE run_series
-                        SET updated_at = :updated_at
-                        WHERE series_id = :series_id AND federation_id = :federation_id
-                        RETURNING series_id
-                        """,
-                        {
-                            "series_id": uint64_to_int64(series_id),
-                            "federation_id": federation_id,
-                            "updated_at": now(),
-                        },
+                    updated_series_id = session.scalar(
+                        update(RunSeriesModel)
+                        .where(
+                            RunSeriesModel.series_id == uint64_to_int64(series_id),
+                            RunSeriesModel.federation_id == federation_id,
+                        )
+                        .values(updated_at=now())
+                        .returning(RunSeriesModel.series_id)
                     )
-                    if not rows:
+                    if updated_series_id is None:
                         log(
                             ERROR,
                             "Run series %d not found in federation %r",
@@ -735,16 +727,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     resolved_series_id = series_id
 
                 # Store the membership last so callers only receive linked series IDs.
-                self.query(
-                    """
-                    INSERT INTO series_runs (series_id, run_id)
-                    VALUES (:series_id, :run_id)
-                    """,
-                    {
-                        "series_id": uint64_to_int64(resolved_series_id),
-                        "run_id": uint64_to_int64(run_id),
-                    },
+                session.add(
+                    SeriesRunsModel(
+                        series_id=uint64_to_int64(resolved_series_id),
+                        run_id=uint64_to_int64(run_id),
+                    )
                 )
+                session.flush()
                 return resolved_series_id
         except IntegrityError:
             return None
