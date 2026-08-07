@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Token-based AppIo interceptors for short-term auth coverage."""
+"""Token-based Runtime interceptors for short-term auth coverage."""
 
 
 from __future__ import annotations
@@ -25,11 +25,7 @@ import grpc
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
-from flwr.supercore.auth import (
-    CLIENTAPPIO_METHOD_AUTH_POLICY,
-    SERVERAPPIO_METHOD_AUTH_POLICY,
-    MethodTokenPolicy,
-)
+from flwr.supercore.auth import RUNTIME_METHOD_AUTH_POLICY, MethodTokenPolicy
 from flwr.supercore.utils import find_metadata_keys, get_metadata_str
 
 TASK_TOKEN_HEADER = "flwr-task-token"
@@ -83,7 +79,7 @@ class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ig
 
 
 class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
-    """Validate AppIo tokens with per-method token policies."""
+    """Validate Runtime tokens with per-method token policies."""
 
     def __init__(
         self,
@@ -154,7 +150,7 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
 def get_authenticated_task() -> Task:
     """Return the task identity authenticated for the current RPC.
 
-    The task is available only while handling an RPC authenticated with an AppIo task
+    The task is available only while handling an RPC authenticated with a Runtime task
     token.
     """
     ret = _current_task.get()
@@ -169,18 +165,18 @@ def get_authenticated_task() -> Task:
 def create_serverappio_token_auth_server_interceptor(
     state_provider: Callable[[], _TokenState],
 ) -> AppIoTokenServerInterceptor:
-    """Create the default token interceptor for ServerAppIo."""
+    """Create the SuperLink Runtime API token interceptor."""
     return AppIoTokenServerInterceptor(
         state_provider=state_provider,
-        method_auth_policy=SERVERAPPIO_METHOD_AUTH_POLICY,
+        method_auth_policy=RUNTIME_METHOD_AUTH_POLICY,
     )
 
 
 def create_clientappio_token_auth_server_interceptor(
     state_provider: Callable[[], _TokenState],
 ) -> AppIoTokenServerInterceptor:
-    """Create the default token interceptor for ClientAppIo."""
+    """Create the SuperNode Runtime API token interceptor."""
     return AppIoTokenServerInterceptor(
         state_provider=state_provider,
-        method_auth_policy=CLIENTAPPIO_METHOD_AUTH_POLICY,
+        method_auth_policy=RUNTIME_METHOD_AUTH_POLICY,
     )

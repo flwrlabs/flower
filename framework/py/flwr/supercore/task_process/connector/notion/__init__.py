@@ -12,25 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared auth policy definitions."""
+"""Notion connector."""
 
-
-from .policy import RUNTIME_METHOD_AUTH_POLICY, MethodTokenPolicy
-from .superexec import (
-    compute_request_body_sha256,
-    compute_superexec_signature,
-    derive_auth_secret,
-    verify_superexec_signature,
-)
-from .superexec_secret import add_superexec_auth_secret_args, load_superexec_auth_secret
+from .definition import CONNECTOR
 
 __all__ = [
-    "MethodTokenPolicy",
-    "RUNTIME_METHOD_AUTH_POLICY",
-    "add_superexec_auth_secret_args",
-    "compute_request_body_sha256",
-    "compute_superexec_signature",
-    "derive_auth_secret",
-    "load_superexec_auth_secret",
-    "verify_superexec_signature",
+    "CONNECTOR",
 ]

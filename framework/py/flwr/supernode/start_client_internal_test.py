@@ -417,7 +417,7 @@ def _run_until_connection_start(
     clientappio_api_address: str = "127.0.0.1:9094",
     bound_address: str = "127.0.0.1:9094",
 ) -> tuple[Mock, Mock]:
-    """Run startup only far enough to inspect ClientAppIo and SuperExec wiring."""
+    """Run startup only far enough to inspect Runtime API and SuperExec wiring."""
     with (
         patch(
             "flwr.supernode.start_client_internal.run_clientappio_api_grpc"
@@ -448,12 +448,12 @@ def _run_until_connection_start(
 
 
 def test_start_client_internal_launches_insecure_superexec_by_default() -> None:
-    """Subprocess SuperExec should use insecure AppIO when ClientAppIo has no TLS."""
+    """Subprocess SuperExec should use insecure Runtime API when TLS is off."""
     # This verifies the default subprocess-isolation path: when SuperNode starts
-    # ClientAppIo without server TLS, the spawned SuperExec must use plaintext too.
+    # Runtime API without server TLS means the spawned SuperExec uses plaintext too.
     run_clientappio, popen = _run_until_connection_start()
 
-    # No ClientAppIo server certificates means the local AppIO server is plaintext,
+    # No Runtime API server certificates means the local server is plaintext,
     # so the child SuperExec must connect with `--insecure`.
     assert run_clientappio.call_args.kwargs["certificates"] is None
     command = popen.call_args.args[0]
@@ -465,9 +465,9 @@ def test_start_client_internal_launches_insecure_superexec_by_default() -> None:
 def test_start_client_internal_launches_secure_superexec_with_root_certificates() -> (
     None
 ):
-    """Subprocess SuperExec should trust the secure ClientAppIo server CA."""
+    """Subprocess SuperExec should trust the secure Runtime API server CA."""
     # This verifies the TLS subprocess-isolation path: when SuperNode starts
-    # ClientAppIo with server TLS, the spawned SuperExec must receive trust roots.
+    # Runtime API with server TLS means the spawned SuperExec receives trust roots.
     certificates = (b"ca", b"cert", b"key")
 
     run_clientappio, popen = _run_until_connection_start(
@@ -475,7 +475,7 @@ def test_start_client_internal_launches_secure_superexec_with_root_certificates(
         clientappio_root_certificates_path="/tmp/ca.pem",
     )
 
-    # When ClientAppIo is started with TLS, SuperExec should verify that server
+    # When the Runtime API starts with TLS, SuperExec should verify that server
     # certificate with the same CA file instead of falling back to plaintext.
     assert run_clientappio.call_args.kwargs["certificates"] == certificates
     command = popen.call_args.args[0]

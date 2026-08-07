@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""ClientAppIo API Servicer."""
+"""SuperNode implementation of the Runtime API."""
 
 
 from .clientappio_servicer import ClientAppIoServicer

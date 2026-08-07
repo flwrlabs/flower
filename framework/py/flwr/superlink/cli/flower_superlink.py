@@ -279,7 +279,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             return
 
         if self._serverappio_server is None:
-            raise RuntimeError("ServerAppIo server is not started.")
+            raise RuntimeError("Runtime API server is not started.")
 
         appio_address = resolve_bind_address(self._serverappio_server.bound_address)
         command = _get_superexec_command(
@@ -510,7 +510,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
 
 
 def flower_superlink() -> None:
-    """Run Flower SuperLink (ServerAppIo API and Fleet API)."""
+    """Run Flower SuperLink (Runtime API and Fleet API)."""
     warn_if_flwr_update_available(process_name="flower-superlink")
 
     config = _parse_superlink_lifespan_config()
@@ -597,7 +597,7 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
 
     # Uvicorn workers must stay at 1 while the lifespan starts gRPC servers. With
     # multiple workers, every worker process would try to bind the same Control,
-    # Fleet, and ServerAppIo ports.
+    # Fleet and Runtime API ports.
     uvicorn.run(
         app=fastapi_app,
         host=lifespan_config.host,
@@ -623,7 +623,7 @@ def _validate_http_api_args(args: argparse.Namespace) -> None:
 def _obtain_superlink_certificates(
     args: argparse.Namespace,
 ) -> tuple[tuple[bytes, bytes, bytes] | None, tuple[bytes, bytes, bytes] | None]:
-    """Return Fleet/Control and ServerAppIo certificate tuples."""
+    """Return Fleet/Control and Runtime API certificate tuples."""
     if args.insecure:
         log(
             WARN,
@@ -751,7 +751,7 @@ def _run_fleet_api_grpc_adapter(
 
 
 def _parse_args_run_superlink() -> argparse.ArgumentParser:
-    """Parse command line arguments for both ServerAppIo API and Fleet API."""
+    """Parse command line arguments for both Runtime API and Fleet API."""
     parser = argparse.ArgumentParser(
         description="Start a Flower SuperLink",
     )
@@ -906,28 +906,28 @@ def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:
         "--simulationio-api-address",
         dest="serverappio_api_address",
         default=SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
-        help="ServerAppIo API (gRPC) server address (IPv4, IPv6, or a domain name). "
+        help="Runtime API (gRPC) server address (IPv4, IPv6, or a domain name). "
         "`--simulationio-api-address` is accepted as a deprecated alias. "
         f"By default, it is set to {SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS}.",
     )
     parser.add_argument(
         "--appio-ssl-certfile",
-        help="ServerAppIo API server TLS certificate file (as a path str) "
+        help="Runtime API server TLS certificate file (as a path str) "
         "to create a secure connection. The certificate must include SANs for "
-        "the AppIO API address used by SuperExec.",
+        "the Runtime API address used by SuperExec.",
         type=str,
         default=None,
     )
     parser.add_argument(
         "--appio-ssl-keyfile",
-        help="ServerAppIo API server TLS private key file (as a path str) "
+        help="Runtime API server TLS private key file (as a path str) "
         "to create a secure connection.",
         type=str,
     )
     parser.add_argument(
         "--appio-ssl-ca-certfile",
         help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
-        "the ServerAppIo API server certificate. This is not a client certificate "
+        "the Runtime API server certificate. This is not a client certificate "
         "for mTLS.",
         type=str,
     )

@@ -12,25 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared auth policy definitions."""
+"""Notion provider definition."""
 
+from ..definition import ConnectorDefinition, ProviderDefinition
+from .actions import ACTIONS
+from .executors import EXECUTORS
+from .oauth import NOTION_CONNECTOR_REF, get_configured_oauth_provider
 
-from .policy import RUNTIME_METHOD_AUTH_POLICY, MethodTokenPolicy
-from .superexec import (
-    compute_request_body_sha256,
-    compute_superexec_signature,
-    derive_auth_secret,
-    verify_superexec_signature,
+PROVIDER = ProviderDefinition(
+    ref=NOTION_CONNECTOR_REF,
+    display_name="Notion",
+    description="Search and read pages and data sources.",
+    actions=ACTIONS,
 )
-from .superexec_secret import add_superexec_auth_secret_args, load_superexec_auth_secret
 
-__all__ = [
-    "MethodTokenPolicy",
-    "RUNTIME_METHOD_AUTH_POLICY",
-    "add_superexec_auth_secret_args",
-    "compute_request_body_sha256",
-    "compute_superexec_signature",
-    "derive_auth_secret",
-    "load_superexec_auth_secret",
-    "verify_superexec_signature",
-]
+CONNECTOR = ConnectorDefinition(
+    provider=PROVIDER,
+    executors=EXECUTORS,
+    oauth_provider=get_configured_oauth_provider(),
+)

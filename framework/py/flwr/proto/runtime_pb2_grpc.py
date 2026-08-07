@@ -22,14 +22,14 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in flwr/proto/serverappio_pb2_grpc.py depends on'
+        + f' but the generated code in flwr/proto/runtime_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
     )
 
 
-class ServerAppIoStub(object):
+class RuntimeStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -39,113 +39,113 @@ class ServerAppIoStub(object):
             channel: A grpc.Channel.
         """
         self.PullPendingTasks = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PullPendingTasks',
+                '/flwr.proto.Runtime/PullPendingTasks',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PullPendingTasksRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.PullPendingTasksResponse.FromString,
                 _registered_method=True)
         self.ClaimTask = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/ClaimTask',
+                '/flwr.proto.Runtime/ClaimTask',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.ClaimTaskRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.ClaimTaskResponse.FromString,
                 _registered_method=True)
         self.GetRun = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/GetRun',
+                '/flwr.proto.Runtime/GetRun',
                 request_serializer=flwr_dot_proto_dot_run__pb2.GetRunRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_run__pb2.GetRunResponse.FromString,
                 _registered_method=True)
         self.SendTaskHeartbeat = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/SendTaskHeartbeat',
+                '/flwr.proto.Runtime/SendTaskHeartbeat',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatResponse.FromString,
                 _registered_method=True)
         self.PullTaskInput = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PullTaskInput',
+                '/flwr.proto.Runtime/PullTaskInput',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputResponse.FromString,
                 _registered_method=True)
         self.PushTaskOutput = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PushTaskOutput',
+                '/flwr.proto.Runtime/PushTaskOutput',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.FromString,
                 _registered_method=True)
         self.PushObject = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PushObject',
+                '/flwr.proto.Runtime/PushObject',
                 request_serializer=flwr_dot_proto_dot_message__pb2.PushObjectRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_message__pb2.PushObjectResponse.FromString,
                 _registered_method=True)
         self.PullObject = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PullObject',
+                '/flwr.proto.Runtime/PullObject',
                 request_serializer=flwr_dot_proto_dot_message__pb2.PullObjectRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_message__pb2.PullObjectResponse.FromString,
                 _registered_method=True)
         self.ConfirmMessageReceived = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/ConfirmMessageReceived',
+                '/flwr.proto.Runtime/ConfirmMessageReceived',
                 request_serializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedResponse.FromString,
                 _registered_method=True)
         self.CreateTask = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/CreateTask',
+                '/flwr.proto.Runtime/CreateTask',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.FromString,
                 _registered_method=True)
         self.StartAutomation = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/StartAutomation',
+                '/flwr.proto.Runtime/StartAutomation',
                 request_serializer=flwr_dot_proto_dot_control__pb2.StartAutomationRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.StartAutomationResponse.FromString,
                 _registered_method=True)
         self.PushTaskMessage = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PushTaskMessage',
+                '/flwr.proto.Runtime/PushTaskMessage',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageResponse.FromString,
                 _registered_method=True)
         self.PushTaskEvents = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PushTaskEvents',
+                '/flwr.proto.Runtime/PushTaskEvents',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskEventsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskEventsResponse.FromString,
                 _registered_method=True)
         self.PullTaskMessage = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PullTaskMessage',
+                '/flwr.proto.Runtime/PullTaskMessage',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.FromString,
                 _registered_method=True)
         self.RecordTaskUsage = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/RecordTaskUsage',
+                '/flwr.proto.Runtime/RecordTaskUsage',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageResponse.FromString,
                 _registered_method=True)
         self.GetConnector = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/GetConnector',
+                '/flwr.proto.Runtime/GetConnector',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.GetConnectorRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.GetConnectorResponse.FromString,
                 _registered_method=True)
         self.PushLogs = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PushLogs',
+                '/flwr.proto.Runtime/PushLogs',
                 request_serializer=flwr_dot_proto_dot_log__pb2.PushLogsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_log__pb2.PushLogsResponse.FromString,
                 _registered_method=True)
         self.PushMessages = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PushMessages',
+                '/flwr.proto.Runtime/PushMessages',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.FromString,
                 _registered_method=True)
         self.PullMessages = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PullMessages',
+                '/flwr.proto.Runtime/PullMessages',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.FromString,
                 _registered_method=True)
         self.GetNodes = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/GetNodes',
+                '/flwr.proto.Runtime/GetNodes',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.GetNodesRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.GetNodesResponse.FromString,
                 _registered_method=True)
 
 
-class ServerAppIoServicer(object):
+class RuntimeServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def PullPendingTasks(self, request, context):
         """///////////////////////////////////////////////////////////////////////////
-        General *AppIo endpoints for SuperExec processes
+        General Runtime endpoints for SuperExec processes
         ///////////////////////////////////////////////////////////////////////////
 
         Pull pending tasks
@@ -163,7 +163,7 @@ class ServerAppIoServicer(object):
 
     def GetRun(self, request, context):
         """///////////////////////////////////////////////////////////////////////////
-        General *AppIo endpoints for App Executor processes
+        General Runtime endpoints for App Executor processes
         ///////////////////////////////////////////////////////////////////////////
 
         Get run details
@@ -195,7 +195,7 @@ class ServerAppIoServicer(object):
 
     def PushObject(self, request, context):
         """///////////////////////////////////////////////////////////////////////////
-        Specific endpoints shared by ServerAppIo and ClientAppIo
+        Object and task endpoints
         ///////////////////////////////////////////////////////////////////////////
 
         Push Object
@@ -300,7 +300,7 @@ class ServerAppIoServicer(object):
         raise NotImplementedError('Method not implemented!')
 
 
-def add_ServerAppIoServicer_to_server(servicer, server):
+def add_RuntimeServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'PullPendingTasks': grpc.unary_unary_rpc_method_handler(
                     servicer.PullPendingTasks,
@@ -404,13 +404,13 @@ def add_ServerAppIoServicer_to_server(servicer, server):
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'flwr.proto.ServerAppIo', rpc_method_handlers)
+            'flwr.proto.Runtime', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('flwr.proto.ServerAppIo', rpc_method_handlers)
+    server.add_registered_method_handlers('flwr.proto.Runtime', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
-class ServerAppIo(object):
+class Runtime(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
@@ -427,7 +427,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PullPendingTasks',
+            '/flwr.proto.Runtime/PullPendingTasks',
             flwr_dot_proto_dot_appio__pb2.PullPendingTasksRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.PullPendingTasksResponse.FromString,
             options,
@@ -454,7 +454,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/ClaimTask',
+            '/flwr.proto.Runtime/ClaimTask',
             flwr_dot_proto_dot_appio__pb2.ClaimTaskRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.ClaimTaskResponse.FromString,
             options,
@@ -481,7 +481,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/GetRun',
+            '/flwr.proto.Runtime/GetRun',
             flwr_dot_proto_dot_run__pb2.GetRunRequest.SerializeToString,
             flwr_dot_proto_dot_run__pb2.GetRunResponse.FromString,
             options,
@@ -508,7 +508,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/SendTaskHeartbeat',
+            '/flwr.proto.Runtime/SendTaskHeartbeat',
             flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatResponse.FromString,
             options,
@@ -535,7 +535,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PullTaskInput',
+            '/flwr.proto.Runtime/PullTaskInput',
             flwr_dot_proto_dot_appio__pb2.PullTaskInputRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.PullTaskInputResponse.FromString,
             options,
@@ -562,7 +562,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PushTaskOutput',
+            '/flwr.proto.Runtime/PushTaskOutput',
             flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.FromString,
             options,
@@ -589,7 +589,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PushObject',
+            '/flwr.proto.Runtime/PushObject',
             flwr_dot_proto_dot_message__pb2.PushObjectRequest.SerializeToString,
             flwr_dot_proto_dot_message__pb2.PushObjectResponse.FromString,
             options,
@@ -616,7 +616,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PullObject',
+            '/flwr.proto.Runtime/PullObject',
             flwr_dot_proto_dot_message__pb2.PullObjectRequest.SerializeToString,
             flwr_dot_proto_dot_message__pb2.PullObjectResponse.FromString,
             options,
@@ -643,7 +643,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/ConfirmMessageReceived',
+            '/flwr.proto.Runtime/ConfirmMessageReceived',
             flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedRequest.SerializeToString,
             flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedResponse.FromString,
             options,
@@ -670,7 +670,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/CreateTask',
+            '/flwr.proto.Runtime/CreateTask',
             flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.FromString,
             options,
@@ -697,7 +697,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/StartAutomation',
+            '/flwr.proto.Runtime/StartAutomation',
             flwr_dot_proto_dot_control__pb2.StartAutomationRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.StartAutomationResponse.FromString,
             options,
@@ -724,7 +724,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PushTaskMessage',
+            '/flwr.proto.Runtime/PushTaskMessage',
             flwr_dot_proto_dot_appio__pb2.PushTaskMessageRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.PushTaskMessageResponse.FromString,
             options,
@@ -751,7 +751,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PushTaskEvents',
+            '/flwr.proto.Runtime/PushTaskEvents',
             flwr_dot_proto_dot_appio__pb2.PushTaskEventsRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.PushTaskEventsResponse.FromString,
             options,
@@ -778,7 +778,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PullTaskMessage',
+            '/flwr.proto.Runtime/PullTaskMessage',
             flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.FromString,
             options,
@@ -805,7 +805,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/RecordTaskUsage',
+            '/flwr.proto.Runtime/RecordTaskUsage',
             flwr_dot_proto_dot_appio__pb2.RecordTaskUsageRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.RecordTaskUsageResponse.FromString,
             options,
@@ -832,7 +832,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/GetConnector',
+            '/flwr.proto.Runtime/GetConnector',
             flwr_dot_proto_dot_appio__pb2.GetConnectorRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.GetConnectorResponse.FromString,
             options,
@@ -859,7 +859,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PushLogs',
+            '/flwr.proto.Runtime/PushLogs',
             flwr_dot_proto_dot_log__pb2.PushLogsRequest.SerializeToString,
             flwr_dot_proto_dot_log__pb2.PushLogsResponse.FromString,
             options,
@@ -886,7 +886,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PushMessages',
+            '/flwr.proto.Runtime/PushMessages',
             flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.FromString,
             options,
@@ -913,7 +913,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PullMessages',
+            '/flwr.proto.Runtime/PullMessages',
             flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.FromString,
             options,
@@ -940,7 +940,7 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/GetNodes',
+            '/flwr.proto.Runtime/GetNodes',
             flwr_dot_proto_dot_appio__pb2.GetNodesRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.GetNodesResponse.FromString,
             options,

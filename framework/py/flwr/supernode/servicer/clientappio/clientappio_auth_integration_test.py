@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""ClientAppIo auth interceptor integration tests."""
+"""SuperNode Runtime API auth interceptor integration tests."""
 
 
 import tempfile
@@ -38,7 +38,7 @@ from flwr.supercore.interceptors import (
     SuperExecAuthClientInterceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
-    CLIENTAPPIO_SUPEREXEC_METHODS,
+    RUNTIME_SUPEREXEC_METHODS,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supernode.nodestate import NodeStateFactory
@@ -48,10 +48,10 @@ _SUPEREXEC_SECRET = b"test-superexec-secret"
 
 
 class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R0902
-    """Integration tests for ClientAppIo token-auth interceptor behavior."""
+    """Integration tests for SuperNode Runtime token-auth behavior."""
 
     def setUp(self) -> None:
-        """Start the ClientAppIo gRPC API without client-side auth helpers."""
+        """Start the Runtime API without client-side auth helpers."""
         self.temp_dir = tempfile.TemporaryDirectory()  # pylint: disable=R1732
         self.addCleanup(self.temp_dir.cleanup)
 
@@ -75,12 +75,12 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
 
         self._base_channel = grpc.insecure_channel(self._server.bound_address)
         self._pull_object = self._base_channel.unary_unary(
-            "/flwr.proto.ClientAppIo/PullObject",
+            "/flwr.proto.Runtime/PullObject",
             request_serializer=PullObjectRequest.SerializeToString,
             response_deserializer=PullObjectResponse.FromString,
         )
         self._list_apps_to_launch_no_auth = self._base_channel.unary_unary(
-            "/flwr.proto.ClientAppIo/PullPendingTasks",
+            "/flwr.proto.Runtime/PullPendingTasks",
             request_serializer=PullPendingTasksRequest.SerializeToString,
             response_deserializer=PullPendingTasksResponse.FromString,
         )
@@ -89,16 +89,16 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             AppIoTokenClientInterceptor(token=self.valid_token),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
-                protected_methods=CLIENTAPPIO_SUPEREXEC_METHODS,
+                protected_methods=RUNTIME_SUPEREXEC_METHODS,
             ),
         )
         self._list_apps_to_launch_with_superexec_auth = self._auth_channel.unary_unary(
-            "/flwr.proto.ClientAppIo/PullPendingTasks",
+            "/flwr.proto.Runtime/PullPendingTasks",
             request_serializer=PullPendingTasksRequest.SerializeToString,
             response_deserializer=PullPendingTasksResponse.FromString,
         )
         self._get_nodes = self._auth_channel.unary_unary(
-            "/flwr.proto.ClientAppIo/GetNodes",
+            "/flwr.proto.Runtime/GetNodes",
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
@@ -164,10 +164,10 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
 
 
 class TestClientAppIoAuthIntegrationWithoutSuperExecSecret(unittest.TestCase):
-    """Integration tests for ClientAppIo when SuperExec auth is disabled."""
+    """Test the SuperNode Runtime API when SuperExec auth is disabled."""
 
     def setUp(self) -> None:
-        """Start the ClientAppIo API with only token interceptor enabled."""
+        """Start the Runtime API with only token interception enabled."""
         self.temp_dir = tempfile.TemporaryDirectory()  # pylint: disable=R1732
         self.addCleanup(self.temp_dir.cleanup)
 
@@ -184,7 +184,7 @@ class TestClientAppIoAuthIntegrationWithoutSuperExecSecret(unittest.TestCase):
 
         channel = grpc.insecure_channel(self._server.bound_address)
         self._list_apps_to_launch = channel.unary_unary(
-            "/flwr.proto.ClientAppIo/PullPendingTasks",
+            "/flwr.proto.Runtime/PullPendingTasks",
             request_serializer=PullPendingTasksRequest.SerializeToString,
             response_deserializer=PullPendingTasksResponse.FromString,
         )
