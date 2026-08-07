@@ -128,7 +128,7 @@ def test_launch_suppresses_output_when_requested() -> None:
 def test_launch_renders_serverappio_task_args(
     task_type: TaskType, command: str
 ) -> None:
-    """Test subprocess executor renders ServerAppIo task args."""
+    """Test subprocess executor renders Runtime API task args."""
     with patch.object(subprocess, "Popen") as popen_mock:
         SubprocessExecutor().launch(_execution_spec(task_type=task_type))
 

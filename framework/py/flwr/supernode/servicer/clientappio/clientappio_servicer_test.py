@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Test the ClientAppIo API servicer."""
+"""Test the SuperNode Runtime API servicer implementation."""
 
 
 import unittest
@@ -27,6 +27,7 @@ from flwr.common.constant import SubStatus
 from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
+    GetConnectorRequest,
     GetNodesRequest,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
@@ -39,6 +40,7 @@ from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.proto.control_pb2 import StartAutomationRequest  # pylint:disable=E0611
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint:disable=E0611
 from flwr.proto.message_pb2 import (  # pylint:disable=E0611
     PullObjectRequest,
@@ -261,11 +263,10 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.assertEqual(finish_task_kwargs["task_id"], task_id)
         self.assertEqual(finish_task_kwargs["sub_status"], request.sub_status)
 
-    def test_servicer_pull_messages_aborts_when_no_message_found(self) -> None:
-        """PullMessages should abort cleanly when no message is available."""
+    def test_servicer_pull_messages_returns_empty_response(self) -> None:
+        """PullMessages should return an empty response when no message is available."""
         run_id = 61016
         context = Mock()
-        context.abort.side_effect = grpc.RpcError()
         self.mock_state.get_messages.return_value = []
 
         with patch(
@@ -273,13 +274,11 @@ class TestClientAppIoServicer(unittest.TestCase):
             "get_authenticated_task",
             return_value=Mock(run_id=run_id),
         ):
-            with self.assertRaises(grpc.RpcError):
-                self.servicer.PullMessages(PullAppMessagesRequest(), context)
+            response = self.servicer.PullMessages(PullAppMessagesRequest(), context)
 
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.NOT_FOUND,
-            f"No message found for run {run_id} in NodeState.",
-        )
+        self.assertEqual(list(response.messages_list), [])
+        self.assertEqual(list(response.message_object_trees), [])
+        context.abort.assert_not_called()
         self.mock_state.record_message_processing_start.assert_not_called()
 
     @parameterized.expand([(0, 0), (1, 0), (0, 1), (2, 1), (1, 2)])  # type: ignore
@@ -309,7 +308,7 @@ class TestClientAppIoServicer(unittest.TestCase):
 
         context.abort.assert_called_once_with(
             grpc.StatusCode.INVALID_ARGUMENT,
-            "ClientAppIo.PushMessages expects exactly one message and one object tree.",
+            "Runtime.PushMessages expects exactly one message and one object tree.",
         )
         self.mock_state.record_message_processing_end.assert_not_called()
         self.mock_state.store_message_and_object_tree.assert_not_called()
@@ -393,17 +392,41 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.assertTrue(response.object_available)
         self.assertEqual(response.object_content, b"content")
 
-    def test_get_nodes_unimplemented(self) -> None:
-        """GetNodes should be unavailable on ClientAppIo."""
+    @parameterized.expand(  # type: ignore
+        [
+            (
+                "start_automation",
+                "StartAutomation",
+                StartAutomationRequest(),
+                "Only AgentApp and ServerApp tasks can create automations.",
+            ),
+            (
+                "get_connector",
+                "GetConnector",
+                GetConnectorRequest(),
+                "Connector credentials are not available to this task.",
+            ),
+            (
+                "get_nodes",
+                "GetNodes",
+                GetNodesRequest(),
+                "This endpoint is only available to ServerApp tasks.",
+            ),
+        ]
+    )
+    def test_server_side_endpoint_permission_denied(
+        self, _case_name: str, method_name: str, request: object, detail: str
+    ) -> None:
+        """Server-side endpoints should be unavailable to ClientApp tasks."""
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
 
         with self.assertRaises(grpc.RpcError):
-            self.servicer.GetNodes(GetNodesRequest(), context)
+            getattr(self.servicer, method_name)(request, context)
 
         context.abort.assert_called_once_with(
-            grpc.StatusCode.UNIMPLEMENTED,
-            "GetNodes is not available on ClientAppIo.",
+            grpc.StatusCode.PERMISSION_DENIED,
+            detail,
         )
 
     @parameterized.expand([(True,), (False,)])  # type: ignore

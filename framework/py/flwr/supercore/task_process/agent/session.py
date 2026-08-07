@@ -37,7 +37,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
     StartRunRequest,
 )
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
+from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
@@ -47,8 +47,8 @@ from flwr.supercore.json_message.connector_message import (
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
-    get_builtin_connector_tool,
     get_connector_ref,
+    get_connector_tools,
     has_builtin_connector,
 )
 from flwr.supercore.task_process.connector.web_fetch import WEB_FETCH_CONNECTOR_NAME
@@ -80,14 +80,14 @@ class RuntimeAgentSession(AgentSession):
 
 
 class RuntimeAgentConnectors(AgentConnectors):
-    """AgentConnectors implementation for built-in model tools."""
+    """AgentConnectors implementation for model tools."""
 
     def __init__(self, responses: RuntimeAgentResponses) -> None:
         self._responses = responses
 
     def tools(self, names: Sequence[str]) -> list[JSONObject]:
-        """Return model-facing schemas for built-in tools."""
-        return [get_builtin_connector_tool(name) for name in names]
+        """Return model-facing tool schemas for the requested connectors."""
+        return [tool for name in names for tool in get_connector_tools(name)]
 
     def call(self, tool_call: JSONObject) -> JSONObject:
         """Execute one model function_call and return a function_call_output item."""
@@ -112,12 +112,12 @@ class RuntimeAgentConnectors(AgentConnectors):
 
 
 class RuntimeAgentResponses(AgentResponses):
-    """AgentResponses implementation backed by AppIo task messages."""
+    """AgentResponses implementation backed by Runtime task messages."""
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
-        stub: ServerAppIoStub,
+        stub: RuntimeStub,
         run_id: int,
         task_id: int,
         context: Context,

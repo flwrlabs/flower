@@ -44,7 +44,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
+from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 from flwr.serverapp.grid import Grid
 from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
 from flwr.supercore.date import now
@@ -103,12 +103,12 @@ at once, or pull messages individually, for example:
 
 
 class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
-    """`GrpcGrid` provides an interface to the ServerAppIo API.
+    """`GrpcGrid` provides an interface to the Runtime API.
 
     Parameters
     ----------
     serverappio_service_address : str (default: "[::]:9091")
-        The address (URL, IPv6, IPv4) of the SuperLink ServerAppIo API service.
+        The address (URL, IPv6, IPv4) of the SuperLink Runtime API service.
     insecure : bool (default: False)
         If True, use plaintext (TLS disabled). If False, use TLS.
     root_certificates : Optional[bytes] (default: None)
@@ -117,7 +117,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         used to verify the server certificate. If None, gRPC default root
         certificates are used.
     token : str
-        Executor token used for ServerAppIo authentication.
+        Executor token used for Runtime API authentication.
     """
 
     _deprecation_warning_logged = False
@@ -137,7 +137,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         self._cert = root_certificates
         self._token = token
         self._run: Run | None = None
-        self._grpc_stub: ServerAppIoStub | None = None
+        self._grpc_stub: RuntimeStub | None = None
         self._channel: grpc.Channel | None = None
         self.node = Node(node_id=SUPERLINK_NODE_ID)
         self._retry_invoker = make_simple_grpc_retry_invoker()
@@ -145,11 +145,11 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
 
     @property
     def _is_connected(self) -> bool:
-        """Check if connected to the ServerAppIo API server."""
+        """Check if connected to the Runtime API server."""
         return self._channel is not None
 
     def _connect(self) -> None:
-        """Connect to the ServerAppIo API.
+        """Connect to the Runtime API.
 
         This will not call GetRun.
         """
@@ -166,12 +166,12 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
             ],
         )
         self._channel.subscribe(on_channel_state_change)
-        self._grpc_stub = ServerAppIoStub(self._channel)
+        self._grpc_stub = RuntimeStub(self._channel)
         wrap_stub(self._grpc_stub, self._retry_invoker)
         log(DEBUG, "[flwr-serverapp] Connected to %s", self._addr)
 
     def _disconnect(self) -> None:
-        """Disconnect from the ServerAppIo API."""
+        """Disconnect from the Runtime API."""
         if not self._is_connected:
             log(DEBUG, "Already disconnected")
             return
@@ -194,11 +194,11 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         return Run(**vars(self._run))
 
     @property
-    def _stub(self) -> ServerAppIoStub:
-        """ServerAppIo stub."""
+    def _stub(self) -> RuntimeStub:
+        """Runtime API stub."""
         if not self._is_connected:
             self._connect()
-        return cast(ServerAppIoStub, self._grpc_stub)
+        return cast(RuntimeStub, self._grpc_stub)
 
     def _check_message(self, message: Message) -> None:
         # Check if the message is valid
@@ -232,7 +232,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
 
     def get_node_ids(self) -> Iterable[int]:
         """Get node IDs."""
-        # Call GrpcServerAppIoStub method
+        # Call RuntimeStub method
         res: GetNodesResponse = self._stub.GetNodes(GetNodesRequest())
         return [node.node_id for node in res.nodes]
 
@@ -248,7 +248,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
             object_trees.append(get_object_tree(msg))
             del msg
 
-        # Call GrpcServerAppIoStub method
+        # Call RuntimeStub method
         res: PushAppMessagesResponse = self._stub.PushMessages(
             PushAppMessagesRequest(
                 messages_list=proto_messages,

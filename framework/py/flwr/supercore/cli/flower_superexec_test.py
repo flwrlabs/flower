@@ -22,8 +22,7 @@ from unittest.mock import Mock
 import pytest
 
 from flwr.common.constant import ExecPluginType
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.constant import ExecutorType
 from flwr.supercore.version import package_version
 
@@ -138,7 +137,7 @@ def test_flower_superexec_clientapp_allows_missing_secret(
     monkeypatch.setattr(
         flower_superexec_module,
         "_get_plugin_and_stub_class",
-        lambda _plugin_type: (object, ClientAppIoStub),
+        lambda _plugin_type: (object, RuntimeStub),
     )
     monkeypatch.setattr(flower_superexec_module, "run_superexec", _run_superexec)
 
@@ -183,7 +182,7 @@ def test_flower_superexec_serverapp_allows_missing_secret(
     monkeypatch.setattr(
         flower_superexec_module,
         "_get_plugin_and_stub_class",
-        lambda _plugin_type: (object, ServerAppIoStub),
+        lambda _plugin_type: (object, RuntimeStub),
     )
     monkeypatch.setattr(flower_superexec_module, "run_superexec", _run_superexec)
 
@@ -223,7 +222,7 @@ def test_flower_superexec_passes_executor_to_run_superexec(
     monkeypatch.setattr(
         flower_superexec_module,
         "_get_plugin_and_stub_class",
-        lambda _plugin_type: (object, ClientAppIoStub),
+        lambda _plugin_type: (object, RuntimeStub),
     )
     monkeypatch.setattr(flower_superexec_module, "run_superexec", run_superexec_mock)
 

@@ -16,21 +16,44 @@
 
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import grpc
 
+from flwr.common.serde import fab_to_proto
+from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    PullAppMessagesResponse,
+    PullTaskInputResponse,
+)
+from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.supercore.exit import ExitCode
+from flwr.supercore.fab import Fab
 from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 
-from .run_clientapp import run_clientapp
+from .run_clientapp import pull_task_input, run_clientapp
 
 
 class TestRunClientApp(unittest.TestCase):
     """Tests for `run_clientapp`."""
+
+    def test_pull_task_input_raises_when_no_message_received(self) -> None:
+        """`pull_task_input` should reject an empty PullMessages response."""
+        stub = Mock()
+        stub.PullTaskInput.return_value = PullTaskInputResponse(
+            context=ProtoContext(run_id=61016, node_id=123),
+            run=ProtoRun(run_id=61016),
+            fab=fab_to_proto(Fab("hash", b"content", {})),
+        )
+        stub.PullMessages.return_value = PullAppMessagesResponse()
+
+        with self.assertRaisesRegex(
+            RuntimeError, "No messages received from ClientAppIo"
+        ):
+            pull_task_input(stub)
 
     def test_run_clientapp_adds_client_interceptors(self) -> None:
         """`run_clientapp` should add client interceptors to gRPC channel creation."""
