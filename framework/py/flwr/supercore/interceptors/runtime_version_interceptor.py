@@ -247,11 +247,11 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
 
 
 def create_serverappio_runtime_version_server_interceptor(
-    connection_name: str = "Caller <-> SuperLink ServerAppIo API",
+    connection_name: str = "Caller <-> SuperLink Runtime API",
     send_warning_metadata: bool = False,
     reject_incompatible: bool = True,
 ) -> RuntimeVersionServerInterceptor:
-    """Create the default runtime version interceptor for ServerAppIo."""
+    """Create the SuperLink Runtime API version interceptor."""
     return RuntimeVersionServerInterceptor(
         connection_name=connection_name,
         local_metadata=RuntimeVersionMetadata.from_local_component("SuperLink"),
@@ -261,11 +261,11 @@ def create_serverappio_runtime_version_server_interceptor(
 
 
 def create_clientappio_runtime_version_server_interceptor(
-    connection_name: str = "Caller <-> SuperNode ClientAppIo API",
+    connection_name: str = "Caller <-> SuperNode Runtime API",
     send_warning_metadata: bool = False,
     reject_incompatible: bool = True,
 ) -> RuntimeVersionServerInterceptor:
-    """Create the default runtime version interceptor for ClientAppIo."""
+    """Create the SuperNode Runtime API version interceptor."""
     return RuntimeVersionServerInterceptor(
         connection_name=connection_name,
         local_metadata=RuntimeVersionMetadata.from_local_component("SuperNode"),

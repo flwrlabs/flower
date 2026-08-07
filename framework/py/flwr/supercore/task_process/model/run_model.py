@@ -28,7 +28,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputResponse,
     PushTaskOutputRequest,
 )
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc import create_channel, on_channel_state_change
@@ -137,8 +137,8 @@ def _create_serverappio_stub(
     token: str,
     insecure: bool,
     certificates: bytes | None,
-) -> tuple[grpc.Channel, ServerAppIoStub, RetryInvoker]:
-    """Create a ServerAppIo stub authenticated as the model task."""
+) -> tuple[grpc.Channel, RuntimeStub, RetryInvoker]:
+    """Create a Runtime stub authenticated as the model task."""
     channel = create_channel(
         server_address=serverappio_api_address,
         insecure=insecure,
@@ -149,7 +149,7 @@ def _create_serverappio_stub(
         ],
     )
     channel.subscribe(on_channel_state_change)
-    stub = ServerAppIoStub(channel)
+    stub = RuntimeStub(channel)
     retry_invoker = make_simple_grpc_retry_invoker()
     wrap_stub(stub, retry_invoker)
     return channel, stub, retry_invoker

@@ -24,7 +24,7 @@ import "flwr/proto/node.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/task.proto";
 
-// These messages are used by both ServerAppIo and ClientAppIo services
+// These messages are used by the Runtime service
 
 // PullPendingTasks messages
 message PullPendingTasksRequest {}

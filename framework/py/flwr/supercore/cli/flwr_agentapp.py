@@ -38,8 +38,7 @@ def flwr_agentapp() -> None:
     log(INFO, "Start `flwr-agentapp` process")
     log(
         DEBUG,
-        "`flwr-agentapp` will attempt to connect to SuperLink's "
-        "ServerAppIo API at %s",
+        "`flwr-agentapp` will attempt to connect to SuperLink's Runtime API at %s",
         args.serverappio_api_address,
     )
     run_agentapp(
@@ -67,7 +66,7 @@ def _parse_args_run_flwr_agentapp() -> argparse.ArgumentParser:
         "--serverappio-api-address",
         default=SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
         type=str,
-        help="Address of SuperLink's ServerAppIo API (IPv4, IPv6, or a domain name)."
+        help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name)."
         f"By default, it is set to {SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
     )
     add_args_flwr_app_common(parser=parser)

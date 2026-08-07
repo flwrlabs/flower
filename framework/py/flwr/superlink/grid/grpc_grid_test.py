@@ -55,7 +55,7 @@ class TestGrpcGrid(unittest.TestCase):
     """Tests for `GrpcGrid` class."""
 
     def setUp(self) -> None:
-        """Initialize mock GrpcServerAppIoStub and Grid instance before each test."""
+        """Initialize mock RuntimeStub and Grid instance before each test."""
         self.mock_stub = Mock()
         self.mock_channel = Mock()
         self.mock_run = Run.create_empty(61016)
@@ -68,7 +68,7 @@ class TestGrpcGrid(unittest.TestCase):
         self.grid.set_run(self.mock_run)
 
     def test_init_grpc_grid(self) -> None:
-        """Test GrpcServerAppIoStub initialization."""
+        """Test RuntimeStub initialization."""
         # Assert
         self.assertEqual(self.grid.run.run_id, 61016)
         self.assertEqual(self.grid.run.fab_id, "mock/mock")
@@ -267,7 +267,7 @@ class TestGrpcGrid(unittest.TestCase):
             self.grid.set_run(61016)  # type: ignore[arg-type]
 
     @patch("flwr.superlink.grid.grpc_grid.wrap_stub")
-    @patch("flwr.superlink.grid.grpc_grid.ServerAppIoStub")
+    @patch("flwr.superlink.grid.grpc_grid.RuntimeStub")
     @patch("flwr.superlink.grid.grpc_grid.create_channel")
     def test_connect_adds_client_interceptors(
         self,

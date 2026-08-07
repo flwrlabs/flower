@@ -99,7 +99,7 @@ from flwr.supercore.interceptors import (
     SuperExecAuthClientInterceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
-    SERVERAPPIO_SUPEREXEC_METHODS,
+    RUNTIME_SUPEREXEC_METHODS,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
@@ -181,7 +181,7 @@ def _start_serverappio_with_port_retry(
             raise
 
     raise AssertionError(
-        f"Could not bind ServerAppIo gRPC server starting at port {start_port}."
+        f"Could not bind Runtime gRPC server starting at port {start_port}."
     )
 
 
@@ -246,11 +246,11 @@ def _claim_task(channel: grpc.Channel, task_id: int) -> str:
         channel,
         SuperExecAuthClientInterceptor(
             master_secret=_SUPEREXEC_SECRET,
-            protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
+            protected_methods=RUNTIME_SUPEREXEC_METHODS,
         ),
     )
     request_token = superexec_channel.unary_unary(
-        "/flwr.proto.ServerAppIo/ClaimTask",
+        "/flwr.proto.Runtime/ClaimTask",
         request_serializer=ClaimTaskRequest.SerializeToString,
         response_deserializer=ClaimTaskResponse.FromString,
     )
@@ -267,12 +267,12 @@ def _claim_in_parallel(
     channel_0: grpc.Channel, channel_1: grpc.Channel, token: str
 ) -> list[grpc.StatusCode | None]:
     pull_task_input_0 = channel_0.unary_unary(
-        "/flwr.proto.ServerAppIo/PullTaskInput",
+        "/flwr.proto.Runtime/PullTaskInput",
         request_serializer=PullTaskInputRequest.SerializeToString,
         response_deserializer=PullTaskInputResponse.FromString,
     )
     pull_task_input_1 = channel_1.unary_unary(
-        "/flwr.proto.ServerAppIo/PullTaskInput",
+        "/flwr.proto.Runtime/PullTaskInput",
         request_serializer=PullTaskInputRequest.SerializeToString,
         response_deserializer=PullTaskInputResponse.FromString,
     )
@@ -480,61 +480,61 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             self._appio_auth_interceptor,
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
-                protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
+                protected_methods=RUNTIME_SUPEREXEC_METHODS,
             ),
         )
         self._get_nodes = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/GetNodes",
+            "/flwr.proto.Runtime/GetNodes",
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
         self._push_messages = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PushMessages",
+            "/flwr.proto.Runtime/PushMessages",
             request_serializer=PushAppMessagesRequest.SerializeToString,
             response_deserializer=PushAppMessagesResponse.FromString,
         )
         self._pull_messages = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PullMessages",
+            "/flwr.proto.Runtime/PullMessages",
             request_serializer=PullAppMessagesRequest.SerializeToString,
             response_deserializer=PullAppMessagesResponse.FromString,
         )
         self._push_task_output = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PushTaskOutput",
+            "/flwr.proto.Runtime/PushTaskOutput",
             request_serializer=PushTaskOutputRequest.SerializeToString,
             response_deserializer=PushTaskOutputResponse.FromString,
         )
         self._send_task_heartbeat = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/SendTaskHeartbeat",
+            "/flwr.proto.Runtime/SendTaskHeartbeat",
             request_serializer=SendTaskHeartbeatRequest.SerializeToString,
             response_deserializer=SendTaskHeartbeatResponse.FromString,
         )
         self._push_object = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PushObject",
+            "/flwr.proto.Runtime/PushObject",
             request_serializer=PushObjectRequest.SerializeToString,
             response_deserializer=PushObjectResponse.FromString,
         )
         self._pull_object = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PullObject",
+            "/flwr.proto.Runtime/PullObject",
             request_serializer=PullObjectRequest.SerializeToString,
             response_deserializer=PullObjectResponse.FromString,
         )
         self._confirm_message_received = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/ConfirmMessageReceived",
+            "/flwr.proto.Runtime/ConfirmMessageReceived",
             request_serializer=ConfirmMessageReceivedRequest.SerializeToString,
             response_deserializer=ConfirmMessageReceivedResponse.FromString,
         )
         self._pull_task_input = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PullTaskInput",
+            "/flwr.proto.Runtime/PullTaskInput",
             request_serializer=PullTaskInputRequest.SerializeToString,
             response_deserializer=PullTaskInputResponse.FromString,
         )
         self._pull_pending_tasks = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PullPendingTasks",
+            "/flwr.proto.Runtime/PullPendingTasks",
             request_serializer=PullPendingTasksRequest.SerializeToString,
             response_deserializer=PullPendingTasksResponse.FromString,
         )
         self._create_task = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/CreateTask",
+            "/flwr.proto.Runtime/CreateTask",
             request_serializer=CreateTaskRequest.SerializeToString,
             response_deserializer=CreateTaskResponse.FromString,
         )
@@ -654,7 +654,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert start_automation_mock.call_args.args[0] is request
 
     def test_start_automation_rejects_clientapp_task(self) -> None:
-        """ClientApp tasks cannot create automations through ServerAppIo."""
+        """ClientApp tasks cannot create automations through the Runtime API."""
         # Prepare
         servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
         context = Mock()

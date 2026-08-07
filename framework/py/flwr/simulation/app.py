@@ -128,7 +128,7 @@ def flwr_simulation() -> None:
     log(INFO, "Starting Flower Simulation")
     log(
         DEBUG,
-        "Starting isolated `Simulation` connected to SuperLink ServerAppIo API at %s",
+        "Starting isolated `Simulation` connected to SuperLink Runtime API at %s",
         args.serverappio_api_address,
     )
     run_simulation_process(
@@ -392,7 +392,7 @@ def _parse_args_run_flwr_simulation() -> argparse.ArgumentParser:
         dest="serverappio_api_address",
         default=SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
         type=str,
-        help="Address of SuperLink's ServerAppIo API (IPv4, IPv6, or a domain name). "
+        help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name). "
         "`--simulationio-api-address` is accepted as a deprecated alias. "
         f"By default, it is set to {SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
     )

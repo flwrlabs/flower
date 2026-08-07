@@ -133,7 +133,7 @@ EXIT_CODE_HELP = {
     ),
     # ClientApp-specific exit codes (250-299)
     ExitCode.CLIENTAPP_COMMUNICATION_ERROR: (
-        "The ClientApp could not communicate with the ClientAppIo API."
+        "The ClientApp could not communicate with the Runtime API."
     ),
     # SuperNode-specific exit codes (300-399)
     ExitCode.SUPERNODE_NODE_AUTH_KEY_INVALID: (

@@ -90,7 +90,7 @@ class InMemoryNodeState(
 
     def store_message(self, message: Message) -> str | None:
         """Store a message."""
-        # No need to check for expired task claims here. The ClientAppIo servicer
+        # No need to check for expired task claims here. The Runtime servicer
         # verifies the authenticated task token before storing messages.
         with self.lock_msg_store:
             msg_id = message.metadata.message_id
