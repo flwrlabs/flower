@@ -20,7 +20,16 @@ from copy import deepcopy
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from . import automation, attio, browser_use, github, notion, slack, web_fetch, web_search
+from . import (
+    attio,
+    automation,
+    browser_use,
+    github,
+    notion,
+    slack,
+    web_fetch,
+    web_search,
+)
 from .definition import (
     ConnectorDefinition,
     ConnectorExecutionContext,
