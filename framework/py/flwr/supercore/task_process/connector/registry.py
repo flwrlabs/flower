@@ -27,7 +27,7 @@ from .definition import (
     ConnectorExecutor,
     ConnectorHandler,
 )
-from .oauth import OAuthConnectorProvider
+from .oauth import OAuthProvider
 
 ConnectorToolFactory = Callable[[], JSONObject]
 
@@ -35,7 +35,7 @@ ConnectorToolFactory = Callable[[], JSONObject]
 CONNECTORS: tuple[ConnectorDefinition, ...] = (slack.CONNECTOR,)
 _CONNECTORS_BY_REF = {connector.ref: connector for connector in CONNECTORS}
 
-OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthConnectorProvider, ...] = tuple(
+OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthProvider, ...] = tuple(
     connector.oauth_provider
     for connector in CONNECTORS
     if connector.oauth_provider is not None
@@ -122,7 +122,7 @@ def get_builtin_connector_tool(name: str) -> JSONObject:
     return make_tool()
 
 
-def get_oauth_connector_provider(connector_ref: str) -> OAuthConnectorProvider:
+def get_oauth_connector_provider(connector_ref: str) -> OAuthProvider:
     """Return the OAuth provider registered for a connector reference."""
     for provider in OAUTH_CONNECTOR_PROVIDERS:
         if provider.connector_ref == connector_ref:

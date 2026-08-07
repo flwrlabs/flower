@@ -21,7 +21,7 @@ import pytest
 
 from .. import registry
 from ..definition import ActionAccess
-from ..oauth import DeclarativeOAuthProvider
+from ..oauth import OAuthProvider
 from .actions import ACTIONS
 from .definition import PROVIDER, SLACK_CONNECTOR_REF, SLACK_USER_SCOPES
 
@@ -51,7 +51,7 @@ def test_slack_actions_are_registered_and_executable() -> None:
 def test_slack_oauth_flow() -> None:
     """Slack OAuth should request read scopes and extract user credentials."""
     redirect_uri = "https://example.com/callback"
-    provider = DeclarativeOAuthProvider(
+    provider = OAuthProvider(
         PROVIDER, client_id="client", client_secret="secret", redirect_uri=redirect_uri
     )
     url = provider.build_authorization_url(

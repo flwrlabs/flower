@@ -14,18 +14,15 @@
 # ==============================================================================
 """Definitions for account-scoped connectors."""
 
-from __future__ import annotations
-
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
-if TYPE_CHECKING:
-    from .oauth import OAuthConnectorProvider
+from .oauth import OAuthProvider
 
 ConnectorHandler = Callable[..., JSONValue]
 
@@ -110,7 +107,7 @@ class ConnectorDefinition:
 
     provider: ProviderDefinition
     executors: Mapping[str, ConnectorExecutor]
-    oauth_provider: OAuthConnectorProvider | None = None
+    oauth_provider: OAuthProvider | None = None
 
     def __post_init__(self) -> None:
         """Reject incomplete definitions when the connector is imported."""

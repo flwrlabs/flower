@@ -17,9 +17,7 @@
 from __future__ import annotations
 
 import os
-from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from typing import TYPE_CHECKING, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlencode
 
 import requests
@@ -32,63 +30,23 @@ if TYPE_CHECKING:
     from .definition import ProviderDefinition
 
 
-class OAuthConnectorProvider(Protocol):
-    """Provider operations required by OAuth connector flows."""
-
-    connector_ref: str
-    display_name: str
-    description: str
-
-    def resolve_redirect_uri(self, requested_redirect_uri: str) -> str:
-        """Validate and return the redirect URI to use for this OAuth flow."""
-
-    def build_authorization_url(
-        self,
-        *,
-        redirect_uri: str,
-        state: str,
-        pkce_challenge: str | None,
-    ) -> str:
-        """Return the provider authorization URL for a new OAuth session."""
-
-    def exchange_code(
-        self,
-        *,
-        code: str,
-        redirect_uri: str,
-        pkce_verifier: str | None,
-    ) -> tuple[JSONObject, JSONObject]:
-        """Exchange an authorization code for credentials and configuration."""
-
-
-OAuthProviderT = TypeVar("OAuthProviderT", bound="BaseOAuthProvider")
-
-
-def load_oauth_provider(
-    provider_type: type[OAuthProviderT],
-    *,
-    client_id_env: str,
-    client_secret_env: str,
-    redirect_uri_env: str,
-) -> OAuthProviderT:
-    """Construct a provider from its environment configuration."""
-    return provider_type(
-        client_id=os.getenv(client_id_env, ""),
-        client_secret=os.getenv(client_secret_env, ""),
-        redirect_uri=os.getenv(redirect_uri_env, ""),
-    )
-
-
-class BaseOAuthProvider(ABC):
-    """Implement the provider-independent OAuth authorization-code flow."""
-
-    display_name: str
-    authorize_url: str
-    error_type: type[RuntimeError]
+class OAuthProvider:
+    """Run OAuth from a provider's declarative configuration."""
 
     def __init__(
-        self, *, client_id: str, client_secret: str, redirect_uri: str
+        self,
+        provider: ProviderDefinition,
+        *,
+        client_id: str,
+        client_secret: str,
+        redirect_uri: str,
     ) -> None:
+        if provider.oauth is None:
+            raise ValueError(f"Provider '{provider.ref}' does not define OAuth.")
+        self.connector_ref = provider.ref
+        self.display_name = provider.display_name
+        self.description = provider.description
+        self._oauth = provider.oauth
         values = (client_id.strip(), client_secret.strip(), redirect_uri.strip())
         if not all(values):
             raise ValueError(f"{self.display_name} OAuth configuration is incomplete.")
@@ -107,107 +65,7 @@ class BaseOAuthProvider(ABC):
         state: str,
         pkce_challenge: str | None,
     ) -> str:
-        """Build a provider authorization URL."""
-        params = self.authorization_parameters(
-            redirect_uri=redirect_uri,
-            state=state,
-            pkce_challenge=pkce_challenge,
-        )
-        return f"{self.authorize_url}?{urlencode(params)}"
-
-    def exchange_code(
-        self,
-        *,
-        code: str,
-        redirect_uri: str,
-        pkce_verifier: str | None,
-    ) -> tuple[JSONObject, JSONObject]:
-        """Exchange a code and parse its JSON object response."""
-        if not code:
-            raise self._error("exchange failed")
-        try:
-            response = self.request_token(
-                code=code,
-                redirect_uri=redirect_uri,
-                pkce_verifier=pkce_verifier,
-            )
-        except requests.RequestException:
-            raise self._error("exchange failed") from None
-        if response.status_code >= 400:
-            raise self._error("exchange failed")
-        try:
-            payload = response.json()
-        except ValueError:
-            raise self._error("returned an invalid response") from None
-        if not isinstance(payload, dict):
-            raise self._error("returned an invalid response")
-        return self.parse_token_response(cast(JSONObject, payload))
-
-    def _error(self, detail: str) -> RuntimeError:
-        """Build a provider-specific secret-safe error."""
-        return self.error_type(f"{self.display_name} OAuth {detail}.")
-
-    @abstractmethod
-    def authorization_parameters(
-        self,
-        *,
-        redirect_uri: str,
-        state: str,
-        pkce_challenge: str | None,
-    ) -> Mapping[str, str]:
-        """Return provider-specific authorization parameters."""
-
-    @abstractmethod
-    def request_token(
-        self,
-        *,
-        code: str,
-        redirect_uri: str,
-        pkce_verifier: str | None,
-    ) -> requests.Response:
-        """Send the provider-specific token request."""
-
-    @abstractmethod
-    def parse_token_response(
-        self, payload: JSONObject
-    ) -> tuple[JSONObject, JSONObject]:
-        """Parse provider-specific credentials and configuration."""
-
-
-class DeclarativeOAuthProvider(BaseOAuthProvider):
-    """Implement OAuth from a provider's declarative configuration."""
-
-    error_type = RuntimeError
-
-    def __init__(
-        self,
-        provider: ProviderDefinition,
-        *,
-        client_id: str,
-        client_secret: str,
-        redirect_uri: str,
-    ) -> None:
-        if provider.oauth is None:
-            raise ValueError(f"Provider '{provider.ref}' does not define OAuth.")
-        self.connector_ref = provider.ref
-        self.display_name = provider.display_name
-        self.description = provider.description
-        self.authorize_url = provider.oauth.authorization_url
-        self._oauth = provider.oauth
-        super().__init__(
-            client_id=client_id,
-            client_secret=client_secret,
-            redirect_uri=redirect_uri,
-        )
-
-    def authorization_parameters(
-        self,
-        *,
-        redirect_uri: str,
-        state: str,
-        pkce_challenge: str | None,
-    ) -> Mapping[str, str]:
-        """Return authorization parameters from the provider definition."""
+        """Build an authorization URL from the provider definition."""
         params = {
             "client_id": self._client_id,
             "redirect_uri": redirect_uri,
@@ -224,16 +82,18 @@ class DeclarativeOAuthProvider(BaseOAuthProvider):
                 code_challenge=pkce_challenge,
                 code_challenge_method="S256",
             )
-        return params
+        return f"{self._oauth.authorization_url}?{urlencode(params)}"
 
-    def request_token(
+    def exchange_code(
         self,
         *,
         code: str,
         redirect_uri: str,
         pkce_verifier: str | None,
-    ) -> requests.Response:
-        """Exchange an authorization code using the provider definition."""
+    ) -> tuple[JSONObject, JSONObject]:
+        """Exchange a code and extract standard credentials."""
+        if not code:
+            raise self._error("exchange failed")
         data = {"code": code, "redirect_uri": redirect_uri}
         if self._oauth.use_pkce:
             if not pkce_verifier:
@@ -247,17 +107,29 @@ class DeclarativeOAuthProvider(BaseOAuthProvider):
                 client_id=self._client_id,
                 client_secret=self._client_secret,
             )
-        return requests.post(
-            self._oauth.token_url,
-            auth=auth,
-            data=data,
-            timeout=30.0,
-        )
+        try:
+            response = requests.post(
+                self._oauth.token_url,
+                auth=auth,
+                data=data,
+                timeout=30.0,
+            )
+        except requests.RequestException:
+            raise self._error("exchange failed") from None
+        if response.status_code >= 400:
+            raise self._error("exchange failed")
+        try:
+            response_payload = response.json()
+        except ValueError:
+            raise self._error("returned an invalid response") from None
+        if not isinstance(response_payload, dict):
+            raise self._error("returned an invalid response")
+        return self._parse_token_response(cast(JSONObject, response_payload))
 
-    def parse_token_response(
+    def _parse_token_response(
         self, payload: JSONObject
     ) -> tuple[JSONObject, JSONObject]:
-        """Extract standard credentials from the configured response path."""
+        """Validate and extract credentials from a token response."""
         if (
             "error" in payload
             or self._oauth.success_field
@@ -277,7 +149,9 @@ class DeclarativeOAuthProvider(BaseOAuthProvider):
             if not isinstance(scope, str):
                 raise self._error("returned an invalid response")
             granted = {
-                item for item in scope.split(self._oauth.scope_separator) if item
+                item.strip()
+                for item in scope.split(self._oauth.scope_separator)
+                if item.strip()
             }
             if not granted.issubset(self._oauth.scopes):
                 raise self._error("returned unsupported permissions")
@@ -292,10 +166,12 @@ class DeclarativeOAuthProvider(BaseOAuthProvider):
                 credentials[key] = value
         return credentials, {}
 
+    def _error(self, detail: str) -> RuntimeError:
+        """Build a provider-labelled, secret-safe OAuth error."""
+        return RuntimeError(f"{self.display_name} OAuth {detail}.")
 
-def load_declarative_oauth_provider(
-    provider: ProviderDefinition,
-) -> DeclarativeOAuthProvider | None:
+
+def load_oauth_provider(provider: ProviderDefinition) -> OAuthProvider | None:
     """Return a provider loaded from its environment, if configured."""
     if provider.oauth is None:
         return None
@@ -303,7 +179,7 @@ def load_declarative_oauth_provider(
     names = (oauth.client_id_env, oauth.client_secret_env, oauth.redirect_uri_env)
     if not any(os.getenv(name, "").strip() for name in names):
         return None
-    return DeclarativeOAuthProvider(
+    return OAuthProvider(
         provider,
         client_id=os.getenv(names[0], ""),
         client_secret=os.getenv(names[1], ""),
