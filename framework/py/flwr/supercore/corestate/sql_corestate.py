@@ -24,12 +24,21 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData, delete, func, insert, literal, or_, select, update
+from sqlalchemy import (
+    MetaData,
+    delete,
+    exists,
+    func,
+    insert,
+    literal,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import aliased
 
 from flwr.app import Context, Message
 from flwr.app.message import make_message
@@ -1374,54 +1383,48 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             self._cleanup_expired_task_tokens()
             message_dict = _task_message_to_row(message)
-            src_task = aliased(TaskModel)
-            dst_task = aliased(TaskModel)
-            task_message_values = (
-                select(
-                    literal(
-                        message_dict["message_id"],
-                        type_=TaskMessageModel.message_id.type,
-                    ),
-                    literal(message_dict["run_id"], type_=TaskMessageModel.run_id.type),
-                    literal(
-                        message_dict["src_task_id"],
-                        type_=TaskMessageModel.src_task_id.type,
-                    ),
-                    literal(
-                        message_dict["dst_task_id"],
-                        type_=TaskMessageModel.dst_task_id.type,
-                    ),
-                    literal(
-                        message_dict["reply_to_message_id"],
-                        type_=TaskMessageModel.reply_to_message_id.type,
-                    ),
-                    literal(
-                        message_dict["created_at"],
-                        type_=TaskMessageModel.created_at.type,
-                    ),
-                    literal(message_dict["ttl"], type_=TaskMessageModel.ttl.type),
-                    literal(
-                        message_dict["message_type"],
-                        type_=TaskMessageModel.message_type.type,
-                    ),
-                    literal(
-                        message_dict["content"],
-                        type_=TaskMessageModel.content.type,
-                    ),
-                    literal(message_dict["error"], type_=TaskMessageModel.error.type),
-                )
-                .select_from(src_task)
-                .join(
-                    dst_task,
-                    (dst_task.task_id == message_dict["dst_task_id"])
-                    & (dst_task.run_id == src_task.run_id),
-                )
-                .where(
-                    src_task.task_id == message_dict["src_task_id"],
-                    src_task.run_id == message_dict["run_id"],
-                    dst_task.finished_at.is_(None),
-                )
+            src_task_exists = exists().where(
+                TaskModel.task_id == message_dict["src_task_id"],
+                TaskModel.run_id == message_dict["run_id"],
             )
+            dst_task_exists = exists().where(
+                TaskModel.task_id == message_dict["dst_task_id"],
+                TaskModel.run_id == message_dict["run_id"],
+                TaskModel.finished_at.is_(None),
+            )
+            task_message_values = select(
+                literal(
+                    message_dict["message_id"],
+                    type_=TaskMessageModel.message_id.type,
+                ),
+                literal(message_dict["run_id"], type_=TaskMessageModel.run_id.type),
+                literal(
+                    message_dict["src_task_id"],
+                    type_=TaskMessageModel.src_task_id.type,
+                ),
+                literal(
+                    message_dict["dst_task_id"],
+                    type_=TaskMessageModel.dst_task_id.type,
+                ),
+                literal(
+                    message_dict["reply_to_message_id"],
+                    type_=TaskMessageModel.reply_to_message_id.type,
+                ),
+                literal(
+                    message_dict["created_at"],
+                    type_=TaskMessageModel.created_at.type,
+                ),
+                literal(message_dict["ttl"], type_=TaskMessageModel.ttl.type),
+                literal(
+                    message_dict["message_type"],
+                    type_=TaskMessageModel.message_type.type,
+                ),
+                literal(
+                    message_dict["content"],
+                    type_=TaskMessageModel.content.type,
+                ),
+                literal(message_dict["error"], type_=TaskMessageModel.error.type),
+            ).where(src_task_exists, dst_task_exists)
             stmt = (
                 insert(TaskMessageModel)
                 .from_select(
