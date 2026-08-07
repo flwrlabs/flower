@@ -2352,6 +2352,56 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state.initialize()
         return state
 
+    def test_legacy_automation_timestamp_format_remains_claimable(self) -> None:
+        """Automations stored with ISO T timestamps remain schedulable."""
+        state = self.state_factory()
+        current = now()
+        legacy_next_run_at = (current - timedelta(seconds=30)).isoformat()
+        next_run_at = (current + timedelta(seconds=30)).isoformat()
+        automation = self.store_automation(
+            state,
+            series_id=123,
+            flwr_aid="aid-legacy",
+            next_run_at=legacy_next_run_at,
+            fixed_interval=60,
+            max_runs=2,
+        )
+        state.query(
+            """
+            UPDATE automation
+            SET next_run_at = :next_run_at
+            WHERE automation_id = :automation_id
+            """,
+            {
+                "automation_id": uint64_to_int64(automation.automation_id),
+                "next_run_at": legacy_next_run_at,
+            },
+        )
+
+        due = state.list_automations(
+            statuses=[AutomationStatus.ACTIVE],
+            due_before=current,
+            order_by="next_run_at",
+        )
+        self.assertIn(automation.automation_id, {item.automation_id for item in due})
+
+        claimed = state.claim_automation(
+            automation.automation_id,
+            previous_next_run_at=legacy_next_run_at,
+            next_run_at=next_run_at,
+        )
+
+        self.assertIsNotNone(claimed)
+        assert claimed is not None
+        _, flwr_aid = claimed
+        self.assertEqual(flwr_aid, "aid-legacy")
+        updated = state.list_automations(
+            automation_ids=[automation.automation_id],
+            order_by="updated_at",
+        )
+        self.assertEqual(updated[0].remaining_runs, 1)
+        self.assertEqual(updated[0].next_run_at, next_run_at)
+
     def test_get_fab_refreshes_cached_row_in_shared_session(self) -> None:
         """Test get_fab observes raw SQL updates in a shared session."""
         state = self.state_factory()
