@@ -2352,6 +2352,32 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state.initialize()
         return state
 
+    def test_automation_queries_avoid_untyped_bind_null_checks(self) -> None:
+        """Automation SQL should avoid bind null checks unsupported by PostgreSQL."""
+        state = self.state_factory()
+        captured_queries: list[str] = []
+
+        # pylint: disable-next=unused-argument
+        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
+            captured_queries.append(query)
+            return []
+
+        state.query = fake_query  # type: ignore[method-assign]
+        state.claim_automation(
+            1,
+            previous_next_run_at="2026-08-07T00:00:00+00:00",
+            next_run_at="2026-08-07T00:01:00+00:00",
+        )
+        state.advance_automation(
+            1,
+            previous_next_run_at="2026-08-07T00:00:00+00:00",
+            next_run_at="2026-08-07T00:01:00+00:00",
+        )
+
+        self.assertEqual(len(captured_queries), 2)
+        for query in captured_queries:
+            self.assertNotIn(":next_run_at IS NOT NULL", query)
+
     def test_get_fab_refreshes_cached_row_in_shared_session(self) -> None:
         """Test get_fab observes raw SQL updates in a shared session."""
         state = self.state_factory()
