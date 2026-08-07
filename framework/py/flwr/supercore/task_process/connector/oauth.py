@@ -96,6 +96,7 @@ class OAuthFlow:
         """Exchange a code and extract standard credentials."""
         if not code:
             raise self._error("exchange failed")
+        redirect_uri = self.resolve_redirect_uri(redirect_uri)
         data = {
             "code": code,
             "grant_type": "authorization_code",
@@ -160,17 +161,7 @@ class OAuthFlow:
             token_payload = value
         if "error" in token_payload:
             raise self._error("exchange failed")
-        scope = token_payload.get("scope")
-        if scope is not None:
-            if not isinstance(scope, str):
-                raise self._error("returned an invalid response")
-            granted = {
-                item.strip()
-                for item in scope.split(self._oauth.scope_separator)
-                if item.strip()
-            }
-            if not set(self._oauth.scopes).issubset(granted):
-                raise self._error("returned insufficient permissions")
+        self._validate_token_permissions(token_payload)
         credentials: JSONObject = {
             "access_token": required_string_field(
                 token_payload, "access_token", error=self._error
@@ -186,6 +177,31 @@ class OAuthFlow:
             if isinstance(value, (str, int, float, bool)):
                 config[key] = value
         return credentials, config
+
+    def _validate_token_permissions(self, token_payload: JSONObject) -> None:
+        """Require the configured scope and token-type policy."""
+        scope = token_payload.get("scope")
+        if scope is not None:
+            if not isinstance(scope, str):
+                raise self._error("returned an invalid response")
+            granted = {
+                item.strip()
+                for item in scope.split(self._oauth.scope_separator)
+                if item.strip()
+            }
+            configured = set(self._oauth.scopes)
+            if not configured.issubset(granted):
+                raise self._error("returned insufficient permissions")
+            if not self._oauth.allow_additional_scopes and not granted.issubset(
+                configured
+            ):
+                raise self._error("returned unsupported permissions")
+        token_type = token_payload.get("token_type")
+        if self._oauth.expected_token_type is not None and (
+            not isinstance(token_type, str)
+            or token_type.lower() != self._oauth.expected_token_type.lower()
+        ):
+            raise self._error("returned unsupported token type")
 
     def _error(self, detail: str) -> RuntimeError:
         """Build a provider-labelled, secret-safe OAuth error."""

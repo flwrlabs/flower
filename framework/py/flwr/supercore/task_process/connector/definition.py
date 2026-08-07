@@ -80,6 +80,8 @@ class OAuth2Definition:
     token_request_format: Literal["form", "json"] = "form"
     token_headers: Mapping[str, str] = field(default_factory=dict)
     config_fields: tuple[str, ...] = ()
+    allow_additional_scopes: bool = True
+    expected_token_type: str | None = None
 
 
 @dataclass(frozen=True)
