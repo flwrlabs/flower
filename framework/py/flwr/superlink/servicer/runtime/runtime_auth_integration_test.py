@@ -23,19 +23,7 @@ import grpc
 from google.protobuf.message import Message as GrpcMessage
 from parameterized import parameterized
 
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    GetConnectorRequest,
-    GetConnectorResponse,
-    GetNodesRequest,
-    GetNodesResponse,
-    PullAppMessagesRequest,
-    PullAppMessagesResponse,
-    PushAppMessagesRequest,
-    PushAppMessagesResponse,
-    SendTaskHeartbeatRequest,
-    SendTaskHeartbeatResponse,
-)
+from flwr.common.constant import SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
@@ -48,12 +36,24 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectRequest,
     PushObjectResponse,
 )
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    GetConnectorRequest,
+    GetConnectorResponse,
+    GetNodesRequest,
+    GetNodesResponse,
+    PullAppMessagesRequest,
+    PullAppMessagesResponse,
+    PushAppMessagesRequest,
+    PushAppMessagesResponse,
+    SendTaskHeartbeatRequest,
+    SendTaskHeartbeatResponse,
+)
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, TaskType
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     TASK_TOKEN_HEADER,
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
@@ -61,14 +61,12 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
-from flwr.superlink.servicer.serverappio.serverappio_grpc import (
-    run_serverappio_api_grpc,
-)
+from flwr.superlink.servicer.runtime.runtime_grpc import run_runtime_api_grpc
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
 
 
-class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R0902
+class TestSuperLinkRuntimeAuthIntegration(unittest.TestCase):  # pylint: disable=R0902
     """Integration tests for SuperLink Runtime token-auth behavior."""
 
     def setUp(self) -> None:
@@ -85,8 +83,8 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         node_id = self.state.create_node("mock_owner", "fake_name", b"pk", 30)
         self.state.acknowledge_node_heartbeat(node_id, 1e3)
 
-        self._server: grpc.Server = run_serverappio_api_grpc(
-            SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
+        self._server: grpc.Server = run_runtime_api_grpc(
+            SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
             state_factory,
             objectstore_factory,
             None,
@@ -114,7 +112,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         )
         auth_channel = grpc.intercept_channel(
             self._base_channel,
-            AppIoTokenClientInterceptor(token=auth_token),
+            RuntimeTokenClientInterceptor(token=auth_token),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 protected_methods=RUNTIME_SUPEREXEC_METHODS,

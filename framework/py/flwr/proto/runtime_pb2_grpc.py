@@ -3,11 +3,11 @@
 import grpc
 import warnings
 
-from flwr.proto import appio_pb2 as flwr_dot_proto_dot_appio__pb2
 from flwr.proto import control_pb2 as flwr_dot_proto_dot_control__pb2
 from flwr.proto import log_pb2 as flwr_dot_proto_dot_log__pb2
 from flwr.proto import message_pb2 as flwr_dot_proto_dot_message__pb2
 from flwr.proto import run_pb2 as flwr_dot_proto_dot_run__pb2
+from flwr.proto import runtime_pb2 as flwr_dot_proto_dot_runtime__pb2
 
 GRPC_GENERATED_VERSION = '1.70.0'
 GRPC_VERSION = grpc.__version__
@@ -40,13 +40,13 @@ class RuntimeStub(object):
         """
         self.PullPendingTasks = channel.unary_unary(
                 '/flwr.proto.Runtime/PullPendingTasks',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PullPendingTasksRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullPendingTasksResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.PullPendingTasksRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.PullPendingTasksResponse.FromString,
                 _registered_method=True)
         self.ClaimTask = channel.unary_unary(
                 '/flwr.proto.Runtime/ClaimTask',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.ClaimTaskRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.ClaimTaskResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.ClaimTaskRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.ClaimTaskResponse.FromString,
                 _registered_method=True)
         self.GetRun = channel.unary_unary(
                 '/flwr.proto.Runtime/GetRun',
@@ -55,18 +55,18 @@ class RuntimeStub(object):
                 _registered_method=True)
         self.SendTaskHeartbeat = channel.unary_unary(
                 '/flwr.proto.Runtime/SendTaskHeartbeat',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.SendTaskHeartbeatRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.SendTaskHeartbeatResponse.FromString,
                 _registered_method=True)
         self.PullTaskInput = channel.unary_unary(
                 '/flwr.proto.Runtime/PullTaskInput',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.PullTaskInputRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.PullTaskInputResponse.FromString,
                 _registered_method=True)
         self.PushTaskOutput = channel.unary_unary(
                 '/flwr.proto.Runtime/PushTaskOutput',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.PushTaskOutputRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.PushTaskOutputResponse.FromString,
                 _registered_method=True)
         self.PushObject = channel.unary_unary(
                 '/flwr.proto.Runtime/PushObject',
@@ -85,8 +85,8 @@ class RuntimeStub(object):
                 _registered_method=True)
         self.CreateTask = channel.unary_unary(
                 '/flwr.proto.Runtime/CreateTask',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.CreateTaskRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.CreateTaskResponse.FromString,
                 _registered_method=True)
         self.StartAutomation = channel.unary_unary(
                 '/flwr.proto.Runtime/StartAutomation',
@@ -95,28 +95,28 @@ class RuntimeStub(object):
                 _registered_method=True)
         self.PushTaskMessage = channel.unary_unary(
                 '/flwr.proto.Runtime/PushTaskMessage',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.PushTaskMessageRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.PushTaskMessageResponse.FromString,
                 _registered_method=True)
         self.PushTaskEvents = channel.unary_unary(
                 '/flwr.proto.Runtime/PushTaskEvents',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskEventsRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskEventsResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.PushTaskEventsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.PushTaskEventsResponse.FromString,
                 _registered_method=True)
         self.PullTaskMessage = channel.unary_unary(
                 '/flwr.proto.Runtime/PullTaskMessage',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.PullTaskMessageRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.PullTaskMessageResponse.FromString,
                 _registered_method=True)
         self.RecordTaskUsage = channel.unary_unary(
                 '/flwr.proto.Runtime/RecordTaskUsage',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.RecordTaskUsageRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.RecordTaskUsageResponse.FromString,
                 _registered_method=True)
         self.GetConnector = channel.unary_unary(
                 '/flwr.proto.Runtime/GetConnector',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.GetConnectorRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.GetConnectorResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.GetConnectorRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.GetConnectorResponse.FromString,
                 _registered_method=True)
         self.PushLogs = channel.unary_unary(
                 '/flwr.proto.Runtime/PushLogs',
@@ -125,18 +125,18 @@ class RuntimeStub(object):
                 _registered_method=True)
         self.PushMessages = channel.unary_unary(
                 '/flwr.proto.Runtime/PushMessages',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.PushAppMessagesRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.PushAppMessagesResponse.FromString,
                 _registered_method=True)
         self.PullMessages = channel.unary_unary(
                 '/flwr.proto.Runtime/PullMessages',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.PullAppMessagesRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.PullAppMessagesResponse.FromString,
                 _registered_method=True)
         self.GetNodes = channel.unary_unary(
                 '/flwr.proto.Runtime/GetNodes',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.GetNodesRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.GetNodesResponse.FromString,
+                request_serializer=flwr_dot_proto_dot_runtime__pb2.GetNodesRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_runtime__pb2.GetNodesResponse.FromString,
                 _registered_method=True)
 
 
@@ -304,13 +304,13 @@ def add_RuntimeServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'PullPendingTasks': grpc.unary_unary_rpc_method_handler(
                     servicer.PullPendingTasks,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullPendingTasksRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullPendingTasksResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.PullPendingTasksRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.PullPendingTasksResponse.SerializeToString,
             ),
             'ClaimTask': grpc.unary_unary_rpc_method_handler(
                     servicer.ClaimTask,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.ClaimTaskRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.ClaimTaskResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.ClaimTaskRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.ClaimTaskResponse.SerializeToString,
             ),
             'GetRun': grpc.unary_unary_rpc_method_handler(
                     servicer.GetRun,
@@ -319,18 +319,18 @@ def add_RuntimeServicer_to_server(servicer, server):
             ),
             'SendTaskHeartbeat': grpc.unary_unary_rpc_method_handler(
                     servicer.SendTaskHeartbeat,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.SendTaskHeartbeatRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.SendTaskHeartbeatResponse.SerializeToString,
             ),
             'PullTaskInput': grpc.unary_unary_rpc_method_handler(
                     servicer.PullTaskInput,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.PullTaskInputRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.PullTaskInputResponse.SerializeToString,
             ),
             'PushTaskOutput': grpc.unary_unary_rpc_method_handler(
                     servicer.PushTaskOutput,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.PushTaskOutputRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.PushTaskOutputResponse.SerializeToString,
             ),
             'PushObject': grpc.unary_unary_rpc_method_handler(
                     servicer.PushObject,
@@ -349,8 +349,8 @@ def add_RuntimeServicer_to_server(servicer, server):
             ),
             'CreateTask': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateTask,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.CreateTaskRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.CreateTaskResponse.SerializeToString,
             ),
             'StartAutomation': grpc.unary_unary_rpc_method_handler(
                     servicer.StartAutomation,
@@ -359,28 +359,28 @@ def add_RuntimeServicer_to_server(servicer, server):
             ),
             'PushTaskMessage': grpc.unary_unary_rpc_method_handler(
                     servicer.PushTaskMessage,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.PushTaskMessageRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.PushTaskMessageResponse.SerializeToString,
             ),
             'PushTaskEvents': grpc.unary_unary_rpc_method_handler(
                     servicer.PushTaskEvents,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskEventsRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskEventsResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.PushTaskEventsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.PushTaskEventsResponse.SerializeToString,
             ),
             'PullTaskMessage': grpc.unary_unary_rpc_method_handler(
                     servicer.PullTaskMessage,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.PullTaskMessageRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.PullTaskMessageResponse.SerializeToString,
             ),
             'RecordTaskUsage': grpc.unary_unary_rpc_method_handler(
                     servicer.RecordTaskUsage,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.RecordTaskUsageResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.RecordTaskUsageRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.RecordTaskUsageResponse.SerializeToString,
             ),
             'GetConnector': grpc.unary_unary_rpc_method_handler(
                     servicer.GetConnector,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.GetConnectorRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.GetConnectorResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.GetConnectorRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.GetConnectorResponse.SerializeToString,
             ),
             'PushLogs': grpc.unary_unary_rpc_method_handler(
                     servicer.PushLogs,
@@ -389,18 +389,18 @@ def add_RuntimeServicer_to_server(servicer, server):
             ),
             'PushMessages': grpc.unary_unary_rpc_method_handler(
                     servicer.PushMessages,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.PushAppMessagesRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.PushAppMessagesResponse.SerializeToString,
             ),
             'PullMessages': grpc.unary_unary_rpc_method_handler(
                     servicer.PullMessages,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.PullAppMessagesRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.PullAppMessagesResponse.SerializeToString,
             ),
             'GetNodes': grpc.unary_unary_rpc_method_handler(
                     servicer.GetNodes,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.GetNodesRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.GetNodesResponse.SerializeToString,
+                    request_deserializer=flwr_dot_proto_dot_runtime__pb2.GetNodesRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_runtime__pb2.GetNodesResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -428,8 +428,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/PullPendingTasks',
-            flwr_dot_proto_dot_appio__pb2.PullPendingTasksRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PullPendingTasksResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.PullPendingTasksRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.PullPendingTasksResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -455,8 +455,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/ClaimTask',
-            flwr_dot_proto_dot_appio__pb2.ClaimTaskRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.ClaimTaskResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.ClaimTaskRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.ClaimTaskResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -509,8 +509,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/SendTaskHeartbeat',
-            flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.SendTaskHeartbeatRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.SendTaskHeartbeatResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -536,8 +536,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/PullTaskInput',
-            flwr_dot_proto_dot_appio__pb2.PullTaskInputRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PullTaskInputResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.PullTaskInputRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.PullTaskInputResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -563,8 +563,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/PushTaskOutput',
-            flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.PushTaskOutputRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.PushTaskOutputResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -671,8 +671,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/CreateTask',
-            flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.CreateTaskRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.CreateTaskResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -725,8 +725,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/PushTaskMessage',
-            flwr_dot_proto_dot_appio__pb2.PushTaskMessageRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PushTaskMessageResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.PushTaskMessageRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.PushTaskMessageResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -752,8 +752,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/PushTaskEvents',
-            flwr_dot_proto_dot_appio__pb2.PushTaskEventsRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PushTaskEventsResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.PushTaskEventsRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.PushTaskEventsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -779,8 +779,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/PullTaskMessage',
-            flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.PullTaskMessageRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.PullTaskMessageResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -806,8 +806,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/RecordTaskUsage',
-            flwr_dot_proto_dot_appio__pb2.RecordTaskUsageRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.RecordTaskUsageResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.RecordTaskUsageRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.RecordTaskUsageResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -833,8 +833,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/GetConnector',
-            flwr_dot_proto_dot_appio__pb2.GetConnectorRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.GetConnectorResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.GetConnectorRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.GetConnectorResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -887,8 +887,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/PushMessages',
-            flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PushAppMessagesResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.PushAppMessagesRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.PushAppMessagesResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -914,8 +914,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/PullMessages',
-            flwr_dot_proto_dot_appio__pb2.PullAppMessagesRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PullAppMessagesResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.PullAppMessagesRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.PullAppMessagesResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -941,8 +941,8 @@ class Runtime(object):
             request,
             target,
             '/flwr.proto.Runtime/GetNodes',
-            flwr_dot_proto_dot_appio__pb2.GetNodesRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.GetNodesResponse.FromString,
+            flwr_dot_proto_dot_runtime__pb2.GetNodesRequest.SerializeToString,
+            flwr_dot_proto_dot_runtime__pb2.GetNodesResponse.FromString,
             options,
             channel_credentials,
             insecure,

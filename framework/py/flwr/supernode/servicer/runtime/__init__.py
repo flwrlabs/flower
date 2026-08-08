@@ -1,4 +1,4 @@
-# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared Runtime API servicer implementation."""
+"""SuperNode implementation of the Runtime API."""
 
 
-from .appio_servicer import AppIoServicer
+from .runtime_grpc import run_runtime_api_grpc
+from .runtime_servicer import SuperNodeRuntimeServicer
 
 __all__ = [
-    "AppIoServicer",
+    "SuperNodeRuntimeServicer",
+    "run_runtime_api_grpc",
 ]

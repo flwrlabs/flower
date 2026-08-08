@@ -26,7 +26,16 @@ from flwr.app.message import make_message
 from flwr.common.constant import SubStatus
 from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
-from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
+from flwr.proto.control_pb2 import StartAutomationRequest  # pylint:disable=E0611
+from flwr.proto.message_pb2 import Context as ProtoContext  # pylint:disable=E0611
+from flwr.proto.message_pb2 import (  # pylint:disable=E0611
+    PullObjectRequest,
+    PullObjectResponse,
+    PushObjectRequest,
+    PushObjectResponse,
+)
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint:disable=E0611
     GetConnectorRequest,
     GetNodesRequest,
     PullAppMessagesRequest,
@@ -40,15 +49,6 @@ from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
-from flwr.proto.control_pb2 import StartAutomationRequest  # pylint:disable=E0611
-from flwr.proto.message_pb2 import Context as ProtoContext  # pylint:disable=E0611
-from flwr.proto.message_pb2 import (  # pylint:disable=E0611
-    PullObjectRequest,
-    PullObjectResponse,
-    PushObjectRequest,
-    PushObjectResponse,
-)
-from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -62,11 +62,11 @@ from flwr.supernode.runtime.run_clientapp import (
     push_task_output,
 )
 
-from .clientappio_servicer import ClientAppIoServicer
+from .runtime_servicer import SuperNodeRuntimeServicer
 
 
-class TestClientAppIoServicer(unittest.TestCase):
-    """Tests for `ClientAppIoServicer` class."""
+class TestSuperNodeRuntimeServicer(unittest.TestCase):
+    """Tests for `SuperNodeRuntimeServicer` class."""
 
     def setUp(self) -> None:
         """Initialize."""
@@ -75,7 +75,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_state = Mock()
         mock_state_factory = Mock()
         mock_state_factory.state.return_value = self.mock_state
-        self.servicer = ClientAppIoServicer(mock_state_factory, Mock())
+        self.servicer = SuperNodeRuntimeServicer(mock_state_factory, Mock())
 
     def test_pull_task_input(self) -> None:
         """Test pulling messages from SuperNode."""
@@ -217,7 +217,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_state.get_fab.return_value = fab
 
         with patch(
-            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "flwr.supernode.servicer.runtime.runtime_servicer."
             "get_authenticated_task",
             return_value=Mock(task_id=task_id, run_id=run_id),
         ):
@@ -248,7 +248,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_state.get_run.return_value = run
 
         with patch(
-            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "flwr.supernode.servicer.runtime.runtime_servicer."
             "get_authenticated_task",
             return_value=Mock(task_id=task_id, run_id=run_id),
         ):
@@ -270,7 +270,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_state.get_messages.return_value = []
 
         with patch(
-            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "flwr.supernode.servicer.runtime.runtime_servicer."
             "get_authenticated_task",
             return_value=Mock(run_id=run_id),
         ):
@@ -299,7 +299,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         )
 
         with patch(
-            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "flwr.supernode.servicer.runtime.runtime_servicer."
             "get_authenticated_task",
             return_value=Mock(run_id=run_id),
         ):
@@ -331,7 +331,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_state.start_session.return_value = "session-id"
 
         with patch(
-            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "flwr.supernode.servicer.runtime.runtime_servicer."
             "get_authenticated_task",
             return_value=Mock(run_id=message.metadata.run_id),
         ):
@@ -364,7 +364,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_state.store_object.return_value = True
 
         with patch(
-            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "flwr.supernode.servicer.runtime.runtime_servicer."
             "get_authenticated_task",
             return_value=Mock(run_id=123),
         ):
@@ -381,7 +381,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_state.get_object.return_value = b"content"
 
         with patch(
-            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "flwr.supernode.servicer.runtime.runtime_servicer."
             "get_authenticated_task",
             return_value=Mock(run_id=123),
         ):
@@ -439,7 +439,7 @@ class TestClientAppIoServicer(unittest.TestCase):
 
         # Execute
         with patch(
-            "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Mock(task_id=task_id),
         ):
             response = self.servicer.SendTaskHeartbeat(request, Mock())
