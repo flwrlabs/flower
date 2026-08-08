@@ -127,7 +127,7 @@ def flower_superexec() -> None:
     run_superexec(
         plugin_class=plugin_class,
         stub_class=stub_class,  # type: ignore
-        appio_api_address=args.appio_api_address,
+        runtime_api_address=args.runtime_api_address,
         insecure=args.insecure,
         root_certificates_path=args.root_certificates,
         superexec_auth_secret=superexec_auth_secret,
@@ -153,6 +153,7 @@ def _parse_args() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--appio-api-address",
+        dest="runtime_api_address",
         type=str,
         required=True,
         help="Address of the Runtime API",

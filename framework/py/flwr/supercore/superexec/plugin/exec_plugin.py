@@ -30,14 +30,14 @@ class ExecPlugin(ABC):
 
     def __init__(  # pylint: disable=R0913, R0917
         self,
-        appio_api_address: str,
+        runtime_api_address: str,
         insecure: bool,
         root_certificates_path: str | None,
         get_run: Callable[[int], Run],
         runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
         executor: Executor | None = None,
     ) -> None:
-        self.appio_api_address = appio_api_address
+        self.runtime_api_address = runtime_api_address
         self.insecure = insecure
         self.root_certificates_path = root_certificates_path
         self.get_run = get_run

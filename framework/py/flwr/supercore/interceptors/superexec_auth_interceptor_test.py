@@ -41,8 +41,8 @@ from flwr.supercore.date import now
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     SuperExecAuthClientInterceptor,
-    create_clientappio_superexec_auth_server_interceptor,
-    create_serverappio_superexec_auth_server_interceptor,
+    create_superlink_runtime_superexec_auth_server_interceptor,
+    create_supernode_runtime_superexec_auth_server_interceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
     RUNTIME_SUPEREXEC_METHODS,
@@ -153,8 +153,8 @@ class TestSuperExecMethodPolicies(TestCase):
     def test_host_factories_protect_runtime_bootstrap_methods(self) -> None:
         """Both retained host factories should enforce the Runtime policy."""
         for factory in (
-            create_serverappio_superexec_auth_server_interceptor,
-            create_clientappio_superexec_auth_server_interceptor,
+            create_superlink_runtime_superexec_auth_server_interceptor,
+            create_supernode_runtime_superexec_auth_server_interceptor,
         ):
             with self.subTest(factory=factory.__name__):
                 context = Mock()
@@ -186,7 +186,7 @@ class TestSuperExecAuthServerInterceptor(TestCase):
         """Create the default server interceptor under test."""
         self._secret = b"secret"
         self._state = _NonceState()
-        self._interceptor = create_serverappio_superexec_auth_server_interceptor(
+        self._interceptor = create_superlink_runtime_superexec_auth_server_interceptor(
             state_provider=lambda: self._state,
             master_secret=self._secret,
         )

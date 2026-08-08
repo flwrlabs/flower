@@ -42,7 +42,7 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supernode.nodestate import NodeStateFactory
-from flwr.supernode.start_client_internal import run_clientappio_api_grpc
+from flwr.supernode.servicer.runtime import run_runtime_api_grpc
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
 
@@ -65,7 +65,7 @@ class TestSuperNodeRuntimeAuthIntegration(unittest.TestCase):  # pylint: disable
         assert token is not None
         self.valid_token = token
 
-        self._server: grpc.Server = run_clientappio_api_grpc(
+        self._server: grpc.Server = run_runtime_api_grpc(
             address="127.0.0.1:0",
             state_factory=state_factory,
             objectstore_factory=objectstore_factory,
@@ -174,7 +174,7 @@ class TestSuperNodeRuntimeAuthIntegrationWithoutSuperExecSecret(unittest.TestCas
         objectstore_factory = ObjectStoreFactory()
         state_factory = NodeStateFactory(objectstore_factory=objectstore_factory)
 
-        self._server: grpc.Server = run_clientappio_api_grpc(
+        self._server: grpc.Server = run_runtime_api_grpc(
             address="127.0.0.1:0",
             state_factory=state_factory,
             objectstore_factory=objectstore_factory,

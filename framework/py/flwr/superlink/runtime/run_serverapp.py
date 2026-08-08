@@ -58,7 +58,7 @@ from flwr.superlink.grid import GrpcGrid
 
 
 def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
-    serverappio_api_address: str,
+    runtime_api_address: str,
     log_queue: Queue[str | None],
     token: str,
     insecure: bool,
@@ -73,7 +73,7 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
 
     # Initialize the GrpcGrid
     grid = GrpcGrid(
-        serverappio_service_address=serverappio_api_address,
+        runtime_api_address=runtime_api_address,
         insecure=insecure,
         root_certificates=certificates,
         token=token,

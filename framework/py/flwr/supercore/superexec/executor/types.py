@@ -28,7 +28,7 @@ class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
     """Describe one TaskExecutor process execution requested by SuperExec."""
 
     task_type: TaskType
-    appio_api_address: str
+    runtime_api_address: str
     token: str
     insecure: bool
     root_certificates_path: str | None
@@ -41,7 +41,7 @@ class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
         """Validate fields required by all executors."""
         if not isinstance(self.task_id, int) or self.task_id <= 0:
             raise ValueError("ExecutionSpec requires a positive integer task_id.")
-        if not self.appio_api_address.strip():
+        if not self.runtime_api_address.strip():
             raise ValueError("ExecutionSpec requires a Runtime API address.")
         if not self.token.strip():
             raise ValueError("ExecutionSpec requires a task token.")

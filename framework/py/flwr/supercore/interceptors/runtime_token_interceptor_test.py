@@ -39,8 +39,8 @@ from flwr.supercore.interceptors import (
     TASK_TOKEN_HEADER,
     RuntimeTokenClientInterceptor,
     RuntimeTokenServerInterceptor,
-    create_clientappio_token_auth_server_interceptor,
-    create_serverappio_token_auth_server_interceptor,
+    create_superlink_runtime_token_auth_server_interceptor,
+    create_supernode_runtime_token_auth_server_interceptor,
     get_authenticated_task,
 )
 
@@ -149,7 +149,7 @@ class TestRuntimeTokenServerInterceptor(TestCase):
         self, token_to_task: dict[str, Task]
     ) -> RuntimeTokenServerInterceptor:
         state = _TokenState(token_to_task)
-        return create_serverappio_token_auth_server_interceptor(lambda: state)
+        return create_superlink_runtime_token_auth_server_interceptor(lambda: state)
 
     @staticmethod
     def _find_runtime_method(*, requires_token: bool) -> str | None:
@@ -252,7 +252,9 @@ class TestRuntimeTokenServerInterceptor(TestCase):
         """Protected methods should pass with a valid task token."""
         state = Mock()
         state.get_task_by_token.return_value = Task(task_id=123, run_id=7)
-        interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
+        interceptor = create_superlink_runtime_token_auth_server_interceptor(
+            lambda: state
+        )
         method = self._find_runtime_method(requires_token=True)
         if method is None:
             self.skipTest("No token-required Runtime method found in policy table.")
@@ -418,10 +420,12 @@ class TestMethodPolicyMaps(TestCase):
 class TestFactoryFunctions(TestCase):
     """Validate interceptor factory behavior."""
 
-    def test_serverappio_factory_uses_server_policy(self) -> None:
+    def test_superlink_runtime_factory_uses_runtime_policy(self) -> None:
         """SuperLink factory should enforce Runtime policy semantics."""
         state = _TokenState({"valid-token": Task(task_id=1, run_id=1)})
-        interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
+        interceptor = create_superlink_runtime_token_auth_server_interceptor(
+            lambda: state
+        )
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
@@ -434,10 +438,12 @@ class TestFactoryFunctions(TestCase):
         response = intercepted.unary_unary(GetNodesRequest(), Mock())
         self.assertEqual(response, "ok")
 
-    def test_clientappio_factory_uses_client_policy(self) -> None:
+    def test_supernode_runtime_factory_uses_runtime_policy(self) -> None:
         """SuperNode factory should enforce Runtime policy semantics."""
         state = _TokenState({"valid-token": Task(task_id=1, run_id=1)})
-        interceptor = create_clientappio_token_auth_server_interceptor(lambda: state)
+        interceptor = create_supernode_runtime_token_auth_server_interceptor(
+            lambda: state
+        )
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),

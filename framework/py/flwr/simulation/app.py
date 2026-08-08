@@ -36,7 +36,7 @@ from flwr.common.config import (
 )
 from flwr.common.constant import (
     RUNTIME_DEPENDENCY_INSTALL,
-    SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+    SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
     SubStatus,
 )
 from flwr.common.logger import (
@@ -129,10 +129,10 @@ def flwr_simulation() -> None:
     log(
         DEBUG,
         "Starting isolated `Simulation` connected to SuperLink Runtime API at %s",
-        args.serverappio_api_address,
+        args.runtime_api_address,
     )
     run_simulation_process(
-        serverappio_api_address=args.serverappio_api_address,
+        runtime_api_address=args.runtime_api_address,
         log_queue=log_queue,
         token=token,
         insecure=args.insecure,
@@ -146,7 +146,7 @@ def flwr_simulation() -> None:
 
 
 def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
-    serverappio_api_address: str,
+    runtime_api_address: str,
     log_queue: Queue[str | None],
     token: str,
     insecure: bool,
@@ -160,7 +160,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         start_parent_process_monitor(parent_pid)
 
     conn = SimulationIoConnection(
-        serverappio_api_address=serverappio_api_address,
+        runtime_api_address=runtime_api_address,
         insecure=insecure,
         root_certificates=certificates,
         token=token,
@@ -389,12 +389,12 @@ def _parse_args_run_flwr_simulation() -> argparse.ArgumentParser:
     parser.add_argument(
         "--serverappio-api-address",
         "--simulationio-api-address",
-        dest="serverappio_api_address",
-        default=SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        dest="runtime_api_address",
+        default=SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
         type=str,
         help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name). "
         "`--simulationio-api-address` is accepted as a deprecated alias. "
-        f"By default, it is set to {SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
+        f"By default, it is set to {SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS}.",
     )
     add_args_flwr_app_common(parser=parser)
     return parser

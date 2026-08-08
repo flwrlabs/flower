@@ -162,7 +162,7 @@ def get_authenticated_task() -> Task:
     return ret
 
 
-def create_serverappio_token_auth_server_interceptor(
+def create_superlink_runtime_token_auth_server_interceptor(
     state_provider: Callable[[], _TokenState],
 ) -> RuntimeTokenServerInterceptor:
     """Create the SuperLink Runtime API token interceptor."""
@@ -172,7 +172,7 @@ def create_serverappio_token_auth_server_interceptor(
     )
 
 
-def create_clientappio_token_auth_server_interceptor(
+def create_supernode_runtime_token_auth_server_interceptor(
     state_provider: Callable[[], _TokenState],
 ) -> RuntimeTokenServerInterceptor:
     """Create the SuperNode Runtime API token interceptor."""

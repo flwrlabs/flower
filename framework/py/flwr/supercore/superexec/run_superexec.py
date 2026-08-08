@@ -104,7 +104,7 @@ def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     plugin_class: type[ExecPlugin],
     stub_class: type[RuntimeStub],
-    appio_api_address: str,
+    runtime_api_address: str,
     insecure: bool,
     root_certificates_path: str | None = None,
     superexec_auth_secret: bytes | None = None,
@@ -123,7 +123,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
         The class of the SuperExec plugin to use.
     stub_class : type[RuntimeStub]
         The gRPC stub class for the Runtime API.
-    appio_api_address : str
+    runtime_api_address : str
         The address of the Runtime API.
     insecure : bool
         Whether to connect to the Runtime API without TLS.
@@ -176,7 +176,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
     # Create the channel to the Runtime API
     channel = create_channel(
-        server_address=appio_api_address,
+        server_address=runtime_api_address,
         insecure=insecure,
         root_certificates=validate_and_resolve_root_certificates(
             root_certificates_path, insecure
@@ -204,7 +204,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
     # Create the SuperExec plugin instance
     plugin = plugin_class(
-        appio_api_address=appio_api_address,
+        runtime_api_address=runtime_api_address,
         insecure=insecure,
         root_certificates_path=root_certificates_path,
         get_run=get_run,

@@ -20,7 +20,7 @@ from typing import cast
 
 import grpc
 
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+from flwr.common.constant import SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
 from flwr.common.logger import log
 from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 from flwr.supercore.grpc import create_channel, on_channel_state_change
@@ -36,7 +36,7 @@ class SimulationIoConnection:
 
     Parameters
     ----------
-    serverappio_api_address : str (default: "127.0.0.1:9091")
+    runtime_api_address : str (default: "127.0.0.1:9091")
         The address (URL, IPv6, IPv4) of the SuperLink Runtime API service.
     insecure : bool (default: False)
         If True, use plaintext (TLS disabled). If False, use TLS.
@@ -51,7 +51,7 @@ class SimulationIoConnection:
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        serverappio_api_address: str = SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        runtime_api_address: str = SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
         insecure: bool = False,
         root_certificates: bytes | None = None,
         *,
@@ -59,7 +59,7 @@ class SimulationIoConnection:
     ) -> None:
         if token == "":
             raise ValueError("`token` must be a non-empty string")
-        self._addr = serverappio_api_address
+        self._addr = runtime_api_address
         self._insecure = insecure
         self._cert = root_certificates
         self._token = token

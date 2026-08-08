@@ -26,8 +26,8 @@ from flwr.app import Message, Metadata, RecordDict
 from flwr.app.error import Error
 from flwr.app.message import make_message, remove_content_from_message
 from flwr.common.constant import (
-    SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SUPERLINK_NODE_ID,
+    SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
     ErrorCode,
 )
 from flwr.common.logger import log, warn_deprecated_feature
@@ -107,7 +107,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
 
     Parameters
     ----------
-    serverappio_service_address : str (default: "[::]:9091")
+    runtime_api_address : str (default: "[::]:9091")
         The address (URL, IPv6, IPv4) of the SuperLink Runtime API service.
     insecure : bool (default: False)
         If True, use plaintext (TLS disabled). If False, use TLS.
@@ -124,7 +124,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        serverappio_service_address: str = SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        runtime_api_address: str = SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
         insecure: bool = False,
         root_certificates: bytes | None = None,
         *,
@@ -132,7 +132,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     ) -> None:
         if token == "":
             raise ValueError("`token` must be a non-empty string")
-        self._addr = serverappio_service_address
+        self._addr = runtime_api_address
         self._insecure = insecure
         self._cert = root_certificates
         self._token = token

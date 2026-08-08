@@ -15,8 +15,10 @@
 """SuperNode implementation of the Runtime API."""
 
 
+from .runtime_grpc import run_runtime_api_grpc
 from .runtime_servicer import SuperNodeRuntimeServicer
 
 __all__ = [
     "SuperNodeRuntimeServicer",
+    "run_runtime_api_grpc",
 ]

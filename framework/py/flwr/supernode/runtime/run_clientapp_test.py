@@ -51,7 +51,7 @@ class TestRunClientApp(unittest.TestCase):
         stub.PullMessages.return_value = PullAppMessagesResponse()
 
         with self.assertRaisesRegex(
-            RuntimeError, "No messages received from ClientAppIo"
+            RuntimeError, "No messages received from Runtime API"
         ):
             pull_task_input(stub)
 
@@ -75,7 +75,7 @@ class TestRunClientApp(unittest.TestCase):
         self.assertEqual(interceptors[0]._metadata.component_name, "flwr-clientapp")
 
     def test_run_clientapp_exits_nonzero_on_grpc_error(self) -> None:
-        """`run_clientapp` should not report success after AppIO gRPC failures."""
+        """`run_clientapp` should not report success after Runtime API failures."""
         with (
             patch("flwr.supernode.runtime.run_clientapp.create_channel") as channel,
             patch("flwr.supernode.runtime.run_clientapp.HeartbeatSender"),

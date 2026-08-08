@@ -31,8 +31,8 @@ from parameterized import parameterized
 from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import (
     NOOP_FLWR_AID,
-    SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,
+    SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
     Status,
     SubStatus,
 )
@@ -103,7 +103,7 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
-from flwr.superlink.servicer.runtime.runtime_grpc import run_serverappio_api_grpc
+from flwr.superlink.servicer.runtime.runtime_grpc import run_runtime_api_grpc
 from flwr.superlink.servicer.runtime.runtime_servicer import (
     SuperLinkRuntimeServicer,
     _raise_if,
@@ -158,7 +158,7 @@ def test_raise_if_true() -> None:
         raise AssertionError() from err
 
 
-def _start_serverappio_with_port_retry(
+def _start_runtime_with_port_retry(
     state_factory: LinkStateFactory,
     objectstore_factory: ObjectStoreFactory,
     start_port: int,
@@ -166,7 +166,7 @@ def _start_serverappio_with_port_retry(
     for offset in range(40):
         address = f"127.0.0.1:{start_port + offset}"
         try:
-            return run_serverappio_api_grpc(
+            return run_runtime_api_grpc(
                 address,
                 state_factory,
                 objectstore_factory,
@@ -226,12 +226,12 @@ def _create_shared_runtime(
     )
     assert run.primary_task_id is not None
     task_id = run.primary_task_id
-    server_0 = _start_serverappio_with_port_retry(
+    server_0 = _start_runtime_with_port_retry(
         state_factory_0,
         objectstore_factory_0,
         start_port=19091,
     )
-    server_1 = _start_serverappio_with_port_retry(
+    server_1 = _start_runtime_with_port_retry(
         state_factory_1,
         objectstore_factory_1,
         start_port=19141,
@@ -454,8 +454,8 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
 
         self.status_to_msg = _STATUS_TO_MSG
 
-        self._server: grpc.Server = run_serverappio_api_grpc(
-            SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
+        self._server: grpc.Server = run_runtime_api_grpc(
+            SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
             state_factory,
             objectstore_factory,
             None,

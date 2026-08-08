@@ -79,7 +79,7 @@ def test_get_executor_builds_kubernetes_executor_from_config(
     assert config.image == "ghcr.io/flwrlabs/taskexecutor:dev"
     assert config.image_pull_policy == "IfNotPresent"
     assert config.active_pod_budget == 5
-    assert config.appio_root_certificates == "root-ca"
+    assert config.runtime_root_certificates == "root-ca"
     assert config.env == [
         {"name": "FLWR_MODEL_API_ENDPOINT", "value": "http://proxy/v1/responses"}
     ]
@@ -111,7 +111,7 @@ def test_get_executor_rejects_missing_required_kubernetes_field(
 def test_get_executor_rejects_unreadable_appio_root_certificates_path(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Test AppIo root certificate load failures do not reach client
+    """Test Runtime API root certificate load failures do not reach client
     creation."""
     create_client = Mock()
     monkeypatch.setattr(

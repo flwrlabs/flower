@@ -86,7 +86,7 @@ except ImportError:
 class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     """Configuration needed to start the SuperLink lifespan."""
 
-    serverappio_address: str
+    runtime_address: str
     control_address: str
     health_server_address: str | None
     enable_http_api: bool
@@ -95,7 +95,7 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     port: int
     insecure: bool
     certificates: tuple[bytes, bytes, bytes] | None
-    appio_certificates: tuple[bytes, bytes, bytes] | None
+    runtime_certificates: tuple[bytes, bytes, bytes] | None
     superexec_auth_secret: bytes | None
     authn_plugin: ControlAuthnPlugin
     authz_plugin: ControlAuthzPlugin
@@ -110,7 +110,7 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     ssl_certfile: str | None
     database: str
     isolation: str
-    appio_ssl_ca_certfile: str | None
+    runtime_ssl_ca_certfile: str | None
     runtime_dependency_install: bool
 
 

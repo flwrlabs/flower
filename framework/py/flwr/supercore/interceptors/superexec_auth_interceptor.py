@@ -217,7 +217,7 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         )
 
 
-def create_serverappio_superexec_auth_server_interceptor(
+def create_superlink_runtime_superexec_auth_server_interceptor(
     *,
     state_provider: Callable[[], _NonceState],
     master_secret: bytes,
@@ -230,7 +230,7 @@ def create_serverappio_superexec_auth_server_interceptor(
     )
 
 
-def create_clientappio_superexec_auth_server_interceptor(
+def create_supernode_runtime_superexec_auth_server_interceptor(
     *,
     state_provider: Callable[[], _NonceState],
     master_secret: bytes,

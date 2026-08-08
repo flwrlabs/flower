@@ -272,7 +272,7 @@ class TestGrpcGrid(unittest.TestCase):
     def test_connect_adds_client_interceptors(
         self,
         mock_create_channel: Mock,
-        _mock_serverappio_stub: Mock,
+        _mock_runtime_stub: Mock,
         _mock_wrap_stub: Mock,
     ) -> None:
         """`_connect` should pass client interceptors to create_channel."""
