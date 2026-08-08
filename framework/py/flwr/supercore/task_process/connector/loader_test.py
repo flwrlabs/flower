@@ -58,7 +58,8 @@ def test_load_connectors_rejects_package_mismatch(
         ),
         executors={},
     )
+    monkeypatch.setattr(loader, "CONNECTOR_PACKAGES", (_PACKAGE,))
     monkeypatch.setitem(sys.modules, f"{_PACKAGE}.definition", module)
 
     with pytest.raises(ValueError, match="must match reference"):
-        loader._load_connector(_PACKAGE)
+        loader.load_connectors()
