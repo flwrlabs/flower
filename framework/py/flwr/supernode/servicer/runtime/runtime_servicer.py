@@ -31,6 +31,19 @@ from flwr.common.serde import (
 
 # pylint: disable=E0611
 from flwr.proto import runtime_pb2_grpc
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
+)
+from flwr.proto.message_pb2 import (
+    ConfirmMessageReceivedRequest,
+    ConfirmMessageReceivedResponse,
+    PullObjectRequest,
+    PullObjectResponse,
+    PushObjectRequest,
+    PushObjectResponse,
+)
+from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
 from flwr.proto.runtime_pb2 import (
     GetConnectorRequest,
     GetConnectorResponse,
@@ -45,19 +58,6 @@ from flwr.proto.runtime_pb2 import (
     PushTaskOutputRequest,
     PushTaskOutputResponse,
 )
-from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    StartAutomationRequest,
-    StartAutomationResponse,
-)
-from flwr.proto.message_pb2 import (
-    ConfirmMessageReceivedRequest,
-    ConfirmMessageReceivedResponse,
-    PullObjectRequest,
-    PullObjectResponse,
-    PushObjectRequest,
-    PushObjectResponse,
-)
-from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.servicer.runtime import RuntimeServicer

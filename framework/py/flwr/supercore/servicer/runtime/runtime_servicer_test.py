@@ -23,6 +23,10 @@ import grpc
 
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.serde import message_to_proto
+from flwr.proto.log_pb2 import (  # pylint: disable=E0611
+    PushLogsRequest,
+    PushLogsResponse,
+)
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     CreateTaskRequest,
@@ -34,10 +38,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskMessageRequest,
     RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
-)
-from flwr.proto.log_pb2 import (  # pylint: disable=E0611
-    PushLogsRequest,
-    PushLogsResponse,
 )
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     Task,

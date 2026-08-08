@@ -15,6 +15,7 @@
 """Shared gRPC interceptors used across supercore services."""
 
 
+from .rpc_error_translation_interceptor import RpcErrorTranslationServerInterceptor
 from .runtime_token_interceptor import (
     AUTHENTICATION_FAILED_MESSAGE,
     TASK_TOKEN_HEADER,
@@ -24,7 +25,6 @@ from .runtime_token_interceptor import (
     create_serverappio_token_auth_server_interceptor,
     get_authenticated_task,
 )
-from .rpc_error_translation_interceptor import RpcErrorTranslationServerInterceptor
 from .runtime_version_interceptor import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
@@ -42,9 +42,9 @@ from .superexec_auth_interceptor import (
 
 __all__ = [
     "AUTHENTICATION_FAILED_MESSAGE",
+    "RpcErrorTranslationServerInterceptor",
     "RuntimeTokenClientInterceptor",
     "RuntimeTokenServerInterceptor",
-    "RpcErrorTranslationServerInterceptor",
     "RuntimeVersionClientInterceptor",
     "RuntimeVersionServerInterceptor",
     "SuperExecAuthClientInterceptor",

@@ -24,11 +24,11 @@ import grpc
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.logger import log
 from flwr.common.serde import run_from_proto
+from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     PullPendingTasksRequest,
 )
-from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor

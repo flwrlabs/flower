@@ -35,6 +35,7 @@ from flwr.common.serde import (
     message_to_proto,
     run_from_proto,
 )
+from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
     PullAppMessagesResponse,
@@ -43,7 +44,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushAppMessagesRequest,
     PushTaskOutputRequest,
 )
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers

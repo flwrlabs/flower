@@ -21,12 +21,12 @@ from unittest.mock import Mock, patch
 import grpc
 
 from flwr.common.serde import fab_to_proto
+from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesResponse,
     PullTaskInputResponse,
 )
-from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
-from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.supercore.exit import ExitCode
 from flwr.supercore.fab import Fab
 from flwr.supercore.interceptors import (

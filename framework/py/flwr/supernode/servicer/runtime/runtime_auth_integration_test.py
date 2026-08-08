@@ -20,15 +20,15 @@ import unittest
 
 import grpc
 
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    PullObjectRequest,
+    PullObjectResponse,
+)
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
-)
-from flwr.proto.message_pb2 import (  # pylint: disable=E0611
-    PullObjectRequest,
-    PullObjectResponse,
 )
 from flwr.supercore.constant import TaskType
 from flwr.supercore.interceptors import (

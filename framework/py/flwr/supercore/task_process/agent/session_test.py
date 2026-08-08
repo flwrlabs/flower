@@ -18,14 +18,14 @@
 from unittest.mock import Mock, patch
 
 from flwr.common.serde import user_config_to_proto
-from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    CreateTaskRequest,
-    CreateTaskResponse,
-)
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
     StartAutomationResponse,
     StartRunRequest,
+)
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    CreateTaskRequest,
+    CreateTaskResponse,
 )
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (

@@ -26,6 +26,15 @@ from flwr.app.message import make_message
 from flwr.common.constant import SubStatus
 from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
+from flwr.proto.control_pb2 import StartAutomationRequest  # pylint:disable=E0611
+from flwr.proto.message_pb2 import Context as ProtoContext  # pylint:disable=E0611
+from flwr.proto.message_pb2 import (  # pylint:disable=E0611
+    PullObjectRequest,
+    PullObjectResponse,
+    PushObjectRequest,
+    PushObjectResponse,
+)
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint:disable=E0611
     GetConnectorRequest,
     GetNodesRequest,
@@ -40,15 +49,6 @@ from flwr.proto.runtime_pb2 import (  # pylint:disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
-from flwr.proto.control_pb2 import StartAutomationRequest  # pylint:disable=E0611
-from flwr.proto.message_pb2 import Context as ProtoContext  # pylint:disable=E0611
-from flwr.proto.message_pb2 import (  # pylint:disable=E0611
-    PullObjectRequest,
-    PullObjectResponse,
-    PushObjectRequest,
-    PushObjectResponse,
-)
-from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,

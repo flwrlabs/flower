@@ -24,13 +24,13 @@ from unittest.mock import Mock
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
+from flwr.proto.message_pb2 import PushObjectRequest  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     PullPendingTasksRequest,
     PushAppMessagesRequest,
     PushTaskOutputRequest,
 )
-from flwr.proto.message_pb2 import PushObjectRequest  # pylint: disable=E0611
 from flwr.proto.runtime_pb2_grpc import RuntimeServicer
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.auth import RUNTIME_METHOD_AUTH_POLICY

@@ -23,6 +23,10 @@ import grpc
 from flwr.common.constant import Status
 from flwr.common.logger import log
 from flwr.common.serde import message_from_proto, message_to_proto
+from flwr.proto.log_pb2 import (  # pylint: disable=E0611
+    PushLogsRequest,
+    PushLogsResponse,
+)
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -40,10 +44,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     RecordTaskUsageResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
-)
-from flwr.proto.log_pb2 import (  # pylint: disable=E0611
-    PushLogsRequest,
-    PushLogsResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import (
