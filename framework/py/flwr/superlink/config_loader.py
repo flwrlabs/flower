@@ -20,7 +20,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from logging import WARN
 from pathlib import Path
-from typing import TypeVar, cast
 
 import yaml
 
@@ -31,15 +30,8 @@ from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.license_plugin import LicensePlugin
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.artifact_provider import ArtifactProvider
-from flwr.superlink.auth_plugin import (
-    ControlAuthnPlugin,
-    ControlAuthzPlugin,
-    NoOpControlAuthnPlugin,
-    NoOpControlAuthzPlugin,
-)
+from flwr.superlink.auth_plugin import ControlAuthnPlugin, NoOpControlAuthnPlugin
 from flwr.superlink.federation import FederationManager, NoOpFederationManager
-
-P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
 
 try:
     from flwr.ee import (
@@ -87,7 +79,6 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     appio_certificates: tuple[bytes, bytes, bytes] | None
     superexec_auth_secret: bytes | None
     authn_plugin: ControlAuthnPlugin
-    authz_plugin: ControlAuthzPlugin
     event_log_plugin: EventLogWriterPlugin | None
     enable_event_log: bool
     artifact_provider: ArtifactProvider | None
@@ -179,11 +170,11 @@ def get_control_authn_plugins() -> dict[str, type[ControlAuthnPlugin]]:
     return ee_dict | {AuthnType.NOOP: NoOpControlAuthnPlugin}
 
 
-def load_control_auth_plugins(
+def load_control_authn_plugin(
     config_path: str | None, verify_tls_cert: bool
-) -> tuple[ControlAuthnPlugin, ControlAuthzPlugin]:
-    """Obtain the configured authentication plugin and no-op authorization plugin."""
-    # Load NoOp plugins if no authentication config path is provided
+) -> ControlAuthnPlugin:
+    """Obtain the configured authentication plugin."""
+    # Load the NoOp plugin if no authentication config path is provided
     if config_path is None:
         config_path = ""
         config = {"authentication": {AUTHN_TYPE_YAML_KEY: AuthnType.NOOP}}
@@ -215,14 +206,16 @@ def load_control_auth_plugins(
         sys.exit("The authentication configuration must be a YAML mapping.")
 
     def _load_plugin(
-        section: str, yaml_key: str, loader: Callable[[], dict[str, type[P]]]
-    ) -> P:
+        section: str,
+        yaml_key: str,
+        loader: Callable[[], dict[str, type[ControlAuthnPlugin]]],
+    ) -> ControlAuthnPlugin:
         section_cfg = config.get(section, {})
         auth_plugin_name = section_cfg.get(yaml_key, "")
         try:
-            plugins: dict[str, type[P]] = loader()
-            plugin_cls: type[P] = plugins[auth_plugin_name]
-            return plugin_cls(Path(cast(str, config_path)), verify_tls_cert)
+            plugins = loader()
+            plugin_cls = plugins[auth_plugin_name]
+            return plugin_cls(Path(config_path), verify_tls_cert)
         except KeyError:
             if auth_plugin_name:
                 sys.exit(
@@ -241,11 +234,8 @@ def load_control_auth_plugins(
         )
         config["authentication"][AUTHN_TYPE_YAML_KEY] = authn_type
 
-    authn_plugin = _load_plugin(
+    return _load_plugin(
         section="authentication",
         yaml_key=AUTHN_TYPE_YAML_KEY,
         loader=get_control_authn_plugins,
     )
-    authz_plugin = NoOpControlAuthzPlugin(Path(config_path), verify_tls_cert)
-
-    return authn_plugin, authz_plugin
