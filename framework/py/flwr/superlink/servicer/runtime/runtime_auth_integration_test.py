@@ -24,7 +24,7 @@ from google.protobuf.message import Message as GrpcMessage
 from parameterized import parameterized
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
@@ -53,7 +53,7 @@ from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID, 
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     TASK_TOKEN_HEADER,
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
@@ -61,14 +61,14 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
-from flwr.superlink.servicer.serverappio.serverappio_grpc import (
+from flwr.superlink.servicer.runtime.runtime_grpc import (
     run_serverappio_api_grpc,
 )
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
 
 
-class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R0902
+class TestSuperLinkRuntimeAuthIntegration(unittest.TestCase):  # pylint: disable=R0902
     """Integration tests for SuperLink Runtime token-auth behavior."""
 
     def setUp(self) -> None:
@@ -114,7 +114,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         )
         auth_channel = grpc.intercept_channel(
             self._base_channel,
-            AppIoTokenClientInterceptor(token=auth_token),
+            RuntimeTokenClientInterceptor(token=auth_token),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 protected_methods=RUNTIME_SUPEREXEC_METHODS,

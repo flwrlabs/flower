@@ -55,7 +55,7 @@ def _unauthenticated_terminator() -> grpc.RpcMethodHandler:
     return grpc.unary_unary_rpc_method_handler(_terminate)
 
 
-class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore
+class RuntimeTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore
     """Attach task-token metadata to outbound unary RPCs."""
 
     def __init__(self, token: str) -> None:
@@ -78,7 +78,7 @@ class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ig
         return continuation(details, request)
 
 
-class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
+class RuntimeTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
     """Validate Runtime tokens with per-method token policies."""
 
     def __init__(
@@ -164,9 +164,9 @@ def get_authenticated_task() -> Task:
 
 def create_serverappio_token_auth_server_interceptor(
     state_provider: Callable[[], _TokenState],
-) -> AppIoTokenServerInterceptor:
+) -> RuntimeTokenServerInterceptor:
     """Create the SuperLink Runtime API token interceptor."""
-    return AppIoTokenServerInterceptor(
+    return RuntimeTokenServerInterceptor(
         state_provider=state_provider,
         method_auth_policy=RUNTIME_METHOD_AUTH_POLICY,
     )
@@ -174,9 +174,9 @@ def create_serverappio_token_auth_server_interceptor(
 
 def create_clientappio_token_auth_server_interceptor(
     state_provider: Callable[[], _TokenState],
-) -> AppIoTokenServerInterceptor:
+) -> RuntimeTokenServerInterceptor:
     """Create the SuperNode Runtime API token interceptor."""
-    return AppIoTokenServerInterceptor(
+    return RuntimeTokenServerInterceptor(
         state_provider=state_provider,
         method_auth_policy=RUNTIME_METHOD_AUTH_POLICY,
     )

@@ -21,7 +21,7 @@ from unittest.mock import Mock, patch
 import grpc
 
 from flwr.common.serde import fab_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesResponse,
     PullTaskInputResponse,
 )
@@ -30,7 +30,7 @@ from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.supercore.exit import ExitCode
 from flwr.supercore.fab import Fab
 from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 
@@ -70,7 +70,7 @@ class TestRunClientApp(unittest.TestCase):
         assert interceptors is not None
         self.assertEqual(len(interceptors), 2)
         self.assertIsInstance(interceptors[0], RuntimeVersionClientInterceptor)
-        self.assertIsInstance(interceptors[1], AppIoTokenClientInterceptor)
+        self.assertIsInstance(interceptors[1], RuntimeTokenClientInterceptor)
         # pylint: disable-next=protected-access
         self.assertEqual(interceptors[0]._metadata.component_name, "flwr-clientapp")
 

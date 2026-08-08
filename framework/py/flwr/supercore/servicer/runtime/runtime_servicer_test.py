@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""AppIoServicer tests."""
+"""RuntimeServicer tests."""
 
 
 import unittest
@@ -23,7 +23,7 @@ import grpc
 
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.serde import message_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     CreateTaskRequest,
     CreateTaskResponse,
@@ -49,11 +49,11 @@ from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
 from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.task_process.connector import registry as connector_registry
 
-from .appio_servicer import AppIoServicer
+from .runtime_servicer import RuntimeServicer
 
 
-class _TestAppIoServicer(AppIoServicer):
-    """Concrete AppIoServicer for tests."""
+class _TestRuntimeServicer(RuntimeServicer):
+    """Concrete RuntimeServicer for tests."""
 
     def __init__(self, state: Mock) -> None:
         self._state = state
@@ -63,21 +63,21 @@ class _TestAppIoServicer(AppIoServicer):
         return self._state
 
 
-class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
-    """Tests for shared AppIoServicer task RPCs."""
+class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
+    """Tests for shared RuntimeServicer task RPCs."""
 
     def setUp(self) -> None:
         """Set up test fixture."""
         self.state = Mock()
         self.state.get_tasks.return_value = []
-        self.servicer = _TestAppIoServicer(self.state)
+        self.servicer = _TestRuntimeServicer(self.state)
 
     def _create_connector_task(
         self, connector_ref: str, context: grpc.ServicerContext | None = None
     ) -> CreateTaskResponse:
         """Create a connector task as an authenticated AgentApp task."""
         with patch(
-            "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Mock(task_id=789, run_id=123, type=TaskType.AGENT_APP),
         ):
             return self.servicer.CreateTask(
@@ -139,7 +139,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         with patch(
-            "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Mock(task_id=123),
         ):
             response = self.servicer.SendTaskHeartbeat(
@@ -161,7 +161,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         with patch(
-            "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
         ):
             response = self.servicer.CreateTask(request, Mock())
@@ -189,7 +189,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
             with self.subTest(requesting_task_type=requesting_task_type):
                 # Execute
                 with patch(
-                    "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+                    "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                     return_value=Mock(
                         task_id=789, run_id=123, type=requesting_task_type
                     ),
@@ -281,7 +281,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with (
             patch(
-                "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                 return_value=Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
             ),
             self.assertRaises(RuntimeError) as err,
@@ -330,7 +330,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
             with self.subTest(task_type=request.type):
                 with (
                     patch(
-                        "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+                        "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                         return_value=Mock(
                             task_id=789, run_id=123, type=TaskType.SERVER_APP
                         ),
@@ -359,7 +359,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with (
             patch(
-                "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                 return_value=Mock(run_id=123, type=TaskType.SERVER_APP),
             ),
             self.assertRaises(grpc.RpcError),
@@ -385,7 +385,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         with patch(
-            "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Task(task_id=123, run_id=789),
         ):
             response = self.servicer.PushTaskMessage(request, Mock())
@@ -412,7 +412,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with (
             patch(
-                "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                 return_value=Task(task_id=123, run_id=789),
             ),
             self.assertRaises(grpc.RpcError),
@@ -444,7 +444,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         with patch(
-            "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Task(task_id=123, run_id=789),
         ):
             response = self.servicer.PushTaskEvents(request, Mock())
@@ -476,10 +476,10 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with (
             patch(
-                "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                 return_value=Task(task_id=123, run_id=789),
             ),
-            patch("flwr.supercore.servicer.appio.appio_servicer.log") as log_mock,
+            patch("flwr.supercore.servicer.runtime.runtime_servicer.log") as log_mock,
         ):
             response = self.servicer.PushTaskEvents(request, context)
 
@@ -507,7 +507,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
         request = RecordTaskUsageRequest(task_usage=usage)
 
         with patch(
-            "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Task(task_id=123, run_id=789, type=TaskType.MODEL),
         ):
             response = self.servicer.RecordTaskUsage(request, Mock())
@@ -528,7 +528,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         with patch(
-            "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Task(task_id=321, run_id=789),
         ):
             response = self.servicer.PullTaskMessage(
@@ -564,7 +564,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
                 # Execute
                 with (
                     patch(
-                        "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+                        "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                         return_value=Mock(run_id=123, type=requesting_task_type),
                     ),
                     self.assertRaises(grpc.RpcError),
@@ -586,7 +586,7 @@ class TestAppIoServicer(unittest.TestCase):  # pylint: disable=R0904
         """PushLogs should concatenate fragments and store them via state."""
         # Execute
         with patch(
-            "flwr.supercore.servicer.appio.appio_servicer.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Mock(task_id=123),
         ):
             response = self.servicer.PushLogs(

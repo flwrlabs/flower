@@ -19,11 +19,11 @@ limitations under the License.
 
 import abc
 import collections.abc
-import flwr.proto.appio_pb2
 import flwr.proto.control_pb2
 import flwr.proto.log_pb2
 import flwr.proto.message_pb2
 import flwr.proto.run_pb2
+import flwr.proto.runtime_pb2
 import grpc
 import grpc.aio
 import typing
@@ -38,8 +38,8 @@ class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type:
 class RuntimeStub:
     def __init__(self, channel: typing.Union[grpc.Channel, grpc.aio.Channel]) -> None: ...
     PullPendingTasks: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullPendingTasksRequest,
-        flwr.proto.appio_pb2.PullPendingTasksResponse,
+        flwr.proto.runtime_pb2.PullPendingTasksRequest,
+        flwr.proto.runtime_pb2.PullPendingTasksResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
     General Runtime endpoints for SuperExec processes
@@ -49,8 +49,8 @@ class RuntimeStub:
     """
 
     ClaimTask: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.ClaimTaskRequest,
-        flwr.proto.appio_pb2.ClaimTaskResponse,
+        flwr.proto.runtime_pb2.ClaimTaskRequest,
+        flwr.proto.runtime_pb2.ClaimTaskResponse,
     ]
     """Claim task"""
 
@@ -66,20 +66,20 @@ class RuntimeStub:
     """
 
     SendTaskHeartbeat: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.SendTaskHeartbeatRequest,
-        flwr.proto.appio_pb2.SendTaskHeartbeatResponse,
+        flwr.proto.runtime_pb2.SendTaskHeartbeatRequest,
+        flwr.proto.runtime_pb2.SendTaskHeartbeatResponse,
     ]
     """Task heartbeat"""
 
     PullTaskInput: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullTaskInputRequest,
-        flwr.proto.appio_pb2.PullTaskInputResponse,
+        flwr.proto.runtime_pb2.PullTaskInputRequest,
+        flwr.proto.runtime_pb2.PullTaskInputResponse,
     ]
     """Pull task inputs"""
 
     PushTaskOutput: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushTaskOutputRequest,
-        flwr.proto.appio_pb2.PushTaskOutputResponse,
+        flwr.proto.runtime_pb2.PushTaskOutputRequest,
+        flwr.proto.runtime_pb2.PushTaskOutputResponse,
     ]
     """Push task outputs"""
 
@@ -107,8 +107,8 @@ class RuntimeStub:
     """Confirm Message Received"""
 
     CreateTask: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.CreateTaskRequest,
-        flwr.proto.appio_pb2.CreateTaskResponse,
+        flwr.proto.runtime_pb2.CreateTaskRequest,
+        flwr.proto.runtime_pb2.CreateTaskResponse,
     ]
     """Create a task"""
 
@@ -119,32 +119,32 @@ class RuntimeStub:
     """Start an automation"""
 
     PushTaskMessage: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushTaskMessageRequest,
-        flwr.proto.appio_pb2.PushTaskMessageResponse,
+        flwr.proto.runtime_pb2.PushTaskMessageRequest,
+        flwr.proto.runtime_pb2.PushTaskMessageResponse,
     ]
     """Push task message"""
 
     PushTaskEvents: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushTaskEventsRequest,
-        flwr.proto.appio_pb2.PushTaskEventsResponse,
+        flwr.proto.runtime_pb2.PushTaskEventsRequest,
+        flwr.proto.runtime_pb2.PushTaskEventsResponse,
     ]
     """Push task events"""
 
     PullTaskMessage: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullTaskMessageRequest,
-        flwr.proto.appio_pb2.PullTaskMessageResponse,
+        flwr.proto.runtime_pb2.PullTaskMessageRequest,
+        flwr.proto.runtime_pb2.PullTaskMessageResponse,
     ]
     """Pull task messages"""
 
     RecordTaskUsage: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.RecordTaskUsageRequest,
-        flwr.proto.appio_pb2.RecordTaskUsageResponse,
+        flwr.proto.runtime_pb2.RecordTaskUsageRequest,
+        flwr.proto.runtime_pb2.RecordTaskUsageResponse,
     ]
     """Record task usage"""
 
     GetConnector: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.GetConnectorRequest,
-        flwr.proto.appio_pb2.GetConnectorResponse,
+        flwr.proto.runtime_pb2.GetConnectorRequest,
+        flwr.proto.runtime_pb2.GetConnectorResponse,
     ]
     """Resolve credentials for the authenticated connector task"""
 
@@ -155,8 +155,8 @@ class RuntimeStub:
     """Push task logs"""
 
     PushMessages: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushAppMessagesRequest,
-        flwr.proto.appio_pb2.PushAppMessagesResponse,
+        flwr.proto.runtime_pb2.PushAppMessagesRequest,
+        flwr.proto.runtime_pb2.PushAppMessagesResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
     Message and node endpoints
@@ -166,21 +166,21 @@ class RuntimeStub:
     """
 
     PullMessages: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullAppMessagesRequest,
-        flwr.proto.appio_pb2.PullAppMessagesResponse,
+        flwr.proto.runtime_pb2.PullAppMessagesRequest,
+        flwr.proto.runtime_pb2.PullAppMessagesResponse,
     ]
     """Pull messages"""
 
     GetNodes: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.GetNodesRequest,
-        flwr.proto.appio_pb2.GetNodesResponse,
+        flwr.proto.runtime_pb2.GetNodesRequest,
+        flwr.proto.runtime_pb2.GetNodesResponse,
     ]
     """Return a set of nodes"""
 
 class RuntimeAsyncStub:
     PullPendingTasks: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullPendingTasksRequest,
-        flwr.proto.appio_pb2.PullPendingTasksResponse,
+        flwr.proto.runtime_pb2.PullPendingTasksRequest,
+        flwr.proto.runtime_pb2.PullPendingTasksResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
     General Runtime endpoints for SuperExec processes
@@ -190,8 +190,8 @@ class RuntimeAsyncStub:
     """
 
     ClaimTask: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.ClaimTaskRequest,
-        flwr.proto.appio_pb2.ClaimTaskResponse,
+        flwr.proto.runtime_pb2.ClaimTaskRequest,
+        flwr.proto.runtime_pb2.ClaimTaskResponse,
     ]
     """Claim task"""
 
@@ -207,20 +207,20 @@ class RuntimeAsyncStub:
     """
 
     SendTaskHeartbeat: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.SendTaskHeartbeatRequest,
-        flwr.proto.appio_pb2.SendTaskHeartbeatResponse,
+        flwr.proto.runtime_pb2.SendTaskHeartbeatRequest,
+        flwr.proto.runtime_pb2.SendTaskHeartbeatResponse,
     ]
     """Task heartbeat"""
 
     PullTaskInput: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullTaskInputRequest,
-        flwr.proto.appio_pb2.PullTaskInputResponse,
+        flwr.proto.runtime_pb2.PullTaskInputRequest,
+        flwr.proto.runtime_pb2.PullTaskInputResponse,
     ]
     """Pull task inputs"""
 
     PushTaskOutput: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushTaskOutputRequest,
-        flwr.proto.appio_pb2.PushTaskOutputResponse,
+        flwr.proto.runtime_pb2.PushTaskOutputRequest,
+        flwr.proto.runtime_pb2.PushTaskOutputResponse,
     ]
     """Push task outputs"""
 
@@ -248,8 +248,8 @@ class RuntimeAsyncStub:
     """Confirm Message Received"""
 
     CreateTask: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.CreateTaskRequest,
-        flwr.proto.appio_pb2.CreateTaskResponse,
+        flwr.proto.runtime_pb2.CreateTaskRequest,
+        flwr.proto.runtime_pb2.CreateTaskResponse,
     ]
     """Create a task"""
 
@@ -260,32 +260,32 @@ class RuntimeAsyncStub:
     """Start an automation"""
 
     PushTaskMessage: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushTaskMessageRequest,
-        flwr.proto.appio_pb2.PushTaskMessageResponse,
+        flwr.proto.runtime_pb2.PushTaskMessageRequest,
+        flwr.proto.runtime_pb2.PushTaskMessageResponse,
     ]
     """Push task message"""
 
     PushTaskEvents: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushTaskEventsRequest,
-        flwr.proto.appio_pb2.PushTaskEventsResponse,
+        flwr.proto.runtime_pb2.PushTaskEventsRequest,
+        flwr.proto.runtime_pb2.PushTaskEventsResponse,
     ]
     """Push task events"""
 
     PullTaskMessage: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullTaskMessageRequest,
-        flwr.proto.appio_pb2.PullTaskMessageResponse,
+        flwr.proto.runtime_pb2.PullTaskMessageRequest,
+        flwr.proto.runtime_pb2.PullTaskMessageResponse,
     ]
     """Pull task messages"""
 
     RecordTaskUsage: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.RecordTaskUsageRequest,
-        flwr.proto.appio_pb2.RecordTaskUsageResponse,
+        flwr.proto.runtime_pb2.RecordTaskUsageRequest,
+        flwr.proto.runtime_pb2.RecordTaskUsageResponse,
     ]
     """Record task usage"""
 
     GetConnector: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.GetConnectorRequest,
-        flwr.proto.appio_pb2.GetConnectorResponse,
+        flwr.proto.runtime_pb2.GetConnectorRequest,
+        flwr.proto.runtime_pb2.GetConnectorResponse,
     ]
     """Resolve credentials for the authenticated connector task"""
 
@@ -296,8 +296,8 @@ class RuntimeAsyncStub:
     """Push task logs"""
 
     PushMessages: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushAppMessagesRequest,
-        flwr.proto.appio_pb2.PushAppMessagesResponse,
+        flwr.proto.runtime_pb2.PushAppMessagesRequest,
+        flwr.proto.runtime_pb2.PushAppMessagesResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
     Message and node endpoints
@@ -307,14 +307,14 @@ class RuntimeAsyncStub:
     """
 
     PullMessages: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullAppMessagesRequest,
-        flwr.proto.appio_pb2.PullAppMessagesResponse,
+        flwr.proto.runtime_pb2.PullAppMessagesRequest,
+        flwr.proto.runtime_pb2.PullAppMessagesResponse,
     ]
     """Pull messages"""
 
     GetNodes: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.GetNodesRequest,
-        flwr.proto.appio_pb2.GetNodesResponse,
+        flwr.proto.runtime_pb2.GetNodesRequest,
+        flwr.proto.runtime_pb2.GetNodesResponse,
     ]
     """Return a set of nodes"""
 
@@ -322,9 +322,9 @@ class RuntimeServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def PullPendingTasks(
         self,
-        request: flwr.proto.appio_pb2.PullPendingTasksRequest,
+        request: flwr.proto.runtime_pb2.PullPendingTasksRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.PullPendingTasksResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullPendingTasksResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.PullPendingTasksResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.PullPendingTasksResponse]]:
         """///////////////////////////////////////////////////////////////////////////
         General Runtime endpoints for SuperExec processes
         ///////////////////////////////////////////////////////////////////////////
@@ -335,9 +335,9 @@ class RuntimeServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def ClaimTask(
         self,
-        request: flwr.proto.appio_pb2.ClaimTaskRequest,
+        request: flwr.proto.runtime_pb2.ClaimTaskRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.ClaimTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.ClaimTaskResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.ClaimTaskResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.ClaimTaskResponse]]:
         """Claim task"""
 
     @abc.abstractmethod
@@ -356,25 +356,25 @@ class RuntimeServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def SendTaskHeartbeat(
         self,
-        request: flwr.proto.appio_pb2.SendTaskHeartbeatRequest,
+        request: flwr.proto.runtime_pb2.SendTaskHeartbeatRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.SendTaskHeartbeatResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.SendTaskHeartbeatResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.SendTaskHeartbeatResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.SendTaskHeartbeatResponse]]:
         """Task heartbeat"""
 
     @abc.abstractmethod
     def PullTaskInput(
         self,
-        request: flwr.proto.appio_pb2.PullTaskInputRequest,
+        request: flwr.proto.runtime_pb2.PullTaskInputRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.PullTaskInputResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullTaskInputResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.PullTaskInputResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.PullTaskInputResponse]]:
         """Pull task inputs"""
 
     @abc.abstractmethod
     def PushTaskOutput(
         self,
-        request: flwr.proto.appio_pb2.PushTaskOutputRequest,
+        request: flwr.proto.runtime_pb2.PushTaskOutputRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.PushTaskOutputResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushTaskOutputResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.PushTaskOutputResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.PushTaskOutputResponse]]:
         """Push task outputs"""
 
     @abc.abstractmethod
@@ -409,9 +409,9 @@ class RuntimeServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def CreateTask(
         self,
-        request: flwr.proto.appio_pb2.CreateTaskRequest,
+        request: flwr.proto.runtime_pb2.CreateTaskRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.CreateTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.CreateTaskResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.CreateTaskResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.CreateTaskResponse]]:
         """Create a task"""
 
     @abc.abstractmethod
@@ -425,41 +425,41 @@ class RuntimeServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def PushTaskMessage(
         self,
-        request: flwr.proto.appio_pb2.PushTaskMessageRequest,
+        request: flwr.proto.runtime_pb2.PushTaskMessageRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.PushTaskMessageResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushTaskMessageResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.PushTaskMessageResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.PushTaskMessageResponse]]:
         """Push task message"""
 
     @abc.abstractmethod
     def PushTaskEvents(
         self,
-        request: flwr.proto.appio_pb2.PushTaskEventsRequest,
+        request: flwr.proto.runtime_pb2.PushTaskEventsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.PushTaskEventsResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushTaskEventsResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.PushTaskEventsResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.PushTaskEventsResponse]]:
         """Push task events"""
 
     @abc.abstractmethod
     def PullTaskMessage(
         self,
-        request: flwr.proto.appio_pb2.PullTaskMessageRequest,
+        request: flwr.proto.runtime_pb2.PullTaskMessageRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.PullTaskMessageResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullTaskMessageResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.PullTaskMessageResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.PullTaskMessageResponse]]:
         """Pull task messages"""
 
     @abc.abstractmethod
     def RecordTaskUsage(
         self,
-        request: flwr.proto.appio_pb2.RecordTaskUsageRequest,
+        request: flwr.proto.runtime_pb2.RecordTaskUsageRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.RecordTaskUsageResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.RecordTaskUsageResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.RecordTaskUsageResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.RecordTaskUsageResponse]]:
         """Record task usage"""
 
     @abc.abstractmethod
     def GetConnector(
         self,
-        request: flwr.proto.appio_pb2.GetConnectorRequest,
+        request: flwr.proto.runtime_pb2.GetConnectorRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.GetConnectorResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.GetConnectorResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.GetConnectorResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.GetConnectorResponse]]:
         """Resolve credentials for the authenticated connector task"""
 
     @abc.abstractmethod
@@ -473,9 +473,9 @@ class RuntimeServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def PushMessages(
         self,
-        request: flwr.proto.appio_pb2.PushAppMessagesRequest,
+        request: flwr.proto.runtime_pb2.PushAppMessagesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.PushAppMessagesResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushAppMessagesResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.PushAppMessagesResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.PushAppMessagesResponse]]:
         """///////////////////////////////////////////////////////////////////////////
         Message and node endpoints
         ///////////////////////////////////////////////////////////////////////////
@@ -486,17 +486,17 @@ class RuntimeServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def PullMessages(
         self,
-        request: flwr.proto.appio_pb2.PullAppMessagesRequest,
+        request: flwr.proto.runtime_pb2.PullAppMessagesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.PullAppMessagesResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullAppMessagesResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.PullAppMessagesResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.PullAppMessagesResponse]]:
         """Pull messages"""
 
     @abc.abstractmethod
     def GetNodes(
         self,
-        request: flwr.proto.appio_pb2.GetNodesRequest,
+        request: flwr.proto.runtime_pb2.GetNodesRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.GetNodesResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.GetNodesResponse]]:
+    ) -> typing.Union[flwr.proto.runtime_pb2.GetNodesResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.GetNodesResponse]]:
         """Return a set of nodes"""
 
 def add_RuntimeServicer_to_server(servicer: RuntimeServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

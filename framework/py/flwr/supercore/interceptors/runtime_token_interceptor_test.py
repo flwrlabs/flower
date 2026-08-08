@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for short-term AppIo token interceptors."""
+"""Tests for short-term Runtime token interceptors."""
 
 
 import inspect
@@ -24,7 +24,7 @@ from unittest.mock import Mock
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     PullPendingTasksRequest,
     PushAppMessagesRequest,
@@ -37,8 +37,8 @@ from flwr.supercore.auth import RUNTIME_METHOD_AUTH_POLICY
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     TASK_TOKEN_HEADER,
-    AppIoTokenClientInterceptor,
-    AppIoTokenServerInterceptor,
+    RuntimeTokenClientInterceptor,
+    RuntimeTokenServerInterceptor,
     create_clientappio_token_auth_server_interceptor,
     create_serverappio_token_auth_server_interceptor,
     get_authenticated_task,
@@ -85,12 +85,12 @@ def _make_non_unary_handler() -> grpc.RpcMethodHandler:
     return grpc.unary_stream_rpc_method_handler(_handler)
 
 
-class TestAppIoTokenClientInterceptor(TestCase):
-    """Unit tests for AppIoTokenClientInterceptor."""
+class TestRuntimeTokenClientInterceptor(TestCase):
+    """Unit tests for RuntimeTokenClientInterceptor."""
 
     def test_attach_task_token_header(self) -> None:
         """The interceptor should attach task-token metadata."""
-        interceptor = AppIoTokenClientInterceptor(token="new-token")
+        interceptor = RuntimeTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
             method="/flwr.proto.Runtime/GetNodes",
             timeout=None,
@@ -124,7 +124,7 @@ class TestAppIoTokenClientInterceptor(TestCase):
 
     def test_raise_if_task_token_header_already_present(self) -> None:
         """The interceptor should reject duplicate task-token metadata."""
-        interceptor = AppIoTokenClientInterceptor(token="new-token")
+        interceptor = RuntimeTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
             method="/flwr.proto.Runtime/GetNodes",
             timeout=None,
@@ -142,12 +142,12 @@ class TestAppIoTokenClientInterceptor(TestCase):
             )
 
 
-class TestAppIoTokenServerInterceptor(TestCase):
-    """Unit tests for AppIoTokenServerInterceptor."""
+class TestRuntimeTokenServerInterceptor(TestCase):
+    """Unit tests for RuntimeTokenServerInterceptor."""
 
     def _new_interceptor(
         self, token_to_task: dict[str, Task]
-    ) -> AppIoTokenServerInterceptor:
+    ) -> RuntimeTokenServerInterceptor:
         state = _TokenState(token_to_task)
         return create_serverappio_token_auth_server_interceptor(lambda: state)
 

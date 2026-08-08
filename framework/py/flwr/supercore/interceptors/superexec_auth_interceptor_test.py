@@ -23,7 +23,7 @@ from unittest.mock import Mock
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.proto.appio_pb2 import PullPendingTasksRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import PullPendingTasksRequest  # pylint: disable=E0611
 from flwr.supercore.auth import (
     RUNTIME_METHOD_AUTH_POLICY,
     compute_request_body_sha256,

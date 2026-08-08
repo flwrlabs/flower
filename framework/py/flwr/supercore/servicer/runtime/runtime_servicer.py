@@ -23,7 +23,7 @@ import grpc
 from flwr.common.constant import Status
 from flwr.common.logger import log
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
     CreateTaskRequest,
@@ -59,7 +59,7 @@ from flwr.supercore.task_process.connector import registry as connector_registry
 
 
 # pylint: disable=invalid-name, unused-argument
-class AppIoServicer(ABC):
+class RuntimeServicer(ABC):
     """Shared scaffolding for task-based Runtime RPCs."""
 
     @abstractmethod

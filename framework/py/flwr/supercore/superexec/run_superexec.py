@@ -24,7 +24,7 @@ import grpc
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.logger import log
 from flwr.common.serde import run_from_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     PullPendingTasksRequest,
 )

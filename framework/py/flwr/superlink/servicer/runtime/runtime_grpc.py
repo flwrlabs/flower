@@ -32,7 +32,7 @@ from flwr.supercore.interceptors import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 
-from .serverappio_servicer import ServerAppIoServicer
+from .runtime_servicer import SuperLinkRuntimeServicer
 
 
 def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
@@ -51,7 +51,7 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
         )
 
     # Create Runtime API gRPC server
-    serverappio_servicer: grpc.Server = ServerAppIoServicer(
+    runtime_servicer = SuperLinkRuntimeServicer(
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
     )
@@ -70,11 +70,11 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
             )
         )
     interceptors.append(create_serverappio_runtime_version_server_interceptor())
-    serverappio_add_servicer_to_server_fn = add_RuntimeServicer_to_server
-    serverappio_grpc_server = generic_create_grpc_server(
+    runtime_add_servicer_to_server_fn = add_RuntimeServicer_to_server
+    runtime_grpc_server = generic_create_grpc_server(
         servicer_and_add_fn=(
-            serverappio_servicer,
-            serverappio_add_servicer_to_server_fn,
+            runtime_servicer,
+            runtime_add_servicer_to_server_fn,
         ),
         server_address=address,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
@@ -82,8 +82,8 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
         interceptors=interceptors,
     )
 
-    address = serverappio_grpc_server.bound_address
+    address = runtime_grpc_server.bound_address
     log(INFO, "Flower Deployment Runtime: Starting Runtime API on %s", address)
-    serverappio_grpc_server.start()
+    runtime_grpc_server.start()
 
-    return serverappio_grpc_server
+    return runtime_grpc_server

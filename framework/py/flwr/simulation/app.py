@@ -53,7 +53,7 @@ from flwr.common.serde import (
     fab_from_proto,
     run_from_proto,
 )
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushTaskOutputRequest,

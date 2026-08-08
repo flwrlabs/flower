@@ -31,7 +31,7 @@ from flwr.common.serde import (
 
 # pylint: disable=E0611
 from flwr.proto import runtime_pb2_grpc
-from flwr.proto.appio_pb2 import (
+from flwr.proto.runtime_pb2 import (
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
@@ -60,12 +60,12 @@ from flwr.proto.message_pb2 import (
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import ObjectStoreFactory
-from flwr.supercore.servicer.appio import AppIoServicer
+from flwr.supercore.servicer.runtime import RuntimeServicer
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 
 
 # pylint: disable=C0103,W0613,W0201
-class ClientAppIoServicer(AppIoServicer, runtime_pb2_grpc.RuntimeServicer):
+class SuperNodeRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer):
     """Runtime API servicer hosted by SuperNode."""
 
     def __init__(

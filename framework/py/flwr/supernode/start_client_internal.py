@@ -83,7 +83,7 @@ from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import get_client_tls_args
 from flwr.supercore.version import package_version
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
-from flwr.supernode.servicer.clientappio import ClientAppIoServicer
+from flwr.supernode.servicer.runtime import SuperNodeRuntimeServicer
 
 FAB_VERIFICATION_ERROR = Error(ErrorCode.INVALID_FAB, "The FAB could not be verified.")
 
@@ -678,7 +678,7 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
             "Request metadata confidentiality is not guaranteed without TLS.",
         )
 
-    clientappio_servicer: ClientAppIoServicer = ClientAppIoServicer(
+    runtime_servicer = SuperNodeRuntimeServicer(
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
     )
@@ -694,21 +694,21 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
             )
         )
     interceptors.append(create_clientappio_runtime_version_server_interceptor())
-    clientappio_add_servicer_to_server_fn = add_RuntimeServicer_to_server
-    clientappio_grpc_server = generic_create_grpc_server(
+    runtime_add_servicer_to_server_fn = add_RuntimeServicer_to_server
+    runtime_grpc_server = generic_create_grpc_server(
         servicer_and_add_fn=(
-            clientappio_servicer,
-            clientappio_add_servicer_to_server_fn,
+            runtime_servicer,
+            runtime_add_servicer_to_server_fn,
         ),
         server_address=address,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
         certificates=certificates,
         interceptors=interceptors,
     )
-    address = clientappio_grpc_server.bound_address
+    address = runtime_grpc_server.bound_address
     log(INFO, "Flower Deployment Runtime: Starting Runtime API on %s", address)
-    clientappio_grpc_server.start()
-    return clientappio_grpc_server
+    runtime_grpc_server.start()
+    return runtime_grpc_server
 
 
 def _verify_fab(fab: Fab, trusted_entities: dict[str, str]) -> bool:

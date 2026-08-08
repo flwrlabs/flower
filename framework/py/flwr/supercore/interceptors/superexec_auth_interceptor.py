@@ -41,7 +41,7 @@ from flwr.supercore.constant import (
 from flwr.supercore.date import now
 from flwr.supercore.utils import get_metadata_str
 
-from .appio_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
+from .runtime_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
 
 _SUPEREXEC_METHOD_NAMES = frozenset({"PullPendingTasks", "ClaimTask", "GetRun"})
 

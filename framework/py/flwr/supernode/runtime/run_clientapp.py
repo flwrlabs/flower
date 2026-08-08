@@ -35,7 +35,7 @@ from flwr.common.serde import (
     message_to_proto,
     run_from_proto,
 )
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -65,7 +65,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     push_objects,
 )
 from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
@@ -99,7 +99,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         root_certificates=certificates,
         interceptors=[
             RuntimeVersionClientInterceptor(component_name="flwr-clientapp"),
-            AppIoTokenClientInterceptor(token),
+            RuntimeTokenClientInterceptor(token),
         ],
     )
     channel.subscribe(on_channel_state_change)

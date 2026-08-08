@@ -25,7 +25,7 @@ from flwr.common.logger import log
 from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
@@ -90,7 +90,7 @@ class SimulationIoConnection:
             root_certificates=self._cert,
             interceptors=[
                 RuntimeVersionClientInterceptor(component_name="flwr-simulation"),
-                AppIoTokenClientInterceptor(token=self._token),
+                RuntimeTokenClientInterceptor(token=self._token),
             ],
         )
         self._channel.subscribe(on_channel_state_change)

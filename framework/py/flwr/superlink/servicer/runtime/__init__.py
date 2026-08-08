@@ -15,7 +15,7 @@
 """SuperLink implementation of the Runtime API."""
 
 
-from .serverappio_grpc import run_serverappio_api_grpc
+from .runtime_grpc import run_serverappio_api_grpc
 
 __all__ = [
     "run_serverappio_api_grpc",

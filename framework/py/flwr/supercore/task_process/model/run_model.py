@@ -23,7 +23,7 @@ import grpc
 
 from flwr.common.constant import SubStatus
 from flwr.common.logger import log
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushTaskOutputRequest,
@@ -34,7 +34,7 @@ from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 from flwr.supercore.retry import RetryInvoker, make_simple_grpc_retry_invoker, wrap_stub
@@ -145,7 +145,7 @@ def _create_serverappio_stub(
         root_certificates=certificates,
         interceptors=[
             RuntimeVersionClientInterceptor(component_name="flwr-model"),
-            AppIoTokenClientInterceptor(token),
+            RuntimeTokenClientInterceptor(token),
         ],
     )
     channel.subscribe(on_channel_state_change)

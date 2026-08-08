@@ -18,7 +18,7 @@
 from unittest.mock import Mock, patch
 
 from flwr.common.serde import user_config_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     CreateTaskResponse,
 )

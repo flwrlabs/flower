@@ -95,7 +95,7 @@ from flwr.superlink.config_loader import (
     load_control_event_log_plugin,
 )
 from flwr.superlink.servicer.control import run_control_api_grpc
-from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
+from flwr.superlink.servicer.runtime import run_serverappio_api_grpc
 
 try:
     from flwr.ee import (

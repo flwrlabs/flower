@@ -30,7 +30,7 @@ from flwr.app.error import Error
 from flwr.app.message import Message
 from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import message_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     PullAppMessagesRequest,
     PushAppMessagesRequest,
@@ -41,7 +41,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
 )
 from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 from flwr.supercore.run import Run
@@ -287,7 +287,7 @@ class TestGrpcGrid(unittest.TestCase):
         assert interceptors is not None
         self.assertEqual(len(interceptors), 2)
         self.assertIsInstance(interceptors[0], RuntimeVersionClientInterceptor)
-        self.assertIsInstance(interceptors[1], AppIoTokenClientInterceptor)
+        self.assertIsInstance(interceptors[1], RuntimeTokenClientInterceptor)
         # pylint: disable-next=protected-access
         self.assertEqual(interceptors[0]._metadata.component_name, "flwr-serverapp")
 
