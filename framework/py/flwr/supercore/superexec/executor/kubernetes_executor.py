@@ -633,7 +633,7 @@ def _has_rejected_projected_source(volume: JSONObject) -> bool:
 def _get_runtime_root_certificates(
     spec: ExecutionSpec, config: KubernetesExecutorConfig
 ) -> str | None:
-    """Return PEM data for AppIo root certificates, if configured."""
+    """Return PEM data for Runtime API root certificates, if configured."""
     if config.runtime_root_certificates is not None:
         return config.runtime_root_certificates
     if spec.root_certificates_path is not None:

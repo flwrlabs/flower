@@ -144,7 +144,7 @@ def start_client_internal(
     isolation : str (default: ISOLATION_MODE_SUBPROCESS)
         Isolation mode for `ClientApp`. Possible values are `subprocess` and
         `process`. If `subprocess`, the `ClientApp` runs in a subprocess started
-        by the SueprNode and communicates using gRPC at the address
+        by the SuperNode and communicates using gRPC at the address
         `runtime_api_address`. If `process`, the `ClientApp` runs in a separate
         isolated process and communicates using gRPC at the address
         `runtime_api_address`.
