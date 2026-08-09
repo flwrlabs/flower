@@ -30,7 +30,7 @@ from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 
-from .account import AccountAccessDependency, get_account, get_authn_plugin
+from .account import AccountAccessDependency, get_account
 
 
 def _make_request(
@@ -202,27 +202,6 @@ def test_account_access_dependency_rejects_unauthorized_account() -> None:
     assert exc_info.value.code == ApiErrorCode.NO_PERMISSIONS
     assert exc_info.value.message == (
         "Account authorization failed for flwr_aid='aid', account_name='account'."
-    )
-
-
-def test_get_authn_plugin_returns_configured_plugin() -> None:
-    """get_authn_plugin should return the configured authentication plugin."""
-    app = FastAPI()
-    authn_plugin = Mock()
-    app.state.account_access_dep = AccountAccessDependency(authn_plugin, Mock())
-
-    assert get_authn_plugin(_make_app_request(app)) is authn_plugin
-
-
-def test_get_authn_plugin_raises_when_plugin_is_missing() -> None:
-    """get_authn_plugin should fail clearly when the app is not configured."""
-    with pytest.raises(FlowerError) as exc_info:
-        get_authn_plugin(_make_app_request(FastAPI()))
-
-    assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED
-    assert exc_info.value.message == (
-        "SuperLink authentication is not initialized: expected ControlAuthnPlugin, "
-        "got None."
     )
 
 

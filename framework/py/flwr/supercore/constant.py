@@ -79,10 +79,6 @@ SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "supergrid.flower.ai")
 # Control API constants
 OAUTH_SESSION_TTL = timedelta(minutes=10)
 RUN_SERIES_DESCRIPTION_MAX_LENGTH = 80
-UNAUTHENTICATED_PATHS = {
-    "/v1/control/get-login-details",
-    "/v1/control/get-auth-tokens",
-}
 
 # Specification for app publishing
 APP_PUBLISH_ALLOWED_LICENSE_FILES = ("LICENSE", "LICENSE.md")
