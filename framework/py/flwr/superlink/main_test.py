@@ -28,7 +28,6 @@ from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.health.router import health
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
-    ControlEventLogMiddleware,
     ControlLicenseMiddleware,
 )
 
@@ -62,7 +61,6 @@ def _control_middleware_classes() -> list[type[object]]:
         ControlAuthenticationMiddleware,
         ControlLicenseMiddleware,
         ProtobufTranslationMiddleware,
-        ControlEventLogMiddleware,
     ]
 
 
