@@ -134,7 +134,7 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        """Authenticate the request and preserve any refreshed token headers."""
+        """Authenticate the request and store its account on the request state."""
         if (
             not _is_control_path(request.url.path)
             or request.url.path in UNAUTHENTICATED_PATHS

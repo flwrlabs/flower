@@ -20,7 +20,11 @@ from fastapi.security.utils import get_authorization_scheme_param
 from flwr.common.constant import ACCESS_TOKEN_KEY
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
+from flwr.superlink.auth_plugin import (
+    ControlAuthnPlugin,
+    ControlAuthzPlugin,
+    NoOpControlAuthnPlugin,
+)
 
 
 class AccountAccessDependency:
@@ -48,23 +52,30 @@ class AccountAccessDependency:
         request: Request,
     ) -> AccountInfo:
         """Return the authenticated and authorized account for a request."""
-        authorization_headers = request.headers.getlist("authorization")
-        if len(authorization_headers) != 1:
-            raise FlowerError(
-                ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-                "Expected exactly one Authorization header with a Bearer token.",
-            )
+        metadata: list[tuple[str, str]]
+        if isinstance(self.authn_plugin, NoOpControlAuthnPlugin):
+            # The no-op plugin means account authentication is disabled. Still call
+            # it to obtain the synthetic account without requiring credentials.
+            metadata = []
+        else:
+            authorization_headers = request.headers.getlist("authorization")
+            if len(authorization_headers) != 1:
+                raise FlowerError(
+                    ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+                    "Expected exactly one Authorization header with a Bearer token.",
+                )
 
-        scheme, access_token = get_authorization_scheme_param(authorization_headers[0])
-        if scheme.lower() != "bearer" or not access_token:
-            raise FlowerError(
-                ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-                "Authorization header does not contain a Bearer token.",
+            scheme, access_token = get_authorization_scheme_param(
+                authorization_headers[0]
             )
+            if scheme.lower() != "bearer" or not access_token:
+                raise FlowerError(
+                    ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+                    "Authorization header does not contain a Bearer token.",
+                )
+            metadata = [(ACCESS_TOKEN_KEY, access_token)]
 
-        valid_token, account = self.authn_plugin.validate_tokens_in_metadata(
-            [(ACCESS_TOKEN_KEY, access_token)]
-        )
+        valid_token, account = self.authn_plugin.validate_tokens_in_metadata(metadata)
         if not valid_token:
             raise FlowerError(
                 ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
