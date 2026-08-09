@@ -131,7 +131,10 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     response = client.post(
         "/v1/control/list-runs",
         content=ListRunsRequest(limit=1).SerializeToString(),
-        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+        headers={
+            "authorization": "Bearer access-token",
+            "content-type": PROTOBUF_MEDIA_TYPE,
+        },
     )
     proto_response = ListRunsResponse.FromString(response.content)
 
@@ -147,27 +150,33 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     )
 
 
-def test_list_runs_preserves_refreshed_authentication_tokens() -> None:
-    """The authentication middleware adds refreshed tokens to protobuf responses."""
+def test_list_runs_rejects_invalid_token_without_refresh() -> None:
+    """Control HTTP rejects invalid access tokens without refreshing them."""
     linkstate = Mock(spec=LinkState)
     authn_plugin = Mock()
     linkstate.get_run_info.return_value = []
     app = _create_app(authn_plugin=authn_plugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
-    authn_plugin.refresh_tokens.return_value = (
-        [("x-access-token", "new-access-token")],
-        _ACCOUNT,
-    )
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     response = TestClient(app).post(
         "/v1/control/list-runs",
         content=ListRunsRequest().SerializeToString(),
-        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+        headers={
+            "authorization": "Bearer invalid-token",
+            "content-type": PROTOBUF_MEDIA_TYPE,
+        },
     )
 
-    assert response.status_code == 200
-    assert response.headers["x-access-token"] == "new-access-token"
-    assert response.headers.get_list("content-length") == [str(len(response.content))]
+    assert response.status_code == 401
+    assert response.json() == {
+        "code": ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+        "public_message": "Authentication failed.",
+        "public_details": None,
+    }
+    assert response.headers["www-authenticate"] == "Bearer"
+    assert "x-access-token" not in response.headers
+    assert "x-refresh-token" not in response.headers
+    authn_plugin.refresh_tokens.assert_not_called()
 
 
 def test_list_runs_rejects_non_protobuf_payload() -> None:
@@ -178,7 +187,10 @@ def test_list_runs_rejects_non_protobuf_payload() -> None:
     response = TestClient(app).post(
         "/v1/control/list-runs",
         content=b"{}",
-        headers={"content-type": "application/json"},
+        headers={
+            "authorization": "Bearer access-token",
+            "content-type": "application/json",
+        },
     )
 
     assert response.status_code == 415

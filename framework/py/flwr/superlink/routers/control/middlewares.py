@@ -149,14 +149,5 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
                 f"AccountAccessDependency, got {type(account_access).__name__}.",
             )
 
-        authentication_response = Response()
-        # ``Response`` adds a default Content-Length header. This temporary
-        # response only collects refreshed token headers, so it must not affect
-        # the protobuf response returned by the endpoint.
-        authentication_response.headers.raw.clear()
-        request.state.account = await run_in_threadpool(
-            account_access, request, authentication_response
-        )
-        response = await call_next(request)
-        response.headers.raw.extend(authentication_response.headers.raw)
-        return response
+        request.state.account = await run_in_threadpool(account_access, request)
+        return await call_next(request)
