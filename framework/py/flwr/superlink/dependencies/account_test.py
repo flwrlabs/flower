@@ -15,17 +15,12 @@
 """Tests for the Control API account dependency."""
 
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from fastapi import FastAPI, Request
 
-from flwr.common.constant import (
-    ACCESS_TOKEN_KEY,
-    NOOP_ACCOUNT_NAME,
-    NOOP_FLWR_AID,
-    REFRESH_TOKEN_KEY,
-)
+from flwr.common.constant import ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
@@ -92,14 +87,18 @@ def test_account_access_dependency_allows_missing_header_for_noop_plugin() -> No
     """No-op authentication should not require HTTP credentials."""
     authn_plugin = NoOpControlAuthnPlugin(Path(), False)
     authz_plugin = Mock()
+    account = AccountInfo(flwr_aid="aid", account_name="account")
     authz_plugin.authorize.return_value = True
 
-    result = AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(()))
+    with patch.object(
+        authn_plugin,
+        "validate_tokens_in_metadata",
+        return_value=(True, account),
+    ) as validate_tokens:
+        result = AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(()))
 
-    assert result == AccountInfo(
-        flwr_aid=NOOP_FLWR_AID,
-        account_name=NOOP_ACCOUNT_NAME,
-    )
+    assert result is account
+    validate_tokens.assert_called_once_with([])
     authz_plugin.authorize.assert_called_once_with(result)
 
 
