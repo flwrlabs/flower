@@ -339,7 +339,7 @@ class TestGetConnector(unittest.TestCase):
         )
 
         with patch(
-            "flwr.superlink.servicer.runtime.runtime_handlers."
+            "flwr.superlink.servicer.runtime.runtime_servicer."
             "get_authenticated_task",
             return_value=task,
         ):
@@ -361,6 +361,20 @@ class TestGetConnector(unittest.TestCase):
             connector_ref="notion",
         )
 
+    def test_authenticates_before_accessing_state(self) -> None:
+        """GetConnector should authenticate before accessing state."""
+        with (
+            patch(
+                "flwr.superlink.servicer.runtime.runtime_servicer."
+                "get_authenticated_task",
+                side_effect=RuntimeError("No authenticated task"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "No authenticated task"),
+        ):
+            self.servicer.GetConnector(GetConnectorRequest(), Mock())
+
+        self.state_factory.state.assert_not_called()
+
     @parameterized.expand(  # type: ignore
         [
             ("wrong_task_type", TaskType.AGENT_APP, "notion"),
@@ -379,7 +393,7 @@ class TestGetConnector(unittest.TestCase):
 
         with (
             patch(
-                "flwr.superlink.servicer.runtime.runtime_handlers."
+                "flwr.superlink.servicer.runtime.runtime_servicer."
                 "get_authenticated_task",
                 return_value=Mock(
                     type=task_type,
@@ -410,7 +424,7 @@ class TestGetConnector(unittest.TestCase):
 
         with (
             patch(
-                "flwr.superlink.servicer.runtime.runtime_handlers."
+                "flwr.superlink.servicer.runtime.runtime_servicer."
                 "get_authenticated_task",
                 return_value=task,
             ),
@@ -628,7 +642,7 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         # Execute
         with (
             patch(
-                "flwr.superlink.servicer.runtime.runtime_handlers."
+                "flwr.superlink.servicer.runtime.runtime_servicer."
                 "get_authenticated_task",
                 return_value=Task(
                     run_id=self._auth_run_id,
@@ -663,7 +677,7 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         # Execute
         with (
             patch(
-                "flwr.superlink.servicer.runtime.runtime_handlers."
+                "flwr.superlink.servicer.runtime.runtime_servicer."
                 "get_authenticated_task",
                 return_value=Task(
                     run_id=self._auth_run_id,
@@ -1137,7 +1151,7 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         # Execute: Pull task input
         request = PullTaskInputRequest()
         with patch(
-            "flwr.superlink.servicer.runtime.runtime_handlers."
+            "flwr.superlink.servicer.runtime.runtime_servicer."
             "get_authenticated_task",
             return_value=Mock(task_id=task_id, run_id=run_id),
         ):

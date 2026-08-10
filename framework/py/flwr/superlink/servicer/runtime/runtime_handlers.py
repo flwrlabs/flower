@@ -62,6 +62,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputRequest,
     PushTaskOutputResponse,
 )
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.auth.typing import AccountInfo
@@ -71,7 +72,6 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     no_object_id_recompute,
 )
-from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
 from flwr.superlink.servicer.control.control_handlers import process_due_automations
 from flwr.superlink.servicer.control.control_handlers import (
@@ -99,11 +99,12 @@ def pull_pending_tasks(
 def get_nodes(
     request: GetNodesRequest,
     state: LinkState,
+    task: Task,
     context: grpc.ServicerContext,
 ) -> GetNodesResponse:
     """Get available nodes."""
     log(DEBUG, "Runtime.GetNodes")
-    run_id = _get_authenticated_serverapp_run_id(context)
+    run_id = _get_authenticated_serverapp_run_id(task, context)
     all_ids: set[int] = state.get_nodes(run_id)
     nodes: list[Node] = [Node(node_id=node_id) for node_id in all_ids]
     return GetNodesResponse(nodes=nodes)
@@ -112,11 +113,12 @@ def get_nodes(
 def push_messages(
     request: PushAppMessagesRequest,
     state: LinkState,
+    task: Task,
     context: grpc.ServicerContext,
 ) -> PushAppMessagesResponse:
     """Push a set of Messages."""
     log(DEBUG, "Runtime.PushMessages")
-    run_id = _get_authenticated_serverapp_run_id(context)
+    run_id = _get_authenticated_serverapp_run_id(task, context)
 
     _raise_if(
         validation_error=len(request.messages_list) == 0,
@@ -162,11 +164,12 @@ def pull_messages(  # pylint: disable=R0914
     request: PullAppMessagesRequest,
     state: LinkState,
     store: ObjectStore,
+    task: Task,
     context: grpc.ServicerContext,
 ) -> PullAppMessagesResponse:
     """Pull a set of Messages."""
     log(DEBUG, "Runtime.PullMessages")
-    run_id = _get_authenticated_serverapp_run_id(context)
+    run_id = _get_authenticated_serverapp_run_id(task, context)
     messages_res: list[Message] = state.get_message_res(
         message_ids=set(request.message_ids)
     )
@@ -221,11 +224,11 @@ def get_run(request: GetRunRequest, state: LinkState) -> GetRunResponse:
 def get_connector(
     request: GetConnectorRequest,
     state: LinkState,
+    task: Task,
     context: grpc.ServicerContext,
 ) -> GetConnectorResponse:
     """Return credentials authorized for the authenticated connector task."""
     log(DEBUG, "Runtime.GetConnector")
-    task = get_authenticated_task()
     if task.type != TaskType.CONNECTOR or not task.connector_ref:
         context.abort(
             grpc.StatusCode.PERMISSION_DENIED,
@@ -257,11 +260,11 @@ def get_connector(
 def pull_task_input(
     request: PullTaskInputRequest,
     state: LinkState,
+    task: Task,
     context: grpc.ServicerContext,
 ) -> PullTaskInputResponse:
     """Pull ServerApp process inputs."""
     log(DEBUG, "Runtime.PullTaskInput")
-    task = get_authenticated_task()
     run_id = task.run_id
 
     runs = state.get_run_info(run_ids=[run_id])
@@ -290,10 +293,10 @@ def pull_task_input(
 def push_task_output(
     request: PushTaskOutputRequest,
     state: LinkState,
+    task: Task,
 ) -> PushTaskOutputResponse:
     """Push ServerApp process outputs."""
     log(DEBUG, "Runtime.PushTaskOutput")
-    task = get_authenticated_task()
     run_id = task.run_id
 
     if request.HasField("clientapp_runtime"):
@@ -319,10 +322,10 @@ def push_task_output(
 def start_automation(
     request: StartAutomationRequest,
     state: LinkState,
+    task: Task,
     context: grpc.ServicerContext,
 ) -> StartAutomationResponse:
     """Start an automation."""
-    task = get_authenticated_task()
     if task.type not in (TaskType.AGENT_APP, TaskType.SERVER_APP):
         context.abort(
             grpc.StatusCode.PERMISSION_DENIED,
@@ -347,11 +350,12 @@ def start_automation(
 def push_object(
     request: PushObjectRequest,
     state: LinkState,
+    task: Task,
     context: grpc.ServicerContext,
 ) -> PushObjectResponse:
     """Push an object to the ObjectStore."""
     log(DEBUG, "Runtime.PushObject")
-    run_id = _get_authenticated_serverapp_run_id(context)
+    run_id = _get_authenticated_serverapp_run_id(task, context)
     if request.node.node_id != SUPERLINK_NODE_ID:
         context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Unexpected node ID.")
     stored = state.store_object(
@@ -366,11 +370,12 @@ def push_object(
 def pull_object(
     request: PullObjectRequest,
     state: LinkState,
+    task: Task,
     context: grpc.ServicerContext,
 ) -> PullObjectResponse:
     """Pull an object from the ObjectStore."""
     log(DEBUG, "Runtime.PullObject")
-    run_id = _get_authenticated_serverapp_run_id(context)
+    run_id = _get_authenticated_serverapp_run_id(task, context)
     if request.node.node_id != SUPERLINK_NODE_ID:
         context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Unexpected node ID.")
 
@@ -387,18 +392,20 @@ def pull_object(
 def confirm_message_received(
     request: ConfirmMessageReceivedRequest,
     store: ObjectStore,
+    task: Task,
     context: grpc.ServicerContext,
 ) -> ConfirmMessageReceivedResponse:
     """Confirm message received."""
     log(DEBUG, "Runtime.ConfirmMessageReceived")
-    _ = _get_authenticated_serverapp_run_id(context)
+    _ = _get_authenticated_serverapp_run_id(task, context)
     store.delete(request.message_object_id)
     return ConfirmMessageReceivedResponse()
 
 
-def _get_authenticated_serverapp_run_id(context: grpc.ServicerContext) -> int:
+def _get_authenticated_serverapp_run_id(
+    task: Task, context: grpc.ServicerContext
+) -> int:
     """Return the authenticated run ID if it can use these Runtime endpoints."""
-    task = get_authenticated_task()
     if task.type != TaskType.SERVER_APP:
         context.abort(
             grpc.StatusCode.PERMISSION_DENIED,
