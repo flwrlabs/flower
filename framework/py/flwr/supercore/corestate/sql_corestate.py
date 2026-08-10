@@ -34,7 +34,6 @@ from sqlalchemy import (
     literal,
     or_,
     select,
-    text,
     update,
 )
 from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
@@ -796,7 +795,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         next_run_at: str | None,
     ) -> tuple[StartRunRequest, str] | None:
         """Claim an automation occurrence and return its unresolved run request."""
-        self._normalize_legacy_automation_timestamp_text()
         stored_automation_id = uint64_to_int64(automation_id)
         query = select(
             AutomationModel.start_run_request,
@@ -839,7 +837,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         limit: int | None = None,
     ) -> Sequence[Automation]:
         """Return automations matching the given filters."""
-        self._normalize_legacy_automation_timestamp_text()
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
         if (
@@ -914,7 +911,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         next_run_at: str | None,
     ) -> bool:
         """Advance an active automation occurrence."""
-        self._normalize_legacy_automation_timestamp_text()
         timestamp = now()
         next_run_at_dt = (
             datetime.fromisoformat(next_run_at) if next_run_at is not None else None
@@ -959,45 +955,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         with self.session() as session:
             return session.scalar(stmt) is not None
-
-    def _normalize_legacy_automation_timestamp_text(self) -> None:
-        """Normalize late legacy SQLite automation timestamp writes."""
-        if self.database_backend != "sqlite":
-            return
-
-        legacy_timestamp_filter = """
-            created_at LIKE '%T%'
-            OR updated_at LIKE '%T%'
-            OR next_run_at LIKE '%T%'
-            OR stopped_at LIKE '%T%'
-        """
-        with self.session() as session:
-            has_legacy_timestamp = session.scalar(
-                text(
-                    f"""
-                    SELECT 1
-                    FROM automation
-                    WHERE {legacy_timestamp_filter}
-                    LIMIT 1
-                    """
-                )
-            )
-            if has_legacy_timestamp is None:
-                return
-
-            session.execute(
-                text(
-                    f"""
-                    UPDATE automation
-                    SET
-                        created_at = replace(created_at, 'T', ' '),
-                        updated_at = replace(updated_at, 'T', ' '),
-                        next_run_at = replace(next_run_at, 'T', ' '),
-                        stopped_at = replace(stopped_at, 'T', ' ')
-                    WHERE {legacy_timestamp_filter}
-                    """
-                )
-            )
 
     def finish_automation(
         self,
