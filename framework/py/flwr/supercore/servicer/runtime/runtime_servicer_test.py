@@ -77,7 +77,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
     ) -> CreateTaskResponse:
         """Create a connector task as an authenticated AgentApp task."""
         with patch(
-            "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Mock(task_id=789, run_id=123, type=TaskType.AGENT_APP),
         ):
             return self.servicer.CreateTask(
@@ -139,7 +139,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         with patch(
-            "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Mock(task_id=123),
         ):
             response = self.servicer.SendTaskHeartbeat(
@@ -161,7 +161,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         with patch(
-            "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
         ):
             response = self.servicer.CreateTask(request, Mock())
@@ -189,7 +189,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
             with self.subTest(requesting_task_type=requesting_task_type):
                 # Execute
                 with patch(
-                    "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+                    "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                     return_value=Mock(
                         task_id=789, run_id=123, type=requesting_task_type
                     ),
@@ -281,7 +281,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with (
             patch(
-                "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                 return_value=Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
             ),
             self.assertRaises(RuntimeError) as err,
@@ -330,7 +330,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
             with self.subTest(task_type=request.type):
                 with (
                     patch(
-                        "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+                        "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                         return_value=Mock(
                             task_id=789, run_id=123, type=TaskType.SERVER_APP
                         ),
@@ -359,7 +359,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with (
             patch(
-                "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                 return_value=Mock(run_id=123, type=TaskType.SERVER_APP),
             ),
             self.assertRaises(grpc.RpcError),
@@ -385,7 +385,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         with patch(
-            "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Task(task_id=123, run_id=789),
         ):
             response = self.servicer.PushTaskMessage(request, Mock())
@@ -412,7 +412,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with (
             patch(
-                "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                 return_value=Task(task_id=123, run_id=789),
             ),
             self.assertRaises(grpc.RpcError),
@@ -444,7 +444,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         with patch(
-            "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Task(task_id=123, run_id=789),
         ):
             response = self.servicer.PushTaskEvents(request, Mock())
@@ -476,7 +476,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with (
             patch(
-                "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                 return_value=Task(task_id=123, run_id=789),
             ),
             patch("flwr.supercore.servicer.runtime.runtime_handlers.log") as log_mock,
@@ -507,7 +507,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         request = RecordTaskUsageRequest(task_usage=usage)
 
         with patch(
-            "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Task(task_id=123, run_id=789, type=TaskType.MODEL),
         ):
             response = self.servicer.RecordTaskUsage(request, Mock())
@@ -528,7 +528,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         with patch(
-            "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Task(task_id=321, run_id=789),
         ):
             response = self.servicer.PullTaskMessage(
@@ -564,7 +564,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
                 # Execute
                 with (
                     patch(
-                        "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+                        "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                         return_value=Mock(run_id=123, type=requesting_task_type),
                     ),
                     self.assertRaises(grpc.RpcError),
@@ -586,7 +586,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         """PushLogs should concatenate fragments and store them via state."""
         # Execute
         with patch(
-            "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Mock(task_id=123),
         ):
             response = self.servicer.PushLogs(

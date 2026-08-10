@@ -16,7 +16,6 @@
 
 # pylint: disable=unused-argument
 
-from collections.abc import Callable
 from logging import DEBUG, ERROR
 
 import grpc
@@ -55,58 +54,52 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.corestate import CoreState
-from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.task_process.connector import registry as connector_registry
-
-StateProvider = Callable[[], CoreState]
 
 
 def pull_pending_tasks(
-    request: PullPendingTasksRequest, state_provider: StateProvider
+    request: PullPendingTasksRequest, state: CoreState
 ) -> PullPendingTasksResponse:
     """Pull pending tasks."""
     log(DEBUG, "Runtime.PullPendingTasks")
 
-    tasks = state_provider().get_tasks(
+    tasks = state.get_tasks(
         statuses=[Status.PENDING], order_by="pending_at", ascending=True
     )
     return PullPendingTasksResponse(tasks=tasks)
 
 
-def claim_task(
-    request: ClaimTaskRequest, state_provider: StateProvider
-) -> ClaimTaskResponse:
+def claim_task(request: ClaimTaskRequest, state: CoreState) -> ClaimTaskResponse:
     """Claim a pending task."""
     log(DEBUG, "Runtime.ClaimTask")
 
-    token = state_provider().claim_task(request.task_id)
+    token = state.claim_task(request.task_id)
     return ClaimTaskResponse(token=token)
 
 
 def send_task_heartbeat(
-    request: SendTaskHeartbeatRequest, state_provider: StateProvider
+    request: SendTaskHeartbeatRequest,
+    state: CoreState,
+    task: Task,
 ) -> SendTaskHeartbeatResponse:
     """Handle a heartbeat for a claimed task."""
     log(DEBUG, "Runtime.SendTaskHeartbeat")
 
-    task = get_authenticated_task()
-    success = state_provider().acknowledge_task_heartbeat(task.task_id)
+    success = state.acknowledge_task_heartbeat(task.task_id)
     return SendTaskHeartbeatResponse(success=success)
 
 
 def create_task(
     request: CreateTaskRequest,
-    state_provider: StateProvider,
+    state: CoreState,
+    task: Task,
     context: grpc.ServicerContext,
 ) -> CreateTaskResponse:
     """Create a task."""
     log(DEBUG, "Runtime.CreateTask")
 
-    # Get authenticated task and associated run ID
-    task = get_authenticated_task()
     run_id = task.run_id
 
-    state = state_provider()
     connector_ref = request.connector_ref or None
 
     _validate_create_task_request(request, task, connector_ref, state, context)
@@ -127,13 +120,12 @@ def create_task(
 
 def push_task_message(
     request: PushTaskMessageRequest,
-    state_provider: StateProvider,
+    state: CoreState,
+    task: Task,
     context: grpc.ServicerContext,
 ) -> PushTaskMessageResponse:
     """Push a task message."""
     log(DEBUG, "Runtime.PushTaskMessage")
-
-    task = get_authenticated_task()
 
     if request.message.metadata.src_task_id != task.task_id:
         context.abort(
@@ -143,7 +135,7 @@ def push_task_message(
 
     message = message_from_proto(request.message)
 
-    stored = state_provider().store_task_message(message)
+    stored = state.store_task_message(message)
     if not stored:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
@@ -154,12 +146,13 @@ def push_task_message(
 
 
 def push_task_events(
-    request: PushTaskEventsRequest, state_provider: StateProvider
+    request: PushTaskEventsRequest,
+    state: CoreState,
+    task: Task,
 ) -> PushTaskEventsResponse:
     """Push task events."""
     log(DEBUG, "Runtime.PushTaskEvents")
 
-    task = get_authenticated_task()
     if not request.events:
         return PushTaskEventsResponse()
 
@@ -167,7 +160,7 @@ def push_task_events(
         event.run_id = task.run_id
         event.task_id = task.task_id
 
-    if not state_provider().store_task_events(request.events):
+    if not state.store_task_events(request.events):
         log(
             ERROR,
             "Task events could not be stored for task %d of run %d.",
@@ -179,25 +172,27 @@ def push_task_events(
 
 
 def record_task_usage(
-    request: RecordTaskUsageRequest, state_provider: StateProvider
+    request: RecordTaskUsageRequest,
+    state: CoreState,
+    task: Task,
 ) -> RecordTaskUsageResponse:
     """Record task usage."""
     log(DEBUG, "Runtime.RecordTaskUsage")
 
-    task = get_authenticated_task()
-    state_provider().add_task_usage(task.task_id, request.task_usage)
+    state.add_task_usage(task.task_id, request.task_usage)
     return RecordTaskUsageResponse()
 
 
 def pull_task_message(
-    request: PullTaskMessageRequest, state_provider: StateProvider
+    request: PullTaskMessageRequest,
+    state: CoreState,
+    task: Task,
 ) -> PullTaskMessageResponse:
     """Pull task messages."""
     log(DEBUG, "Runtime.PullTaskMessage")
 
-    task = get_authenticated_task()
     limit = request.limit if request.HasField("limit") else None
-    messages = state_provider().get_task_message(
+    messages = state.get_task_message(
         dst_task_ids=[task.task_id],
         limit=limit,
         order_by="created_at",
@@ -208,14 +203,12 @@ def pull_task_message(
 
 
 def push_logs(
-    request: PushLogsRequest, state_provider: StateProvider
+    request: PushLogsRequest,
+    state: CoreState,
+    task: Task,
 ) -> PushLogsResponse:
     """Push logs."""
     log(DEBUG, "Runtime.PushLogs")
-    state = state_provider()
-
-    task = get_authenticated_task()
-
     # Add logs to LinkState
     merged_logs = "".join(request.logs)
     state.add_task_log(task.task_id, merged_logs)

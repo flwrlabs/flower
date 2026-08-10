@@ -439,7 +439,7 @@ class TestSuperNodeRuntimeServicer(unittest.TestCase):
 
         # Execute
         with patch(
-            "flwr.supercore.servicer.runtime.runtime_handlers.get_authenticated_task",
+            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
             return_value=Mock(task_id=task_id),
         ):
             response = self.servicer.SendTaskHeartbeat(request, Mock())

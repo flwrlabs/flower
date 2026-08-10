@@ -41,6 +41,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatResponse,
 )
 from flwr.supercore.corestate import CoreState
+from flwr.supercore.interceptors import get_authenticated_task
 
 from . import runtime_handlers
 
@@ -57,52 +58,60 @@ class RuntimeServicer(ABC):
         self, request: PullPendingTasksRequest, context: grpc.ServicerContext
     ) -> PullPendingTasksResponse:
         """Pull pending tasks."""
-        return runtime_handlers.pull_pending_tasks(request, self.state)
+        return runtime_handlers.pull_pending_tasks(request, self.state())
 
     def ClaimTask(
         self, request: ClaimTaskRequest, context: grpc.ServicerContext
     ) -> ClaimTaskResponse:
         """Claim a pending task."""
-        return runtime_handlers.claim_task(request, self.state)
+        return runtime_handlers.claim_task(request, self.state())
 
     def SendTaskHeartbeat(
         self, request: SendTaskHeartbeatRequest, context: grpc.ServicerContext
     ) -> SendTaskHeartbeatResponse:
         """Handle a heartbeat for a claimed task."""
-        return runtime_handlers.send_task_heartbeat(request, self.state)
+        task = get_authenticated_task()
+        return runtime_handlers.send_task_heartbeat(request, self.state(), task)
 
     def CreateTask(
         self, request: CreateTaskRequest, context: grpc.ServicerContext
     ) -> CreateTaskResponse:
         """Create a task."""
-        return runtime_handlers.create_task(request, self.state, context)
+        task = get_authenticated_task()
+        return runtime_handlers.create_task(request, self.state(), task, context)
 
     def PushTaskMessage(
         self, request: PushTaskMessageRequest, context: grpc.ServicerContext
     ) -> PushTaskMessageResponse:
         """Push a task message."""
-        return runtime_handlers.push_task_message(request, self.state, context)
+        task = get_authenticated_task()
+        return runtime_handlers.push_task_message(request, self.state(), task, context)
 
     def PushTaskEvents(
         self, request: PushTaskEventsRequest, context: grpc.ServicerContext
     ) -> PushTaskEventsResponse:
         """Push task events."""
-        return runtime_handlers.push_task_events(request, self.state)
+        task = get_authenticated_task()
+        return runtime_handlers.push_task_events(request, self.state(), task)
 
     def RecordTaskUsage(
         self, request: RecordTaskUsageRequest, context: grpc.ServicerContext
     ) -> RecordTaskUsageResponse:
         """Record task usage."""
-        return runtime_handlers.record_task_usage(request, self.state)
+        task = get_authenticated_task()
+        return runtime_handlers.record_task_usage(request, self.state(), task)
 
     def PullTaskMessage(
         self, request: PullTaskMessageRequest, context: grpc.ServicerContext
     ) -> PullTaskMessageResponse:
         """Pull task messages."""
-        return runtime_handlers.pull_task_message(request, self.state)
+        task = get_authenticated_task()
+        return runtime_handlers.pull_task_message(request, self.state(), task)
 
     def PushLogs(
         self, request: PushLogsRequest, context: grpc.ServicerContext
     ) -> PushLogsResponse:
         """Push logs."""
-        return runtime_handlers.push_logs(request, self.state)
+        state = self.state()
+        task = get_authenticated_task()
+        return runtime_handlers.push_logs(request, state, task)
