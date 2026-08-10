@@ -19,10 +19,28 @@ from typing import Any
 import pytest
 from sqlalchemy import Column, Table
 
-from flwr.supercore.state.schema.corestate_models import FlwrBase, Task
+from flwr.supercore.state.schema.corestate_models import FlwrBase, Task, TaskLogsTable
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 
-UNMAPPED_CORE_TABLES = {"task_logs"}
+CORESTATE_TABLE_NAMES = {
+    "nonce_store",
+    "fab",
+    "run_series",
+    "series_context",
+    "series_runs",
+    "automation",
+    "connector",
+    "connector_oauth_session",
+    "run_connector",
+    "task",
+    "task_event",
+    "task_message",
+    "task_logs",
+    "object_push_sessions",
+    "object_push_session_roots",
+    "object_push_session_pending",
+    "task_usage",
+}
 
 
 def _server_default(column: Column[Any]) -> str | None:
@@ -86,6 +104,7 @@ def _primary_key_signature(table: Table) -> tuple[str, ...]:
         "task",
         "task_event",
         "task_message",
+        "task_logs",
         "object_push_sessions",
         "object_push_session_roots",
         "object_push_session_pending",
@@ -106,12 +125,12 @@ def test_declarative_model_matches_core_metadata(table_name: str) -> None:
 
 
 def test_declarative_metadata_covers_all_mappable_core_tables() -> None:
-    """Ensure all mappable CoreState tables have a declarative representation."""
+    """Ensure CoreState metadata is fully defined by model metadata."""
     core_table_names = set(create_corestate_metadata().tables)
     model_table_names = set(FlwrBase.metadata.tables)
 
-    assert model_table_names == core_table_names - UNMAPPED_CORE_TABLES
-    assert model_table_names.isdisjoint(UNMAPPED_CORE_TABLES)
+    assert model_table_names == CORESTATE_TABLE_NAMES
+    assert core_table_names == model_table_names
 
 
 def test_task_mapper_uses_task_id_as_identity_key() -> None:
@@ -119,7 +138,7 @@ def test_task_mapper_uses_task_id_as_identity_key() -> None:
     assert [column.name for column in Task.__mapper__.primary_key] == ["task_id"]
 
 
-def test_task_logs_remains_unmapped_without_unique_identity_key() -> None:
-    """Ensure keyless task_logs is not mapped with an unsafe ORM identity key."""
+def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:
+    """Ensure keyless task_logs stays a table, not an ORM mapper."""
     assert "task_logs" in create_corestate_metadata().tables
-    assert "task_logs" not in FlwrBase.metadata.tables
+    assert TaskLogsTable.primary_key.columns.values() == []
