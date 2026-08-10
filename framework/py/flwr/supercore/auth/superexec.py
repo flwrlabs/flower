@@ -19,10 +19,23 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from typing import Protocol
 
-from google.protobuf.message import Message as GrpcMessage
+from google.protobuf.message import Message as ProtoMessage
 
-from flwr.supercore.constant import SUPEREXEC_AUTH_SECRET_CONTEXT
+from flwr.supercore.constant import (
+    MAX_TIMESTAMP_DIFF_SECONDS,
+    MIN_TIMESTAMP_DIFF_SECONDS,
+    SUPEREXEC_AUTH_SECRET_CONTEXT,
+)
+from flwr.supercore.date import now
+
+
+class _NonceStore(Protocol):
+    """Store used to reserve SuperExec authentication nonces."""
+
+    def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
+        """Atomically reserve a nonce until it expires."""
 
 
 def canonicalize_superexec_auth_input(  # pylint: disable=R0913
@@ -42,7 +55,7 @@ def canonicalize_superexec_auth_input(  # pylint: disable=R0913
     return canonical.encode("utf-8")
 
 
-def compute_request_body_sha256(request: GrpcMessage) -> str:
+def compute_request_body_sha256(request: ProtoMessage) -> str:
     """Compute SHA256 of the deterministic protobuf request body."""
     payload = request.SerializeToString(deterministic=True)
     return hashlib.sha256(payload).hexdigest()
@@ -78,3 +91,53 @@ def verify_superexec_signature(
 ) -> bool:
     """Verify signatures with constant-time comparison."""
     return hmac.compare_digest(expected_signature, received_signature)
+
+
+def verify_superexec_request(  # pylint: disable=too-many-arguments
+    *,
+    request: ProtoMessage,
+    method: str,
+    auth_secret: bytes,
+    timestamp_raw: str | None,
+    nonce: str | None,
+    body_sha256_header: str | None,
+    signature: str | None,
+    nonce_store: _NonceStore,
+) -> bool:
+    """Verify SuperExec authentication fields for a protobuf request."""
+    # Reject incomplete authentication metadata before doing any state access.
+    if not timestamp_raw or not nonce or not body_sha256_header or not signature:
+        return False
+
+    # Require an integer timestamp within the accepted clock-skew and age window.
+    try:
+        timestamp = int(timestamp_raw)
+    except (TypeError, ValueError):
+        return False
+
+    time_diff = now().timestamp() - timestamp
+    if not MIN_TIMESTAMP_DIFF_SECONDS < time_diff < MAX_TIMESTAMP_DIFF_SECONDS:
+        return False
+
+    # Bind the authentication metadata to the deterministic protobuf payload.
+    body_sha256 = compute_request_body_sha256(request)
+    if body_sha256 != body_sha256_header:
+        return False
+
+    # Recompute and compare the HMAC without leaking timing information.
+    expected_signature = compute_superexec_signature(
+        auth_secret=auth_secret,
+        method=method,
+        timestamp=timestamp,
+        nonce=nonce,
+        body_sha256=body_sha256,
+    )
+    if not verify_superexec_signature(expected_signature, signature):
+        return False
+
+    # Reserve the nonce last so failed requests cannot consume nonce entries.
+    return nonce_store.reserve_nonce(
+        namespace=f"superexec:{method}",
+        nonce=nonce,
+        expires_at=float(timestamp + MAX_TIMESTAMP_DIFF_SECONDS),
+    )
