@@ -137,7 +137,7 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         Kubernetes namespace for TaskExecutor Pods and credential Secrets.
     image : str
         Container image used for TaskExecutor Pods.
-    appio_root_certificates : str | None
+    runtime_root_certificates : str | None
         Optional PEM data mounted as ca.crt. If unset, launch uses
         ExecutionSpec.root_certificates_path when provided.
     image_pull_policy : str | None
@@ -176,7 +176,7 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
 
     namespace: str
     image: str
-    appio_root_certificates: str | None = None
+    runtime_root_certificates: str | None = None
     image_pull_policy: str | None = None
     labels: dict[str, str] | None = None
     annotations: dict[str, str] | None = None
@@ -296,14 +296,16 @@ class KubernetesExecutor:
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Submit the TaskExecutor Pod and credential Secret."""
         try:
-            appio_root_certificates = _get_appio_root_certificates(spec, self._config)
+            runtime_root_certificates = _get_runtime_root_certificates(
+                spec, self._config
+            )
             launch_attempt_id = _new_launch_attempt_id()
             secret_name = _credential_secret_name(spec, launch_attempt_id)
             secret = _build_appio_credentials_secret(
-                spec, self._config, appio_root_certificates, launch_attempt_id
+                spec, self._config, runtime_root_certificates, launch_attempt_id
             )
             pod = _build_taskexecutor_pod(
-                spec, self._config, appio_root_certificates, launch_attempt_id
+                spec, self._config, runtime_root_certificates, launch_attempt_id
             )
             self._client.create_namespaced_secret(self._config.namespace, secret)
         except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -409,13 +411,13 @@ class CompletedPodSweeper:
 def _build_appio_credentials_secret(
     spec: ExecutionSpec,
     config: KubernetesExecutorConfig,
-    appio_root_certificates: str | None,
+    runtime_root_certificates: str | None,
     launch_attempt_id: str,
 ) -> JSONObject:
     """Build the AppIo credential Secret for a TaskExecutor Pod."""
     data: JSONObject = {"token": spec.token}
-    if appio_root_certificates is not None:
-        data["ca.crt"] = appio_root_certificates
+    if runtime_root_certificates is not None:
+        data["ca.crt"] = runtime_root_certificates
 
     return {
         "apiVersion": "v1",
@@ -434,7 +436,7 @@ def _build_appio_credentials_secret(
 def _build_taskexecutor_pod(
     spec: ExecutionSpec,
     config: KubernetesExecutorConfig,
-    appio_root_certificates: str | None,
+    runtime_root_certificates: str | None,
     launch_attempt_id: str,
 ) -> JSONObject:
     """Build the TaskExecutor Pod for a claimed SuperExec task."""
@@ -452,7 +454,7 @@ def _build_taskexecutor_pod(
         "name": "taskexecutor",
         "image": config.image,
         "command": [TASK_TYPE_TO_COMMAND[spec.task_type]],
-        "args": _taskexecutor_args(spec, appio_root_certificates),
+        "args": _taskexecutor_args(spec, runtime_root_certificates),
         "volumeMounts": volume_mounts,
     }
     if config.image_pull_policy is not None:
@@ -506,19 +508,19 @@ def _build_taskexecutor_pod(
 
 
 def _taskexecutor_args(
-    spec: ExecutionSpec, appio_root_certificates: str | None
+    spec: ExecutionSpec, runtime_root_certificates: str | None
 ) -> list[str]:
     """Build TaskExecutor arguments with file-based credential delivery."""
     args = [
         TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],
-        spec.appio_api_address,
+        spec.runtime_api_address,
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
     ]
 
     if spec.insecure:
         args.append("--insecure")
-    elif appio_root_certificates is not None:
+    elif runtime_root_certificates is not None:
         args.extend(["--root-certificates", APPIO_ROOT_CERTIFICATES_FILE_PATH])
 
     if spec.runtime_dependency_install:
@@ -628,12 +630,12 @@ def _has_rejected_projected_source(volume: JSONObject) -> bool:
     )
 
 
-def _get_appio_root_certificates(
+def _get_runtime_root_certificates(
     spec: ExecutionSpec, config: KubernetesExecutorConfig
 ) -> str | None:
-    """Return PEM data for AppIo root certificates, if configured."""
-    if config.appio_root_certificates is not None:
-        return config.appio_root_certificates
+    """Return PEM data for Runtime API root certificates, if configured."""
+    if config.runtime_root_certificates is not None:
+        return config.runtime_root_certificates
     if spec.root_certificates_path is not None:
         return (
             Path(spec.root_certificates_path).expanduser().read_text(encoding="utf-8")

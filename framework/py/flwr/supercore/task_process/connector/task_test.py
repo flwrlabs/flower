@@ -19,7 +19,7 @@ import unittest
 from unittest.mock import ANY, Mock, patch
 
 from flwr.common.serde import message_from_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorRequest,
     GetConnectorResponse,
 )

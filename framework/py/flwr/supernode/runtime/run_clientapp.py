@@ -35,7 +35,8 @@ from flwr.common.serde import (
     message_to_proto,
     run_from_proto,
 )
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -43,7 +44,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesRequest,
     PushTaskOutputRequest,
 )
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
@@ -65,7 +65,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     push_objects,
 )
 from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
@@ -79,7 +79,7 @@ from flwr.supercore.telemetry import EventType, event
 
 
 def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
-    clientappio_api_address: str,
+    runtime_api_address: str,
     token: str,
     insecure: bool,
     certificates: bytes | None = None,
@@ -94,12 +94,12 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     event(EventType.FLWR_CLIENTAPP_RUN_ENTER)
 
     channel = create_channel(
-        server_address=clientappio_api_address,
+        server_address=runtime_api_address,
         insecure=insecure,
         root_certificates=certificates,
         interceptors=[
             RuntimeVersionClientInterceptor(component_name="flwr-clientapp"),
-            AppIoTokenClientInterceptor(token),
+            RuntimeTokenClientInterceptor(token),
         ],
     )
     channel.subscribe(on_channel_state_change)
@@ -245,7 +245,7 @@ def pull_task_input(stub: RuntimeStub) -> tuple[Message, Context, Run, Fab]:
     # Pull and inflate the message
     pull_msg_res: PullAppMessagesResponse = stub.PullMessages(PullAppMessagesRequest())
     if not pull_msg_res.messages_list:
-        raise RuntimeError("No messages received from ClientAppIo")
+        raise RuntimeError("No messages received from Runtime API")
     run_id = context.run_id
     node = Node(node_id=context.node_id)
     object_tree = pull_msg_res.message_object_trees[0]

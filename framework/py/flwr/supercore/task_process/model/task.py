@@ -21,7 +21,7 @@ import time
 from typing import cast
 
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
