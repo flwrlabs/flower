@@ -14,15 +14,10 @@
 # ==============================================================================
 """Shared Runtime API servicer implementation."""
 
-
 from abc import ABC, abstractmethod
-from logging import DEBUG, ERROR
 
 import grpc
 
-from flwr.common.constant import Status
-from flwr.common.logger import log
-from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
@@ -45,17 +40,9 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
-from flwr.supercore.constant import (
-    TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
-    TASK_TYPES_REQUIRING_CONNECTOR_REF,
-    TASK_TYPES_REQUIRING_FAB_HASH,
-    TASK_TYPES_REQUIRING_MODEL_REF,
-    TaskType,
-)
 from flwr.supercore.corestate import CoreState
-from flwr.supercore.interceptors import get_authenticated_task
-from flwr.supercore.task_process.connector import registry as connector_registry
+
+from . import runtime_handlers
 
 
 # pylint: disable=invalid-name, unused-argument
@@ -70,203 +57,52 @@ class RuntimeServicer(ABC):
         self, request: PullPendingTasksRequest, context: grpc.ServicerContext
     ) -> PullPendingTasksResponse:
         """Pull pending tasks."""
-        log(DEBUG, "Runtime.PullPendingTasks")
-
-        tasks = self.state().get_tasks(
-            statuses=[Status.PENDING], order_by="pending_at", ascending=True
-        )
-        return PullPendingTasksResponse(tasks=tasks)
+        return runtime_handlers.pull_pending_tasks(request, self.state)
 
     def ClaimTask(
         self, request: ClaimTaskRequest, context: grpc.ServicerContext
     ) -> ClaimTaskResponse:
         """Claim a pending task."""
-        log(DEBUG, "Runtime.ClaimTask")
-
-        token = self.state().claim_task(request.task_id)
-        return ClaimTaskResponse(token=token)
+        return runtime_handlers.claim_task(request, self.state)
 
     def SendTaskHeartbeat(
         self, request: SendTaskHeartbeatRequest, context: grpc.ServicerContext
     ) -> SendTaskHeartbeatResponse:
         """Handle a heartbeat for a claimed task."""
-        log(DEBUG, "Runtime.SendTaskHeartbeat")
-
-        task = get_authenticated_task()
-        success = self.state().acknowledge_task_heartbeat(task.task_id)
-        return SendTaskHeartbeatResponse(success=success)
+        return runtime_handlers.send_task_heartbeat(request, self.state)
 
     def CreateTask(
         self, request: CreateTaskRequest, context: grpc.ServicerContext
     ) -> CreateTaskResponse:
         """Create a task."""
-        log(DEBUG, "Runtime.CreateTask")
-
-        # Get authenticated task and associated run ID
-        task = get_authenticated_task()
-        run_id = task.run_id
-
-        state = self.state()
-        connector_ref = request.connector_ref or None
-
-        _validate_create_task_request(request, task, connector_ref, state, context)
-        created_task_id = state.create_task(
-            task_type=request.type,
-            run_id=run_id,
-            fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
-            model_ref=request.model_ref if request.HasField("model_ref") else None,
-            connector_ref=connector_ref,
-            requesting_task_id=task.task_id,
-        )
-        if created_task_id is None:
-            context.abort(grpc.StatusCode.INTERNAL, "Failed to create task")
-            raise RuntimeError("This line should never be reached.")
-
-        return CreateTaskResponse(task_id=created_task_id)
+        return runtime_handlers.create_task(request, self.state, context)
 
     def PushTaskMessage(
         self, request: PushTaskMessageRequest, context: grpc.ServicerContext
     ) -> PushTaskMessageResponse:
         """Push a task message."""
-        log(DEBUG, "Runtime.PushTaskMessage")
-
-        task = get_authenticated_task()
-
-        if request.message.metadata.src_task_id != task.task_id:
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                "`Message.metadata.src_task_id` does not match the authenticated task.",
-            )
-
-        message = message_from_proto(request.message)
-
-        stored = self.state().store_task_message(message)
-        if not stored:
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                "Task message could not be stored.",
-            )
-
-        return PushTaskMessageResponse(message_id=message.metadata.message_id)
+        return runtime_handlers.push_task_message(request, self.state, context)
 
     def PushTaskEvents(
         self, request: PushTaskEventsRequest, context: grpc.ServicerContext
     ) -> PushTaskEventsResponse:
         """Push task events."""
-        log(DEBUG, "Runtime.PushTaskEvents")
-
-        task = get_authenticated_task()
-        if not request.events:
-            return PushTaskEventsResponse()
-
-        for event in request.events:
-            event.run_id = task.run_id
-            event.task_id = task.task_id
-
-        if not self.state().store_task_events(request.events):
-            log(
-                ERROR,
-                "Task events could not be stored for task %d of run %d.",
-                task.task_id,
-                task.run_id,
-            )
-
-        return PushTaskEventsResponse()
+        return runtime_handlers.push_task_events(request, self.state)
 
     def RecordTaskUsage(
         self, request: RecordTaskUsageRequest, context: grpc.ServicerContext
     ) -> RecordTaskUsageResponse:
         """Record task usage."""
-        log(DEBUG, "Runtime.RecordTaskUsage")
-
-        task = get_authenticated_task()
-        self.state().add_task_usage(task.task_id, request.task_usage)
-        return RecordTaskUsageResponse()
+        return runtime_handlers.record_task_usage(request, self.state)
 
     def PullTaskMessage(
         self, request: PullTaskMessageRequest, context: grpc.ServicerContext
     ) -> PullTaskMessageResponse:
         """Pull task messages."""
-        log(DEBUG, "Runtime.PullTaskMessage")
-
-        task = get_authenticated_task()
-        limit = request.limit if request.HasField("limit") else None
-        messages = self.state().get_task_message(
-            dst_task_ids=[task.task_id],
-            limit=limit,
-            order_by="created_at",
-        )
-        return PullTaskMessageResponse(
-            messages=[message_to_proto(message) for message in messages]
-        )
+        return runtime_handlers.pull_task_message(request, self.state)
 
     def PushLogs(
         self, request: PushLogsRequest, context: grpc.ServicerContext
     ) -> PushLogsResponse:
         """Push logs."""
-        log(DEBUG, "Runtime.PushLogs")
-        state = self.state()
-
-        task = get_authenticated_task()
-
-        # Add logs to LinkState
-        merged_logs = "".join(request.logs)
-        state.add_task_log(task.task_id, merged_logs)
-        return PushLogsResponse()
-
-
-def _validate_create_task_request(
-    request: CreateTaskRequest,
-    requesting_task: Task,
-    connector_ref: str | None,
-    state: CoreState,
-    context: grpc.ServicerContext,
-) -> None:
-    """Validate the task creation request."""
-    if requesting_task.type not in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
-            f"Task type '{requesting_task.type}' is not allowed to create tasks.",
-        )
-
-    if request.type not in set(TaskType):
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Invalid task type: {request.type}",
-        )
-
-    if request.type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Task type '{request.type}' requires fab_hash.",
-        )
-
-    if request.type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Task type '{request.type}' requires model_ref.",
-        )
-
-    if request.type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not connector_ref:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Task type '{request.type}' requires connector_ref.",
-        )
-
-    # Check if the connector ref is valid
-    if request.type == TaskType.CONNECTOR and connector_ref:
-
-        if connector_registry.has_builtin_connector(connector_ref):
-            return
-
-        try:
-            connector_registry.get_oauth_connector_provider(connector_ref)
-        except ValueError as err:
-            context.abort(grpc.StatusCode.NOT_FOUND, str(err))
-
-        available_refs = state.get_run_connector_refs(run_id=requesting_task.run_id)
-        if connector_ref not in available_refs:
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Connector is not available to this run.",
-            )
+        return runtime_handlers.push_logs(request, self.state)
