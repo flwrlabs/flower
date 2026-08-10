@@ -17,6 +17,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from .exit_code import EXIT_CODE_HELP, ExitCode
 
 
@@ -34,6 +36,9 @@ def test_exit_code_help_url_exist() -> None:
     """Test if all exit codes have help URL."""
     # Get all exit code help URLs
     dir_path = Path(__file__).parents[4] / "docs/source/ref-exit-codes"
+    if not dir_path.exists():
+        pytest.skip("docs/ is not available in this source tree")
+
     files = {int(f.stem): f for f in dir_path.glob("*.rst") if f.stem.isdigit()}
 
     # Check if all exit codes
