@@ -106,6 +106,7 @@ def create_app(
     if config is None:
         is_simulation = False
         database = get_ee_linkstate_db()
+        superexec_auth_secret = None
         authn_plugin, authz_plugin = load_control_auth_plugins(
             os.getenv("FLWR_ACCOUNT_AUTH_CONFIG"), verify_tls_cert=True
         )
@@ -117,6 +118,7 @@ def create_app(
     else:
         is_simulation = config.simulation
         database = config.database
+        superexec_auth_secret = config.superexec_auth_secret
         authn_plugin, authz_plugin = config.authn_plugin, config.authz_plugin
         event_log_plugin = config.event_log_plugin
 
@@ -173,6 +175,7 @@ def create_app(
     fastapi_app.state.superlink_lifespan = superlink_lifespan
     fastapi_app.state.linkstate_factory = linkstate_factory
     fastapi_app.state.objectstore_factory = objectstore_factory
+    fastapi_app.state.superexec_auth_secret = superexec_auth_secret
     fastapi_app.state.account_access_dep = AccountAccessDependency(
         authn_plugin, authz_plugin
     )
