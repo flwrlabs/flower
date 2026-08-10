@@ -2449,7 +2449,7 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
             """,
             {"automation_id": uint64_to_int64(legacy.automation_id)},
         )
-        self.assertNotIn("T", rows[0]["next_run_at"])
+        self.assertNotIn("T", str(rows[0]["next_run_at"]))
 
     def test_legacy_automation_normalization_flag_waits_for_commit(self) -> None:
         """Rolled-back timestamp normalization does not poison later reads."""
