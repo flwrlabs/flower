@@ -26,6 +26,7 @@ from flwr.proto.runtime_pb2_grpc import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.interceptors import (
+    RpcErrorTranslationServerInterceptor,
     create_superlink_runtime_superexec_auth_server_interceptor,
     create_superlink_runtime_token_auth_server_interceptor,
     create_superlink_runtime_version_server_interceptor,
@@ -58,6 +59,7 @@ def run_runtime_api_grpc(  # pylint: disable=R0913,R0917
 
     # Create interceptors
     interceptors = [
+        RpcErrorTranslationServerInterceptor(),
         create_superlink_runtime_token_auth_server_interceptor(
             state_provider=state_factory.state
         )
