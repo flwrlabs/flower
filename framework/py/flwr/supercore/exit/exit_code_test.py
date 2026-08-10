@@ -35,10 +35,12 @@ def test_exit_code_help_exist() -> None:
 def test_exit_code_help_url_exist() -> None:
     """Test if all exit codes have help URL."""
     # Get all exit code help URLs
-    dir_path = Path(__file__).parents[4] / "docs/source/ref-exit-codes"
-    if not dir_path.exists():
+    docs_root = Path(__file__).parents[4] / "docs"
+    if not docs_root.is_dir():
         pytest.skip("docs/ is not available in this source tree")
 
+    dir_path = docs_root / "source/ref-exit-codes"
+    assert dir_path.is_dir(), f"Expected exit-code docs directory at {dir_path}"
     files = {int(f.stem): f for f in dir_path.glob("*.rst") if f.stem.isdigit()}
 
     # Check if all exit codes
