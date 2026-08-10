@@ -290,6 +290,11 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         public_message="ObjectStore is not initialized.",
     ),
+    ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED: ApiErrorSpec(
+        status_code=StatusCode.UNAUTHENTICATED,
+        http_status_code=status.HTTP_401_UNAUTHORIZED,
+        public_message="Authentication failed.",
+    ),
     ApiErrorCode.FLEET_SUPERNODE_REGISTRATION_DISABLED: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
