@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SuperNode implementation of the Runtime API."""
+"""SuperLink implementation of the Runtime API."""
 
 
-from .clientappio_servicer import ClientAppIoServicer
+from .runtime_grpc import run_runtime_api_grpc
 
 __all__ = [
-    "ClientAppIoServicer",
+    "run_runtime_api_grpc",
 ]

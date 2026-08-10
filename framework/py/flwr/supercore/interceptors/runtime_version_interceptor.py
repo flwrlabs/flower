@@ -246,7 +246,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
         return method_handler
 
 
-def create_serverappio_runtime_version_server_interceptor(
+def create_superlink_runtime_version_server_interceptor(
     connection_name: str = "Caller <-> SuperLink Runtime API",
     send_warning_metadata: bool = False,
     reject_incompatible: bool = True,
@@ -260,7 +260,7 @@ def create_serverappio_runtime_version_server_interceptor(
     )
 
 
-def create_clientappio_runtime_version_server_interceptor(
+def create_supernode_runtime_version_server_interceptor(
     connection_name: str = "Caller <-> SuperNode Runtime API",
     send_warning_metadata: bool = False,
     reject_incompatible: bool = True,
