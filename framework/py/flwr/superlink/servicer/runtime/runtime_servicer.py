@@ -14,23 +14,8 @@
 # ==============================================================================
 """Runtime API servicer hosted by SuperLink."""
 
-
-from itertools import chain
-from logging import DEBUG, ERROR, INFO
-
 import grpc
 
-from flwr.app import Message
-from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.common.logger import log
-from flwr.common.serde import (
-    context_from_proto,
-    context_to_proto,
-    fab_to_proto,
-    message_from_proto,
-    message_to_proto,
-    run_to_proto,
-)
 from flwr.proto import runtime_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
@@ -44,7 +29,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectRequest,
     PushObjectResponse,
 )
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorRequest,
@@ -63,25 +47,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
 )
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
-from flwr.server.utils.validator import validate_message
-from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
-from flwr.supercore.inflatable.inflatable_object import (
-    get_all_nested_objects,
-    get_object_tree,
-    no_object_id_recompute,
-)
-from flwr.supercore.interceptors import get_authenticated_task
-from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
+from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.servicer.runtime import RuntimeServicer
-from flwr.superlink.servicer.control.control_handlers import (
-    process_due_automations,
-    start_automation,
-)
 
-RUNTIME_ENDPOINT_UNAVAILABLE_MESSAGE = (
-    "Some Runtime API endpoints are only available for Deployment Runtime runs."
-)
+from . import runtime_handlers
 
 
 class SuperLinkRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer):
@@ -103,267 +72,54 @@ class SuperLinkRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
         self, request: PullPendingTasksRequest, context: grpc.ServicerContext
     ) -> PullPendingTasksResponse:
         """Process due automations, then pull pending tasks."""
-        state = self.state()
-        process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
-        return super().PullPendingTasks(request, context)
+        return runtime_handlers.pull_pending_tasks(request, self.state())
 
     def GetNodes(
         self, request: GetNodesRequest, context: grpc.ServicerContext
     ) -> GetNodesResponse:
         """Get available nodes."""
-        log(DEBUG, "Runtime.GetNodes")
-
-        # Init state
-        state = self.state_factory.state()
-
-        run_id = _get_authenticated_serverapp_run_id(context)
-
-        all_ids: set[int] = state.get_nodes(run_id)
-        nodes: list[Node] = [Node(node_id=node_id) for node_id in all_ids]
-        return GetNodesResponse(nodes=nodes)
+        return runtime_handlers.get_nodes(request, self.state(), context)
 
     def PushMessages(
         self, request: PushAppMessagesRequest, context: grpc.ServicerContext
     ) -> PushAppMessagesResponse:
         """Push a set of Messages."""
-        log(DEBUG, "Runtime.PushMessages")
+        return runtime_handlers.push_messages(request, self.state(), context)
 
-        # Init state
-        state = self.state_factory.state()
-
-        run_id = _get_authenticated_serverapp_run_id(context)
-
-        # Validate request and insert in State
-        _raise_if(
-            validation_error=len(request.messages_list) == 0,
-            request_name="PushMessages",
-            detail="`messages_list` must not be empty",
-        )
-        session_id = state.start_session(run_id)
-        message_ids: list[str] = []
-        missing_objects_lists: list[list[str]] = []
-        for message_proto, object_tree in zip(
-            request.messages_list, request.message_object_trees, strict=True
-        ):
-            message = message_from_proto(message_proto=message_proto)
-            validation_errors = validate_message(message, is_reply_message=False)
-            _raise_if(
-                validation_error=bool(validation_errors),
-                request_name="PushMessages",
-                detail=", ".join(validation_errors),
-            )
-            _raise_if(
-                validation_error=run_id != message.metadata.run_id,
-                request_name="PushMessages",
-                detail="`Message.metadata` has mismatched `run_id`",
-            )
-            # Store message and register in ObjectStore
-            stored, missing_objects = state.store_message_and_object_tree(
-                message, object_tree, session_id
-            )
-            if stored:
-                message_ids.append(message.metadata.message_id)
-                missing_objects_lists.append(missing_objects)
-            else:
-                message_ids.append("")
-
-        # Concatenate all missing objects and deduplicate
-        objects_to_push = list(dict.fromkeys(chain(*missing_objects_lists)))
-
-        return PushAppMessagesResponse(
-            message_ids=message_ids,
-            objects_to_push=objects_to_push,
-            session_id=session_id,
-        )
-
-    def PullMessages(  # pylint: disable=R0914
+    def PullMessages(
         self, request: PullAppMessagesRequest, context: grpc.ServicerContext
     ) -> PullAppMessagesResponse:
         """Pull a set of Messages."""
-        log(DEBUG, "Runtime.PullMessages")
-
-        # Init state and store
-        state = self.state_factory.state()
-        store = self.objectstore_factory.store()
-
-        run_id = _get_authenticated_serverapp_run_id(context)
-
-        # Read from state
-        messages_res: list[Message] = state.get_message_res(
-            message_ids=set(request.message_ids)
-        )
-
-        # Register messages generated by LinkState in the Store for consistency
-        for msg_res in messages_res:
-            if msg_res.metadata.src_node_id == SUPERLINK_NODE_ID:
-                with no_object_id_recompute():
-                    all_objects = get_all_nested_objects(msg_res)
-                    # Preregister
-                    store.preregister(run_id, get_object_tree(msg_res))
-                    # Store objects
-                    for obj_id, obj in all_objects.items():
-                        store.put(obj_id, obj.deflate())
-
-        # Delete the instruction Messages and their replies if found
-        message_ins_ids_to_delete = {
-            msg_res.metadata.reply_to_message_id for msg_res in messages_res
-        }
-
-        state.delete_messages(message_ins_ids=message_ins_ids_to_delete)
-
-        # Convert Messages to proto
-        messages_list = []
-        trees = []
-        while messages_res:
-            msg = messages_res.pop(0)
-
-            # Skip `run_id` check for SuperLink generated replies
-            if msg.metadata.src_node_id != SUPERLINK_NODE_ID:
-                _raise_if(
-                    validation_error=run_id != msg.metadata.run_id,
-                    request_name="PullMessages",
-                    detail="`message.metadata` has mismatched `run_id`",
-                )
-
-            try:
-                msg_object_id = msg.metadata.message_id
-                obj_tree = store.get_object_tree(msg_object_id)
-                # Add message and object tree to the response
-                messages_list.append(message_to_proto(msg))
-                trees.append(obj_tree)
-            except NoObjectInStoreError as e:
-                log(ERROR, e.message)
-                # Delete message ins from state
-                state.delete_messages(message_ins_ids={msg_object_id})
-
-        return PullAppMessagesResponse(
-            messages_list=messages_list, message_object_trees=trees
+        return runtime_handlers.pull_messages(
+            request,
+            self.state(),
+            self.objectstore_factory.store(),
+            context,
         )
 
     def GetRun(
         self, request: GetRunRequest, context: grpc.ServicerContext
     ) -> GetRunResponse:
         """Get run information."""
-        log(DEBUG, "Runtime.GetRun")
-
-        # Init state
-        state: LinkState = self.state_factory.state()
-
-        # Retrieve run information
-        runs = state.get_run_info(run_ids=[request.run_id])
-
-        if not runs:
-            return GetRunResponse()
-
-        return GetRunResponse(run=run_to_proto(runs[0]))
+        return runtime_handlers.get_run(request, self.state())
 
     def GetConnector(
         self, request: GetConnectorRequest, context: grpc.ServicerContext
     ) -> GetConnectorResponse:
         """Return credentials authorized for the authenticated connector task."""
-        log(DEBUG, "Runtime.GetConnector")
-
-        task = get_authenticated_task()
-        if task.type != TaskType.CONNECTOR or not task.connector_ref:
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Connector credentials are not available to this task.",
-            )
-        connector_ref = task.connector_ref
-
-        state = self.state_factory.state()
-        runs = state.get_run_info(run_ids=[task.run_id])
-        run = runs[0] if runs else None
-        if run is None or not run.flwr_aid:
-            context.abort(grpc.StatusCode.NOT_FOUND, "Connector not found.")
-            raise RuntimeError("This line should never be reached.")
-
-        connector = state.get_connector(
-            flwr_aid=run.flwr_aid,
-            connector_ref=connector_ref,
-        )
-        if connector is None:
-            context.abort(grpc.StatusCode.NOT_FOUND, "Connector not found.")
-            raise RuntimeError("This line should never be reached.")
-
-        return GetConnectorResponse(
-            connector_ref=connector.connector_ref,
-            credentials_json=connector.credentials_json,
-            config_json=connector.config_json,
-        )
+        return runtime_handlers.get_connector(request, self.state(), context)
 
     def PullTaskInput(
         self, request: PullTaskInputRequest, context: grpc.ServicerContext
     ) -> PullTaskInputResponse:
         """Pull ServerApp process inputs."""
-        log(DEBUG, "Runtime.PullTaskInput")
-        # Init access to LinkState
-        state = self.state_factory.state()
-
-        # Get the authenticated task and associated run ID
-        task = get_authenticated_task()
-        run_id = task.run_id
-
-        # Retrieve Run, FAB, and shared RunSeries context for the run_id
-        runs = state.get_run_info(run_ids=[run_id])
-        run = runs[0] if runs else None
-        fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
-        series_context = None
-        if run and run.series_id:
-            series_context = state.get_run_series_context(run.series_id)
-        if run and fab and series_context:
-            if state.activate_task(task.task_id):
-                log(INFO, "Started task %d of run %d", task.task_id, run_id)
-                return PullTaskInputResponse(
-                    context=context_to_proto(series_context),
-                    run=run_to_proto(run),
-                    fab=fab_to_proto(fab),
-                    federation_config=state.get_federation_config(run_id),
-                    task_id=task.task_id,
-                )
-
-        # Raise an exception if the Run or Fab is not found,
-        # or if the status cannot be updated to RUNNING
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Failed to start task {task.task_id} of run {run_id}",
-        )
-        raise RuntimeError("Unreachable code")  # for mypy
+        return runtime_handlers.pull_task_input(request, self.state(), context)
 
     def PushTaskOutput(
         self, request: PushTaskOutputRequest, context: grpc.ServicerContext
     ) -> PushTaskOutputResponse:
         """Push ServerApp process outputs."""
-        log(DEBUG, "Runtime.PushTaskOutput")
-
-        # Get the authenticated task and associated run ID
-        task = get_authenticated_task()
-        run_id = task.run_id
-
-        # Init state and store
-        state = self.state_factory.state()
-
-        # Store Simulation Runtime usage before finishing the primary task.
-        # This ensures usage is captured even if the task fails to finish properly.
-        if request.HasField("clientapp_runtime"):
-            state.add_clientapp_runtime(run_id, request.clientapp_runtime)
-
-        # Finish the task
-        if state.finish_task(
-            task.task_id, sub_status=request.sub_status, details=request.details
-        ):
-            log(INFO, "Finished task %d of run %d", task.task_id, run_id)
-            if request.HasField("context"):
-                runs = state.get_run_info(run_ids=[run_id])
-                run = runs[0] if runs else None
-                if run and run.series_id and run.primary_task_id == task.task_id:
-                    state.set_run_series_context(
-                        run.series_id,
-                        context_from_proto(request.context),
-                    )
-        else:
-            log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
-        return PushTaskOutputResponse()
+        return runtime_handlers.push_task_output(request, self.state())
 
     def StartAutomation(
         self,
@@ -371,108 +127,26 @@ class SuperLinkRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
         context: grpc.ServicerContext,
     ) -> StartAutomationResponse:
         """Start an automation."""
-        task = get_authenticated_task()
-        if task.type not in (TaskType.AGENT_APP, TaskType.SERVER_APP):
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Only AgentApp and ServerApp tasks can create automations.",
-            )
-
-        state = self.state_factory.state()
-        run = state.get_run_info(run_ids=[task.run_id])[0]
-        del request.start_run_request.connector_refs[:]
-        request.start_run_request.connector_refs.extend(
-            state.get_run_connector_refs(run_id=run.run_id)
-        )
-        return start_automation(
-            request,
-            AccountInfo(
-                flwr_aid=run.flwr_aid,
-                account_name=run.account_name,
-            ),
-            state,
-        )
+        return runtime_handlers.start_automation(request, self.state(), context)
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext
     ) -> PushObjectResponse:
         """Push an object to the ObjectStore."""
-        log(DEBUG, "Runtime.PushObject")
-
-        # Init state
-        state = self.state_factory.state()
-
-        run_id = _get_authenticated_serverapp_run_id(context)
-
-        if request.node.node_id != SUPERLINK_NODE_ID:
-            # Cancel insertion in ObjectStore
-            context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Unexpected node ID.")
-
-        # Insert in state
-        stored = state.store_object(
-            run_id,
-            request.session_id,
-            request.object_id,
-            request.object_content,
-        )
-
-        return PushObjectResponse(stored=stored)
+        return runtime_handlers.push_object(request, self.state(), context)
 
     def PullObject(
         self, request: PullObjectRequest, context: grpc.ServicerContext
     ) -> PullObjectResponse:
         """Pull an object from the ObjectStore."""
-        log(DEBUG, "Runtime.PullObject")
-
-        # Init state
-        state = self.state_factory.state()
-
-        run_id = _get_authenticated_serverapp_run_id(context)
-
-        if request.node.node_id != SUPERLINK_NODE_ID:
-            # Cancel insertion in ObjectStore
-            context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Unexpected node ID.")
-
-        # Fetch from state
-        content = state.get_object(run_id, request.object_id)
-        if content is not None:
-            object_available = content != b""
-            return PullObjectResponse(
-                object_found=True,
-                object_available=object_available,
-                object_content=content,
-            )
-        return PullObjectResponse(object_found=False, object_available=False)
+        return runtime_handlers.pull_object(request, self.state(), context)
 
     def ConfirmMessageReceived(
         self, request: ConfirmMessageReceivedRequest, context: grpc.ServicerContext
     ) -> ConfirmMessageReceivedResponse:
         """Confirm message received."""
-        log(DEBUG, "Runtime.ConfirmMessageReceived")
-
-        # Init store
-        store = self.objectstore_factory.store()
-
-        _ = _get_authenticated_serverapp_run_id(context)
-
-        # Delete the message object
-        store.delete(request.message_object_id)
-
-        return ConfirmMessageReceivedResponse()
-
-
-def _get_authenticated_serverapp_run_id(context: grpc.ServicerContext) -> int:
-    """Return the authenticated run ID if it can use these Runtime endpoints."""
-    task = get_authenticated_task()
-    if task.type != TaskType.SERVER_APP:
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
-            RUNTIME_ENDPOINT_UNAVAILABLE_MESSAGE,
+        return runtime_handlers.confirm_message_received(
+            request,
+            self.objectstore_factory.store(),
+            context,
         )
-    return task.run_id
-
-
-def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:
-    """Raise a `ValueError` with a detailed message if a validation error occurs."""
-    if validation_error:
-        raise ValueError(f"Malformed {request_name}: {detail}")
