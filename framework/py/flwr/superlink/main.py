@@ -121,7 +121,7 @@ def create_app(
         event_log_plugin = config.event_log_plugin
 
     federation_manager = get_federation_manager(is_simulation=is_simulation)
-    _, linkstate_factory = get_objectstore_linkstate_factories(
+    objectstore_factory, linkstate_factory = get_objectstore_linkstate_factories(
         database, federation_manager
     )
     # Force initialization before exposing LinkState through FastAPI dependencies
@@ -172,6 +172,7 @@ def create_app(
     )
     fastapi_app.state.superlink_lifespan = superlink_lifespan
     fastapi_app.state.linkstate_factory = linkstate_factory
+    fastapi_app.state.objectstore_factory = objectstore_factory
     fastapi_app.state.account_access_dep = AccountAccessDependency(
         authn_plugin, authz_plugin
     )
