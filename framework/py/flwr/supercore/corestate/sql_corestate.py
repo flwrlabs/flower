@@ -965,21 +965,36 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if self.database_backend != "sqlite":
             return
 
+        legacy_timestamp_filter = """
+            created_at LIKE '%T%'
+            OR updated_at LIKE '%T%'
+            OR next_run_at LIKE '%T%'
+            OR stopped_at LIKE '%T%'
+        """
         with self.session() as session:
+            has_legacy_timestamp = session.scalar(
+                text(
+                    f"""
+                    SELECT 1
+                    FROM automation
+                    WHERE {legacy_timestamp_filter}
+                    LIMIT 1
+                    """
+                )
+            )
+            if has_legacy_timestamp is None:
+                return
+
             session.execute(
                 text(
-                    """
+                    f"""
                     UPDATE automation
                     SET
                         created_at = replace(created_at, 'T', ' '),
                         updated_at = replace(updated_at, 'T', ' '),
                         next_run_at = replace(next_run_at, 'T', ' '),
                         stopped_at = replace(stopped_at, 'T', ' ')
-                    WHERE
-                        created_at LIKE '%T%'
-                        OR updated_at LIKE '%T%'
-                        OR next_run_at LIKE '%T%'
-                        OR stopped_at LIKE '%T%'
+                    WHERE {legacy_timestamp_filter}
                     """
                 )
             )
