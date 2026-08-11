@@ -1001,8 +1001,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Get task logs for the specified `task_id`."""
         sint64_task_id = uint64_to_int64(task_id)
 
-        # We don't check if the task exists before querying logs
-        # because the task_id is validated by the authz layer
+        # We don't check if the task exists before querying logs because the Control API
+        # handler validates access to the associated run before reading logs.
 
         if after_timestamp is None:
             after_timestamp = 0.0

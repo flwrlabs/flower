@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Concrete NoOp implementation for Servicer-side account authentication and
-authorization plugins."""
+"""Concrete NoOp implementation for Servicer-side account authentication."""
 
 
 from collections.abc import Sequence
@@ -26,7 +25,7 @@ from flwr.supercore.auth.typing import (
     AccountInfo,
 )
 
-from .auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
+from .auth_plugin import ControlAuthnPlugin
 
 NOOP_ACCOUNT_INFO = AccountInfo(
     flwr_aid=NOOP_FLWR_AID,
@@ -71,14 +70,3 @@ class NoOpControlAuthnPlugin(ControlAuthnPlugin):
     ) -> tuple[Sequence[tuple[str, str | bytes]] | None, AccountInfo | None]:
         """Refresh authentication tokens in the provided metadata."""
         return metadata, NOOP_ACCOUNT_INFO
-
-
-class NoOpControlAuthzPlugin(ControlAuthzPlugin):
-    """No-operation implementation of ControlAuthzPlugin."""
-
-    def __init__(self, account_auth_config_path: Path, verify_tls_cert: bool):
-        pass
-
-    def authorize(self, account_info: AccountInfo) -> bool:
-        """Return True for no-op plugin."""
-        return True

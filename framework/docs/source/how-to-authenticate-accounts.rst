@@ -122,6 +122,5 @@ command to start a Flower app:
     $ flwr run
     🎊 Successfully started run 1859953118041441032
 
-Authenticated requests pass SuperLink's global authorization plugin. Access to specific
-runs and federations remains subject to ownership, federation membership and roles, and
-entitlement checks.
+SuperLink uses the authenticated account identity to enforce access to specific runs and
+federations through ownership, federation membership and roles, and entitlement checks.
