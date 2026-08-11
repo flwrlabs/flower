@@ -15,16 +15,12 @@
 """Tests for shared connector infrastructure."""
 
 
-from collections.abc import Mapping
 from unittest.mock import Mock, patch
 
 import pytest
 import requests
 
-from flwr.supercore.typing import JSONObject
-
 from .http import ConnectorApiError, ConnectorHttpClient, request_json_object
-from .oauth import BaseOAuthProvider, load_oauth_provider
 
 
 class ExampleApiError(ConnectorApiError):
@@ -70,71 +66,3 @@ def test_connector_http_client_adds_credentials() -> None:
         "Authorization": "Bearer secret",
         "X-Api-Version": "1",
     }
-
-
-class ExampleOAuthProvider(BaseOAuthProvider):
-    """Minimal provider for the shared OAuth flow."""
-
-    display_name = "Example"
-    authorize_url = "https://example.com/authorize"
-    error_type = RuntimeError
-
-    def __init__(self, response: Mock | None = None, **kwargs: str) -> None:
-        super().__init__(**kwargs)
-        self.response = response or Mock()
-
-    def authorization_parameters(
-        self,
-        *,
-        redirect_uri: str,
-        state: str,
-        pkce_challenge: str | None,
-    ) -> Mapping[str, str]:
-        """Return test authorization parameters."""
-        del pkce_challenge
-        return {"redirect_uri": redirect_uri, "state": state}
-
-    def request_token(
-        self,
-        *,
-        code: str,
-        redirect_uri: str,
-        pkce_verifier: str | None,
-    ) -> requests.Response:
-        """Return the configured token response."""
-        del code, redirect_uri, pkce_verifier
-        return self.response
-
-    def parse_token_response(
-        self, payload: JSONObject
-    ) -> tuple[JSONObject, JSONObject]:
-        """Return credentials from the token response."""
-        return {"access_token": str(payload["access_token"])}, {}
-
-
-def test_oauth_flow_and_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """OAuth should parse tokens and reject invalid environment configuration."""
-    response = Mock(status_code=200)
-    response.json.return_value = {"access_token": "token"}
-    provider = ExampleOAuthProvider(
-        response,
-        client_id="client",
-        client_secret="secret",
-        redirect_uri="https://example.com/callback",
-    )
-    assert provider.exchange_code(
-        code="code",
-        redirect_uri="https://example.com/callback",
-        pkce_verifier=None,
-    ) == ({"access_token": "token"}, {})
-
-    monkeypatch.setenv("EXAMPLE_CLIENT_ID", "client")
-    monkeypatch.delenv("EXAMPLE_CLIENT_SECRET", raising=False)
-    monkeypatch.delenv("EXAMPLE_REDIRECT_URI", raising=False)
-    with pytest.raises(ValueError, match="configuration is incomplete"):
-        load_oauth_provider(
-            ExampleOAuthProvider,
-            client_id_env="EXAMPLE_CLIENT_ID",
-            client_secret_env="EXAMPLE_CLIENT_SECRET",
-            redirect_uri_env="EXAMPLE_REDIRECT_URI",
-        )

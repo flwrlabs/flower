@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Runtime gRPC API hosted by SuperLink."""
+"""Runtime gRPC API hosted by SuperNode."""
 
 
 from logging import INFO, WARNING
@@ -23,67 +23,60 @@ from flwr.common.logger import log
 from flwr.proto.runtime_pb2_grpc import (  # pylint: disable=E0611
     add_RuntimeServicer_to_server,
 )
-from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.interceptors import (
-    create_serverappio_runtime_version_server_interceptor,
-    create_serverappio_superexec_auth_server_interceptor,
-    create_serverappio_token_auth_server_interceptor,
+    create_supernode_runtime_superexec_auth_server_interceptor,
+    create_supernode_runtime_token_auth_server_interceptor,
+    create_supernode_runtime_version_server_interceptor,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supernode.nodestate import NodeStateFactory
 
-from .serverappio_servicer import ServerAppIoServicer
+from .runtime_servicer import SuperNodeRuntimeServicer
 
 
-def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
+def run_runtime_api_grpc(  # pylint: disable=R0913,R0917
     address: str,
-    state_factory: LinkStateFactory,
+    state_factory: NodeStateFactory,
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
-    superexec_auth_secret: bytes | None = None,
+    superexec_auth_secret: bytes | None,
 ) -> grpc.Server:
-    """Run the Runtime API (gRPC, request-response)."""
-    if superexec_auth_secret is not None and certificates is None:
+    """Run the Runtime API gRPC server."""
+    if certificates is None and superexec_auth_secret is not None:
         log(
             WARNING,
             "SuperExec auth is enabled on insecure Runtime API transport. "
             "Request metadata confidentiality is not guaranteed without TLS.",
         )
 
-    # Create Runtime API gRPC server
-    serverappio_servicer: grpc.Server = ServerAppIoServicer(
+    runtime_servicer = SuperNodeRuntimeServicer(
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
     )
-
-    # Create interceptors
-    interceptors = [
-        create_serverappio_token_auth_server_interceptor(
-            state_provider=state_factory.state
-        )
-    ]
+    auth_interceptor = create_supernode_runtime_token_auth_server_interceptor(
+        state_provider=state_factory.state
+    )
+    interceptors: list[grpc.ServerInterceptor] = [auth_interceptor]
     if superexec_auth_secret is not None:
         interceptors.append(
-            create_serverappio_superexec_auth_server_interceptor(
+            create_supernode_runtime_superexec_auth_server_interceptor(
                 state_provider=state_factory.state,
                 master_secret=superexec_auth_secret,
             )
         )
-    interceptors.append(create_serverappio_runtime_version_server_interceptor())
-    serverappio_add_servicer_to_server_fn = add_RuntimeServicer_to_server
-    serverappio_grpc_server = generic_create_grpc_server(
+    interceptors.append(create_supernode_runtime_version_server_interceptor())
+    runtime_grpc_server = generic_create_grpc_server(
         servicer_and_add_fn=(
-            serverappio_servicer,
-            serverappio_add_servicer_to_server_fn,
+            runtime_servicer,
+            add_RuntimeServicer_to_server,
         ),
         server_address=address,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
         certificates=certificates,
         interceptors=interceptors,
     )
-
-    address = serverappio_grpc_server.bound_address
+    address = runtime_grpc_server.bound_address
     log(INFO, "Flower Deployment Runtime: Starting Runtime API on %s", address)
-    serverappio_grpc_server.start()
-
-    return serverappio_grpc_server
+    runtime_grpc_server.start()
+    return runtime_grpc_server

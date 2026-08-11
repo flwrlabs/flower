@@ -95,7 +95,9 @@ def _kubernetes_executor_config_from_mapping(
                 "Kubernetes executor config field 'appio-root-certificates-path' "
                 "must be a non-empty path."
             )
-        kwargs["appio_root_certificates"] = _read_appio_root_certificates(path_value)
+        kwargs["runtime_root_certificates"] = _read_runtime_root_certificates(
+            path_value
+        )
 
     return KubernetesExecutorConfig(**kwargs)
 
@@ -110,8 +112,8 @@ def _required_nonempty_string(config: ExecutorConfig, field_name: str) -> str:
     return value
 
 
-def _read_appio_root_certificates(path_value: str) -> str:
-    """Read AppIo root certificate PEM data from the configured path."""
+def _read_runtime_root_certificates(path_value: str) -> str:
+    """Read Runtime API root certificate PEM data from the configured path."""
     try:
         return Path(path_value).expanduser().read_text(encoding="utf-8")
     except OSError as err:

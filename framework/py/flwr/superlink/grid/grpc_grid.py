@@ -26,13 +26,17 @@ from flwr.app import Message, Metadata, RecordDict
 from flwr.app.error import Error
 from flwr.app.message import make_message, remove_content_from_message
 from flwr.common.constant import (
-    SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SUPERLINK_NODE_ID,
+    SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
     ErrorCode,
 )
 from flwr.common.logger import log, warn_deprecated_feature
 from flwr.common.serde import message_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ConfirmMessageReceivedRequest,
+)
+from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
     PullAppMessagesRequest,
@@ -40,10 +44,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesRequest,
     PushAppMessagesResponse,
 )
-from flwr.proto.message_pb2 import (  # pylint: disable=E0611
-    ConfirmMessageReceivedRequest,
-)
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 from flwr.serverapp.grid import Grid
 from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
@@ -67,7 +67,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     push_objects,
 )
 from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
@@ -107,7 +107,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
 
     Parameters
     ----------
-    serverappio_service_address : str (default: "[::]:9091")
+    runtime_api_address : str (default: "[::]:9091")
         The address (URL, IPv6, IPv4) of the SuperLink Runtime API service.
     insecure : bool (default: False)
         If True, use plaintext (TLS disabled). If False, use TLS.
@@ -124,7 +124,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        serverappio_service_address: str = SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        runtime_api_address: str = SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
         insecure: bool = False,
         root_certificates: bytes | None = None,
         *,
@@ -132,7 +132,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     ) -> None:
         if token == "":
             raise ValueError("`token` must be a non-empty string")
-        self._addr = serverappio_service_address
+        self._addr = runtime_api_address
         self._insecure = insecure
         self._cert = root_certificates
         self._token = token
@@ -162,7 +162,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
             root_certificates=self._cert,
             interceptors=[
                 RuntimeVersionClientInterceptor(component_name="flwr-serverapp"),
-                AppIoTokenClientInterceptor(token=self._token),
+                RuntimeTokenClientInterceptor(token=self._token),
             ],
         )
         self._channel.subscribe(on_channel_state_change)

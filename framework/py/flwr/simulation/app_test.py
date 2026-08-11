@@ -24,7 +24,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+from flwr.common.constant import SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
 
 from .app import _parse_args_run_flwr_simulation, run_simulation_process
 
@@ -51,14 +51,14 @@ class TestRunSimulationProcess(unittest.TestCase):
         mock_connection_cls.return_value = mock_conn
 
         run_simulation_process(
-            serverappio_api_address="127.0.0.1:9091",
+            runtime_api_address="127.0.0.1:9091",
             log_queue=Queue(),
             insecure=True,
             token="test-token",
         )
 
         mock_connection_cls.assert_called_once_with(
-            serverappio_api_address="127.0.0.1:9091",
+            runtime_api_address="127.0.0.1:9091",
             insecure=True,
             root_certificates=None,
             token="test-token",
@@ -93,7 +93,7 @@ def test_parse_flwr_simulation_parses_tokenized_invocation() -> None:
         ]
     )
 
-    assert args.serverappio_api_address == SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+    assert args.runtime_api_address == SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
@@ -133,7 +133,7 @@ def test_flwr_simulation_forwards_cli_args(
     """The simulation CLI should forward parsed args to the runtime."""
     args = SimpleNamespace(
         insecure=True,
-        serverappio_api_address="127.0.0.1:9091",
+        runtime_api_address="127.0.0.1:9091",
         token="test-token",
         root_certificates=None,
         parent_pid=321,
@@ -170,7 +170,7 @@ def test_flwr_simulation_forwards_cli_args(
     simulation_app_module.flwr_simulation()
 
     assert calls == ["mirror", "restore"]
-    assert captured["serverappio_api_address"] == "127.0.0.1:9091"
+    assert captured["runtime_api_address"] == "127.0.0.1:9091"
     assert captured["token"] == "test-token"
     assert captured["certificates"] is None
     assert captured["parent_pid"] == 321
@@ -186,7 +186,7 @@ def test_flwr_simulation_forwards_token_file(
     token_file.write_text("test-token\n", encoding="utf-8")
     args = SimpleNamespace(
         insecure=True,
-        serverappio_api_address="127.0.0.1:9091",
+        runtime_api_address="127.0.0.1:9091",
         token=None,
         token_file=str(token_file),
         root_certificates=None,

@@ -14,16 +14,16 @@
 # ==============================================================================
 """Definitions for account-scoped connectors."""
 
-
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Literal
 
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
 from .http import ConnectorHttpClient
-from .oauth import OAuthConnectorProvider
+from .oauth import OAuthFlow
 
 ConnectorHandler = Callable[..., JSONValue]
 
@@ -59,6 +59,33 @@ class ActionDefinition:
 
 
 @dataclass(frozen=True)
+# pylint: disable-next=too-many-instance-attributes
+class OAuth2Definition:
+    """Describe a standard OAuth 2 authorization-code integration."""
+
+    authorization_url: str
+    token_url: str
+    client_id_env: str
+    client_secret_env: str
+    redirect_uri_env: str
+    scopes: tuple[str, ...] = ()
+    scope_parameter: str = "scope"
+    scope_separator: Literal[" ", ","] = " "
+    token_auth_method: Literal["client_secret_basic", "client_secret_post"] = (
+        "client_secret_basic"
+    )
+    token_response_path: tuple[str, ...] = ()
+    success_field: str | None = None
+    use_pkce: bool = False
+    authorization_params: Mapping[str, str] = field(default_factory=dict)
+    token_request_format: Literal["form", "json"] = "form"
+    token_headers: Mapping[str, str] = field(default_factory=dict)
+    config_fields: tuple[str, ...] = ()
+    allow_additional_scopes: bool = True
+    expected_token_type: str | None = None
+
+
+@dataclass(frozen=True)
 class ProviderDefinition:
     """Describe one account-scoped connector provider."""
 
@@ -66,6 +93,7 @@ class ProviderDefinition:
     display_name: str
     description: str
     actions: tuple[ActionDefinition, ...]
+    oauth: OAuth2Definition | None = None
     api_base_url: str | None = None
     api_headers: Mapping[str, str] = field(default_factory=dict)
 
@@ -89,7 +117,7 @@ class ConnectorDefinition:
 
     provider: ProviderDefinition
     executors: Mapping[str, ConnectorExecutor]
-    oauth_provider: OAuthConnectorProvider | None = None
+    oauth_flow: OAuthFlow | None = None
 
     def __post_init__(self) -> None:
         """Reject incomplete definitions when the connector is imported."""

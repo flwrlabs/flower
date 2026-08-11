@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""ServerAppIoServicer tests."""
+"""SuperLinkRuntimeServicer tests."""
 
 # pylint: disable=too-many-lines
 
@@ -31,13 +31,28 @@ from parameterized import parameterized
 from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import (
     NOOP_FLWR_AID,
-    SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,
+    SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
     Status,
     SubStatus,
 )
 from flwr.common.serde import context_to_proto, message_from_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
+    StartRunRequest,
+)
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ConfirmMessageReceivedRequest,
+    ConfirmMessageReceivedResponse,
+    ObjectTree,
+    PullObjectRequest,
+    PullObjectResponse,
+    PushObjectRequest,
+    PushObjectResponse,
+)
+from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
     CreateTaskRequest,
@@ -59,21 +74,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
-from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    StartAutomationRequest,
-    StartAutomationResponse,
-    StartRunRequest,
-)
-from flwr.proto.message_pb2 import (  # pylint: disable=E0611
-    ConfirmMessageReceivedRequest,
-    ConfirmMessageReceivedResponse,
-    ObjectTree,
-    PullObjectRequest,
-    PullObjectResponse,
-    PushObjectRequest,
-    PushObjectResponse,
-)
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
@@ -86,6 +86,7 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -95,7 +96,7 @@ from flwr.supercore.inflatable.inflatable_object import (
 )
 from flwr.supercore.interceptors import (
     TASK_TOKEN_HEADER,
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
@@ -103,13 +104,9 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
-from flwr.superlink.servicer.serverappio.serverappio_grpc import (
-    run_serverappio_api_grpc,
-)
-from flwr.superlink.servicer.serverappio.serverappio_servicer import (
-    ServerAppIoServicer,
-    _raise_if,
-)
+from flwr.superlink.servicer.runtime.runtime_grpc import run_runtime_api_grpc
+from flwr.superlink.servicer.runtime.runtime_handlers import _raise_if
+from flwr.superlink.servicer.runtime.runtime_servicer import SuperLinkRuntimeServicer
 
 # pylint: disable=broad-except,too-many-lines
 
@@ -160,7 +157,7 @@ def test_raise_if_true() -> None:
         raise AssertionError() from err
 
 
-def _start_serverappio_with_port_retry(
+def _start_runtime_with_port_retry(
     state_factory: LinkStateFactory,
     objectstore_factory: ObjectStoreFactory,
     start_port: int,
@@ -168,7 +165,7 @@ def _start_serverappio_with_port_retry(
     for offset in range(40):
         address = f"127.0.0.1:{start_port + offset}"
         try:
-            return run_serverappio_api_grpc(
+            return run_runtime_api_grpc(
                 address,
                 state_factory,
                 objectstore_factory,
@@ -228,12 +225,12 @@ def _create_shared_runtime(
     )
     assert run.primary_task_id is not None
     task_id = run.primary_task_id
-    server_0 = _start_serverappio_with_port_retry(
+    server_0 = _start_runtime_with_port_retry(
         state_factory_0,
         objectstore_factory_0,
         start_port=19091,
     )
-    server_1 = _start_serverappio_with_port_retry(
+    server_1 = _start_runtime_with_port_retry(
         state_factory_1,
         objectstore_factory_1,
         start_port=19141,
@@ -327,7 +324,7 @@ class TestGetConnector(unittest.TestCase):
         self.state = Mock(spec=LinkState)
         self.state_factory = Mock(spec=LinkStateFactory)
         self.state_factory.state.return_value = self.state
-        self.servicer = ServerAppIoServicer(
+        self.servicer = SuperLinkRuntimeServicer(
             self.state_factory,
             Mock(spec=ObjectStoreFactory),
         )
@@ -343,7 +340,7 @@ class TestGetConnector(unittest.TestCase):
         )
 
         with patch(
-            "flwr.superlink.servicer.serverappio.serverappio_servicer."
+            "flwr.superlink.servicer.runtime.runtime_servicer."
             "get_authenticated_task",
             return_value=task,
         ):
@@ -365,6 +362,20 @@ class TestGetConnector(unittest.TestCase):
             connector_ref="notion",
         )
 
+    def test_authenticates_before_accessing_state(self) -> None:
+        """GetConnector should authenticate before accessing state."""
+        with (
+            patch(
+                "flwr.superlink.servicer.runtime.runtime_servicer."
+                "get_authenticated_task",
+                side_effect=RuntimeError("No authenticated task"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "No authenticated task"),
+        ):
+            self.servicer.GetConnector(GetConnectorRequest(), Mock())
+
+        self.state_factory.state.assert_not_called()
+
     @parameterized.expand(  # type: ignore
         [
             ("wrong_task_type", TaskType.AGENT_APP, "notion"),
@@ -378,12 +389,9 @@ class TestGetConnector(unittest.TestCase):
         connector_ref: str,
     ) -> None:
         """GetConnector should reject tasks without a connector identity."""
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
-
         with (
             patch(
-                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "flwr.superlink.servicer.runtime.runtime_servicer."
                 "get_authenticated_task",
                 return_value=Mock(
                     type=task_type,
@@ -391,16 +399,13 @@ class TestGetConnector(unittest.TestCase):
                     run_id=123,
                 ),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(FlowerError) as error,
         ):
-            self.servicer.GetConnector(
-                GetConnectorRequest(),
-                context,
-            )
+            self.servicer.GetConnector(GetConnectorRequest(), Mock())
 
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.PERMISSION_DENIED,
-            "Connector credentials are not available to this task.",
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE,
         )
         self.state.get_connector.assert_not_called()
 
@@ -409,34 +414,26 @@ class TestGetConnector(unittest.TestCase):
         task = Mock(type=TaskType.CONNECTOR, connector_ref="notion", run_id=123)
         self.state.get_run_info.return_value = [Mock(flwr_aid="account-b")]
         self.state.get_connector.return_value = None
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
 
         with (
             patch(
-                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "flwr.superlink.servicer.runtime.runtime_servicer."
                 "get_authenticated_task",
                 return_value=task,
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(FlowerError) as error,
         ):
-            self.servicer.GetConnector(
-                GetConnectorRequest(),
-                context,
-            )
+            self.servicer.GetConnector(GetConnectorRequest(), Mock())
 
         self.state.get_connector.assert_called_once_with(
             flwr_aid="account-b",
             connector_ref="notion",
         )
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.NOT_FOUND,
-            "Connector not found.",
-        )
+        self.assertEqual(error.exception.code, ApiErrorCode.CONNECTOR_NOT_FOUND)
 
 
-class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
-    """ServerAppIoServicer tests for allowed RunStatuses."""
+class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
+    """SuperLinkRuntimeServicer tests for allowed RunStatuses."""
 
     def setUp(self) -> None:
         """Initialize mock stub and server interceptor."""
@@ -456,8 +453,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
         self.status_to_msg = _STATUS_TO_MSG
 
-        self._server: grpc.Server = run_serverappio_api_grpc(
-            SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
+        self._server: grpc.Server = run_runtime_api_grpc(
+            SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
             state_factory,
             objectstore_factory,
             None,
@@ -474,10 +471,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert auth_token is not None
         assert self.state.activate_task(auth_task_id)
         self._auth_token = auth_token
-        self._appio_auth_interceptor = AppIoTokenClientInterceptor(auth_token)
+        self._runtime_auth_interceptor = RuntimeTokenClientInterceptor(auth_token)
         self._channel = grpc.intercept_channel(
             grpc.insecure_channel("localhost:9091"),
-            self._appio_auth_interceptor,
+            self._runtime_auth_interceptor,
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 protected_methods=RUNTIME_SUPEREXEC_METHODS,
@@ -621,7 +618,9 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
     def test_start_automation_enriches_connector_refs(self) -> None:
         """Enrich connector refs and delegate automation creation."""
         # Prepare
-        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+        servicer = SuperLinkRuntimeServicer(
+            self.state_factory, self.objectstore_factory
+        )
         request = StartAutomationRequest(
             start_run_request=StartRunRequest(connector_refs=["untrusted"])
         )
@@ -630,7 +629,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Execute
         with (
             patch(
-                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "flwr.superlink.servicer.runtime.runtime_servicer."
                 "get_authenticated_task",
                 return_value=Task(
                     run_id=self._auth_run_id,
@@ -638,8 +637,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
                 ),
             ),
             patch(
-                "flwr.superlink.servicer.serverappio.serverappio_servicer."
-                "start_automation",
+                "flwr.superlink.servicer.runtime.runtime_handlers."
+                "start_control_automation",
                 return_value=expected,
             ) as start_automation_mock,
             patch.object(
@@ -656,28 +655,28 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
     def test_start_automation_rejects_clientapp_task(self) -> None:
         """ClientApp tasks cannot create automations through the Runtime API."""
         # Prepare
-        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
-        context = Mock()
-        context.abort.side_effect = RuntimeError("aborted")
+        servicer = SuperLinkRuntimeServicer(
+            self.state_factory, self.objectstore_factory
+        )
 
         # Execute
         with (
             patch(
-                "flwr.superlink.servicer.serverappio.serverappio_servicer."
+                "flwr.superlink.servicer.runtime.runtime_servicer."
                 "get_authenticated_task",
                 return_value=Task(
                     run_id=self._auth_run_id,
                     type=TaskType.CLIENT_APP,
                 ),
             ),
-            self.assertRaisesRegex(RuntimeError, "aborted"),
+            self.assertRaises(FlowerError) as error,
         ):
-            servicer.StartAutomation(StartAutomationRequest(), context)
+            servicer.StartAutomation(StartAutomationRequest(), Mock())
 
         # Assert
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.PERMISSION_DENIED,
-            "Only AgentApp and ServerApp tasks can create automations.",
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
         )
 
     def test_push_task_output_stores_simulation_runtime(self) -> None:
@@ -1111,7 +1110,9 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         )
         run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
         task_id = self._primary_task_id(run_id)
-        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+        servicer = SuperLinkRuntimeServicer(
+            self.state_factory, self.objectstore_factory
+        )
 
         # Claim task through the servicer to transition the run to STARTING.
         claim_response = servicer.ClaimTask(ClaimTaskRequest(task_id=task_id), Mock())
@@ -1135,7 +1136,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Execute: Pull task input
         request = PullTaskInputRequest()
         with patch(
-            "flwr.superlink.servicer.serverappio.serverappio_servicer."
+            "flwr.superlink.servicer.runtime.runtime_servicer."
             "get_authenticated_task",
             return_value=Mock(task_id=task_id, run_id=run_id),
         ):

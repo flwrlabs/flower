@@ -41,7 +41,7 @@ class BaseExecPlugin(ExecPlugin):
 
     def __init__(  # pylint: disable=R0913, R0917
         self,
-        appio_api_address: str,
+        runtime_api_address: str,
         insecure: bool,
         root_certificates_path: str | None,
         get_run: Callable[[int], Run],
@@ -50,7 +50,7 @@ class BaseExecPlugin(ExecPlugin):
         executor: Executor,
     ) -> None:
         super().__init__(
-            appio_api_address=appio_api_address,
+            runtime_api_address=runtime_api_address,
             insecure=insecure,
             root_certificates_path=root_certificates_path,
             get_run=get_run,
@@ -92,7 +92,7 @@ class BaseExecPlugin(ExecPlugin):
         """Build the execution spec for the selected task."""
         return ExecutionSpec(
             task_type=task_type,
-            appio_api_address=self.appio_api_address,
+            runtime_api_address=self.runtime_api_address,
             token=token,
             insecure=self.insecure,
             root_certificates_path=self.root_certificates_path,

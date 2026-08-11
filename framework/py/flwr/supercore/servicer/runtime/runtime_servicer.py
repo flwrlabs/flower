@@ -23,7 +23,11 @@ import grpc
 from flwr.common.constant import Status
 from flwr.common.logger import log
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.log_pb2 import (  # pylint: disable=E0611
+    PushLogsRequest,
+    PushLogsResponse,
+)
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
     CreateTaskRequest,
@@ -41,10 +45,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
-from flwr.proto.log_pb2 import (  # pylint: disable=E0611
-    PushLogsRequest,
-    PushLogsResponse,
-)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import (
     TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
@@ -59,7 +59,7 @@ from flwr.supercore.task_process.connector import registry as connector_registry
 
 
 # pylint: disable=invalid-name, unused-argument
-class AppIoServicer(ABC):
+class RuntimeServicer(ABC):
     """Shared scaffolding for task-based Runtime RPCs."""
 
     @abstractmethod
@@ -260,7 +260,7 @@ def _validate_create_task_request(
             return
 
         try:
-            connector_registry.get_oauth_connector_provider(connector_ref)
+            connector_registry.get_oauth_flow(connector_ref)
         except ValueError as err:
             context.abort(grpc.StatusCode.NOT_FOUND, str(err))
 

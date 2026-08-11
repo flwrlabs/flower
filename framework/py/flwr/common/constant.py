@@ -30,19 +30,27 @@ TRANSPORT_TYPES = [
 
 # Addresses
 # Ports
-CLIENTAPPIO_PORT = "9094"
-SERVERAPPIO_PORT = "9091"
+SUPERNODE_RUNTIME_API_PORT = "9094"
+SUPERLINK_RUNTIME_API_PORT = "9091"
 FLEETAPI_GRPC_RERE_PORT = "9092"
 CONTROL_API_PORT = "9093"
 # Octets
 SERVER_OCTET = "0.0.0.0"
 CLIENT_OCTET = "127.0.0.1"
 # SuperNode
-CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{CLIENTAPPIO_PORT}"
-CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{CLIENTAPPIO_PORT}"
+SUPERNODE_RUNTIME_API_DEFAULT_SERVER_ADDRESS = (
+    f"{SERVER_OCTET}:{SUPERNODE_RUNTIME_API_PORT}"
+)
+SUPERNODE_RUNTIME_API_DEFAULT_CLIENT_ADDRESS = (
+    f"{CLIENT_OCTET}:{SUPERNODE_RUNTIME_API_PORT}"
+)
 # SuperLink
-SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{SERVERAPPIO_PORT}"
-SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SERVERAPPIO_PORT}"
+SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS = (
+    f"{SERVER_OCTET}:{SUPERLINK_RUNTIME_API_PORT}"
+)
+SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS = (
+    f"{CLIENT_OCTET}:{SUPERLINK_RUNTIME_API_PORT}"
+)
 FLEET_API_GRPC_RERE_DEFAULT_ADDRESS = f"{SERVER_OCTET}:{FLEETAPI_GRPC_RERE_PORT}"
 FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS = (
     "[::]:8080"  # IPv6 to keep start_server compatible
@@ -155,9 +163,6 @@ AUTHN_TYPE_YAML_KEY = "authn_type"  # For key name in YAML file
 ACCESS_TOKEN_KEY = "flwr-oidc-access-token"
 REFRESH_TOKEN_KEY = "flwr-oidc-refresh-token"
 
-# Constants for account authorization
-AUTHZ_TYPE_YAML_KEY = "authz_type"  # For key name in YAML file
-
 # Constants for node authentication
 PUBLIC_KEY_HEADER = "flwr-public-key-bin"  # Must end with "-bin" for binary data
 SIGNATURE_HEADER = "flwr-signature-bin"  # Must end with "-bin" for binary data
@@ -265,16 +270,6 @@ class AuthnType:
     OIDC = "oidc"
 
     def __new__(cls) -> AuthnType:
-        """Prevent instantiation."""
-        raise TypeError(f"{cls.__name__} cannot be instantiated.")
-
-
-class AuthzType:
-    """Account authorization types."""
-
-    NOOP = "noop"
-
-    def __new__(cls) -> AuthzType:
         """Prevent instantiation."""
         raise TypeError(f"{cls.__name__} cannot be instantiated.")
 

@@ -71,6 +71,7 @@ class ConnectorHttpClient:
         *,
         params: Mapping[str, str] | None = None,
         json: JSONObject | None = None,
+        headers: Mapping[str, str] | None = None,
         error: ConnectorErrorFactory | None = None,
         http_error_code: HttpErrorCode | None = None,
     ) -> JSONObject:
@@ -84,7 +85,11 @@ class ConnectorHttpClient:
             method,
             f"{self._base_url}{path}",
             error=error_factory,
-            headers={"Authorization": f"Bearer {self._token}", **self._headers},
+            headers={
+                **self._headers,
+                **(headers or {}),
+                "Authorization": f"Bearer {self._token}",
+            },
             params=params,
             json=json,
             http_error_code=http_error_code,

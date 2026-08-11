@@ -12,22 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Notion provider definition."""
+"""Notion connector definition."""
 
-from ..definition import ConnectorDefinition, ProviderDefinition
+from ..definition import ConnectorDefinition, OAuth2Definition, ProviderDefinition
+from ..oauth import load_oauth_flow
 from .actions import ACTIONS
-from .executors import EXECUTORS
-from .oauth import (
-    NOTION_API_VERSION,
-    NOTION_CONNECTOR_REF,
-    get_configured_oauth_provider,
-)
+from .executors import EXECUTORS, NOTION_API_VERSION
+
+NOTION_CONNECTOR_REF = "notion"
 
 PROVIDER = ProviderDefinition(
     ref=NOTION_CONNECTOR_REF,
     display_name="Notion",
     description="Search and read pages and data sources.",
     actions=ACTIONS,
+    oauth=OAuth2Definition(
+        authorization_url="https://api.notion.com/v1/oauth/authorize",
+        token_url="https://api.notion.com/v1/oauth/token",
+        client_id_env="FLWR_NOTION_CLIENT_ID",
+        client_secret_env="FLWR_NOTION_CLIENT_SECRET",
+        redirect_uri_env="FLWR_NOTION_REDIRECT_URI",
+        authorization_params={"owner": "user"},
+        token_request_format="json",
+        token_headers={"Notion-Version": NOTION_API_VERSION},
+        config_fields=("workspace_id", "workspace_name", "bot_id"),
+    ),
     api_base_url="https://api.notion.com/v1",
     api_headers={"Notion-Version": NOTION_API_VERSION},
 )
@@ -35,5 +44,5 @@ PROVIDER = ProviderDefinition(
 CONNECTOR = ConnectorDefinition(
     provider=PROVIDER,
     executors=EXECUTORS,
-    oauth_provider=get_configured_oauth_provider(),
+    oauth_flow=load_oauth_flow(PROVIDER),
 )

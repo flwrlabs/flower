@@ -20,21 +20,21 @@ import unittest
 
 import grpc
 
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    PullObjectRequest,
+    PullObjectResponse,
+)
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
 )
-from flwr.proto.message_pb2 import (  # pylint: disable=E0611
-    PullObjectRequest,
-    PullObjectResponse,
-)
 from flwr.supercore.constant import TaskType
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     TASK_TOKEN_HEADER,
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
@@ -42,12 +42,12 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supernode.nodestate import NodeStateFactory
-from flwr.supernode.start_client_internal import run_clientappio_api_grpc
+from flwr.supernode.servicer.runtime import run_runtime_api_grpc
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
 
 
-class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R0902
+class TestSuperNodeRuntimeAuthIntegration(unittest.TestCase):  # pylint: disable=R0902
     """Integration tests for SuperNode Runtime token-auth behavior."""
 
     def setUp(self) -> None:
@@ -65,7 +65,7 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         assert token is not None
         self.valid_token = token
 
-        self._server: grpc.Server = run_clientappio_api_grpc(
+        self._server: grpc.Server = run_runtime_api_grpc(
             address="127.0.0.1:0",
             state_factory=state_factory,
             objectstore_factory=objectstore_factory,
@@ -86,7 +86,7 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         )
         self._auth_channel = grpc.intercept_channel(
             self._base_channel,
-            AppIoTokenClientInterceptor(token=self.valid_token),
+            RuntimeTokenClientInterceptor(token=self.valid_token),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 protected_methods=RUNTIME_SUPEREXEC_METHODS,
@@ -163,7 +163,7 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         )
 
 
-class TestClientAppIoAuthIntegrationWithoutSuperExecSecret(unittest.TestCase):
+class TestSuperNodeRuntimeAuthIntegrationWithoutSuperExecSecret(unittest.TestCase):
     """Test the SuperNode Runtime API when SuperExec auth is disabled."""
 
     def setUp(self) -> None:
@@ -174,7 +174,7 @@ class TestClientAppIoAuthIntegrationWithoutSuperExecSecret(unittest.TestCase):
         objectstore_factory = ObjectStoreFactory()
         state_factory = NodeStateFactory(objectstore_factory=objectstore_factory)
 
-        self._server: grpc.Server = run_clientappio_api_grpc(
+        self._server: grpc.Server = run_runtime_api_grpc(
             address="127.0.0.1:0",
             state_factory=state_factory,
             objectstore_factory=objectstore_factory,

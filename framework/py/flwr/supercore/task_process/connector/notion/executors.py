@@ -22,6 +22,8 @@ from ..definition import ConnectorExecutionContext, ConnectorExecutor
 from ..http import ConnectorApiError
 from ..json_utils import optional_string, require_int_range, require_string
 
+NOTION_API_VERSION = "2026-03-11"
+
 
 class NotionApiError(ConnectorApiError):
     """Secret-safe Notion API failure."""
