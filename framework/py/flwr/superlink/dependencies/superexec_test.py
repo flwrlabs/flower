@@ -40,8 +40,12 @@ _HEADERS = {
 }
 
 
-def _make_request(master_secret: bytes | None) -> tuple[Request, ClaimTaskRequest]:
+def _make_request(
+    master_secret: bytes | None,
+    headers: list[tuple[str, str]] | None = None,
+) -> tuple[Request, ClaimTaskRequest]:
     """Return a request carrying parsed protobuf and SuperExec headers."""
+    headers = list(_HEADERS.items()) if headers is None else headers
     app = FastAPI()
     app.state.superexec_auth_secret = master_secret
     request = Request(
@@ -49,9 +53,7 @@ def _make_request(master_secret: bytes | None) -> tuple[Request, ClaimTaskReques
             "type": "http",
             "method": "POST",
             "path": "/v1/runtime/claim-task",
-            "headers": [
-                (key.encode(), value.encode()) for key, value in _HEADERS.items()
-            ],
+            "headers": [(key.encode(), value.encode()) for key, value in headers],
             "query_string": b"",
             "server": ("testserver", 80),
             "client": ("testclient", 50000),
@@ -120,3 +122,36 @@ def test_superexec_auth_rejects_failed_verification() -> None:
 
     assert exc_info.value.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
     assert exc_info.value.message == (f"SuperExec authentication failed for {_METHOD}.")
+
+
+@pytest.mark.parametrize(
+    "timestamp_headers",
+    [
+        [],
+        [(SUPEREXEC_AUTH_TIMESTAMP_HEADER, "")],
+        [(SUPEREXEC_AUTH_TIMESTAMP_HEADER, "1000")] * 2,
+    ],
+)
+def test_superexec_auth_rejects_invalid_header_count_or_value(
+    timestamp_headers: list[tuple[str, str]],
+) -> None:
+    """Reject missing, empty, or duplicate SuperExec authentication headers."""
+    other_headers = [
+        (name, value)
+        for name, value in _HEADERS.items()
+        if name != SUPEREXEC_AUTH_TIMESTAMP_HEADER
+    ]
+    request, _ = _make_request(
+        b"master-secret", headers=timestamp_headers + other_headers
+    )
+
+    with (
+        patch(
+            "flwr.superlink.dependencies.superexec.verify_superexec_request"
+        ) as verify,
+        pytest.raises(FlowerError) as exc_info,
+    ):
+        SuperExecAuthDependency(_METHOD)(request, Mock(spec=LinkState))
+
+    assert exc_info.value.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+    verify.assert_not_called()

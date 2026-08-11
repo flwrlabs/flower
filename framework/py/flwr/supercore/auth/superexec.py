@@ -98,21 +98,17 @@ def verify_superexec_request(  # pylint: disable=too-many-arguments
     request: ProtoMessage,
     method: str,
     auth_secret: bytes,
-    timestamp_raw: str | None,
-    nonce: str | None,
-    body_sha256_header: str | None,
-    signature: str | None,
+    timestamp_raw: str,
+    nonce: str,
+    body_sha256_header: str,
+    signature: str,
     nonce_store: _NonceStore,
 ) -> bool:
     """Verify SuperExec authentication fields for a protobuf request."""
-    # Reject incomplete authentication metadata before doing any state access.
-    if not timestamp_raw or not nonce or not body_sha256_header or not signature:
-        return False
-
     # Require an integer timestamp within the accepted clock-skew and age window.
     try:
         timestamp = int(timestamp_raw)
-    except (TypeError, ValueError):
+    except ValueError:
         return False
 
     time_diff = now().timestamp() - timestamp

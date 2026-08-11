@@ -14,7 +14,7 @@
 # ==============================================================================
 """FastAPI SuperExec authentication dependency for Runtime routes."""
 
-from typing import Annotated, cast
+from typing import Annotated, NoReturn, cast
 
 from fastapi import Depends, Request
 
@@ -30,6 +30,14 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.translation import get_protobuf_request
 
 from .linkstate import get_linkstate
+
+
+def _raise_authentication_failed(method: str) -> NoReturn:
+    """Raise a Runtime authentication error for a SuperExec method."""
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
+        f"SuperExec authentication failed for {method}.",
+    )
 
 
 class SuperExecAuthDependency:
@@ -51,18 +59,30 @@ class SuperExecAuthDependency:
         if master_secret is None:
             return
 
+        header_values = [
+            request.headers.getlist(name)
+            for name in (
+                SUPEREXEC_AUTH_TIMESTAMP_HEADER,
+                SUPEREXEC_AUTH_NONCE_HEADER,
+                SUPEREXEC_AUTH_BODY_SHA256_HEADER,
+                SUPEREXEC_AUTH_SIGNATURE_HEADER,
+            )
+        ]
+        if any(len(values) != 1 or not values[0] for values in header_values):
+            _raise_authentication_failed(self.method)
+
+        timestamp_raw, nonce, body_sha256_header, signature = (
+            values[0] for values in header_values
+        )
         authenticated = verify_superexec_request(
             request=get_protobuf_request(request),
             method=self.method,
             auth_secret=derive_auth_secret(master_secret),
-            timestamp_raw=request.headers.get(SUPEREXEC_AUTH_TIMESTAMP_HEADER),
-            nonce=request.headers.get(SUPEREXEC_AUTH_NONCE_HEADER),
-            body_sha256_header=request.headers.get(SUPEREXEC_AUTH_BODY_SHA256_HEADER),
-            signature=request.headers.get(SUPEREXEC_AUTH_SIGNATURE_HEADER),
+            timestamp_raw=timestamp_raw,
+            nonce=nonce,
+            body_sha256_header=body_sha256_header,
+            signature=signature,
             nonce_store=state,
         )
         if not authenticated:
-            raise FlowerError(
-                ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
-                f"SuperExec authentication failed for {self.method}.",
-            )
+            _raise_authentication_failed(self.method)
