@@ -278,10 +278,88 @@
     }
   }
 
+  function makeFetchedUrlsAbsolute(root, baseUrl) {
+    root.querySelectorAll("[href], [src]").forEach((element) => {
+      for (const attribute of ["href", "src"]) {
+        const value = element.getAttribute(attribute);
+        if (!value || value.startsWith("#")) {
+          continue;
+        }
+        try {
+          element.setAttribute(attribute, new URL(value, baseUrl).href);
+        } catch (error) {
+          console.warn(`Could not resolve changelog ${attribute}:`, value, error);
+        }
+      }
+    });
+  }
+
+  async function fetchSharedChangelog(docsBaseUrl, language) {
+    const url = `${docsBaseUrl}/main/${language}/changelog/index.html`;
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+
+    const html = await response.text();
+    const parsedDocument = new DOMParser().parseFromString(html, "text/html");
+    const article = parsedDocument.querySelector("article#furo-main-content");
+    if (!article) {
+      throw new Error("Shared changelog article was not found");
+    }
+    makeFetchedUrlsAbsolute(article, response.url);
+    return article;
+  }
+
+  async function loadSharedChangelog(versioningContainer) {
+    const placeholder = document.querySelector("[data-flwr-changelog]");
+    const isChangelogPage = window.location.pathname.endsWith(
+      "/ref-changelog.html",
+    );
+    const currentArticle =
+      placeholder?.closest("article") ||
+      (isChangelogPage && document.querySelector("article#furo-main-content"));
+    if (!currentArticle) {
+      return;
+    }
+
+    const docsBaseUrl = getDocsBaseUrl(versioningContainer);
+    const currentLanguage =
+      (versioningContainer && versioningContainer.dataset.currentLanguage) || "en";
+    const languages = currentLanguage === "en" ? ["en"] : [currentLanguage, "en"];
+
+    for (const language of languages) {
+      try {
+        const sharedArticle = await fetchSharedChangelog(docsBaseUrl, language);
+        currentArticle.innerHTML = sharedArticle.innerHTML;
+        const anchor = window.location.hash.slice(1);
+        if (anchor) {
+          requestAnimationFrame(() => {
+            document.getElementById(anchor)?.scrollIntoView();
+          });
+        }
+        return;
+      } catch (error) {
+        console.warn(`Could not load the ${language} changelog:`, error);
+      }
+    }
+
+    if (!placeholder) {
+      return;
+    }
+    placeholder.setAttribute("role", "alert");
+    placeholder.textContent = "Could not load the shared changelog. ";
+    const fallbackLink = document.createElement("a");
+    fallbackLink.href = `${docsBaseUrl}/main/en/changelog/index.html`;
+    fallbackLink.textContent = "Open the changelog from main.";
+    placeholder.appendChild(fallbackLink);
+  }
+
   document.addEventListener("DOMContentLoaded", async () => {
     const versioningContainer = getVersioningContainer();
     bindVersionLinks(versioningContainer);
     hideEmptyAnnouncementFallback();
+    loadSharedChangelog(versioningContainer);
 
     const docsUiMetadataUrl = getDocsUiMetadataUrl(versioningContainer);
     const docsUiMetadata = await loadDocsUiMetadata(docsUiMetadataUrl);

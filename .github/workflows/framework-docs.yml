@@ -55,6 +55,7 @@ jobs:
             framework/docs/source/_static/docs-ui.js \
             framework/docs/source/_static/custom.css \
             framework/docs/source/conf_base.py \
+            framework/docs/source/ref-changelog.md \
             framework/docs/source/_templates/
       - name: Resolve docs version
         id: doc_version

@@ -57,7 +57,7 @@ jobs:
 
       - name: Generate body
         run: |
-          ./framework/dev/get-latest-changelog.sh > body.md
+          ./framework/dev/get-latest-changelog.sh "${TAG_NAME}" > body.md
           cat body.md
 
       - name: Release
