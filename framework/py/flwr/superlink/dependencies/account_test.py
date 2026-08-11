@@ -14,8 +14,7 @@
 # ==============================================================================
 """Tests for the Control API account dependency."""
 
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 from fastapi import FastAPI, Request
@@ -23,7 +22,6 @@ from fastapi import FastAPI, Request
 from flwr.common.constant import ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 
 from .account import AccountAccessDependency, get_account, get_authn_plugin
 
@@ -80,26 +78,21 @@ def test_account_access_dependency_returns_authenticated_account(scheme: str) ->
     authn_plugin.refresh_tokens.assert_not_called()
 
 
-def test_account_access_dependency_allows_missing_header_for_noop_plugin() -> None:
-    """No-op authentication should not require HTTP credentials."""
-    authn_plugin = NoOpControlAuthnPlugin(Path(), False)
+def test_account_access_dependency_allows_plugin_to_accept_missing_header() -> None:
+    """The authentication plugin can accept requests without credentials."""
+    authn_plugin = Mock()
     account = AccountInfo(flwr_aid="aid", account_name="account")
+    authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
 
-    with patch.object(
-        authn_plugin,
-        "validate_tokens_in_metadata",
-        return_value=(True, account),
-    ) as validate_tokens:
-        result = AccountAccessDependency(authn_plugin)(_make_request(()))
+    result = AccountAccessDependency(authn_plugin)(_make_request(()))
 
     assert result is account
-    validate_tokens.assert_called_once_with([])
+    authn_plugin.validate_tokens_in_metadata.assert_called_once_with([])
 
 
 @pytest.mark.parametrize(
     "authorization_headers",
     [
-        (),
         ("Basic access-token",),
         ("Bearer",),
         ("Bearer ",),
@@ -109,7 +102,7 @@ def test_account_access_dependency_allows_missing_header_for_noop_plugin() -> No
 def test_account_access_dependency_rejects_invalid_authorization_header(
     authorization_headers: tuple[str, ...],
 ) -> None:
-    """AccountAccessDependency should require exactly one Bearer credential."""
+    """AccountAccessDependency should reject malformed or duplicate credentials."""
     authn_plugin = Mock()
 
     with pytest.raises(FlowerError) as exc_info:
@@ -123,6 +116,7 @@ def test_account_access_dependency_rejects_invalid_authorization_header(
 def test_account_access_dependency_rejects_legacy_headers_without_bearer() -> None:
     """Legacy Control metadata headers are not an HTTP authentication contract."""
     authn_plugin = Mock()
+    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     request = _make_request(
         (),
         (
@@ -135,7 +129,7 @@ def test_account_access_dependency_rejects_legacy_headers_without_bearer() -> No
         AccountAccessDependency(authn_plugin)(request)
 
     assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED
-    authn_plugin.validate_tokens_in_metadata.assert_not_called()
+    authn_plugin.validate_tokens_in_metadata.assert_called_once_with([])
     authn_plugin.refresh_tokens.assert_not_called()
 
 

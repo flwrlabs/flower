@@ -20,7 +20,7 @@ from fastapi.security.utils import get_authorization_scheme_param
 from flwr.common.constant import ACCESS_TOKEN_KEY
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.superlink.auth_plugin import ControlAuthnPlugin, NoOpControlAuthnPlugin
+from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
 
 class AccountAccessDependency:
@@ -43,19 +43,15 @@ class AccountAccessDependency:
         request: Request,
     ) -> AccountInfo:
         """Return the authenticated account for a request."""
-        metadata: list[tuple[str, str]]
-        if isinstance(self.authn_plugin, NoOpControlAuthnPlugin):
-            # The no-op plugin means account authentication is disabled. Still call
-            # it to obtain the synthetic account without requiring credentials.
-            metadata = []
-        else:
-            authorization_headers = request.headers.getlist("authorization")
-            if len(authorization_headers) != 1:
-                raise FlowerError(
-                    ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-                    "Expected exactly one Authorization header with a Bearer token.",
-                )
+        authorization_headers = request.headers.getlist("authorization")
+        if len(authorization_headers) > 1:
+            raise FlowerError(
+                ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+                "Expected at most one Authorization header with a Bearer token.",
+            )
 
+        metadata: list[tuple[str, str]] = []
+        if authorization_headers:
             scheme, access_token = get_authorization_scheme_param(
                 authorization_headers[0]
             )
