@@ -2352,148 +2352,6 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state.initialize()
         return state
 
-    def test_legacy_automation_timestamp_format_remains_claimable(self) -> None:
-        """Automations stored with ISO T timestamps remain schedulable."""
-        state = self.state_factory()
-        current = now()
-        legacy_next_run_at = (current - timedelta(seconds=30)).isoformat()
-        next_run_at = (current + timedelta(seconds=30)).isoformat()
-        automation = self.store_automation(
-            state,
-            series_id=123,
-            flwr_aid="aid-legacy",
-            next_run_at=legacy_next_run_at,
-            fixed_interval=60,
-            max_runs=2,
-        )
-        state.query(
-            """
-            UPDATE automation
-            SET next_run_at = :next_run_at
-            WHERE automation_id = :automation_id
-            """,
-            {
-                "automation_id": uint64_to_int64(automation.automation_id),
-                "next_run_at": legacy_next_run_at,
-            },
-        )
-
-        due = state.list_automations(
-            statuses=[AutomationStatus.ACTIVE],
-            due_before=current,
-            order_by="next_run_at",
-        )
-        self.assertIn(automation.automation_id, {item.automation_id for item in due})
-
-        claimed = state.claim_automation(
-            automation.automation_id,
-            previous_next_run_at=legacy_next_run_at,
-            next_run_at=next_run_at,
-        )
-
-        self.assertIsNotNone(claimed)
-        assert claimed is not None
-        _, flwr_aid = claimed
-        self.assertEqual(flwr_aid, "aid-legacy")
-        updated = state.list_automations(
-            automation_ids=[automation.automation_id],
-            order_by="updated_at",
-        )
-        self.assertEqual(updated[0].remaining_runs, 1)
-        self.assertEqual(updated[0].next_run_at, next_run_at)
-
-    def test_legacy_automation_timestamp_ordering_is_chronological(self) -> None:
-        """Mixed timestamp encodings are ordered by time, not raw text."""
-        state = self.state_factory()
-        legacy_next_run_at = datetime(2026, 1, 1, 10, tzinfo=UTC).isoformat()
-        new_next_run_at = datetime(2026, 1, 1, 11, tzinfo=UTC).isoformat()
-        due_before = datetime(2026, 1, 1, 12, tzinfo=UTC)
-        legacy = self.store_automation(
-            state,
-            series_id=123,
-            next_run_at=legacy_next_run_at,
-        )
-        newer = self.store_automation(
-            state,
-            series_id=124,
-            next_run_at=new_next_run_at,
-        )
-        state.query(
-            """
-            UPDATE automation
-            SET next_run_at = :next_run_at
-            WHERE automation_id = :automation_id
-            """,
-            {
-                "automation_id": uint64_to_int64(legacy.automation_id),
-                "next_run_at": legacy_next_run_at,
-            },
-        )
-
-        due = state.list_automations(
-            statuses=[AutomationStatus.ACTIVE],
-            due_before=due_before,
-            order_by="next_run_at",
-            limit=1,
-        )
-
-        self.assertEqual(
-            [automation.automation_id for automation in due], [legacy.automation_id]
-        )
-        self.assertNotEqual(due[0].automation_id, newer.automation_id)
-        rows = state.query(
-            """
-            SELECT next_run_at
-            FROM automation
-            WHERE automation_id = :automation_id
-            """,
-            {"automation_id": uint64_to_int64(legacy.automation_id)},
-        )
-        self.assertNotIn("T", str(rows[0]["next_run_at"]))
-
-    def test_legacy_automation_normalization_flag_waits_for_commit(self) -> None:
-        """Rolled-back timestamp normalization does not poison later reads."""
-        state = self.state_factory()
-        legacy_next_run_at = datetime(2026, 1, 1, 10, tzinfo=UTC).isoformat()
-        due_before = datetime(2026, 1, 1, 12, tzinfo=UTC)
-        automation = self.store_automation(
-            state,
-            series_id=123,
-            next_run_at=legacy_next_run_at,
-        )
-        state.query(
-            """
-            UPDATE automation
-            SET next_run_at = :next_run_at
-            WHERE automation_id = :automation_id
-            """,
-            {
-                "automation_id": uint64_to_int64(automation.automation_id),
-                "next_run_at": legacy_next_run_at,
-            },
-        )
-
-        with self.assertRaises(RuntimeError):
-            with state.session():
-                due = state.list_automations(
-                    statuses=[AutomationStatus.ACTIVE],
-                    due_before=due_before,
-                    order_by="next_run_at",
-                )
-                self.assertEqual(
-                    [item.automation_id for item in due], [automation.automation_id]
-                )
-                raise RuntimeError("roll back normalization")
-
-        due = state.list_automations(
-            statuses=[AutomationStatus.ACTIVE],
-            due_before=due_before,
-            order_by="next_run_at",
-        )
-        self.assertEqual(
-            [item.automation_id for item in due], [automation.automation_id]
-        )
-
     def test_get_fab_refreshes_cached_row_in_shared_session(self) -> None:
         """Test get_fab observes raw SQL updates in a shared session."""
         state = self.state_factory()
@@ -2536,6 +2394,56 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         assert second is not None
         self.assertEqual(second.credentials_json, '{"token":"new"}')
         self.assertEqual(second.config_json, '{"calendar":"work"}')
+
+    def test_get_node_info_refreshes_rows_after_offline_tagging(self) -> None:
+        """Test get_node_info observes offline tagging in a shared session."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+
+        with state.session():
+            state.get_node_info(node_ids=[node_id])
+            state.query(
+                "UPDATE node SET online_until = :online_until WHERE node_id = :node_id",
+                {
+                    "online_until": now().timestamp() - 1.0,
+                    "node_id": uint64_to_int64(node_id),
+                },
+            )
+            refreshed = state.get_node_info(node_ids=[node_id])[0]
+
+        self.assertEqual(refreshed.status, NodeStatus.OFFLINE)
+
+    def test_get_run_info_refreshes_rows_after_raw_sql_update(self) -> None:
+        """Test get_run_info observes raw SQL updates in a shared session."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+
+        with state.session():
+            state.get_run_info(run_ids=[run_id])
+            state.store_traffic(run_id, bytes_sent=100, bytes_recv=200)
+            refreshed = state.get_run_info(run_ids=[run_id])[0]
+
+        self.assertEqual(refreshed.bytes_sent, 100)
+        self.assertEqual(refreshed.bytes_recv, 200)
+
+    def test_get_run_status_refreshes_task_after_raw_sql_update(self) -> None:
+        """Test get_run_status observes raw SQL updates in a shared session."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        task_id = get_primary_task_id(state, run_id)
+
+        with state.session():
+            state.get_run_status({run_id})
+            state.query(
+                "UPDATE task SET starting_at = :starting_at WHERE task_id = :task_id",
+                {
+                    "starting_at": now().isoformat(),
+                    "task_id": uint64_to_int64(task_id),
+                },
+            )
+            refreshed = state.get_run_status({run_id})[run_id]
+
+        self.assertEqual(refreshed.status, Status.STARTING)
 
     def test_reserve_nonce_cleans_expired_rows_on_duplicate(self) -> None:
         """Expired nonce cleanup commits even when reservation is duplicate."""

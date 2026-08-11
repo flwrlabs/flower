@@ -17,13 +17,16 @@
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
 
+import pytest
+
 from .. import registry
 from ..definition import ActionAccess
+from ..oauth import OAuthFlow
 from .actions import ACTIONS
-from .oauth import SLACK_CONNECTOR_REF, SLACK_USER_SCOPES, SlackOAuthProvider
+from .definition import PROVIDER, SLACK_CONNECTOR_REF, SLACK_USER_SCOPES
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
-_OAUTH_REQUEST = "flwr.supercore.task_process.connector.slack.oauth.requests.post"
+_OAUTH_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
 
 
 def test_slack_actions_are_registered_and_executable() -> None:
@@ -48,16 +51,39 @@ def test_slack_actions_are_registered_and_executable() -> None:
 def test_slack_oauth_flow() -> None:
     """Slack OAuth should request read scopes and extract user credentials."""
     redirect_uri = "https://example.com/callback"
-    provider = SlackOAuthProvider(
-        client_id="client", client_secret="secret", redirect_uri=redirect_uri
+    flow = OAuthFlow(
+        PROVIDER, client_id="client", client_secret="secret", redirect_uri=redirect_uri
     )
-    url = provider.build_authorization_url(
-        redirect_uri=redirect_uri, state="state", pkce_challenge=None
+    url = flow.build_authorization_url(
+        redirect_uri=redirect_uri, state="state", pkce_challenge="ignored"
     )
-    assert parse_qs(urlparse(url).query)["user_scope"] == [",".join(SLACK_USER_SCOPES)]
+    query = parse_qs(urlparse(url).query)
+    assert query["response_type"] == ["code"]
+    assert query["user_scope"] == [",".join(SLACK_USER_SCOPES)]
     response = Mock(status_code=200)
-    response.json.return_value = {"ok": True, "authed_user": {"access_token": "token"}}
-    with patch(_OAUTH_REQUEST, return_value=response):
-        assert provider.exchange_code(
-            code="code", redirect_uri=redirect_uri, pkce_verifier=None
+    response.json.return_value = {
+        "ok": True,
+        "authed_user": {
+            "access_token": "token",
+            "scope": ", ".join(SLACK_USER_SCOPES),
+        },
+    }
+    with patch(_OAUTH_REQUEST, return_value=response) as post:
+        assert flow.exchange_code(
+            code="code", redirect_uri=redirect_uri, pkce_verifier="ignored"
         )[0] == {"access_token": "token"}
+    assert post.call_args.kwargs["data"]["grant_type"] == "authorization_code"
+
+    response.json.return_value["authed_user"]["scope"] = "search:read"
+    with patch(_OAUTH_REQUEST, return_value=response), pytest.raises(RuntimeError):
+        flow.exchange_code(
+            code="code", redirect_uri=redirect_uri, pkce_verifier="ignored"
+        )
+
+    response.json.return_value["authed_user"][
+        "scope"
+    ] = f"{','.join(SLACK_USER_SCOPES)},chat:write"
+    with patch(_OAUTH_REQUEST, return_value=response):
+        flow.exchange_code(
+            code="code", redirect_uri=redirect_uri, pkce_verifier="ignored"
+        )

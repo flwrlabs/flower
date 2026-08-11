@@ -24,11 +24,18 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from sqlalchemy import MetaData, String, case
-from sqlalchemy import cast as sql_cast
-from sqlalchemy import delete
-from sqlalchemy import event as sqlalchemy_event
-from sqlalchemy import exists, func, insert, literal, or_, select, update
+from sqlalchemy import (
+    MetaData,
+    case,
+    delete,
+    exists,
+    func,
+    insert,
+    literal,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -93,6 +100,7 @@ from flwr.supercore.state.schema.corestate_models import (
 from flwr.supercore.state.schema.corestate_models import SeriesRuns as SeriesRunsModel
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
+from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
@@ -126,7 +134,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
         super().__init__(database_path)
         self._object_store = object_store
-        self._automation_timestamp_legacy_text_normalized = False
 
     def dialect_insert(self, table: Any) -> SQLiteInsert | PostgresInsert:
         """Return a dialect-specific insert statement for CoreState upserts."""
@@ -789,7 +796,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         next_run_at: str | None,
     ) -> tuple[StartRunRequest, str] | None:
         """Claim an automation occurrence and return its unresolved run request."""
-        self._normalize_legacy_automation_timestamp_text()
         stored_automation_id = uint64_to_int64(automation_id)
         query = select(
             AutomationModel.start_run_request,
@@ -832,7 +838,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         limit: int | None = None,
     ) -> Sequence[Automation]:
         """Return automations matching the given filters."""
-        self._normalize_legacy_automation_timestamp_text()
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
         if (
@@ -907,7 +912,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         next_run_at: str | None,
     ) -> bool:
         """Advance an active automation occurrence."""
-        self._normalize_legacy_automation_timestamp_text()
         timestamp = now()
         next_run_at_dt = (
             datetime.fromisoformat(next_run_at) if next_run_at is not None else None
@@ -953,26 +957,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             return session.scalar(stmt) is not None
 
-    def _normalize_legacy_automation_timestamp_text(self) -> None:
-        """Normalize legacy SQLite automation timestamps for indexed comparisons."""
-        if (
-            self.database_backend != "sqlite"
-            or self._automation_timestamp_legacy_text_normalized
-        ):
-            return
-
-        with self.session() as session:
-            session.execute(
-                update(AutomationModel)
-                .where(sql_cast(AutomationModel.next_run_at, String).like("%T%"))
-                .values(next_run_at=func.replace(AutomationModel.next_run_at, "T", " "))
-            )
-
-            def mark_normalized(_session: Any) -> None:
-                self._automation_timestamp_legacy_text_normalized = True
-
-            sqlalchemy_event.listen(session, "after_commit", mark_normalized, once=True)
-
     def finish_automation(
         self,
         automation_id: int,
@@ -1000,17 +984,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         sint64_task_id = uint64_to_int64(task_id)
 
         try:
-            self.query(
-                """
-                INSERT INTO task_logs (timestamp, task_id, log)
-                VALUES (:current_ts, :task_id, :log)
-                """,
-                {
-                    "current_ts": now().timestamp(),
-                    "task_id": sint64_task_id,
-                    "log": log_message,
-                },
-            )
+            with self.session() as session:
+                session.execute(
+                    insert(TaskLogsTable).values(
+                        timestamp=now().timestamp(),
+                        task_id=sint64_task_id,
+                        log=log_message,
+                    )
+                )
         except IntegrityError:
             raise ValueError(f"Task {task_id} not found") from None
 
@@ -1028,14 +1009,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         # Polling is strict-after: entries at the checkpoint timestamp have
         # already been delivered.
-        rows = self.query(
-            """
-            SELECT log, timestamp FROM task_logs
-            WHERE task_id = :task_id AND timestamp > :after_timestamp
-            ORDER BY timestamp
-            """,
-            {"task_id": sint64_task_id, "after_timestamp": after_timestamp},
-        )
+        with self.session() as session:
+            rows = (
+                session.execute(
+                    select(TaskLogsTable.c.log, TaskLogsTable.c.timestamp)
+                    .where(
+                        TaskLogsTable.c.task_id == sint64_task_id,
+                        TaskLogsTable.c.timestamp > after_timestamp,
+                    )
+                    .order_by(TaskLogsTable.c.timestamp)
+                )
+                .mappings()
+                .all()
+            )
         latest_timestamp = rows[-1]["timestamp"] if rows else 0.0
         return "".join(row["log"] for row in rows), latest_timestamp
 
