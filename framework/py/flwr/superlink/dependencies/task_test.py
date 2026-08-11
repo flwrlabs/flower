@@ -27,9 +27,11 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from .task import get_task
 
 
-def _make_request(token: str | None = None) -> Request:
-    """Return a minimal request with an optional task-token header."""
-    headers = [] if token is None else [(TASK_TOKEN_HEADER.encode(), token.encode())]
+def _make_request(tokens: str | list[str] | None = None) -> Request:
+    """Return a minimal request with optional task-token headers."""
+    if isinstance(tokens, str):
+        tokens = [tokens]
+    headers = [(TASK_TOKEN_HEADER.encode(), token.encode()) for token in tokens or []]
     return Request(
         {
             "type": "http",
@@ -71,3 +73,27 @@ def test_get_task_rejects_missing_or_invalid_token(token: str | None) -> None:
         state.get_task_by_token.assert_not_called()
     else:
         state.get_task_by_token.assert_called_once_with(token)
+
+
+@pytest.mark.parametrize(
+    "tokens",
+    [
+        ["invalid-token", "valid-token"],
+        ["valid-token", "invalid-token"],
+        ["valid-token", "valid-token"],
+        [""],
+    ],
+)
+def test_get_task_rejects_ambiguous_or_empty_token_headers(
+    tokens: list[str],
+) -> None:
+    """Reject duplicate or empty token headers without querying state."""
+    state = Mock(spec=LinkState)
+    state.get_task_by_token.return_value = Task(task_id=123)
+
+    with pytest.raises(FlowerError) as exc_info:
+        get_task(_make_request(tokens), state)
+
+    assert exc_info.value.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+    assert exc_info.value.message == "Runtime task-token authentication failed."
+    state.get_task_by_token.assert_not_called()

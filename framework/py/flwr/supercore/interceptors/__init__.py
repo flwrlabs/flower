@@ -14,11 +14,11 @@
 # ==============================================================================
 """Shared gRPC interceptors used across supercore services."""
 
+from flwr.supercore.constant import TASK_TOKEN_HEADER
 
 from .rpc_error_translation_interceptor import RpcErrorTranslationServerInterceptor
 from .runtime_token_interceptor import (
     AUTHENTICATION_FAILED_MESSAGE,
-    TASK_TOKEN_HEADER,
     RuntimeTokenClientInterceptor,
     RuntimeTokenServerInterceptor,
     create_superlink_runtime_token_auth_server_interceptor,

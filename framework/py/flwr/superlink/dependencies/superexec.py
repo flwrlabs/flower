@@ -57,9 +57,7 @@ class SuperExecAuthDependency:
             auth_secret=derive_auth_secret(master_secret),
             timestamp_raw=request.headers.get(SUPEREXEC_AUTH_TIMESTAMP_HEADER),
             nonce=request.headers.get(SUPEREXEC_AUTH_NONCE_HEADER),
-            body_sha256_header=request.headers.get(
-                SUPEREXEC_AUTH_BODY_SHA256_HEADER
-            ),
+            body_sha256_header=request.headers.get(SUPEREXEC_AUTH_BODY_SHA256_HEADER),
             signature=request.headers.get(SUPEREXEC_AUTH_SIGNATURE_HEADER),
             nonce_store=state,
         )

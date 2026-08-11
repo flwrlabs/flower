@@ -141,8 +141,10 @@ TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exi
 # Constants for message processing timing
 MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS = 3600
 
-# SuperExec auth constants
+# Runtime auth constants
 TASK_TOKEN_HEADER = "flwr-task-token"
+
+# SuperExec auth constants
 SUPEREXEC_AUTH_TIMESTAMP_HEADER = "flwr-superexec-ts"
 SUPEREXEC_AUTH_NONCE_HEADER = "flwr-superexec-nonce"
 SUPEREXEC_AUTH_BODY_SHA256_HEADER = "flwr-superexec-body-sha256"
