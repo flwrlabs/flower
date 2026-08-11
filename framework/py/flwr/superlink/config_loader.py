@@ -24,13 +24,7 @@ from typing import TypeVar, cast
 
 import yaml
 
-from flwr.common.constant import (
-    AUTHN_TYPE_YAML_KEY,
-    AUTHZ_TYPE_YAML_KEY,
-    AuthnType,
-    AuthzType,
-    EventLogWriterType,
-)
+from flwr.common.constant import AUTHN_TYPE_YAML_KEY, AuthnType, EventLogWriterType
 from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.common.logger import log
 from flwr.server.superlink.linkstate import LinkStateFactory
@@ -50,7 +44,6 @@ P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
 try:
     from flwr.ee import (
         get_control_authn_ee_plugins,
-        get_control_authz_ee_plugins,
         get_ee_federation_manager,
         get_ee_linkstate_factory,
         get_ee_objectstore_factory,
@@ -59,10 +52,6 @@ except ImportError:
 
     def get_control_authn_ee_plugins() -> dict[str, type[ControlAuthnPlugin]]:
         """Return all Control API authentication plugins for EE."""
-        return {}
-
-    def get_control_authz_ee_plugins() -> dict[str, type[ControlAuthzPlugin]]:
-        """Return all Control API authorization plugins for EE."""
         return {}
 
     def get_ee_federation_manager() -> FederationManager:
@@ -190,27 +179,40 @@ def get_control_authn_plugins() -> dict[str, type[ControlAuthnPlugin]]:
     return ee_dict | {AuthnType.NOOP: NoOpControlAuthnPlugin}
 
 
-def get_control_authz_plugins() -> dict[str, type[ControlAuthzPlugin]]:
-    """Return all Control API authorization plugins."""
-    ee_dict: dict[str, type[ControlAuthzPlugin]] = get_control_authz_ee_plugins()
-    return ee_dict | {AuthzType.NOOP: NoOpControlAuthzPlugin}
-
-
 def load_control_auth_plugins(
     config_path: str | None, verify_tls_cert: bool
 ) -> tuple[ControlAuthnPlugin, ControlAuthzPlugin]:
-    """Obtain Control API authentication and authorization plugins."""
-    # Load NoOp plugins if no config path is provided
+    """Obtain the configured authentication plugin and no-op authorization plugin."""
+    # Load NoOp plugins if no authentication config path is provided
     if config_path is None:
         config_path = ""
-        config = {
-            "authentication": {AUTHN_TYPE_YAML_KEY: AuthnType.NOOP},
-            "authorization": {AUTHZ_TYPE_YAML_KEY: AuthzType.NOOP},
-        }
+        config = {"authentication": {AUTHN_TYPE_YAML_KEY: AuthnType.NOOP}}
     # Load YAML file
     else:
-        with Path(config_path).expanduser().open("r", encoding="utf-8") as file:
-            config = yaml.safe_load(file)
+        try:
+            with Path(config_path).expanduser().open("r", encoding="utf-8") as file:
+                config = yaml.safe_load(file)
+        except yaml.YAMLError:
+            sys.exit(
+                f"Invalid account authentication configuration in '{config_path}': "
+                "the file is not valid YAML."
+            )
+
+    if not isinstance(config, dict):
+        sys.exit("Account authentication configuration must be a YAML mapping.")
+
+    unknown_sections = set(config) - {"authentication"}
+    if unknown_sections:
+        sections = ", ".join(sorted(str(section) for section in unknown_sections))
+        sys.exit(
+            "Unsupported top-level account authentication configuration "
+            f"section(s): {sections}. Only `authentication` is supported."
+        )
+
+    if "authentication" not in config:
+        sys.exit("No authentication section is provided in the configuration.")
+    if not isinstance(config["authentication"], dict):
+        sys.exit("The authentication configuration must be a YAML mapping.")
 
     def _load_plugin(
         section: str, yaml_key: str, loader: Callable[[], dict[str, type[P]]]
@@ -244,10 +246,6 @@ def load_control_auth_plugins(
         yaml_key=AUTHN_TYPE_YAML_KEY,
         loader=get_control_authn_plugins,
     )
-    authz_plugin = _load_plugin(
-        section="authorization",
-        yaml_key=AUTHZ_TYPE_YAML_KEY,
-        loader=get_control_authz_plugins,
-    )
+    authz_plugin = NoOpControlAuthzPlugin(Path(config_path), verify_tls_cert)
 
     return authn_plugin, authz_plugin
