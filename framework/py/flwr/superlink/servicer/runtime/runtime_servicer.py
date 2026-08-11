@@ -97,7 +97,6 @@ class SuperLinkRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
         return runtime_handlers.pull_messages(
             request,
             self.state(),
-            self.objectstore_factory.store(),
             task,
         )
 
@@ -158,6 +157,6 @@ class SuperLinkRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
         task = get_authenticated_task()
         return runtime_handlers.confirm_message_received(
             request,
-            self.objectstore_factory.store(),
+            self.state(),
             task,
         )
