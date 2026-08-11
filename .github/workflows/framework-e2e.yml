@@ -218,7 +218,10 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.pythonLocation }}
-          key: pythonloc-${{ runner.os }}-${{ matrix.directory }}-${{ env.pythonLocation }}-${{ hashFiles(format('./framework/e2e/{0}/pyproject.toml', matrix.directory)) }}
+          # Cache entries are shared across workflow jobs. Namespace this one
+          # by job and matrix directory so another E2E job cannot restore a
+          # different Python environment by accident.
+          key: pythonloc-${{ runner.os }}-frameworks-${{ matrix.directory }}-${{ env.pythonLocation }}-${{ hashFiles(format('./framework/e2e/{0}/pyproject.toml', matrix.directory), 'framework/pyproject.toml', 'framework/uv.lock') }}
       - name: Install dependencies
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: python -m pip install --upgrade . --extra-index-url https://download.pytorch.org/whl/cpu
@@ -227,6 +230,16 @@ jobs:
         run: |
           WHEEL_URL="https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}"
           python -m pip install "flwr[simulation] @ ${WHEEL_URL}"
+      - name: Save Python location cache
+        id: cache-save-python
+        uses: actions/cache/save@v4
+        if: ${{ needs.changes.outputs.framework == 'true' && github.ref_name == 'main' && steps.cache-restore-python.outputs.cache-hit != 'true' }}
+        with:
+          path: ${{ env.pythonLocation }}
+          # E2E tests modify pyproject.toml while they run. Reuse the key from
+          # restore so those changes do not make the saved dependency cache
+          # unavailable to the next run.
+          key: ${{ steps.cache-restore-python.outputs.cache-primary-key }}
       - name: Download dataset
         if: ${{ needs.changes.outputs.framework == 'true' && matrix.dataset }}
         run: python -c "${{ matrix.dataset }}"
@@ -252,13 +265,6 @@ jobs:
       # - name: Run reconnection test with SQLite database (Temporarily disabled due to in-memory ObjectStore)
       #   if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory == 'e2e-bare' }}
       #   run: ./../test_reconnection.sh sqlite
-      - name: Cache save Python location
-        id: cache-save-python
-        uses: actions/cache/save@v4
-        if: ${{ needs.changes.outputs.framework == 'true' && github.ref_name == 'main' &&  !steps.cache-restore-python.outputs.cache-hit }}
-        with:
-          path: ${{ env.pythonLocation }}
-          key: pythonloc-${{ runner.os }}-${{ matrix.directory }}-${{ env.pythonLocation }}-${{ hashFiles(format('./framework/e2e/{0}/pyproject.toml', matrix.directory)) }}
 
   strategies:
     runs-on: ubuntu-24.04
