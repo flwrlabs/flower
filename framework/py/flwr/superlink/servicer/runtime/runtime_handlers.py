@@ -72,7 +72,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     no_object_id_recompute,
 )
-from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
+from flwr.supercore.object_store import NoObjectInStoreError
 from flwr.superlink.servicer.control.control_handlers import process_due_automations
 from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
@@ -163,7 +163,6 @@ def push_messages(
 def pull_messages(  # pylint: disable=R0914
     request: PullAppMessagesRequest,
     state: LinkState,
-    store: ObjectStore,
     task: Task,
     context: grpc.ServicerContext,
 ) -> PullAppMessagesResponse:
@@ -174,6 +173,7 @@ def pull_messages(  # pylint: disable=R0914
         message_ids=set(request.message_ids)
     )
 
+    store = state.object_store
     for msg_res in messages_res:
         if msg_res.metadata.src_node_id == SUPERLINK_NODE_ID:
             with no_object_id_recompute():
@@ -391,14 +391,14 @@ def pull_object(
 
 def confirm_message_received(
     request: ConfirmMessageReceivedRequest,
-    store: ObjectStore,
+    state: LinkState,
     task: Task,
     context: grpc.ServicerContext,
 ) -> ConfirmMessageReceivedResponse:
     """Confirm message received."""
     log(DEBUG, "Runtime.ConfirmMessageReceived")
     _ = _get_authenticated_serverapp_run_id(task, context)
-    store.delete(request.message_object_id)
+    state.object_store.delete(request.message_object_id)
     return ConfirmMessageReceivedResponse()
 
 
