@@ -25,7 +25,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 
 from flwr.common.logger import log
 
-from .base import ApiErrorCode, FlowerError
+from .base import FlowerError
 from .catalog import API_ERROR_MAP
 
 INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error."
@@ -49,25 +49,20 @@ async def http_error_translator(
             error_spec = API_ERROR_MAP[err.code]
             http_status = error_spec.http_status_code
             public_message = error_spec.public_message
+            http_headers = error_spec.http_headers
         except (ValueError, KeyError):
             http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
             public_message = INTERNAL_SERVER_ERROR_MESSAGE
+            http_headers = None
 
         # Log error as is
         msg = f"[{request.url.path}][ApiError:{err.code}] {err.message}"
         log(ERROR, msg)
         # Return sanitized error to client
-        # Advertise the required authentication scheme so clients can distinguish
-        # this 401 response from other API errors and retry with a Bearer token.
-        headers = (
-            {"WWW-Authenticate": "Bearer"}
-            if err.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED
-            else None
-        )
         return Response(
             status_code=http_status,
             content=err.to_json(public_message),
-            headers=headers,
+            headers=http_headers,
             media_type="application/json",
         )
     except HTTPException as err:
