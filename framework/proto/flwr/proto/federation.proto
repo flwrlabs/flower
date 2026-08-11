@@ -39,6 +39,8 @@ message Federation {
   bool archived = 6;           // Added in v1.27.0
   bool simulation = 7;         // Added in v1.28.0
   SimulationConfig config = 8; // Added in v1.28.0
+  bool can_invite_members = 9; // Added in v1.34.0
+  bool can_add_supernodes = 10; // Added in v1.34.0
 }
 
 message Invitation {
