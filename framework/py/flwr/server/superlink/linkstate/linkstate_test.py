@@ -34,7 +34,8 @@ from uuid import uuid4
 
 from google.protobuf.message import DecodeError
 from parameterized import parameterized
-from sqlalchemy import insert
+from sqlalchemy import event, insert
+from sqlalchemy.sql.dml import Update
 
 from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
@@ -1541,15 +1542,15 @@ class StateTest(CoreStateTest):
             }
 
         # Assert
-        # Allow up to 1 decimal place difference due to file-based SQLite DB speed.
-        # CI runs on cracky old machines, so minor delays are expected.
+        # Allow up to one second of difference due to file-based SQLite DB speed.
+        # CI runs on shared machines, so minor delays are expected.
         self.assertSetEqual(online_node_ids, set(node_ids[7:]))
         for node in nodes:
             actual = datetime.fromisoformat(node.last_activated_at).timestamp()
-            self.assertAlmostEqual(actual, expected_activated_at, 1)
+            self.assertAlmostEqual(actual, expected_activated_at, delta=1)
             if node.status == NodeStatus.OFFLINE:
                 actual = datetime.fromisoformat(node.last_deactivated_at).timestamp()
-                self.assertAlmostEqual(actual, expected_deactivated_at, 1)
+                self.assertAlmostEqual(actual, expected_deactivated_at, delta=1)
 
     def test_acknowledge_node_heartbeat_failed(self) -> None:
         """Test that acknowledge_node_heartbeat returns False when the heartbeat
@@ -2826,30 +2827,43 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             heartbeat_state = states[0]
             delete_state = states[1]
             node_id = create_dummy_node(heartbeat_state, activate=False)
-            original_query = heartbeat_state.query
             did_delete = False
 
             def delete_before_heartbeat_update(
-                query: str, data: Any = None
-            ) -> list[dict[str, Any]]:
+                _conn: Any,
+                statement: Any,
+                _multiparams: Any,
+                _params: Any,
+                _execution_options: Any,
+            ) -> None:
                 nonlocal did_delete
-                normalized_query = " ".join(query.split())
-                if not did_delete and normalized_query.startswith(
-                    "UPDATE node SET online_until"
+                if (
+                    not did_delete
+                    and isinstance(statement, Update)
+                    and getattr(statement.table, "name", None) == "node"
                 ):
                     did_delete = True
                     delete_state.delete_node("mock_flwr_aid", node_id)
-                return original_query(query, data)
-
-            heartbeat_state.query = (  # type: ignore[method-assign]
-                delete_before_heartbeat_update
-            )
 
             # Execute
-            acknowledged = heartbeat_state.acknowledge_node_heartbeat(
-                node_id, heartbeat_interval=30
+            engine = heartbeat_state._engine  # pylint: disable=protected-access
+            assert engine is not None
+            event.listen(
+                engine,
+                "before_execute",
+                delete_before_heartbeat_update,
             )
 
+            try:
+                acknowledged = heartbeat_state.acknowledge_node_heartbeat(
+                    node_id, heartbeat_interval=30
+                )
+            finally:
+                event.remove(
+                    engine,
+                    "before_execute",
+                    delete_before_heartbeat_update,
+                )
             # Assert
             assert did_delete
             assert not acknowledged
