@@ -595,7 +595,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """
         with self.session() as session:
             # pylint: disable-next=not-callable
-            cnt = session.scalar(select(func.count()).select_from(MessageInsModel))
+            cnt = session.scalar(select(func.count()).select_from(MessageResModel))
             return cast(int, cnt)
 
     def delete_messages(self, message_ins_ids: set[str]) -> None:
