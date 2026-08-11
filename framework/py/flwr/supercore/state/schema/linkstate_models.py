@@ -89,6 +89,10 @@ class Run(LinkStateBase):
     __mapper_args__ = {"primary_key": [run_id]}
 
 
+# Keep logs as a Core table: it has no non-null primary key. Its nullable
+# (timestamp, run_id, node_id) unique constraint cannot provide a stable ORM
+# identity because SQL NULL values may occur in multiple rows. Map this table
+# only after the schema gains a reliable identity column or constraint.
 LogsTable = Table(
     "logs",
     LinkStateBase.metadata,
