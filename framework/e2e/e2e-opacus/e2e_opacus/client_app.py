@@ -16,8 +16,7 @@ from flwr.clientapp import ClientApp
 # Define parameters.
 PARAMS = {
     "batch_size": 32,
-    "dataset_size": 200,
-    "train_split": 0.7,
+    "fixture_size": 200,
     "local_epochs": 1,
 }
 PRIVACY_PARAMS = {
