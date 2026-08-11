@@ -9,6 +9,7 @@ XY = Tuple[np.ndarray, np.ndarray]
 Dataset = Tuple[XY, XY]
 LogRegParams = Union[XY, Tuple[np.ndarray]]
 XYList = List[XY]
+MAX_PARTITION_SAMPLES = 100
 
 
 def get_model_parameters(model: LogisticRegression) -> LogRegParams:
@@ -65,7 +66,9 @@ def load_data(partition_id: int, num_partitions: int):
             partitioners={"train": partitioner},
         )
 
-    dataset = fds.load_partition(partition_id, "train").with_format("numpy")
+    dataset = fds.load_partition(partition_id, "train")
+    dataset = dataset.select(range(min(MAX_PARTITION_SAMPLES, len(dataset))))
+    dataset = dataset.with_format("numpy")
 
     batch = dataset[:]
     X = batch["image"].reshape((len(dataset), -1))
