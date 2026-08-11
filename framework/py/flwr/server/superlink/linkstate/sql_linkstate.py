@@ -1142,6 +1142,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             select(RunModel.run_id, TaskModel)
             .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
             .where(RunModel.run_id.in_(sint64_run_ids))
+            .execution_options(populate_existing=True)
         )
         with self.session() as session:
             rows = session.execute(stmt).all()
