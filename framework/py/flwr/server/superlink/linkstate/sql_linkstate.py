@@ -918,7 +918,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if federation_config:
             fed_config_json = json.dumps(simulation_config_to_json(federation_config))
 
-
         override_config_json = json.dumps(override_config)
         run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
