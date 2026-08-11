@@ -20,7 +20,7 @@ dls = ImageDataLoaders.from_folder(
     path, valid_pct=0.5, train="training", valid="testing", num_workers=0
 )
 
-subset_size = 100  # Or whatever
+subset_size = 50  # Enough examples to exercise fit and evaluation.
 selected_train = np.random.choice(dls.train_ds.items, subset_size, replace=False)
 selected_valid = np.random.choice(dls.valid_ds.items, subset_size, replace=False)
 # Swap in the subset for the whole thing (Note: this mutates dls, so re-initialize before full training!)
