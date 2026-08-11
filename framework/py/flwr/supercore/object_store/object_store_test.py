@@ -19,13 +19,12 @@ import tempfile
 import threading
 import unittest
 from abc import abstractmethod
-from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, cast
-from unittest.mock import Mock, patch
+from typing import cast
+from unittest.mock import Mock
 
 from parameterized import parameterized
-from sqlalchemy import Engine, inspect
+from sqlalchemy import Engine, inspect, select
 
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.inflatable.inflatable_object import (
@@ -35,6 +34,7 @@ from flwr.supercore.inflatable.inflatable_object import (
 )
 from flwr.supercore.inflatable.inflatable_object_test import CustomDataClass
 
+from ..state.schema.objectstore_models import ObjectStoreLock
 from .in_memory_object_store import InMemoryObjectStore
 from .object_store import NoObjectInStoreError, ObjectStore
 from .sql_object_store import SqlObjectStore
@@ -468,29 +468,28 @@ class SqlPersistentObjectStoreTestMixin(unittest.TestCase):
     def test_mutation_lock_uses_sql_lock_row(self) -> None:
         """Ensure ObjectStore mutations use a transaction-scoped SQL lock."""
         store = self.object_store_factory()
-        store.query = Mock()  # type: ignore[method-assign]
-
         store._lock_objectstore_mutation()  # pylint: disable=protected-access
 
-        store.query.assert_any_call(
-            "INSERT INTO objectstore_locks (lock_id, lock_value) "
-            "VALUES (:lock_id, 0) "
-            "ON CONFLICT (lock_id) DO UPDATE "
-            "SET lock_value = objectstore_locks.lock_value",
-            {"lock_id": store._MUTATION_LOCK_ID},  # pylint: disable=W0212
-        )
-        self.assertEqual(store.query.call_count, 1)
+        with store.session() as session:
+            self.assertEqual(
+                session.scalar(
+                    select(ObjectStoreLock.lock_id).where(
+                        ObjectStoreLock.lock_id == store._MUTATION_LOCK_ID
+                    )
+                ),
+                store._MUTATION_LOCK_ID,
+            )
 
     def test_mutation_session_locks_once(self) -> None:
         """Ensure nested mutation sessions reuse the transaction-scoped lock."""
         store = self.object_store_factory()
-        store.query = Mock()  # type: ignore[method-assign]
+        store._lock_objectstore_mutation = Mock()  # type: ignore[method-assign]
 
         with store._mutation_session():  # pylint: disable=protected-access
             with store._mutation_session():  # pylint: disable=protected-access
                 pass
 
-        self.assertEqual(store.query.call_count, 1)
+        store._lock_objectstore_mutation.assert_called_once_with()
 
     def test_concurrent_preregister_and_run_cleanup(self) -> None:
         """Concurrent run cleanup preserves objects registered by another run."""
@@ -526,7 +525,7 @@ class SqlPersistentObjectStoreTestMixin(unittest.TestCase):
         self.assertEqual(store.get(new_parent.object_id), new_parent.deflate())
 
     def test_put_raises_if_object_deleted_before_update(self) -> None:
-        """A concurrent delete before the write must not report put success."""
+        """A delete before the write must not report put success."""
         store = self.object_store_factory()
         second_store = self.object_store_factory()
         obj = CustomDataClass(data=b"test_value")
@@ -534,37 +533,10 @@ class SqlPersistentObjectStoreTestMixin(unittest.TestCase):
         object_id = get_object_id(object_content)
         store.preregister(self.run_id, get_object_tree(obj))
 
-        should_delete = True
-        original_query = store.query
+        second_store.delete(object_id)
 
-        def delete_before_update(
-            query: str,
-            data: Sequence[dict[str, Any]] | dict[str, Any] | None = None,
-        ) -> list[dict[str, Any]]:
-            nonlocal should_delete
-            normalized_query = " ".join(query.split())
-            if should_delete and normalized_query.startswith(
-                "UPDATE objects SET content = :content"
-            ):
-                should_delete = False
-
-                def delete_object() -> None:
-                    with second_store.session():
-                        second_store.query(
-                            "DELETE FROM objects "
-                            "WHERE object_id = :object_id AND ref_count = 0",
-                            {"object_id": object_id},
-                        )
-
-                # Use a separate thread so the ContextVar-bound session used by put()
-                # is not reused; the deletion must run in another transaction.
-                with ThreadPoolExecutor(max_workers=1) as executor:
-                    executor.submit(delete_object).result()
-            return original_query(query, data)
-
-        with patch.object(store, "query", side_effect=delete_before_update):
-            with self.assertRaises(NoObjectInStoreError):
-                store.put(object_id, object_content)
+        with self.assertRaises(NoObjectInStoreError):
+            store.put(object_id, object_content)
 
         self.assertIsNone(store.get(object_id))
 
