@@ -22,7 +22,7 @@ from flwr.supercore.interceptors import (
     RpcErrorTranslationServerInterceptor,
     RuntimeVersionServerInterceptor,
 )
-from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin, NoOpControlAuthzPlugin
+from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 
 from .control_grpc import run_control_api_grpc
 
@@ -47,7 +47,6 @@ def test_run_control_api_grpc_adds_expected_interceptors() -> None:
             objectstore_factory=Mock(),
             certificates=None,
             authn_plugin=NoOpControlAuthnPlugin(Path(), False),
-            authz_plugin=NoOpControlAuthzPlugin(Path(), False),
         )
 
     interceptors = create_grpc_server.call_args.kwargs["interceptors"]
