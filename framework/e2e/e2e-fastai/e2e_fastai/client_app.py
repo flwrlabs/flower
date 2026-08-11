@@ -31,7 +31,7 @@ dls.valid = dls.test_dl(selected_valid, with_labels=True)
 # so a production-sized pretrained model only adds CPU time.
 learn = Learner(
     dls,
-    nn.Sequential(nn.Flatten(), nn.Linear(28 * 28, 10)),
+    nn.Sequential(nn.Flatten(), nn.Linear(3 * 28 * 28, 10)),
     metrics=error_rate,
 )
 
