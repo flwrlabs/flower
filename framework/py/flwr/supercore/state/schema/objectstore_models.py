@@ -88,7 +88,5 @@ class ObjectStoreLock(ObjectStoreBase):
     """Represent an ObjectStore transaction lock."""
 
     __tablename__ = "objectstore_locks"
-    __table_args__ = (PrimaryKeyConstraint("lock_id"),)
-
-    lock_id: Mapped[str] = mapped_column(String, nullable=False)
+    lock_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     lock_value: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
