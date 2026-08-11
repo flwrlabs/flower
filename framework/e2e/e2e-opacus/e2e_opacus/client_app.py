@@ -16,6 +16,7 @@ from flwr.clientapp import ClientApp
 # Define parameters.
 PARAMS = {
     "batch_size": 32,
+    "dataset_size": 200,
     "train_split": 0.7,
     "local_epochs": 1,
 }
@@ -96,10 +97,10 @@ def load_data():
         [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     )
     data = Cifar10Dataset("train", transform=transform)
-    split = math.floor(len(data) * 0.01 * PARAMS["train_split"])
+    split = math.floor(PARAMS["dataset_size"] * PARAMS["train_split"])
     trainset = torch.utils.data.Subset(data, list(range(0, split)))
     testset = torch.utils.data.Subset(
-        data, list(range(split, math.floor(len(data) * 0.01)))
+        data, list(range(split, PARAMS["dataset_size"]))
     )
     trainloader = DataLoader(trainset, PARAMS["batch_size"])
     testloader = DataLoader(testset, PARAMS["batch_size"])
