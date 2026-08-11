@@ -67,7 +67,22 @@ def load_data(partition_id: int, num_partitions: int):
         )
 
     dataset = fds.load_partition(partition_id, "train")
-    dataset = dataset.select(range(min(MAX_PARTITION_SAMPLES, len(dataset))))
+    num_samples = min(MAX_PARTITION_SAMPLES, len(dataset))
+    labels = np.asarray(dataset["label"])
+    unique_labels = np.unique(labels)
+    samples_per_label = num_samples // len(unique_labels)
+    selected_indices = (
+        np.stack(
+            [
+                np.flatnonzero(labels == label)[:samples_per_label]
+                for label in unique_labels
+            ],
+            axis=1,
+        )
+        .reshape(-1)
+        .tolist()
+    )
+    dataset = dataset.select(selected_indices)
     dataset = dataset.with_format("numpy")
 
     batch = dataset[:]
