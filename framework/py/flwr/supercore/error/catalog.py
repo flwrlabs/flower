@@ -285,11 +285,6 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         public_message="Invalid protobuf response.",
     ),
-    ApiErrorCode.OBJECTSTORE_NOT_INITIALIZED: ApiErrorSpec(
-        status_code=StatusCode.UNAVAILABLE,
-        http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        public_message="ObjectStore is not initialized.",
-    ),
     ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED: ApiErrorSpec(
         status_code=StatusCode.UNAUTHENTICATED,
         http_status_code=status.HTTP_401_UNAUTHORIZED,
