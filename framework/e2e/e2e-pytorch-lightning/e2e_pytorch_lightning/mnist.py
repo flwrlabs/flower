@@ -21,14 +21,14 @@ class LitAutoEncoder(pl.LightningModule):
     def __init__(self):
         super().__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(28 * 28, 64),
+            nn.Linear(28 * 28, 16),
             nn.ReLU(),
-            nn.Linear(64, 3),
+            nn.Linear(16, 3),
         )
         self.decoder = nn.Sequential(
-            nn.Linear(3, 64),
+            nn.Linear(3, 16),
             nn.ReLU(),
-            nn.Linear(64, 28 * 28),
+            nn.Linear(16, 28 * 28),
         )
 
     def forward(self, x):
