@@ -564,14 +564,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         This includes delivered but not yet deleted.
         """
         with self.session() as session:
-            return (
-                session.scalar(
-                    select(func.count()).select_from(  # pylint: disable=not-callable
-                        MessageInsModel
-                    )
-                )
-                or 0
-            )
+            # pylint: disable-next=not-callable
+            cnt = session.scalar(select(func.count()).select_from(MessageInsModel))
+            return cast(int, cnt)
 
     def num_message_res(self) -> int:
         """Calculate the number of reply Messages in store.
@@ -579,14 +574,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         This includes delivered but not yet deleted.
         """
         with self.session() as session:
-            return (
-                session.scalar(
-                    select(func.count()).select_from(  # pylint: disable=not-callable
-                        MessageResModel
-                    )
-                )
-                or 0
-            )
+            # pylint: disable-next=not-callable
+            cnt = session.scalar(select(func.count()).select_from(MessageResModel))
+            return cast(int, cnt)
 
     def delete_messages(self, message_ins_ids: set[str]) -> None:
         """Delete a Message and its reply based on provided Message IDs."""

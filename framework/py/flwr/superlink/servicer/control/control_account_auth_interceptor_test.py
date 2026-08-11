@@ -81,18 +81,11 @@ class TestControlAccountAuthInterceptor(unittest.TestCase):
         dummy_request = request
         dummy_context = MagicMock()
         dummy_authn_plugin = MagicMock()
-        dummy_authz_plugin = MagicMock()
         handler_call_details = MagicMock()
 
         # Set up validate_tokens_in_metadata to return a tuple indicating invalid tokens
         dummy_authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
-        # Set up validate account authorization to return True. The return value is
-        # irrelevant because no account authentication is required for requests of type
-        # GetLoginDetailsRequest and GetAuthTokensRequest.
-        dummy_authz_plugin.authorize.return_value = True
-        interceptor = ControlAccountAuthInterceptor(
-            authn_plugin=dummy_authn_plugin, authz_plugin=dummy_authz_plugin
-        )
+        interceptor = ControlAccountAuthInterceptor(authn_plugin=dummy_authn_plugin)
         intercepted_handler = interceptor.intercept_service(
             get_noop_unary_unary_handler, handler_call_details
         )
@@ -124,19 +117,12 @@ class TestControlAccountAuthInterceptor(unittest.TestCase):
         dummy_request = request
         dummy_context = MagicMock()
         dummy_authn_plugin = MagicMock()
-        dummy_authz_plugin = MagicMock()
         handler_call_details = MagicMock()
 
         # Set up validate_tokens_in_metadata to return a tuple indicating invalid tokens
         dummy_authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
         dummy_authn_plugin.refresh_tokens.return_value = (None, None)
-        # Set up `authorize` to return True. The return value is
-        # irrelevant because the authentication will fail and the authorization
-        # plugin will not be called.
-        dummy_authz_plugin.authorize.return_value = True
-        interceptor = ControlAccountAuthInterceptor(
-            authn_plugin=dummy_authn_plugin, authz_plugin=dummy_authz_plugin
-        )
+        interceptor = ControlAccountAuthInterceptor(authn_plugin=dummy_authn_plugin)
         continuation: (
             Callable[[Any], NoOpUnaryUnaryHandler]
             | Callable[[Any], NoOpUnaryStreamHandler]
@@ -173,7 +159,6 @@ class TestControlAccountAuthInterceptor(unittest.TestCase):
         dummy_request = request
         dummy_context = MagicMock()
         dummy_authn_plugin = MagicMock()
-        dummy_authz_plugin = MagicMock()
         handler_call_details = MagicMock()
 
         # Set up validate_tokens_in_metadata to return a tuple indicating valid tokens
@@ -181,13 +166,7 @@ class TestControlAccountAuthInterceptor(unittest.TestCase):
             True,
             self.expected_account_info,
         )
-        # Set up `authorize` to return True. The return value must
-        # be True because the authorization plugin is expected to be called after a
-        # successful token validation.
-        dummy_authz_plugin.authorize.return_value = True
-        interceptor = ControlAccountAuthInterceptor(
-            authn_plugin=dummy_authn_plugin, authz_plugin=dummy_authz_plugin
-        )
+        interceptor = ControlAccountAuthInterceptor(authn_plugin=dummy_authn_plugin)
         continuation: (
             Callable[[Any], NoOpUnaryUnaryHandler]
             | Callable[[Any], NoOpUnaryStreamHandler]
@@ -236,7 +215,6 @@ class TestControlAccountAuthInterceptor(unittest.TestCase):
         dummy_request = request
         dummy_context = MagicMock()
         dummy_authn_plugin = MagicMock()
-        dummy_authz_plugin = MagicMock()
         handler_call_details = MagicMock()
 
         # Set up validate_tokens_in_metadata to return a tuple indicating invalid tokens
@@ -247,14 +225,7 @@ class TestControlAccountAuthInterceptor(unittest.TestCase):
             expected_refresh_tokens_value,
             self.default_account_info,
         )
-        # Set up `authorize` to return True. The return value must be True
-        # because the authorization plugin is expected to be called after a successful
-        # token refresh.
-        dummy_authz_plugin.authorize.return_value = True
-
-        interceptor = ControlAccountAuthInterceptor(
-            authn_plugin=dummy_authn_plugin, authz_plugin=dummy_authz_plugin
-        )
+        interceptor = ControlAccountAuthInterceptor(authn_plugin=dummy_authn_plugin)
         continuation: (
             Callable[[Any], NoOpUnaryUnaryHandler]
             | Callable[[Any], NoOpUnaryStreamHandler]
@@ -281,121 +252,4 @@ class TestControlAccountAuthInterceptor(unittest.TestCase):
         # Assert refresh tokens were sent in initial metadata
         dummy_context.send_initial_metadata.assert_called_once_with(
             expected_refresh_tokens_value
-        )
-
-
-class TestExecUserAuthInterceptorAuthorization(unittest.TestCase):
-    """Test the ExecUserAuthInterceptor authorization logic."""
-
-    def setUp(self) -> None:
-        """Set up test fixtures."""
-        # Reset the shared AccountInfo before each test
-        self.default_token = shared_account_info.set(
-            AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name=NOOP_ACCOUNT_NAME)
-        )
-        self.expected_account_info = AccountInfo(
-            flwr_aid="flwr_aid", account_name="account_name"
-        )
-
-        # A dummy authorization plugin
-        self.authz_plugin = MagicMock()
-
-        # A dummy authentication plugin that always validates tokens
-        self.authn_plugin = MagicMock()
-        self.authn_plugin.validate_tokens_in_metadata.return_value = (
-            True,
-            self.expected_account_info,
-        )
-
-    def tearDown(self) -> None:
-        """Reset shared_account_info."""
-        shared_account_info.reset(self.default_token)
-
-    @parameterized.expand(
-        [
-            (ListRunsRequest()),
-            (StartRunRequest()),
-            (StopRunRequest()),
-            (StreamLogsRequest()),
-        ]
-    )  # type: ignore
-    def test_authorization_successful(self, request: GrpcMessage) -> None:
-        """Test RPC calls successful when authorization is approved.
-
-        When AuthZ plugin approves, the RPC calls should succeed.
-        """
-        dummy_context = MagicMock()
-        handler_call_details = MagicMock()
-
-        # Authorization approves
-        self.authz_plugin.authorize.return_value = True
-
-        interceptor = ControlAccountAuthInterceptor(
-            authn_plugin=self.authn_plugin, authz_plugin=self.authz_plugin
-        )
-
-        # Pick correct continuation for unary vs stream
-        continuation: (
-            Callable[[Any], NoOpUnaryUnaryHandler]
-            | Callable[[Any], NoOpUnaryStreamHandler]
-        ) = get_noop_unary_unary_handler
-        if isinstance(request, StreamLogsRequest):
-            continuation = get_noop_unary_stream_handler
-
-        intercepted = interceptor.intercept_service(continuation, handler_call_details)
-
-        # Execute & Assert
-        if isinstance(request, StreamLogsRequest):
-            result = list(intercepted.unary_stream(request, dummy_context))
-            self.assertEqual(result, ["stream response 1", "stream response 2"])
-        else:
-            result = intercepted.unary_unary(request, dummy_context)
-            self.assertEqual(result, "dummy_response")
-        # Authz plugin should have been called once
-        self.authz_plugin.authorize.assert_called_once_with(self.expected_account_info)
-
-    @parameterized.expand(
-        [
-            (ListRunsRequest()),
-            (StartRunRequest()),
-            (StopRunRequest()),
-            (StreamLogsRequest()),
-        ]
-    )  # type: ignore
-    def test_authorization_failure(self, request: GrpcMessage) -> None:
-        """Test RPC calls not successful when authorization fails.
-
-        When AuthZ plugin denies, the calls should be aborted with PERMISSION_DENIED.
-        """
-        dummy_context = MagicMock()
-        handler_call_details = MagicMock()
-
-        # Authorization denies
-        self.authz_plugin.authorize.return_value = False
-
-        interceptor = ControlAccountAuthInterceptor(
-            authn_plugin=self.authn_plugin, authz_plugin=self.authz_plugin
-        )
-
-        continuation: (
-            Callable[[Any], NoOpUnaryUnaryHandler]
-            | Callable[[Any], NoOpUnaryStreamHandler]
-        ) = get_noop_unary_unary_handler
-        if isinstance(request, StreamLogsRequest):
-            continuation = get_noop_unary_stream_handler
-
-        intercepted = interceptor.intercept_service(continuation, handler_call_details)
-
-        # Execute & Assert
-        if isinstance(request, StreamLogsRequest):
-            with self.assertRaises(grpc.RpcError):
-                _ = intercepted.unary_stream(request, dummy_context)
-        else:
-            with self.assertRaises(grpc.RpcError):
-                _ = intercepted.unary_unary(request, dummy_context)
-
-        # Ensure abort was called with PERMISSION_DENIED
-        dummy_context.abort.assert_called_once_with(
-            grpc.StatusCode.PERMISSION_DENIED,
-            "❗️ Account not authorized. Please contact the SuperLink administrator.",
         )
