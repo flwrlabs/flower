@@ -2395,6 +2395,56 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         self.assertEqual(second.credentials_json, '{"token":"new"}')
         self.assertEqual(second.config_json, '{"calendar":"work"}')
 
+    def test_get_node_info_refreshes_rows_after_offline_tagging(self) -> None:
+        """Test get_node_info observes offline tagging in a shared session."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+
+        with state.session():
+            state.get_node_info(node_ids=[node_id])
+            state.query(
+                "UPDATE node SET online_until = :online_until WHERE node_id = :node_id",
+                {
+                    "online_until": now().timestamp() - 1.0,
+                    "node_id": uint64_to_int64(node_id),
+                },
+            )
+            refreshed = state.get_node_info(node_ids=[node_id])[0]
+
+        self.assertEqual(refreshed.status, NodeStatus.OFFLINE)
+
+    def test_get_run_info_refreshes_rows_after_raw_sql_update(self) -> None:
+        """Test get_run_info observes raw SQL updates in a shared session."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+
+        with state.session():
+            state.get_run_info(run_ids=[run_id])
+            state.store_traffic(run_id, bytes_sent=100, bytes_recv=200)
+            refreshed = state.get_run_info(run_ids=[run_id])[0]
+
+        self.assertEqual(refreshed.bytes_sent, 100)
+        self.assertEqual(refreshed.bytes_recv, 200)
+
+    def test_get_run_status_refreshes_task_after_raw_sql_update(self) -> None:
+        """Test get_run_status observes raw SQL updates in a shared session."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        task_id = get_primary_task_id(state, run_id)
+
+        with state.session():
+            state.get_run_status({run_id})
+            state.query(
+                "UPDATE task SET starting_at = :starting_at WHERE task_id = :task_id",
+                {
+                    "starting_at": now().isoformat(),
+                    "task_id": uint64_to_int64(task_id),
+                },
+            )
+            refreshed = state.get_run_status({run_id})[run_id]
+
+        self.assertEqual(refreshed.status, Status.STARTING)
+
     def test_reserve_nonce_cleans_expired_rows_on_duplicate(self) -> None:
         """Expired nonce cleanup commits even when reservation is duplicate."""
         state = self.state_factory()
