@@ -22,7 +22,18 @@ from datetime import UTC, datetime
 from logging import ERROR, WARNING
 from typing import Any, Literal, cast
 
-from sqlalchemy import MetaData, delete, exists, func, insert, or_, select, update
+from sqlalchemy import (
+    MetaData,
+    bindparam,
+    case,
+    delete,
+    exists,
+    func,
+    insert,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Message
@@ -690,30 +701,27 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def delete_node(self, owner_aid: str, node_id: int) -> None:
         """Delete a node."""
         sint64_node_id = uint64_to_int64(node_id)
-
-        query = """
-            UPDATE node
-            SET status = :unregistered, unregistered_at = :unregistered_at,
-            online_until = CASE
-                WHEN online_until > :current
-                    THEN :current
-                ELSE online_until
-            END
-            WHERE node_id = :node_id AND status != :unregistered
-            AND owner_aid = :owner_aid
-            RETURNING node_id
-        """
         current = now()
-        params = {
-            "unregistered": NodeStatus.UNREGISTERED,
-            "unregistered_at": current.isoformat(),
-            "current": current.timestamp(),
-            "node_id": sint64_node_id,
-            "owner_aid": owner_aid,
-        }
-
-        rows = self.query(query, params)
-        if not rows:
+        stmt = (
+            update(NodeModel)
+            .where(
+                NodeModel.node_id == sint64_node_id,
+                NodeModel.status != NodeStatus.UNREGISTERED,
+                NodeModel.owner_aid == owner_aid,
+            )
+            .values(
+                status=NodeStatus.UNREGISTERED,
+                unregistered_at=current.isoformat(),
+                online_until=case(
+                    (NodeModel.online_until > current.timestamp(), current.timestamp()),
+                    else_=NodeModel.online_until,
+                ),
+            )
+            .returning(NodeModel.node_id)
+        )
+        with self.session() as session:
+            updated_node_id = session.scalar(stmt)
+        if updated_node_id is None:
             raise ValueError(
                 f"Node {node_id} already deleted, not found or unauthorized "
                 "deletion attempt."
@@ -726,28 +734,23 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Only activate if the node is currently registered or offline
         current_dt = now()
         sint64_node_id = uint64_to_int64(node_id)
-        query = """
-            UPDATE node
-            SET status = :online,
-                last_activated_at = :current,
-                online_until = :online_until,
-                heartbeat_interval = :heartbeat_interval
-            WHERE node_id = :node_id AND status IN (:registered, :offline)
-            RETURNING node_id
-        """
-        params = {
-            "online": NodeStatus.ONLINE,
-            "current": current_dt.isoformat(),
-            "online_until": current_dt.timestamp()
-            + HEARTBEAT_PATIENCE * heartbeat_interval,
-            "heartbeat_interval": heartbeat_interval,
-            "node_id": sint64_node_id,
-            "registered": NodeStatus.REGISTERED,
-            "offline": NodeStatus.OFFLINE,
-        }
-
-        rows = self.query(query, params)
-        return len(rows) > 0
+        stmt = (
+            update(NodeModel)
+            .where(
+                NodeModel.node_id == sint64_node_id,
+                NodeModel.status.in_([NodeStatus.REGISTERED, NodeStatus.OFFLINE]),
+            )
+            .values(
+                status=NodeStatus.ONLINE,
+                last_activated_at=current_dt.isoformat(),
+                online_until=current_dt.timestamp()
+                + HEARTBEAT_PATIENCE * heartbeat_interval,
+                heartbeat_interval=heartbeat_interval,
+            )
+            .returning(NodeModel.node_id)
+        )
+        with self.session() as session:
+            return session.scalar(stmt) is not None
 
     def deactivate_node(self, node_id: int) -> bool:
         """Deactivate the node with the specified `node_id`."""
@@ -755,24 +758,21 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         # Only deactivate if the node is currently online
         current_dt = now()
-        query = """
-            UPDATE node
-            SET status = :offline,
-                last_deactivated_at = :current_iso,
-                online_until = :current_ts
-            WHERE node_id = :node_id AND status = :online
-            RETURNING node_id
-        """
-        params = {
-            "offline": NodeStatus.OFFLINE,
-            "current_iso": current_dt.isoformat(),
-            "current_ts": current_dt.timestamp(),
-            "node_id": uint64_to_int64(node_id),
-            "online": NodeStatus.ONLINE,
-        }
-
-        rows = self.query(query, params)
-        return len(rows) > 0
+        stmt = (
+            update(NodeModel)
+            .where(
+                NodeModel.node_id == uint64_to_int64(node_id),
+                NodeModel.status == NodeStatus.ONLINE,
+            )
+            .values(
+                status=NodeStatus.OFFLINE,
+                last_deactivated_at=current_dt.isoformat(),
+                online_until=current_dt.timestamp(),
+            )
+            .returning(NodeModel.node_id)
+        )
+        with self.session() as session:
+            return session.scalar(stmt) is not None
 
     def get_nodes(self, run_id: int) -> set[int]:
         """Retrieve all currently stored node IDs as a set.
@@ -803,53 +803,50 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def _check_and_tag_offline_nodes(self, node_ids: list[int] | None = None) -> None:
         """Check and tag offline nodes."""
-        query = """
-            SELECT node_id, online_until
-            FROM node
-            WHERE online_until <= :current_time
-              AND status = :online
-        """
-        params: dict[str, Any] = {
-            "current_time": now().timestamp(),
-            "online": NodeStatus.ONLINE,
-        }
+        current_time = now().timestamp()
+        stmt = select(NodeModel.node_id, NodeModel.online_until).where(
+            NodeModel.online_until <= current_time,
+            NodeModel.status == NodeStatus.ONLINE,
+        )
         if node_ids is not None:
             if not node_ids:
                 return
             sint64_node_ids = [uint64_to_int64(nid) for nid in node_ids]
-            placeholders, in_params = build_sql_in_params(sint64_node_ids, "nid")
-            query += f" AND node_id IN ({placeholders})"
-            params.update(in_params)
+            stmt = stmt.where(NodeModel.node_id.in_(sint64_node_ids))
 
         # Select candidate node_ids first so `last_deactivated_at` can preserve the
         # expiry time without relying on database-specific epoch formatting functions
-        rows = self.query(query, params)
-        if not rows:
-            return
+        with self.session() as session:
+            rows = session.execute(stmt).all()
+            if not rows:
+                return
 
-        update_query = """
-            UPDATE node
-            SET status = :offline, last_deactivated_at = :last_deactivated_at
-            WHERE node_id = :node_id
-              AND status = :online
-              AND online_until <= :current_time
-        """
-        update_data = [
-            {
-                "offline": NodeStatus.OFFLINE,
-                # Convert epoch seconds to a UTC ISO-8601 string
-                "last_deactivated_at": datetime.fromtimestamp(
-                    row["online_until"], tz=UTC
-                ).isoformat(),
-                "node_id": row["node_id"],
-                "online": NodeStatus.ONLINE,
-                # Re-check expiry to avoid marking a node offline after a concurrent
-                # heartbeat extended its `online_until`
-                "current_time": params["current_time"],
-            }
-            for row in rows
-        ]
-        self.query(update_query, update_data)
+            # Use one executemany UPDATE while keeping the state and expiry checks
+            # in the statement to avoid overwriting a concurrent heartbeat.
+            update_stmt = (
+                update(NodeModel)
+                .execution_options(dml_strategy="core_only")
+                .where(
+                    NodeModel.node_id == bindparam("offline_node_id"),
+                    NodeModel.status == NodeStatus.ONLINE,
+                    NodeModel.online_until <= bindparam("offline_current_time"),
+                )
+                .values(
+                    status=NodeStatus.OFFLINE,
+                    last_deactivated_at=bindparam("offline_deactivated_at"),
+                )
+            )
+            update_params = [
+                {
+                    "offline_node_id": node_id,
+                    "offline_current_time": current_time,
+                    "offline_deactivated_at": datetime.fromtimestamp(
+                        cast(float, online_until), tz=UTC
+                    ).isoformat(),
+                }
+                for node_id, online_until in rows
+            ]
+            session.execute(update_stmt, update_params)
 
     def get_node_info(  # pylint: disable=too-many-locals
         self,
@@ -941,6 +938,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
              :active_until, :pending_at, :starting_at, :running_at, :finished_at,
              :sub_status, :details)
         """
+
         override_config_json = json.dumps(override_config)
         run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
@@ -1228,30 +1226,29 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         sint64_node_id = uint64_to_int64(node_id)
 
         current_dt = now()
-        query = """
-            UPDATE node
-            SET online_until = :online_until,
-                heartbeat_interval = :heartbeat_interval,
-                last_activated_at = CASE
-                    WHEN status != :online THEN :last_activated_at
-                    ELSE last_activated_at
-                END,
-                status = :online
-            WHERE node_id = :node_id AND status != :unregistered
-            RETURNING node_id
-        """
-        params: dict[str, Any] = {
-            "online_until": current_dt.timestamp()
-            + HEARTBEAT_PATIENCE * heartbeat_interval,
-            "heartbeat_interval": heartbeat_interval,
-            "last_activated_at": current_dt.isoformat(),
-            "online": NodeStatus.ONLINE,
-            "node_id": sint64_node_id,
-            "unregistered": NodeStatus.UNREGISTERED,
-        }
-
-        rows = self.query(query, params)
-        return len(rows) > 0
+        stmt = (
+            update(NodeModel)
+            .where(
+                NodeModel.node_id == sint64_node_id,
+                NodeModel.status != NodeStatus.UNREGISTERED,
+            )
+            .values(
+                online_until=current_dt.timestamp()
+                + HEARTBEAT_PATIENCE * heartbeat_interval,
+                heartbeat_interval=heartbeat_interval,
+                last_activated_at=case(
+                    (
+                        NodeModel.status != NodeStatus.ONLINE,
+                        current_dt.isoformat(),
+                    ),
+                    else_=NodeModel.last_activated_at,
+                ),
+                status=NodeStatus.ONLINE,
+            )
+            .returning(NodeModel.node_id)
+        )
+        with self.session() as session:
+            return session.scalar(stmt) is not None
 
     def get_valid_message_ins(self, message_id: str) -> dict[str, Any] | None:
         """Check if the Message exists and is valid (not expired).
