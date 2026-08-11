@@ -12,17 +12,17 @@ jobs:
     strategy:
       matrix:
         include:
-          - directory: bare
-          - directory: bare-https
-          - directory: bare-client-auth
-          - directory: jax
-          - directory: pytorch
-          - directory: tensorflow
-          - directory: opacus
-          - directory: pytorch-lightning
-          - directory: scikit-learn
-          - directory: fastai
-          - directory: pandas
+          - directory: e2e-bare
+          - directory: e2e-bare-https
+          - directory: e2e-bare-auth
+          - directory: e2e-jax
+          - directory: e2e-pytorch
+          - directory: e2e-tensorflow
+          - directory: e2e-opacus
+          - directory: e2e-pytorch-lightning
+          - directory: e2e-scikit-learn
+          - directory: e2e-fastai
+          - directory: e2e-pandas
 
     name: Framework / ${{ matrix.directory }}
 
@@ -39,12 +39,16 @@ jobs:
         # Only keep caches that match the latest keys for each directory
         run: |
           gh extension install actions/gh-actions-cache
-          
+
           REPO=${{ github.repository }}
-          LATEST_KEY=pythonloc-${{ matrix.directory }}-${{ env.pythonLocation }}-${{ hashFiles(format('./e2e/{0}/pyproject.toml', matrix.directory)) }}
+          # The producer job is named `frameworks`; keep this namespace aligned
+          # with github.job in framework-e2e.yml.
+          CACHE_JOB_NAME=frameworks
+          CACHE_PREFIX="pythonloc-${{ runner.os }}-${CACHE_JOB_NAME}-${{ matrix.directory }}-"
+          LATEST_KEY="${CACHE_PREFIX}${{ env.pythonLocation }}-${{ hashFiles(format('./framework/e2e/{0}/pyproject.toml', matrix.directory), 'framework/pyproject.toml', 'framework/uv.lock') }}"
 
           echo "Fetching list of cache keys"
-          cacheKeys=$(gh actions-cache list -R $REPO | grep "${{ matrix.directory }}" | cut -f 1 )
+          cacheKeys=$(gh actions-cache list -R "$REPO" | awk '{print $1}' | grep -F "$CACHE_PREFIX" || true)
 
           ## Setting this to not fail the workflow while deleting cache keys. 
           set +e
