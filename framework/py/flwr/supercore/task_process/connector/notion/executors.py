@@ -21,9 +21,9 @@ from flwr.supercore.typing import JSONObject
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
 from ..http import ConnectorApiError, request_json_object
 from ..json_utils import optional_string, require_int_range, require_string
-from .oauth import NOTION_API_VERSION
 
 _NOTION_API_BASE_URL = "https://api.notion.com/v1"
+NOTION_API_VERSION = "2026-03-11"
 
 
 class NotionApiError(ConnectorApiError):

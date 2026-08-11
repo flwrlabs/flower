@@ -285,6 +285,11 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         public_message="Invalid protobuf response.",
     ),
+    ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED: ApiErrorSpec(
+        status_code=StatusCode.UNAUTHENTICATED,
+        http_status_code=status.HTTP_401_UNAUTHORIZED,
+        public_message="Authentication failed.",
+    ),
     ApiErrorCode.FLEET_SUPERNODE_REGISTRATION_DISABLED: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
@@ -332,5 +337,31 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         status_code=StatusCode.PERMISSION_DENIED,
         http_status_code=status.HTTP_403_FORBIDDEN,
         public_message="Failed to get FAB.",
+    ),
+    ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Connector credentials are not available to this task.",
+    ),
+    ApiErrorCode.RUNTIME_TASK_START_FAILED: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="Failed to start task.",
+    ),
+    ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Only AgentApp and ServerApp tasks can create automations.",
+    ),
+    ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="Unexpected node ID.",
+    ),
+    ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Some Runtime API endpoints are only available for Deployment "
+        "Runtime runs.",
     ),
 }

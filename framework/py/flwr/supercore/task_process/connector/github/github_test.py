@@ -21,10 +21,11 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 
 from .. import registry
-from .oauth import GitHubOAuthError, GitHubOAuthProvider
+from ..oauth import OAuthFlow
+from .definition import PROVIDER
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
-_TOKEN_REQUEST = "flwr.supercore.task_process.connector.github.oauth.requests.post"
+_TOKEN_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
 
 
 def _response(payload: object, status_code: int = 200) -> Mock:
@@ -58,12 +59,13 @@ def test_get_file_content_decodes_utf8() -> None:
 
 def test_github_oauth_requests_no_scope() -> None:
     """OAuth should request and accept only scope-free credentials."""
-    provider = GitHubOAuthProvider(
+    flow = OAuthFlow(
+        PROVIDER,
         client_id="client",
         client_secret="secret",
         redirect_uri="https://example.com/callback",
     )
-    url = provider.build_authorization_url(
+    url = flow.build_authorization_url(
         redirect_uri="https://example.com/callback",
         state="state",
         pkce_challenge="challenge",
@@ -73,20 +75,20 @@ def test_github_oauth_requests_no_scope() -> None:
         {"access_token": "token", "token_type": "bearer", "scope": ""}
     )
     with patch(_TOKEN_REQUEST, return_value=token_response):
-        credentials, config = provider.exchange_code(
+        credentials, config = flow.exchange_code(
             code="code",
             redirect_uri="https://example.com/callback",
             pkce_verifier="verifier",
         )
-    assert credentials == {"access_token": "token"}
+    assert credentials == {"access_token": "token", "token_type": "bearer"}
     assert not config
 
     token_response.json.return_value["scope"] = "repo"
     with (
         patch(_TOKEN_REQUEST, return_value=token_response),
-        pytest.raises(GitHubOAuthError),
+        pytest.raises(RuntimeError),
     ):
-        provider.exchange_code(
+        flow.exchange_code(
             code="code",
             redirect_uri="https://example.com/callback",
             pkce_verifier="verifier",

@@ -48,47 +48,37 @@ def _make_app_request(app: FastAPI) -> Request:
     return request
 
 
-def test_account_access_dependency_returns_authorized_account() -> None:
+def test_account_access_dependency_returns_authenticated_account() -> None:
     """AccountAccessDependency should return the account when tokens are valid."""
     authn_plugin = Mock()
-    authz_plugin = Mock()
     account = AccountInfo(flwr_aid="aid", account_name="account")
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
-    authz_plugin.authorize.return_value = True
 
-    result = AccountAccessDependency(authn_plugin, authz_plugin)(
-        _make_request(), Response()
-    )
+    result = AccountAccessDependency(authn_plugin)(_make_request(), Response())
 
     assert result is account
     authn_plugin.validate_tokens_in_metadata.assert_called_once_with(
         [("authorization", "Bearer access-token")]
     )
     authn_plugin.refresh_tokens.assert_not_called()
-    authz_plugin.authorize.assert_called_once_with(account)
 
 
 def test_account_access_dependency_refreshes_tokens_and_sets_response_headers() -> None:
-    """AccountAccessDependency returns an authorized account after token refresh."""
+    """AccountAccessDependency returns an account after token refresh."""
     authn_plugin = Mock()
-    authz_plugin = Mock()
     account = AccountInfo(flwr_aid="aid", account_name="account")
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     authn_plugin.refresh_tokens.return_value = (
         [("x-access-token", "new-token"), ("x-refresh-token", b"new-refresh")],
         account,
     )
-    authz_plugin.authorize.return_value = True
     response = Response()
 
-    result = AccountAccessDependency(authn_plugin, authz_plugin)(
-        _make_request(), response
-    )
+    result = AccountAccessDependency(authn_plugin)(_make_request(), response)
 
     assert result is account
     assert response.headers.get("x-access-token") == "new-token"
     assert response.headers.get("x-refresh-token") == "new-refresh"
-    authz_plugin.authorize.assert_called_once_with(account)
 
 
 @pytest.mark.parametrize(
@@ -124,40 +114,21 @@ def test_account_access_dependency_rejects_unauthenticated_requests(
 ) -> None:
     """AccountAccessDependency should reject absent or incomplete authentication."""
     authn_plugin = Mock()
-    authz_plugin = Mock()
     authn_plugin.validate_tokens_in_metadata.return_value = (valid_tokens, account)
     authn_plugin.refresh_tokens.return_value = (tokens, account)
 
     with pytest.raises(FlowerError) as exc_info:
-        AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(), Response())
+        AccountAccessDependency(authn_plugin)(_make_request(), Response())
 
     assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED
     assert exc_info.value.message == detail
-    authz_plugin.authorize.assert_not_called()
-
-
-def test_account_access_dependency_rejects_unauthorized_account() -> None:
-    """AccountAccessDependency should reject accounts denied by authorization."""
-    authn_plugin = Mock()
-    authz_plugin = Mock()
-    account = AccountInfo(flwr_aid="aid", account_name="account")
-    authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
-    authz_plugin.authorize.return_value = False
-
-    with pytest.raises(FlowerError) as exc_info:
-        AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(), Response())
-
-    assert exc_info.value.code == ApiErrorCode.NO_PERMISSIONS
-    assert exc_info.value.message == (
-        "Account authorization failed for flwr_aid='aid', account_name='account'."
-    )
 
 
 def test_get_authn_plugin_returns_configured_plugin() -> None:
     """get_authn_plugin should return the configured authentication plugin."""
     app = FastAPI()
     authn_plugin = Mock()
-    app.state.account_access_dep = AccountAccessDependency(authn_plugin, Mock())
+    app.state.account_access_dep = AccountAccessDependency(authn_plugin)
 
     assert get_authn_plugin(_make_app_request(app)) is authn_plugin
 
