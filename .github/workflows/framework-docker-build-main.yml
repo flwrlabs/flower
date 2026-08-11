@@ -84,12 +84,14 @@ jobs:
             exit 1
           fi
 
-      - id: versions
+      - name: Export dependency versions
+        id: versions
         run: |
           echo "pip-version=${{ steps.bootstrap.outputs.pip-version }}" >> "$GITHUB_OUTPUT"
           echo "setuptools-version=${{ steps.bootstrap.outputs.setuptools-version }}" >> "$GITHUB_OUTPUT"
 
-      - id: matrix
+      - name: Build Docker image matrix
+        id: matrix
         run: |
           FLWR_VERSION_REF="git+${{ github.server_url }}/${{ github.repository }}.git@${{ github.sha }}#subdirectory=framework"
           python framework/dev/build-docker-image-matrix.py --flwr-version "${FLWR_VERSION_REF}" --matrix unstable > matrix.raw.json
