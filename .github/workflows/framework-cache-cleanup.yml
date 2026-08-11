@@ -44,7 +44,7 @@ jobs:
           # The producer job is named `frameworks`; keep this namespace aligned
           # with github.job in framework-e2e.yml.
           CACHE_JOB_NAME=frameworks
-          CACHE_PREFIX="pythonloc-${{ runner.os }}-${CACHE_JOB_NAME}-${{ matrix.directory }}-"
+          CACHE_PREFIX="pythonloc-${{ runner.os }}-${CACHE_JOB_NAME}-${{ matrix.directory }}-${{ env.pythonLocation }}-"
           LATEST_KEY="${CACHE_PREFIX}${{ env.pythonLocation }}-${{ hashFiles(format('./framework/e2e/{0}/pyproject.toml', matrix.directory), 'framework/pyproject.toml', 'framework/uv.lock') }}"
 
           echo "Fetching list of cache keys"
