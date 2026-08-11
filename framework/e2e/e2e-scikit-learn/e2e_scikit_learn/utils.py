@@ -9,7 +9,7 @@ XY = Tuple[np.ndarray, np.ndarray]
 Dataset = Tuple[XY, XY]
 LogRegParams = Union[XY, Tuple[np.ndarray]]
 XYList = List[XY]
-MAX_PARTITION_SAMPLES = 100
+MAX_PARTITION_SAMPLES = 50
 IMAGE_STRIDE = 2
 NUM_FEATURES = (28 // IMAGE_STRIDE) ** 2
 
