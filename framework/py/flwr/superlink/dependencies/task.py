@@ -42,10 +42,12 @@ def get_task(
     state: LinkStateDependency,
 ) -> Task:
     """Return the task authenticated by the Runtime task-token header."""
-    tokens = request.headers.getlist(TASK_TOKEN_HEADER)
-    # Match gRPC metadata validation and reject ambiguous credentials.
-    token_is_valid = len(tokens) == 1 and bool(token) and tokens[0] == token
-    task = state.get_task_by_token(token) if token_is_valid and token else None
+    if len(request.headers.getlist(TASK_TOKEN_HEADER)) != 1:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
+            "Runtime task-token authentication failed.",
+        )
+    task = state.get_task_by_token(token) if token else None
     if task is None:
         raise FlowerError(
             ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
