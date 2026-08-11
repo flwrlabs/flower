@@ -33,34 +33,31 @@ ownership, federation, and entitlement checks.
 Enable Account Authentication on the SuperLink
 ==============================================
 
-Create a YAML configuration file with the following content:
-
-.. code-block:: yaml
-
-    authentication:
-      authn_type: oidc
-      authn_url:          # OIDC provider's authorization_endpoint
-      token_url:          # OIDC provider's token_endpoint
-      validate_url:       # OIDC provider's account-authinfo_endpoint
-      oidc_client_id:     # OIDC provider Client ID
-      oidc_client_secret: # The corresponding Client Secret
-
-Save this file as ``account-auth-config.yaml``. Then pass it to the SuperLink via the
-``--account-auth-config`` flag when deploying the SuperLink:
+Set the following environment variables on the SuperLink process:
 
 .. code-block:: bash
 
-    $ flower-superlink \
-        --account-auth-config=account-auth-config.yaml
-        <other flags>
+    FLWR_OIDC_ENABLED=1
+    FLWR_OIDC_ISSUER=https://<domain>/realms/<realm>
+    FLWR_OIDC_CLIENT_ID=<client_id>
+    FLWR_OIDC_CLIENT_SECRET=<client_secret>
+    FLWR_OIDC_VERIFY_TLS=1
 
-.. warning::
+``FLWR_OIDC_ENABLED`` defaults to ``0``. ``FLWR_OIDC_VERIFY_TLS`` defaults to
+``1``. As with other Flower binary environment variables, use ``1`` for true and
+``0`` for false. Control authentication remains NoOp unless
+``FLWR_OIDC_ENABLED=1``, even when credentials are present.
+``FLWR_OIDC_VERIFY_TLS`` affects only requests to the OIDC provider.
 
-    Starting with Flower ``v1.23.0``, the following options/keys have been renamed:
+Start the SuperLink with these variables in its environment:
 
-    - ``auth_type`` → ``authn_type`` (in YAML configuration)
-    - ``auth_url`` → ``authn_url`` (in YAML configuration)
-    - ``--user-auth-config`` → ``--account-auth-config`` (in SuperLink CLI)
+.. code-block:: bash
+
+    $ FLWR_OIDC_ENABLED=1 \
+        FLWR_OIDC_ISSUER=https://<domain>/realms/<realm> \
+        FLWR_OIDC_CLIENT_ID=<client_id> \
+        FLWR_OIDC_CLIENT_SECRET=<client_secret> \
+        flower-superlink <other flags>
 
 ************************
  Login to the SuperLink
