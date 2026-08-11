@@ -12,16 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Compatibility wrapper for CoreState SQLAlchemy metadata."""
+"""Generated connector package registry. Do not edit."""
 
-from sqlalchemy import MetaData
-
-from flwr.supercore.state.schema.corestate_models import FlwrBase
-
-
-def create_corestate_metadata() -> MetaData:
-    """Create and return MetaData with CoreState table definitions."""
-    metadata = MetaData()
-    for table in FlwrBase.metadata.tables.values():
-        table.to_metadata(metadata)
-    return metadata
+CONNECTOR_PACKAGES: tuple[str, ...] = (
+    "flwr.supercore.task_process.connector.attio",
+    "flwr.supercore.task_process.connector.github",
+    "flwr.supercore.task_process.connector.notion",
+    "flwr.supercore.task_process.connector.slack",
+)

@@ -13,6 +13,10 @@ echo "RUN_PYTEST: $RUN_PYTEST"
 
 echo "- Start Python checks"
 
+echo "- connector registry: start"
+python -m dev.generate_connector --check
+echo "- connector registry: done"
+
 echo "- clang-format:  start"
 clang-format --Werror --dry-run proto/flwr/proto/*
 echo "- clang-format:  done"

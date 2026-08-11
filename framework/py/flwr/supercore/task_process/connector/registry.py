@@ -20,33 +20,20 @@ from copy import deepcopy
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from . import (
-    attio,
-    automation,
-    browser_use,
-    github,
-    notion,
-    slack,
-    web_fetch,
-    web_search,
-)
+from . import automation, browser_use, web_fetch, web_search
 from .definition import (
     ConnectorDefinition,
     ConnectorExecutionContext,
     ConnectorExecutor,
     ConnectorHandler,
 )
+from .loader import load_connectors
 from .oauth import OAuthConnectorProvider
 
 ConnectorToolFactory = Callable[[], JSONObject]
 
 
-CONNECTORS: tuple[ConnectorDefinition, ...] = (
-    slack.CONNECTOR,
-    github.CONNECTOR,
-    notion.CONNECTOR,
-    attio.CONNECTOR,
-)
+CONNECTORS: tuple[ConnectorDefinition, ...] = load_connectors()
 _CONNECTORS_BY_REF = {connector.ref: connector for connector in CONNECTORS}
 
 OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthConnectorProvider, ...] = tuple(
