@@ -104,10 +104,8 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.runtime.runtime_grpc import run_runtime_api_grpc
-from flwr.superlink.servicer.runtime.runtime_servicer import (
-    SuperLinkRuntimeServicer,
-    _raise_if,
-)
+from flwr.superlink.servicer.runtime.runtime_handlers import _raise_if
+from flwr.superlink.servicer.runtime.runtime_servicer import SuperLinkRuntimeServicer
 
 # pylint: disable=broad-except,too-many-lines
 
@@ -362,6 +360,20 @@ class TestGetConnector(unittest.TestCase):
             flwr_aid="account-a",
             connector_ref="notion",
         )
+
+    def test_authenticates_before_accessing_state(self) -> None:
+        """GetConnector should authenticate before accessing state."""
+        with (
+            patch(
+                "flwr.superlink.servicer.runtime.runtime_servicer."
+                "get_authenticated_task",
+                side_effect=RuntimeError("No authenticated task"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "No authenticated task"),
+        ):
+            self.servicer.GetConnector(GetConnectorRequest(), Mock())
+
+        self.state_factory.state.assert_not_called()
 
     @parameterized.expand(  # type: ignore
         [
@@ -638,7 +650,8 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
                 ),
             ),
             patch(
-                "flwr.superlink.servicer.runtime.runtime_servicer.start_automation",
+                "flwr.superlink.servicer.runtime.runtime_handlers."
+                "start_control_automation",
                 return_value=expected,
             ) as start_automation_mock,
             patch.object(
