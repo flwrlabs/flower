@@ -22,7 +22,18 @@ from datetime import UTC, datetime
 from logging import ERROR, WARNING
 from typing import Any, Literal, cast
 
-from sqlalchemy import MetaData, case, delete, exists, func, insert, or_, select, update
+from sqlalchemy import (
+    MetaData,
+    bindparam,
+    case,
+    delete,
+    exists,
+    func,
+    insert,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
@@ -807,22 +818,35 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # expiry time without relying on database-specific epoch formatting functions
         with self.session() as session:
             rows = session.execute(stmt).all()
-            for node_id, online_until in rows:
-                session.execute(
-                    update(NodeModel)
-                    .where(
-                        NodeModel.node_id == node_id,
-                        NodeModel.status == NodeStatus.ONLINE,
-                        # Re-check expiry in case a concurrent heartbeat extended it.
-                        NodeModel.online_until <= current_time,
-                    )
-                    .values(
-                        status=NodeStatus.OFFLINE,
-                        last_deactivated_at=datetime.fromtimestamp(
-                            cast(float, online_until), tz=UTC
-                        ).isoformat(),
-                    )
+            if not rows:
+                return
+
+            # Use one executemany UPDATE while keeping the state and expiry checks
+            # in the statement to avoid overwriting a concurrent heartbeat.
+            update_stmt = (
+                update(NodeModel)
+                .execution_options(dml_strategy="core_only")
+                .where(
+                    NodeModel.node_id == bindparam("offline_node_id"),
+                    NodeModel.status == NodeStatus.ONLINE,
+                    NodeModel.online_until <= bindparam("offline_current_time"),
                 )
+                .values(
+                    status=NodeStatus.OFFLINE,
+                    last_deactivated_at=bindparam("offline_deactivated_at"),
+                )
+            )
+            update_params = [
+                {
+                    "offline_node_id": node_id,
+                    "offline_current_time": current_time,
+                    "offline_deactivated_at": datetime.fromtimestamp(
+                        cast(float, online_until), tz=UTC
+                    ).isoformat(),
+                }
+                for node_id, online_until in rows
+            ]
+            session.execute(update_stmt, update_params)
 
     def get_node_info(  # pylint: disable=too-many-locals
         self,
