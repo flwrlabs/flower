@@ -46,6 +46,7 @@ ds_test = (
 
 # Load a small CNN for the E2E smoke tests. The test exercises the TensorFlow
 # client/runtime integration, so a large application model only adds CPU time.
+tf.keras.utils.set_random_seed(42)
 model = tf.keras.Sequential(
     [
         tf.keras.layers.Input(shape=(32, 32, 3)),
@@ -55,7 +56,11 @@ model = tf.keras.Sequential(
         tf.keras.layers.Dense(10, activation="softmax"),
     ]
 )
-model.compile("adam", "sparse_categorical_crossentropy", metrics=["accuracy"])
+model.compile(
+    optimizer=tf.keras.optimizers.SGD(learning_rate=0.001),
+    loss="sparse_categorical_crossentropy",
+    metrics=["accuracy"],
+)
 
 
 # Define Flower client
