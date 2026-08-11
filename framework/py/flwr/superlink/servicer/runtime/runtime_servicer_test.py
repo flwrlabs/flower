@@ -86,6 +86,7 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -388,9 +389,6 @@ class TestGetConnector(unittest.TestCase):
         connector_ref: str,
     ) -> None:
         """GetConnector should reject tasks without a connector identity."""
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
-
         with (
             patch(
                 "flwr.superlink.servicer.runtime.runtime_servicer."
@@ -401,16 +399,13 @@ class TestGetConnector(unittest.TestCase):
                     run_id=123,
                 ),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(FlowerError) as error,
         ):
-            self.servicer.GetConnector(
-                GetConnectorRequest(),
-                context,
-            )
+            self.servicer.GetConnector(GetConnectorRequest(), Mock())
 
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.PERMISSION_DENIED,
-            "Connector credentials are not available to this task.",
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE,
         )
         self.state.get_connector.assert_not_called()
 
@@ -419,8 +414,6 @@ class TestGetConnector(unittest.TestCase):
         task = Mock(type=TaskType.CONNECTOR, connector_ref="notion", run_id=123)
         self.state.get_run_info.return_value = [Mock(flwr_aid="account-b")]
         self.state.get_connector.return_value = None
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
 
         with (
             patch(
@@ -428,21 +421,15 @@ class TestGetConnector(unittest.TestCase):
                 "get_authenticated_task",
                 return_value=task,
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(FlowerError) as error,
         ):
-            self.servicer.GetConnector(
-                GetConnectorRequest(),
-                context,
-            )
+            self.servicer.GetConnector(GetConnectorRequest(), Mock())
 
         self.state.get_connector.assert_called_once_with(
             flwr_aid="account-b",
             connector_ref="notion",
         )
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.NOT_FOUND,
-            "Connector not found.",
-        )
+        self.assertEqual(error.exception.code, ApiErrorCode.CONNECTOR_NOT_FOUND)
 
 
 class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
@@ -671,8 +658,6 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         servicer = SuperLinkRuntimeServicer(
             self.state_factory, self.objectstore_factory
         )
-        context = Mock()
-        context.abort.side_effect = RuntimeError("aborted")
 
         # Execute
         with (
@@ -684,14 +669,14 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
                     type=TaskType.CLIENT_APP,
                 ),
             ),
-            self.assertRaisesRegex(RuntimeError, "aborted"),
+            self.assertRaises(FlowerError) as error,
         ):
-            servicer.StartAutomation(StartAutomationRequest(), context)
+            servicer.StartAutomation(StartAutomationRequest(), Mock())
 
         # Assert
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.PERMISSION_DENIED,
-            "Only AgentApp and ServerApp tasks can create automations.",
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
         )
 
     def test_push_task_output_stores_simulation_runtime(self) -> None:

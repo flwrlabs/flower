@@ -80,14 +80,14 @@ class SuperLinkRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
     ) -> GetNodesResponse:
         """Get available nodes."""
         task = get_authenticated_task()
-        return runtime_handlers.get_nodes(request, self.state(), task, context)
+        return runtime_handlers.get_nodes(request, self.state(), task)
 
     def PushMessages(
         self, request: PushAppMessagesRequest, context: grpc.ServicerContext
     ) -> PushAppMessagesResponse:
         """Push a set of Messages."""
         task = get_authenticated_task()
-        return runtime_handlers.push_messages(request, self.state(), task, context)
+        return runtime_handlers.push_messages(request, self.state(), task)
 
     def PullMessages(
         self, request: PullAppMessagesRequest, context: grpc.ServicerContext
@@ -98,7 +98,6 @@ class SuperLinkRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
             request,
             self.state(),
             task,
-            context,
         )
 
     def GetRun(
@@ -112,14 +111,14 @@ class SuperLinkRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
     ) -> GetConnectorResponse:
         """Return credentials authorized for the authenticated connector task."""
         task = get_authenticated_task()
-        return runtime_handlers.get_connector(request, self.state(), task, context)
+        return runtime_handlers.get_connector(request, self.state(), task)
 
     def PullTaskInput(
         self, request: PullTaskInputRequest, context: grpc.ServicerContext
     ) -> PullTaskInputResponse:
         """Pull ServerApp process inputs."""
         task = get_authenticated_task()
-        return runtime_handlers.pull_task_input(request, self.state(), task, context)
+        return runtime_handlers.pull_task_input(request, self.state(), task)
 
     def PushTaskOutput(
         self, request: PushTaskOutputRequest, context: grpc.ServicerContext
@@ -135,21 +134,21 @@ class SuperLinkRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
     ) -> StartAutomationResponse:
         """Start an automation."""
         task = get_authenticated_task()
-        return runtime_handlers.start_automation(request, self.state(), task, context)
+        return runtime_handlers.start_automation(request, self.state(), task)
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext
     ) -> PushObjectResponse:
         """Push an object to the ObjectStore."""
         task = get_authenticated_task()
-        return runtime_handlers.push_object(request, self.state(), task, context)
+        return runtime_handlers.push_object(request, self.state(), task)
 
     def PullObject(
         self, request: PullObjectRequest, context: grpc.ServicerContext
     ) -> PullObjectResponse:
         """Pull an object from the ObjectStore."""
         task = get_authenticated_task()
-        return runtime_handlers.pull_object(request, self.state(), task, context)
+        return runtime_handlers.pull_object(request, self.state(), task)
 
     def ConfirmMessageReceived(
         self, request: ConfirmMessageReceivedRequest, context: grpc.ServicerContext
@@ -160,5 +159,4 @@ class SuperLinkRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
             request,
             self.state(),
             task,
-            context,
         )

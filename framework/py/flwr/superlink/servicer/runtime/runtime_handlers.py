@@ -19,8 +19,6 @@
 from itertools import chain
 from logging import DEBUG, ERROR, INFO
 
-import grpc
-
 from flwr.app import Message
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.logger import log
@@ -67,6 +65,7 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
@@ -100,11 +99,10 @@ def get_nodes(
     request: GetNodesRequest,
     state: LinkState,
     task: Task,
-    context: grpc.ServicerContext,
 ) -> GetNodesResponse:
     """Get available nodes."""
     log(DEBUG, "Runtime.GetNodes")
-    run_id = _get_authenticated_serverapp_run_id(task, context)
+    run_id = _get_authenticated_serverapp_run_id(task)
     all_ids: set[int] = state.get_nodes(run_id)
     nodes: list[Node] = [Node(node_id=node_id) for node_id in all_ids]
     return GetNodesResponse(nodes=nodes)
@@ -114,11 +112,10 @@ def push_messages(
     request: PushAppMessagesRequest,
     state: LinkState,
     task: Task,
-    context: grpc.ServicerContext,
 ) -> PushAppMessagesResponse:
     """Push a set of Messages."""
     log(DEBUG, "Runtime.PushMessages")
-    run_id = _get_authenticated_serverapp_run_id(task, context)
+    run_id = _get_authenticated_serverapp_run_id(task)
 
     _raise_if(
         validation_error=len(request.messages_list) == 0,
@@ -164,11 +161,10 @@ def pull_messages(  # pylint: disable=R0914
     request: PullAppMessagesRequest,
     state: LinkState,
     task: Task,
-    context: grpc.ServicerContext,
 ) -> PullAppMessagesResponse:
     """Pull a set of Messages."""
     log(DEBUG, "Runtime.PullMessages")
-    run_id = _get_authenticated_serverapp_run_id(task, context)
+    run_id = _get_authenticated_serverapp_run_id(task)
     messages_res: list[Message] = state.get_message_res(
         message_ids=set(request.message_ids)
     )
@@ -225,13 +221,12 @@ def get_connector(
     request: GetConnectorRequest,
     state: LinkState,
     task: Task,
-    context: grpc.ServicerContext,
 ) -> GetConnectorResponse:
     """Return credentials authorized for the authenticated connector task."""
     log(DEBUG, "Runtime.GetConnector")
     if task.type != TaskType.CONNECTOR or not task.connector_ref:
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE,
             "Connector credentials are not available to this task.",
         )
     connector_ref = task.connector_ref
@@ -239,16 +234,14 @@ def get_connector(
     runs = state.get_run_info(run_ids=[task.run_id])
     run = runs[0] if runs else None
     if run is None or not run.flwr_aid:
-        context.abort(grpc.StatusCode.NOT_FOUND, "Connector not found.")
-        raise RuntimeError("This line should never be reached.")
+        raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
 
     connector = state.get_connector(
         flwr_aid=run.flwr_aid,
         connector_ref=connector_ref,
     )
     if connector is None:
-        context.abort(grpc.StatusCode.NOT_FOUND, "Connector not found.")
-        raise RuntimeError("This line should never be reached.")
+        raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
 
     return GetConnectorResponse(
         connector_ref=connector.connector_ref,
@@ -261,7 +254,6 @@ def pull_task_input(
     request: PullTaskInputRequest,
     state: LinkState,
     task: Task,
-    context: grpc.ServicerContext,
 ) -> PullTaskInputResponse:
     """Pull ServerApp process inputs."""
     log(DEBUG, "Runtime.PullTaskInput")
@@ -283,11 +275,10 @@ def pull_task_input(
             task_id=task.task_id,
         )
 
-    context.abort(
-        grpc.StatusCode.FAILED_PRECONDITION,
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_TASK_START_FAILED,
         f"Failed to start task {task.task_id} of run {run_id}",
     )
-    raise RuntimeError("Unreachable code")
 
 
 def push_task_output(
@@ -323,12 +314,11 @@ def start_automation(
     request: StartAutomationRequest,
     state: LinkState,
     task: Task,
-    context: grpc.ServicerContext,
 ) -> StartAutomationResponse:
     """Start an automation."""
     if task.type not in (TaskType.AGENT_APP, TaskType.SERVER_APP):
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
             "Only AgentApp and ServerApp tasks can create automations.",
         )
 
@@ -351,13 +341,14 @@ def push_object(
     request: PushObjectRequest,
     state: LinkState,
     task: Task,
-    context: grpc.ServicerContext,
 ) -> PushObjectResponse:
     """Push an object to the ObjectStore."""
     log(DEBUG, "Runtime.PushObject")
-    run_id = _get_authenticated_serverapp_run_id(task, context)
+    run_id = _get_authenticated_serverapp_run_id(task)
     if request.node.node_id != SUPERLINK_NODE_ID:
-        context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Unexpected node ID.")
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID, "Unexpected node ID."
+        )
     stored = state.store_object(
         run_id,
         request.session_id,
@@ -371,13 +362,14 @@ def pull_object(
     request: PullObjectRequest,
     state: LinkState,
     task: Task,
-    context: grpc.ServicerContext,
 ) -> PullObjectResponse:
     """Pull an object from the ObjectStore."""
     log(DEBUG, "Runtime.PullObject")
-    run_id = _get_authenticated_serverapp_run_id(task, context)
+    run_id = _get_authenticated_serverapp_run_id(task)
     if request.node.node_id != SUPERLINK_NODE_ID:
-        context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Unexpected node ID.")
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID, "Unexpected node ID."
+        )
 
     content = state.get_object(run_id, request.object_id)
     if content is not None:
@@ -393,22 +385,19 @@ def confirm_message_received(
     request: ConfirmMessageReceivedRequest,
     state: LinkState,
     task: Task,
-    context: grpc.ServicerContext,
 ) -> ConfirmMessageReceivedResponse:
     """Confirm message received."""
     log(DEBUG, "Runtime.ConfirmMessageReceived")
-    _ = _get_authenticated_serverapp_run_id(task, context)
+    _ = _get_authenticated_serverapp_run_id(task)
     state.object_store.delete(request.message_object_id)
     return ConfirmMessageReceivedResponse()
 
 
-def _get_authenticated_serverapp_run_id(
-    task: Task, context: grpc.ServicerContext
-) -> int:
+def _get_authenticated_serverapp_run_id(task: Task) -> int:
     """Return the authenticated run ID if it can use these Runtime endpoints."""
     if task.type != TaskType.SERVER_APP:
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
             RUNTIME_ENDPOINT_UNAVAILABLE_MESSAGE,
         )
     return task.run_id
