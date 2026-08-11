@@ -10,6 +10,8 @@ Dataset = Tuple[XY, XY]
 LogRegParams = Union[XY, Tuple[np.ndarray]]
 XYList = List[XY]
 MAX_PARTITION_SAMPLES = 100
+IMAGE_STRIDE = 2
+NUM_FEATURES = (28 // IMAGE_STRIDE) ** 2
 
 
 def get_model_parameters(model: LogisticRegression) -> LogRegParams:
@@ -44,7 +46,7 @@ def set_initial_params(model: LogisticRegression):
     sklearn.linear_model.LogisticRegression documentation for more information.
     """
     n_classes = 10  # MNIST has 10 classes
-    n_features = 784  # Number of features in dataset
+    n_features = NUM_FEATURES  # Number of features in downsampled images
     model.classes_ = np.array([i for i in range(10)])
 
     model.coef_ = np.zeros((n_classes, n_features))
@@ -86,7 +88,7 @@ def load_data(partition_id: int, num_partitions: int):
     dataset = dataset.with_format("numpy")
 
     batch = dataset[:]
-    X = batch["image"].reshape((len(dataset), -1))
+    X = batch["image"][:, ::IMAGE_STRIDE, ::IMAGE_STRIDE].reshape((len(dataset), -1))
     y = batch["label"]
 
     # Split the on edge data: 80% train, 20% test
