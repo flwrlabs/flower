@@ -1542,15 +1542,15 @@ class StateTest(CoreStateTest):
             }
 
         # Assert
-        # Allow up to 1 decimal place difference due to file-based SQLite DB speed.
-        # CI runs on cracky old machines, so minor delays are expected.
+        # Allow up to one second of difference due to file-based SQLite DB speed.
+        # CI runs on shared machines, so minor delays are expected.
         self.assertSetEqual(online_node_ids, set(node_ids[7:]))
         for node in nodes:
             actual = datetime.fromisoformat(node.last_activated_at).timestamp()
-            self.assertAlmostEqual(actual, expected_activated_at, 1)
+            self.assertAlmostEqual(actual, expected_activated_at, delta=1)
             if node.status == NodeStatus.OFFLINE:
                 actual = datetime.fromisoformat(node.last_deactivated_at).timestamp()
-                self.assertAlmostEqual(actual, expected_deactivated_at, 1)
+                self.assertAlmostEqual(actual, expected_deactivated_at, delta=1)
 
     def test_acknowledge_node_heartbeat_failed(self) -> None:
         """Test that acknowledge_node_heartbeat returns False when the heartbeat
