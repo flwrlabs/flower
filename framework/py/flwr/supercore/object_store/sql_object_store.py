@@ -17,6 +17,7 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from typing import cast
 
 from sqlalchemy import MetaData, func, select
 
