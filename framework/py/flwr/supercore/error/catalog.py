@@ -364,4 +364,29 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         public_message="Some Runtime API endpoints are only available for Deployment "
         "Runtime runs.",
     ),
+    ApiErrorCode.RUNTIME_TASK_CREATION_FAILED: ApiErrorSpec(
+        status_code=StatusCode.INTERNAL,
+        http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        public_message="Failed to create task.",
+    ),
+    ApiErrorCode.RUNTIME_TASK_CREATION_NOT_ALLOWED: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Task creation is not allowed.",
+    ),
+    ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="Invalid task creation request.",
+    ),
+    ApiErrorCode.RUNTIME_INVALID_TASK_MESSAGE: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        http_status_code=status.HTTP_412_PRECONDITION_FAILED,
+        public_message="Invalid task message.",
+    ),
+    ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Connector is not available to this run.",
+    ),
 }

@@ -18,8 +18,6 @@
 
 from logging import DEBUG, ERROR
 
-import grpc
-
 from flwr.common.constant import Status
 from flwr.common.logger import log
 from flwr.common.serde import message_from_proto, message_to_proto
@@ -54,6 +52,7 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.corestate import CoreState
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 
@@ -93,7 +92,6 @@ def create_task(
     request: CreateTaskRequest,
     state: CoreState,
     task: Task,
-    context: grpc.ServicerContext,
 ) -> CreateTaskResponse:
     """Create a task."""
     log(DEBUG, "Runtime.CreateTask")
@@ -102,7 +100,7 @@ def create_task(
 
     connector_ref = request.connector_ref or None
 
-    _validate_create_task_request(request, task, connector_ref, state, context)
+    _validate_create_task_request(request, task, connector_ref, state)
     created_task_id = state.create_task(
         task_type=request.type,
         run_id=run_id,
@@ -112,8 +110,9 @@ def create_task(
         requesting_task_id=task.task_id,
     )
     if created_task_id is None:
-        context.abort(grpc.StatusCode.INTERNAL, "Failed to create task")
-        raise RuntimeError("This line should never be reached.")
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_TASK_CREATION_FAILED, "Failed to create task"
+        )
 
     return CreateTaskResponse(task_id=created_task_id)
 
@@ -122,14 +121,13 @@ def push_task_message(
     request: PushTaskMessageRequest,
     state: CoreState,
     task: Task,
-    context: grpc.ServicerContext,
 ) -> PushTaskMessageResponse:
     """Push a task message."""
     log(DEBUG, "Runtime.PushTaskMessage")
 
     if request.message.metadata.src_task_id != task.task_id:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_TASK_MESSAGE,
             "`Message.metadata.src_task_id` does not match the authenticated task.",
         )
 
@@ -137,8 +135,8 @@ def push_task_message(
 
     stored = state.store_task_message(message)
     if not stored:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_TASK_MESSAGE,
             "Task message could not be stored.",
         )
 
@@ -220,36 +218,35 @@ def _validate_create_task_request(
     requesting_task: Task,
     connector_ref: str | None,
     state: CoreState,
-    context: grpc.ServicerContext,
 ) -> None:
     """Validate the task creation request."""
     if requesting_task.type not in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_TASK_CREATION_NOT_ALLOWED,
             f"Task type '{requesting_task.type}' is not allowed to create tasks.",
         )
 
     if request.type not in set(TaskType):
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
             f"Invalid task type: {request.type}",
         )
 
     if request.type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
             f"Task type '{request.type}' requires fab_hash.",
         )
 
     if request.type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
             f"Task type '{request.type}' requires model_ref.",
         )
 
     if request.type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not connector_ref:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
             f"Task type '{request.type}' requires connector_ref.",
         )
 
@@ -262,11 +259,11 @@ def _validate_create_task_request(
         try:
             connector_registry.get_oauth_flow(connector_ref)
         except ValueError as err:
-            context.abort(grpc.StatusCode.NOT_FOUND, str(err))
+            raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, str(err)) from err
 
         available_refs = state.get_run_connector_refs(run_id=requesting_task.run_id)
         if connector_ref not in available_refs:
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
+            raise FlowerError(
+                ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
                 "Connector is not available to this run.",
             )
