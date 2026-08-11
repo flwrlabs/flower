@@ -388,7 +388,7 @@ def confirm_message_received(
 ) -> ConfirmMessageReceivedResponse:
     """Confirm message received."""
     log(DEBUG, "Runtime.ConfirmMessageReceived")
-    _ = _get_authenticated_serverapp_run_id(task, context)
+    _ = _get_authenticated_serverapp_run_id(task)
     state.object_store.delete(request.message_object_id)
     return ConfirmMessageReceivedResponse()
 
