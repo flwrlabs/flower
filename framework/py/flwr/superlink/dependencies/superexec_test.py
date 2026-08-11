@@ -119,6 +119,4 @@ def test_superexec_auth_rejects_failed_verification() -> None:
         SuperExecAuthDependency(_METHOD)(request, Mock(spec=LinkState))
 
     assert exc_info.value.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
-    assert exc_info.value.message == (
-        f"SuperExec authentication failed for {_METHOD}."
-    )
+    assert exc_info.value.message == (f"SuperExec authentication failed for {_METHOD}.")
