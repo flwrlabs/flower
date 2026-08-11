@@ -18,6 +18,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
+    Column,
     Float,
     ForeignKey,
     Index,
@@ -26,6 +27,7 @@ from sqlalchemy import (
     MetaData,
     PrimaryKeyConstraint,
     String,
+    Table,
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -234,6 +236,16 @@ class TaskMessage(FlwrBase):
     message_type: Mapped[str] = mapped_column(String, nullable=False)
     content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     error: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+
+
+TaskLogsTable = Table(
+    "task_logs",
+    FlwrBase.metadata,
+    Column("timestamp", Float, nullable=False),
+    Column("task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
+    Column("log", String, nullable=False),
+    Index("idx_task_logs_task_id_timestamp", "task_id", "timestamp"),
+)
 
 
 class ObjectPushSession(FlwrBase):

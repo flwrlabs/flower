@@ -100,6 +100,7 @@ from flwr.supercore.state.schema.corestate_models import (
 from flwr.supercore.state.schema.corestate_models import SeriesRuns as SeriesRunsModel
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
+from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
@@ -983,17 +984,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         sint64_task_id = uint64_to_int64(task_id)
 
         try:
-            self.query(
-                """
-                INSERT INTO task_logs (timestamp, task_id, log)
-                VALUES (:current_ts, :task_id, :log)
-                """,
-                {
-                    "current_ts": now().timestamp(),
-                    "task_id": sint64_task_id,
-                    "log": log_message,
-                },
-            )
+            with self.session() as session:
+                session.execute(
+                    insert(TaskLogsTable).values(
+                        timestamp=now().timestamp(),
+                        task_id=sint64_task_id,
+                        log=log_message,
+                    )
+                )
         except IntegrityError:
             raise ValueError(f"Task {task_id} not found") from None
 
@@ -1003,22 +1001,27 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Get task logs for the specified `task_id`."""
         sint64_task_id = uint64_to_int64(task_id)
 
-        # We don't check if the task exists before querying logs
-        # because the task_id is validated by the authz layer
+        # We don't check if the task exists before querying logs because the Control API
+        # handler validates access to the associated run before reading logs.
 
         if after_timestamp is None:
             after_timestamp = 0.0
 
         # Polling is strict-after: entries at the checkpoint timestamp have
         # already been delivered.
-        rows = self.query(
-            """
-            SELECT log, timestamp FROM task_logs
-            WHERE task_id = :task_id AND timestamp > :after_timestamp
-            ORDER BY timestamp
-            """,
-            {"task_id": sint64_task_id, "after_timestamp": after_timestamp},
-        )
+        with self.session() as session:
+            rows = (
+                session.execute(
+                    select(TaskLogsTable.c.log, TaskLogsTable.c.timestamp)
+                    .where(
+                        TaskLogsTable.c.task_id == sint64_task_id,
+                        TaskLogsTable.c.timestamp > after_timestamp,
+                    )
+                    .order_by(TaskLogsTable.c.timestamp)
+                )
+                .mappings()
+                .all()
+            )
         latest_timestamp = rows[-1]["timestamp"] if rows else 0.0
         return "".join(row["log"] for row in rows), latest_timestamp
 
