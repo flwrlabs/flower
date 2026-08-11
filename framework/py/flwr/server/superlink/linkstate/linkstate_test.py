@@ -34,6 +34,8 @@ from uuid import uuid4
 
 from google.protobuf.message import DecodeError
 from parameterized import parameterized
+from sqlalchemy import event, insert
+from sqlalchemy.sql.dml import Update
 
 from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
@@ -72,6 +74,7 @@ from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.linkstate_models import MessageIns as MessageInsModel
 from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
 
@@ -2576,58 +2579,79 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         rows = state.query("SELECT description FROM run_series")
         self.assertCountEqual([row["description"] for row in rows], [None, ""])
 
-    @parameterized.expand(
-        [  # type: ignore
-            ("claim", "_claim_message_ins_rows", (1, 3)),
-            ("load", "_load_message_ins_rows", ({"abc"},)),
-        ]
-    )
-    def test_message_ins_rows_uses_deterministic_ordering(
-        self, _name: str, method: str, args: tuple[Any, ...]
-    ) -> None:
-        """Message querying should use deterministic ordering."""
+    def test_message_ins_claim_uses_deterministic_candidates(self) -> None:
+        """Message claiming should prefer the oldest message IDs."""
         state = self.state_factory()
-        captured: list[str] = []
+        assert isinstance(state, SqlLinkState)
+        created_at = now().timestamp()
+        with state.session() as session:
+            session.execute(
+                insert(MessageInsModel),
+                [
+                    {
+                        "message_id": message_id,
+                        "dst_node_id": 1,
+                        "created_at": created_at,
+                        "delivered_at": "",
+                        "ttl": 60.0,
+                    }
+                    for message_id in ["c", "a", "b"]
+                ],
+            )
 
-        # pylint: disable-next=unused-argument
-        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
-            captured.append(query)
-            return []
+        rows = state._claim_message_ins_rows(  # pylint: disable=protected-access
+            node_id=1, limit=2
+        )
 
-        state.query = fake_query  # type: ignore[method-assign]
-        getattr(state, method)(*args)
+        self.assertEqual({row["message_id"] for row in rows}, {"a", "b"})
 
-        self.assertTrue(captured)
-        self.assertIn("ORDER BY created_at, message_id", captured[0])
-        self.assertNotIn("rowid", captured[0])
-
-    def test_message_ins_claim_can_append_select_lock_clause(self) -> None:
-        """Message claiming can append a subclass-provided row-locking clause."""
-        # Prepare
+    def test_load_message_ins_rows_uses_deterministic_ordering(self) -> None:
+        """Loading messages should order equal timestamps by message ID."""
         state = self.state_factory()
-        last_query = ""
+        assert isinstance(state, SqlLinkState)
+        created_at = now().timestamp()
+        with state.session() as session:
+            session.execute(
+                insert(MessageInsModel),
+                [
+                    {
+                        "message_id": message_id,
+                        "created_at": created_at,
+                    }
+                    for message_id in ["b", "a"]
+                ],
+            )
 
-        # pylint: disable-next=unused-argument
-        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
-            nonlocal last_query
-            last_query = query
-            return []
+        rows = state._load_message_ins_rows(  # pylint: disable=protected-access
+            {"a", "b"}
+        )
 
-        state.query = fake_query  # type: ignore[method-assign]
+        self.assertEqual([row["message_id"] for row in rows], ["a", "b"])
 
-        # Execute & assert - without lock clause
-        state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
-        self.assertNotIn("FOR TEST LOCK", last_query)
+    def test_message_ins_claim_supports_select_lock_clause(self) -> None:
+        """Message claiming should support the standard row-locking clause."""
+        state = self.state_factory()
+        assert isinstance(state, SqlLinkState)
 
-        # Execute & assert - with lock clause
+        with patch.object(
+            type(state),
+            "select_lock_sql",
+            new_callable=PropertyMock,
+            return_value="FOR UPDATE SKIP LOCKED",
+        ):
+            rows = state._claim_message_ins_rows(  # pylint: disable=protected-access
+                1, 3
+            )
+        self.assertEqual(rows, [])
+
         with patch.object(
             type(state),
             "select_lock_sql",
             new_callable=PropertyMock,
             return_value="FOR TEST LOCK",
         ):
-            state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
-        self.assertIn("FOR TEST LOCK", last_query)
+            with self.assertRaises(NotImplementedError):
+                state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
 
     def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
         """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
@@ -2803,29 +2827,42 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             heartbeat_state = states[0]
             delete_state = states[1]
             node_id = create_dummy_node(heartbeat_state, activate=False)
-            original_query = heartbeat_state.query
             did_delete = False
 
             def delete_before_heartbeat_update(
-                query: str, data: Any = None
-            ) -> list[dict[str, Any]]:
+                _conn: Any,
+                statement: Any,
+                _multiparams: Any,
+                _params: Any,
+                _execution_options: Any,
+            ) -> None:
                 nonlocal did_delete
-                normalized_query = " ".join(query.split())
-                if not did_delete and normalized_query.startswith(
-                    "UPDATE node SET online_until"
+                if (
+                    not did_delete
+                    and isinstance(statement, Update)
+                    and getattr(statement.table, "name", None) == "node"
                 ):
                     did_delete = True
                     delete_state.delete_node("mock_flwr_aid", node_id)
-                return original_query(query, data)
-
-            heartbeat_state.query = (  # type: ignore[method-assign]
-                delete_before_heartbeat_update
-            )
 
             # Execute
-            acknowledged = heartbeat_state.acknowledge_node_heartbeat(
-                node_id, heartbeat_interval=30
+            engine = heartbeat_state._engine  # pylint: disable=protected-access
+            assert engine is not None
+            event.listen(
+                engine,
+                "before_execute",
+                delete_before_heartbeat_update,
             )
+            try:
+                acknowledged = heartbeat_state.acknowledge_node_heartbeat(
+                    node_id, heartbeat_interval=30
+                )
+            finally:
+                event.remove(
+                    engine,
+                    "before_execute",
+                    delete_before_heartbeat_update,
+                )
 
             # Assert
             assert did_delete
