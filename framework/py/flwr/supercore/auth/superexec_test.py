@@ -153,7 +153,7 @@ class TestVerifySuperExecRequest(TestCase):
     )
     def test_rejects_invalid_authentication_fields(self, _now: Mock) -> None:
         """Reject incomplete, expired, or mismatched authentication fields."""
-        invalid_overrides = [
+        invalid_overrides: list[dict[str, str | None]] = [
             {"timestamp_raw": None},
             {"timestamp_raw": "invalid"},
             {"timestamp_raw": str(_TIMESTAMP - MAX_TIMESTAMP_DIFF_SECONDS)},
