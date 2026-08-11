@@ -20,7 +20,7 @@ from flwr.clientapp import ClientApp
 
 warnings.filterwarnings("ignore", category=UserWarning)
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-SUBSET_SIZE = 1000
+SUBSET_SIZE = 100
 STATE_VAR = "timestamp"
 
 
@@ -100,6 +100,7 @@ def load_data():
 # #############################################################################
 
 # Load model and data (simple CNN, CIFAR-10)
+torch.manual_seed(42)
 net = Net().to(DEVICE)
 trainloader, testloader = load_data()
 
