@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from logging import ERROR, WARNING
 from typing import Any, Literal, cast
 
-from sqlalchemy import MetaData, delete, func, insert, or_, select, update
+from sqlalchemy import MetaData, delete, exists, func, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Message
@@ -112,26 +112,24 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         self, run_id: int, *, require_unfinished: bool = False
     ) -> dict[str, Any] | None:
         """Lock the run row if it is in the required state."""
-        condition = ""
+        stmt = update(RunModel).where(RunModel.run_id == uint64_to_int64(run_id))
         if require_unfinished:
-            condition = """
-            AND EXISTS (
-                SELECT 1
-                FROM task
-                WHERE task.task_id = run.primary_task_id
-                AND task.finished_at IS NULL
+            stmt = stmt.where(
+                exists(
+                    select(TaskModel.task_id).where(
+                        TaskModel.task_id == RunModel.primary_task_id,
+                        TaskModel.finished_at.is_(None),
+                    )
+                )
             )
-            """
-        rows = self.query(
-            f"""
-            UPDATE run
-            SET run_id = run_id
-            WHERE run_id = :run_id {condition}
-            RETURNING run_id, federation_id, primary_task_id
-            """,
-            {"run_id": uint64_to_int64(run_id)},
+        stmt = stmt.values(run_id=RunModel.run_id).returning(
+            RunModel.run_id,
+            RunModel.federation_id,
+            RunModel.primary_task_id,
         )
-        return dict(rows[0]) if rows else None
+        with self.session() as session:
+            row = session.execute(stmt).mappings().one_or_none()
+            return dict(row) if row is not None else None
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
@@ -159,7 +157,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             return None
 
         try:
-            with self.session():
+            with self.session() as session:
                 # Validate run_id
                 run_row = self._lock_run(
                     message.metadata.run_id, require_unfinished=True
@@ -174,17 +172,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 federation_id: str = run_row["federation_id"]
 
                 # Validate destination node ID
-                query = """SELECT node_id FROM node WHERE node_id = :node_id
-                           AND status IN (:online, :offline)"""
-                rows = self.query(
-                    query,
-                    {
-                        "node_id": data[0]["dst_node_id"],
-                        "online": NodeStatus.ONLINE,
-                        "offline": NodeStatus.OFFLINE,
-                    },
+                node_id = session.scalar(
+                    select(NodeModel.node_id).where(
+                        NodeModel.node_id == data[0]["dst_node_id"],
+                        NodeModel.status.in_([NodeStatus.ONLINE, NodeStatus.OFFLINE]),
+                    )
                 )
-                if not rows or not self.federation_manager.has_node(
+                if node_id is None or not self.federation_manager.has_node(
                     message.metadata.dst_node_id, federation_id
                 ):
                     log(
@@ -194,11 +188,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     )
                     return None
 
-                # Insert message
-                columns = ", ".join([f":{key}" for key in data[0]])
-                query = f"INSERT INTO message_ins VALUES({columns})"
-
-                self.query(query, data[0])
+                session.execute(insert(MessageInsModel).values(data[0]))
         except IntegrityError as e:
             orig = e.orig
             constraint = getattr(getattr(orig, "diag", None), "constraint_name", None)
@@ -234,37 +224,33 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if not message_ids:
             return
 
-        with self.session():
-            # Batch fetch all messages in one query
-            placeholders, params = build_sql_in_params(
-                [str(mid) for mid in message_ids], "mid"
-            )
-            query = f"""
-                SELECT * FROM message_ins
-                WHERE message_id IN ({placeholders})
-            """
-            message_rows = self.query(query, params)
+        with self.session() as session:
+            message_rows = session.scalars(
+                select(MessageInsModel).where(
+                    MessageInsModel.message_id.in_(message_ids)
+                )
+            ).all()
 
             if not message_rows:
                 return
 
             # Build message lookup dict
-            message_dict: dict[str, dict[str, Any]] = {
-                row["message_id"]: row for row in message_rows
+            message_dict: dict[str, MessageInsModel] = {
+                cast(str, model.message_id): model for model in message_rows
             }
 
             # Collect unique run_ids for batch federation lookup
-            run_ids = {row["run_id"] for row in message_rows}
-            placeholders, params = build_sql_in_params(run_ids, "rid")
-            query = f"""
-                SELECT run_id, federation_id FROM run
-                WHERE run_id IN ({placeholders})
-            """
-            run_rows = self.query(query, params)
+            run_ids = {model.run_id for model in message_rows}
+            run_rows = session.execute(
+                select(RunModel.run_id, RunModel.federation_id).where(
+                    RunModel.run_id.in_(run_ids)
+                )
+            ).all()
 
             # Build run_id to federation ID mapping
             run_id_to_federation_id: dict[int, str] = {
-                row["run_id"]: row["federation_id"] for row in run_rows
+                cast(int, run_id): cast(str, federation_id)
+                for run_id, federation_id in run_rows
             }
 
             invalid_msg_ids: set[str] = set()
@@ -272,26 +258,28 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
             # Check each message for validity
             for msg_id in message_ids:
-                message_row = message_dict.get(msg_id)
-                if not message_row:
+                message_model = message_dict.get(msg_id)
+                if not message_model:
                     continue
 
                 # Check if the message has expired
-                available_until = message_row["created_at"] + message_row["ttl"]
+                available_until = cast(float, message_model.created_at) + cast(
+                    float, message_model.ttl
+                )
                 if available_until <= current_time:
                     invalid_msg_ids.add(msg_id)
                     continue
 
                 # Check if run exists and get federation ID
-                run_id = message_row["run_id"]
+                run_id = cast(int, message_model.run_id)
                 federation_id = run_id_to_federation_id.get(run_id)
                 if not federation_id:
                     invalid_msg_ids.add(msg_id)
                     continue
 
                 # Convert sint64 to uint64 for node IDs
-                src_node_id = int64_to_uint64(message_row["src_node_id"])
-                dst_node_id = int64_to_uint64(message_row["dst_node_id"])
+                src_node_id = int64_to_uint64(cast(int, message_model.src_node_id))
+                dst_node_id = int64_to_uint64(cast(int, message_model.dst_node_id))
 
                 # Filter nodes to check if they're in the federation
                 filtered = self.federation_manager.filter_nodes(
@@ -337,62 +325,57 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     ) -> list[dict[str, Any]]:
         """Atomically claim eligible instruction Messages for a node."""
         current_time = now()
-        params: dict[str, str | int | float] = {
-            # Convert the uint64 value to sint64 for SQLite
-            "node_id": uint64_to_int64(node_id),
-            "current": current_time.timestamp(),
-            "delivered_at": current_time.isoformat(),
-        }
-        common_condition = """
-            dst_node_id = :node_id
-            AND delivered_at = ''
-            AND (created_at + ttl) > :current
-        """
-        candidate_cte = ""
-        condition = common_condition
+        common_conditions = (
+            MessageInsModel.dst_node_id == uint64_to_int64(node_id),
+            MessageInsModel.delivered_at == "",
+            MessageInsModel.created_at + MessageInsModel.ttl > current_time.timestamp(),
+        )
+        stmt = update(MessageInsModel).where(*common_conditions)
         if limit is not None:
             # Materialize limited candidates before updating. Some backends can
             # otherwise re-evaluate same-table subqueries while UPDATE scans rows.
-            # `self.select_lock_sql` is an optional clause for backends that support
-            # row-locking while selecting candidates. Keep it before LIMIT so locked
-            # rows are skipped before limiting the result set.
-            candidate_cte = f"""
-                WITH candidate_message_ins AS (
-                    SELECT message_id
-                    FROM message_ins
-                    WHERE {common_condition}
-                    ORDER BY created_at, message_id
-                    {self.select_lock_sql}
-                    LIMIT :limit
+            candidates = (
+                select(MessageInsModel.message_id)
+                .where(*common_conditions)
+                .order_by(
+                    MessageInsModel.created_at.asc(),
+                    MessageInsModel.message_id.asc(),
                 )
-            """
-            condition = """
-                message_id IN (
-                    SELECT message_id FROM candidate_message_ins
-                )
-                AND delivered_at = ''
-            """
-            params["limit"] = limit
+                .limit(limit)
+            )
+            if self.select_lock_sql:
+                if self.select_lock_sql.strip().upper() != "FOR UPDATE SKIP LOCKED":
+                    raise NotImplementedError(
+                        "Custom select_lock_sql values are not supported for ORM "
+                        "message_ins claims."
+                    )
+                candidates = candidates.with_for_update(skip_locked=True)
+            selected = candidates.cte("candidate_message_ins")
+            stmt = update(MessageInsModel).where(
+                MessageInsModel.message_id.in_(select(selected.c.message_id)),
+                MessageInsModel.delivered_at == "",
+            )
 
-        query = f"""
-            {candidate_cte}
-            UPDATE message_ins
-            SET delivered_at = :delivered_at
-            WHERE {condition}
-            RETURNING *
-        """
-        return self.query(query, params)
+        stmt = stmt.values(delivered_at=current_time.isoformat()).returning(
+            MessageInsModel
+        )
+        with self.session() as session:
+            models = list(session.scalars(stmt))
+            return [_message_model_to_dict(model) for model in models]
 
     def _load_message_ins_rows(self, message_ids: set[str]) -> list[dict[str, Any]]:
         """Load instruction Messages by IDs."""
-        placeholders, params = build_sql_in_params(message_ids, "mid")
-        query = f"""
-            SELECT *
-            FROM message_ins
-            WHERE message_id IN ({placeholders})
-            ORDER BY created_at, message_id
-        """
-        return self.query(query, params)
+        stmt = (
+            select(MessageInsModel)
+            .where(MessageInsModel.message_id.in_(message_ids))
+            .order_by(
+                MessageInsModel.created_at.asc(), MessageInsModel.message_id.asc()
+            )
+        )
+        with self.session() as session:
+            return [
+                _message_model_to_dict(model) for model in session.scalars(stmt).all()
+            ]
 
     def store_message_res(  # pylint: disable=too-many-return-statements
         self, message: Message
@@ -408,7 +391,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         message_id = res_metadata.message_id
 
         try:
-            with self.session():
+            with self.session() as session:
                 if not self._lock_run(res_metadata.run_id, require_unfinished=True):
                     log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
                     return None
@@ -452,9 +435,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 # IntegrityError details alone because `message_res` also has a unique
                 # constraint on `reply_to_message_id`, so the same retry can violate
                 # either constraint depending on backend/index behavior.
-                if self.query(
-                    "SELECT 1 FROM message_res WHERE message_id = :message_id",
-                    {"message_id": message_id},
+                if (
+                    session.scalar(
+                        select(MessageResModel.message_id).where(
+                            MessageResModel.message_id == message_id
+                        )
+                    )
+                    is not None
                 ):
                     return message_id
 
@@ -466,10 +453,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     msg_dict, ["run_id", "src_node_id", "dst_node_id"]
                 )
 
-                columns = ", ".join([f":{key}" for key in msg_dict])
-                query = f"INSERT INTO message_res VALUES({columns})"
-
-                self.query(query, msg_dict)
+                session.execute(insert(MessageResModel).values(msg_dict))
         except IntegrityError:
             log(
                 ERROR,
@@ -489,19 +473,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         ret: dict[str, Message] = {}
 
-        with self.session():
+        with self.session() as session:
             # Verify Message IDs
             self._check_stored_messages(message_ids)
             current = now().timestamp()
-            placeholders, params = build_sql_in_params(
-                [str(mid) for mid in message_ids], "mid"
-            )
-            query = f"""
-                SELECT *
-                FROM message_ins
-                WHERE message_id IN ({placeholders})
-            """
-            rows = self.query(query, params)
+            rows = [
+                _message_model_to_dict(model)
+                for model in session.scalars(
+                    select(MessageInsModel).where(
+                        MessageInsModel.message_id.in_(message_ids)
+                    )
+                ).all()
+            ]
             found_message_ins_dict: dict[str, Message] = {}
             for row in rows:
                 convert_sint64_values_in_dict_to_uint64(
@@ -524,22 +507,20 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 sint_node_id = uint64_to_int64(in_message.metadata.dst_node_id)
                 dst_node_ids.add(sint_node_id)
             if dst_node_ids:
-                placeholders, node_params = build_sql_in_params(dst_node_ids, "nid")
-                query = f"""
-                    SELECT node_id, online_until
-                    FROM node
-                    WHERE node_id IN ({placeholders})
-                    AND status != :unregistered
-                """
-                node_params["unregistered"] = NodeStatus.UNREGISTERED
-                rows = self.query(query, node_params)
+                node_rows = session.execute(
+                    select(NodeModel.node_id, NodeModel.online_until).where(
+                        NodeModel.node_id.in_(dst_node_ids),
+                        NodeModel.status != NodeStatus.UNREGISTERED,
+                    )
+                ).all()
             else:
-                rows = []
+                node_rows = []
             tmp_ret_dict = check_node_availability_for_in_message(
                 inquired_in_message_ids=message_ids,
                 found_in_message_dict=found_message_ins_dict,
                 node_id_to_online_until={
-                    int64_to_uint64(row["node_id"]): row["online_until"] for row in rows
+                    int64_to_uint64(cast(int, node_id)): cast(float, online_until)
+                    for node_id, online_until in node_rows
                 },
                 current_time=current,
             )
@@ -550,20 +531,19 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 return list(ret.values())
 
             # Atomically claim all eligible reply Messages
-            placeholders, in_params = build_sql_in_params(
-                [str(mid) for mid in message_ids], "mid"
-            )
             delivered_at = now().isoformat()
-            query = f"""
-                UPDATE message_res
-                SET delivered_at = :delivered_at
-                WHERE reply_to_message_id IN ({placeholders})
-                AND delivered_at = ''
-                RETURNING *
-            """
-            params = {"delivered_at": delivered_at}
-            params.update(in_params)
-            rows = self.query(query, params)
+            rows = [
+                _message_model_to_dict(model)
+                for model in session.scalars(
+                    update(MessageResModel)
+                    .where(
+                        MessageResModel.reply_to_message_id.in_(message_ids),
+                        MessageResModel.delivered_at == "",
+                    )
+                    .values(delivered_at=delivered_at)
+                    .returning(MessageResModel)
+                )
+            ]
             for row in rows:
                 convert_sint64_values_in_dict_to_uint64(
                     row, ["run_id", "src_node_id", "dst_node_id"]
@@ -1387,6 +1367,26 @@ def _node_info_from_model(model: NodeModel) -> NodeInfo:
         heartbeat_interval=cast(float, model.heartbeat_interval),
         public_key=cast(bytes, model.public_key),
     )
+
+
+def _message_model_to_dict(
+    model: MessageInsModel | MessageResModel,
+) -> dict[str, Any]:
+    """Convert a message model to the dictionary representation used by serde."""
+    return {
+        "message_id": model.message_id,
+        "group_id": model.group_id,
+        "run_id": model.run_id,
+        "src_node_id": model.src_node_id,
+        "dst_node_id": model.dst_node_id,
+        "reply_to_message_id": model.reply_to_message_id,
+        "created_at": model.created_at,
+        "delivered_at": model.delivered_at,
+        "ttl": model.ttl,
+        "message_type": model.message_type,
+        "content": model.content,
+        "error": model.error,
+    }
 
 
 def _run_from_models(run: RunModel, task: TaskModel) -> Run:
