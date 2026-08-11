@@ -24,7 +24,7 @@ from unittest.mock import Mock, patch
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.proto.appio_pb2 import GetNodesRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
     FLWR_PACKAGE_NAME_METADATA_KEY,
@@ -36,10 +36,10 @@ from flwr.supercore.exit import ExitCode
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
-    create_clientappio_runtime_version_server_interceptor,
     create_control_runtime_version_server_interceptor,
     create_fleet_runtime_version_server_interceptor,
-    create_serverappio_runtime_version_server_interceptor,
+    create_superlink_runtime_version_server_interceptor,
+    create_supernode_runtime_version_server_interceptor,
 )
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 
@@ -390,14 +390,14 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             "simulation version 1.30.1.",
         )
 
-    def test_serverappio_factory_rejects_incompatible_by_default(self) -> None:
+    def test_superlink_runtime_factory_rejects_incompatible_by_default(self) -> None:
         """SuperLink Runtime factory should reject different major.minor."""
-        interceptor = create_serverappio_runtime_version_server_interceptor()
+        interceptor = create_superlink_runtime_version_server_interceptor()
         self.assertTrue(interceptor._reject_incompatible)  # pylint: disable=W0212
 
-    def test_clientappio_factory_rejects_incompatible_by_default(self) -> None:
+    def test_supernode_runtime_factory_rejects_incompatible_by_default(self) -> None:
         """SuperNode Runtime factory should reject different major.minor."""
-        interceptor = create_clientappio_runtime_version_server_interceptor()
+        interceptor = create_supernode_runtime_version_server_interceptor()
         self.assertTrue(interceptor._reject_incompatible)  # pylint: disable=W0212
 
     def test_fleet_factory_observes_by_default(self) -> None:

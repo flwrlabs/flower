@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for short-term AppIo token interceptors."""
+"""Tests for short-term Runtime token interceptors."""
 
 
 import inspect
@@ -24,23 +24,23 @@ from unittest.mock import Mock
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.message_pb2 import PushObjectRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     PullPendingTasksRequest,
     PushAppMessagesRequest,
     PushTaskOutputRequest,
 )
-from flwr.proto.message_pb2 import PushObjectRequest  # pylint: disable=E0611
 from flwr.proto.runtime_pb2_grpc import RuntimeServicer
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.auth import RUNTIME_METHOD_AUTH_POLICY
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     TASK_TOKEN_HEADER,
-    AppIoTokenClientInterceptor,
-    AppIoTokenServerInterceptor,
-    create_clientappio_token_auth_server_interceptor,
-    create_serverappio_token_auth_server_interceptor,
+    RuntimeTokenClientInterceptor,
+    RuntimeTokenServerInterceptor,
+    create_superlink_runtime_token_auth_server_interceptor,
+    create_supernode_runtime_token_auth_server_interceptor,
     get_authenticated_task,
 )
 
@@ -85,12 +85,12 @@ def _make_non_unary_handler() -> grpc.RpcMethodHandler:
     return grpc.unary_stream_rpc_method_handler(_handler)
 
 
-class TestAppIoTokenClientInterceptor(TestCase):
-    """Unit tests for AppIoTokenClientInterceptor."""
+class TestRuntimeTokenClientInterceptor(TestCase):
+    """Unit tests for RuntimeTokenClientInterceptor."""
 
     def test_attach_task_token_header(self) -> None:
         """The interceptor should attach task-token metadata."""
-        interceptor = AppIoTokenClientInterceptor(token="new-token")
+        interceptor = RuntimeTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
             method="/flwr.proto.Runtime/GetNodes",
             timeout=None,
@@ -124,7 +124,7 @@ class TestAppIoTokenClientInterceptor(TestCase):
 
     def test_raise_if_task_token_header_already_present(self) -> None:
         """The interceptor should reject duplicate task-token metadata."""
-        interceptor = AppIoTokenClientInterceptor(token="new-token")
+        interceptor = RuntimeTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
             method="/flwr.proto.Runtime/GetNodes",
             timeout=None,
@@ -142,14 +142,14 @@ class TestAppIoTokenClientInterceptor(TestCase):
             )
 
 
-class TestAppIoTokenServerInterceptor(TestCase):
-    """Unit tests for AppIoTokenServerInterceptor."""
+class TestRuntimeTokenServerInterceptor(TestCase):
+    """Unit tests for RuntimeTokenServerInterceptor."""
 
     def _new_interceptor(
         self, token_to_task: dict[str, Task]
-    ) -> AppIoTokenServerInterceptor:
+    ) -> RuntimeTokenServerInterceptor:
         state = _TokenState(token_to_task)
-        return create_serverappio_token_auth_server_interceptor(lambda: state)
+        return create_superlink_runtime_token_auth_server_interceptor(lambda: state)
 
     @staticmethod
     def _find_runtime_method(*, requires_token: bool) -> str | None:
@@ -252,7 +252,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
         """Protected methods should pass with a valid task token."""
         state = Mock()
         state.get_task_by_token.return_value = Task(task_id=123, run_id=7)
-        interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
+        interceptor = create_superlink_runtime_token_auth_server_interceptor(
+            lambda: state
+        )
         method = self._find_runtime_method(requires_token=True)
         if method is None:
             self.skipTest("No token-required Runtime method found in policy table.")
@@ -418,10 +420,12 @@ class TestMethodPolicyMaps(TestCase):
 class TestFactoryFunctions(TestCase):
     """Validate interceptor factory behavior."""
 
-    def test_serverappio_factory_uses_server_policy(self) -> None:
+    def test_superlink_runtime_factory_uses_runtime_policy(self) -> None:
         """SuperLink factory should enforce Runtime policy semantics."""
         state = _TokenState({"valid-token": Task(task_id=1, run_id=1)})
-        interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
+        interceptor = create_superlink_runtime_token_auth_server_interceptor(
+            lambda: state
+        )
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
@@ -434,10 +438,12 @@ class TestFactoryFunctions(TestCase):
         response = intercepted.unary_unary(GetNodesRequest(), Mock())
         self.assertEqual(response, "ok")
 
-    def test_clientappio_factory_uses_client_policy(self) -> None:
+    def test_supernode_runtime_factory_uses_runtime_policy(self) -> None:
         """SuperNode factory should enforce Runtime policy semantics."""
         state = _TokenState({"valid-token": Task(task_id=1, run_id=1)})
-        interceptor = create_clientappio_token_auth_server_interceptor(lambda: state)
+        interceptor = create_supernode_runtime_token_auth_server_interceptor(
+            lambda: state
+        )
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),

@@ -1,4 +1,4 @@
-# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Compatibility wrapper for CoreState SQLAlchemy metadata."""
-
-from sqlalchemy import MetaData
-
-from flwr.supercore.state.schema.corestate_models import FlwrBase
+"""SuperLink implementation of the Runtime API."""
 
 
-def create_corestate_metadata() -> MetaData:
-    """Create and return MetaData with CoreState table definitions."""
-    metadata = MetaData()
-    for table in FlwrBase.metadata.tables.values():
-        table.to_metadata(metadata)
-    return metadata
+from .runtime_grpc import run_runtime_api_grpc
+
+__all__ = [
+    "run_runtime_api_grpc",
+]

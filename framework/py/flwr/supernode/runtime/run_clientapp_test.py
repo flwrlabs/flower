@@ -21,16 +21,16 @@ from unittest.mock import Mock, patch
 import grpc
 
 from flwr.common.serde import fab_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesResponse,
     PullTaskInputResponse,
 )
-from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
-from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.supercore.exit import ExitCode
 from flwr.supercore.fab import Fab
 from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 
@@ -51,7 +51,7 @@ class TestRunClientApp(unittest.TestCase):
         stub.PullMessages.return_value = PullAppMessagesResponse()
 
         with self.assertRaisesRegex(
-            RuntimeError, "No messages received from ClientAppIo"
+            RuntimeError, "No messages received from Runtime API"
         ):
             pull_task_input(stub)
 
@@ -70,12 +70,12 @@ class TestRunClientApp(unittest.TestCase):
         assert interceptors is not None
         self.assertEqual(len(interceptors), 2)
         self.assertIsInstance(interceptors[0], RuntimeVersionClientInterceptor)
-        self.assertIsInstance(interceptors[1], AppIoTokenClientInterceptor)
+        self.assertIsInstance(interceptors[1], RuntimeTokenClientInterceptor)
         # pylint: disable-next=protected-access
         self.assertEqual(interceptors[0]._metadata.component_name, "flwr-clientapp")
 
     def test_run_clientapp_exits_nonzero_on_grpc_error(self) -> None:
-        """`run_clientapp` should not report success after AppIO gRPC failures."""
+        """`run_clientapp` should not report success after Runtime API failures."""
         with (
             patch("flwr.supernode.runtime.run_clientapp.create_channel") as channel,
             patch("flwr.supernode.runtime.run_clientapp.HeartbeatSender"),

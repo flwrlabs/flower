@@ -17,7 +17,7 @@
 
 from unittest import TestCase
 
-from flwr.proto.appio_pb2 import ClaimTaskRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import ClaimTaskRequest  # pylint: disable=E0611
 
 from .superexec import (
     canonicalize_superexec_auth_input,
