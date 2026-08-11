@@ -291,23 +291,14 @@ class SqlObjectStore(ObjectStore, SqlMixin):
     def __contains__(self, object_id: str) -> bool:
         """Check if an object_id is in the store."""
         with self.session() as session:
-            return (
-                session.scalar(
-                    select(StoredObject.object_id).where(
-                        StoredObject.object_id == object_id
-                    )
-                )
-                is not None
+            stmt = select(StoredObject.object_id).where(
+                StoredObject.object_id == object_id
             )
+            return session.scalar(stmt) is not None
 
     def __len__(self) -> int:
         """Return the number of objects in the store."""
         with self.session() as session:
-            return int(
-                session.scalar(
-                    select(func.count()).select_from(  # pylint: disable=not-callable
-                        StoredObject
-                    )
-                )
-                or 0
-            )
+            # pylint: disable-next=not-callable
+            cnt = session.scalar(select(func.count()).select_from(StoredObject))
+            return cast(int, cnt)
