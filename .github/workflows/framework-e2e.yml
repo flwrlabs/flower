@@ -258,7 +258,9 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' && github.ref_name == 'main' &&  !steps.cache-restore-python.outputs.cache-hit }}
         with:
           path: ${{ env.pythonLocation }}
-          key: pythonloc-${{ runner.os }}-${{ matrix.directory }}-${{ env.pythonLocation }}-${{ hashFiles(format('./framework/e2e/{0}/pyproject.toml', matrix.directory)) }}
+          # The E2E scripts mutate pyproject.toml while the tests run. Reuse the
+          # key computed during restore so the saved cache remains restorable.
+          key: ${{ steps.cache-restore-python.outputs.cache-primary-key }}
 
   strategies:
     runs-on: ubuntu-24.04
