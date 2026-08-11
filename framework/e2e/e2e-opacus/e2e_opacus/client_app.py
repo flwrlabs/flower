@@ -99,9 +99,7 @@ def load_data():
     data = Cifar10Dataset("train", transform=transform)
     split = math.floor(PARAMS["dataset_size"] * PARAMS["train_split"])
     trainset = torch.utils.data.Subset(data, list(range(0, split)))
-    testset = torch.utils.data.Subset(
-        data, list(range(split, PARAMS["dataset_size"]))
-    )
+    testset = torch.utils.data.Subset(data, list(range(split, PARAMS["dataset_size"])))
     trainloader = DataLoader(trainset, PARAMS["batch_size"])
     testloader = DataLoader(testset, PARAMS["batch_size"])
     sample_rate = PARAMS["batch_size"] / len(trainset)
