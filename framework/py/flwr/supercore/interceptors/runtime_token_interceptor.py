@@ -26,9 +26,9 @@ from google.protobuf.message import Message as GrpcMessage
 
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.auth import RUNTIME_METHOD_AUTH_POLICY, MethodTokenPolicy
+from flwr.supercore.constant import TASK_TOKEN_HEADER
 from flwr.supercore.utils import find_metadata_keys, get_metadata_str
 
-TASK_TOKEN_HEADER = "flwr-task-token"
 AUTHENTICATION_FAILED_MESSAGE = "Authentication failed."
 
 

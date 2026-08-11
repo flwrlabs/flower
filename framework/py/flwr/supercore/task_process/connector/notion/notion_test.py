@@ -23,12 +23,13 @@ from flwr.supercore.typing import JSONObject
 
 from .. import registry
 from ..definition import ActionAccess
+from ..oauth import OAuthFlow
 from .actions import ACTIONS
+from .definition import NOTION_CONNECTOR_REF, PROVIDER
 from .executors import NotionApiError
-from .oauth import NOTION_CONNECTOR_REF, NotionOAuthError, NotionOAuthProvider
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
-_OAUTH_REQUEST = "flwr.supercore.task_process.connector.notion.oauth.requests.post"
+_OAUTH_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
 _CREDENTIALS: JSONObject = {"access_token": "ntn-secret"}
 
 
@@ -84,10 +85,13 @@ def test_notion_api_errors_are_secret_safe() -> None:
 def test_notion_oauth_flow() -> None:
     """Notion OAuth should authorize and separate credentials from metadata."""
     redirect_uri = "https://example.com/callback"
-    provider = NotionOAuthProvider(
-        client_id="client", client_secret="secret", redirect_uri=redirect_uri
+    flow = OAuthFlow(
+        PROVIDER,
+        client_id="client",
+        client_secret="secret",
+        redirect_uri=redirect_uri,
     )
-    url = provider.build_authorization_url(
+    url = flow.build_authorization_url(
         redirect_uri=redirect_uri, state="state", pkce_challenge=None
     )
     assert parse_qs(urlparse(url).query)["owner"] == ["user"]
@@ -97,14 +101,12 @@ def test_notion_oauth_flow() -> None:
         "workspace_id": "workspace-1",
     }
     with patch(_OAUTH_REQUEST, return_value=response):
-        credentials, config = provider.exchange_code(
+        credentials, config = flow.exchange_code(
             code="code", redirect_uri=redirect_uri, pkce_verifier=None
         )
     assert credentials == {"access_token": "token"}
     assert config == {"workspace_id": "workspace-1"}
 
     response.json.return_value = {"error": "secret"}
-    with patch(_OAUTH_REQUEST, return_value=response), pytest.raises(NotionOAuthError):
-        provider.exchange_code(
-            code="code", redirect_uri=redirect_uri, pkce_verifier=None
-        )
+    with patch(_OAUTH_REQUEST, return_value=response), pytest.raises(RuntimeError):
+        flow.exchange_code(code="code", redirect_uri=redirect_uri, pkce_verifier=None)
