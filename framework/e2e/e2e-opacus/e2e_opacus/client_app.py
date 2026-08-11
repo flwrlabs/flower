@@ -19,6 +19,7 @@ PARAMS = {
     "fixture_size": 200,
     "local_epochs": 1,
 }
+TRAIN_SPLIT = 0.7
 PRIVACY_PARAMS = {
     # 'target_epsilon': 5.0,
     "target_delta": 1e-5,
@@ -96,9 +97,9 @@ def load_data():
         [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     )
     data = Cifar10Dataset("train", transform=transform)
-    split = math.floor(PARAMS["dataset_size"] * PARAMS["train_split"])
+    split = math.floor(PARAMS["fixture_size"] * TRAIN_SPLIT)
     trainset = torch.utils.data.Subset(data, list(range(0, split)))
-    testset = torch.utils.data.Subset(data, list(range(split, PARAMS["dataset_size"])))
+    testset = torch.utils.data.Subset(data, list(range(split, PARAMS["fixture_size"])))
     trainloader = DataLoader(trainset, PARAMS["batch_size"])
     testloader = DataLoader(testset, PARAMS["batch_size"])
     sample_rate = PARAMS["batch_size"] / len(trainset)
