@@ -58,13 +58,11 @@ def _make_app_request(app: FastAPI) -> Request:
 
 
 @pytest.mark.parametrize("scheme", ["Bearer", "bearer", "BEARER"])
-def test_account_access_dependency_returns_authorized_account(scheme: str) -> None:
+def test_account_access_dependency_returns_authenticated_account(scheme: str) -> None:
     """AccountAccessDependency should return the account when tokens are valid."""
     authn_plugin = Mock()
-    authz_plugin = Mock()
     account = AccountInfo(flwr_aid="aid", account_name="account")
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
-    authz_plugin.authorize.return_value = True
 
     request = _make_request(
         (f"{scheme} access-token",),
@@ -73,33 +71,29 @@ def test_account_access_dependency_returns_authorized_account(scheme: str) -> No
             (REFRESH_TOKEN_KEY.encode(), b"legacy-refresh-token"),
         ),
     )
-    result = AccountAccessDependency(authn_plugin, authz_plugin)(request)
+    result = AccountAccessDependency(authn_plugin)(request)
 
     assert result is account
     authn_plugin.validate_tokens_in_metadata.assert_called_once_with(
         [(ACCESS_TOKEN_KEY, "access-token")]
     )
     authn_plugin.refresh_tokens.assert_not_called()
-    authz_plugin.authorize.assert_called_once_with(account)
 
 
 def test_account_access_dependency_allows_missing_header_for_noop_plugin() -> None:
     """No-op authentication should not require HTTP credentials."""
     authn_plugin = NoOpControlAuthnPlugin(Path(), False)
-    authz_plugin = Mock()
     account = AccountInfo(flwr_aid="aid", account_name="account")
-    authz_plugin.authorize.return_value = True
 
     with patch.object(
         authn_plugin,
         "validate_tokens_in_metadata",
         return_value=(True, account),
     ) as validate_tokens:
-        result = AccountAccessDependency(authn_plugin, authz_plugin)(_make_request(()))
+        result = AccountAccessDependency(authn_plugin)(_make_request(()))
 
     assert result is account
     validate_tokens.assert_called_once_with([])
-    authz_plugin.authorize.assert_called_once_with(result)
 
 
 @pytest.mark.parametrize(
@@ -117,23 +111,18 @@ def test_account_access_dependency_rejects_invalid_authorization_header(
 ) -> None:
     """AccountAccessDependency should require exactly one Bearer credential."""
     authn_plugin = Mock()
-    authz_plugin = Mock()
 
     with pytest.raises(FlowerError) as exc_info:
-        AccountAccessDependency(authn_plugin, authz_plugin)(
-            _make_request(authorization_headers)
-        )
+        AccountAccessDependency(authn_plugin)(_make_request(authorization_headers))
 
     assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED
     authn_plugin.validate_tokens_in_metadata.assert_not_called()
     authn_plugin.refresh_tokens.assert_not_called()
-    authz_plugin.authorize.assert_not_called()
 
 
 def test_account_access_dependency_rejects_legacy_headers_without_bearer() -> None:
     """Legacy Control metadata headers are not an HTTP authentication contract."""
     authn_plugin = Mock()
-    authz_plugin = Mock()
     request = _make_request(
         (),
         (
@@ -143,12 +132,11 @@ def test_account_access_dependency_rejects_legacy_headers_without_bearer() -> No
     )
 
     with pytest.raises(FlowerError) as exc_info:
-        AccountAccessDependency(authn_plugin, authz_plugin)(request)
+        AccountAccessDependency(authn_plugin)(request)
 
     assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED
     authn_plugin.validate_tokens_in_metadata.assert_not_called()
     authn_plugin.refresh_tokens.assert_not_called()
-    authz_plugin.authorize.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -174,41 +162,22 @@ def test_account_access_dependency_rejects_unauthenticated_requests(
 ) -> None:
     """AccountAccessDependency should reject absent or incomplete authentication."""
     authn_plugin = Mock()
-    authz_plugin = Mock()
     authn_plugin.validate_tokens_in_metadata.return_value = (valid_token, account)
 
     with pytest.raises(FlowerError) as exc_info:
-        AccountAccessDependency(authn_plugin, authz_plugin)(_make_request())
+        AccountAccessDependency(authn_plugin)(_make_request())
 
     assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED
     assert exc_info.value.message == detail
     assert "access-token" not in exc_info.value.message
     authn_plugin.refresh_tokens.assert_not_called()
-    authz_plugin.authorize.assert_not_called()
-
-
-def test_account_access_dependency_rejects_unauthorized_account() -> None:
-    """AccountAccessDependency should reject accounts denied by authorization."""
-    authn_plugin = Mock()
-    authz_plugin = Mock()
-    account = AccountInfo(flwr_aid="aid", account_name="account")
-    authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
-    authz_plugin.authorize.return_value = False
-
-    with pytest.raises(FlowerError) as exc_info:
-        AccountAccessDependency(authn_plugin, authz_plugin)(_make_request())
-
-    assert exc_info.value.code == ApiErrorCode.NO_PERMISSIONS
-    assert exc_info.value.message == (
-        "Account authorization failed for flwr_aid='aid', account_name='account'."
-    )
 
 
 def test_get_authn_plugin_returns_configured_plugin() -> None:
     """get_authn_plugin should return the configured authentication plugin."""
     app = FastAPI()
     authn_plugin = Mock()
-    app.state.account_access_dep = AccountAccessDependency(authn_plugin, Mock())
+    app.state.account_access_dep = AccountAccessDependency(authn_plugin)
 
     assert get_authn_plugin(_make_app_request(app)) is authn_plugin
 
