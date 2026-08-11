@@ -75,7 +75,12 @@ def test_all_control_routes_have_protobuf_request_types() -> None:
         for method in (route.methods or set())
     }
 
-    assert route_keys == set(PROTOBUF_REQUEST_TYPES)
+    control_request_types = {
+        route_key
+        for route_key in PROTOBUF_REQUEST_TYPES
+        if route_key[1].startswith("/v1/control/")
+    }
+    assert route_keys == control_request_types
 
 
 def test_protobuf_request_without_handler_response_returns_internal_error() -> None:
