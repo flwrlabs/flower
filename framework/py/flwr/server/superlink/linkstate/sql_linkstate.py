@@ -919,7 +919,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         with self.session() as session:
             self._check_and_tag_offline_nodes()
 
-            stmt = select(NodeModel)
+            stmt = select(NodeModel).execution_options(populate_existing=True)
             if node_ids is not None:
                 sint64_node_ids = [uint64_to_int64(node_id) for node_id in node_ids]
                 stmt = stmt.where(NodeModel.node_id.in_(sint64_node_ids))
@@ -1073,8 +1073,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters."""
         self._cleanup_expired_task_tokens()
-        stmt = select(RunModel, TaskModel).join(
-            TaskModel, TaskModel.task_id == RunModel.primary_task_id
+        stmt = (
+            select(RunModel, TaskModel)
+            .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
+            .execution_options(populate_existing=True)
         )
 
         # Filter by run_ids
