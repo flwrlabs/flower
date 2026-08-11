@@ -12,92 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SQLAlchemy Core Table definitions for ObjectStore."""
+"""Compatibility wrapper for ObjectStore SQLAlchemy metadata."""
 
+from sqlalchemy import MetaData
 
-from sqlalchemy import (
-    BigInteger,
-    CheckConstraint,
-    Column,
-    ForeignKey,
-    Integer,
-    LargeBinary,
-    MetaData,
-    PrimaryKeyConstraint,
-    String,
-    Table,
-)
+from flwr.supercore.state.schema.objectstore_models import ObjectStoreBase
 
 
 def create_objectstore_metadata() -> MetaData:
     """Create and return MetaData with ObjectStore table definitions."""
     metadata = MetaData()
-
-    # --------------------------------------------------------------------------
-    #  Table: objects
-    # --------------------------------------------------------------------------
-    Table(
-        "objects",
-        metadata,
-        Column("object_id", String, primary_key=True, nullable=True),
-        Column("content", LargeBinary),
-        Column(
-            "is_available",
-            Integer,
-            nullable=False,
-            server_default="0",
-        ),
-        Column("ref_count", Integer, nullable=False, server_default="0"),
-        CheckConstraint("is_available IN (0, 1)", name="ck_objects_is_available"),
-        CheckConstraint("ref_count >= 0", name="ck_objects_ref_count_nonnegative"),
-    )
-
-    # --------------------------------------------------------------------------
-    #  Table: object_children
-    # --------------------------------------------------------------------------
-    Table(
-        "object_children",
-        metadata,
-        Column(
-            "parent_id",
-            String,
-            ForeignKey("objects.object_id", ondelete="CASCADE"),
-            nullable=False,
-        ),
-        Column(
-            "child_id",
-            String,
-            ForeignKey("objects.object_id", ondelete="CASCADE"),
-            nullable=False,
-        ),
-        PrimaryKeyConstraint("parent_id", "child_id"),
-    )
-
-    # --------------------------------------------------------------------------
-    #  Table: run_objects
-    # --------------------------------------------------------------------------
-    Table(
-        "run_objects",
-        metadata,
-        Column("run_id", BigInteger, nullable=False),
-        Column(
-            "object_id",
-            String,
-            ForeignKey("objects.object_id", ondelete="CASCADE"),
-            nullable=False,
-        ),
-        PrimaryKeyConstraint("run_id", "object_id"),
-    )
-
-    # --------------------------------------------------------------------------
-    #  Table: objectstore_locks
-    # --------------------------------------------------------------------------
-    Table(
-        "objectstore_locks",
-        metadata,
-        Column("lock_id", String, nullable=False),
-        Column("lock_value", Integer, nullable=False, server_default="0"),
-        PrimaryKeyConstraint("lock_id"),
-    )
-
+    for table in ObjectStoreBase.metadata.tables.values():
+        table.to_metadata(metadata)
     return metadata
