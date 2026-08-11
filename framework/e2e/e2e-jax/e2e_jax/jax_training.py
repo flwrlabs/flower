@@ -16,7 +16,7 @@ from sklearn.datasets import make_regression
 from sklearn.model_selection import train_test_split
 
 key = jax.random.PRNGKey(0)
-NUM_EPOCHS = 10
+NUM_EPOCHS = 5
 
 
 def load_data() -> (
