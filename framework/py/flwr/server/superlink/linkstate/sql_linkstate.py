@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from logging import ERROR, WARNING
 from typing import Any, Literal, cast
 
-from sqlalchemy import MetaData, func, or_, select
+from sqlalchemy import MetaData, delete, func, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Message
@@ -613,39 +613,29 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if not message_ins_ids:
             return
 
-        placeholders, params = build_sql_in_params(
-            [str(mid) for mid in message_ins_ids], "mid"
-        )
-
-        # Delete Message
-        query_1 = f"""
-            DELETE FROM message_ins
-            WHERE message_id IN ({placeholders})
-        """
-
-        # Delete reply Message
-        query_2 = f"""
-            DELETE FROM message_res
-            WHERE reply_to_message_id IN ({placeholders})
-        """
-
-        with self.session():
-            self.query(query_1, params)
-            self.query(query_2, params)
+        with self.session() as session:
+            session.execute(
+                delete(MessageInsModel).where(
+                    MessageInsModel.message_id.in_(message_ins_ids)
+                )
+            )
+            session.execute(
+                delete(MessageResModel).where(
+                    MessageResModel.reply_to_message_id.in_(message_ins_ids)
+                )
+            )
 
     def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
         """Delete Messages belonging to an expired push session."""
         if not message_object_ids:
             return
 
-        placeholders, params = build_sql_in_params(
-            [str(message_id) for message_id in message_object_ids], "m_id"
-        )
-        with self.session():
+        with self.session() as session:
             self.delete_messages(message_object_ids)
-            self.query(
-                f"DELETE FROM message_res WHERE message_id IN ({placeholders})",
-                params,
+            session.execute(
+                delete(MessageResModel).where(
+                    MessageResModel.message_id.in_(message_object_ids)
+                )
             )
 
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
@@ -691,34 +681,24 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Convert the uint64 value to sint64 for SQLite
         sint64_node_id = uint64_to_int64(uint64_node_id)
 
-        query = """
-            INSERT INTO node
-            (node_id, owner_aid, owner_name, status, registered_at, last_activated_at,
-            last_deactivated_at, unregistered_at, online_until, heartbeat_interval,
-            public_key)
-            VALUES (:node_id, :owner_aid, :owner_name, :status, :registered_at,
-            :last_activated_at, :last_deactivated_at, :unregistered_at, :online_until,
-            :heartbeat_interval, :public_key)
-        """
-
         # Mark the node online until now().timestamp() + heartbeat_interval
         try:
-            self.query(
-                query,
-                {
-                    "node_id": sint64_node_id,
-                    "owner_aid": owner_aid,
-                    "owner_name": owner_name,
-                    "status": NodeStatus.REGISTERED,
-                    "registered_at": now().isoformat(),
-                    "last_activated_at": None,
-                    "last_deactivated_at": None,
-                    "unregistered_at": None,
-                    "online_until": None,  # initialized with offline status
-                    "heartbeat_interval": heartbeat_interval,
-                    "public_key": public_key,
-                },
-            )
+            with self.session() as session:
+                session.execute(
+                    insert(NodeModel).values(
+                        node_id=sint64_node_id,
+                        owner_aid=owner_aid,
+                        owner_name=owner_name,
+                        status=NodeStatus.REGISTERED,
+                        registered_at=now().isoformat(),
+                        last_activated_at=None,
+                        last_deactivated_at=None,
+                        unregistered_at=None,
+                        online_until=None,  # initialized with offline status
+                        heartbeat_interval=heartbeat_interval,
+                        public_key=public_key,
+                    )
+                )
         except IntegrityError as e:
             # Check the underlying DB exception to distinguish constraint types.
             # - SQLite: str(e.orig) is e.g. "UNIQUE constraint failed: node.public_key"
@@ -1338,43 +1318,32 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         sint64_run_id = uint64_to_int64(run_id)
 
-        with self.session():
-            # Check if run exists, performing the update only if it does
-            update_query = """
-                UPDATE run
-                SET bytes_sent = bytes_sent + :bytes_sent,
-                    bytes_recv = bytes_recv + :bytes_recv
-                WHERE run_id = :run_id
-                RETURNING run_id
-            """
-            rows = self.query(
-                update_query,
-                {
-                    "bytes_sent": bytes_sent,
-                    "bytes_recv": bytes_recv,
-                    "run_id": sint64_run_id,
-                },
+        stmt = (
+            update(RunModel)
+            .where(RunModel.run_id == sint64_run_id)
+            .values(
+                bytes_sent=RunModel.bytes_sent + bytes_sent,
+                bytes_recv=RunModel.bytes_recv + bytes_recv,
             )
-
-            if not rows:
+            .returning(RunModel.run_id)
+        )
+        with self.session() as session:
+            if session.scalar(stmt) is None:
                 raise ValueError(f"Run {run_id} not found")
 
     def add_clientapp_runtime(self, run_id: int, runtime: float) -> None:
         """Add ClientApp runtime to the cumulative total for the specified `run_id`."""
         sint64_run_id = uint64_to_int64(run_id)
-        with self.session():
-            # Check if run exists, performing the update only if it does
-            update_query = """
-                UPDATE run
-                SET clientapp_runtime = clientapp_runtime + :runtime
-                WHERE run_id = :run_id
-                RETURNING run_id
-            """
-            rows = self.query(
-                update_query, {"runtime": runtime, "run_id": sint64_run_id}
+        stmt = (
+            update(RunModel)
+            .where(RunModel.run_id == sint64_run_id)
+            .values(
+                clientapp_runtime=RunModel.clientapp_runtime + runtime,
             )
-
-            if not rows:
+            .returning(RunModel.run_id)
+        )
+        with self.session() as session:
+            if session.scalar(stmt) is None:
                 raise ValueError(f"Run {run_id} not found")
 
 
