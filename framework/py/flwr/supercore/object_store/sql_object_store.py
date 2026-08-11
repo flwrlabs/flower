@@ -304,5 +304,10 @@ class SqlObjectStore(ObjectStore, SqlMixin):
         """Return the number of objects in the store."""
         with self.session() as session:
             return int(
-                session.scalar(select(func.count()).select_from(StoredObject)) or 0
+                session.scalar(
+                    select(func.count()).select_from(  # pylint: disable=not-callable
+                        StoredObject
+                    )
+                )
+                or 0
             )
