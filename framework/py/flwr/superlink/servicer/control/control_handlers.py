@@ -192,7 +192,7 @@ def list_connectors(
 
     connectors: list[Connector] = []
     for flow in sorted(
-        connector_registry.OAUTH_FLOWS,
+        connector_registry.OAUTH_FLOWS.values(),
         key=lambda item: item.connector_ref,
     ):
         connector_ref = flow.connector_ref

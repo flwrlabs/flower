@@ -36,9 +36,11 @@ ConnectorToolFactory = Callable[[], JSONObject]
 CONNECTORS: tuple[ConnectorDefinition, ...] = load_connectors()
 _CONNECTORS_BY_REF = {connector.ref: connector for connector in CONNECTORS}
 
-OAUTH_FLOWS: tuple[OAuthFlow, ...] = tuple(
-    connector.oauth_flow for connector in CONNECTORS if connector.oauth_flow is not None
-)
+OAUTH_FLOWS: dict[str, OAuthFlow] = {
+    connector.ref: connector.oauth_flow
+    for connector in CONNECTORS
+    if connector.oauth_flow is not None
+}
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
@@ -123,10 +125,10 @@ def get_builtin_connector_tool(name: str) -> JSONObject:
 
 def get_oauth_flow(connector_ref: str) -> OAuthFlow:
     """Return the OAuth flow registered for a connector reference."""
-    for flow in OAUTH_FLOWS:
-        if flow.connector_ref == connector_ref:
-            return flow
-    raise ValueError(f"Unsupported OAuth connector '{connector_ref}'.")
+    flow = OAUTH_FLOWS.get(connector_ref)
+    if flow is None:
+        raise ValueError(f"Unsupported OAuth connector '{connector_ref}'.")
+    return flow
 
 
 def has_builtin_connector(name: str) -> bool:
