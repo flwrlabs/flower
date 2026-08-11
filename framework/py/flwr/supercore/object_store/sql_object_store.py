@@ -139,7 +139,12 @@ class SqlObjectStore(ObjectStore, SqlMixin):
     def get_object_tree(self, object_id: str) -> ObjectTree:
         """Get the object tree for a given object ID."""
         with self.session() as session:
-            if session.get(StoredObject, object_id, populate_existing=True) is None:
+            object_exists = session.scalar(
+                select(StoredObject.object_id)
+                .where(StoredObject.object_id == object_id)
+                .execution_options(populate_existing=True)
+            )
+            if object_exists is None:
                 raise NoObjectInStoreError(
                     f"Object {object_id} was not pre-registered."
                 )
@@ -303,7 +308,12 @@ class SqlObjectStore(ObjectStore, SqlMixin):
         """Check if an object_id is in the store."""
         with self.session() as session:
             return (
-                session.get(StoredObject, object_id, populate_existing=True) is not None
+                session.scalar(
+                    select(StoredObject.object_id)
+                    .where(StoredObject.object_id == object_id)
+                    .execution_options(populate_existing=True)
+                )
+                is not None
             )
 
     def __len__(self) -> int:
