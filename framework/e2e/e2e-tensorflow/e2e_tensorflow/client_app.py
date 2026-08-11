@@ -44,9 +44,16 @@ ds_test = (
 )
 
 
-# Load model (MobileNetV2, CIFAR-10)
-model = tf.keras.applications.MobileNetV2(
-    input_shape=(32, 32, 3), classes=10, weights=None
+# Load a small CNN for the E2E smoke tests. The test exercises the TensorFlow
+# client/runtime integration, so a large application model only adds CPU time.
+model = tf.keras.Sequential(
+    [
+        tf.keras.layers.Input(shape=(32, 32, 3)),
+        tf.keras.layers.Conv2D(4, 3, activation="relu"),
+        tf.keras.layers.MaxPooling2D(),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(10, activation="softmax"),
+    ]
 )
 model.compile("adam", "sparse_categorical_crossentropy", metrics=["accuracy"])
 
