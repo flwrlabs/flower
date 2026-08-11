@@ -39,7 +39,7 @@ from flwr.superlink.config_loader import (
     SuperLinkLifespanConfig,
     get_federation_manager,
     get_objectstore_linkstate_factories,
-    load_control_auth_plugins,
+    load_control_authn_plugin,
     load_control_event_log_plugin,
 )
 from flwr.superlink.dependencies.account import AccountAccessDependency
