@@ -1372,7 +1372,12 @@ def _node_info_from_model(model: NodeModel) -> NodeInfo:
 def _message_model_to_dict(
     model: MessageInsModel | MessageResModel,
 ) -> dict[str, Any]:
-    """Convert a message model to the dictionary representation used by serde."""
+    """Convert a message model to the dictionary representation used by serde.
+
+    This is a temporary compatibility adapter while the message utilities still
+    consume dictionaries. It should be replaced and removed once those utilities
+    accept ORM models or typed domain objects directly.
+    """
     return {
         "message_id": model.message_id,
         "group_id": model.group_id,
