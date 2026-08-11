@@ -3,6 +3,7 @@ from collections import OrderedDict
 
 import numpy as np
 import torch
+import torch.nn as nn
 from fastai.vision.all import *
 
 from flwr.app import Context
@@ -26,8 +27,13 @@ selected_valid = np.random.choice(dls.valid_ds.items, subset_size, replace=False
 dls.train = dls.test_dl(selected_train, with_labels=True)
 dls.valid = dls.test_dl(selected_valid, with_labels=True)
 
-# Define model
-learn = vision_learner(dls, squeezenet1_1, metrics=error_rate)
+# Define a small model. The E2E test exercises the FastAI/Flower integration,
+# so a production-sized pretrained model only adds CPU time.
+learn = Learner(
+    dls,
+    nn.Sequential(nn.Flatten(), nn.Linear(28 * 28, 10)),
+    metrics=error_rate,
+)
 
 
 # Define Flower client
