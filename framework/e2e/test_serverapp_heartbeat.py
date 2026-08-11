@@ -10,7 +10,7 @@ import time
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
-    SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+    SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
     Status,
     SubStatus,
 )
@@ -40,7 +40,7 @@ def run_superlink(database_path: str, secret_path: str) -> subprocess.Popen:
 def run_superexec(secret_path: str) -> subprocess.Popen:
     """Run the SuperExec."""
     cmd = ["flower-superexec", "--insecure"]
-    cmd += ["--appio-api-address", SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS]
+    cmd += ["--appio-api-address", SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS]
     cmd += ["--plugin-type", plugin_type_arg]
     cmd += ["--superexec-auth-secret-file", secret_path]
     return subprocess.Popen(cmd)

@@ -32,7 +32,21 @@ from flwr.common.serde import (
     run_to_proto,
 )
 from flwr.proto import runtime_pb2_grpc  # pylint: disable=E0611
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    StartAutomationRequest,
+    StartAutomationResponse,
+)
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ConfirmMessageReceivedRequest,
+    ConfirmMessageReceivedResponse,
+    PullObjectRequest,
+    PullObjectResponse,
+    PushObjectRequest,
+    PushObjectResponse,
+)
+from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
@@ -48,20 +62,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushTaskOutputRequest,
     PushTaskOutputResponse,
 )
-from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    StartAutomationRequest,
-    StartAutomationResponse,
-)
-from flwr.proto.message_pb2 import (  # pylint: disable=E0611
-    ConfirmMessageReceivedRequest,
-    ConfirmMessageReceivedResponse,
-    PullObjectRequest,
-    PullObjectResponse,
-    PushObjectRequest,
-    PushObjectResponse,
-)
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.auth.typing import AccountInfo
@@ -73,7 +73,7 @@ from flwr.supercore.inflatable.inflatable_object import (
 )
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
-from flwr.supercore.servicer.appio import AppIoServicer
+from flwr.supercore.servicer.runtime import RuntimeServicer
 from flwr.superlink.servicer.control.control_handlers import (
     process_due_automations,
     start_automation,
@@ -84,7 +84,7 @@ RUNTIME_ENDPOINT_UNAVAILABLE_MESSAGE = (
 )
 
 
-class ServerAppIoServicer(AppIoServicer, runtime_pb2_grpc.RuntimeServicer):
+class SuperLinkRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer):
     """Runtime API servicer hosted by SuperLink."""
 
     def __init__(

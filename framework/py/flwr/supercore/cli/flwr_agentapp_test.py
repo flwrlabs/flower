@@ -21,7 +21,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+from flwr.common.constant import SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.cli.flwr_agentapp import _parse_args_run_flwr_agentapp
 
 flwr_agentapp_module = importlib.import_module("flwr.supercore.cli.flwr_agentapp")
@@ -54,7 +54,7 @@ def test_parse_flwr_agentapp_parses_tokenized_invocation() -> None:
         ]
     )
 
-    assert args.serverappio_api_address == SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+    assert args.runtime_api_address == SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
@@ -89,7 +89,7 @@ def test_flwr_agentapp_forwards_cli_args() -> None:
     """The AgentApp CLI should forward parsed args to the runtime."""
     args = SimpleNamespace(
         insecure=True,
-        serverappio_api_address="127.0.0.1:9091",
+        runtime_api_address="127.0.0.1:9091",
         token="test-token",
         root_certificates=None,
         parent_pid=321,
@@ -121,7 +121,7 @@ def test_flwr_agentapp_forwards_cli_args() -> None:
     restore_output.assert_called_once_with()
     run_agentapp.assert_called_once()
     kwargs = run_agentapp.call_args.kwargs
-    assert kwargs["serverappio_api_address"] == "127.0.0.1:9091"
+    assert kwargs["runtime_api_address"] == "127.0.0.1:9091"
     assert kwargs["log_queue"] is mirror_output_to_queue.call_args.args[0]
     assert kwargs["token"] == "test-token"
     assert kwargs["insecure"] is True

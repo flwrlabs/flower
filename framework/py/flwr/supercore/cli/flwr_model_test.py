@@ -21,7 +21,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+from flwr.common.constant import SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
 
 from .flwr_model import _parse_args_run_flwr_model
 
@@ -53,7 +53,7 @@ def test_parse_flwr_model_parses_tokenized_invocation() -> None:
         ]
     )
 
-    assert args.serverappio_api_address == SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+    assert args.runtime_api_address == SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
@@ -64,7 +64,7 @@ def test_flwr_model_forwards_cli_args() -> None:
     """The ModelApp CLI should forward parsed args to the runtime."""
     args = SimpleNamespace(
         insecure=True,
-        serverappio_api_address="127.0.0.1:9091",
+        runtime_api_address="127.0.0.1:9091",
         token="test-token",
         root_certificates=None,
         parent_pid=321,
@@ -86,7 +86,7 @@ def test_flwr_model_forwards_cli_args() -> None:
 
     run_model.assert_called_once()
     kwargs = run_model.call_args.kwargs
-    assert kwargs["serverappio_api_address"] == "127.0.0.1:9091"
+    assert kwargs["runtime_api_address"] == "127.0.0.1:9091"
     assert kwargs["token"] == "test-token"
     assert kwargs["insecure"] is True
     assert kwargs["certificates"] is None
