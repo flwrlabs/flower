@@ -49,9 +49,11 @@ async def http_error_translator(
             error_spec = API_ERROR_MAP[err.code]
             http_status = error_spec.http_status_code
             public_message = error_spec.public_message
+            http_headers = error_spec.http_headers
         except (ValueError, KeyError):
             http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
             public_message = INTERNAL_SERVER_ERROR_MESSAGE
+            http_headers = None
 
         # Log error as is
         msg = f"[{request.url.path}][ApiError:{err.code}] {err.message}"
@@ -60,6 +62,7 @@ async def http_error_translator(
         return Response(
             status_code=http_status,
             content=err.to_json(public_message),
+            headers=http_headers,
             media_type="application/json",
         )
     except HTTPException as err:
