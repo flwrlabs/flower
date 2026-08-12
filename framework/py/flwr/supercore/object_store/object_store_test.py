@@ -465,6 +465,7 @@ class SqlPersistentObjectStoreTestMixin(unittest.TestCase):
         self.assertIn("alembic_version", table_names)
         self.assertIn("objectstore_locks", table_names)
 
+    # pylint: disable=protected-access
     def test_mutation_lock_uses_sql_lock_row(self) -> None:
         """Ensure ObjectStore mutations use a transaction-scoped SQL lock."""
         store = self.object_store_factory()
@@ -490,6 +491,8 @@ class SqlPersistentObjectStoreTestMixin(unittest.TestCase):
                 pass
 
         store._lock_objectstore_mutation.assert_called_once_with()
+
+    # pylint: enable=protected-access
 
     def test_concurrent_preregister_and_run_cleanup(self) -> None:
         """Concurrent run cleanup preserves objects registered by another run."""
