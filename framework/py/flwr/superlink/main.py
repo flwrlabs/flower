@@ -46,7 +46,6 @@ from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.routers.control import router as control_router
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
-    ControlEventLogMiddleware,
     ControlLicenseMiddleware,
 )
 
@@ -94,7 +93,6 @@ def _get_middleware() -> list[Middleware]:
         Middleware(ControlAuthenticationMiddleware),
         Middleware(ControlLicenseMiddleware),
         Middleware(ProtobufTranslationMiddleware),
-        Middleware(ControlEventLogMiddleware),
     ]
 
 

@@ -41,6 +41,7 @@ from flwr.supercore.protobuf.translation import (
 )
 from flwr.supercore.run import Run
 from flwr.superlink.dependencies.account import AccountAccessDependency
+from flwr.superlink.dependencies.event_log import log_control_event
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
 from flwr.superlink.routers.control.router import router
@@ -72,6 +73,21 @@ def test_all_control_routes_have_protobuf_request_types() -> None:
     }
 
     assert route_keys == set(PROTOBUF_REQUEST_TYPES)
+
+
+def test_all_control_routes_have_function_scoped_event_logging() -> None:
+    """Every Control handler logs while its raw protobuf result is available."""
+    control_routes = [route for route in router.routes if isinstance(route, APIRoute)]
+
+    assert control_routes
+    assert all(
+        any(
+            dependency.dependency is log_control_event
+            and dependency.scope == "function"
+            for dependency in route.dependencies
+        )
+        for route in control_routes
+    )
 
 
 def test_protobuf_request_without_handler_response_returns_internal_error() -> None:

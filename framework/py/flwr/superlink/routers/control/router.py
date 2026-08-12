@@ -78,10 +78,16 @@ from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import get_protobuf_request
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.dependencies.account import get_account, get_authn_plugin
+from flwr.superlink.dependencies.event_log import log_control_event
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.servicer.control import control_handlers
 
-router = APIRouter(prefix="/v1/control", tags=["Control"], route_class=ProtobufRoute)
+router = APIRouter(
+    prefix="/v1/control",
+    tags=["Control"],
+    dependencies=[Depends(log_control_event, scope="function")],
+    route_class=ProtobufRoute,
+)
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
