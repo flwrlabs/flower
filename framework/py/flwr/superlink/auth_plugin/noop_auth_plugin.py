@@ -16,7 +16,6 @@
 
 
 from collections.abc import Sequence
-from pathlib import Path
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID, AuthnType
 from flwr.supercore.auth.typing import (
@@ -36,11 +35,7 @@ NOOP_ACCOUNT_INFO = AccountInfo(
 class NoOpControlAuthnPlugin(ControlAuthnPlugin):
     """No-operation implementation of ControlAuthnPlugin."""
 
-    def __init__(
-        self,
-        account_auth_config_path: Path,
-        verify_tls_cert: bool,
-    ):
+    def __init__(self) -> None:
         pass
 
     def get_login_details(self) -> AccountAuthLoginDetails | None:
