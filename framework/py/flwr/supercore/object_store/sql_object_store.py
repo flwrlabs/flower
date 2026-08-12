@@ -17,8 +17,9 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from typing import cast
 
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, func, select
 
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.inflatable.inflatable_object import (
@@ -28,6 +29,7 @@ from flwr.supercore.inflatable.inflatable_object import (
 )
 from flwr.supercore.inflatable.inflatable_utils import validate_object_content
 from flwr.supercore.sql_mixin import SqlMixin
+from flwr.supercore.state.schema.objectstore_models import ObjectChild, StoredObject
 from flwr.supercore.state.schema.objectstore_tables import create_objectstore_metadata
 from flwr.supercore.utils import build_sql_in_params, uint64_to_int64
 
@@ -134,23 +136,24 @@ class SqlObjectStore(ObjectStore, SqlMixin):
 
     def get_object_tree(self, object_id: str) -> ObjectTree:
         """Get the object tree for a given object ID."""
-        with self.session():
-            rows = self.query(
-                "SELECT object_id FROM objects WHERE object_id = :object_id",
-                {"object_id": object_id},
+        with self.session() as session:
+            object_exists = session.scalar(
+                select(StoredObject.object_id).where(
+                    StoredObject.object_id == object_id
+                )
             )
-            if not rows:
+            if object_exists is None:
                 raise NoObjectInStoreError(
                     f"Object {object_id} was not pre-registered."
                 )
-            children = self.query(
-                "SELECT child_id FROM object_children WHERE parent_id = :parent_id",
-                {"parent_id": object_id},
-            )
 
-            # Build the object trees of all children
             try:
-                child_trees = [self.get_object_tree(ch["child_id"]) for ch in children]
+                child_ids = session.scalars(
+                    select(ObjectChild.child_id).where(
+                        ObjectChild.parent_id == object_id
+                    )
+                ).all()
+                child_trees = [self.get_object_tree(ch_id) for ch_id in child_ids]
             except NoObjectInStoreError as e:
                 # Raise an error if any child object is missing
                 # This indicates an integrity issue
@@ -198,10 +201,10 @@ class SqlObjectStore(ObjectStore, SqlMixin):
 
     def get(self, object_id: str) -> bytes | None:
         """Get an object from the store."""
-        rows = self.query(
-            "SELECT content FROM objects WHERE object_id = :oid", {"oid": object_id}
-        )
-        return rows[0]["content"] if rows else None
+        with self.session() as session:
+            return session.scalar(
+                select(StoredObject.content).where(StoredObject.object_id == object_id)
+            )
 
     def delete(self, object_id: str) -> None:
         """Delete an object and its unreferenced descendants from the store."""
@@ -288,12 +291,15 @@ class SqlObjectStore(ObjectStore, SqlMixin):
 
     def __contains__(self, object_id: str) -> bool:
         """Check if an object_id is in the store."""
-        rows = self.query(
-            "SELECT 1 FROM objects WHERE object_id = :oid", {"oid": object_id}
-        )
-        return len(rows) > 0
+        with self.session() as session:
+            stmt = select(StoredObject.object_id).where(
+                StoredObject.object_id == object_id
+            )
+            return session.scalar(stmt) is not None
 
     def __len__(self) -> int:
         """Return the number of objects in the store."""
-        rows = self.query("SELECT COUNT(*) AS cnt FROM objects")
-        return int(rows[0]["cnt"])
+        with self.session() as session:
+            # pylint: disable-next=not-callable
+            cnt = session.scalar(select(func.count()).select_from(StoredObject))
+            return cast(int, cnt)

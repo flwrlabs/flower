@@ -386,6 +386,7 @@ class SqlObjectStoreTestMixin(unittest.TestCase):
     """Test SQL-specific ObjectStore behavior."""
 
     __test__ = False
+    run_id: int
 
     def object_store_factory(self) -> SqlObjectStore:
         """Provide SQL ObjectStore implementation to test."""
@@ -407,6 +408,22 @@ class SqlObjectStoreTestMixin(unittest.TestCase):
                     children=[ObjectTree(object_id=child_id)],
                 ),
             )
+
+    def test_get_object_tree_uses_current_database_state(self) -> None:
+        """Ensure tree reads do not return a cached object after deletion."""
+        store = self.object_store_factory()
+        object_id = get_object_id(b"object")
+        store.preregister(self.run_id, ObjectTree(object_id=object_id))
+
+        with store.session():
+            self.assertTrue(object_id in store)
+            store.query(
+                "DELETE FROM objects WHERE object_id = :object_id",
+                {"object_id": object_id},
+            )
+
+            with self.assertRaises(NoObjectInStoreError):
+                store.get_object_tree(object_id)
 
 
 class SqlInMemoryObjectStoreTest(SqlObjectStoreTestMixin, ObjectStoreTest):
