@@ -1239,19 +1239,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         Return Message if valid.
         """
-        with self.session():
+        with self.session() as session:
             self._check_stored_messages({message_id})
-            query = """
-                SELECT *
-                FROM message_ins
-                WHERE message_id = :message_id
-            """
-            rows = self.query(query, {"message_id": message_id})
-            if not rows:
+            model = session.scalar(
+                select(MessageInsModel).where(
+                    MessageInsModel.message_id == message_id
+                )
+            )
+            if model is None:
                 # Message does not exist
                 return None
 
-        return dict(rows[0])
+        return _message_model_to_dict(model)
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""
