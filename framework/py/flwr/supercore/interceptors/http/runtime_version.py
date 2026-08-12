@@ -12,17 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Reusable protobuf-over-HTTP client interceptors."""
+"""Runtime-version interceptor for protobuf-over-HTTP clients."""
 
-from __future__ import annotations
-
-from collections.abc import Collection
 from logging import WARN
 
 import requests
 
 from flwr.common.logger import log
-from flwr.supercore.auth import create_superexec_auth_metadata, derive_auth_secret
 from flwr.supercore.constant import VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.protobuf.client import ProtobufCall, ProtobufRequestContext
@@ -31,48 +27,7 @@ from flwr.supercore.runtime_version_compatibility import (
     get_runtime_version_incompatibility_exit_message,
 )
 
-
-def _add_headers(
-    request: requests.PreparedRequest,
-    headers: dict[str, str],
-) -> None:
-    """Add headers while rejecting values already provided by another layer."""
-    duplicates = {name for name in headers if name in request.headers}
-    if duplicates:
-        raise RuntimeError(
-            f"HTTP request already contains headers: {', '.join(sorted(duplicates))}"
-        )
-    request.headers.update(headers)
-
-
-class SuperExecAuthHttpInterceptor:
-    """Attach SuperExec HMAC authentication headers to HTTP requests."""
-
-    def __init__(
-        self,
-        *,
-        master_secret: bytes,
-        protected_methods: Collection[str],
-    ) -> None:
-        self._auth_secret = derive_auth_secret(master_secret)
-        self._protected_methods = frozenset(protected_methods)
-
-    def intercept(
-        self,
-        context: ProtobufRequestContext,
-        call_next: ProtobufCall,
-    ) -> requests.Response:
-        """Sign protected requests before sending them."""
-        if context.rpc_method in self._protected_methods:
-            _add_headers(
-                context.request,
-                create_superexec_auth_metadata(
-                    auth_secret=self._auth_secret,
-                    method=context.rpc_method,
-                    request=context.message,
-                ),
-            )
-        return call_next(context)
+from .utils import add_headers
 
 
 class RuntimeVersionHttpInterceptor:
@@ -87,7 +42,7 @@ class RuntimeVersionHttpInterceptor:
         call_next: ProtobufCall,
     ) -> requests.Response:
         """Add local version headers and handle compatibility responses."""
-        _add_headers(context.request, dict(self._metadata.as_metadata()))
+        add_headers(context.request, dict(self._metadata.as_metadata()))
         response = call_next(context)
 
         if incompatibility_message := response.headers.get(
