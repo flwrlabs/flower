@@ -15,14 +15,13 @@
 """Tests for Control API gRPC server wiring."""
 
 
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 from flwr.supercore.interceptors import (
     RpcErrorTranslationServerInterceptor,
     RuntimeVersionServerInterceptor,
 )
-from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin, NoOpControlAuthzPlugin
+from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 
 from .control_grpc import run_control_api_grpc
 
@@ -46,8 +45,7 @@ def test_run_control_api_grpc_adds_expected_interceptors() -> None:
             state_factory=Mock(),
             objectstore_factory=Mock(),
             certificates=None,
-            authn_plugin=NoOpControlAuthnPlugin(Path(), False),
-            authz_plugin=NoOpControlAuthzPlugin(Path(), False),
+            authn_plugin=NoOpControlAuthnPlugin(),
         )
 
     interceptors = create_grpc_server.call_args.kwargs["interceptors"]

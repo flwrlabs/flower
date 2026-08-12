@@ -39,7 +39,7 @@ from flwr.superlink.config_loader import (
     SuperLinkLifespanConfig,
     get_federation_manager,
     get_objectstore_linkstate_factories,
-    load_control_auth_plugins,
+    load_control_authn_plugin,
     load_control_event_log_plugin,
 )
 from flwr.superlink.dependencies.account import AccountAccessDependency
@@ -106,9 +106,7 @@ def create_app(
     if config is None:
         is_simulation = False
         database = get_ee_linkstate_db()
-        authn_plugin, authz_plugin = load_control_auth_plugins(
-            os.getenv("FLWR_ACCOUNT_AUTH_CONFIG"), verify_tls_cert=True
-        )
+        authn_plugin = load_control_authn_plugin()
         event_log_plugin = (
             load_control_event_log_plugin()
             if os.getenv("FLWR_ENABLE_EVENT_LOG") == "1"
@@ -117,7 +115,7 @@ def create_app(
     else:
         is_simulation = config.simulation
         database = config.database
-        authn_plugin, authz_plugin = config.authn_plugin, config.authz_plugin
+        authn_plugin = config.authn_plugin
         event_log_plugin = config.event_log_plugin
 
     federation_manager = get_federation_manager(is_simulation=is_simulation)
@@ -172,9 +170,7 @@ def create_app(
     )
     fastapi_app.state.superlink_lifespan = superlink_lifespan
     fastapi_app.state.linkstate_factory = linkstate_factory
-    fastapi_app.state.account_access_dep = AccountAccessDependency(
-        authn_plugin, authz_plugin
-    )
+    fastapi_app.state.account_access_dep = AccountAccessDependency(authn_plugin)
     fastapi_app.state.control_event_log_plugin = event_log_plugin
 
     # Core APIs

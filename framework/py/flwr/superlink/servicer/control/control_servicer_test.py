@@ -187,7 +187,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
             ),
             objectstore_factory=objectstore_factory,
-            authn_plugin=(authn_plugin := NoOpControlAuthnPlugin(Mock(), False)),
+            authn_plugin=(authn_plugin := NoOpControlAuthnPlugin()),
         )
         account_info = authn_plugin.validate_tokens_in_metadata([])[1]
         assert account_info is not None
@@ -1181,7 +1181,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 objectstore_factory,
             ),
             objectstore_factory=objectstore_factory,
-            authn_plugin=NoOpControlAuthnPlugin(Mock(), False),
+            authn_plugin=NoOpControlAuthnPlugin(),
         )
 
         response: ListFederationsResponse = servicer.ListFederations(
@@ -1896,7 +1896,7 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
                 FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
             ),
             objectstore_factory=objectstore_factory,
-            authn_plugin=(authn_plugin := NoOpControlAuthnPlugin(Mock(), False)),
+            authn_plugin=(authn_plugin := NoOpControlAuthnPlugin()),
         )
         account_info = authn_plugin.validate_tokens_in_metadata([])[1]
         assert account_info is not None

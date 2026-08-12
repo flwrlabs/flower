@@ -15,6 +15,7 @@
 """Error catalog for translating internal API error codes to public responses."""
 
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Final
 
@@ -31,6 +32,7 @@ class ApiErrorSpec:
     status_code: StatusCode
     http_status_code: int
     public_message: str
+    http_headers: Mapping[str, str] | None = None
 
 
 API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
@@ -218,6 +220,9 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         status_code=StatusCode.UNAUTHENTICATED,
         http_status_code=status.HTTP_401_UNAUTHORIZED,
         public_message="Authentication failed.",
+        # A 401 response must advertise its authentication scheme so standards-based
+        # HTTP clients know that the API expects a Bearer access token.
+        http_headers={"WWW-Authenticate": "Bearer"},
     ),
     ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED: ApiErrorSpec(
         status_code=StatusCode.UNAVAILABLE,
