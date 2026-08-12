@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import secrets
 from typing import Protocol
 
 from google.protobuf.message import Message as ProtoMessage
@@ -26,7 +27,11 @@ from google.protobuf.message import Message as ProtoMessage
 from flwr.supercore.constant import (
     MAX_TIMESTAMP_DIFF_SECONDS,
     MIN_TIMESTAMP_DIFF_SECONDS,
+    SUPEREXEC_AUTH_BODY_SHA256_HEADER,
+    SUPEREXEC_AUTH_NONCE_HEADER,
     SUPEREXEC_AUTH_SECRET_CONTEXT,
+    SUPEREXEC_AUTH_SIGNATURE_HEADER,
+    SUPEREXEC_AUTH_TIMESTAMP_HEADER,
 )
 from flwr.supercore.date import now
 
@@ -84,6 +89,30 @@ def compute_superexec_signature(  # pylint: disable=R0913
         body_sha256=body_sha256,
     )
     return hmac.new(auth_secret, canonical, hashlib.sha256).hexdigest()
+
+
+def create_superexec_auth_metadata(
+    *,
+    auth_secret: bytes,
+    method: str,
+    request: ProtoMessage,
+) -> dict[str, str]:
+    """Create SuperExec authentication metadata for an outbound request."""
+    timestamp = int(now().timestamp())
+    nonce = secrets.token_hex(16)
+    body_sha256 = compute_request_body_sha256(request)
+    return {
+        SUPEREXEC_AUTH_TIMESTAMP_HEADER: str(timestamp),
+        SUPEREXEC_AUTH_NONCE_HEADER: nonce,
+        SUPEREXEC_AUTH_BODY_SHA256_HEADER: body_sha256,
+        SUPEREXEC_AUTH_SIGNATURE_HEADER: compute_superexec_signature(
+            auth_secret=auth_secret,
+            method=method,
+            timestamp=timestamp,
+            nonce=nonce,
+            body_sha256=body_sha256,
+        ),
+    }
 
 
 def verify_superexec_signature(
