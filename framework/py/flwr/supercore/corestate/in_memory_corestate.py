@@ -762,8 +762,8 @@ class InMemoryCoreState(
         self, task_id: int, after_timestamp: float | None
     ) -> tuple[str, float]:
         """Get task logs for the specified `task_id`."""
-        # We don't check if the task exists before querying logs
-        # because the task_id is validated by the authz layer
+        # We don't check if the task exists before querying logs because the Control API
+        # handler validates access to the associated run before reading logs.
 
         with self.log_lock:
             task_logs = self.task_logs.get(task_id, [])

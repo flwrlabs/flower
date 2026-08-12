@@ -158,8 +158,6 @@ LOG_UPLOAD_INTERVAL = 0.2  # Minimum interval between two log uploads
 MAX_RETRY_DELAY = 20  # Maximum delay duration between two consecutive retries.
 
 # Constants for account authentication
-AUTHN_TYPE_JSON_KEY = "authn-type"  # For key name in JSON file
-AUTHN_TYPE_YAML_KEY = "authn_type"  # For key name in YAML file
 ACCESS_TOKEN_KEY = "flwr-oidc-access-token"
 REFRESH_TOKEN_KEY = "flwr-oidc-refresh-token"
 
