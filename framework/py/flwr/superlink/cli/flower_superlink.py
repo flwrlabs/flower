@@ -396,25 +396,12 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
                     f"Failed to load SuperExec authentication secret: {err}",
                 )
 
-    # Disable the account auth TLS check if args.disable_oidc_tls_cert_verification is
-    # provided
-    verify_tls_cert = not getattr(args, "disable_oidc_tls_cert_verification", None)
-
-    event_log_plugin: EventLogWriterPlugin | None = None
-    # Load the auth plugin if the args.account_auth_config is provided
-    if cfg_path := getattr(args, "user_auth_config", None):
-        log(
-            WARN,
-            "The `--user-auth-config` flag is deprecated and will be removed in a "
-            "future release. Please use `--account-auth-config` instead.",
-        )
-        args.account_auth_config = cfg_path
-    cfg_path = getattr(args, "account_auth_config", None)
-    authn_plugin = load_control_authn_plugin(cfg_path, verify_tls_cert)
-    if cfg_path is not None:
-        # Enable event logging if the args.enable_event_log is True
-        if args.enable_event_log:
-            event_log_plugin = load_control_event_log_plugin()
+    authn_plugin = load_control_authn_plugin()
+    event_log_plugin = (
+        load_control_event_log_plugin()
+        if getattr(args, "enable_event_log", False)
+        else None
+    )
 
     # Load artifact provider if the args.artifact_provider_config is provided
     artifact_provider = None
