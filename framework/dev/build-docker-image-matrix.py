@@ -175,7 +175,7 @@ def build_matrix(
     flwr_version_ref: str,
     flwr_package: str,
     image_tags: list[str],
-) -> List[BaseImage]:
+) -> tuple[List[BaseImage], List[Dict[str, Any]]]:
     """Build the complete Framework image matrix."""
 
     @dataclass
