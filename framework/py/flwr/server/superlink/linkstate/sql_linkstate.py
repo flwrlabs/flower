@@ -22,8 +22,20 @@ from datetime import UTC, datetime
 from logging import ERROR, WARNING
 from typing import Any, Literal, cast
 
-from sqlalchemy import MetaData, delete, exists, func, insert, or_, select, update
+from sqlalchemy import (
+    MetaData,
+    bindparam,
+    case,
+    delete,
+    exists,
+    func,
+    insert,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import aliased
 
 from flwr.app import Message
 from flwr.app.user_config import UserConfig
@@ -57,7 +69,6 @@ from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
 from flwr.supercore.utils import (
-    build_sql_in_params,
     int64_to_uint64,
     simulation_config_from_json,
     simulation_config_to_json,
@@ -690,30 +701,27 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def delete_node(self, owner_aid: str, node_id: int) -> None:
         """Delete a node."""
         sint64_node_id = uint64_to_int64(node_id)
-
-        query = """
-            UPDATE node
-            SET status = :unregistered, unregistered_at = :unregistered_at,
-            online_until = CASE
-                WHEN online_until > :current
-                    THEN :current
-                ELSE online_until
-            END
-            WHERE node_id = :node_id AND status != :unregistered
-            AND owner_aid = :owner_aid
-            RETURNING node_id
-        """
         current = now()
-        params = {
-            "unregistered": NodeStatus.UNREGISTERED,
-            "unregistered_at": current.isoformat(),
-            "current": current.timestamp(),
-            "node_id": sint64_node_id,
-            "owner_aid": owner_aid,
-        }
-
-        rows = self.query(query, params)
-        if not rows:
+        stmt = (
+            update(NodeModel)
+            .where(
+                NodeModel.node_id == sint64_node_id,
+                NodeModel.status != NodeStatus.UNREGISTERED,
+                NodeModel.owner_aid == owner_aid,
+            )
+            .values(
+                status=NodeStatus.UNREGISTERED,
+                unregistered_at=current.isoformat(),
+                online_until=case(
+                    (NodeModel.online_until > current.timestamp(), current.timestamp()),
+                    else_=NodeModel.online_until,
+                ),
+            )
+            .returning(NodeModel.node_id)
+        )
+        with self.session() as session:
+            updated_node_id = session.scalar(stmt)
+        if updated_node_id is None:
             raise ValueError(
                 f"Node {node_id} already deleted, not found or unauthorized "
                 "deletion attempt."
@@ -726,28 +734,23 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Only activate if the node is currently registered or offline
         current_dt = now()
         sint64_node_id = uint64_to_int64(node_id)
-        query = """
-            UPDATE node
-            SET status = :online,
-                last_activated_at = :current,
-                online_until = :online_until,
-                heartbeat_interval = :heartbeat_interval
-            WHERE node_id = :node_id AND status IN (:registered, :offline)
-            RETURNING node_id
-        """
-        params = {
-            "online": NodeStatus.ONLINE,
-            "current": current_dt.isoformat(),
-            "online_until": current_dt.timestamp()
-            + HEARTBEAT_PATIENCE * heartbeat_interval,
-            "heartbeat_interval": heartbeat_interval,
-            "node_id": sint64_node_id,
-            "registered": NodeStatus.REGISTERED,
-            "offline": NodeStatus.OFFLINE,
-        }
-
-        rows = self.query(query, params)
-        return len(rows) > 0
+        stmt = (
+            update(NodeModel)
+            .where(
+                NodeModel.node_id == sint64_node_id,
+                NodeModel.status.in_([NodeStatus.REGISTERED, NodeStatus.OFFLINE]),
+            )
+            .values(
+                status=NodeStatus.ONLINE,
+                last_activated_at=current_dt.isoformat(),
+                online_until=current_dt.timestamp()
+                + HEARTBEAT_PATIENCE * heartbeat_interval,
+                heartbeat_interval=heartbeat_interval,
+            )
+            .returning(NodeModel.node_id)
+        )
+        with self.session() as session:
+            return session.scalar(stmt) is not None
 
     def deactivate_node(self, node_id: int) -> bool:
         """Deactivate the node with the specified `node_id`."""
@@ -755,24 +758,21 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         # Only deactivate if the node is currently online
         current_dt = now()
-        query = """
-            UPDATE node
-            SET status = :offline,
-                last_deactivated_at = :current_iso,
-                online_until = :current_ts
-            WHERE node_id = :node_id AND status = :online
-            RETURNING node_id
-        """
-        params = {
-            "offline": NodeStatus.OFFLINE,
-            "current_iso": current_dt.isoformat(),
-            "current_ts": current_dt.timestamp(),
-            "node_id": uint64_to_int64(node_id),
-            "online": NodeStatus.ONLINE,
-        }
-
-        rows = self.query(query, params)
-        return len(rows) > 0
+        stmt = (
+            update(NodeModel)
+            .where(
+                NodeModel.node_id == uint64_to_int64(node_id),
+                NodeModel.status == NodeStatus.ONLINE,
+            )
+            .values(
+                status=NodeStatus.OFFLINE,
+                last_deactivated_at=current_dt.isoformat(),
+                online_until=current_dt.timestamp(),
+            )
+            .returning(NodeModel.node_id)
+        )
+        with self.session() as session:
+            return session.scalar(stmt) is not None
 
     def get_nodes(self, run_id: int) -> set[int]:
         """Retrieve all currently stored node IDs as a set.
@@ -803,53 +803,50 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def _check_and_tag_offline_nodes(self, node_ids: list[int] | None = None) -> None:
         """Check and tag offline nodes."""
-        query = """
-            SELECT node_id, online_until
-            FROM node
-            WHERE online_until <= :current_time
-              AND status = :online
-        """
-        params: dict[str, Any] = {
-            "current_time": now().timestamp(),
-            "online": NodeStatus.ONLINE,
-        }
+        current_time = now().timestamp()
+        stmt = select(NodeModel.node_id, NodeModel.online_until).where(
+            NodeModel.online_until <= current_time,
+            NodeModel.status == NodeStatus.ONLINE,
+        )
         if node_ids is not None:
             if not node_ids:
                 return
             sint64_node_ids = [uint64_to_int64(nid) for nid in node_ids]
-            placeholders, in_params = build_sql_in_params(sint64_node_ids, "nid")
-            query += f" AND node_id IN ({placeholders})"
-            params.update(in_params)
+            stmt = stmt.where(NodeModel.node_id.in_(sint64_node_ids))
 
         # Select candidate node_ids first so `last_deactivated_at` can preserve the
         # expiry time without relying on database-specific epoch formatting functions
-        rows = self.query(query, params)
-        if not rows:
-            return
+        with self.session() as session:
+            rows = session.execute(stmt).all()
+            if not rows:
+                return
 
-        update_query = """
-            UPDATE node
-            SET status = :offline, last_deactivated_at = :last_deactivated_at
-            WHERE node_id = :node_id
-              AND status = :online
-              AND online_until <= :current_time
-        """
-        update_data = [
-            {
-                "offline": NodeStatus.OFFLINE,
-                # Convert epoch seconds to a UTC ISO-8601 string
-                "last_deactivated_at": datetime.fromtimestamp(
-                    row["online_until"], tz=UTC
-                ).isoformat(),
-                "node_id": row["node_id"],
-                "online": NodeStatus.ONLINE,
-                # Re-check expiry to avoid marking a node offline after a concurrent
-                # heartbeat extended its `online_until`
-                "current_time": params["current_time"],
-            }
-            for row in rows
-        ]
-        self.query(update_query, update_data)
+            # Use one executemany UPDATE while keeping the state and expiry checks
+            # in the statement to avoid overwriting a concurrent heartbeat.
+            update_stmt = (
+                update(NodeModel)
+                .execution_options(dml_strategy="core_only")
+                .where(
+                    NodeModel.node_id == bindparam("offline_node_id"),
+                    NodeModel.status == NodeStatus.ONLINE,
+                    NodeModel.online_until <= bindparam("offline_current_time"),
+                )
+                .values(
+                    status=NodeStatus.OFFLINE,
+                    last_deactivated_at=bindparam("offline_deactivated_at"),
+                )
+            )
+            update_params = [
+                {
+                    "offline_node_id": node_id,
+                    "offline_current_time": current_time,
+                    "offline_deactivated_at": datetime.fromtimestamp(
+                        cast(float, online_until), tz=UTC
+                    ).isoformat(),
+                }
+                for node_id, online_until in rows
+            ]
+            session.execute(update_stmt, update_params)
 
     def get_node_info(  # pylint: disable=too-many-locals
         self,
@@ -921,34 +918,17 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if federation_config:
             fed_config_json = json.dumps(simulation_config_to_json(federation_config))
 
-        run_insert_query = """
-            INSERT INTO run
-            (run_id, fab_id, fab_version, fab_hash, override_config, federation_id,
-            primary_task_id, federation_config, usage_reported_at,
-            series_id, flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
-            VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
-            :federation_id, :primary_task_id, :federation_config,
-            :usage_reported_at, :series_id, :flwr_aid,
-            :bytes_sent, :bytes_recv, :clientapp_runtime)
-        """
-        task_insert_query = """
-            INSERT INTO task
-            (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
-             active_until, pending_at, starting_at, running_at, finished_at,
-             sub_status, details)
-            VALUES
-            (:task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
-             :active_until, :pending_at, :starting_at, :running_at, :finished_at,
-             :sub_status, :details)
-        """
         override_config_json = json.dumps(override_config)
         run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
 
-        with self.session():
-            query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
-            if rows[0]["cnt"] == 0:
+        with self.session() as session:
+            existing_run_id = session.scalar(
+                select(RunModel.run_id).where(
+                    RunModel.run_id == uint64_to_int64(run_id)
+                )
+            )
+            if existing_run_id is None:
                 current = now()
                 resolved_series_id = self.store_run_in_series(
                     run_id=run_id,
@@ -963,43 +943,41 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     run_id=run_id,
                     series_id=resolved_series_id,
                 )
-                self.query(
-                    run_insert_query,
-                    {
-                        "run_id": uint64_to_int64(run_id),
-                        "fab_id": fab_id or "",
-                        "fab_version": fab_version or "",
-                        "fab_hash": fab_hash or "",
-                        "override_config": override_config_json,
-                        "federation_id": federation_id,
-                        "primary_task_id": uint64_to_int64(task_id),
-                        "federation_config": fed_config_json,
-                        "usage_reported_at": "",
-                        "series_id": uint64_to_int64(resolved_series_id),
-                        "flwr_aid": flwr_aid or "",
-                        "bytes_sent": 0,
-                        "bytes_recv": 0,
-                        "clientapp_runtime": 0.0,
-                    },
+                session.execute(
+                    insert(RunModel).values(
+                        run_id=uint64_to_int64(run_id),
+                        fab_id=fab_id or "",
+                        fab_version=fab_version or "",
+                        fab_hash=fab_hash or "",
+                        override_config=override_config_json,
+                        federation_id=federation_id,
+                        primary_task_id=uint64_to_int64(task_id),
+                        federation_config=fed_config_json,
+                        usage_reported_at="",
+                        series_id=uint64_to_int64(resolved_series_id),
+                        flwr_aid=flwr_aid or "",
+                        bytes_sent=0,
+                        bytes_recv=0,
+                        clientapp_runtime=0.0,
+                    )
                 )
-                self.query(
-                    task_insert_query,
-                    {
-                        "task_id": uint64_to_int64(task_id),
-                        "type": primary_task_type,
-                        "run_id": uint64_to_int64(run_id),
-                        "fab_hash": fab_hash,
-                        "model_ref": None,
-                        "connector_ref": None,
-                        "token": None,
-                        "active_until": None,
-                        "pending_at": current,
-                        "starting_at": None,
-                        "running_at": None,
-                        "finished_at": None,
-                        "sub_status": "",
-                        "details": "",
-                    },
+                session.execute(
+                    insert(TaskModel).values(
+                        task_id=uint64_to_int64(task_id),
+                        type=primary_task_type,
+                        run_id=uint64_to_int64(run_id),
+                        fab_hash=fab_hash,
+                        model_ref=None,
+                        connector_ref=None,
+                        token=None,
+                        active_until=None,
+                        pending_at=current,
+                        starting_at=None,
+                        running_at=None,
+                        finished_at=None,
+                        sub_status="",
+                        details="",
+                    )
                 )
                 self.bind_connectors_to_run(
                     run_id=run_id,
@@ -1132,29 +1110,32 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         sint_run_ids = [pair[0] for pair in run_primary_pairs]
         sint_task_ids = [pair[1] for pair in run_primary_pairs]
-        run_id_ph, run_id_params = build_sql_in_params(sint_run_ids, "run_id")
-        pt_id_ph, pt_id_params = build_sql_in_params(sint_task_ids, "pt_id")
-
-        self.query(
-            f"""
-            UPDATE task
-            SET finished_at = (
-                    SELECT pt.finished_at FROM task pt
-                    WHERE pt.task_id IN ({pt_id_ph}) AND pt.run_id = task.run_id
-                ),
-                sub_status = :sub_status,
-                details = :details,
-                active_until = NULL,
-                token = NULL
-            WHERE run_id IN ({run_id_ph}) AND finished_at IS NULL
-            """,
-            {
-                **run_id_params,
-                **pt_id_params,
-                "sub_status": sub_status,
-                "details": details,
-            },
+        primary_task = aliased(TaskModel)
+        primary_finished_at = (
+            select(primary_task.finished_at)
+            .where(
+                primary_task.task_id.in_(sint_task_ids),
+                primary_task.run_id == TaskModel.run_id,
+            )
+            .correlate(TaskModel)
+            .scalar_subquery()
         )
+        stmt = (
+            update(TaskModel)
+            .where(
+                TaskModel.run_id.in_(sint_run_ids),
+                TaskModel.finished_at.is_(None),
+            )
+            .values(
+                finished_at=primary_finished_at,
+                sub_status=sub_status,
+                details=details,
+                active_until=None,
+                token=None,
+            )
+        )
+        with self.session() as session:
+            session.execute(stmt)
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
@@ -1162,11 +1143,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if result:
             sint64_task_id = uint64_to_int64(task_id)
             # Check whether this task is referenced as a run's primary task
-            rows = self.query(
-                "SELECT run_id FROM run WHERE primary_task_id = :task_id",
-                {"task_id": sint64_task_id},
-            )
-            if rows:
+            with self.session() as session:
+                run_id = session.scalar(
+                    select(RunModel.run_id).where(
+                        RunModel.primary_task_id == sint64_task_id
+                    )
+                )
+            if run_id is not None:
                 # Stop all tasks of the run when the run is stopped
                 if sub_status == SubStatus.STOPPED:
                     finish_sub_status = SubStatus.STOPPED
@@ -1176,7 +1159,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     finish_sub_status = SubStatus.FAILED
                     finish_details = "Task failed because the run finished"
                 self._finish_run_tasks(
-                    [(rows[0]["run_id"], sint64_task_id)],
+                    [(run_id, sint64_task_id)],
                     sub_status=finish_sub_status,
                     details=finish_details,
                 )
@@ -1194,20 +1177,19 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             return
 
         # Check if any of the expired tasks is referenced as a run's primary task.
-        task_id_ph, task_id_params = build_sql_in_params(
-            [uint64_to_int64(task.task_id) for task in tasks], "task_id"
-        )
-        rows = self.query(
-            f"SELECT run_id, primary_task_id FROM run"
-            f" WHERE primary_task_id IN ({task_id_ph})",
-            task_id_params,
-        )
+        task_ids = [uint64_to_int64(task.task_id) for task in tasks]
+        with self.session() as session:
+            rows = session.execute(
+                select(RunModel.run_id, RunModel.primary_task_id).where(
+                    RunModel.primary_task_id.in_(task_ids)
+                )
+            ).all()
         if not rows:
             return
 
         # Fail any remaining tasks for expired runs
         self._finish_run_tasks(
-            [(row["run_id"], row["primary_task_id"]) for row in rows],
+            [(cast(int, run_id), primary_task_id) for run_id, primary_task_id in rows],
             sub_status=SubStatus.FAILED,
             details="Task failed because the run expired",
         )
@@ -1228,49 +1210,44 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         sint64_node_id = uint64_to_int64(node_id)
 
         current_dt = now()
-        query = """
-            UPDATE node
-            SET online_until = :online_until,
-                heartbeat_interval = :heartbeat_interval,
-                last_activated_at = CASE
-                    WHEN status != :online THEN :last_activated_at
-                    ELSE last_activated_at
-                END,
-                status = :online
-            WHERE node_id = :node_id AND status != :unregistered
-            RETURNING node_id
-        """
-        params: dict[str, Any] = {
-            "online_until": current_dt.timestamp()
-            + HEARTBEAT_PATIENCE * heartbeat_interval,
-            "heartbeat_interval": heartbeat_interval,
-            "last_activated_at": current_dt.isoformat(),
-            "online": NodeStatus.ONLINE,
-            "node_id": sint64_node_id,
-            "unregistered": NodeStatus.UNREGISTERED,
-        }
-
-        rows = self.query(query, params)
-        return len(rows) > 0
+        stmt = (
+            update(NodeModel)
+            .where(
+                NodeModel.node_id == sint64_node_id,
+                NodeModel.status != NodeStatus.UNREGISTERED,
+            )
+            .values(
+                online_until=current_dt.timestamp()
+                + HEARTBEAT_PATIENCE * heartbeat_interval,
+                heartbeat_interval=heartbeat_interval,
+                last_activated_at=case(
+                    (
+                        NodeModel.status != NodeStatus.ONLINE,
+                        current_dt.isoformat(),
+                    ),
+                    else_=NodeModel.last_activated_at,
+                ),
+                status=NodeStatus.ONLINE,
+            )
+            .returning(NodeModel.node_id)
+        )
+        with self.session() as session:
+            return session.scalar(stmt) is not None
 
     def get_valid_message_ins(self, message_id: str) -> dict[str, Any] | None:
         """Check if the Message exists and is valid (not expired).
 
         Return Message if valid.
         """
-        with self.session():
+        with self.session() as session:
             self._check_stored_messages({message_id})
-            query = """
-                SELECT *
-                FROM message_ins
-                WHERE message_id = :message_id
-            """
-            rows = self.query(query, {"message_id": message_id})
-            if not rows:
+            model = session.scalar(
+                select(MessageInsModel).where(MessageInsModel.message_id == message_id)
+            )
+            if model is None:
                 # Message does not exist
                 return None
-
-        return dict(rows[0])
+            return _message_model_to_dict(model)
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""
