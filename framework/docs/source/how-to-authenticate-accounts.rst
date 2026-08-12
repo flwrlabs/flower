@@ -43,11 +43,11 @@ Set the following environment variables on the SuperLink process:
     FLWR_OIDC_CLIENT_SECRET=<client_secret>
     FLWR_OIDC_VERIFY_TLS=1
 
-``FLWR_OIDC_ENABLED`` defaults to ``0``. ``FLWR_OIDC_VERIFY_TLS`` defaults to
-``1``. As with other Flower binary environment variables, use ``1`` for true and
-``0`` for false. Control authentication remains NoOp unless
-``FLWR_OIDC_ENABLED=1``, even when credentials are present.
-``FLWR_OIDC_VERIFY_TLS`` affects only requests to the OIDC provider.
+``FLWR_OIDC_ENABLED`` defaults to ``0``. ``FLWR_OIDC_VERIFY_TLS`` defaults to ``1``. As
+with other Flower binary environment variables, use ``1`` for true and ``0`` for false.
+Control authentication remains NoOp unless ``FLWR_OIDC_ENABLED=1``, even when
+credentials are present. ``FLWR_OIDC_VERIFY_TLS`` affects only requests to the OIDC
+provider.
 
 Start the SuperLink with these variables in its environment:
 
