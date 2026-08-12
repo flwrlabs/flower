@@ -106,6 +106,7 @@ def create_app(
     if config is None:
         is_simulation = False
         database = get_ee_linkstate_db()
+        superexec_auth_secret = None
         authn_plugin = load_control_authn_plugin()
         event_log_plugin = (
             load_control_event_log_plugin()
