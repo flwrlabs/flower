@@ -107,9 +107,7 @@ def create_app(
         is_simulation = False
         database = get_ee_linkstate_db()
         superexec_auth_secret = None
-        authn_plugin = load_control_authn_plugin(
-            os.getenv("FLWR_ACCOUNT_AUTH_CONFIG"), verify_tls_cert=True
-        )
+        authn_plugin = load_control_authn_plugin()
         event_log_plugin = (
             load_control_event_log_plugin()
             if os.getenv("FLWR_ENABLE_EVENT_LOG") == "1"

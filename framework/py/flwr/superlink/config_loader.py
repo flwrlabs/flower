@@ -15,17 +15,12 @@
 """Load SuperLink configuration and config-driven components."""
 
 
+import os
 import sys
-from collections.abc import Callable
 from dataclasses import dataclass
-from logging import WARN
-from pathlib import Path
 
-import yaml
-
-from flwr.common.constant import AUTHN_TYPE_YAML_KEY, AuthnType, EventLogWriterType
+from flwr.common.constant import AuthnType, EventLogWriterType
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.common.logger import log
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.license_plugin import LicensePlugin
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -170,72 +165,15 @@ def get_control_authn_plugins() -> dict[str, type[ControlAuthnPlugin]]:
     return ee_dict | {AuthnType.NOOP: NoOpControlAuthnPlugin}
 
 
-def load_control_authn_plugin(
-    config_path: str | None, verify_tls_cert: bool
-) -> ControlAuthnPlugin:
+def load_control_authn_plugin() -> ControlAuthnPlugin:
     """Obtain the configured authentication plugin."""
-    # Load the NoOp plugin if no authentication config path is provided
-    if config_path is None:
-        config_path = ""
-        config = {"authentication": {AUTHN_TYPE_YAML_KEY: AuthnType.NOOP}}
-    # Load YAML file
-    else:
-        try:
-            with Path(config_path).expanduser().open("r", encoding="utf-8") as file:
-                config = yaml.safe_load(file)
-        except yaml.YAMLError:
-            sys.exit(
-                f"Invalid account authentication configuration in '{config_path}': "
-                "the file is not valid YAML."
-            )
+    if os.getenv("FLWR_OIDC_ENABLED", "0") != "1":
+        return NoOpControlAuthnPlugin()
 
-    if not isinstance(config, dict):
-        sys.exit("Account authentication configuration must be a YAML mapping.")
-
-    unknown_sections = set(config) - {"authentication"}
-    if unknown_sections:
-        sections = ", ".join(sorted(str(section) for section in unknown_sections))
+    try:
+        plugin_cls = get_control_authn_plugins()[AuthnType.OIDC]
+    except KeyError:
         sys.exit(
-            "Unsupported top-level account authentication configuration "
-            f"section(s): {sections}. Only `authentication` is supported."
+            "OIDC account authentication is unavailable in this Flower distribution."
         )
-
-    if "authentication" not in config:
-        sys.exit("No authentication section is provided in the configuration.")
-    if not isinstance(config["authentication"], dict):
-        sys.exit("The authentication configuration must be a YAML mapping.")
-
-    def _load_plugin(
-        section: str,
-        yaml_key: str,
-        loader: Callable[[], dict[str, type[ControlAuthnPlugin]]],
-    ) -> ControlAuthnPlugin:
-        section_cfg = config.get(section, {})
-        auth_plugin_name = section_cfg.get(yaml_key, "")
-        try:
-            plugins = loader()
-            plugin_cls = plugins[auth_plugin_name]
-            return plugin_cls(Path(config_path), verify_tls_cert)
-        except KeyError:
-            if auth_plugin_name:
-                sys.exit(
-                    f"{yaml_key}: {auth_plugin_name} is not supported. "
-                    f"Please provide a valid {section} type in the configuration."
-                )
-            sys.exit(f"No {section} type is provided in the configuration.")
-
-    # Warn deprecated auth_type key
-    if authn_type := config["authentication"].pop("auth_type", None):
-        log(
-            WARN,
-            "The `auth_type` key in the authentication configuration is deprecated. "
-            "Use `%s` instead.",
-            AUTHN_TYPE_YAML_KEY,
-        )
-        config["authentication"][AUTHN_TYPE_YAML_KEY] = authn_type
-
-    return _load_plugin(
-        section="authentication",
-        yaml_key=AUTHN_TYPE_YAML_KEY,
-        loader=get_control_authn_plugins,
-    )
+    return plugin_cls()
