@@ -22,6 +22,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from threading import Lock
 from time import monotonic
+from types import NoneType
 from typing import Any, cast
 
 import click
@@ -714,15 +715,13 @@ def _parse_agents(payload: Any) -> list[_Agent]:
         display_name = raw_agent.get("display_name")
         description = raw_agent.get("description")
         fab_hash = raw_agent.get("fab_hash")
-        if not isinstance(app_spec, str) or (
-            fab_hash is not None and not isinstance(fab_hash, str)
+        if not (
+            isinstance(app_spec, str)
+            and re.fullmatch(APP_ID_PATTERN, app_spec) is not None
+            and isinstance(fab_hash, (str, NoneType))
+            and isinstance(display_name, (str, NoneType))
+            and isinstance(description, (str, NoneType))
         ):
-            raise click.ClickException("Invalid response from the agents API.")
-        if display_name is not None and not isinstance(display_name, str):
-            raise click.ClickException("Invalid response from the agents API.")
-        if description is not None and not isinstance(description, str):
-            raise click.ClickException("Invalid response from the agents API.")
-        if re.fullmatch(APP_ID_PATTERN, app_spec) is None:
             raise click.ClickException("Invalid response from the agents API.")
         display_name = display_name or app_spec
         description = description or display_name
