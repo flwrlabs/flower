@@ -171,32 +171,32 @@ stringData:
 ## Enable Account Authentication
 
 Account authentication can be enabled if you're using the Flower Enterprise Edition (EE) Docker images.
-This is configured in the `global.userAuth` section of your `values.yml` file.
+This is configured in the `global.accountAuth` section of your `values.yml` file.
 
 ### Example: Enabling OpenID Connect (OIDC) Authentication
 
 ```yaml
 global:
-  userAuth:
+  accountAuth:
     enabled: true
     config:
-      authentication:
-        authn_type: oidc
-        authn_url: https://<domain>/auth/device
-        token_url: https://<domain>/token
-        validate_url: https://<domain>/userinfo
-        oidc_client_id: <client_id>
-        oidc_client_secret: <client_secret>
+      FLWR_OIDC_ISSUER: https://<domain>/realms/<realm>
+      FLWR_OIDC_CLIENT_ID: <client_id>
+      FLWR_OIDC_CLIENT_SECRET: <client_secret>
+      FLWR_OIDC_VERIFY_TLS: "1"
 ```
 
 Explanation of Parameters:
 
-- `authn_type`: The authentication mechanism being used (e.g., oidc).
-- `authn_url`: The OpenID Connect authentication endpoint where users authenticate.
-- `token_url`: The URL for retrieving access tokens.
-- `validate_url`: The endpoint for validating account authentication.
-- `oidc_client_id`: The client ID issued by the authentication provider.
-- `oidc_client_secret`: The secret key associated with the client ID.
+- `FLWR_OIDC_ISSUER`: The OpenID Connect issuer.
+- `FLWR_OIDC_CLIENT_ID`: The client ID issued by the authentication provider.
+- `FLWR_OIDC_CLIENT_SECRET`: The corresponding client secret.
+- `FLWR_OIDC_VERIFY_TLS`: Whether to verify TLS certificates; defaults to `1`.
+
+The chart sets `FLWR_OIDC_ENABLED=1` when account authentication is enabled.
+As with other Flower binary environment variables, use `1` for true and `0` for
+false. Credentials alone do not enable Control authentication, and
+`FLWR_OIDC_VERIFY_TLS` affects only requests to the OIDC provider.
 
 ### Use an Existing Secret
 
@@ -205,25 +205,21 @@ to the name of the existing secret:
 
 ```yaml
 global:
-  userAuth:
+  accountAuth:
     enabled: true
     config: {}
-    existingSecret: "existing-account-auth-config"
+    existingSecret: "existing-oidc-config"
 ```
 
-Note that the existing secret must contain the key `account-auth-config.yml`:
+The existing Secret must contain the OIDC environment keys:
 
 ```yaml
 kind: Secret
 stringData:
-  account-auth-config.yml: |
-    authentication:
-      authn_type: oidc
-      authn_url: https://<domain>/auth/device
-      token_url: https://<domain>/token
-      validate_url: https://<domain>/userinfo
-      oidc_client_id: <client_id>
-      oidc_client_secret: <client_secret>
+  FLWR_OIDC_ISSUER: https://<domain>/realms/<realm>
+  FLWR_OIDC_CLIENT_ID: <client_id>
+  FLWR_OIDC_CLIENT_SECRET: <client_secret>
+  FLWR_OIDC_VERIFY_TLS: "1"
 ```
 
 ## Change Isolation Mode

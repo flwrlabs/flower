@@ -47,6 +47,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
 from flwr.supercore.corestate.utils_test import create_task_message
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 from .runtime_servicer import RuntimeServicer
@@ -72,9 +73,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         self.state.get_tasks.return_value = []
         self.servicer = _TestRuntimeServicer(self.state)
 
-    def _create_connector_task(
-        self, connector_ref: str, context: grpc.ServicerContext | None = None
-    ) -> CreateTaskResponse:
+    def _create_connector_task(self, connector_ref: str) -> CreateTaskResponse:
         """Create a connector task as an authenticated AgentApp task."""
         with patch(
             "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
@@ -85,7 +84,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
                     type=TaskType.CONNECTOR,
                     connector_ref=connector_ref,
                 ),
-                context if context is not None else Mock(),
+                Mock(),
             )
 
     def test_pull_pending_tasks_returns_pending_tasks(self) -> None:
@@ -228,8 +227,6 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_create_task_rejects_unbound_oauth_connector(self) -> None:
         """CreateTask should reject OAuth credentials unavailable to the run."""
         self.state.get_run_connector_refs.return_value = []
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
 
         with (
             patch.object(
@@ -237,28 +234,22 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
                 "OAUTH_FLOWS",
                 {"notion": Mock(connector_ref="notion")},
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(FlowerError) as error,
         ):
-            self._create_connector_task("notion", context)
+            self._create_connector_task("notion")
 
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.PERMISSION_DENIED,
-            "Connector is not available to this run.",
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
         )
         self.state.create_task.assert_not_called()
 
     def test_create_task_rejects_unknown_connector(self) -> None:
         """CreateTask should reject names absent from the connector registry."""
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
+        with self.assertRaises(FlowerError) as error:
+            self._create_connector_task("unknown")
 
-        with self.assertRaises(grpc.RpcError):
-            self._create_connector_task("unknown", context)
-
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.NOT_FOUND,
-            "Unsupported OAuth connector 'unknown'.",
-        )
+        self.assertEqual(error.exception.code, ApiErrorCode.CONNECTOR_NOT_FOUND)
         self.state.get_run_connector_refs.assert_not_called()
         self.state.create_task.assert_not_called()
 
@@ -305,7 +296,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
             requesting_task_id=789,
         )
 
-    def test_create_task_aborts_if_required_field_is_missing(self) -> None:
+    def test_create_task_rejects_missing_required_field(self) -> None:
         """CreateTask should validate task-type-specific required fields."""
         # Prepare
         test_cases = [
@@ -324,9 +315,6 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         ]
 
         for request, detail in test_cases:
-            context = Mock(spec=grpc.ServicerContext)
-            context.abort.side_effect = grpc.RpcError()
-
             with self.subTest(task_type=request.type):
                 with (
                     patch(
@@ -335,22 +323,21 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
                             task_id=789, run_id=123, type=TaskType.SERVER_APP
                         ),
                     ),
-                    self.assertRaises(grpc.RpcError),
+                    self.assertRaises(FlowerError) as error,
                 ):
-                    self.servicer.CreateTask(request, context)
+                    self.servicer.CreateTask(request, Mock())
 
-                context.abort.assert_called_once_with(
-                    grpc.StatusCode.FAILED_PRECONDITION,
-                    detail,
+                self.assertEqual(
+                    error.exception.code,
+                    ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
                 )
+                self.assertEqual(error.exception.message, detail)
                 self.state.create_task.assert_not_called()
 
-    def test_create_task_aborts_if_state_creation_fails(self) -> None:
+    def test_create_task_raises_if_state_creation_fails(self) -> None:
         """CreateTask should surface task creation failures as INTERNAL."""
         # Prepare
         self.state.create_task.return_value = None
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
         request = CreateTaskRequest(
             type=TaskType.MODEL,
             model_ref="models/abc",
@@ -362,14 +349,14 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
                 "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                 return_value=Mock(run_id=123, type=TaskType.SERVER_APP),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(FlowerError) as error,
         ):
-            self.servicer.CreateTask(request, context)
+            self.servicer.CreateTask(request, Mock())
 
         # Assert
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.INTERNAL,
-            "Failed to create task",
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_TASK_CREATION_FAILED,
         )
 
     def test_push_task_message_stores_message_for_authenticated_task(self) -> None:
@@ -400,29 +387,46 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(stored_message.metadata.src_task_id, 123)
         self.assertEqual(stored_message.metadata.dst_task_id, 456)
 
-    def test_push_task_message_aborts_when_state_rejects_message(self) -> None:
-        """PushTaskMessage should abort when CoreState cannot store the message."""
+    def test_push_task_message_rejects_mismatched_source_task(self) -> None:
+        """PushTaskMessage should reject a source other than the authenticated task."""
+        message = create_task_message(run_id=789, src_task_id=321, dst_task_id=456)
+        request = PushTaskMessageRequest(message=message_to_proto(message))
+
+        with (
+            patch(
+                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
+                return_value=Task(task_id=123, run_id=789),
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            self.servicer.PushTaskMessage(request, Mock())
+
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_INVALID_TASK_MESSAGE,
+        )
+        self.state.store_task_message.assert_not_called()
+
+    def test_push_task_message_raises_when_state_rejects_message(self) -> None:
+        """PushTaskMessage should raise when CoreState cannot store the message."""
         # Prepare
         self.state.store_task_message.return_value = False
         message = create_task_message(run_id=789, src_task_id=123, dst_task_id=456)
         request = PushTaskMessageRequest(message=message_to_proto(message))
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
-
         # Execute
         with (
             patch(
                 "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                 return_value=Task(task_id=123, run_id=789),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(FlowerError) as error,
         ):
-            self.servicer.PushTaskMessage(request, context)
+            self.servicer.PushTaskMessage(request, Mock())
 
         # Assert
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            "Task message could not be stored.",
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_INVALID_TASK_MESSAGE,
         )
 
     def test_push_task_events_derives_authenticated_task_identity(self) -> None:
@@ -479,7 +483,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
                 "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                 return_value=Task(task_id=123, run_id=789),
             ),
-            patch("flwr.supercore.servicer.runtime.runtime_servicer.log") as log_mock,
+            patch("flwr.supercore.servicer.runtime.runtime_handlers.log") as log_mock,
         ):
             response = self.servicer.PushTaskEvents(request, context)
 
@@ -548,7 +552,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(response.messages[0].metadata.src_node_id, SUPERLINK_NODE_ID)
         self.assertEqual(response.messages[0].metadata.dst_node_id, SUPERLINK_NODE_ID)
 
-    def test_create_task_aborts_if_requesting_task_type_is_not_allowed(self) -> None:
+    def test_create_task_rejects_disallowed_requesting_task_type(self) -> None:
         """CreateTask should reject task creation requests from non-app task types."""
         # Prepare
         disallowed_requesting_task_types = (
@@ -556,8 +560,6 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         ) | {"unknown"}
 
         for requesting_task_type in disallowed_requesting_task_types:
-            context = Mock(spec=grpc.ServicerContext)
-            context.abort.side_effect = grpc.RpcError()
             self.state.create_task.reset_mock()
 
             with self.subTest(requesting_task_type=requesting_task_type):
@@ -567,18 +569,17 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
                         "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                         return_value=Mock(run_id=123, type=requesting_task_type),
                     ),
-                    self.assertRaises(grpc.RpcError),
+                    self.assertRaises(FlowerError) as error,
                 ):
                     self.servicer.CreateTask(
                         CreateTaskRequest(type=TaskType.MODEL, model_ref="model"),
-                        context,
+                        Mock(),
                     )
 
                 # Assert
-                context.abort.assert_called_once_with(
-                    grpc.StatusCode.PERMISSION_DENIED,
-                    f"Task type '{requesting_task_type}' is not allowed to "
-                    "create tasks.",
+                self.assertEqual(
+                    error.exception.code,
+                    ApiErrorCode.RUNTIME_TASK_CREATION_NOT_ALLOWED,
                 )
                 self.state.create_task.assert_not_called()
 
