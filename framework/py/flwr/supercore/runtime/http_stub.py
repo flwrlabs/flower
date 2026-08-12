@@ -15,10 +15,15 @@
 """Protobuf-over-HTTP Runtime API client."""
 
 import secrets
+from typing import TypeVar
 
 import requests
+from google.protobuf.message import Message
 
+from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    ClaimTaskRequest,
+    ClaimTaskResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
 )
@@ -36,8 +41,7 @@ from flwr.supercore.constant import (
 from flwr.supercore.date import now
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 
-_PULL_PENDING_TASKS_PATH = "/v1/runtime/pull-pending-tasks"
-_PULL_PENDING_TASKS_METHOD = "/flwr.proto.Runtime/PullPendingTasks"
+ResponseT = TypeVar("ResponseT", bound=Message)
 
 
 class RuntimeHttpStub:
@@ -65,6 +69,44 @@ class RuntimeHttpStub:
         self, request: PullPendingTasksRequest
     ) -> PullPendingTasksResponse:
         """Pull pending tasks."""
+        return self._post(
+            path="/v1/runtime/pull-pending-tasks",
+            method="/flwr.proto.Runtime/PullPendingTasks",
+            request=request,
+            response_type=PullPendingTasksResponse,
+        )
+
+    def ClaimTask(  # pylint: disable=invalid-name
+        self, request: ClaimTaskRequest
+    ) -> ClaimTaskResponse:
+        """Claim a pending task."""
+        return self._post(
+            path="/v1/runtime/claim-task",
+            method="/flwr.proto.Runtime/ClaimTask",
+            request=request,
+            response_type=ClaimTaskResponse,
+        )
+
+    def GetRun(  # pylint: disable=invalid-name
+        self, request: GetRunRequest
+    ) -> GetRunResponse:
+        """Get run information."""
+        return self._post(
+            path="/v1/runtime/get-run",
+            method="/flwr.proto.Runtime/GetRun",
+            request=request,
+            response_type=GetRunResponse,
+        )
+
+    def _post(
+        self,
+        *,
+        path: str,
+        method: str,
+        request: Message,
+        response_type: type[ResponseT],
+    ) -> ResponseT:
+        """Send a SuperExec-authenticated protobuf request over HTTP."""
         headers = {"content-type": PROTOBUF_MEDIA_TYPE}
         if self._auth_secret is not None:
             timestamp = int(now().timestamp())
@@ -77,7 +119,7 @@ class RuntimeHttpStub:
                     SUPEREXEC_AUTH_BODY_SHA256_HEADER: body_sha256,
                     SUPEREXEC_AUTH_SIGNATURE_HEADER: compute_superexec_signature(
                         auth_secret=self._auth_secret,
-                        method=_PULL_PENDING_TASKS_METHOD,
+                        method=method,
                         timestamp=timestamp,
                         nonce=nonce,
                         body_sha256=body_sha256,
@@ -86,7 +128,7 @@ class RuntimeHttpStub:
             )
 
         response = self._session.post(
-            f"{self._base_url}{_PULL_PENDING_TASKS_PATH}",
+            f"{self._base_url}{path}",
             data=request.SerializeToString(deterministic=True),
             headers=headers,
             verify=self._verify,
@@ -94,7 +136,7 @@ class RuntimeHttpStub:
         )
         response.raise_for_status()
 
-        result = PullPendingTasksResponse()
+        result = response_type()
         result.ParseFromString(response.content)
         return result
 

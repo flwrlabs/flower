@@ -15,10 +15,8 @@
 """Flower ServerApp runtime."""
 
 
-from .http_stub import RuntimeHttpStub
 from .run_serverapp import run_serverapp
 
 __all__ = [
-    "RuntimeHttpStub",
     "run_serverapp",
 ]
