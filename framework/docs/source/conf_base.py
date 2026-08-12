@@ -184,6 +184,20 @@ exclude_patterns = [
     "changelog/v*.md" if current_version == "main" else "changelog/**",
 ]
 
+
+def _use_shared_changelog(app, docname, source):
+    """Avoid rendering release branches' historical changelog sources."""
+    if current_version != "main" and docname == "ref-changelog":
+        source[0] = (
+            Path(app.confdir) / "_templates" / "shared-changelog.md"
+        ).read_text(encoding="utf-8")
+
+
+def setup(app):
+    """Configure build-time source replacements."""
+    app.connect("source-read", _use_shared_changelog)
+
+
 # Sphinx redirects, implemented after the doc filename changes.
 # To prevent 404 errors and redirect to the new pages.
 redirects = {

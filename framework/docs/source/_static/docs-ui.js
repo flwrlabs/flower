@@ -308,7 +308,11 @@
       throw new Error("Shared changelog article was not found");
     }
     makeFetchedUrlsAbsolute(article, response.url);
-    return article;
+    const toc = parsedDocument.querySelector("aside.toc-drawer");
+    if (toc) {
+      makeFetchedUrlsAbsolute(toc, response.url);
+    }
+    return { article, toc };
   }
 
   async function loadSharedChangelog(versioningContainer) {
@@ -330,8 +334,17 @@
 
     for (const language of languages) {
       try {
-        const sharedArticle = await fetchSharedChangelog(docsBaseUrl, language);
-        currentArticle.innerHTML = sharedArticle.innerHTML;
+        const sharedChangelog = await fetchSharedChangelog(docsBaseUrl, language);
+        currentArticle.innerHTML = sharedChangelog.article.innerHTML;
+        const currentToc = document.querySelector("aside.toc-drawer");
+        if (sharedChangelog.toc && currentToc) {
+          currentToc.replaceWith(sharedChangelog.toc);
+          document
+            .querySelectorAll(".toc-overlay-icon.no-toc")
+            .forEach((element) => {
+              element.classList.remove("no-toc");
+            });
+        }
         const anchor = window.location.hash.slice(1);
         if (anchor) {
           requestAnimationFrame(() => {
