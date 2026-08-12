@@ -35,6 +35,7 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import aliased
 
 from flwr.app import Message
 from flwr.app.user_config import UserConfig
@@ -68,7 +69,6 @@ from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
 from flwr.supercore.utils import (
-    build_sql_in_params,
     int64_to_uint64,
     simulation_config_from_json,
     simulation_config_to_json,
@@ -918,35 +918,17 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if federation_config:
             fed_config_json = json.dumps(simulation_config_to_json(federation_config))
 
-        run_insert_query = """
-            INSERT INTO run
-            (run_id, fab_id, fab_version, fab_hash, override_config, federation_id,
-            primary_task_id, federation_config, usage_reported_at,
-            series_id, flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
-            VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
-            :federation_id, :primary_task_id, :federation_config,
-            :usage_reported_at, :series_id, :flwr_aid,
-            :bytes_sent, :bytes_recv, :clientapp_runtime)
-        """
-        task_insert_query = """
-            INSERT INTO task
-            (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
-             active_until, pending_at, starting_at, running_at, finished_at,
-             sub_status, details)
-            VALUES
-            (:task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
-             :active_until, :pending_at, :starting_at, :running_at, :finished_at,
-             :sub_status, :details)
-        """
-
         override_config_json = json.dumps(override_config)
         run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
 
-        with self.session():
-            query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
-            if rows[0]["cnt"] == 0:
+        with self.session() as session:
+            existing_run_id = session.scalar(
+                select(RunModel.run_id).where(
+                    RunModel.run_id == uint64_to_int64(run_id)
+                )
+            )
+            if existing_run_id is None:
                 current = now()
                 resolved_series_id = self.store_run_in_series(
                     run_id=run_id,
@@ -961,43 +943,41 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     run_id=run_id,
                     series_id=resolved_series_id,
                 )
-                self.query(
-                    run_insert_query,
-                    {
-                        "run_id": uint64_to_int64(run_id),
-                        "fab_id": fab_id or "",
-                        "fab_version": fab_version or "",
-                        "fab_hash": fab_hash or "",
-                        "override_config": override_config_json,
-                        "federation_id": federation_id,
-                        "primary_task_id": uint64_to_int64(task_id),
-                        "federation_config": fed_config_json,
-                        "usage_reported_at": "",
-                        "series_id": uint64_to_int64(resolved_series_id),
-                        "flwr_aid": flwr_aid or "",
-                        "bytes_sent": 0,
-                        "bytes_recv": 0,
-                        "clientapp_runtime": 0.0,
-                    },
+                session.execute(
+                    insert(RunModel).values(
+                        run_id=uint64_to_int64(run_id),
+                        fab_id=fab_id or "",
+                        fab_version=fab_version or "",
+                        fab_hash=fab_hash or "",
+                        override_config=override_config_json,
+                        federation_id=federation_id,
+                        primary_task_id=uint64_to_int64(task_id),
+                        federation_config=fed_config_json,
+                        usage_reported_at="",
+                        series_id=uint64_to_int64(resolved_series_id),
+                        flwr_aid=flwr_aid or "",
+                        bytes_sent=0,
+                        bytes_recv=0,
+                        clientapp_runtime=0.0,
+                    )
                 )
-                self.query(
-                    task_insert_query,
-                    {
-                        "task_id": uint64_to_int64(task_id),
-                        "type": primary_task_type,
-                        "run_id": uint64_to_int64(run_id),
-                        "fab_hash": fab_hash,
-                        "model_ref": None,
-                        "connector_ref": None,
-                        "token": None,
-                        "active_until": None,
-                        "pending_at": current,
-                        "starting_at": None,
-                        "running_at": None,
-                        "finished_at": None,
-                        "sub_status": "",
-                        "details": "",
-                    },
+                session.execute(
+                    insert(TaskModel).values(
+                        task_id=uint64_to_int64(task_id),
+                        type=primary_task_type,
+                        run_id=uint64_to_int64(run_id),
+                        fab_hash=fab_hash,
+                        model_ref=None,
+                        connector_ref=None,
+                        token=None,
+                        active_until=None,
+                        pending_at=current,
+                        starting_at=None,
+                        running_at=None,
+                        finished_at=None,
+                        sub_status="",
+                        details="",
+                    )
                 )
                 self.bind_connectors_to_run(
                     run_id=run_id,
@@ -1130,29 +1110,32 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         sint_run_ids = [pair[0] for pair in run_primary_pairs]
         sint_task_ids = [pair[1] for pair in run_primary_pairs]
-        run_id_ph, run_id_params = build_sql_in_params(sint_run_ids, "run_id")
-        pt_id_ph, pt_id_params = build_sql_in_params(sint_task_ids, "pt_id")
-
-        self.query(
-            f"""
-            UPDATE task
-            SET finished_at = (
-                    SELECT pt.finished_at FROM task pt
-                    WHERE pt.task_id IN ({pt_id_ph}) AND pt.run_id = task.run_id
-                ),
-                sub_status = :sub_status,
-                details = :details,
-                active_until = NULL,
-                token = NULL
-            WHERE run_id IN ({run_id_ph}) AND finished_at IS NULL
-            """,
-            {
-                **run_id_params,
-                **pt_id_params,
-                "sub_status": sub_status,
-                "details": details,
-            },
+        primary_task = aliased(TaskModel)
+        primary_finished_at = (
+            select(primary_task.finished_at)
+            .where(
+                primary_task.task_id.in_(sint_task_ids),
+                primary_task.run_id == TaskModel.run_id,
+            )
+            .correlate(TaskModel)
+            .scalar_subquery()
         )
+        stmt = (
+            update(TaskModel)
+            .where(
+                TaskModel.run_id.in_(sint_run_ids),
+                TaskModel.finished_at.is_(None),
+            )
+            .values(
+                finished_at=primary_finished_at,
+                sub_status=sub_status,
+                details=details,
+                active_until=None,
+                token=None,
+            )
+        )
+        with self.session() as session:
+            session.execute(stmt)
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
@@ -1160,11 +1143,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if result:
             sint64_task_id = uint64_to_int64(task_id)
             # Check whether this task is referenced as a run's primary task
-            rows = self.query(
-                "SELECT run_id FROM run WHERE primary_task_id = :task_id",
-                {"task_id": sint64_task_id},
-            )
-            if rows:
+            with self.session() as session:
+                run_id = session.scalar(
+                    select(RunModel.run_id).where(
+                        RunModel.primary_task_id == sint64_task_id
+                    )
+                )
+            if run_id is not None:
                 # Stop all tasks of the run when the run is stopped
                 if sub_status == SubStatus.STOPPED:
                     finish_sub_status = SubStatus.STOPPED
@@ -1174,7 +1159,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     finish_sub_status = SubStatus.FAILED
                     finish_details = "Task failed because the run finished"
                 self._finish_run_tasks(
-                    [(rows[0]["run_id"], sint64_task_id)],
+                    [(run_id, sint64_task_id)],
                     sub_status=finish_sub_status,
                     details=finish_details,
                 )
@@ -1192,20 +1177,19 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             return
 
         # Check if any of the expired tasks is referenced as a run's primary task.
-        task_id_ph, task_id_params = build_sql_in_params(
-            [uint64_to_int64(task.task_id) for task in tasks], "task_id"
-        )
-        rows = self.query(
-            f"SELECT run_id, primary_task_id FROM run"
-            f" WHERE primary_task_id IN ({task_id_ph})",
-            task_id_params,
-        )
+        task_ids = [uint64_to_int64(task.task_id) for task in tasks]
+        with self.session() as session:
+            rows = session.execute(
+                select(RunModel.run_id, RunModel.primary_task_id).where(
+                    RunModel.primary_task_id.in_(task_ids)
+                )
+            ).all()
         if not rows:
             return
 
         # Fail any remaining tasks for expired runs
         self._finish_run_tasks(
-            [(row["run_id"], row["primary_task_id"]) for row in rows],
+            [(cast(int, run_id), primary_task_id) for run_id, primary_task_id in rows],
             sub_status=SubStatus.FAILED,
             details="Task failed because the run expired",
         )
@@ -1255,19 +1239,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         Return Message if valid.
         """
-        with self.session():
+        with self.session() as session:
             self._check_stored_messages({message_id})
-            query = """
-                SELECT *
-                FROM message_ins
-                WHERE message_id = :message_id
-            """
-            rows = self.query(query, {"message_id": message_id})
-            if not rows:
+            model = session.scalar(
+                select(MessageInsModel).where(MessageInsModel.message_id == message_id)
+            )
+            if model is None:
                 # Message does not exist
                 return None
-
-        return dict(rows[0])
+            return _message_model_to_dict(model)
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""

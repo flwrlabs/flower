@@ -17,7 +17,6 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from pathlib import Path
 
 from flwr.supercore.auth.typing import (
     AccountAuthCredentials,
@@ -27,23 +26,10 @@ from flwr.supercore.auth.typing import (
 
 
 class ControlAuthnPlugin(ABC):
-    """Abstract Flower Authentication Plugin class for ControlServicer.
-
-    Parameters
-    ----------
-    account_auth_config_path : Path
-        Path to the YAML file containing the authentication configuration.
-    verify_tls_cert : bool
-        Boolean indicating whether to verify the TLS certificate
-        when making requests to the server.
-    """
+    """Abstract Flower Authentication Plugin class for ControlServicer."""
 
     @abstractmethod
-    def __init__(
-        self,
-        account_auth_config_path: Path,
-        verify_tls_cert: bool,
-    ):
+    def __init__(self) -> None:
         """Abstract constructor."""
 
     @abstractmethod
