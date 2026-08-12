@@ -1249,8 +1249,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if model is None:
                 # Message does not exist
                 return None
-
-        return _message_model_to_dict(model)
+            return _message_model_to_dict(model)
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""
