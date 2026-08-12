@@ -23,8 +23,6 @@ import pytest
 
 from flwr.cli.constant import CHAT_SUPERGRID_CONNECTION_NAME
 from flwr.cli.typing import SuperLinkConnection
-from flwr.proto.control_pb2 import ListFederationsResponse  # pylint: disable=E0611
-from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 
 chat_module = importlib.import_module("flwr.cli.chat")
 
@@ -71,9 +69,6 @@ def test_chat_runs_interactive_application() -> None:
     )
     channel = Mock()
     stub = Mock()
-    stub.ListFederations.return_value = ListFederationsResponse(
-        federations=[Federation(name="@flower/workspace")]
-    )
     auth_plugin = Mock()
 
     with (
@@ -99,8 +94,6 @@ def test_chat_runs_interactive_application() -> None:
 
     stub.ListFederations.assert_called_once()
     mock_init_channel.assert_called_once_with(superlink_connection, auth_plugin)
-    mock_chat_application.assert_called_once_with(
-        stub, "@flower/workspace", auth_plugin
-    )
+    mock_chat_application.assert_called_once_with(stub, None, auth_plugin)
     mock_chat_application.return_value.run.assert_called_once_with()
     channel.close.assert_called_once()

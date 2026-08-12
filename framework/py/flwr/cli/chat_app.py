@@ -20,6 +20,7 @@ import json
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from threading import Lock
 from time import monotonic
 from typing import Any, cast
 
@@ -80,7 +81,6 @@ from flwr.cli.constant import (
     CHAT_WEB_SEARCH_CONNECTOR_REF,
     CHAT_WELCOME_MESSAGE,
 )
-from flwr.common.constant import ACCESS_TOKEN_KEY
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartRunRequest,
@@ -93,7 +93,7 @@ from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import APP_ID_PATTERN, FLWR_SUPERGRID_API_URL
 from flwr.supercore.typing import JSONObject
 
-from .auth_plugin import CliAuthPlugin
+from .auth_plugin import CliAuthPlugin, OidcCliPlugin
 from .utils import flwr_cli_grpc_exc_handler
 
 
@@ -123,6 +123,14 @@ class _ChatCompleter(Completer):
         self.auth_plugin = auth_plugin
         self.federation = federation
         self.agents: list[_Agent] | None = None
+        self._agents_lock = Lock()
+
+    def load_agents(self) -> list[_Agent]:
+        """Load and cache the available agents."""
+        with self._agents_lock:
+            if self.agents is None:
+                self.agents = fetch_chat_agents(self.auth_plugin, self.federation)
+            return self.agents
 
     def get_completions(
         self, document: Document, _complete_event: CompleteEvent
@@ -146,16 +154,13 @@ class _ChatCompleter(Completer):
 
         if not text.startswith("@"):
             return
-        if self.agents is None:
-            try:
-                self.agents = fetch_chat_agents(self.auth_plugin, self.federation)
-            except (click.ClickException, requests.RequestException, ValueError):
-                self.agents = []
+        try:
+            agents = self.load_agents()
+        except click.ClickException:
+            return
 
         matches = [
-            agent
-            for agent in self.agents
-            if agent.app_spec.lower().startswith(text.lower())
+            agent for agent in agents if agent.app_spec.lower().startswith(text.lower())
         ]
         if not matches:
             return
@@ -344,7 +349,15 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
         selected_agent, prompt = _extract_agent_selection(prompt)
         if selected_agent is not None:
-            agent = _find_agent(selected_agent, self.completer.agents)
+            try:
+                agents = self.completer.load_agents()
+            except click.ClickException as exc:
+                self._append_transcript(
+                    "class:error", f"Error: {exc.format_message()}\n\n"
+                )
+                event.app.invalidate()
+                return
+            agent = _find_agent(selected_agent, agents)
             selected_fab_hash = agent.fab_hash if agent is not None else None
             if (
                 selected_agent != self.agent_app_spec
@@ -667,24 +680,15 @@ def fetch_chat_agents(
     auth_plugin: CliAuthPlugin, federation: str | None
 ) -> list[_Agent]:
     """Fetch agents available to the authenticated Flower account."""
-    metadata = auth_plugin.write_tokens_to_metadata([])
-    access_token = next(
-        (
-            value.decode("utf-8") if isinstance(value, bytes) else value
-            for key, value in metadata
-            if key == ACCESS_TOKEN_KEY
-        ),
-        None,
-    )
-    if access_token is None:
+    if not isinstance(auth_plugin, OidcCliPlugin) or not auth_plugin.access_token:
         raise click.ClickException("Missing authentication tokens. Please login first.")
-    headers = {"Authorization": f"Bearer {access_token}"}
+    headers = {"Authorization": f"Bearer {auth_plugin.access_token}"}
     url = f"{FLWR_SUPERGRID_API_URL}{CHAT_AGENTS_API_PATH}"
     try:
         response = requests.get(
             url,
             headers=headers,
-            params={"federation_id": federation or ""},
+            params={"federation_id": federation} if federation is not None else None,
             timeout=10,
         )
         response.raise_for_status()
@@ -697,37 +701,28 @@ def fetch_chat_agents(
 
 def _parse_agents(payload: Any) -> list[_Agent]:
     """Parse the user agents API response into completion entries."""
-    raw_agents = payload
-    if isinstance(payload, dict):
-        raw_agents = payload.get("agents", payload.get("apps", payload.get("data", [])))
-    if not isinstance(raw_agents, list):
-        return []
+    if not isinstance(payload, dict) or not isinstance(
+        raw_agents := payload.get("agents"), list
+    ):
+        raise click.ClickException("Invalid response from the agents API.")
 
     agents: list[_Agent] = []
     for raw_agent in raw_agents:
         if not isinstance(raw_agent, dict):
-            continue
-        raw_app_spec = raw_agent.get(
-            "app_id",
-            raw_agent.get("app_spec", raw_agent.get("fab_id", raw_agent.get("id"))),
-        )
-        if not isinstance(raw_app_spec, str):
-            continue
-        app_spec = raw_app_spec if raw_app_spec.startswith("@") else f"@{raw_app_spec}"
+            raise click.ClickException("Invalid response from the agents API.")
+        app_spec = raw_agent.get("app_id")
+        display_name = raw_agent.get("display_name")
+        description = raw_agent.get("description")
+        fab_hash = raw_agent.get("fab_hash")
+        if (
+            not isinstance(app_spec, str)
+            or not isinstance(display_name, str)
+            or not isinstance(description, str)
+            or (fab_hash is not None and not isinstance(fab_hash, str))
+        ):
+            raise click.ClickException("Invalid response from the agents API.")
         if re.fullmatch(APP_ID_PATTERN, app_spec) is None:
-            continue
-        raw_name = raw_agent.get("display_name", raw_agent.get("name"))
-        display_name = raw_name if isinstance(raw_name, str) else app_spec
-        raw_description = raw_agent.get(
-            "description", raw_agent.get("summary", display_name)
-        )
-        description = (
-            raw_description if isinstance(raw_description, str) else display_name
-        )
-        raw_fab_hash = raw_agent.get("fab_hash")
-        fab_hash = (
-            raw_fab_hash if isinstance(raw_fab_hash, str) and raw_fab_hash else None
-        )
+            raise click.ClickException("Invalid response from the agents API.")
         agents.append(_Agent(app_spec, display_name, description, fab_hash))
     return agents
 
@@ -740,9 +735,9 @@ def _extract_agent_selection(prompt: str) -> tuple[str | None, str]:
     return parts[0], parts[1] if len(parts) == 2 else ""
 
 
-def _find_agent(app_spec: str, agents: list[_Agent] | None) -> _Agent | None:
+def _find_agent(app_spec: str, agents: list[_Agent]) -> _Agent | None:
     """Find an agent by app spec."""
-    for agent in agents or []:
+    for agent in agents:
         if agent.app_spec == app_spec:
             return agent
     return None
