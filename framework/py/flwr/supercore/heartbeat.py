@@ -30,7 +30,7 @@ from flwr.common.constant import (
 )
 
 # pylint: disable=E0611
-from flwr.proto.appio_pb2 import SendTaskHeartbeatRequest
+from flwr.proto.runtime_pb2 import SendTaskHeartbeatRequest
 from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.retry import RetryInvoker, exponential
 

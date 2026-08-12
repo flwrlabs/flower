@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from flwr.proto.appio_pb2 import RecordTaskUsageRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import RecordTaskUsageRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskUsage  # pylint: disable=E0611
 from flwr.supercore.typing import JSONObject
 

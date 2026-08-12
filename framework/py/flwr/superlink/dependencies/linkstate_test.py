@@ -66,7 +66,6 @@ def _create_app_with_linkstate_factory(
     config.database = ":flwr-in-memory:"
     config.disable_grpc_api = not start_legacy_grpc
     config.authn_plugin = Mock()
-    config.authz_plugin = Mock()
     with (
         patch("flwr.superlink.main.get_federation_manager"),
         patch(

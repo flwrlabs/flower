@@ -41,7 +41,7 @@ from flwr.supercore.constant import (
 from flwr.supercore.date import now
 from flwr.supercore.utils import get_metadata_str
 
-from .appio_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
+from .runtime_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
 
 _SUPEREXEC_METHOD_NAMES = frozenset({"PullPendingTasks", "ClaimTask", "GetRun"})
 
@@ -217,7 +217,7 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         )
 
 
-def create_serverappio_superexec_auth_server_interceptor(
+def create_superlink_runtime_superexec_auth_server_interceptor(
     *,
     state_provider: Callable[[], _NonceState],
     master_secret: bytes,
@@ -230,7 +230,7 @@ def create_serverappio_superexec_auth_server_interceptor(
     )
 
 
-def create_clientappio_superexec_auth_server_interceptor(
+def create_supernode_runtime_superexec_auth_server_interceptor(
     *,
     state_provider: Callable[[], _NonceState],
     master_secret: bytes,

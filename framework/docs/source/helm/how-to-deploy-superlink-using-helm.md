@@ -171,32 +171,32 @@ stringData:
 ## Enable Account Authentication
 
 Account authentication can be enabled if you're using the Flower Enterprise Edition (EE) Docker images.
-This is configured in the `global.userAuth` section of your `values.yml` file.
+This is configured in the `global.accountAuth` section of your `values.yml` file.
 
 ### Example: Enabling OpenID Connect (OIDC) Authentication
 
 ```yaml
 global:
-  userAuth:
+  accountAuth:
     enabled: true
     config:
-      authentication:
-        authn_type: oidc
-        authn_url: https://<domain>/auth/device
-        token_url: https://<domain>/token
-        validate_url: https://<domain>/userinfo
-        oidc_client_id: <client_id>
-        oidc_client_secret: <client_secret>
+      FLWR_OIDC_ISSUER: https://<domain>/realms/<realm>
+      FLWR_OIDC_CLIENT_ID: <client_id>
+      FLWR_OIDC_CLIENT_SECRET: <client_secret>
+      FLWR_OIDC_VERIFY_TLS: "1"
 ```
 
 Explanation of Parameters:
 
-- `authn_type`: The authentication mechanism being used (e.g., oidc).
-- `authn_url`: The OpenID Connect authentication endpoint where users authenticate.
-- `token_url`: The URL for retrieving access tokens.
-- `validate_url`: The endpoint for validating account authentication.
-- `oidc_client_id`: The client ID issued by the authentication provider.
-- `oidc_client_secret`: The secret key associated with the client ID.
+- `FLWR_OIDC_ISSUER`: The OpenID Connect issuer.
+- `FLWR_OIDC_CLIENT_ID`: The client ID issued by the authentication provider.
+- `FLWR_OIDC_CLIENT_SECRET`: The corresponding client secret.
+- `FLWR_OIDC_VERIFY_TLS`: Whether to verify TLS certificates; defaults to `1`.
+
+The chart sets `FLWR_OIDC_ENABLED=1` when account authentication is enabled.
+As with other Flower binary environment variables, use `1` for true and `0` for
+false. Credentials alone do not enable Control authentication, and
+`FLWR_OIDC_VERIFY_TLS` affects only requests to the OIDC provider.
 
 ### Use an Existing Secret
 
@@ -205,136 +205,21 @@ to the name of the existing secret:
 
 ```yaml
 global:
-  userAuth:
+  accountAuth:
     enabled: true
     config: {}
-    existingSecret: "existing-account-auth-config"
+    existingSecret: "existing-oidc-config"
 ```
 
-Note that the existing secret must contain the key `account-auth-config.yml`:
+The existing Secret must contain the OIDC environment keys:
 
 ```yaml
 kind: Secret
 stringData:
-  account-auth-config.yml: |
-    authentication:
-      authn_type: oidc
-      authn_url: https://<domain>/auth/device
-      token_url: https://<domain>/token
-      validate_url: https://<domain>/userinfo
-      oidc_client_id: <client_id>
-      oidc_client_secret: <client_secret>
-```
-
-### Configuring OpenFGA
-
-The Flower server chart component supports OpenFGA as a fine-grained authorization service,
-but it is disabled by default.
-
-To enable OpenFGA change the following value in your `values.yml` file:
-
-```yaml
-openfga:
-  enabled: true
-```
-
-By default, OpenFGA will run with an in-memory store, which is non-persistent and suitable
-only for testing or development.
-
-OpenFGA supports persistent storage using PostgreSQL or MySQL:
-
-- To deploy OpenFGA with a new PostgreSQL/MySQL instance, enable the bundled chart configuration.
-- To connect to an existing database, provide the appropriate connection details via Helm values
-  (e.g., `openfga.datastore.uri`).
-
-For more information visit the official [OpenFGA Helm Chart Documentation](https://artifacthub.io/packages/helm/openfga/openfga/0.2.30).
-
-The following commands set up a store, authorization model, and inserts users (using tuples) into OpenFGA. Run these once the OpenFGA instance is deployed.
-
-Setup the authorization model and tuples:
-
-:::{dropdown} Authorization model file `model.fga`
-
-```text
-model
-  # We are using the 1.1 schema with type restrictions
-  schema 1.1
-
-# Define the 'flwr_aid' type to represent individual users in the system.
-type flwr_aid
-
-# Define the 'service' type to group users.
-type service
-  relations
-    # The 'has_access' relation defines users who have access to this service.
-    define has_access: [flwr_aid]
-```
-
-:::
-
-:::{dropdown} User permissions file `tuples.yaml`
-
-```yaml
-- user: flwr_aid:<OIDC_SUB_1>
-  relation: has_access
-  object: service:<your_grid_name>
-- user: flwr_aid:<OIDC_SUB_2>
-  relation: has_access
-  object: service:<your_grid_name>
-```
-
-:::
-
-Create store:
-
-```shell
-OPENFGA_URL="<OPENFGA_URL>"
-OPENFGA_STORE_NAME="<OPENFGA_STORE_NAME>"
-docker run --rm -v "$(pwd)":/app -w /app openfga/cli \
-  --api-url ${OPENFGA_URL} store create \
-  --name ${OPENFGA_STORE_NAME}
-```
-
-The response will include an `id` field, which is the OpenFGA store ID associated with the `OPENFGA_STORE_NAME` that was created.
-
-Get store ID (alternative way):
-
-```shell
-docker run --rm -v "$(pwd)":/app -w /app openfga/cli \
-  --api-url ${OPENFGA_URL} store list
-```
-
-Set OpenFGA store ID from previous step and write model:
-
-```shell
-OPENFGA_STORE_ID="<STORE_ID_FROM_EARLIER_STEP>"
-docker run --rm -v "$(pwd)":/app -w /app openfga/cli \
-  --api-url ${OPENFGA_URL} model write \
-  --store-id ${OPENFGA_STORE_ID} \
-  --file model.fga
-```
-
-Set OpenFGA model ID from previous step and write tuples:
-
-```shell
-OPENFGA_MODEL_ID="<MODEL_ID_FROM_EARLIER_STEP>"
-docker run --rm -v "$(pwd)":/app -w /app openfga/cli \
-  --api-url ${OPENFGA_URL} tuple write \
-  --store-id ${OPENFGA_STORE_ID} \
-  --model-id ${OPENFGA_MODEL_ID} \
-  --file tuples.yaml
-```
-
-Add a new `authorization` section under your existing `global.userAuth` configuration or directly within your existing secret, depending on your setup. Set the `OPENFGA_STORE_ID` and `OPENFGA_MODEL_ID` from the previous steps in the file:
-
-```yaml
-authorization:
-  authz_type: openfga
-  authz_url: <OPENFGA_URL>
-  store_id: <OPENFGA_STORE_ID>
-  model_id: <OPENFGA_MODEL_ID>
-  relation: has_access
-  object: service:<your_grid_name>
+  FLWR_OIDC_ISSUER: https://<domain>/realms/<realm>
+  FLWR_OIDC_CLIENT_ID: <client_id>
+  FLWR_OIDC_CLIENT_SECRET: <client_secret>
+  FLWR_OIDC_VERIFY_TLS: "1"
 ```
 
 ## Change Isolation Mode
@@ -950,9 +835,3 @@ global:
 | `superexec.taskExecutorNetworkPolicy.allowExternalEgress`             | Allow unrestricted egress from TaskExecutor Pods.                                                                                                                                                                                                                                                   | `false`                                   |
 | `superexec.taskExecutorNetworkPolicy.labels`                          | Additional labels for the TaskExecutor NetworkPolicy pod selector. These labels are also added to generated TaskExecutor Pod labels.                                                                                                                                                                | `{}`                                      |
 | `superexec.taskExecutorNetworkPolicy.extraEgress`                     | Add egress rules from TaskExecutor Pods to the Runtime API, proxies, registries, or other required services (ignored if allowExternalEgress=true).                                                                                                                                                  | `[]`                                      |
-
-### Component OpenFGA
-
-| Name              | Description                                    | Value   |
-| ----------------- | ---------------------------------------------- | ------- |
-| `openfga.enabled` | Enable the openfga subchart and deploy OpenFGA | `false` |
