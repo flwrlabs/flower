@@ -15,7 +15,6 @@
 """Tests for reusable protobuf-over-HTTP client interceptors."""
 
 from datetime import UTC, datetime
-from io import BytesIO
 from logging import WARN
 from unittest.mock import Mock, patch
 
@@ -54,7 +53,7 @@ def _context() -> ProtobufRequestContext:
     """Create a representative protobuf HTTP request context."""
     message = PullPendingTasksRequest()
     return ProtobufRequestContext(
-        method=_METHOD,
+        rpc_method=_METHOD,
         message=message,
         request=requests.Request("POST", "http://runtime.example").prepare(),
     )
@@ -68,7 +67,7 @@ def _response(
     """Create a requests response with a readable body."""
     response = requests.Response()
     response.status_code = status_code
-    response.raw = BytesIO(content)
+    response._content = content  # pylint: disable=protected-access
     response.headers.update(headers or {})
     return response
 
@@ -114,7 +113,7 @@ def test_superexec_auth_http_interceptor_skips_unprotected_request() -> None:
     """Leave requests outside the configured method set unsigned."""
     context = _context()
     context = ProtobufRequestContext(
-        method="/flwr.proto.Runtime/Other",
+        rpc_method="/flwr.proto.Runtime/Other",
         message=context.message,
         request=context.request,
     )

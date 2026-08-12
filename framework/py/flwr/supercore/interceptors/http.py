@@ -63,12 +63,12 @@ class SuperExecAuthHttpInterceptor:
         call_next: ProtobufCall,
     ) -> requests.Response:
         """Sign protected requests before sending them."""
-        if context.method in self._protected_methods:
+        if context.rpc_method in self._protected_methods:
             _add_headers(
                 context.request,
                 create_superexec_auth_metadata(
                     auth_secret=self._auth_secret,
-                    method=context.method,
+                    method=context.rpc_method,
                     request=context.message,
                 ),
             )
