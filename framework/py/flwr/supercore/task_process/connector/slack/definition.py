@@ -12,22 +12,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Slack provider definition."""
+"""Slack connector definition."""
 
-from ..definition import ConnectorDefinition, ProviderDefinition
+from ..definition import ConnectorDefinition, OAuth2Definition, ProviderDefinition
+from ..oauth import load_oauth_flow
 from .actions import ACTIONS
 from .executors import EXECUTORS
-from .oauth import SLACK_CONNECTOR_REF, get_configured_oauth_provider
+
+SLACK_CONNECTOR_REF = "slack"
+SLACK_USER_SCOPES = (
+    "search:read",
+    "channels:read",
+    "groups:read",
+    "im:read",
+    "mpim:read",
+    "channels:history",
+    "groups:history",
+    "im:history",
+    "mpim:history",
+)
 
 PROVIDER = ProviderDefinition(
     ref=SLACK_CONNECTOR_REF,
     display_name="Slack",
     description="Search and read messages, conversations, and threads.",
     actions=ACTIONS,
+    oauth=OAuth2Definition(
+        authorization_url="https://slack.com/oauth/v2/authorize",
+        token_url="https://slack.com/api/oauth.v2.access",
+        client_id_env="FLWR_SLACK_CLIENT_ID",
+        client_secret_env="FLWR_SLACK_CLIENT_SECRET",
+        redirect_uri_env="FLWR_SLACK_REDIRECT_URI",
+        scopes=SLACK_USER_SCOPES,
+        scope_parameter="user_scope",
+        scope_separator=",",
+        token_response_path=("authed_user",),
+        success_field="ok",
+    ),
 )
 
 CONNECTOR = ConnectorDefinition(
     provider=PROVIDER,
     executors=EXECUTORS,
-    oauth_provider=get_configured_oauth_provider(),
+    oauth_flow=load_oauth_flow(PROVIDER),
 )

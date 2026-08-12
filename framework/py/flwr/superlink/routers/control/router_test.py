@@ -45,16 +45,12 @@ from flwr.superlink.routers.control.router import router
 _ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
 
 
-def _create_app(
-    authn_plugin: Mock | None = None, authz_plugin: Mock | None = None
-) -> FastAPI:
+def _create_app(authn_plugin: Mock | None = None) -> FastAPI:
     """Create a minimal app containing the Control API stack."""
     authn_plugin = authn_plugin or Mock()
-    authz_plugin = authz_plugin or Mock()
     authn_plugin.validate_tokens_in_metadata.return_value = (True, _ACCOUNT)
-    authz_plugin.authorize.return_value = True
     app = FastAPI()
-    app.state.account_access_dep = AccountAccessDependency(authn_plugin, authz_plugin)
+    app.state.account_access_dep = AccountAccessDependency(authn_plugin)
     app.include_router(router)
     app.add_middleware(ProtobufTranslationMiddleware)
     app.add_middleware(ControlAuthenticationMiddleware)

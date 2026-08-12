@@ -214,8 +214,8 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
 
         with patch.object(
             connector_registry,
-            "OAUTH_CONNECTOR_PROVIDERS",
-            (Mock(connector_ref="notion"),),
+            "OAUTH_FLOWS",
+            {"notion": Mock(connector_ref="notion")},
         ):
             response = self._create_connector_task("notion")
 
@@ -234,8 +234,8 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         with (
             patch.object(
                 connector_registry,
-                "OAUTH_CONNECTOR_PROVIDERS",
-                (Mock(connector_ref="notion"),),
+                "OAUTH_FLOWS",
+                {"notion": Mock(connector_ref="notion")},
             ),
             self.assertRaises(grpc.RpcError),
         ):
@@ -479,7 +479,7 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
                 "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
                 return_value=Task(task_id=123, run_id=789),
             ),
-            patch("flwr.supercore.servicer.runtime.runtime_servicer.log") as log_mock,
+            patch("flwr.supercore.servicer.runtime.runtime_handlers.log") as log_mock,
         ):
             response = self.servicer.PushTaskEvents(request, context)
 

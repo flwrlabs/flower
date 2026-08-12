@@ -12,7 +12,7 @@ from flwr.clientapp import ClientApp
 
 # Load data and determine model shape
 train_x, train_y, test_x, test_y = jax_training.load_data()
-grad_fn = jax.grad(jax_training.loss_fn)
+grad_fn = jax.jit(jax.grad(jax_training.loss_fn))
 model_shape = train_x.shape[1:]
 
 

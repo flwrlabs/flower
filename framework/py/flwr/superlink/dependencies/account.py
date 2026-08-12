@@ -20,51 +20,38 @@ from fastapi.security.utils import get_authorization_scheme_param
 from flwr.common.constant import ACCESS_TOKEN_KEY
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.superlink.auth_plugin import (
-    ControlAuthnPlugin,
-    ControlAuthzPlugin,
-    NoOpControlAuthnPlugin,
-)
+from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
 
 class AccountAccessDependency:
-    """Authenticate and authorize a Control API request.
+    """Authenticate a Control API request.
 
     Instances are FastAPI dependencies. For example::
 
-        get_account = AccountAccessDependency(authn_plugin, authz_plugin)
+        get_account = AccountAccessDependency(authn_plugin)
 
         @router.get("/")
         def endpoint(account: Annotated[AccountInfo, Depends(get_account)]) -> None:
             ...
     """
 
-    def __init__(
-        self,
-        authn_plugin: ControlAuthnPlugin,
-        authz_plugin: ControlAuthzPlugin,
-    ) -> None:
+    def __init__(self, authn_plugin: ControlAuthnPlugin) -> None:
         self.authn_plugin = authn_plugin
-        self.authz_plugin = authz_plugin
 
     def __call__(
         self,
         request: Request,
     ) -> AccountInfo:
-        """Return the authenticated and authorized account for a request."""
-        metadata: list[tuple[str, str]]
-        if isinstance(self.authn_plugin, NoOpControlAuthnPlugin):
-            # The no-op plugin means account authentication is disabled. Still call
-            # it to obtain the synthetic account without requiring credentials.
-            metadata = []
-        else:
-            authorization_headers = request.headers.getlist("authorization")
-            if len(authorization_headers) != 1:
-                raise FlowerError(
-                    ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-                    "Expected exactly one Authorization header with a Bearer token.",
-                )
+        """Return the authenticated account for a request."""
+        authorization_headers = request.headers.getlist("authorization")
+        if len(authorization_headers) > 1:
+            raise FlowerError(
+                ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+                "Expected at most one Authorization header with a Bearer token.",
+            )
 
+        metadata: list[tuple[str, str]] = []
+        if authorization_headers:
             scheme, access_token = get_authorization_scheme_param(
                 authorization_headers[0]
             )
@@ -82,28 +69,21 @@ class AccountAccessDependency:
                 "Access token validation failed.",
             )
 
-        return self._authorize(
+        return self._require_account(
             account=account,
             missing_account_detail="Token validated, but account info not found",
         )
 
-    def _authorize(
+    def _require_account(
         self,
         account: AccountInfo | None,
         missing_account_detail: str,
     ) -> AccountInfo:
-        """Require account information and authorization."""
+        """Require account information from the authentication plugin."""
         if account is None:
             raise FlowerError(
                 ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
                 f"{missing_account_detail}: authentication plugin returned no account.",
-            )
-        if not self.authz_plugin.authorize(account):
-            raise FlowerError(
-                ApiErrorCode.NO_PERMISSIONS,
-                "Account authorization failed for "
-                f"flwr_aid={account.flwr_aid!r}, "
-                f"account_name={account.account_name!r}.",
             )
         return account
 

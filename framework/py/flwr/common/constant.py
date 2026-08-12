@@ -158,13 +158,8 @@ LOG_UPLOAD_INTERVAL = 0.2  # Minimum interval between two log uploads
 MAX_RETRY_DELAY = 20  # Maximum delay duration between two consecutive retries.
 
 # Constants for account authentication
-AUTHN_TYPE_JSON_KEY = "authn-type"  # For key name in JSON file
-AUTHN_TYPE_YAML_KEY = "authn_type"  # For key name in YAML file
 ACCESS_TOKEN_KEY = "flwr-oidc-access-token"
 REFRESH_TOKEN_KEY = "flwr-oidc-refresh-token"
-
-# Constants for account authorization
-AUTHZ_TYPE_YAML_KEY = "authz_type"  # For key name in YAML file
 
 # Constants for node authentication
 PUBLIC_KEY_HEADER = "flwr-public-key-bin"  # Must end with "-bin" for binary data
@@ -273,16 +268,6 @@ class AuthnType:
     OIDC = "oidc"
 
     def __new__(cls) -> AuthnType:
-        """Prevent instantiation."""
-        raise TypeError(f"{cls.__name__} cannot be instantiated.")
-
-
-class AuthzType:
-    """Account authorization types."""
-
-    NOOP = "noop"
-
-    def __new__(cls) -> AuthzType:
         """Prevent instantiation."""
         raise TypeError(f"{cls.__name__} cannot be instantiated.")
 

@@ -23,12 +23,13 @@ from flwr.supercore.typing import JSONObject, JSONValue
 
 from .. import registry
 from ..definition import ActionAccess
+from ..oauth import OAuthFlow
 from .actions import ACTIONS
+from .definition import ATTIO_CONNECTOR_REF, PROVIDER
 from .executors import AttioApiError
-from .oauth import ATTIO_CONNECTOR_REF, AttioOAuthProvider
 
 _HTTP_REQUEST = "flwr.supercore.task_process.connector.http.requests.request"
-_TOKEN_REQUEST = "flwr.supercore.task_process.connector.attio.oauth.requests.post"
+_TOKEN_REQUEST = "flwr.supercore.task_process.connector.oauth.requests.post"
 _CREDENTIALS: JSONObject = {"access_token": "attio-secret"}
 _REDIRECT_URI = "https://client.example/oauth/attio"
 
@@ -40,8 +41,9 @@ def _response(payload: object, status_code: int = 200) -> Mock:
     return response
 
 
-def _provider() -> AttioOAuthProvider:
-    return AttioOAuthProvider(
+def _flow() -> OAuthFlow:
+    return OAuthFlow(
+        PROVIDER,
         client_id="client-id",
         client_secret="client-secret",
         redirect_uri=_REDIRECT_URI,
@@ -103,7 +105,7 @@ def test_api_errors_are_secret_safe() -> None:
 
 def test_oauth_builds_url_and_exchanges_code() -> None:
     """OAuth should validate redirects and return Attio credentials."""
-    url = _provider().build_authorization_url(
+    url = _flow().build_authorization_url(
         redirect_uri=_REDIRECT_URI,
         state="oauth-state",
         pkce_challenge="shared-pkce-challenge",
@@ -112,11 +114,11 @@ def test_oauth_builds_url_and_exchanges_code() -> None:
     assert query["redirect_uri"] == [_REDIRECT_URI]
     assert "code_challenge" not in query
     with pytest.raises(ValueError):
-        _provider().resolve_redirect_uri("https://attacker.example/callback")
+        _flow().resolve_redirect_uri("https://attacker.example/callback")
 
     response = _response({"access_token": "attio-access"})
     with patch(_TOKEN_REQUEST, return_value=response) as post:
-        credentials, config = _provider().exchange_code(
+        credentials, config = _flow().exchange_code(
             code="authorization-code",
             redirect_uri=_REDIRECT_URI,
             pkce_verifier="shared-pkce-verifier",
@@ -132,7 +134,7 @@ def test_oauth_builds_url_and_exchanges_code() -> None:
         "redirect_uri": _REDIRECT_URI,
     }
     with pytest.raises(ValueError):
-        _provider().exchange_code(
+        _flow().exchange_code(
             code="authorization-code",
             redirect_uri="https://attacker.example/callback",
             pkce_verifier="shared-pkce-verifier",
