@@ -338,7 +338,9 @@
         currentArticle.innerHTML = sharedChangelog.article.innerHTML;
         const currentToc = document.querySelector("aside.toc-drawer");
         if (sharedChangelog.toc && currentToc) {
-          currentToc.replaceWith(sharedChangelog.toc);
+          currentToc.className = sharedChangelog.toc.className;
+          currentToc.innerHTML = sharedChangelog.toc.innerHTML;
+          initializeSharedChangelogToc(currentToc);
           document
             .querySelectorAll(".toc-overlay-icon.no-toc")
             .forEach((element) => {
@@ -366,6 +368,68 @@
     fallbackLink.href = `${docsBaseUrl}/main/en/changelog/index.html`;
     fallbackLink.textContent = "Open the changelog from main.";
     placeholder.appendChild(fallbackLink);
+  }
+
+  function initializeSharedChangelogToc(toc) {
+    const tocScroll = toc.querySelector(".toc-scroll");
+    const entries = Array.from(toc.querySelectorAll('.toc-tree a[href^="#"]'))
+      .map((link) => ({
+        link,
+        target: document.getElementById(link.hash.slice(1)),
+      }))
+      .filter(({ target }) => target);
+    if (!tocScroll || entries.length === 0) {
+      return;
+    }
+
+    let activeItem;
+    let frame;
+    const update = () => {
+      frame = undefined;
+      const headerHeight =
+        document.querySelector("header")?.getBoundingClientRect().height || 0;
+      const scrollPosition = window.scrollY + headerHeight + 40;
+      let activeEntry = entries[0];
+      for (const entry of entries) {
+        const top = entry.target.getBoundingClientRect().top + window.scrollY;
+        if (top > scrollPosition) {
+          break;
+        }
+        activeEntry = entry;
+      }
+
+      const nextActiveItem = activeEntry.link.closest("li");
+      if (!nextActiveItem || nextActiveItem === activeItem) {
+        return;
+      }
+      toc.querySelectorAll(".scroll-current").forEach((element) => {
+        element.classList.remove("scroll-current");
+      });
+      activeItem = nextActiveItem;
+      for (
+        let item = activeItem;
+        item && toc.contains(item);
+        item = item.parentElement?.closest("li")
+      ) {
+        item.classList.add("scroll-current");
+      }
+
+      const itemRect = activeItem.getBoundingClientRect();
+      const scrollRect = tocScroll.getBoundingClientRect();
+      if (itemRect.top < scrollRect.top) {
+        tocScroll.scrollTop -= scrollRect.top - itemRect.top;
+      } else if (itemRect.bottom > scrollRect.bottom) {
+        tocScroll.scrollTop += itemRect.bottom - scrollRect.bottom;
+      }
+    };
+    const scheduleUpdate = () => {
+      if (frame === undefined) {
+        frame = requestAnimationFrame(update);
+      }
+    };
+
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    update();
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
