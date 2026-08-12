@@ -22,7 +22,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Invitation  # pylint: disable=E0611
 from flwr.supercore.constant import ActionType
 from flwr.supercore.typing import ActionContext
-from flwr.superlink.federation.typing import Federation
+from flwr.superlink.federation.typing import Federation, FederationAgent
 
 if TYPE_CHECKING:
     from flwr.server.superlink.linkstate.linkstate import LinkState
@@ -80,6 +80,24 @@ class FederationManager(ABC):
     @abstractmethod
     def get_details(self, federation_id: str) -> Federation:
         """Get details of the federation."""
+
+    @abstractmethod
+    def list_agents(self, federation_id: str) -> list[FederationAgent]:
+        """List agents associated with a federation."""
+
+    @abstractmethod
+    def upsert_agent(
+        self,
+        federation_id: str,
+        app_id: str,
+        fab_hash: str | None,
+        created_by: str,
+    ) -> FederationAgent:
+        """Create or update an agent association in a federation."""
+
+    @abstractmethod
+    def delete_agent(self, flwr_aid: str, federation_id: str, agent_id: str) -> bool:
+        """Delete an agent association from a federation."""
 
     @abstractmethod
     def get_simulation_config(self, federation_id: str) -> SimulationConfig | None:

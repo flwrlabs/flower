@@ -134,6 +134,16 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.ListFederationsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.ListFederationsResponse.FromString,
                 _registered_method=True)
+        self.ListFederationAgents = channel.unary_unary(
+                '/flwr.proto.Control/ListFederationAgents',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListFederationAgentsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListFederationAgentsResponse.FromString,
+                _registered_method=True)
+        self.DeleteFederationAgent = channel.unary_unary(
+                '/flwr.proto.Control/DeleteFederationAgent',
+                request_serializer=flwr_dot_proto_dot_control__pb2.DeleteFederationAgentRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.DeleteFederationAgentResponse.FromString,
+                _registered_method=True)
         self.ShowFederation = channel.unary_unary(
                 '/flwr.proto.Control/ShowFederation',
                 request_serializer=flwr_dot_proto_dot_control__pb2.ShowFederationRequest.SerializeToString,
@@ -344,6 +354,20 @@ class ControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListFederationAgents(self, request, context):
+        """List agents in a Federation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteFederationAgent(self, request, context):
+        """Delete an agent from a Federation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def ShowFederation(self, request, context):
         """Show Federation
         """
@@ -541,6 +565,16 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.ListFederations,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ListFederationsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.ListFederationsResponse.SerializeToString,
+            ),
+            'ListFederationAgents': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListFederationAgents,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListFederationAgentsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListFederationAgentsResponse.SerializeToString,
+            ),
+            'DeleteFederationAgent': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteFederationAgent,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.DeleteFederationAgentRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.DeleteFederationAgentResponse.SerializeToString,
             ),
             'ShowFederation': grpc.unary_unary_rpc_method_handler(
                     servicer.ShowFederation,
@@ -1148,6 +1182,60 @@ class Control(object):
             '/flwr.proto.Control/ListFederations',
             flwr_dot_proto_dot_control__pb2.ListFederationsRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.ListFederationsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListFederationAgents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListFederationAgents',
+            flwr_dot_proto_dot_control__pb2.ListFederationAgentsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListFederationAgentsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteFederationAgent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/DeleteFederationAgent',
+            flwr_dot_proto_dot_control__pb2.DeleteFederationAgentRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.DeleteFederationAgentResponse.FromString,
             options,
             channel_credentials,
             insecure,

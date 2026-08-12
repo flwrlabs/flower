@@ -27,7 +27,6 @@ from logging import ERROR, INFO
 from typing import cast
 
 import requests
-
 from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
 from flwr.app.user_config import UserConfig
 from flwr.cli.utils import validate_federation_name
@@ -70,6 +69,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteFederationAgentRequest,
+    DeleteFederationAgentResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -82,6 +83,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAutomationsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
+    ListFederationAgentsRequest,
+    ListFederationAgentsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -122,7 +125,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UnregisterNodeResponse,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
+from flwr.proto.federation_pb2 import (
+    Federation,  # pylint: disable=E0611
+    FederationAgent,
+)
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
@@ -579,6 +585,14 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 f"flwr_aid={flwr_aid}, federation_id={federation_id}, "
                 f"fab_id={fab_id}, fab_version={fab_version}, "
                 f"fab_hash={fab_hash}, primary_task_type={primary_task_type}.",
+            )
+
+        if primary_task_type == TaskType.AGENT_APP:
+            state.federation_manager.upsert_agent(
+                federation_id=federation_id,
+                app_id=f"@{fab_id}",
+                fab_hash=fab_hash,
+                created_by=flwr_aid,
             )
 
         run = state.get_run_info(run_ids=[run_id])[0]
@@ -1284,6 +1298,44 @@ def list_federations(
             for fed in federations
         ]
     )
+
+
+def list_federation_agents(
+    request: ListFederationAgentsRequest, account: AccountInfo, state: LinkState
+) -> ListFederationAgentsResponse:
+    """List agents associated with a federation."""
+    federation_id = request.federation_id
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    return ListFederationAgentsResponse(
+        agents=[
+            FederationAgent(
+                id=agent.id,
+                federation_id=agent.federation_id,
+                app_id=agent.app_id,
+                fab_hash=agent.fab_hash,
+            )
+            for agent in state.federation_manager.list_agents(federation_id)
+        ]
+    )
+
+
+def delete_federation_agent(
+    request: DeleteFederationAgentRequest, account: AccountInfo, state: LinkState
+) -> DeleteFederationAgentResponse:
+    """Delete an agent association from a federation."""
+    federation_id = request.federation_id
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    if not state.federation_manager.delete_agent(
+        flwr_aid=account.flwr_aid,
+        federation_id=federation_id,
+        agent_id=request.agent_id,
+    ):
+        raise FlowerError(
+            ApiErrorCode.FEDERATION_AGENT_NOT_FOUND,
+            f"Agent '{request.agent_id}' not found in federation "
+            f"'{federation_id}'.",
+        )
+    return DeleteFederationAgentResponse()
 
 
 def show_federation(

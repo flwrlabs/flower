@@ -18,8 +18,6 @@
 from unittest.mock import Mock
 
 import pytest
-from parameterized import parameterized
-
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
@@ -34,6 +32,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.typing import ActionContext
 from flwr.superlink.federation.typing import Federation
+from parameterized import parameterized
 
 from .noop_federation_manager import NoOpFederationManager
 
@@ -272,6 +271,25 @@ def test_get_federations() -> None:
     assert result2[0].description == NOOP_FEDERATION_DESCRIPTION
     assert result2[0].archived is False
     assert result2[0].simulation is False
+
+
+def test_upsert_list_and_delete_agent() -> None:
+    """Test in-memory federation agent management."""
+    manager = NoOpFederationManager()
+
+    created = manager.upsert_agent(
+        NOOP_FEDERATION_ID, "@alice/research-agent", "hash-1", NOOP_FLWR_AID
+    )
+    updated = manager.upsert_agent(
+        NOOP_FEDERATION_ID, "@alice/research-agent", "hash-2", NOOP_FLWR_AID
+    )
+
+    assert updated.id == created.id
+    assert updated.fab_hash == "hash-2"
+    assert manager.list_agents(NOOP_FEDERATION_ID) == [updated]
+    assert manager.delete_agent(NOOP_FLWR_AID, NOOP_FEDERATION_ID, updated.id)
+    assert manager.list_agents(NOOP_FEDERATION_ID) == []
+    assert not manager.delete_agent(NOOP_FLWR_AID, NOOP_FEDERATION_ID, updated.id)
 
 
 def test_simulation_runtime_flag_is_reflected() -> None:

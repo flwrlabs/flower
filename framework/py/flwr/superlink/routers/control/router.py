@@ -17,7 +17,6 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
@@ -31,6 +30,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteFederationAgentRequest,
+    DeleteFederationAgentResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
@@ -39,6 +40,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetRunSeriesResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
+    ListFederationAgentsRequest,
+    ListFederationAgentsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -225,6 +228,26 @@ def list_federations(
 ) -> ListFederationsResponse:
     """List federations."""
     return control_handlers.list_federations(request, account, linkstate)
+
+
+@router.post("/list-federation-agents")
+def list_federation_agents(
+    request: Annotated[ListFederationAgentsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListFederationAgentsResponse:
+    """List agents associated with a federation."""
+    return control_handlers.list_federation_agents(request, account, linkstate)
+
+
+@router.post("/delete-federation-agent")
+def delete_federation_agent(
+    request: Annotated[DeleteFederationAgentRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> DeleteFederationAgentResponse:
+    """Delete an agent association from a federation."""
+    return control_handlers.delete_federation_agent(request, account, linkstate)
 
 
 @router.post("/show-federation")

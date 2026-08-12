@@ -27,6 +27,8 @@ from flwr.common.constant import NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
+    ListFederationAgentsRequest,
+    ListFederationAgentsResponse,
     ListRunsRequest,
     ListRunsResponse,
 )
@@ -42,6 +44,7 @@ from flwr.supercore.protobuf.translation import (
 from flwr.supercore.run import Run
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
+from flwr.superlink.federation.typing import FederationAgent
 from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
 from flwr.superlink.routers.control.router import router
 from flwr.superlink.servicer.control import control_handlers
@@ -149,6 +152,46 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
         ascending=False,
         limit=1,
     )
+
+
+def test_list_federation_agents_returns_persisted_associations() -> None:
+    """ListFederationAgents serializes associations from FederationManager."""
+    linkstate = Mock(spec=LinkState)
+    manager = linkstate.federation_manager
+    manager.has_member.return_value = True
+    manager.list_agents.return_value = [
+        FederationAgent(
+            id="fa_1",
+            federation_id="@alice/research",
+            app_id="@alice/research-agent",
+            fab_hash=None,
+            created_by=_ACCOUNT.flwr_aid,
+            created_at="2026-08-12T12:00:00+00:00",
+        )
+    ]
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: linkstate
+
+    response = TestClient(app).post(
+        "/v1/control/list-federation-agents",
+        content=ListFederationAgentsRequest(
+            federation_id="@alice/research"
+        ).SerializeToString(),
+        headers={
+            "authorization": "Bearer access-token",
+            "content-type": PROTOBUF_MEDIA_TYPE,
+        },
+    )
+    proto_response = ListFederationAgentsResponse.FromString(response.content)
+
+    assert response.status_code == 200
+    assert len(proto_response.agents) == 1
+    assert proto_response.agents[0].id == "fa_1"
+    assert not proto_response.agents[0].HasField("fab_hash")
+    manager.has_member.assert_called_once_with(
+        _ACCOUNT.flwr_aid, "@alice/research"
+    )
+    manager.list_agents.assert_called_once_with("@alice/research")
 
 
 def test_list_runs_rejects_invalid_token_without_refresh() -> None:

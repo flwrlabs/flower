@@ -255,6 +255,11 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_400_BAD_REQUEST,
         public_message="Invalid automation request.",
     ),
+    ApiErrorCode.FEDERATION_AGENT_NOT_FOUND: ApiErrorSpec(
+        status_code=StatusCode.NOT_FOUND,
+        http_status_code=status.HTTP_404_NOT_FOUND,
+        public_message="Federation agent not found.",
+    ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,

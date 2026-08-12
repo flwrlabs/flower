@@ -21,9 +21,6 @@ from typing import cast
 
 from fastapi import Request
 from fastapi.responses import Response, StreamingResponse
-from google.protobuf.message import DecodeError, Message
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AddNodeToFederationRequest,
@@ -31,10 +28,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationRequest,
     CreateFederationRequest,
     CreateInvitationRequest,
+    DeleteFederationAgentRequest,
     GetAuthTokensRequest,
     GetLoginDetailsRequest,
     GetRunSeriesRequest,
     ListAutomationsRequest,
+    ListFederationAgentsRequest,
     ListFederationsRequest,
     ListInvitationsRequest,
     ListNodesRequest,
@@ -59,8 +58,8 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectRequest,
 )
 from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
-from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    ClaimTaskRequest,
+from flwr.proto.runtime_pb2 import (
+    ClaimTaskRequest,  # pylint: disable=E0611
     CreateTaskRequest,
     GetConnectorRequest,
     GetNodesRequest,
@@ -81,6 +80,8 @@ from flwr.supercore.protobuf.constants import (
     PROTOBUF_STREAM_MEDIA_TYPE,
 )
 from flwr.supercore.protobuf.framing import frame_message
+from google.protobuf.message import DecodeError, Message
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 RouteKey = tuple[str, str]
 
@@ -99,6 +100,8 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/unregister-node"): UnregisterNodeRequest,
     ("POST", "/v1/control/list-nodes"): ListNodesRequest,
     ("POST", "/v1/control/list-federations"): ListFederationsRequest,
+    ("POST", "/v1/control/list-federation-agents"): ListFederationAgentsRequest,
+    ("POST", "/v1/control/delete-federation-agent"): DeleteFederationAgentRequest,
     ("POST", "/v1/control/show-federation"): ShowFederationRequest,
     ("POST", "/v1/control/create-federation"): CreateFederationRequest,
     ("POST", "/v1/control/archive-federation"): ArchiveFederationRequest,

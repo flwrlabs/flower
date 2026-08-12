@@ -95,6 +95,14 @@ service Control {
   rpc ListFederations(ListFederationsRequest)
       returns (ListFederationsResponse) {}
 
+  // List agents in a Federation
+  rpc ListFederationAgents(ListFederationAgentsRequest)
+      returns (ListFederationAgentsResponse) {}
+
+  // Delete an agent from a Federation
+  rpc DeleteFederationAgent(DeleteFederationAgentRequest)
+      returns (DeleteFederationAgentResponse) {}
+
   // Show Federation
   rpc ShowFederation(ShowFederationRequest) returns (ShowFederationResponse) {}
 
@@ -291,6 +299,15 @@ message ListNodesResponse {
 
 message ListFederationsRequest {}
 message ListFederationsResponse { repeated Federation federations = 1; }
+
+message ListFederationAgentsRequest { string federation_id = 1; }
+message ListFederationAgentsResponse { repeated FederationAgent agents = 1; }
+
+message DeleteFederationAgentRequest {
+  string federation_id = 1;
+  string agent_id = 2;
+}
+message DeleteFederationAgentResponse {}
 
 message ShowFederationRequest { string federation_name = 1; }
 message ShowFederationResponse {

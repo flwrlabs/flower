@@ -17,7 +17,6 @@
 from collections.abc import Generator
 
 import grpc
-
 from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -36,6 +35,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteFederationAgentRequest,
+    DeleteFederationAgentResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -48,6 +49,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAutomationsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
+    ListFederationAgentsRequest,
+    ListFederationAgentsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -286,6 +289,22 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     ) -> ListFederationsResponse:
         """List all SuperNodes."""
         return control_handlers.list_federations(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def ListFederationAgents(
+        self, request: ListFederationAgentsRequest, context: grpc.ServicerContext
+    ) -> ListFederationAgentsResponse:
+        """List agents associated with a federation."""
+        return control_handlers.list_federation_agents(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def DeleteFederationAgent(
+        self, request: DeleteFederationAgentRequest, context: grpc.ServicerContext
+    ) -> DeleteFederationAgentResponse:
+        """Delete an agent association from a federation."""
+        return control_handlers.delete_federation_agent(
             request, _get_account(), self.linkstate_factory.state()
         )
 

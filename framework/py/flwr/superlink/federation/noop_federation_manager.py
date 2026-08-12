@@ -15,12 +15,13 @@
 """NoOp implementation of FederationManager."""
 
 
+import secrets
 from typing import cast
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-from flwr.proto.federation_pb2 import (  # pylint: disable=E0611
-    Account,
+from flwr.proto.federation_pb2 import (
+    Account,  # pylint: disable=E0611
     Invitation,
     Member,
 )
@@ -30,9 +31,10 @@ from flwr.supercore.constant import (
     NOOP_FEDERATION_ID,
     ActionType,
 )
+from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.typing import ActionContext
-from flwr.superlink.federation.typing import Federation
+from flwr.superlink.federation.typing import Federation, FederationAgent
 
 from .federation_manager import FederationManager
 
@@ -57,6 +59,7 @@ class NoOpFederationManager(FederationManager):
         if self._simulation:
             self._simulation_config = SimulationConfig()
             self._simulation_config.CopyFrom(DEFAULT_SIMULATION_CONFIG)
+        self._agents: dict[str, FederationAgent] = {}
 
     def exists(self, federation_id: str) -> bool:
         """Check if a federation exists."""
@@ -121,6 +124,47 @@ class NoOpFederationManager(FederationManager):
             simulation=self._simulation,
             config=self._simulation_config,
         )
+
+    def list_agents(self, federation_id: str) -> list[FederationAgent]:
+        """List agents associated with the federation."""
+        if not self.exists(federation_id):
+            raise ValueError(f"Federation '{federation_id}' does not exist.")
+        return sorted(self._agents.values(), key=lambda agent: agent.created_at)
+
+    def upsert_agent(
+        self,
+        federation_id: str,
+        app_id: str,
+        fab_hash: str | None,
+        created_by: str,
+    ) -> FederationAgent:
+        """Create or update an agent association in the federation."""
+        if not self.has_member(created_by, federation_id):
+            raise ValueError(f"Account '{created_by}' is not a federation member.")
+        existing = next(
+            (agent for agent in self._agents.values() if agent.app_id == app_id),
+            None,
+        )
+        agent = FederationAgent(
+            id=existing.id if existing else f"fa_{secrets.token_urlsafe(16)}",
+            federation_id=federation_id,
+            app_id=app_id,
+            fab_hash=fab_hash,
+            created_by=existing.created_by if existing else created_by,
+            created_at=existing.created_at if existing else now().isoformat(),
+        )
+        self._agents[agent.id] = agent
+        return agent
+
+    def delete_agent(self, flwr_aid: str, federation_id: str, agent_id: str) -> bool:
+        """Delete an agent association from the federation."""
+        if not self.has_member(flwr_aid, federation_id):
+            return False
+        agent = self._agents.get(agent_id)
+        if agent is None or agent.federation_id != federation_id:
+            return False
+        del self._agents[agent_id]
+        return True
 
     def get_simulation_config(self, federation_id: str) -> SimulationConfig | None:
         """Get the simulation configuration."""

@@ -116,6 +116,32 @@ class Federation(google.protobuf.message.Message):
 global___Federation = Federation
 
 @typing.final
+class FederationAgent(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    FEDERATION_ID_FIELD_NUMBER: builtins.int
+    APP_ID_FIELD_NUMBER: builtins.int
+    FAB_HASH_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    federation_id: builtins.str
+    app_id: builtins.str
+    fab_hash: builtins.str
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        federation_id: builtins.str = ...,
+        app_id: builtins.str = ...,
+        fab_hash: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_fab_hash", b"_fab_hash", "fab_hash", b"fab_hash"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_fab_hash", b"_fab_hash", "app_id", b"app_id", "fab_hash", b"fab_hash", "federation_id", b"federation_id", "id", b"id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_fab_hash", b"_fab_hash"]) -> typing.Literal["fab_hash"] | None: ...
+
+global___FederationAgent = FederationAgent
+
+@typing.final
 class Invitation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

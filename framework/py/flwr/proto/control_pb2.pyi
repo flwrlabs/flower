@@ -858,6 +858,65 @@ class ListFederationsResponse(google.protobuf.message.Message):
 global___ListFederationsResponse = ListFederationsResponse
 
 @typing.final
+class ListFederationAgentsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_ID_FIELD_NUMBER: builtins.int
+    federation_id: builtins.str
+    def __init__(
+        self,
+        *,
+        federation_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation_id", b"federation_id"]) -> None: ...
+
+global___ListFederationAgentsRequest = ListFederationAgentsRequest
+
+@typing.final
+class ListFederationAgentsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AGENTS_FIELD_NUMBER: builtins.int
+    @property
+    def agents(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.federation_pb2.FederationAgent]: ...
+    def __init__(
+        self,
+        *,
+        agents: collections.abc.Iterable[flwr.proto.federation_pb2.FederationAgent] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agents", b"agents"]) -> None: ...
+
+global___ListFederationAgentsResponse = ListFederationAgentsResponse
+
+@typing.final
+class DeleteFederationAgentRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_ID_FIELD_NUMBER: builtins.int
+    AGENT_ID_FIELD_NUMBER: builtins.int
+    federation_id: builtins.str
+    agent_id: builtins.str
+    def __init__(
+        self,
+        *,
+        federation_id: builtins.str = ...,
+        agent_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agent_id", b"agent_id", "federation_id", b"federation_id"]) -> None: ...
+
+global___DeleteFederationAgentRequest = DeleteFederationAgentRequest
+
+@typing.final
+class DeleteFederationAgentResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___DeleteFederationAgentResponse = DeleteFederationAgentResponse
+
+@typing.final
 class ShowFederationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

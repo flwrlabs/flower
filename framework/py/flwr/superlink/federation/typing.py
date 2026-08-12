@@ -35,3 +35,15 @@ class Federation:  # pylint: disable=R0902
     archived: bool
     simulation: bool
     config: SimulationConfig | None
+
+
+@dataclass(frozen=True)
+class FederationAgent:
+    """Agent associated with a federation."""
+
+    id: str
+    federation_id: str
+    app_id: str
+    fab_hash: str | None
+    created_by: str
+    created_at: str

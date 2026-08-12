@@ -41,6 +41,13 @@ message Federation {
   SimulationConfig config = 8; // Added in v1.28.0
 }
 
+message FederationAgent {
+  string id = 1;
+  string federation_id = 2;
+  string app_id = 3;
+  optional string fab_hash = 4;
+}
+
 message Invitation {
   string federation_name = 1;
   Account inviter = 2;

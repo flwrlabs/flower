@@ -153,6 +153,18 @@ class ControlStub:
     ]
     """List Federations"""
 
+    ListFederationAgents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListFederationAgentsRequest,
+        flwr.proto.control_pb2.ListFederationAgentsResponse,
+    ]
+    """List agents in a Federation"""
+
+    DeleteFederationAgent: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DeleteFederationAgentRequest,
+        flwr.proto.control_pb2.DeleteFederationAgentResponse,
+    ]
+    """Delete an agent from a Federation"""
+
     ShowFederation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
         flwr.proto.control_pb2.ShowFederationResponse,
@@ -356,6 +368,18 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.ListFederationsResponse,
     ]
     """List Federations"""
+
+    ListFederationAgents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListFederationAgentsRequest,
+        flwr.proto.control_pb2.ListFederationAgentsResponse,
+    ]
+    """List agents in a Federation"""
+
+    DeleteFederationAgent: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DeleteFederationAgentRequest,
+        flwr.proto.control_pb2.DeleteFederationAgentResponse,
+    ]
+    """Delete an agent from a Federation"""
 
     ShowFederation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
@@ -600,6 +624,22 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ListFederationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListFederationsResponse]]:
         """List Federations"""
+
+    @abc.abstractmethod
+    def ListFederationAgents(
+        self,
+        request: flwr.proto.control_pb2.ListFederationAgentsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListFederationAgentsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListFederationAgentsResponse]]:
+        """List agents in a Federation"""
+
+    @abc.abstractmethod
+    def DeleteFederationAgent(
+        self,
+        request: flwr.proto.control_pb2.DeleteFederationAgentRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.DeleteFederationAgentResponse, collections.abc.Awaitable[flwr.proto.control_pb2.DeleteFederationAgentResponse]]:
+        """Delete an agent from a Federation"""
 
     @abc.abstractmethod
     def ShowFederation(

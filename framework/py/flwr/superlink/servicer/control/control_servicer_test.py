@@ -27,8 +27,6 @@ from typing import Any, cast
 from unittest.mock import MagicMock, Mock, patch
 
 import grpc
-from parameterized import parameterized
-
 from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
 from flwr.app import ConfigRecord, Context, RecordDict
 from flwr.common.constant import NOOP_ACCOUNT_NAME, SUPERLINK_NODE_ID, Status, SubStatus
@@ -45,9 +43,11 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationRequest,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteFederationAgentRequest,
     DisconnectConnectorRequest,
     GetRunSeriesRequest,
     ListConnectorsRequest,
+    ListFederationAgentsRequest,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -106,6 +106,7 @@ from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.control.control_account_auth_interceptor import (
     shared_account_info,
 )
+from parameterized import parameterized
 
 from .control_handlers import (
     _derive_run_series_description,
@@ -638,6 +639,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
         self.assertEqual(tasks[0].fab_hash, runs[0].fab_hash)
+        agents = self.state.federation_manager.list_agents(NOOP_FEDERATION_ID)
+        self.assertEqual(len(agents), 1)
+        self.assertEqual(agents[0].app_id, "@flwr/agent")
+        self.assertEqual(agents[0].fab_hash, runs[0].fab_hash)
 
     def test_start_run_creates_builtin_agentapp_run_from_app_spec(self) -> None:
         """Test StartRun creates an AgentApp run for the built-in flwr agent."""
@@ -1190,6 +1195,49 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(len(response.federations), 1)
         self.assertTrue(response.federations[0].simulation)
+
+    def test_list_and_delete_federation_agent(self) -> None:
+        """Test listing and deleting an agent through the Control API."""
+        agent = self.state.federation_manager.upsert_agent(
+            NOOP_FEDERATION_ID,
+            "@alice/research-agent",
+            "hash-1",
+            self.aid,
+        )
+
+        response = self.servicer.ListFederationAgents(
+            ListFederationAgentsRequest(federation_id=NOOP_FEDERATION_ID), Mock()
+        )
+
+        self.assertEqual(len(response.agents), 1)
+        self.assertEqual(response.agents[0].id, agent.id)
+        self.assertEqual(response.agents[0].app_id, agent.app_id)
+        self.assertEqual(response.agents[0].fab_hash, agent.fab_hash)
+
+        self.servicer.DeleteFederationAgent(
+            DeleteFederationAgentRequest(
+                federation_id=NOOP_FEDERATION_ID,
+                agent_id=agent.id,
+            ),
+            Mock(),
+        )
+        self.assertEqual(
+            self.servicer.ListFederationAgents(
+                ListFederationAgentsRequest(federation_id=NOOP_FEDERATION_ID),
+                Mock(),
+            ).agents,
+            [],
+        )
+
+        with self.assertRaises(FlowerError) as error:
+            self.servicer.DeleteFederationAgent(
+                DeleteFederationAgentRequest(
+                    federation_id=NOOP_FEDERATION_ID,
+                    agent_id=agent.id,
+                ),
+                Mock(),
+            )
+        self.assertEqual(error.exception.code, ApiErrorCode.FEDERATION_AGENT_NOT_FOUND)
 
     def test_create_federation_success(self) -> None:
         """Test CreateFederation succeeds when federation_manager.create_federation
