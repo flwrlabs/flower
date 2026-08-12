@@ -714,15 +714,18 @@ def _parse_agents(payload: Any) -> list[_Agent]:
         display_name = raw_agent.get("display_name")
         description = raw_agent.get("description")
         fab_hash = raw_agent.get("fab_hash")
-        if (
-            not isinstance(app_spec, str)
-            or not isinstance(display_name, str)
-            or not isinstance(description, str)
-            or (fab_hash is not None and not isinstance(fab_hash, str))
+        if not isinstance(app_spec, str) or (
+            fab_hash is not None and not isinstance(fab_hash, str)
         ):
+            raise click.ClickException("Invalid response from the agents API.")
+        if display_name is not None and not isinstance(display_name, str):
+            raise click.ClickException("Invalid response from the agents API.")
+        if description is not None and not isinstance(description, str):
             raise click.ClickException("Invalid response from the agents API.")
         if re.fullmatch(APP_ID_PATTERN, app_spec) is None:
             raise click.ClickException("Invalid response from the agents API.")
+        display_name = display_name or app_spec
+        description = description or display_name
         agents.append(_Agent(app_spec, display_name, description, fab_hash))
     return agents
 
