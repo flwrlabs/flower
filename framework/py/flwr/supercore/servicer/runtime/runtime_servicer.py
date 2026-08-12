@@ -78,14 +78,14 @@ class RuntimeServicer(ABC):
     ) -> CreateTaskResponse:
         """Create a task."""
         task = get_authenticated_task()
-        return runtime_handlers.create_task(request, self.state(), task, context)
+        return runtime_handlers.create_task(request, self.state(), task)
 
     def PushTaskMessage(
         self, request: PushTaskMessageRequest, context: grpc.ServicerContext
     ) -> PushTaskMessageResponse:
         """Push a task message."""
         task = get_authenticated_task()
-        return runtime_handlers.push_task_message(request, self.state(), task, context)
+        return runtime_handlers.push_task_message(request, self.state(), task)
 
     def PushTaskEvents(
         self, request: PushTaskEventsRequest, context: grpc.ServicerContext

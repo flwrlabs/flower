@@ -25,12 +25,15 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    CreateTaskRequest,
+    CreateTaskResponse,
     GetNodesRequest,
     GetNodesResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
 )
 from flwr.supercore.constant import TaskType
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     TASK_TOKEN_HEADER,
@@ -102,10 +105,25 @@ class TestSuperNodeRuntimeAuthIntegration(unittest.TestCase):  # pylint: disable
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
+        self._create_task = self._auth_channel.unary_unary(
+            "/flwr.proto.Runtime/CreateTask",
+            request_serializer=CreateTaskRequest.SerializeToString,
+            response_deserializer=CreateTaskResponse.FromString,
+        )
 
     def tearDown(self) -> None:
         """Stop the gRPC API server."""
         self._server.stop(None)
+
+    def test_runtime_flower_error_is_translated(self) -> None:
+        """Translate handler FlowerError into its configured gRPC status."""
+        with self.assertRaises(grpc.RpcError) as err:
+            self._create_task.with_call(request=CreateTaskRequest(type=TaskType.MODEL))
+
+        assert err.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
+        flower_error = FlowerError.from_json(err.exception.details())
+        assert flower_error is not None
+        assert flower_error.code == ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST
 
     def test_pull_object_denied_without_metadata_token(self) -> None:
         """Protected RPC should deny requests missing metadata token."""
