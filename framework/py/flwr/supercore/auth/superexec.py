@@ -111,7 +111,10 @@ def verify_superexec_request(  # pylint: disable=too-many-arguments
     except ValueError:
         return False
 
-    time_diff = now().timestamp() - timestamp
+    try:
+        time_diff = now().timestamp() - timestamp
+    except OverflowError:
+        return False
     if not MIN_TIMESTAMP_DIFF_SECONDS < time_diff < MAX_TIMESTAMP_DIFF_SECONDS:
         return False
 
@@ -128,7 +131,11 @@ def verify_superexec_request(  # pylint: disable=too-many-arguments
         nonce=nonce,
         body_sha256=body_sha256,
     )
-    if not verify_superexec_signature(expected_signature, signature):
+    try:
+        signature_matches = verify_superexec_signature(expected_signature, signature)
+    except TypeError:
+        return False
+    if not signature_matches:
         return False
 
     # Reserve the nonce last so failed requests cannot consume nonce entries.
