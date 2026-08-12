@@ -108,12 +108,8 @@ def verify_superexec_request(  # pylint: disable=too-many-arguments
     # Require an integer timestamp within the accepted clock-skew and age window.
     try:
         timestamp = int(timestamp_raw)
-    except ValueError:
-        return False
-
-    try:
         time_diff = now().timestamp() - timestamp
-    except OverflowError:
+    except (ValueError, OverflowError):
         return False
     if not MIN_TIMESTAMP_DIFF_SECONDS < time_diff < MAX_TIMESTAMP_DIFF_SECONDS:
         return False
