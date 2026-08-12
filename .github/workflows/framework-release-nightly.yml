@@ -61,7 +61,12 @@ jobs:
 
           NAME=$(uv version | awk '{ print $1 }')
           VERSION=$(uv version --short)
-          python dev/build-docker-image-matrix.py --flwr-version "${VERSION}" --matrix nightly --flwr-package "${NAME}" > matrix.raw.json
+          python dev/build-docker-image-matrix.py \
+            --flwr-version "${VERSION}" \
+            --flwr-package "${NAME}" \
+            --image-tag "${VERSION}" \
+            --image-tag nightly \
+            > matrix.raw.json
           python dev/release/resolve-docker-matrix.py \
             --input matrix.raw.json \
             --output matrix.json \

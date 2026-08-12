@@ -60,6 +60,11 @@ on:
         required: false
         default: ""
         type: string
+      export-index-digest:
+        description: "Upload the final OCI index digest for collection by the caller."
+        required: false
+        type: boolean
+        default: false
     secrets:
       docker-registry-token:
         required: false
@@ -259,7 +264,37 @@ jobs:
             digest_args+=("${{ inputs.image-repository }}@sha256:${digest}")
           done
 
-          docker buildx imagetools create "${tag_args[@]}" "${digest_args[@]}"
+          docker buildx imagetools create \
+            --metadata-file /tmp/manifest-metadata.json \
+            "${tag_args[@]}" \
+            "${digest_args[@]}"
 
       - name: Inspect Docker image
-        run: docker buildx imagetools inspect ${{ inputs.image-repository }}:${{ steps.meta.outputs.version }}
+        env:
+          IMAGE: ${{ inputs.image-repository }}:${{ steps.meta.outputs.version }}
+        run: docker buildx imagetools inspect "${IMAGE}"
+
+      - name: Export OCI index digest
+        if: ${{ inputs.export-index-digest }}
+        env:
+          IMAGE_REPOSITORY: ${{ inputs.image-repository }}
+        run: |
+          mkdir -p /tmp/index-digest
+          digest="$(jq --exit-status --raw-output \
+            '.["containerimage.descriptor"].digest | select(test("^sha256:[0-9a-f]{64}$"))' \
+            /tmp/manifest-metadata.json)"
+          jq -n \
+            --arg repository "${IMAGE_REPOSITORY}" \
+            --arg digest "${digest}" \
+            --argjson tags "$(jq -c '.tags' <<< "${DOCKER_METADATA_OUTPUT_JSON}")" \
+            '{repository: $repository, tags: $tags, index_digest: $digest}' \
+            > "/tmp/index-digest/${{ needs.build.outputs.build-id }}.json"
+
+      - name: Upload OCI index digest
+        if: ${{ inputs.export-index-digest }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: index-digest-${{ needs.build.outputs.build-id }}
+          path: /tmp/index-digest/*.json
+          if-no-files-found: error
+          retention-days: 1

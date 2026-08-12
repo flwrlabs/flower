@@ -1,8 +1,8 @@
 """
-Usage: python dev/build-docker-image-matrix.py --flwr-version <flower version e.g. 1.13.0>
+Usage: python dev/build-docker-image-matrix.py \
+    (--flwr-version VERSION | --flwr-version-ref REF) [--image-tag TAG]
 
-Images are built in three workflows: stable, nightly, and unstable (main).
-Each builds for `amd64` and `arm64`.
+Images are built for `amd64` and `arm64` from a versioned package or Git ref.
 
 1. **Ubuntu Images**:
    - Used for images where dependencies might be installed by users.
@@ -12,10 +12,8 @@ Each builds for `amd64` and `arm64`.
    - Used only for minimal images (e.g., SuperLink) where no extra dependencies are expected.
    - Limited use due to dependency (in particular ML frameworks) compilation complexity with `musl`.
 
-Workflow Details:
-- **Stable Release**: Triggered on new releases. Builds full matrix (all Python versions, Ubuntu and Alpine).
-- **Nightly Release**: Daily trigger. Builds full matrix (latest Python, Ubuntu only).
-- **Unstable**: Triggered on main branch commits. Builds simplified matrix (latest Python, Ubuntu only).
+Every caller builds the same full matrix across all supported Python versions,
+Ubuntu, and Alpine.
 """
 
 import argparse
@@ -172,84 +170,73 @@ def generate_binary_images(
     ]
 
 
-def tag_superlink_supernode_images(image: BaseImage) -> List[str]:
-    """
-    Compute the Docker image tags based on its build arguments.
+def build_matrix(
+    flwr_version: str,
+    flwr_version_ref: str,
+    flwr_package: str,
+    image_tags: list[str],
+) -> List[BaseImage]:
+    """Build the complete Framework image matrix."""
 
-    - If the image is built on Alpine with the latest supported Python version,
-      append the Flower framework version to the existing tags.
-    - Else if the image is built on Ubuntu with the latest supported Python version
-      and a CPU-only variant, append the "latest" tag to the existing tags.
-    - Otherwise, return the original tags unchanged.
-    """
-    if (
-        image.build_args.variant.distro.name == DistroName.ALPINE
-        and image.build_args.python_version == LATEST_SUPPORTED_PYTHON_VERSION
-    ):
-        return image.tags + [image.build_args.flwr_version]
-    elif (
-        image.build_args.variant.distro.name == DistroName.UBUNTU
-        and image.build_args.python_version == LATEST_SUPPORTED_PYTHON_VERSION
-        and isinstance(image.build_args.variant.extras, CpuVariant)
-    ):
-        return image.tags + ["latest"]
-    else:
-        return image.tags
-
-
-def tag_superexec_images(image: BaseImage) -> List[str]:
-    """
-    Compute the Docker image tags based on its build arguments.
-
-    For images built on Ubuntu with the latest supported Python version
-    and a CPU variant, this will append the Flower framework version
-    and the "latest" tag to the existing tags list. All other images
-    simply retain their original tags.
-    """
-    if (
-        image.build_args.variant.distro.name == DistroName.UBUNTU
-        and image.build_args.python_version == LATEST_SUPPORTED_PYTHON_VERSION
-        and isinstance(image.build_args.variant.extras, CpuVariant)
-    ):
-        return image.tags + [image.build_args.flwr_version, "latest"]
-    else:
-        return image.tags
-
-
-#
-# Build matrix for stable releases
-#
-def build_stable_matrix(flwr_version: str) -> List[BaseImage]:
     @dataclass
-    class StableBaseImageBuildArgs:
+    class BaseImageBuildArgs:
         variant: Variant
         python_version: str
         flwr_version: str
+        flwr_version_ref: str
+        flwr_package: str
+        image_tags: list[str]
 
     cpu_build_args = """PYTHON_VERSION={python_version}
 FLWR_VERSION={flwr_version}
+FLWR_VERSION_REF={flwr_version_ref}
+FLWR_PACKAGE={flwr_package}
 DISTRO={distro_name}
 DISTRO_VERSION={distro_version}
 """
 
     cpu_build_args_variants = [
-        StableBaseImageBuildArgs(UBUNTU_VARIANT, python_version, flwr_version)
+        BaseImageBuildArgs(
+            UBUNTU_VARIANT,
+            python_version,
+            flwr_version,
+            flwr_version_ref,
+            flwr_package,
+            image_tags,
+        )
         for python_version in SUPPORTED_PYTHON_VERSIONS
     ] + [
-        StableBaseImageBuildArgs(
-            ALPINE_VARIANT, LATEST_SUPPORTED_PYTHON_VERSION, flwr_version
+        BaseImageBuildArgs(
+            ALPINE_VARIANT,
+            LATEST_SUPPORTED_PYTHON_VERSION,
+            flwr_version,
+            flwr_version_ref,
+            flwr_package,
+            image_tags,
         )
     ]
+
+    def tags(args: BaseImageBuildArgs) -> list[str]:
+        variant_tags = [
+            f"{tag}-py{args.python_version}-{args.variant.distro.name.value}{args.variant.distro.version}"
+            for tag in args.image_tags
+        ]
+        if (
+            args.variant == UBUNTU_VARIANT
+            and args.python_version == LATEST_SUPPORTED_PYTHON_VERSION
+        ):
+            return variant_tags + args.image_tags
+        return variant_tags
 
     cpu_base_images = [
         BaseImage(
             file_dir_fn=lambda args: f"{DOCKERFILE_ROOT}/base/{args.variant.distro.name.value}",
-            tags_fn=lambda args: [
-                f"{args.flwr_version}-py{args.python_version}-{args.variant.distro.name.value}{args.variant.distro.version}"
-            ],
+            tags_fn=tags,
             build_args_fn=lambda args: cpu_build_args.format(
                 python_version=args.python_version,
                 flwr_version=args.flwr_version,
+                flwr_version_ref=args.flwr_version_ref,
+                flwr_package=args.flwr_package,
                 distro_name=args.variant.distro.name,
                 distro_version=args.variant.distro.version,
             ),
@@ -259,7 +246,14 @@ DISTRO_VERSION={distro_version}
     ]
 
     cuda_build_args_variants = [
-        StableBaseImageBuildArgs(variant, python_version, flwr_version)
+        BaseImageBuildArgs(
+            variant,
+            python_version,
+            flwr_version,
+            flwr_version_ref,
+            flwr_package,
+            image_tags,
+        )
         for variant in CUDA_VARIANTS
         for python_version in SUPPORTED_PYTHON_VERSIONS
     ]
@@ -275,6 +269,8 @@ DISTRO_VERSION={distro_version}
             build_args_fn=lambda args: cuda_build_args.format(
                 python_version=args.python_version,
                 flwr_version=args.flwr_version,
+                flwr_version_ref=args.flwr_version_ref,
+                flwr_package=args.flwr_package,
                 distro_name=args.variant.distro.name,
                 distro_version=args.variant.distro.version,
                 cuda_version=args.variant.extras.version,
@@ -292,7 +288,7 @@ DISTRO_VERSION={distro_version}
         generate_binary_images(
             "superlink",
             base_images,
-            tag_superlink_supernode_images,
+            lambda image: image.tags,
             lambda image: image.build_args.python_version
             == LATEST_SUPPORTED_PYTHON_VERSION
             and isinstance(image.build_args.variant.extras, CpuVariant),
@@ -301,7 +297,7 @@ DISTRO_VERSION={distro_version}
         + generate_binary_images(
             "supernode",
             base_images,
-            tag_superlink_supernode_images,
+            lambda image: image.tags,
             lambda image: (
                 image.build_args.variant.distro.name == DistroName.UBUNTU
                 and isinstance(image.build_args.variant.extras, CpuVariant)
@@ -315,162 +311,9 @@ DISTRO_VERSION={distro_version}
         + generate_binary_images(
             "superexec",
             base_images,
-            tag_superexec_images,
+            lambda image: image.tags,
             lambda image: image.build_args.variant.distro.name == DistroName.UBUNTU,
         )
-    )
-
-    return base_images, binary_images
-
-
-#
-# Build matrix for unstable releases
-#
-def build_unstable_matrix(flwr_version_ref: str) -> List[BaseImage]:
-    @dataclass
-    class UnstableBaseImageBuildArgs:
-        variant: Variant
-        python_version: str
-        flwr_version_ref: str
-
-    cpu_ubuntu_build_args_variant = UnstableBaseImageBuildArgs(
-        UBUNTU_VARIANT, LATEST_SUPPORTED_PYTHON_VERSION, flwr_version_ref
-    )
-
-    cpu_build_args = """PYTHON_VERSION={python_version}
-FLWR_VERSION_REF={flwr_version_ref}
-DISTRO={distro_name}
-DISTRO_VERSION={distro_version}
-"""
-
-    cpu_base_image = BaseImage(
-        file_dir_fn=lambda args: f"{DOCKERFILE_ROOT}/base/{args.variant.distro.name.value}",
-        tags_fn=lambda _: ["unstable"],
-        build_args_fn=lambda args: cpu_build_args.format(
-            python_version=args.python_version,
-            flwr_version_ref=args.flwr_version_ref,
-            distro_name=args.variant.distro.name,
-            distro_version=args.variant.distro.version,
-        ),
-        build_args=cpu_ubuntu_build_args_variant,
-    )
-
-    cuda_build_args_variant = UnstableBaseImageBuildArgs(
-        LATEST_SUPPORTED_CUDA_VERSION, LATEST_SUPPORTED_PYTHON_VERSION, flwr_version_ref
-    )
-
-    cuda_build_args = cpu_build_args + """CUDA_VERSION={cuda_version}"""
-
-    cuda_base_image = BaseImage(
-        file_dir_fn=lambda args: f"{DOCKERFILE_ROOT}/base/{args.variant.distro.name.value}-cuda",
-        tags_fn=lambda _: ["unstable-cuda"],
-        build_args_fn=lambda args: cuda_build_args.format(
-            python_version=args.python_version,
-            flwr_version_ref=args.flwr_version_ref,
-            distro_name=args.variant.distro.name,
-            distro_version=args.variant.distro.version,
-            cuda_version=args.variant.extras.version,
-        ),
-        build_args=cuda_build_args_variant,
-    )
-
-    # base_images = [cpu_base_image, cuda_base_image]
-    base_images = [cpu_base_image]
-
-    binary_images = (
-        generate_binary_images(
-            "superlink",
-            base_images,
-            lambda image: image.tags,
-            lambda image: isinstance(image.build_args.variant.extras, CpuVariant),
-        )
-        + generate_binary_images(
-            "supernode",
-            base_images,
-            lambda image: image.tags,
-            lambda image: isinstance(image.build_args.variant.extras, CpuVariant),
-        )
-        + generate_binary_images("superexec", base_images, lambda image: image.tags)
-    )
-
-    return base_images, binary_images
-
-
-#
-# Build matrix for nightly releases
-#
-def build_nightly_matrix(flwr_version: str, flwr_package: str) -> List[BaseImage]:
-    @dataclass
-    class NightlyBaseImageBuildArgs:
-        variant: Variant
-        python_version: str
-        flwr_version: str
-        flwr_package: str
-
-    cpu_ubuntu_build_args_variant = NightlyBaseImageBuildArgs(
-        UBUNTU_VARIANT, LATEST_SUPPORTED_PYTHON_VERSION, flwr_version, flwr_package
-    )
-
-    cpu_build_args = """PYTHON_VERSION={python_version}
-FLWR_VERSION={flwr_version}
-FLWR_PACKAGE={flwr_package}
-DISTRO={distro_name}
-DISTRO_VERSION={distro_version}
-"""
-
-    cpu_base_image = BaseImage(
-        file_dir_fn=lambda args: f"{DOCKERFILE_ROOT}/base/{args.variant.distro.name.value}",
-        tags_fn=lambda args: [args.flwr_version, "nightly"],
-        build_args_fn=lambda args: cpu_build_args.format(
-            python_version=args.python_version,
-            flwr_version=args.flwr_version,
-            flwr_package=args.flwr_package,
-            distro_name=args.variant.distro.name,
-            distro_version=args.variant.distro.version,
-        ),
-        build_args=cpu_ubuntu_build_args_variant,
-    )
-
-    cuda_build_args_variant = NightlyBaseImageBuildArgs(
-        LATEST_SUPPORTED_CUDA_VERSION,
-        LATEST_SUPPORTED_PYTHON_VERSION,
-        flwr_version,
-        flwr_package,
-    )
-
-    cuda_build_args = cpu_build_args + """CUDA_VERSION={cuda_version}"""
-
-    cuda_base_image = BaseImage(
-        file_dir_fn=lambda args: f"{DOCKERFILE_ROOT}/base/{args.variant.distro.name.value}-cuda",
-        tags_fn=lambda args: [f"{args.flwr_version}-cuda", "nightly-cuda"],
-        build_args_fn=lambda args: cuda_build_args.format(
-            python_version=args.python_version,
-            flwr_version=args.flwr_version,
-            flwr_package=args.flwr_package,
-            distro_name=args.variant.distro.name,
-            distro_version=args.variant.distro.version,
-            cuda_version=args.variant.extras.version,
-        ),
-        build_args=cuda_build_args_variant,
-    )
-
-    # base_images = [cpu_base_image, cuda_base_image]
-    base_images = [cpu_base_image]
-
-    binary_images = (
-        generate_binary_images(
-            "superlink",
-            base_images,
-            lambda image: image.tags,
-            lambda image: isinstance(image.build_args.variant.extras, CpuVariant),
-        )
-        + generate_binary_images(
-            "supernode",
-            base_images,
-            lambda image: image.tags,
-            lambda image: isinstance(image.build_args.variant.extras, CpuVariant),
-        )
-        + generate_binary_images("superexec", base_images, lambda image: image.tags)
     )
 
     return base_images, binary_images
@@ -480,24 +323,25 @@ if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(
         description="Generate Github Docker workflow matrix"
     )
-    arg_parser.add_argument("--flwr-version", type=str, required=True)
+    source = arg_parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--flwr-version", type=str)
+    source.add_argument("--flwr-version-ref", type=str)
     arg_parser.add_argument("--flwr-package", type=str, default="flwr")
-    arg_parser.add_argument(
-        "--matrix", choices=["stable", "nightly", "unstable"], default="stable"
-    )
+    arg_parser.add_argument("--image-tag", action="append")
+    # Retain the stable-only argument until framework-release.yml is migrated.
+    arg_parser.add_argument("--matrix", choices=["stable"], help=argparse.SUPPRESS)
 
     args = arg_parser.parse_args()
+    image_tags = args.image_tag or ([args.flwr_version] if args.flwr_version else None)
+    if image_tags is None:
+        arg_parser.error("--image-tag is required with --flwr-version-ref")
 
-    flwr_version = args.flwr_version
-    flwr_package = args.flwr_package
-    matrix = args.matrix
-
-    if matrix == "stable":
-        base_images, binary_images = build_stable_matrix(flwr_version)
-    elif matrix == "nightly":
-        base_images, binary_images = build_nightly_matrix(flwr_version, flwr_package)
-    else:
-        base_images, binary_images = build_unstable_matrix(flwr_version)
+    base_images, binary_images = build_matrix(
+        flwr_version=args.flwr_version or "",
+        flwr_version_ref=args.flwr_version_ref or "",
+        flwr_package=args.flwr_package,
+        image_tags=image_tags,
+    )
 
     print(
         json.dumps(
