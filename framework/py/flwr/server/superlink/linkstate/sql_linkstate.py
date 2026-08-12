@@ -1242,9 +1242,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         with self.session() as session:
             self._check_stored_messages({message_id})
             model = session.scalar(
-                select(MessageInsModel).where(
-                    MessageInsModel.message_id == message_id
-                )
+                select(MessageInsModel).where(MessageInsModel.message_id == message_id)
             )
             if model is None:
                 # Message does not exist
