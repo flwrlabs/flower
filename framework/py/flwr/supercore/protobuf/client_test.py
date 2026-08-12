@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for reusable protobuf-over-HTTP client infrastructure."""
 
-from io import BytesIO
 from unittest.mock import patch
 
 import pytest
@@ -38,7 +37,7 @@ def _response(status_code: int, content: bytes = b"") -> requests.Response:
     """Create a requests response with a readable body."""
     response = requests.Response()
     response.status_code = status_code
-    response.raw = BytesIO(content)
+    response._content = content  # pylint: disable=protected-access
     return response
 
 
@@ -46,7 +45,7 @@ def _call(client: ProtobufClient) -> ClaimTaskResponse:
     """Call one representative unary protobuf operation."""
     return client._unary_unary(  # pylint: disable=protected-access
         path=_PATH,
-        method=_METHOD,
+        rpc_method=_METHOD,
         request=_REQUEST,
         response_type=ClaimTaskResponse,
     )
@@ -88,7 +87,7 @@ def test_unary_unary_normalizes_path() -> None:
         # pylint: disable-next=protected-access
         client._unary_unary(
             path=_PATH.removeprefix("/"),
-            method=_METHOD,
+            rpc_method=_METHOD,
             request=_REQUEST,
             response_type=ClaimTaskResponse,
         )
@@ -134,7 +133,7 @@ class _RecordingInterceptor:
     ) -> requests.Response:
         """Record execution around the next interceptor and HTTP transport."""
         self._events.append(f"{self._name} before")
-        assert context.method == _METHOD
+        assert context.rpc_method == _METHOD
         assert context.message == _REQUEST
         context.request.headers[f"x-{self._name}"] = "present"
         response = call_next(context)

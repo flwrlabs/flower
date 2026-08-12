@@ -32,7 +32,7 @@ ResponseT = TypeVar("ResponseT", bound=Message)
 class ProtobufRequestContext:
     """Context available to protobuf HTTP client interceptors."""
 
-    method: str
+    rpc_method: str
     message: Message
     request: requests.PreparedRequest
 
@@ -84,7 +84,7 @@ class ProtobufClient:
         self,
         *,
         path: str,
-        method: str,
+        rpc_method: str,
         request: Message,
         response_type: type[ResponseT],
     ) -> ResponseT:
@@ -100,7 +100,7 @@ class ProtobufClient:
             },
         )
         context = ProtobufRequestContext(
-            method=method,
+            rpc_method=rpc_method,
             message=request,
             request=self._session.prepare_request(http_request),
         )
