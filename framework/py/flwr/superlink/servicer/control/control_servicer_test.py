@@ -116,8 +116,8 @@ from .control_handlers import (
 from .control_servicer import ControlServicer
 
 
-class _OAuthProvider:
-    """Minimal OAuth provider for Control servicer tests."""
+class _OAuthFlow:
+    """Minimal OAuth flow for Control servicer tests."""
 
     connector_ref = "slack"
     display_name = "Slack"
@@ -245,8 +245,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_connector_oauth_flow(self) -> None:
         """Begin and complete a single-use OAuth flow."""
-        provider = _OAuthProvider()
-        with patch.object(connector_registry, "OAUTH_CONNECTOR_PROVIDERS", (provider,)):
+        flow = _OAuthFlow()
+        with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
             oauth_session_id, oauth_state = self._begin_connector_oauth()
             request = CompleteConnectorOAuthRequest(
                 oauth_session_id=oauth_session_id,
@@ -265,7 +265,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 json.loads(connector.credentials_json),
                 {"access_token": "access-secret"},
             )
-            self.assertEqual(provider.exchanged_codes, ["authorization-code"])
+            self.assertEqual(flow.exchanged_codes, ["authorization-code"])
 
             with self.assertRaises(FlowerError) as exc_info:
                 self.servicer.CompleteConnectorOAuth(request, Mock())
@@ -275,7 +275,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_list_and_disconnect_connectors_are_account_scoped(self) -> None:
         """List and disconnect only the authenticated account's connector."""
-        provider = _OAuthProvider()
+        flow = _OAuthFlow()
         for flwr_aid in (self.aid, "other-account"):
             self.assertTrue(
                 self.state.upsert_connector(
@@ -286,7 +286,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 )
             )
 
-        with patch.object(connector_registry, "OAUTH_CONNECTOR_PROVIDERS", (provider,)):
+        with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
             response = self.servicer.ListConnectors(ListConnectorsRequest(), Mock())
             self.assertEqual(len(response.connectors), 1)
             self.assertTrue(response.connectors[0].connected)
@@ -304,8 +304,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_connector_oauth_rejects_invalid_or_expired_session(self) -> None:
         """Reject invalid state and expired OAuth sessions before exchange."""
-        provider = _OAuthProvider()
-        with patch.object(connector_registry, "OAUTH_CONNECTOR_PROVIDERS", (provider,)):
+        flow = _OAuthFlow()
+        with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
             oauth_session_id, _ = self._begin_connector_oauth()
             with self.assertRaises(FlowerError) as invalid_state:
                 self.servicer.CompleteConnectorOAuth(
@@ -343,13 +343,13 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             expired_session.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST
         )
-        self.assertEqual(provider.exchanged_codes, [])
+        self.assertEqual(flow.exchanged_codes, [])
 
-    def test_connector_oauth_provider_failure_is_sanitized(self) -> None:
-        """Hide authorization codes from provider failure errors."""
-        provider = _OAuthProvider(fail_exchange=True)
+    def test_connector_oauth_flow_failure_is_sanitized(self) -> None:
+        """Hide authorization codes from OAuth flow failure errors."""
+        flow = _OAuthFlow(fail_exchange=True)
         sensitive_code = "sensitive-authorization-code"
-        with patch.object(connector_registry, "OAUTH_CONNECTOR_PROVIDERS", (provider,)):
+        with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
             oauth_session_id, oauth_state = self._begin_connector_oauth()
             with self.assertRaises(FlowerError) as exc_info:
                 self.servicer.CompleteConnectorOAuth(
@@ -408,7 +408,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
         """StartRun should bind canonical connected OAuth connector refs."""
-        provider = _OAuthProvider()
+        flow = _OAuthFlow()
         self.state.upsert_connector(
             flwr_aid=self.aid,
             connector_ref="slack",
@@ -424,8 +424,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         with (
             patch.object(
                 connector_registry,
-                "OAUTH_CONNECTOR_PROVIDERS",
-                (provider,),
+                "OAUTH_FLOWS",
+                {"slack": flow},
             ),
             patch(
                 "flwr.superlink.servicer.control.control_handlers.get_fab_config",
@@ -458,7 +458,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         expected_code: ApiErrorCode,
     ) -> None:
         """StartRun should reject invalid, unknown, and other-account refs."""
-        provider = _OAuthProvider()
+        flow = _OAuthFlow()
         if connector_ref == "slack":
             self.state.upsert_connector(
                 flwr_aid="other-account",
@@ -471,8 +471,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         with (
             patch.object(
                 connector_registry,
-                "OAUTH_CONNECTOR_PROVIDERS",
-                (provider,),
+                "OAUTH_FLOWS",
+                {"slack": flow},
             ),
             self.assertRaises(FlowerError) as error,
         ):

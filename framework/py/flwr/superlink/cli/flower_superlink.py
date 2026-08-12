@@ -91,7 +91,7 @@ from flwr.superlink.config_loader import (
     SuperLinkLifespanConfig,
     get_federation_manager,
     get_objectstore_linkstate_factories,
-    load_control_auth_plugins,
+    load_control_authn_plugin,
     load_control_event_log_plugin,
 )
 from flwr.superlink.servicer.control import run_control_api_grpc
@@ -204,7 +204,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             objectstore_factory=self.objectstore_factory,
             certificates=config.certificates,
             authn_plugin=config.authn_plugin,
-            authz_plugin=config.authz_plugin,
             event_log_plugin=config.event_log_plugin,
             artifact_provider=config.artifact_provider,
             fleet_api_type=config.fleet_api_type,
@@ -411,7 +410,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         )
         args.account_auth_config = cfg_path
     cfg_path = getattr(args, "account_auth_config", None)
-    authn_plugin, authz_plugin = load_control_auth_plugins(cfg_path, verify_tls_cert)
+    authn_plugin = load_control_authn_plugin(cfg_path, verify_tls_cert)
     if cfg_path is not None:
         # Enable event logging if the args.enable_event_log is True
         if args.enable_event_log:
@@ -492,7 +491,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         runtime_certificates=runtime_certificates,
         superexec_auth_secret=superexec_auth_secret,
         authn_plugin=authn_plugin,
-        authz_plugin=authz_plugin,
         event_log_plugin=event_log_plugin,
         enable_event_log=getattr(args, "enable_event_log", False),
         artifact_provider=artifact_provider,

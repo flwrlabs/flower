@@ -214,8 +214,8 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
 
         with patch.object(
             connector_registry,
-            "OAUTH_CONNECTOR_PROVIDERS",
-            (Mock(connector_ref="notion"),),
+            "OAUTH_FLOWS",
+            {"notion": Mock(connector_ref="notion")},
         ):
             response = self._create_connector_task("notion")
 
@@ -234,8 +234,8 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         with (
             patch.object(
                 connector_registry,
-                "OAUTH_CONNECTOR_PROVIDERS",
-                (Mock(connector_ref="notion"),),
+                "OAUTH_FLOWS",
+                {"notion": Mock(connector_ref="notion")},
             ),
             self.assertRaises(grpc.RpcError),
         ):

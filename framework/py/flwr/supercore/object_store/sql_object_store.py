@@ -140,9 +140,9 @@ class SqlObjectStore(ObjectStore, SqlMixin):
         """Get the object tree for a given object ID."""
         with self.session() as session:
             object_exists = session.scalar(
-                select(StoredObject.object_id)
-                .where(StoredObject.object_id == object_id)
-                .execution_options(populate_existing=True)
+                select(StoredObject.object_id).where(
+                    StoredObject.object_id == object_id
+                )
             )
             if object_exists is None:
                 raise NoObjectInStoreError(
@@ -309,9 +309,9 @@ class SqlObjectStore(ObjectStore, SqlMixin):
         with self.session() as session:
             return (
                 session.scalar(
-                    select(StoredObject.object_id)
-                    .where(StoredObject.object_id == object_id)
-                    .execution_options(populate_existing=True)
+                    select(StoredObject.object_id).where(
+                        StoredObject.object_id == object_id
+                    )
                 )
                 is not None
             )
@@ -319,6 +319,6 @@ class SqlObjectStore(ObjectStore, SqlMixin):
     def __len__(self) -> int:
         """Return the number of objects in the store."""
         with self.session() as session:
-            return int(
-                session.scalar(select(func.count()).select_from(StoredObject)) or 0
-            )
+            # pylint: disable-next=not-callable
+            cnt = session.scalar(select(func.count()).select_from(StoredObject))
+            return cast(int, cnt)
