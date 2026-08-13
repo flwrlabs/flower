@@ -14,123 +14,51 @@
 # ==============================================================================
 """Tests for the HTTP SuperLink Runtime API stub."""
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
-from google.protobuf.message import Message
 
-from flwr.proto.log_pb2 import (  # pylint: disable=E0611
-    PushLogsRequest,
-    PushLogsResponse,
-)
-from flwr.proto.message_pb2 import (  # pylint: disable=E0611
-    ConfirmMessageReceivedRequest,
-    ConfirmMessageReceivedResponse,
-    PullObjectRequest,
-    PullObjectResponse,
-    PushObjectRequest,
-    PushObjectResponse,
-)
-from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    GetNodesRequest,
-    GetNodesResponse,
-    PullAppMessagesRequest,
-    PullAppMessagesResponse,
-    PullTaskInputRequest,
-    PullTaskInputResponse,
-    PushAppMessagesRequest,
-    PushAppMessagesResponse,
-    PushTaskOutputRequest,
-    PushTaskOutputResponse,
-    SendTaskHeartbeatRequest,
-    SendTaskHeartbeatResponse,
-)
 from flwr.supercore.protobuf.client import ProtobufClient
 from flwr.superlink.runtime import RuntimeHttpStub
 
+_UNARY_UNARY_PATHS = (
+    "send-task-heartbeat",
+    "pull-task-input",
+    "push-task-output",
+    "push-object",
+    "pull-object",
+    "confirm-message-received",
+    "push-logs",
+    "push-messages",
+    "pull-messages",
+    "get-nodes",
+)
+_RESPONSE_NAME_OVERRIDES = {
+    "push-messages": "PushAppMessagesResponse",
+    "pull-messages": "PullAppMessagesResponse",
+}
+
 
 @pytest.mark.parametrize(
-    ("method_name", "path", "request_message", "response_type"),
-    [
-        (
-            "SendTaskHeartbeat",
-            "/v1/runtime/send-task-heartbeat",
-            SendTaskHeartbeatRequest(),
-            SendTaskHeartbeatResponse,
-        ),
-        (
-            "PullTaskInput",
-            "/v1/runtime/pull-task-input",
-            PullTaskInputRequest(),
-            PullTaskInputResponse,
-        ),
-        (
-            "PushTaskOutput",
-            "/v1/runtime/push-task-output",
-            PushTaskOutputRequest(),
-            PushTaskOutputResponse,
-        ),
-        (
-            "PushObject",
-            "/v1/runtime/push-object",
-            PushObjectRequest(),
-            PushObjectResponse,
-        ),
-        (
-            "PullObject",
-            "/v1/runtime/pull-object",
-            PullObjectRequest(),
-            PullObjectResponse,
-        ),
-        (
-            "ConfirmMessageReceived",
-            "/v1/runtime/confirm-message-received",
-            ConfirmMessageReceivedRequest(),
-            ConfirmMessageReceivedResponse,
-        ),
-        (
-            "PushLogs",
-            "/v1/runtime/push-logs",
-            PushLogsRequest(),
-            PushLogsResponse,
-        ),
-        (
-            "PushMessages",
-            "/v1/runtime/push-messages",
-            PushAppMessagesRequest(),
-            PushAppMessagesResponse,
-        ),
-        (
-            "PullMessages",
-            "/v1/runtime/pull-messages",
-            PullAppMessagesRequest(),
-            PullAppMessagesResponse,
-        ),
-        (
-            "GetNodes",
-            "/v1/runtime/get-nodes",
-            GetNodesRequest(),
-            GetNodesResponse,
-        ),
-    ],
+    "endpoint",
+    _UNARY_UNARY_PATHS,
 )
-def test_serverapp_runtime_method(
-    method_name: str,
-    path: str,
-    request_message: Message,
-    response_type: type[Message],
-) -> None:
+def test_serverapp_runtime_method(endpoint: str) -> None:
     """Call one Runtime endpoint required by flwr-serverapp."""
-    response = response_type()
+    method_name = endpoint.title().replace("-", "")
+    request = Mock()
+    response = Mock()
     stub = RuntimeHttpStub("http://runtime.example")
 
     with patch.object(ProtobufClient, "_unary_unary", return_value=response) as call:
-        result = getattr(stub, method_name)(request_message)
+        result = getattr(stub, method_name)(request)
 
     assert result is response
-    call.assert_called_once_with(
-        path=path,
-        rpc_method=f"/flwr.proto.Runtime/{method_name}",
-        request=request_message,
-        response_type=response_type,
+    call.assert_called_once()
+    assert call.call_args.kwargs["path"] == f"/v1/runtime/{endpoint}"
+    assert call.call_args.kwargs["rpc_method"] == f"/flwr.proto.Runtime/{method_name}"
+    assert call.call_args.kwargs["request"] is request
+    expected_response_name = _RESPONSE_NAME_OVERRIDES.get(
+        endpoint, f"{method_name}Response"
     )
+    assert call.call_args.kwargs["response_type"].__name__ == expected_response_name
