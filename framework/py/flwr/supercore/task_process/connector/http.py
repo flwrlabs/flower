@@ -22,20 +22,33 @@ import requests
 
 from flwr.supercore.typing import JSONObject
 
+from .errors import PublicConnectorError
+
 ConnectorErrorFactory = Callable[[str, int | None], RuntimeError]
 HttpErrorCode = Callable[[requests.Response], str]
 
+_RETRYABLE_ERROR_CODES = {
+    "gateway_timeout",
+    "rate_limited",
+    "request_failed",
+    "service_unavailable",
+}
 
-class ConnectorApiError(RuntimeError):
+
+class ConnectorApiError(PublicConnectorError, RuntimeError):
     """Base class for secret-safe connector API failures."""
 
     provider: str
 
     def __init__(self, code: str, status_code: int | None = None) -> None:
-        self.code = code
-        self.status_code = status_code
         detail = code if status_code is None else f"{code} ({status_code})"
-        super().__init__(f"{self.provider} API request failed: {detail}.")
+        super().__init__(
+            code,
+            f"{self.provider} API request failed: {detail}.",
+            status_code=status_code,
+            retryable=code in _RETRYABLE_ERROR_CODES
+            or (status_code is not None and status_code >= 500),
+        )
 
 
 # pylint: disable-next=too-many-arguments

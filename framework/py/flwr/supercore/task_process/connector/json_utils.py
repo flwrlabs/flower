@@ -20,13 +20,15 @@ from typing import cast
 
 from flwr.supercore.typing import JSONObject
 
+from .errors import ConnectorArgumentError
+
 ErrorFactory = Callable[[str], Exception]
 
 
 def require_string(value: object, provider: str, name: str) -> str:
     """Validate and normalize a required connector argument."""
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{provider} {name} must be a non-empty string.")
+        raise ConnectorArgumentError(f"{provider} {name} must be a non-empty string.")
     return value.strip()
 
 
@@ -47,16 +49,18 @@ def require_int_range(
 ) -> int:
     """Validate an integer connector argument with inclusive bounds."""
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"{provider} {name} must be an integer.")
+        raise ConnectorArgumentError(f"{provider} {name} must be an integer.")
     if value < minimum or value > maximum:
-        raise ValueError(f"{provider} {name} must be between {minimum} and {maximum}.")
+        raise ConnectorArgumentError(
+            f"{provider} {name} must be between {minimum} and {maximum}."
+        )
     return value
 
 
 def require_bool(value: object, provider: str, name: str) -> bool:
     """Validate a boolean connector argument."""
     if not isinstance(value, bool):
-        raise ValueError(f"{provider} {name} must be a boolean.")
+        raise ConnectorArgumentError(f"{provider} {name} must be a boolean.")
     return value
 
 

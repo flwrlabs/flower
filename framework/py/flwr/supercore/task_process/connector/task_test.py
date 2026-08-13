@@ -30,7 +30,14 @@ from flwr.supercore.json_message.connector_message import (
 
 from . import registry
 from .definition import ConnectorExecutionContext
+from .http import ConnectorApiError
 from .task import handle_task
+
+
+class NotionTestApiError(ConnectorApiError):
+    """Secret-safe test error matching the Notion provider."""
+
+    provider = "Notion"
 
 
 def _connector_request(name: str) -> ConnectorRequest:
@@ -148,3 +155,39 @@ class TestHandleTask(unittest.TestCase):
         assert secret not in str(response.payload)
         assert secret not in "".join(traceback.format_exception(error.exception))
         assert error.exception.__context__ is None
+
+    def test_exposes_secret_safe_provider_errors(self) -> None:
+        """Credential-backed providers should return actionable safe errors."""
+        self._configure_connector("notion", connector_ref="notion")
+        self.provider.side_effect = NotionTestApiError("validation_error", 400)
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"Notion API request failed: validation_error \(400\)\.",
+        ):
+            handle_task(stub=self.stub, task_id=22, run_id=7)
+
+        assert _pushed_response(self.stub).payload["error"] == {
+            "code": "validation_error",
+            "message": "Notion API request failed: validation_error (400).",
+            "retryable": False,
+            "status_code": 400,
+        }
+
+    def test_exposes_retryable_provider_errors(self) -> None:
+        """Temporary provider failures should tell the agent it may retry."""
+        self._configure_connector("notion", connector_ref="notion")
+        self.provider.side_effect = NotionTestApiError("rate_limited", 429)
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"Notion API request failed: rate_limited \(429\)\.",
+        ):
+            handle_task(stub=self.stub, task_id=22, run_id=7)
+
+        assert _pushed_response(self.stub).payload["error"] == {
+            "code": "rate_limited",
+            "message": "Notion API request failed: rate_limited (429).",
+            "retryable": True,
+            "status_code": 429,
+        }

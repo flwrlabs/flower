@@ -19,6 +19,7 @@ from urllib.parse import quote
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
+from ..errors import ConnectorArgumentError
 from ..http import ConnectorApiError, request_json_object
 from ..json_utils import optional_string, require_int_range, require_string
 
@@ -37,7 +38,7 @@ def search_records(
     """Search records in one Attio workspace."""
     objects = arguments.get("objects")
     if not isinstance(objects, list) or not objects:
-        raise ValueError("Attio objects must be a non-empty list.")
+        raise ConnectorArgumentError("Attio objects must be a non-empty list.")
     return _call_attio_api(
         "POST",
         "/objects/records/search",

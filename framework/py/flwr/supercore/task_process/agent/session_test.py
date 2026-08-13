@@ -17,6 +17,8 @@
 
 from unittest.mock import Mock, patch
 
+import pytest
+
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
@@ -164,3 +166,49 @@ def test_create_connector_response_resolves_canonical_name() -> None:
     assert isinstance(request, ConnectorRequest)
     assert request.payload["name"] == "notion_search"
     assert output == "done"
+
+
+def test_create_connector_response_exposes_safe_error_message() -> None:
+    """Agent connector calls should surface the provider's safe failure."""
+    stub = Mock()
+    stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
+    responses = RuntimeAgentResponses(
+        stub=stub,
+        run_id=123,
+        task_id=789,
+        context=Mock(),
+        start_run_request=StartRunRequest(),
+    )
+    reply = ConnectorResponse(
+        dst_task_id=789,
+        name="notion_search",
+        call_id="call-1",
+        output=None,
+        error={
+            "code": "validation_error",
+            "message": "Notion API request failed: validation_error (400).",
+            "retryable": False,
+            "status_code": 400,
+        },
+        reply_to_message_id="request-message-id",
+    )
+
+    with (
+        patch(
+            "flwr.supercore.task_process.agent.session.get_connector_ref",
+            return_value="notion",
+        ),
+        patch.object(responses, "_send_and_receive", return_value=reply),
+        pytest.raises(
+            RuntimeError,
+            match=(
+                "Connector 'notion_search' failed: "
+                r"Notion API request failed: validation_error \(400\)\."
+            ),
+        ),
+    ):
+        responses.create_connector_response(
+            name="notion_search",
+            call_id="call-1",
+            arguments={"query": "Meeting Notes"},
+        )

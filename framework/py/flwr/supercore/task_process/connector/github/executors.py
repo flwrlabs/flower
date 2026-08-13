@@ -22,6 +22,7 @@ from urllib.parse import quote
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
+from ..errors import ConnectorArgumentError
 from ..http import ConnectorApiError, request_json_object
 from ..json_utils import optional_string, require_int_range, require_string
 
@@ -47,7 +48,7 @@ def search_code(
     owner, repo = _repository_ref(arguments.get("owner"), arguments.get("repo"))
     query = require_string(arguments.get("query"), "GitHub", "query")
     if _REPOSITORY_QUALIFIER.search(query) is not None:
-        raise ValueError("GitHub query must not contain a repo qualifier.")
+        raise ConnectorArgumentError("GitHub query must not contain a repo qualifier.")
     limit = require_int_range(arguments.get("limit", 5), "GitHub", "limit", maximum=10)
     return _call_api(
         "/search/code",
@@ -122,9 +123,9 @@ def _repository_ref(owner: object, repo: object) -> tuple[str, str]:
     owner = require_string(owner, "GitHub", "owner")
     repo = require_string(repo, "GitHub", "repo")
     if _OWNER.fullmatch(owner) is None or _REPOSITORY.fullmatch(repo) is None:
-        raise ValueError("GitHub repository is invalid.")
+        raise ConnectorArgumentError("GitHub repository is invalid.")
     if repo in {".", ".."}:
-        raise ValueError("GitHub repository is invalid.")
+        raise ConnectorArgumentError("GitHub repository is invalid.")
     return owner, repo
 
 
@@ -132,5 +133,5 @@ def _repository_path(value: object) -> str:
     """Validate a repository-relative file path."""
     path = require_string(value, "GitHub", "path").lstrip("/")
     if not path or any(part in {"", ".", ".."} for part in path.split("/")):
-        raise ValueError("GitHub path must point to a file.")
+        raise ConnectorArgumentError("GitHub path must point to a file.")
     return path
