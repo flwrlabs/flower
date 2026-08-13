@@ -19,7 +19,6 @@ from typing import cast
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
-from ..errors import ConnectorArgumentError
 from ..http import ConnectorApiError, request_json_object
 from ..json_utils import (
     optional_string,
@@ -60,14 +59,14 @@ def list_conversations(
     if types is not None and (
         not isinstance(types, list) or not all(isinstance(item, str) for item in types)
     ):
-        raise ConnectorArgumentError("Slack conversation types are invalid.")
+        raise ValueError("Slack conversation types are invalid.")
     selected_types = (
         list(SLACK_CONVERSATION_TYPES) if types is None else cast(list[str], types)
     )
     if not selected_types or any(
         item not in SLACK_CONVERSATION_TYPES for item in selected_types
     ):
-        raise ConnectorArgumentError("Slack conversation types are invalid.")
+        raise ValueError("Slack conversation types are invalid.")
     return _call_slack_api(
         "conversations.list",
         context.credentials,

@@ -20,9 +20,7 @@ from unittest.mock import Mock, patch
 import pytest
 import requests
 
-from .errors import ConnectorArgumentError
 from .http import ConnectorApiError, request_json_object
-from .json_utils import require_int_range
 
 
 class ExampleApiError(ConnectorApiError):
@@ -44,17 +42,4 @@ def test_json_request_failure_is_secret_safe() -> None:
         )
 
     assert exc_info.value.code == "request_failed"
-    assert exc_info.value.retryable is True
     assert "secret" not in str(exc_info.value)
-
-
-def test_argument_failure_is_public_and_actionable() -> None:
-    """Argument validation should produce a structured model-facing error."""
-    with pytest.raises(ConnectorArgumentError) as exc_info:
-        require_int_range("many", "Notion", "limit", maximum=100)
-
-    assert exc_info.value.to_json() == {
-        "code": "invalid_arguments",
-        "message": "Notion limit must be an integer.",
-        "retryable": False,
-    }

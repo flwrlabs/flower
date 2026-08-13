@@ -34,7 +34,7 @@ from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_loads
 
-from .errors import PublicConnectorError
+from .http import ConnectorApiError
 from .registry import (
     get_connector_ref,
     invoke_connector,
@@ -93,7 +93,7 @@ def handle_task(
         }
     except Exception as ex:  # pylint: disable=broad-exception-caught
         if uses_credentials:
-            safe_error = ex if isinstance(ex, PublicConnectorError) else None
+            safe_error = ex if isinstance(ex, ConnectorApiError) else None
             response = _make_error_response(safe_error)
             credential_failure_message = (
                 str(safe_error)
@@ -139,14 +139,10 @@ def _parse_connector_json(value: str) -> JSONObject:
 
 def _make_error_response(ex: Exception | None) -> JSONObject:
     """Create a JSON error response from an exception."""
-    if isinstance(ex, PublicConnectorError):
-        error = ex.to_json()
-    else:
-        error = {
-            "code": "connector_error",
-            "message": str(ex) if ex is not None else "Connector execution failed.",
-        }
     return {
         "output": None,
-        "error": error,
+        "error": {
+            "code": "connector_error",
+            "message": str(ex) if ex is not None else "Connector execution failed.",
+        },
     }
