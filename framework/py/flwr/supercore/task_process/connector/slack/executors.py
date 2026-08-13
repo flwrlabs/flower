@@ -19,7 +19,7 @@ from typing import cast
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
-from ..http import ConnectorApiError, request_json_object
+from ..http import ConnectorApiError
 from ..json_utils import (
     optional_string,
     require_bool,
@@ -27,8 +27,6 @@ from ..json_utils import (
     require_string,
 )
 from .actions import SLACK_CONVERSATION_TYPES
-
-_SLACK_API_BASE_URL = "https://slack.com/api"
 
 
 class SlackApiError(ConnectorApiError):
@@ -43,7 +41,7 @@ def search_messages(
     """Search messages visible to the connected Slack user."""
     return _call_slack_api(
         "search.messages",
-        context.credentials,
+        context,
         {
             "query": require_string(arguments.get("query"), "Slack", "query"),
             "count": _limit(arguments, default=5, maximum=15),
@@ -69,7 +67,7 @@ def list_conversations(
         raise ValueError("Slack conversation types are invalid.")
     return _call_slack_api(
         "conversations.list",
-        context.credentials,
+        context,
         {
             "limit": _limit(arguments, default=10, maximum=50),
             "cursor": optional_string(arguments.get("cursor"), "Slack", "cursor"),
@@ -91,7 +89,7 @@ def get_conversation_history(
     """Read one page of a Slack conversation's message history."""
     return _call_slack_api(
         "conversations.history",
-        context.credentials,
+        context,
         _conversation_params(arguments),
     )
 
@@ -102,7 +100,7 @@ def get_thread_replies(
     """Read one page of replies from a Slack thread."""
     params = _conversation_params(arguments)
     params["ts"] = require_string(arguments.get("thread_ts"), "Slack", "thread_ts")
-    return _call_slack_api("conversations.replies", context.credentials, params)
+    return _call_slack_api("conversations.replies", context, params)
 
 
 EXECUTORS: dict[str, ConnectorExecutor] = {
@@ -114,17 +112,15 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
 
 
 def _call_slack_api(
-    method: str, credentials: JSONObject, params: dict[str, str | None]
+    method: str, context: ConnectorExecutionContext, params: dict[str, str | None]
 ) -> JSONObject:
     """Call one Slack Web API method and validate its response envelope."""
-    token = credentials.get("access_token")
-    if not isinstance(token, str) or not token:
-        raise SlackApiError("invalid_credentials")
-    payload = request_json_object(
+    if context.http is None:
+        raise RuntimeError("Slack HTTP client is not configured.")
+    payload = context.http.request(
         "GET",
-        f"{_SLACK_API_BASE_URL}/{method}",
+        f"/{method}",
         error=SlackApiError,
-        headers={"Authorization": f"Bearer {token}"},
         params={key: value for key, value in params.items() if value is not None},
         http_error_code=lambda response: (
             "rate_limited" if response.status_code == 429 else "http_error"

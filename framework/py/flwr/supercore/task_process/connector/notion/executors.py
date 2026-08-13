@@ -19,10 +19,9 @@ import requests
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
-from ..http import ConnectorApiError, request_json_object
+from ..http import ConnectorApiError
 from ..json_utils import optional_string, require_int_range, require_string
 
-_NOTION_API_BASE_URL = "https://api.notion.com/v1"
 NOTION_API_VERSION = "2026-03-11"
 
 
@@ -42,7 +41,7 @@ def search(arguments: JSONObject, context: ConnectorExecutionContext) -> JSONObj
     }
     if cursor := optional_string(arguments.get("cursor"), "Notion", "cursor"):
         body["start_cursor"] = cursor
-    return _call_notion_api("POST", "/search", context.credentials, body=body)
+    return _call_notion_api("POST", "/search", context, body=body)
 
 
 def get_page_content(
@@ -63,7 +62,7 @@ def get_page_content(
         params["start_cursor"] = cursor
     page_id = require_string(arguments.get("page_id"), "Notion", "page_id")
     return _call_notion_api(
-        "GET", f"/blocks/{page_id}/children", context.credentials, params=params
+        "GET", f"/blocks/{page_id}/children", context, params=params
     )
 
 
@@ -76,23 +75,18 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
 def _call_notion_api(
     method: str,
     path: str,
-    credentials: JSONObject,
+    context: ConnectorExecutionContext,
     *,
     body: JSONObject | None = None,
     params: dict[str, str] | None = None,
 ) -> JSONObject:
     """Call one Notion API endpoint and return its JSON response."""
-    token = credentials.get("access_token")
-    if not isinstance(token, str) or not token:
-        raise NotionApiError("invalid_credentials")
-    return request_json_object(
+    if context.http is None:
+        raise RuntimeError("Notion HTTP client is not configured.")
+    return context.http.request(
         method,
-        f"{_NOTION_API_BASE_URL}{path}",
+        path,
         error=NotionApiError,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Notion-Version": NOTION_API_VERSION,
-        },
         params=params,
         json=body,
         http_error_code=_response_error_code,

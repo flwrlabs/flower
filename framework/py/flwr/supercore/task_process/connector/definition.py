@@ -22,6 +22,7 @@ from typing import Literal
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
+from .http import ConnectorHttpClient
 from .oauth import OAuthFlow
 
 ConnectorHandler = Callable[..., JSONValue]
@@ -93,6 +94,8 @@ class ProviderDefinition:
     description: str
     actions: tuple[ActionDefinition, ...]
     oauth: OAuth2Definition | None = None
+    api_base_url: str | None = None
+    api_headers: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -102,6 +105,7 @@ class ConnectorExecutionContext:
     credentials: JSONObject
     config: JSONObject
     usage_recorder: TaskUsageRecorder
+    http: ConnectorHttpClient | None = None
 
 
 ConnectorExecutor = Callable[[JSONObject, ConnectorExecutionContext], JSONValue]

@@ -37,6 +37,8 @@ PROVIDER = ProviderDefinition(
         token_headers={"Notion-Version": NOTION_API_VERSION},
         config_fields=("workspace_id", "workspace_name", "bot_id"),
     ),
+    api_base_url="https://api.notion.com/v1",
+    api_headers={"Notion-Version": NOTION_API_VERSION},
 )
 
 CONNECTOR = ConnectorDefinition(

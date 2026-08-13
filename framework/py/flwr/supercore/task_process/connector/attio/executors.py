@@ -19,10 +19,8 @@ from urllib.parse import quote
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
-from ..http import ConnectorApiError, request_json_object
+from ..http import ConnectorApiError
 from ..json_utils import optional_string, require_int_range, require_string
-
-_ATTIO_API_BASE_URL = "https://api.attio.com/v2"
 
 
 class AttioApiError(ConnectorApiError):
@@ -41,7 +39,7 @@ def search_records(
     return _call_attio_api(
         "POST",
         "/objects/records/search",
-        context.credentials,
+        context,
         json_body={
             "query": require_string(arguments.get("query"), "Attio", "query"),
             "objects": [require_string(item, "Attio", "object") for item in objects],
@@ -58,7 +56,7 @@ def list_meetings(
     return _call_attio_api(
         "GET",
         "/meetings",
-        context.credentials,
+        context,
         params={
             "limit": str(_limit(arguments, default=50, maximum=50)),
             "cursor": _optional(arguments, "cursor"),
@@ -77,7 +75,7 @@ def list_call_recordings(
     return _call_attio_api(
         "GET",
         f"/meetings/{meeting_id}/call_recordings",
-        context.credentials,
+        context,
         params={
             "limit": str(_limit(arguments, default=50, maximum=200)),
             "cursor": _optional(arguments, "cursor"),
@@ -96,7 +94,7 @@ def get_call_transcript(
     return _call_attio_api(
         "GET",
         f"/meetings/{meeting_id}/call_recordings/{recording_id}/transcript",
-        context.credentials,
+        context,
         params={"cursor": _optional(arguments, "cursor")},
     )
 
@@ -112,23 +110,18 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
 def _call_attio_api(
     method: str,
     path: str,
-    credentials: JSONObject,
+    context: ConnectorExecutionContext,
     *,
     params: dict[str, str | None] | None = None,
     json_body: JSONObject | None = None,
 ) -> JSONObject:
     """Call one Attio REST endpoint."""
-    token = credentials.get("access_token")
-    if not isinstance(token, str) or not token:
-        raise AttioApiError("invalid_credentials")
-    return request_json_object(
+    if context.http is None:
+        raise RuntimeError("Attio HTTP client is not configured.")
+    return context.http.request(
         method,
-        f"{_ATTIO_API_BASE_URL}{path}",
+        path,
         error=AttioApiError,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        },
         params={k: v for k, v in (params or {}).items() if v is not None},
         json=json_body,
         http_error_code=lambda response: (

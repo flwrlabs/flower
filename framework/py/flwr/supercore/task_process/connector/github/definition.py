@@ -17,7 +17,7 @@
 from ..definition import ConnectorDefinition, OAuth2Definition, ProviderDefinition
 from ..oauth import load_oauth_flow
 from .actions import ACTIONS
-from .executors import EXECUTORS
+from .executors import EXECUTORS, GITHUB_API_VERSION, GITHUB_JSON_ACCEPT
 
 GITHUB_CONNECTOR_REF = "github"
 
@@ -38,6 +38,11 @@ PROVIDER = ProviderDefinition(
         allow_additional_scopes=False,
         expected_token_type="bearer",
     ),
+    api_base_url="https://api.github.com",
+    api_headers={
+        "Accept": GITHUB_JSON_ACCEPT,
+        "X-GitHub-Api-Version": GITHUB_API_VERSION,
+    },
 )
 
 CONNECTOR = ConnectorDefinition(

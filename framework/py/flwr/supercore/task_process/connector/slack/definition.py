@@ -49,6 +49,7 @@ PROVIDER = ProviderDefinition(
         token_response_path=("authed_user",),
         success_field="ok",
     ),
+    api_base_url="https://slack.com/api",
 )
 
 CONNECTOR = ConnectorDefinition(

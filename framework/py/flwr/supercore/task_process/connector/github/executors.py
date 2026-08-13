@@ -22,12 +22,11 @@ from urllib.parse import quote
 from flwr.supercore.typing import JSONObject
 
 from ..definition import ConnectorExecutionContext, ConnectorExecutor
-from ..http import ConnectorApiError, request_json_object
+from ..http import ConnectorApiError
 from ..json_utils import optional_string, require_int_range, require_string
 
-_API_BASE_URL = "https://api.github.com"
-_API_VERSION = "2026-03-10"
-_JSON_ACCEPT = "application/vnd.github+json"
+GITHUB_API_VERSION = "2026-03-10"
+GITHUB_JSON_ACCEPT = "application/vnd.github+json"
 _TEXT_MATCH_ACCEPT = "application/vnd.github.text-match+json"
 _OWNER = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
 _REPOSITORY = re.compile(r"^[A-Za-z0-9._-]{1,100}$")
@@ -51,7 +50,7 @@ def search_code(
     limit = require_int_range(arguments.get("limit", 5), "GitHub", "limit", maximum=10)
     return _call_api(
         "/search/code",
-        context.credentials,
+        context,
         params={"q": f"{query} repo:{owner}/{repo}", "per_page": str(limit)},
         accept=_TEXT_MATCH_ACCEPT,
     )
@@ -67,7 +66,7 @@ def get_file_content(
     payload = _call_api(
         f"/repos/{quote(owner, safe='')}/{quote(repo, safe='')}/"
         f"contents/{quote(path, safe='/')}",
-        context.credentials,
+        context,
         params={"ref": ref} if ref else {},
     )
     if payload.get("type") != "file" or payload.get("encoding") != "base64":
@@ -95,24 +94,19 @@ EXECUTORS: dict[str, ConnectorExecutor] = {
 
 def _call_api(
     path: str,
-    credentials: JSONObject,
+    context: ConnectorExecutionContext,
     *,
     params: dict[str, str],
-    accept: str = _JSON_ACCEPT,
+    accept: str = GITHUB_JSON_ACCEPT,
 ) -> JSONObject:
     """Call one GitHub REST endpoint."""
-    token = credentials.get("access_token")
-    if not isinstance(token, str) or not token:
-        raise GitHubApiError("invalid_credentials")
-    return request_json_object(
+    if context.http is None:
+        raise RuntimeError("GitHub HTTP client is not configured.")
+    return context.http.request(
         "GET",
-        f"{_API_BASE_URL}{path}",
+        path,
         error=GitHubApiError,
-        headers={
-            "Accept": accept,
-            "Authorization": f"Bearer {token}",
-            "X-GitHub-Api-Version": _API_VERSION,
-        },
+        headers={"Accept": accept},
         params=params,
     )
 

@@ -34,6 +34,8 @@ PROVIDER = ProviderDefinition(
         redirect_uri_env="FLWR_ATTIO_REDIRECT_URI",
         token_auth_method="client_secret_post",
     ),
+    api_base_url="https://api.attio.com/v2",
+    api_headers={"Content-Type": "application/json"},
 )
 
 CONNECTOR = ConnectorDefinition(
