@@ -526,7 +526,11 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         runtime = RunTime.DEPLOYMENT
         sim_cfg = state.federation_manager.get_simulation_config(federation_id)
         if sim_cfg and is_agentapp_bundle:
-            raise ValueError("AgentApp cannot run in a simulation federation.")
+            raise FlowerError(
+                ApiErrorCode.INVALID_RUN_CONFIG,
+                "AgentApp cannot run in a simulation federation.",
+                public_details="AgentApp cannot run in a simulation federation.",
+            )
         if sim_cfg:
             primary_task_type = TaskType.SIMULATION
             runtime = RunTime.SIMULATION

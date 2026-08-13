@@ -622,6 +622,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             self.servicer.StartRun(request, Mock())
 
         self.assertEqual(error.exception.code, ApiErrorCode.INVALID_RUN_CONFIG)
+        self.assertEqual(
+            error.exception.public_details,
+            "AgentApp cannot run in a simulation federation.",
+        )
         self.assertEqual(list(self.state.get_run_info()), [])
 
     def test_start_run_creates_builtin_agentapp_run_from_app_spec(self) -> None:
