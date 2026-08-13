@@ -58,6 +58,8 @@ def postgresql_url_from_environment(
     except ValueError as exc:
         raise ValueError("FLWR_POSTGRES_PORT must be an integer") from exc
 
+    if not 1 <= port <= 65535:
+        raise ValueError("FLWR_POSTGRES_PORT must be between 1 and 65535")
     return URL.create(
         "postgresql+psycopg",
         username=values["FLWR_POSTGRES_USER"],
