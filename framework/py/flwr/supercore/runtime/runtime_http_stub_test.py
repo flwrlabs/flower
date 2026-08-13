@@ -16,6 +16,9 @@
 
 from unittest.mock import patch
 
+import pytest
+from google.protobuf.message import Message
+
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
@@ -27,55 +30,46 @@ from flwr.supercore.protobuf.client import ProtobufClient
 from flwr.supercore.runtime import RuntimeHttpStub
 
 
-def test_pull_pending_tasks() -> None:
-    """Call the PullPendingTasks HTTP endpoint."""
-    request = PullPendingTasksRequest()
-    response = PullPendingTasksResponse()
+@pytest.mark.parametrize(
+    ("method_name", "path", "request_message", "response_type"),
+    [
+        (
+            "PullPendingTasks",
+            "/v1/runtime/pull-pending-tasks",
+            PullPendingTasksRequest(),
+            PullPendingTasksResponse,
+        ),
+        (
+            "ClaimTask",
+            "/v1/runtime/claim-task",
+            ClaimTaskRequest(task_id=123),
+            ClaimTaskResponse,
+        ),
+        (
+            "GetRun",
+            "/v1/runtime/get-run",
+            GetRunRequest(run_id=123),
+            GetRunResponse,
+        ),
+    ],
+)
+def test_runtime_method(
+    method_name: str,
+    path: str,
+    request_message: Message,
+    response_type: type[Message],
+) -> None:
+    """Call one shared Runtime HTTP endpoint."""
+    response = response_type()
     stub = RuntimeHttpStub("http://runtime.example")
 
     with patch.object(ProtobufClient, "_unary_unary", return_value=response) as call:
-        result = stub.PullPendingTasks(request=request)
+        result = getattr(stub, method_name)(request_message)
 
     assert result is response
     call.assert_called_once_with(
-        path="/v1/runtime/pull-pending-tasks",
-        rpc_method="/flwr.proto.Runtime/PullPendingTasks",
-        request=request,
-        response_type=PullPendingTasksResponse,
-    )
-
-
-def test_claim_task() -> None:
-    """Call the ClaimTask HTTP endpoint."""
-    request = ClaimTaskRequest(task_id=123)
-    response = ClaimTaskResponse(token="token")
-    stub = RuntimeHttpStub("http://runtime.example")
-
-    with patch.object(ProtobufClient, "_unary_unary", return_value=response) as call:
-        result = stub.ClaimTask(request)
-
-    assert result is response
-    call.assert_called_once_with(
-        path="/v1/runtime/claim-task",
-        rpc_method="/flwr.proto.Runtime/ClaimTask",
-        request=request,
-        response_type=ClaimTaskResponse,
-    )
-
-
-def test_get_run() -> None:
-    """Call the GetRun HTTP endpoint."""
-    request = GetRunRequest(run_id=123)
-    response = GetRunResponse()
-    stub = RuntimeHttpStub("http://runtime.example")
-
-    with patch.object(ProtobufClient, "_unary_unary", return_value=response) as call:
-        result = stub.GetRun(request)
-
-    assert result is response
-    call.assert_called_once_with(
-        path="/v1/runtime/get-run",
-        rpc_method="/flwr.proto.Runtime/GetRun",
-        request=request,
-        response_type=GetRunResponse,
+        path=path,
+        rpc_method=f"/flwr.proto.Runtime/{method_name}",
+        request=request_message,
+        response_type=response_type,
     )
