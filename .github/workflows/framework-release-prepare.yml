@@ -1,0 +1,295 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+name: Prepare Framework Minor Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Framework minor release version, e.g. 1.34.0"
+        required: true
+        type: string
+
+concurrency:
+  group: framework-release-prepare-${{ inputs.version }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  authorize-manual-trigger:
+    name: Authorize manual trigger
+    uses: ./.github/workflows/_repo-authorize-manual-trigger.yml
+
+  prepare-release:
+    name: Prepare Framework release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: authorize-manual-trigger
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate version and pin main
+        id: release
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="${INPUT_VERSION}"
+          if [[ ! "${version}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.0$ ]]; then
+            echo "Invalid Framework minor release version: ${version}" >&2
+            echo "Expected X.Y.0, for example 1.34.0." >&2
+            exit 1
+          fi
+
+          git fetch origin main
+          release_source_sha="$(git rev-parse origin/main)"
+          release_series="${version%.0}"
+          branch="automation/release/framework-${version}"
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "release-series=${release_series}" >> "${GITHUB_OUTPUT}"
+          echo "release-source-sha=${release_source_sha}" >> "${GITHUB_OUTPUT}"
+          echo "branch=${branch}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check release preconditions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SERIES: ${{ steps.release.outputs.release-series }}
+          RELEASE_SOURCE_SHA: ${{ steps.release.outputs.release-source-sha }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          remote_ref_must_not_exist() {
+            local ref="$1"
+            local description="$2"
+            local status
+
+            set +e
+            git ls-remote --exit-code origin "${ref}" >/dev/null
+            status=$?
+            set -e
+
+            case "${status}" in
+              0)
+                echo "${description} already exists: ${ref}" >&2
+                exit 1
+                ;;
+              2)
+                ;;
+              *)
+                echo "Unable to check ${description}: ${ref}" >&2
+                exit "${status}"
+                ;;
+            esac
+          }
+
+          remote_ref_must_not_exist \
+            "refs/tags/framework-${VERSION}" \
+            "Framework release tag"
+          remote_ref_must_not_exist \
+            "refs/heads/release/framework-${RELEASE_SERIES}" \
+            "Framework release branch"
+
+          release_exists="$(
+            gh release list \
+              --repo "${GITHUB_REPOSITORY}" \
+              --limit 1000 \
+              --json tagName \
+              --jq "any(.[]; .tagName == \"framework-${VERSION}\")"
+          )"
+          if [[ "${release_exists}" == "true" ]]; then
+            echo "GitHub Release for Framework ${VERSION} already exists." >&2
+            exit 1
+          fi
+
+          source_version="$(
+            git show "${RELEASE_SOURCE_SHA}:framework/pyproject.toml" \
+              | sed -nE 's/^version = "([^"]+)"$/\1/p' \
+              | head -n 1
+          )"
+          if [[ "${source_version}" != "${VERSION}" ]]; then
+            echo "Pinned main commit ${RELEASE_SOURCE_SHA} contains Framework version '${source_version:-unknown}', expected '${VERSION}'." >&2
+            exit 1
+          fi
+
+      - name: Select automation branch
+        id: automation
+        env:
+          BRANCH: ${{ steps.release.outputs.branch }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SOURCE_SHA: ${{ steps.release.outputs.release-source-sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          set +e
+          git ls-remote --exit-code --heads origin "refs/heads/${BRANCH}" >/dev/null
+          branch_status=$?
+          set -e
+
+          case "${branch_status}" in
+            0)
+              prs="$(
+                gh pr list \
+                  --repo "${GITHUB_REPOSITORY}" \
+                  --head "${BRANCH}" \
+                  --state open \
+                  --limit 2 \
+                  --json number,baseRefName
+              )"
+              pr_count="$(jq 'length' <<< "${prs}")"
+              if [[ "${pr_count}" -ne 1 ]]; then
+                echo "Automation branch ${BRANCH} must have exactly one open release PR; found ${pr_count}." >&2
+                exit 1
+              fi
+
+              pr_base="$(jq -r '.[0].baseRefName' <<< "${prs}")"
+              if [[ "${pr_base}" != "main" ]]; then
+                echo "Release PR for ${BRANCH} targets '${pr_base}', expected 'main'." >&2
+                exit 1
+              fi
+
+              git fetch --no-tags origin \
+                "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+              git switch --create "${BRANCH}" --track "origin/${BRANCH}"
+
+              echo "mode=refresh" >> "${GITHUB_OUTPUT}"
+              echo "pr-number=$(jq -r '.[0].number' <<< "${prs}")" >> "${GITHUB_OUTPUT}"
+              ;;
+            2)
+              previous_prs="$(
+                gh pr list \
+                  --repo "${GITHUB_REPOSITORY}" \
+                  --head "${BRANCH}" \
+                  --state all \
+                  --limit 1 \
+                  --json number
+              )"
+              if [[ "$(jq 'length' <<< "${previous_prs}")" -ne 0 ]]; then
+                echo "Found an existing PR for missing automation branch ${BRANCH}; refusing to recreate it." >&2
+                exit 1
+              fi
+
+              git switch --create "${BRANCH}" "${RELEASE_SOURCE_SHA}"
+              echo "mode=create" >> "${GITHUB_OUTPUT}"
+              ;;
+            *)
+              echo "Unable to check automation branch ${BRANCH}." >&2
+              exit "${branch_status}"
+              ;;
+          esac
+
+      - name: Bootstrap Python
+        uses: ./.github/actions/bootstrap
+
+      - name: Install changelog updater dependency
+        run: python -m pip install GitPython==3.1.50
+
+      - name: Prepare Framework changelog inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SOURCE_SHA: ${{ steps.release.outputs.release-source-sha }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          python framework/dev/update_changelog.py \
+            --version "${VERSION}" \
+            --source-sha "${RELEASE_SOURCE_SHA}"
+
+      - name: Draft Framework changelog
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: gpt-5.6-sol
+          effort: high
+          permission-profile: ":workspace"
+          prompt: >-
+            Use $flower-release-changelog for Framework ${{ inputs.version }}.
+            Changelog: framework/docs/source/changelog/v${{ inputs.version }}.md
+
+      - name: Update Framework versions
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          python framework/dev/update_version.py \
+            --released-version "${VERSION}"
+
+      - name: Commit release changes
+        id: release-commit
+        env:
+          MODE: ${{ steps.automation.outputs.mode }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf -- .cache/update_changelog
+
+          git config user.name "Flower"
+          git config user.email "148336023+flwrmachine@users.noreply.github.com"
+          git add --all
+
+          if git diff --cached --quiet; then
+            if [[ "${MODE}" == "create" ]]; then
+              echo "Release preparation produced no changes, so a new release PR cannot be created." >&2
+              exit 1
+            fi
+            echo "Release bookkeeping is already up to date; skipping commit and push."
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          git commit -m "feat(framework): Prepare ${VERSION} release"
+          echo "changed=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Push release changes
+        if: ${{ steps.release-commit.outputs.changed == 'true' }}
+        env:
+          BRANCH: ${{ steps.release.outputs.branch }}
+          GH_TOKEN: ${{ secrets.FLWRMACHINE_TOKEN }}
+        run: |
+          gh auth setup-git
+          git push origin "HEAD:${BRANCH}"
+
+      - name: Create or refresh release PR
+        env:
+          BRANCH: ${{ steps.release.outputs.branch }}
+          GH_TOKEN: ${{ secrets.FLWRMACHINE_TOKEN }}
+          MODE: ${{ steps.automation.outputs.mode }}
+          PR_NUMBER: ${{ steps.automation.outputs.pr-number }}
+          RELEASE_SOURCE_SHA: ${{ steps.release.outputs.release-source-sha }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          body_file="${RUNNER_TEMP}/framework-release-pr-body.md"
+          {
+            echo '<!-- framework-release-metadata:start -->'
+            printf -- '- Release version: `%s`\n' "${VERSION}"
+            printf -- '- Release source SHA: `%s`\n' "${RELEASE_SOURCE_SHA}"
+            echo '<!-- framework-release-metadata:end -->'
+          } > "${body_file}"
+
+          if [[ "${MODE}" == "create" ]]; then
+            gh pr create \
+              --repo "${GITHUB_REPOSITORY}" \
+              --base main \
+              --head "${BRANCH}" \
+              --title "feat(framework): Prepare ${VERSION} release" \
+              --body-file "${body_file}" \
+              --draft
+          else
+            gh pr edit "${PR_NUMBER}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --body-file "${body_file}"
+          fi
