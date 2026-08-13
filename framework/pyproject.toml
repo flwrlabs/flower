@@ -58,6 +58,7 @@ dependencies = [
     "rich>=14.0.0,<15.0.0",
     "pyyaml>=6.0.2,<7.0.0",
     "requests>=2.33.0,<3.0.0",
+    "httpx>=0.28.1,<1.0.0",
     "click>=8.0.0,<9.0.0",
     "packaging>=24.0,<26.0",
     "SQLAlchemy[asyncio]>=2.0.45,<3.0.0",

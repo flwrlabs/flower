@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower ServerApp runtime."""
+"""Flower SuperLink runtime."""
 
 
 from .run_serverapp import run_serverapp
+from .runtime_http_stub import RuntimeHttpStub as RuntimeHttpStub
 
 __all__ = [
+    "RuntimeHttpStub",
     "run_serverapp",
 ]
