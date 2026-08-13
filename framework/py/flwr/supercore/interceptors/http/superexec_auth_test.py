@@ -17,8 +17,8 @@
 from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
+import httpx
 import pytest
-import requests
 
 from flwr.proto.runtime_pb2 import PullPendingTasksRequest  # pylint: disable=E0611
 from flwr.supercore.auth import (
@@ -49,7 +49,7 @@ def _context(rpc_method: str = _RPC_METHOD) -> ProtobufRequestContext:
     return ProtobufRequestContext(
         rpc_method=rpc_method,
         message=PullPendingTasksRequest(),
-        request=requests.Request("POST", "http://runtime.example").prepare(),
+        request=httpx.Request("POST", "http://runtime.example"),
     )
 
 
@@ -62,7 +62,7 @@ def test_signs_protected_request(_token_hex: Mock, _now: Mock) -> None:
     """Attach verifiable SuperExec authentication headers."""
     master_secret = b"master-secret"
     context = _context()
-    response = requests.Response()
+    response = httpx.Response(200)
     call_next = Mock(return_value=response)
     interceptor = SuperExecAuthHttpInterceptor(
         master_secret=master_secret,
@@ -95,7 +95,7 @@ def test_skips_unprotected_request() -> None:
         protected_methods=RUNTIME_SUPEREXEC_METHODS,
     )
 
-    interceptor.intercept(context, Mock(return_value=requests.Response()))
+    interceptor.intercept(context, Mock(return_value=httpx.Response(200)))
 
     assert SUPEREXEC_AUTH_SIGNATURE_HEADER not in context.request.headers
 
@@ -110,4 +110,4 @@ def test_rejects_duplicate_headers() -> None:
     )
 
     with pytest.raises(RuntimeError, match=SUPEREXEC_AUTH_TIMESTAMP_HEADER):
-        interceptor.intercept(context, Mock(return_value=requests.Response()))
+        interceptor.intercept(context, Mock(return_value=httpx.Response(200)))

@@ -16,7 +16,7 @@
 
 from collections.abc import Collection
 
-import requests
+import httpx
 
 from flwr.supercore.auth import create_superexec_auth_metadata, derive_auth_secret
 from flwr.supercore.protobuf.client import ProtobufCall, ProtobufRequestContext
@@ -40,7 +40,7 @@ class SuperExecAuthHttpInterceptor:
         self,
         context: ProtobufRequestContext,
         call_next: ProtobufCall,
-    ) -> requests.Response:
+    ) -> httpx.Response:
         """Sign protected requests before sending them."""
         if context.rpc_method in self._protected_methods:
             add_headers(

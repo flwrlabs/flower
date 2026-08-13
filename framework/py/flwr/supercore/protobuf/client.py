@@ -20,7 +20,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol, Self, TypeVar
 
-import requests
+import httpx
 from google.protobuf.message import DecodeError, Message
 
 from .constants import PROTOBUF_MEDIA_TYPE
@@ -34,10 +34,10 @@ class ProtobufRequestContext:
 
     rpc_method: str
     message: Message
-    request: requests.PreparedRequest
+    request: httpx.Request
 
 
-ProtobufCall = Callable[[ProtobufRequestContext], requests.Response]
+ProtobufCall = Callable[[ProtobufRequestContext], httpx.Response]
 
 
 class ProtobufClientInterceptor(Protocol):
@@ -47,7 +47,7 @@ class ProtobufClientInterceptor(Protocol):
         self,
         context: ProtobufRequestContext,
         call_next: ProtobufCall,
-    ) -> requests.Response:
+    ) -> httpx.Response:
         """Process a request around the next interceptor or HTTP transport."""
 
 
@@ -57,7 +57,7 @@ def _wrap_interceptor(
 ) -> ProtobufCall:
     """Wrap one interceptor around the next call in the chain."""
 
-    def call(context: ProtobufRequestContext) -> requests.Response:
+    def call(context: ProtobufRequestContext) -> httpx.Response:
         return interceptor.intercept(context, call_next)
 
     return call
@@ -76,9 +76,7 @@ class ProtobufClient:
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._interceptors = tuple(interceptors)
-        self._verify = verify
-        self._timeout = timeout
-        self._session = requests.Session()
+        self._client = httpx.Client(verify=verify, timeout=timeout)
 
     def _unary_unary(
         self,
@@ -90,10 +88,10 @@ class ProtobufClient:
     ) -> ResponseT:
         """Send a unary request and parse its unary protobuf response."""
         path = path if path.startswith("/") else f"/{path}"
-        http_request = requests.Request(
+        http_request = self._client.build_request(
             method="POST",
             url=f"{self._base_url}{path}",
-            data=request.SerializeToString(deterministic=True),
+            content=request.SerializeToString(deterministic=True),
             headers={
                 "content-type": PROTOBUF_MEDIA_TYPE,
                 "accept": PROTOBUF_MEDIA_TYPE,
@@ -102,10 +100,11 @@ class ProtobufClient:
         context = ProtobufRequestContext(
             rpc_method=rpc_method,
             message=request,
-            request=self._session.prepare_request(http_request),
+            request=http_request,
         )
         response = self._send(context)
-        response.raise_for_status()
+        if response.is_error:
+            response.raise_for_status()
 
         result = response_type()
         try:
@@ -114,15 +113,11 @@ class ProtobufClient:
             raise ValueError("Invalid protobuf response payload") from exc
         return result
 
-    def _send(self, context: ProtobufRequestContext) -> requests.Response:
+    def _send(self, context: ProtobufRequestContext) -> httpx.Response:
         """Send a request through the configured interceptor chain."""
 
-        def send(current_context: ProtobufRequestContext) -> requests.Response:
-            return self._session.send(
-                current_context.request,
-                verify=self._verify,
-                timeout=self._timeout,
-            )
+        def send(current_context: ProtobufRequestContext) -> httpx.Response:
+            return self._client.send(current_context.request)
 
         call_next: ProtobufCall = send
         for interceptor in reversed(self._interceptors):
@@ -131,8 +126,8 @@ class ProtobufClient:
         return call_next(context)
 
     def close(self) -> None:
-        """Close the underlying HTTP session."""
-        self._session.close()
+        """Close the underlying HTTP client."""
+        self._client.close()
 
     def __enter__(self) -> Self:
         """Return this client from a context manager."""
