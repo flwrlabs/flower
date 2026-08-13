@@ -14,11 +14,11 @@
 # ==============================================================================
 """Utilities shared by protobuf-over-HTTP client interceptors."""
 
-import requests
+import httpx
 
 
 def add_headers(
-    request: requests.PreparedRequest,
+    request: httpx.Request,
     headers: dict[str, str],
 ) -> None:
     """Add headers while rejecting values already provided by another layer."""
