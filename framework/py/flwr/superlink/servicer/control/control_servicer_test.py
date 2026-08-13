@@ -587,8 +587,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, expected_task_type)
 
-    def test_start_run_creates_agentapp_run_from_local_fab(self) -> None:
-        """Test StartRun creates an AgentApp run for a submitted AgentApp FAB."""
+    def test_start_run_rejects_agentapp_in_simulation_federation(self) -> None:
+        """Test StartRun rejects an AgentApp in a simulation federation."""
         fab_content = b"test AgentApp FAB content"
         request = StartRunRequest()
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
@@ -602,14 +602,12 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch(
                 "flwr.superlink.servicer.control.control_handlers.get_fab_config"
             ) as mock_get_fab_config,
-            patch(
-                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config"
-            ) as mock_get_metadata_from_config,
             patch.object(
                 self.state.federation_manager,
                 "get_simulation_config",
                 return_value=SimulationConfig(),
             ),
+            self.assertRaises(FlowerError) as error,
         ):
             mock_get_fab_config.return_value = {
                 "tool": {
@@ -621,23 +619,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                     }
                 }
             }
-            mock_get_metadata_from_config.return_value = ("flwr/agent", "0.1.0")
-            response = self.servicer.StartRun(request, Mock())
+            self.servicer.StartRun(request, Mock())
 
-        runs = self.state.get_run_info(run_ids=[response.run_id])
-        tasks = self.state.get_tasks()
-        series = self.state.get_run_series(series_ids=[response.series_id])
-
-        self.assertEqual(len(runs), 1)
-        self.assertEqual(runs[0].fab_id, "flwr/agent")
-        self.assertEqual(runs[0].fab_version, "0.1.0")
-        self.assertEqual(runs[0].primary_task_type, TaskType.AGENT_APP)
-        self.assertEqual(runs[0].override_config["agent.input"], agent_input)
-        self.assertEqual(series[0].description, "Hello from the agent")
-        self.assertEqual(len(tasks), 1)
-        self.assertEqual(tasks[0].run_id, response.run_id)
-        self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
-        self.assertEqual(tasks[0].fab_hash, runs[0].fab_hash)
+        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_RUN_CONFIG)
+        self.assertEqual(list(self.state.get_run_info()), [])
 
     def test_start_run_creates_builtin_agentapp_run_from_app_spec(self) -> None:
         """Test StartRun creates an AgentApp run for the built-in flwr agent."""
