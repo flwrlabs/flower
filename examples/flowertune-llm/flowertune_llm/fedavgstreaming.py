@@ -767,6 +767,8 @@ class FedAvgStreaming(FedAvg):
         offload_dir: str,
         chunk_count_by_layer: dict[str, int],
         layer_names: list[str],
+        downstream_bytes_by_id: dict[str, int],
+        downstream_duration_ms: float,
     ) -> None:
         """Pull reply objects one array at a time and aggregate incrementally."""
         if not msg_ids:
