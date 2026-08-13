@@ -12,10 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared gRPC interceptors used across supercore services."""
+"""Shared client and server interceptors used across supercore services."""
 
 from flwr.supercore.constant import TASK_TOKEN_HEADER
 
+from .http import (
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
+    SuperExecAuthHttpInterceptor,
+)
 from .rpc_error_translation_interceptor import RpcErrorTranslationServerInterceptor
 from .runtime_token_interceptor import (
     AUTHENTICATION_FAILED_MESSAGE,
@@ -44,10 +49,13 @@ __all__ = [
     "AUTHENTICATION_FAILED_MESSAGE",
     "RpcErrorTranslationServerInterceptor",
     "RuntimeTokenClientInterceptor",
+    "RuntimeTokenHttpInterceptor",
     "RuntimeTokenServerInterceptor",
     "RuntimeVersionClientInterceptor",
+    "RuntimeVersionHttpInterceptor",
     "RuntimeVersionServerInterceptor",
     "SuperExecAuthClientInterceptor",
+    "SuperExecAuthHttpInterceptor",
     "SuperExecAuthServerInterceptor",
     "TASK_TOKEN_HEADER",
     "create_control_runtime_version_server_interceptor",

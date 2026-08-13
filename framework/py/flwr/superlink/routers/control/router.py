@@ -169,7 +169,7 @@ def stop_automation(
     return control_handlers.stop_automation(request, account, linkstate)
 
 
-@router.post("/get-login-details")
+@router.post("/get-login-details", deprecated=True)
 def get_login_details(
     request: Annotated[GetLoginDetailsRequest, Depends(get_protobuf_request)],
     authn_plugin: AuthnPluginDependency,
@@ -178,7 +178,7 @@ def get_login_details(
     return control_handlers.get_login_details(request, authn_plugin)
 
 
-@router.post("/get-auth-tokens")
+@router.post("/get-auth-tokens", deprecated=True)
 def get_auth_tokens(
     request: Annotated[GetAuthTokensRequest, Depends(get_protobuf_request)],
     authn_plugin: AuthnPluginDependency,

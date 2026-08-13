@@ -19,6 +19,7 @@ from .policy import RUNTIME_METHOD_AUTH_POLICY, MethodTokenPolicy
 from .superexec import (
     compute_request_body_sha256,
     compute_superexec_signature,
+    create_superexec_auth_metadata,
     derive_auth_secret,
     verify_superexec_request,
     verify_superexec_signature,
@@ -31,6 +32,7 @@ __all__ = [
     "add_superexec_auth_secret_args",
     "compute_request_body_sha256",
     "compute_superexec_signature",
+    "create_superexec_auth_metadata",
     "derive_auth_secret",
     "load_superexec_auth_secret",
     "verify_superexec_request",
