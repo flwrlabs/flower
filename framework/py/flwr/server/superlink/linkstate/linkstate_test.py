@@ -2294,7 +2294,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     )
 
 
-def _claim_running_in_separate_process(
+def _claim_running_in_separate_process(  # pylint: disable=too-many-positional-arguments
     database_path: str,
     task_id: int,
     ready_event: Any,
@@ -2905,7 +2905,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
                 != claimed_messages[1][0].metadata.message_id
             )
 
-    # pylint: disable-next=too-many-locals
+    # pylint: disable-next=too-many-branches,too-many-locals
     def test_activate_task_running_claim_is_atomic_across_replicas(self) -> None:
         """Ensure only one replica can claim STARTING -> RUNNING transition."""
         with tempfile.TemporaryDirectory() as tmpdir:
