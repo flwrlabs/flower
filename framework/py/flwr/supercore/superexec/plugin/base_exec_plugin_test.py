@@ -17,6 +17,8 @@
 from typing import cast
 from unittest.mock import Mock, patch
 
+import pytest
+
 from flwr.supercore.constant import TaskType
 from flwr.supercore.run import Run
 from flwr.supercore.superexec.executor import ExecutionSpec
@@ -118,6 +120,27 @@ def test_simulation_launch_delegates_simulation_task_type() -> None:
     spec = _execution_spec_from_executor(executor)
     assert spec.task_type == TaskType.SIMULATION
     assert spec.suppress_output is True
+
+
+@pytest.mark.parametrize("task_type", [TaskType.MODEL, TaskType.CONNECTOR])
+def test_serverapp_launch_exposes_model_and_connector_output(
+    task_type: TaskType,
+) -> None:
+    """Model and connector task output should be visible for error reporting."""
+    executor = Mock()
+    plugin = ServerAppExecPlugin(
+        appio_api_address="127.0.0.1:9092",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=_get_run,
+        executor=executor,
+    )
+
+    plugin.launch_task(token="token", task=_get_task(task_id=5, task_type=task_type))
+
+    spec = _execution_spec_from_executor(executor)
+    assert spec.task_type == task_type
+    assert spec.suppress_output is False
 
 
 class DummyExecPlugin(BaseExecPlugin):
