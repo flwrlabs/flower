@@ -12,16 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Compatibility wrapper for LinkState SQLAlchemy metadata."""
+"""Utilities shared by protobuf-over-HTTP client interceptors."""
 
-from sqlalchemy import MetaData
-
-from flwr.supercore.state.schema.linkstate_models import LinkStateBase
+import httpx
 
 
-def create_linkstate_metadata() -> MetaData:
-    """Create and return MetaData with LinkState table definitions."""
-    metadata = MetaData()
-    for table in LinkStateBase.metadata.tables.values():
-        table.to_metadata(metadata)
-    return metadata
+def add_headers(
+    request: httpx.Request,
+    headers: dict[str, str],
+) -> None:
+    """Add headers while rejecting values already provided by another layer."""
+    duplicates = {name for name in headers if name in request.headers}
+    if duplicates:
+        raise RuntimeError(
+            f"HTTP request already contains headers: {', '.join(sorted(duplicates))}"
+        )
+    request.headers.update(headers)

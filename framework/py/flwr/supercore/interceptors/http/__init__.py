@@ -12,16 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Compatibility wrapper for LinkState SQLAlchemy metadata."""
+"""Reusable protobuf-over-HTTP client interceptors."""
 
-from sqlalchemy import MetaData
+from .runtime_version import RuntimeVersionHttpInterceptor
+from .superexec_auth import SuperExecAuthHttpInterceptor
 
-from flwr.supercore.state.schema.linkstate_models import LinkStateBase
-
-
-def create_linkstate_metadata() -> MetaData:
-    """Create and return MetaData with LinkState table definitions."""
-    metadata = MetaData()
-    for table in LinkStateBase.metadata.tables.values():
-        table.to_metadata(metadata)
-    return metadata
+__all__ = ["RuntimeVersionHttpInterceptor", "SuperExecAuthHttpInterceptor"]
