@@ -39,7 +39,7 @@ def _make_request(tokens: list[str]) -> Request:
     )
 
 
-def test_get_task_returns_task_for_valid_token() -> None:
+def test_authenticate_task_returns_task_for_valid_token() -> None:
     """Return the task associated with a valid task token."""
     state = Mock(spec=CoreState)
     expected_task = Task(task_id=123)
@@ -52,7 +52,9 @@ def test_get_task_returns_task_for_valid_token() -> None:
 
 
 @pytest.mark.parametrize("token", [None, "invalid-token"])
-def test_get_task_rejects_missing_or_invalid_token(token: str | None) -> None:
+def test_authenticate_task_rejects_missing_or_invalid_token(
+    token: str | None,
+) -> None:
     """Reject requests without a task matching the supplied token."""
     state = Mock(spec=CoreState)
     state.get_task_by_token.return_value = None
@@ -68,7 +70,7 @@ def test_get_task_rejects_missing_or_invalid_token(token: str | None) -> None:
         state.get_task_by_token.assert_called_once_with(token)
 
 
-def test_get_task_rejects_duplicate_token_headers() -> None:
+def test_authenticate_task_rejects_duplicate_token_headers() -> None:
     """Reject duplicate task-token headers without querying state."""
     state = Mock(spec=CoreState)
 
