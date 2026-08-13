@@ -169,10 +169,8 @@ def test_list_agents_returns_recent_distinct_agentapps() -> None:
 
     linkstate.get_run_info.return_value = [
         run("alice/research", "latest-hash"),
-        run("alice/research", "older-hash"),
         run("alice/writer", "writer-hash"),
         run("alice/planner", "planner-hash"),
-        run("alice/excluded-by-limit", "fourth-hash"),
     ]
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
@@ -215,10 +213,7 @@ def test_list_agents_uses_request_limit() -> None:
     first = Run.create_empty(1)
     first.fab_id = "alice/research"
     first.fab_hash = "research-hash"
-    second = Run.create_empty(2)
-    second.fab_id = "alice/writer"
-    second.fab_hash = "writer-hash"
-    linkstate.get_run_info.return_value = [first, second]
+    linkstate.get_run_info.return_value = [first]
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
 

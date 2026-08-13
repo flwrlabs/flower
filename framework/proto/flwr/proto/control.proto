@@ -301,7 +301,7 @@ message AgentInfo {
 }
 message ListAgentsRequest {
   string federation_id = 1;
-  optional uint64 limit = 2;
+  optional uint32 limit = 2;
 }
 message ListAgentsResponse { repeated AgentInfo agents = 1; }
 
