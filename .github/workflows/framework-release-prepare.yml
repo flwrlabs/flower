@@ -206,10 +206,18 @@ jobs:
           git commit -m "feat(framework): Prepare ${VERSION} release"
           echo "changed=true" >> "${GITHUB_OUTPUT}"
 
-      - name: Publish release preparation
+      - name: Push release changes
+        if: ${{ steps.release-commit.outputs.changed == 'true' }}
         env:
           BRANCH: ${{ steps.release.outputs.branch }}
-          CHANGED: ${{ steps.release-commit.outputs.changed }}
+          GH_TOKEN: ${{ secrets.FLWRMACHINE_TOKEN }}
+        run: |
+          gh auth setup-git
+          git push origin "HEAD:${BRANCH}"
+
+      - name: Create or refresh release PR
+        env:
+          BRANCH: ${{ steps.release.outputs.branch }}
           GH_TOKEN: ${{ secrets.FLWRMACHINE_TOKEN }}
           MODE: ${{ steps.automation.outputs.mode }}
           RELEASE_SOURCE_SHA: ${{ steps.release.outputs.release-source-sha }}
@@ -225,11 +233,6 @@ jobs:
             printf -- '- Release source SHA: `%s`\n' "${RELEASE_SOURCE_SHA}"
             echo '<!-- framework-release-metadata:end -->'
           } > "${body_file}"
-
-          if [[ "${CHANGED}" == "true" ]]; then
-            gh auth setup-git
-            git push origin "HEAD:${BRANCH}"
-          fi
 
           if [[ "${MODE}" == "create" ]]; then
             gh pr create \
