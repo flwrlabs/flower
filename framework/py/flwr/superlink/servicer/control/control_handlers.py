@@ -184,8 +184,7 @@ class ConnectorFailureError(FlowerError):
         )
 
 
-AGENTAPP_CANDIDATE_LIMIT = 50
-AGENT_LIMIT = 3
+DEFAULT_AGENT_LIMIT = 3
 
 
 def list_connectors(
@@ -1299,27 +1298,23 @@ def list_agents(
     """List recent AgentApps in a federation."""
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    limit = request.limit if request.HasField("limit") else DEFAULT_AGENT_LIMIT
+    if limit == 0:
+        return ListAgentsResponse()
 
     runs = state.get_run_info(
         federation_ids=[federation_id],
         primary_task_types=[TaskType.AGENT_APP],
         order_by="pending_at",
         ascending=False,
-        limit=AGENTAPP_CANDIDATE_LIMIT,
+        distinct_by_fab_id=True,
+        limit=limit,
     )
-
-    agents: list[AgentInfo] = []
-    seen_app_ids: set[str] = set()
-    for run in runs:
-        app_id = f"@{run.fab_id}"
-        if app_id in seen_app_ids:
-            continue
-        seen_app_ids.add(app_id)
-        agents.append(AgentInfo(app_id=app_id, fab_hash=run.fab_hash))
-        if len(agents) == AGENT_LIMIT:
-            break
-
-    return ListAgentsResponse(agents=agents)
+    return ListAgentsResponse(
+        agents=[
+            AgentInfo(app_id=f"@{run.fab_id}", fab_hash=run.fab_hash) for run in runs
+        ]
+    )
 
 
 def show_federation(

@@ -202,7 +202,49 @@ def test_list_agents_returns_recent_distinct_agentapps() -> None:
         primary_task_types=[TaskType.AGENT_APP],
         order_by="pending_at",
         ascending=False,
-        limit=50,
+        distinct_by_fab_id=True,
+        limit=3,
+    )
+
+
+def test_list_agents_uses_request_limit() -> None:
+    """ListAgents uses an explicitly requested response limit."""
+    linkstate = Mock(spec=LinkState)
+    linkstate.federation_manager.exists.return_value = True
+    linkstate.federation_manager.has_member.return_value = True
+    first = Run.create_empty(1)
+    first.fab_id = "alice/research"
+    first.fab_hash = "research-hash"
+    second = Run.create_empty(2)
+    second.fab_id = "alice/writer"
+    second.fab_hash = "writer-hash"
+    linkstate.get_run_info.return_value = [first, second]
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: linkstate
+
+    response = TestClient(app).post(
+        "/v1/control/list-agents",
+        content=ListAgentsRequest(
+            federation_id="@alice/research", limit=1
+        ).SerializeToString(),
+        headers={
+            "authorization": "Bearer access-token",
+            "content-type": PROTOBUF_MEDIA_TYPE,
+        },
+    )
+    proto_response = ListAgentsResponse.FromString(response.content)
+
+    assert response.status_code == 200
+    assert [(agent.app_id, agent.fab_hash) for agent in proto_response.agents] == [
+        ("@alice/research", "research-hash")
+    ]
+    linkstate.get_run_info.assert_called_once_with(
+        federation_ids=["@alice/research"],
+        primary_task_types=[TaskType.AGENT_APP],
+        order_by="pending_at",
+        ascending=False,
+        distinct_by_fab_id=True,
+        limit=1,
     )
 
 

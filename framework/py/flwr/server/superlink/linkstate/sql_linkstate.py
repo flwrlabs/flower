@@ -998,6 +998,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         primary_task_types: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
+        distinct_by_fab_id: bool = False,
         limit: int | None = None,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters."""
@@ -1050,6 +1051,26 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not primary_task_types:
                 return []
             stmt = stmt.where(TaskModel.type.in_(primary_task_types))
+
+        if distinct_by_fab_id:
+            if order_by is None:
+                raise ValueError("distinct_by_fab_id requires order_by")
+            rank_order = (
+                TaskModel.pending_at.asc() if ascending else TaskModel.pending_at.desc()
+            )
+            ranked_runs = stmt.with_only_columns(
+                RunModel.run_id.label("run_id"),
+                func.row_number()
+                .over(partition_by=RunModel.fab_id, order_by=rank_order)
+                .label("row_number"),
+            ).subquery()
+            stmt = (
+                select(RunModel, TaskModel)
+                .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
+                .join(ranked_runs, ranked_runs.c.run_id == RunModel.run_id)
+                .where(ranked_runs.c.row_number == 1)
+                .execution_options(populate_existing=True)
+            )
 
         if order_by is not None:
             order_column = TaskModel.pending_at

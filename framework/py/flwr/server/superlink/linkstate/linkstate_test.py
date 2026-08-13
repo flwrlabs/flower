@@ -523,6 +523,28 @@ class StateTest(CoreStateTest):
         self.assertEqual([run.run_id for run in descending_runs], run_ids[::-1])
         self.assertEqual([run.run_id for run in limited_runs], run_ids[:2])
 
+    def test_get_run_info_distinct_by_fab_id_before_limit(self) -> None:
+        """Test distinct FAB IDs are selected before applying the limit."""
+        state = self.state_factory()
+        _ = create_dummy_run(state, fab_id="app-a", fab_hash="older-hash")
+        time.sleep(1e-6)
+        app_b_run_id = create_dummy_run(state, fab_id="app-b")
+        time.sleep(1e-6)
+        latest_app_a_run_id = create_dummy_run(
+            state, fab_id="app-a", fab_hash="latest-hash"
+        )
+
+        runs = state.get_run_info(
+            order_by="pending_at",
+            ascending=False,
+            distinct_by_fab_id=True,
+            limit=2,
+        )
+
+        self.assertEqual(
+            [run.run_id for run in runs], [latest_app_a_run_id, app_b_run_id]
+        )
+
     @parameterized.expand([(1,), (2,), (9999,)])  # type: ignore
     def test_get_run_info_limit_without_order_by(self, limit: int) -> None:
         """Test get_run_info applies limit when no order_by is specified."""

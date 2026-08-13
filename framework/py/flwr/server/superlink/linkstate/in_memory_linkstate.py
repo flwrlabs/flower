@@ -733,6 +733,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         primary_task_types: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
+        distinct_by_fab_id: bool = False,
         limit: int | None = None,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters."""
@@ -799,6 +800,17 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     key=lambda run: run.pending_at,
                     reverse=not ascending,
                 )
+
+            if distinct_by_fab_id:
+                if order_by is None:
+                    raise ValueError("distinct_by_fab_id requires order_by")
+                seen_fab_ids: set[str] = set()
+                distinct_runs = []
+                for run in runs:
+                    if run.fab_id not in seen_fab_ids:
+                        seen_fab_ids.add(run.fab_id)
+                        distinct_runs.append(run)
+                runs = distinct_runs
 
             if limit is not None:
                 runs = runs[:limit]

@@ -880,13 +880,18 @@ class ListAgentsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FEDERATION_ID_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
     federation_id: builtins.str
+    limit: builtins.int
     def __init__(
         self,
         *,
         federation_id: builtins.str = ...,
+        limit: builtins.int | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["federation_id", b"federation_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "limit", b"limit"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "federation_id", b"federation_id", "limit", b"limit"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
 
 global___ListAgentsRequest = ListAgentsRequest
 

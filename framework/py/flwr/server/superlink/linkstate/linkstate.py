@@ -330,6 +330,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         primary_task_types: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
+        distinct_by_fab_id: bool = False,
         limit: int | None = None,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters.
@@ -354,6 +355,9 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Field used to order the result.
         ascending : bool (default: True)
             Whether sorting should be in ascending order.
+        distinct_by_fab_id : bool (default: False)
+            Keep only the first run for each FAB ID in the requested order.
+            Requires `order_by` to be set.
         limit : Optional[int] (default: None)
             Maximum number of runs to return. If `None`, no limit is applied.
 
