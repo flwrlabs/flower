@@ -1,0 +1,136 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Tests for the HTTP SuperLink Runtime API stub."""
+
+from unittest.mock import patch
+
+import pytest
+from google.protobuf.message import Message
+
+from flwr.proto.log_pb2 import (  # pylint: disable=E0611
+    PushLogsRequest,
+    PushLogsResponse,
+)
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ConfirmMessageReceivedRequest,
+    ConfirmMessageReceivedResponse,
+    PullObjectRequest,
+    PullObjectResponse,
+    PushObjectRequest,
+    PushObjectResponse,
+)
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    GetNodesRequest,
+    GetNodesResponse,
+    PullAppMessagesRequest,
+    PullAppMessagesResponse,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
+    PushAppMessagesRequest,
+    PushAppMessagesResponse,
+    PushTaskOutputRequest,
+    PushTaskOutputResponse,
+    SendTaskHeartbeatRequest,
+    SendTaskHeartbeatResponse,
+)
+from flwr.supercore.protobuf.client import ProtobufClient
+from flwr.superlink.runtime import RuntimeHttpStub
+
+
+@pytest.mark.parametrize(
+    ("method_name", "path", "request_message", "response_type"),
+    [
+        (
+            "SendTaskHeartbeat",
+            "/v1/runtime/send-task-heartbeat",
+            SendTaskHeartbeatRequest(),
+            SendTaskHeartbeatResponse,
+        ),
+        (
+            "PullTaskInput",
+            "/v1/runtime/pull-task-input",
+            PullTaskInputRequest(),
+            PullTaskInputResponse,
+        ),
+        (
+            "PushTaskOutput",
+            "/v1/runtime/push-task-output",
+            PushTaskOutputRequest(),
+            PushTaskOutputResponse,
+        ),
+        (
+            "PushObject",
+            "/v1/runtime/push-object",
+            PushObjectRequest(),
+            PushObjectResponse,
+        ),
+        (
+            "PullObject",
+            "/v1/runtime/pull-object",
+            PullObjectRequest(),
+            PullObjectResponse,
+        ),
+        (
+            "ConfirmMessageReceived",
+            "/v1/runtime/confirm-message-received",
+            ConfirmMessageReceivedRequest(),
+            ConfirmMessageReceivedResponse,
+        ),
+        (
+            "PushLogs",
+            "/v1/runtime/push-logs",
+            PushLogsRequest(),
+            PushLogsResponse,
+        ),
+        (
+            "PushMessages",
+            "/v1/runtime/push-messages",
+            PushAppMessagesRequest(),
+            PushAppMessagesResponse,
+        ),
+        (
+            "PullMessages",
+            "/v1/runtime/pull-messages",
+            PullAppMessagesRequest(),
+            PullAppMessagesResponse,
+        ),
+        (
+            "GetNodes",
+            "/v1/runtime/get-nodes",
+            GetNodesRequest(),
+            GetNodesResponse,
+        ),
+    ],
+)
+def test_serverapp_runtime_method(
+    method_name: str,
+    path: str,
+    request_message: Message,
+    response_type: type[Message],
+) -> None:
+    """Call one Runtime endpoint required by flwr-serverapp."""
+    response = response_type()
+    stub = RuntimeHttpStub("http://runtime.example")
+
+    with patch.object(ProtobufClient, "_unary_unary", return_value=response) as call:
+        result = getattr(stub, method_name)(request_message)
+
+    assert result is response
+    call.assert_called_once_with(
+        path=path,
+        rpc_method=f"/flwr.proto.Runtime/{method_name}",
+        request=request_message,
+        response_type=response_type,
+    )
