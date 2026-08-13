@@ -18,8 +18,6 @@
 
 from logging import DEBUG, ERROR
 
-import grpc
-
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -57,6 +55,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import ObjectStore
 from flwr.supernode.nodestate import NodeState
 
@@ -78,7 +77,6 @@ def pull_task_input(
     request: PullTaskInputRequest,
     state: NodeState,
     task: Task,
-    context: grpc.ServicerContext,
 ) -> PullTaskInputResponse:
     """Pull Message, Context, and Run."""
     log(DEBUG, "Runtime.PullTaskInput")
@@ -88,18 +86,16 @@ def pull_task_input(
     # Retrieve run, context, and FAB for this run
     run = state.get_run(run_id)
     if run is None:
-        context.abort(
-            grpc.StatusCode.NOT_FOUND,
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND,
             f"Run {run_id} not found in NodeState.",
         )
-        raise RuntimeError("This line should never be reached.")
     series_context = state.get_run_series_context(run.series_id)
     if series_context is None:
-        context.abort(
-            grpc.StatusCode.NOT_FOUND,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_RUN_SERIES_CONTEXT_NOT_FOUND,
             f"Context for RunSeries {run.series_id} not found in NodeState.",
         )
-        raise RuntimeError("This line should never be reached.")
 
     # Retrieve FAB from NodeState
     if fab := state.get_fab(run.fab_hash):
@@ -111,11 +107,10 @@ def pull_task_input(
             fab.verifications,
         )
     else:
-        context.abort(
-            grpc.StatusCode.NOT_FOUND,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_FAB_NOT_FOUND,
             f"FAB with hash {run.fab_hash} not found in NodeState.",
         )
-        raise RuntimeError("This line should never be reached.")
 
     # Activate task
     if state.activate_task(task_id=task.task_id):
@@ -127,8 +122,10 @@ def pull_task_input(
         )
 
     log(ERROR, "Failed to start task %d of run %s", task.task_id, run_id)
-    context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Failed to start task.")
-    raise RuntimeError("Unreachable code")  # for mypy
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_TASK_START_FAILED,
+        "Failed to start task.",
+    )
 
 
 def push_task_output(
@@ -195,7 +192,6 @@ def push_messages(
     request: PushAppMessagesRequest,
     state: NodeState,
     task: Task,
-    context: grpc.ServicerContext,
 ) -> PushAppMessagesResponse:
     """Push messages for ClientApp; currently accepts exactly one message."""
     log(DEBUG, "Runtime.PushMessages")
@@ -203,18 +199,16 @@ def push_messages(
     run_id = task.run_id
 
     if len(request.messages_list) != 1 or len(request.message_object_trees) != 1:
-        context.abort(
-            grpc.StatusCode.INVALID_ARGUMENT,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_MESSAGE_COUNT,
             "Runtime.PushMessages expects exactly one message and one object tree.",
         )
-        raise RuntimeError("Unreachable code")  # for mypy
 
     if run_id != request.messages_list[0].metadata.run_id:
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_MESSAGE_RUN_ID_MISMATCH,
             "Run ID in message does not match authenticated task's run ID.",
         )
-        raise RuntimeError("Unreachable code")  # for mypy
 
     # Record message processing end time
     message = message_from_proto(request.messages_list[0])
@@ -231,42 +225,35 @@ def push_messages(
     )
 
 
-def get_nodes(
-    request: GetNodesRequest, context: grpc.ServicerContext
-) -> GetNodesResponse:
+def get_nodes(request: GetNodesRequest) -> GetNodesResponse:
     """Get available nodes."""
     log(DEBUG, "Runtime.GetNodes")
-    context.abort(
-        grpc.StatusCode.PERMISSION_DENIED,
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
         "This endpoint is only available to ServerApp tasks.",
     )
-    raise RuntimeError("Unreachable code")  # for mypy
 
 
 def start_automation(
     request: StartAutomationRequest,
-    context: grpc.ServicerContext,
 ) -> StartAutomationResponse:
     """Reject automation requests from ClientApp tasks."""
     log(DEBUG, "Runtime.StartAutomation")
-    context.abort(
-        grpc.StatusCode.PERMISSION_DENIED,
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
         "Only AgentApp and ServerApp tasks can create automations.",
     )
-    raise RuntimeError("Unreachable code")  # for mypy
 
 
 def get_connector(
     request: GetConnectorRequest,
-    context: grpc.ServicerContext,
 ) -> GetConnectorResponse:
     """Reject connector credential requests from ClientApp tasks."""
     log(DEBUG, "Runtime.GetConnector")
-    context.abort(
-        grpc.StatusCode.PERMISSION_DENIED,
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE,
         "Connector credentials are not available to this task.",
     )
-    raise RuntimeError("Unreachable code")  # for mypy
 
 
 def push_object(
