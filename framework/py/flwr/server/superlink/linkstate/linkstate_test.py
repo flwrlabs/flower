@@ -2706,7 +2706,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
 
     def _claim_running_process_target(
         self,
-    ) -> Callable[[str, int, Any, Any, float], None]:
+    ) -> Callable[[str, int, Any, Any, Any, float], None]:
         """Return process target for STARTING -> RUNNING claim tests."""
         return _claim_running_in_separate_process
 
