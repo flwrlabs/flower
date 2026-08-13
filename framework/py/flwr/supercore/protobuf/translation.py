@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import cast
 
 from fastapi import Request
 from fastapi.responses import Response, StreamingResponse
@@ -216,9 +215,11 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
 
         # Synchronous generators and other iterables are streamed lazily too.
         # Starlette advances a synchronous iterator outside the event loop.
-        if isinstance(result, Iterable):
+        if isinstance(result, Iterable) and not isinstance(
+            result, (str, bytes, bytearray)
+        ):
             return StreamingResponse(
-                (frame_message(message) for message in cast(Iterable[Message], result)),
+                (frame_message(message) for message in result),
                 media_type=PROTOBUF_STREAM_MEDIA_TYPE,
             )
 
