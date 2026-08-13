@@ -2294,9 +2294,10 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     )
 
 
-def _claim_running_in_separate_process(
+def _claim_running_in_separate_process(  # pylint: disable=too-many-positional-arguments
     database_path: str,
     task_id: int,
+    ready_event: Any,
     start_event: Any,
     result_queue: Any,
     timeout: float,
@@ -2308,6 +2309,7 @@ def _claim_running_in_separate_process(
         object_store=ObjectStoreFactory().store(),
     )
     state.initialize()
+    ready_event.set()
     if not start_event.wait(timeout=timeout):
         result_queue.put((False, "start-event-timeout"))
         return
@@ -2704,7 +2706,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
 
     def _claim_running_process_target(
         self,
-    ) -> Callable[[str, int, Any, Any, float], None]:
+    ) -> Callable[[str, int, Any, Any, Any, float], None]:
         """Return process target for STARTING -> RUNNING claim tests."""
         return _claim_running_in_separate_process
 
@@ -2903,7 +2905,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
                 != claimed_messages[1][0].metadata.message_id
             )
 
-    # pylint: disable-next=too-many-locals
+    # pylint: disable-next=too-many-branches,too-many-locals
     def test_activate_task_running_claim_is_atomic_across_replicas(self) -> None:
         """Ensure only one replica can claim STARTING -> RUNNING transition."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2918,22 +2920,54 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             start_event = ctx.Event()
             result_queue = ctx.Queue()
             timeout = self._CONCURRENT_TEST_TIMEOUT
+            ready_events = [ctx.Event(), ctx.Event()]
 
             # Execute
             claim_target = self._claim_running_process_target()
             processes = [
                 ctx.Process(
                     target=claim_target,
-                    args=(db_path, task_id, start_event, result_queue, timeout),
+                    args=(
+                        db_path,
+                        task_id,
+                        ready_events[0],
+                        start_event,
+                        result_queue,
+                        timeout,
+                    ),
                 ),
                 ctx.Process(
                     target=claim_target,
-                    args=(db_path, task_id, start_event, result_queue, timeout),
+                    args=(
+                        db_path,
+                        task_id,
+                        ready_events[1],
+                        start_event,
+                        result_queue,
+                        timeout,
+                    ),
                 ),
             ]
             for proc in processes:
                 proc.start()
-            # Release both processes to claim at (roughly) the same time.
+
+            # Wait until both replicas have initialized before releasing them to
+            # claim at (roughly) the same time. This keeps SQLite migration startup
+            # contention out of the atomic claim assertion.
+            ready_deadline = time.monotonic() + timeout
+            for ready_event in ready_events:
+                remaining = ready_deadline - time.monotonic()
+                if remaining <= 0 or not ready_event.wait(timeout=remaining):
+                    for proc in processes:
+                        if proc.is_alive():
+                            proc.terminate()
+                    for proc in processes:
+                        proc.join(timeout=1.0)
+                    self.fail(
+                        "Concurrent run-claim test timed out waiting for replicas "
+                        f"to initialize after {timeout} seconds."
+                    )
+
             start_event.set()
             for proc in processes:
                 proc.join(timeout=timeout)
