@@ -27,6 +27,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.utils import (
     MetadataLookupError,
     find_metadata_keys,
@@ -120,12 +121,15 @@ class RuntimeVersionMetadata:
                 "gRPC metadata already contains runtime version keys: "
                 f"{', '.join(sorted(existing_runtime_keys))}"
             )
-        runtime_metadata = (
+        return metadata + self.as_metadata()
+
+    def as_metadata(self) -> tuple[tuple[str, str], ...]:
+        """Return runtime-version values as transport-neutral metadata."""
+        return (
             (FLWR_PACKAGE_NAME_METADATA_KEY, self.package_name),
             (FLWR_PACKAGE_VERSION_METADATA_KEY, self.package_version),
             (FLWR_COMPONENT_NAME_METADATA_KEY, self.component_name),
         )
-        return metadata + runtime_metadata
 
     def check_compatibility(self, peer: RuntimeVersionMetadata | None) -> str | None:
         """Return a rejection message, or ``None`` if the peer is accepted.
@@ -178,6 +182,23 @@ class RuntimeVersionMetadata:
 
         # Versions are compatible
         return None
+
+
+def get_runtime_version_incompatibility_exit_message(
+    serialized_error: str | None,
+) -> str | None:
+    """Return an exit message for a serialized version-incompatibility error."""
+    flower_error = FlowerError.from_json(serialized_error)
+    if (
+        flower_error is None
+        or flower_error.code != ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
+    ):
+        return None
+
+    exit_message = flower_error.message
+    if flower_error.public_details:
+        exit_message += f"\n{flower_error.public_details}"
+    return exit_message
 
 
 def _metadata_is_missing(

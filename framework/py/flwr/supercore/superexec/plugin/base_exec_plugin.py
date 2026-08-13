@@ -38,6 +38,7 @@ class BaseExecPlugin(ExecPlugin):
     # Placeholders to be defined in subclasses
     supported_task_types: ClassVar[frozenset[TaskType]]
     suppress_output = False
+    visible_output_task_types: ClassVar[frozenset[TaskType]] = frozenset()
 
     def __init__(  # pylint: disable=R0913, R0917
         self,
@@ -98,7 +99,9 @@ class BaseExecPlugin(ExecPlugin):
             root_certificates_path=self.root_certificates_path,
             runtime_dependency_install=self.runtime_dependency_install,
             parent_pid=os.getpid(),
-            suppress_output=self.suppress_output,
+            suppress_output=(
+                self.suppress_output and task_type not in self.visible_output_task_types
+            ),
             task_id=task_id,
         )
 

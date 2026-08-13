@@ -14,10 +14,10 @@
 # ==============================================================================
 """FastAPI dependency for Control API account authentication."""
 
-from collections.abc import Sequence
+from fastapi import Request
+from fastapi.security.utils import get_authorization_scheme_param
 
-from fastapi import Request, Response
-
+from flwr.common.constant import ACCESS_TOKEN_KEY
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
@@ -41,30 +41,38 @@ class AccountAccessDependency:
     def __call__(
         self,
         request: Request,
-        response: Response,
     ) -> AccountInfo:
         """Return the authenticated account for a request."""
-        metadata = request.headers.items()
-        valid_tokens, account = self.authn_plugin.validate_tokens_in_metadata(metadata)
-        if valid_tokens:
-            return self._require_account(
-                account,
-                "Tokens validated, but account info not found",
-            )
-
-        tokens, account = self.authn_plugin.refresh_tokens(metadata)
-        if tokens is None:
+        authorization_headers = request.headers.getlist("authorization")
+        if len(authorization_headers) > 1:
             raise FlowerError(
                 ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-                "Token refresh failed: authentication plugin returned no tokens.",
+                "Expected at most one Authorization header with a Bearer token.",
             )
 
-        account = self._require_account(
-            account,
-            "Tokens refreshed, but account info not found",
+        metadata: list[tuple[str, str]] = []
+        if authorization_headers:
+            scheme, access_token = get_authorization_scheme_param(
+                authorization_headers[0]
+            )
+            if scheme.lower() != "bearer" or not access_token:
+                raise FlowerError(
+                    ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+                    "Authorization header does not contain a Bearer token.",
+                )
+            metadata = [(ACCESS_TOKEN_KEY, access_token)]
+
+        valid_token, account = self.authn_plugin.validate_tokens_in_metadata(metadata)
+        if not valid_token:
+            raise FlowerError(
+                ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+                "Access token validation failed.",
+            )
+
+        return self._require_account(
+            account=account,
+            missing_account_detail="Token validated, but account info not found",
         )
-        self._set_response_headers(response, tokens)
-        return account
 
     def _require_account(
         self,
@@ -78,17 +86,6 @@ class AccountAccessDependency:
                 f"{missing_account_detail}: authentication plugin returned no account.",
             )
         return account
-
-    @staticmethod
-    def _set_response_headers(
-        response: Response,
-        tokens: Sequence[tuple[str, str | bytes]],
-    ) -> None:
-        """Add refreshed authentication tokens to the HTTP response."""
-        for key, value in tokens:
-            response.headers[key] = (
-                value.decode("latin-1") if isinstance(value, bytes) else value
-            )
 
 
 def get_account(

@@ -68,6 +68,29 @@ def test_http_error_translator_mapped_flower_error() -> None:
     assert b"internal diagnostic message" not in response.body
 
 
+def test_http_error_translator_adds_bearer_authentication_challenge() -> None:
+    """Challenge clients when HTTP account authentication fails."""
+    response = _run_translator(
+        FlowerError(
+            ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+            "internal authentication failure",
+        )
+    )
+
+    spec = API_ERROR_MAP[ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED]
+    _assert_json_response(
+        response,
+        spec.http_status_code,
+        {
+            "code": ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
+            "public_message": spec.public_message,
+            "public_details": None,
+        },
+    )
+    assert response.headers["www-authenticate"] == "Bearer"
+    assert b"internal authentication failure" not in response.body
+
+
 def test_http_error_translator_unmapped_flower_error() -> None:
     """Translate an unmapped FlowerError into INTERNAL."""
     response = _run_translator(FlowerError(999, "internal diagnostic message"))

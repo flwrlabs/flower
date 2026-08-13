@@ -34,7 +34,8 @@ from uuid import uuid4
 
 from google.protobuf.message import DecodeError
 from parameterized import parameterized
-from sqlalchemy import insert
+from sqlalchemy import event, insert
+from sqlalchemy.sql.dml import Update
 
 from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
@@ -1541,15 +1542,15 @@ class StateTest(CoreStateTest):
             }
 
         # Assert
-        # Allow up to 1 decimal place difference due to file-based SQLite DB speed.
-        # CI runs on cracky old machines, so minor delays are expected.
+        # Allow up to one second of difference due to file-based SQLite DB speed.
+        # CI runs on shared machines, so minor delays are expected.
         self.assertSetEqual(online_node_ids, set(node_ids[7:]))
         for node in nodes:
             actual = datetime.fromisoformat(node.last_activated_at).timestamp()
-            self.assertAlmostEqual(actual, expected_activated_at, 1)
+            self.assertAlmostEqual(actual, expected_activated_at, delta=1)
             if node.status == NodeStatus.OFFLINE:
                 actual = datetime.fromisoformat(node.last_deactivated_at).timestamp()
-                self.assertAlmostEqual(actual, expected_deactivated_at, 1)
+                self.assertAlmostEqual(actual, expected_deactivated_at, delta=1)
 
     def test_acknowledge_node_heartbeat_failed(self) -> None:
         """Test that acknowledge_node_heartbeat returns False when the heartbeat
@@ -2293,9 +2294,10 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     )
 
 
-def _claim_running_in_separate_process(
+def _claim_running_in_separate_process(  # pylint: disable=too-many-positional-arguments
     database_path: str,
     task_id: int,
+    ready_event: Any,
     start_event: Any,
     result_queue: Any,
     timeout: float,
@@ -2307,6 +2309,7 @@ def _claim_running_in_separate_process(
         object_store=ObjectStoreFactory().store(),
     )
     state.initialize()
+    ready_event.set()
     if not start_event.wait(timeout=timeout):
         result_queue.put((False, "start-event-timeout"))
         return
@@ -2703,7 +2706,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
 
     def _claim_running_process_target(
         self,
-    ) -> Callable[[str, int, Any, Any, float], None]:
+    ) -> Callable[[str, int, Any, Any, Any, float], None]:
         """Return process target for STARTING -> RUNNING claim tests."""
         return _claim_running_in_separate_process
 
@@ -2826,30 +2829,43 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             heartbeat_state = states[0]
             delete_state = states[1]
             node_id = create_dummy_node(heartbeat_state, activate=False)
-            original_query = heartbeat_state.query
             did_delete = False
 
             def delete_before_heartbeat_update(
-                query: str, data: Any = None
-            ) -> list[dict[str, Any]]:
+                _conn: Any,
+                statement: Any,
+                _multiparams: Any,
+                _params: Any,
+                _execution_options: Any,
+            ) -> None:
                 nonlocal did_delete
-                normalized_query = " ".join(query.split())
-                if not did_delete and normalized_query.startswith(
-                    "UPDATE node SET online_until"
+                if (
+                    not did_delete
+                    and isinstance(statement, Update)
+                    and getattr(statement.table, "name", None) == "node"
                 ):
                     did_delete = True
                     delete_state.delete_node("mock_flwr_aid", node_id)
-                return original_query(query, data)
-
-            heartbeat_state.query = (  # type: ignore[method-assign]
-                delete_before_heartbeat_update
-            )
 
             # Execute
-            acknowledged = heartbeat_state.acknowledge_node_heartbeat(
-                node_id, heartbeat_interval=30
+            engine = heartbeat_state._engine  # pylint: disable=protected-access
+            assert engine is not None
+            event.listen(
+                engine,
+                "before_execute",
+                delete_before_heartbeat_update,
             )
 
+            try:
+                acknowledged = heartbeat_state.acknowledge_node_heartbeat(
+                    node_id, heartbeat_interval=30
+                )
+            finally:
+                event.remove(
+                    engine,
+                    "before_execute",
+                    delete_before_heartbeat_update,
+                )
             # Assert
             assert did_delete
             assert not acknowledged
@@ -2889,7 +2905,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
                 != claimed_messages[1][0].metadata.message_id
             )
 
-    # pylint: disable-next=too-many-locals
+    # pylint: disable-next=too-many-branches,too-many-locals
     def test_activate_task_running_claim_is_atomic_across_replicas(self) -> None:
         """Ensure only one replica can claim STARTING -> RUNNING transition."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2904,22 +2920,54 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             start_event = ctx.Event()
             result_queue = ctx.Queue()
             timeout = self._CONCURRENT_TEST_TIMEOUT
+            ready_events = [ctx.Event(), ctx.Event()]
 
             # Execute
             claim_target = self._claim_running_process_target()
             processes = [
                 ctx.Process(
                     target=claim_target,
-                    args=(db_path, task_id, start_event, result_queue, timeout),
+                    args=(
+                        db_path,
+                        task_id,
+                        ready_events[0],
+                        start_event,
+                        result_queue,
+                        timeout,
+                    ),
                 ),
                 ctx.Process(
                     target=claim_target,
-                    args=(db_path, task_id, start_event, result_queue, timeout),
+                    args=(
+                        db_path,
+                        task_id,
+                        ready_events[1],
+                        start_event,
+                        result_queue,
+                        timeout,
+                    ),
                 ),
             ]
             for proc in processes:
                 proc.start()
-            # Release both processes to claim at (roughly) the same time.
+
+            # Wait until both replicas have initialized before releasing them to
+            # claim at (roughly) the same time. This keeps SQLite migration startup
+            # contention out of the atomic claim assertion.
+            ready_deadline = time.monotonic() + timeout
+            for ready_event in ready_events:
+                remaining = ready_deadline - time.monotonic()
+                if remaining <= 0 or not ready_event.wait(timeout=remaining):
+                    for proc in processes:
+                        if proc.is_alive():
+                            proc.terminate()
+                    for proc in processes:
+                        proc.join(timeout=1.0)
+                    self.fail(
+                        "Concurrent run-claim test timed out waiting for replicas "
+                        f"to initialize after {timeout} seconds."
+                    )
+
             start_event.set()
             for proc in processes:
                 proc.join(timeout=timeout)
