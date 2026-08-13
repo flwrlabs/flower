@@ -12,14 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Reusable protobuf-over-HTTP client interceptors."""
+"""Shared Runtime API clients."""
 
-from .runtime_token import RuntimeTokenHttpInterceptor
-from .runtime_version import RuntimeVersionHttpInterceptor
-from .superexec_auth import SuperExecAuthHttpInterceptor
+from .runtime_http_stub import RuntimeHttpStub as RuntimeHttpStub
 
-__all__ = [
-    "RuntimeTokenHttpInterceptor",
-    "RuntimeVersionHttpInterceptor",
-    "SuperExecAuthHttpInterceptor",
-]
+__all__ = ["RuntimeHttpStub"]

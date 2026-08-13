@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check PR inventory and section placement in a Flower release changelog."""
+"""Validate PR inventory, heading cleanup, link ordering, and incompatible-section placement in a Flower release changelog."""
 
 import argparse
 import re
@@ -14,7 +14,7 @@ ALLOWED_SECTIONS = {
 }
 SECTION_RE = re.compile(r"^###\s+(.+?)\s*$", re.MULTILINE)
 PR_RE = re.compile(
-    r"\[#\d+\]\(https://github\.com/flwrlabs/flower/pull/(\d+)/?\)"
+    r"\[#(\d+)\]\(https://github\.com/flwrlabs/flower/pull/(\d+)/?\)"
 )
 ITEM_RE = re.compile(r"^- \*\*.+?\*\* \(([^\n]+)\)\s*$", re.MULTILINE)
 
@@ -49,7 +49,12 @@ def validate(text: str, expected: set[int], incompatible: set[int]) -> list[str]
     if generated:
         errors.append("generated headings remain: " + ", ".join(generated))
 
-    actual = [int(number) for number in PR_RE.findall(text)]
+    links = [(int(label), int(target)) for label, target in PR_RE.findall(text)]
+    for label, target in links:
+        if label != target:
+            errors.append(f"PR label #{label} links to PR #{target}")
+
+    actual = [target for _, target in links]
     counts = Counter(actual)
     missing = expected - set(actual)
     extra = set(actual) - expected
@@ -62,13 +67,15 @@ def validate(text: str, expected: set[int], incompatible: set[int]) -> list[str]
         errors.append("duplicate PRs: " + format_prs(duplicates))
 
     for links in ITEM_RE.findall(text):
-        item_prs = [int(number) for number in PR_RE.findall(links)]
+        item_prs = [int(target) for _, target in PR_RE.findall(links)]
         if item_prs != sorted(item_prs):
             found = ", ".join(f"#{number}" for number in item_prs)
             errors.append("PRs are not ascending: " + found)
 
     incompatible_body = section_body(text, "Incompatible changes")
-    actual_incompatible = {int(number) for number in PR_RE.findall(incompatible_body)}
+    actual_incompatible = {
+        int(target) for _, target in PR_RE.findall(incompatible_body)
+    }
     if actual_incompatible != incompatible:
         errors.append(
             "incompatible PRs differ: expected "

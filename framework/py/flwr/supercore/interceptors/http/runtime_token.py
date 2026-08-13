@@ -12,43 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SuperExec authentication interceptor for protobuf-over-HTTP clients."""
-
-from collections.abc import Collection
+"""Task-token interceptor for protobuf-over-HTTP clients."""
 
 import httpx
 
-from flwr.supercore.auth import create_superexec_auth_metadata, derive_auth_secret
+from flwr.supercore.constant import TASK_TOKEN_HEADER
 from flwr.supercore.protobuf.client import ProtobufCall, ProtobufRequestContext
 
 from .utils import add_headers
 
 
-class SuperExecAuthHttpInterceptor:
-    """Attach SuperExec HMAC authentication headers to HTTP requests."""
+class RuntimeTokenHttpInterceptor:
+    """Attach a Runtime task token to HTTP requests."""
 
-    def __init__(
-        self,
-        *,
-        master_secret: bytes,
-        protected_methods: Collection[str],
-    ) -> None:
-        self._auth_secret = derive_auth_secret(master_secret)
-        self._protected_methods = frozenset(protected_methods)
+    def __init__(self, token: str) -> None:
+        if not token:
+            raise ValueError("`token` must be a non-empty string")
+        self._token = token
 
     def intercept(
         self,
         context: ProtobufRequestContext,
         call_next: ProtobufCall,
     ) -> httpx.Response:
-        """Sign protected requests before sending them."""
-        if context.rpc_method in self._protected_methods:
-            add_headers(
-                context.request,
-                create_superexec_auth_metadata(
-                    auth_secret=self._auth_secret,
-                    method=context.rpc_method,
-                    request=context.message,
-                ),
-            )
+        """Add the task-token header before sending the request."""
+        add_headers(context.request, {TASK_TOKEN_HEADER: self._token})
         return call_next(context)
