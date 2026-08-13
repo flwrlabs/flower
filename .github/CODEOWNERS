@@ -26,6 +26,8 @@ README.md @jafermarq @tanertopal @danieljanes
 
 # Changelog
 /framework/docs/source/ref-changelog.md @jafermarq @tanertopal @danieljanes
+/framework/docs/source/changelog/ @jafermarq @tanertopal @danieljanes
+/framework/docs/source/_templates/shared-changelog.md @jafermarq @tanertopal @danieljanes
 
 # Translations
 /framework/docs/locales @charlesbvll @tanertopal @danieljanes
