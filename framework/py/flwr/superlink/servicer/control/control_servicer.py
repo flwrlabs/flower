@@ -46,6 +46,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetRunSeriesResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
     ListFederationsRequest,
@@ -288,6 +290,15 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         return control_handlers.list_federations(
             request, _get_account(), self.linkstate_factory.state()
         )
+
+    def ListAgents(
+        self, request: ListAgentsRequest, context: grpc.ServicerContext
+    ) -> ListAgentsResponse:
+        """List AgentApps in a federation."""
+        _ = request
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("ListAgents is not implemented.")
+        raise NotImplementedError("ListAgents is not implemented.")
 
     def ShowFederation(
         self, request: ShowFederationRequest, context: grpc.ServicerContext

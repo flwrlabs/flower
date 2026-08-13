@@ -134,6 +134,11 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.ListFederationsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.ListFederationsResponse.FromString,
                 _registered_method=True)
+        self.ListAgents = channel.unary_unary(
+                '/flwr.proto.Control/ListAgents',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListAgentsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListAgentsResponse.FromString,
+                _registered_method=True)
         self.ShowFederation = channel.unary_unary(
                 '/flwr.proto.Control/ShowFederation',
                 request_serializer=flwr_dot_proto_dot_control__pb2.ShowFederationRequest.SerializeToString,
@@ -344,6 +349,13 @@ class ControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListAgents(self, request, context):
+        """List AgentApps in a Federation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def ShowFederation(self, request, context):
         """Show Federation
         """
@@ -541,6 +553,11 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.ListFederations,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ListFederationsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.ListFederationsResponse.SerializeToString,
+            ),
+            'ListAgents': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListAgents,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListAgentsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListAgentsResponse.SerializeToString,
             ),
             'ShowFederation': grpc.unary_unary_rpc_method_handler(
                     servicer.ShowFederation,
@@ -1148,6 +1165,33 @@ class Control(object):
             '/flwr.proto.Control/ListFederations',
             flwr_dot_proto_dot_control__pb2.ListFederationsRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.ListFederationsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListAgents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListAgents',
+            flwr_dot_proto_dot_control__pb2.ListAgentsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListAgentsResponse.FromString,
             options,
             channel_credentials,
             insecure,
