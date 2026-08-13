@@ -68,12 +68,12 @@ def test_unary_unary_sends_and_receives_protobuf() -> None:
         )
 
     assert result == _RESPONSE
-    prepared_request = send.call_args.args[0]
-    assert prepared_request.method == "POST"
-    assert str(prepared_request.url) == f"https://api.example{_PATH}"
-    assert prepared_request.content == _REQUEST.SerializeToString(deterministic=True)
-    assert prepared_request.headers["content-type"] == PROTOBUF_MEDIA_TYPE
-    assert prepared_request.headers["accept"] == PROTOBUF_MEDIA_TYPE
+    http_request = send.call_args.args[0]
+    assert http_request.method == "POST"
+    assert str(http_request.url) == f"https://api.example{_PATH}"
+    assert http_request.content == _REQUEST.SerializeToString(deterministic=True)
+    assert http_request.headers["content-type"] == PROTOBUF_MEDIA_TYPE
+    assert http_request.headers["accept"] == PROTOBUF_MEDIA_TYPE
     assert send.call_args.kwargs == {}
 
 
