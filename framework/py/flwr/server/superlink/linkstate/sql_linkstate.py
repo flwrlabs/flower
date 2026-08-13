@@ -988,7 +988,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         log(ERROR, "Unexpected run creation failure.")
         return 0
 
-    def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches
+    def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches, too-many-locals, too-many-return-statements
         self,
         *,
         run_ids: Sequence[int] | None = None,

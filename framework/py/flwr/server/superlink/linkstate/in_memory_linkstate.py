@@ -723,7 +723,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
             return run_id
 
-    def get_run_info(
+    def get_run_info(  # pylint: disable=too-many-branches
         self,
         *,
         run_ids: Sequence[int] | None = None,
