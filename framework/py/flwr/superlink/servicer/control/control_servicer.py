@@ -46,6 +46,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetRunSeriesResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
     ListFederationsRequest,
@@ -286,6 +288,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     ) -> ListFederationsResponse:
         """List all SuperNodes."""
         return control_handlers.list_federations(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def ListAgents(
+        self, request: ListAgentsRequest, context: grpc.ServicerContext
+    ) -> ListAgentsResponse:
+        """List recent AgentApps in a federation."""
+        return control_handlers.list_agents(
             request, _get_account(), self.linkstate_factory.state()
         )
 

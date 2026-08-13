@@ -995,6 +995,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str] | None = None,
+        primary_task_types: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
@@ -1043,6 +1044,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not federation_ids:
                 return []
             stmt = stmt.where(RunModel.federation_id.in_(federation_ids))
+
+        # Filter by primary task types
+        if primary_task_types is not None:
+            if not primary_task_types:
+                return []
+            stmt = stmt.where(TaskModel.type.in_(primary_task_types))
 
         if order_by is not None:
             order_column = TaskModel.pending_at

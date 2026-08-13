@@ -730,6 +730,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str] | None = None,
+        primary_task_types: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
@@ -777,6 +778,17 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     run_id
                     for run_id in matched_run_ids
                     if self.run_ids[run_id].run.federation_id in federation_id_set
+                }
+
+            # Filter by primary task types
+            if primary_task_types is not None:
+                if not primary_task_types:
+                    return []
+                primary_task_type_set = set(primary_task_types)
+                matched_run_ids &= {
+                    run_id
+                    for run_id in matched_run_ids
+                    if self._get_run(run_id).primary_task_type in primary_task_type_set
                 }
 
             runs = [self._get_run(run_id) for run_id in matched_run_ids]

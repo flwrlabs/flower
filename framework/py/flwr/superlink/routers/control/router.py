@@ -39,6 +39,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetRunSeriesResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -225,6 +227,16 @@ def list_federations(
 ) -> ListFederationsResponse:
     """List federations."""
     return control_handlers.list_federations(request, account, linkstate)
+
+
+@router.post("/list-agents")
+def list_agents(
+    request: Annotated[ListAgentsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListAgentsResponse:
+    """List recent AgentApps in a federation."""
+    return control_handlers.list_agents(request, account, linkstate)
 
 
 @router.post("/show-federation")

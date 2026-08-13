@@ -55,6 +55,7 @@ from flwr.common.serde import (
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
+    AgentInfo,
     AddNodeToFederationRequest,
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
@@ -80,6 +81,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetRunSeriesResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
     ListFederationsRequest,
@@ -179,6 +182,10 @@ class ConnectorFailureError(FlowerError):
         super().__init__(
             ApiErrorCode.CONNECTOR_FAILURE, f"Connector failure: {reason}."
         )
+
+
+AGENTAPP_CANDIDATE_LIMIT = 50
+AGENT_LIMIT = 3
 
 
 def list_connectors(
@@ -1284,6 +1291,35 @@ def list_federations(
             for fed in federations
         ]
     )
+
+
+def list_agents(
+    request: ListAgentsRequest, account: AccountInfo, state: LinkState
+) -> ListAgentsResponse:
+    """List recent AgentApps in a federation."""
+    federation_id = request.federation_id
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+
+    runs = state.get_run_info(
+        federation_ids=[federation_id],
+        primary_task_types=[TaskType.AGENT_APP],
+        order_by="pending_at",
+        ascending=False,
+        limit=AGENTAPP_CANDIDATE_LIMIT,
+    )
+
+    agents: list[AgentInfo] = []
+    seen_app_ids: set[str] = set()
+    for run in runs:
+        app_id = f"@{run.fab_id}"
+        if app_id in seen_app_ids:
+            continue
+        seen_app_ids.add(app_id)
+        agents.append(AgentInfo(app_id=app_id, fab_hash=run.fab_hash))
+        if len(agents) == AGENT_LIMIT:
+            break
+
+    return ListAgentsResponse(agents=agents)
 
 
 def show_federation(

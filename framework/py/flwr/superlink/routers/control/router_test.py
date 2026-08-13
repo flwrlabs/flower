@@ -27,11 +27,14 @@ from flwr.common.constant import NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
     ListRunsRequest,
     ListRunsResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.constant import TaskType
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import (
@@ -148,6 +151,58 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
         order_by="pending_at",
         ascending=False,
         limit=1,
+    )
+
+
+def test_list_agents_returns_recent_distinct_agentapps() -> None:
+    """ListAgents returns recent AgentApps from the requested federation."""
+    linkstate = Mock(spec=LinkState)
+    linkstate.federation_manager.exists.return_value = True
+    linkstate.federation_manager.has_member.return_value = True
+
+    def run(fab_id: str, fab_hash: str, task_type: str = TaskType.AGENT_APP) -> Run:
+        result = Run.create_empty(1)
+        result.fab_id = fab_id
+        result.fab_hash = fab_hash
+        result.primary_task_type = task_type
+        return result
+
+    linkstate.get_run_info.return_value = [
+        run("alice/research", "latest-hash"),
+        run("alice/research", "older-hash"),
+        run("alice/writer", "writer-hash"),
+        run("alice/planner", "planner-hash"),
+        run("alice/excluded-by-limit", "fourth-hash"),
+    ]
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: linkstate
+
+    response = TestClient(app).post(
+        "/v1/control/list-agents",
+        content=ListAgentsRequest(federation_id="@alice/research").SerializeToString(),
+        headers={
+            "authorization": "Bearer access-token",
+            "content-type": PROTOBUF_MEDIA_TYPE,
+        },
+    )
+    proto_response = ListAgentsResponse.FromString(response.content)
+
+    assert response.status_code == 200
+    assert [(agent.app_id, agent.fab_hash) for agent in proto_response.agents] == [
+        ("@alice/research", "latest-hash"),
+        ("@alice/writer", "writer-hash"),
+        ("@alice/planner", "planner-hash"),
+    ]
+    linkstate.federation_manager.exists.assert_called_once_with("@alice/research")
+    linkstate.federation_manager.has_member.assert_called_once_with(
+        _ACCOUNT.flwr_aid, "@alice/research"
+    )
+    linkstate.get_run_info.assert_called_once_with(
+        federation_ids=["@alice/research"],
+        primary_task_types=[TaskType.AGENT_APP],
+        order_by="pending_at",
+        ascending=False,
+        limit=50,
     )
 
 

@@ -858,6 +858,55 @@ class ListFederationsResponse(google.protobuf.message.Message):
 global___ListFederationsResponse = ListFederationsResponse
 
 @typing.final
+class AgentInfo(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    APP_ID_FIELD_NUMBER: builtins.int
+    FAB_HASH_FIELD_NUMBER: builtins.int
+    app_id: builtins.str
+    fab_hash: builtins.str
+    def __init__(
+        self,
+        *,
+        app_id: builtins.str = ...,
+        fab_hash: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "fab_hash", b"fab_hash"]) -> None: ...
+
+global___AgentInfo = AgentInfo
+
+@typing.final
+class ListAgentsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_ID_FIELD_NUMBER: builtins.int
+    federation_id: builtins.str
+    def __init__(
+        self,
+        *,
+        federation_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation_id", b"federation_id"]) -> None: ...
+
+global___ListAgentsRequest = ListAgentsRequest
+
+@typing.final
+class ListAgentsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AGENTS_FIELD_NUMBER: builtins.int
+    @property
+    def agents(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___AgentInfo]: ...
+    def __init__(
+        self,
+        *,
+        agents: collections.abc.Iterable[global___AgentInfo] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agents", b"agents"]) -> None: ...
+
+global___ListAgentsResponse = ListAgentsResponse
+
+@typing.final
 class ShowFederationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

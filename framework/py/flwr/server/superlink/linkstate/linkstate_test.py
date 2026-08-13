@@ -473,6 +473,21 @@ class StateTest(CoreStateTest):
         # Assert
         self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id3})
 
+    def test_get_run_info_filter_by_primary_task_types(self) -> None:
+        """Test get_run_info filters correctly by primary task types."""
+        state = self.state_factory()
+        agent_run_id = create_dummy_run(state, primary_task_type=TaskType.AGENT_APP)
+        _ = create_dummy_run(state, primary_task_type=TaskType.SERVER_APP)
+
+        runs = state.get_run_info(
+            primary_task_types=[TaskType.AGENT_APP],
+            order_by="pending_at",
+            ascending=False,
+            limit=1,
+        )
+
+        self.assertEqual([run.run_id for run in runs], [agent_run_id])
+
     def test_get_run_info_filter_by_nonexistent_run_ids(self) -> None:
         """Test get_run_info returns empty for non-existent run_ids."""
         # Prepare
@@ -541,6 +556,9 @@ class StateTest(CoreStateTest):
 
         runs_federation_ids_empty = state.get_run_info(federation_ids=[])
         self.assertEqual(list(runs_federation_ids_empty), [])
+
+        runs_primary_task_types_empty = state.get_run_info(primary_task_types=[])
+        self.assertEqual(list(runs_primary_task_types_empty), [])
 
         runs_run_ids_empty = state.get_run_info(run_ids=[])
         self.assertEqual(list(runs_run_ids_empty), [])

@@ -327,6 +327,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str] | None = None,
+        primary_task_types: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
@@ -347,6 +348,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Sequence of Flower Account IDs to filter by.
         federation_ids : Optional[Sequence[str]] (default: None)
             Sequence of federation IDs to filter by.
+        primary_task_types : Optional[Sequence[str]] (default: None)
+            Sequence of primary task types to filter by.
         order_by : Optional[Literal["pending_at"]] (default: None)
             Field used to order the result.
         ascending : bool (default: True)
