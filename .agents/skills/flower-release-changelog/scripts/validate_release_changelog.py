@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check PR inventory and section placement in a Flower release changelog."""
+"""Validate PR inventory, heading cleanup, link ordering, and incompatible-section placement in a Flower release changelog."""
 
 import argparse
 import re
