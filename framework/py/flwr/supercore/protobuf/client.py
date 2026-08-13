@@ -76,7 +76,11 @@ class ProtobufClient:
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._interceptors = tuple(interceptors)
-        self._client = httpx.Client(verify=verify, timeout=timeout)
+        self._client = httpx.Client(
+            verify=verify,
+            timeout=timeout,
+            follow_redirects=True,
+        )
 
     def _unary_unary(
         self,

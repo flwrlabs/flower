@@ -86,7 +86,11 @@ def test_configures_http_client() -> None:
             timeout=10.0,
         )
 
-    client_class.assert_called_once_with(verify="ca.pem", timeout=10.0)
+    client_class.assert_called_once_with(
+        verify="ca.pem",
+        timeout=10.0,
+        follow_redirects=True,
+    )
 
 
 def test_unary_unary_normalizes_path() -> None:
