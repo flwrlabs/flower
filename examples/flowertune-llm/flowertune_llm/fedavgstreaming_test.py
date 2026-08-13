@@ -5,6 +5,12 @@ import types
 
 import torch
 
+from flwr.common.profiling import (
+    ProfileRecorder,
+    clear_active_profiler,
+    set_active_profiler,
+)
+
 task_stub = types.ModuleType("flowertune_llm.task")
 task_stub.state_dict_fingerprint = lambda state_dict: 0.0
 sys.modules.setdefault("flowertune_llm.task", task_stub)
@@ -12,6 +18,7 @@ sys.modules.setdefault("flowertune_llm.task", task_stub)
 from flowertune_llm.fedavgstreaming import (
     _batch_entries_by_size,
     _build_layer_chunk_entries,
+    _record_network_profile,
 )
 
 
@@ -53,3 +60,28 @@ def test_batch_entries_by_size_honors_explicit_chunk_cap() -> None:
 
     assert len(batches) == len(entries)
     assert all(len(batch) == 1 for batch in batches)
+
+
+def test_record_network_profile_preserves_endpoint_and_bytes() -> None:
+    """Custom layerwise transfers should use the standard network profile schema."""
+    profiler = ProfileRecorder(run_id=1)
+    set_active_profiler(profiler)
+    try:
+        _record_network_profile(
+            "upstream",
+            12.5,
+            node_id=7,
+            sender_node_id=7,
+            receiver_node_id="server",
+            network_bytes=3 * 1024 * 1024,
+        )
+    finally:
+        clear_active_profiler()
+
+    entries = profiler.summarize()["entries"]
+    assert len(entries) == 1
+    assert entries[0]["scope"] == "network"
+    assert entries[0]["task"] == "upstream"
+    assert entries[0]["total_network_mb"] == 3.0
+    assert entries[0]["sender_node_id"] == 7
+    assert entries[0]["receiver_node_id"] == "server"

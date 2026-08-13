@@ -106,6 +106,15 @@ class Grid(ABC):
             to pull replies.
         """
 
+    def pop_pushed_message_sizes(self, message_ids: Iterable[str]) -> dict[str, int]:
+        """Return serialized sizes for pushed messages and remove them.
+
+        Grids may collect these sizes while profiling is enabled. The default
+        implementation keeps custom Grid implementations source-compatible.
+        """
+        del message_ids
+        return {}
+
     @abstractmethod
     def pull_messages(self, message_ids: Iterable[str]) -> Iterable[Message]:
         """Pull messages based on message IDs.

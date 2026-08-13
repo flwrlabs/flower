@@ -156,6 +156,14 @@ class InMemoryGrid(Grid):
 
         return msg_ids
 
+    def pop_pushed_message_sizes(self, message_ids: Iterable[str]) -> dict[str, int]:
+        """Return and remove profiler sizes for pushed messages."""
+        return {
+            message_id: self._pushed_message_size_bytes.pop(message_id)
+            for message_id in message_ids
+            if message_id in self._pushed_message_size_bytes
+        }
+
     def pull_messages(self, message_ids: Iterable[str]) -> Iterable[Message]:
         """Pull messages based on message IDs.
 
@@ -250,7 +258,7 @@ class InMemoryGrid(Grid):
         downstream_bytes_by_id = {}
         if profiler is not None:
             for msg_id in msg_ids:
-                size_bytes = self._pushed_message_size_bytes.pop(msg_id, None)
+                size_bytes = self.pop_pushed_message_sizes([msg_id]).get(msg_id)
                 if size_bytes is not None:
                     downstream_bytes_by_id[msg_id] = size_bytes
         downstream_bytes_total = sum(downstream_bytes_by_id.values())

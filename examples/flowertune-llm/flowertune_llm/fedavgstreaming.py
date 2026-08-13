@@ -45,6 +45,7 @@ from flwr.common import (
 from flwr.common.inflatable import (
     get_object_body,
     get_object_children_ids_from_object_content,
+    iterate_object_tree,
 )
 from flwr.common.inflatable_protobuf_utils import make_pull_object_fn_protobuf
 from flwr.common.inflatable_utils import pull_objects
@@ -134,8 +135,17 @@ class _StreamedReply:
     """Metadata needed to pull one client's layer chunks incrementally."""
 
     object_id: str
+    reply_to_message_id: str
+    node_id: int
+    owner_key: str
+    object_ids: set[str]
+    message_bytes: int
+    created_at_ms: float
+    delivered_at_ms: float
+    downstream_ms: float | None
     array_refs: dict[str, str]
     metrics: MetricRecord
+    network_bytes: int = 0
 
 
 class _StreamObjectReader:
@@ -149,13 +159,29 @@ class _StreamObjectReader:
             self._stub.PullObject, self._node, run_id
         )
         self.pull_ms = 0.0
+        self._pull_ms_by_owner: dict[str, float] = {}
+        self._object_sizes: dict[str, int] = {}
 
-    def pull(self, object_id: str) -> bytes:
+    def pull(self, object_id: str, *, owner_key: str | None = None) -> bytes:
         """Pull one deflated object through the Grid's private object RPC."""
         t0 = perf_counter()
         content = pull_objects([object_id], self._pull_object)[object_id]
-        self.pull_ms += (perf_counter() - t0) * 1000.0
+        elapsed_ms = (perf_counter() - t0) * 1000.0
+        self.pull_ms += elapsed_ms
+        self._object_sizes[object_id] = len(content)
+        if owner_key is not None:
+            self._pull_ms_by_owner[owner_key] = (
+                self._pull_ms_by_owner.get(owner_key, 0.0) + elapsed_ms
+            )
         return content
+
+    def pull_ms_for(self, owner_key: str) -> float:
+        """Return the object-pull time attributed to one reply."""
+        return self._pull_ms_by_owner.get(owner_key, 0.0)
+
+    def bytes_for(self, object_ids: set[str]) -> int:
+        """Return the bytes pulled for the selected object IDs."""
+        return sum(self._object_sizes.get(object_id, 0) for object_id in object_ids)
 
     def confirm(self, object_id: str) -> None:
         """Confirm a streamed message so SuperLink can release objects."""
@@ -167,35 +193,48 @@ class _StreamObjectReader:
             )
         )
 
-    def array_refs(self, message_object_id: str) -> tuple[dict[str, str], MetricRecord]:
+    def array_refs(
+        self, message_object_id: str, *, owner_key: str
+    ) -> tuple[dict[str, str], MetricRecord, float | None]:
         """Pull a reply's small metadata objects and return array-name refs."""
-        message_content = self.pull(message_object_id)
+        message_content = self.pull(message_object_id, owner_key=owner_key)
         record_dict_ids = get_object_children_ids_from_object_content(message_content)
         if not record_dict_ids:
-            return {}, MetricRecord()
+            return {}, MetricRecord(), None
 
-        record_refs = _json_body(self.pull(record_dict_ids[0]), RecordDict)
+        record_refs = _json_body(
+            self.pull(record_dict_ids[0], owner_key=owner_key), RecordDict
+        )
 
         metrics = MetricRecord()
         if metrics_id := record_refs.get("metrics"):
-            metrics = MetricRecord.inflate(self.pull(metrics_id))
+            metrics = MetricRecord.inflate(self.pull(metrics_id, owner_key=owner_key))
+
+        downstream_ms = None
+        if delivery_id := record_refs.get("_flwr_network_delivery"):
+            delivery_metrics = MetricRecord.inflate(
+                self.pull(delivery_id, owner_key=owner_key)
+            )
+            value = delivery_metrics.get("downstream_ms")
+            if isinstance(value, (int, float)):
+                downstream_ms = max(float(value), 0.0)
 
         array_refs: dict[str, str] = {}
         if arrays_id := record_refs.get("arrays"):
             array_refs = {
                 str(array_name): str(array_id)
                 for array_name, array_id in _json_body(
-                    self.pull(arrays_id), ArrayRecord
+                    self.pull(arrays_id, owner_key=owner_key), ArrayRecord
                 ).items()
             }
 
-        return array_refs, metrics
+        return array_refs, metrics, downstream_ms
 
-    def array(self, array_object_id: str) -> Array:
+    def array(self, array_object_id: str, *, owner_key: str) -> Array:
         """Pull and inflate one Array from a streamed reply object tree."""
-        array_content = self.pull(array_object_id)
+        array_content = self.pull(array_object_id, owner_key=owner_key)
         children = {
-            chunk_id: ArrayChunk.inflate(self.pull(chunk_id))
+            chunk_id: ArrayChunk.inflate(self.pull(chunk_id, owner_key=owner_key))
             for chunk_id in get_object_children_ids_from_object_content(array_content)
         }
         try:
@@ -294,6 +333,33 @@ def _record_server_profile(task: str, duration_ms: float, metadata: dict[str, An
         metadata=metadata,
     )
     publish_profile_summary()
+
+
+def _record_network_profile(
+    task: str,
+    duration_ms: float,
+    *,
+    node_id: int,
+    sender_node_id: int | str | None,
+    receiver_node_id: int | str | None,
+    network_bytes: int,
+) -> None:
+    """Record a per-peer network event for custom layerwise transfers."""
+    profiler = get_active_profiler()
+    if profiler is None:
+        return
+    profiler.record(
+        scope="network",
+        task=task,
+        round=get_current_round(),
+        node_id=node_id,
+        duration_ms=duration_ms,
+        metadata={
+            "sender_node_id": sender_node_id,
+            "receiver_node_id": receiver_node_id,
+            "network_bytes": network_bytes,
+        },
+    )
 
 
 def _sanitize_layer_name(name: str) -> str:
@@ -502,6 +568,7 @@ class FedAvgStreaming(FedAvg):
         batch_pending_counts: dict[int, int] = {}
         batch_valid_counts: dict[int, int] = {}
         batch_errors: dict[int, list[Message]] = {}
+        pending_downstream_bytes: dict[str, int] = {}
         next_batch_idx = 0
         completed_batches = 0
         pull_interval = float(getattr(grid, "pull_interval", 0.1))
@@ -527,6 +594,7 @@ class FedAvgStreaming(FedAvg):
                 msg_ids = [
                     msg_id for msg_id in grid.push_messages(messages) if msg_id
                 ]
+                downstream_bytes = grid.pop_pushed_message_sizes(msg_ids)
                 _record_server_profile(
                     "network_downstream",
                     (perf_counter() - push_start) * 1000.0,
@@ -534,6 +602,7 @@ class FedAvgStreaming(FedAvg):
                         "expected_replies": len(msg_ids),
                         "batch_idx": next_batch_idx,
                         "pipeline_depth": self._download_pipeline_depth,
+                        "network_bytes": sum(downstream_bytes.values()),
                     },
                 )
                 batch_pending_counts[next_batch_idx] = len(msg_ids)
@@ -541,6 +610,7 @@ class FedAvgStreaming(FedAvg):
                 batch_errors[next_batch_idx] = []
                 for msg_id in msg_ids:
                     pending[msg_id] = next_batch_idx
+                    pending_downstream_bytes[msg_id] = downstream_bytes.get(msg_id, 0)
                 next_batch_idx += 1
 
         push_more_batches()
@@ -556,6 +626,17 @@ class FedAvgStreaming(FedAvg):
             replies = list(grid.pull_messages(list(pending)))
             pull_ms = (perf_counter() - pull_start) * 1000.0
             if replies:
+                upstream_bytes = 0
+                for msg in replies:
+                    reply_to = msg.metadata.reply_to_message_id
+                    downstream_bytes = pending_downstream_bytes.pop(reply_to, 0)
+                    if downstream_bytes:
+                        msg.metadata.__dict__["_network_downstream_bytes"] = (
+                            downstream_bytes
+                        )
+                    upstream_bytes += int(
+                        msg.metadata.__dict__.get("_network_upstream_bytes", 0)
+                    )
                 _record_server_profile(
                     "network_upstream",
                     pull_ms,
@@ -563,6 +644,7 @@ class FedAvgStreaming(FedAvg):
                         "received": len(replies),
                         "pending": len(pending),
                         "pipeline_depth": self._download_pipeline_depth,
+                        "network_bytes": upstream_bytes,
                     },
                 )
                 _record_profile_replies(replies)
@@ -621,6 +703,8 @@ class FedAvgStreaming(FedAvg):
         offload_dir: str,
         chunk_count_by_layer: dict[str, int],
         layer_names: list[str],
+        downstream_bytes_by_id: dict[str, int],
+        downstream_duration_ms: float,
     ) -> None:
         """Apply one aggregated upload chunk to the server state."""
         layer_idx = int(entry["layer_idx"])
@@ -731,10 +815,28 @@ class FedAvgStreaming(FedAvg):
                     object_reader.confirm(msg_tree.object_id)
                     continue
 
-                array_refs, metrics = object_reader.array_refs(msg_tree.object_id)
+                owner_key = str(msg_tree.object_id)
+                object_ids = {
+                    str(tree.object_id) for tree in iterate_object_tree(msg_tree)
+                }
+                array_refs, metrics, downstream_ms = object_reader.array_refs(
+                    msg_tree.object_id,
+                    owner_key=owner_key,
+                )
                 streamed_replies.append(
                     _StreamedReply(
                         object_id=msg_tree.object_id,
+                        reply_to_message_id=light_msg.metadata.reply_to_message_id,
+                        node_id=int(light_msg.metadata.src_node_id),
+                        owner_key=owner_key,
+                        object_ids=object_ids,
+                        message_bytes=(
+                            len(msg_proto.SerializeToString())
+                            + len(msg_tree.SerializeToString())
+                        ),
+                        created_at_ms=float(light_msg.metadata.created_at) * 1000.0,
+                        delivered_at_ms=time.time() * 1000.0,
+                        downstream_ms=downstream_ms,
                         array_refs=array_refs,
                         metrics=metrics,
                     )
@@ -779,7 +881,7 @@ class FedAvgStreaming(FedAvg):
                 if array_id is None:
                     continue
 
-                array = object_reader.array(array_id)
+                array = object_reader.array(array_id, owner_key=reply.owner_key)
                 aggregate_start = perf_counter()
                 value_np = array.numpy()
                 if value_np.dtype.kind in {"f", "c"} and weight != 1.0:
@@ -820,6 +922,52 @@ class FedAvgStreaming(FedAvg):
         for reply in streamed_replies:
             object_reader.confirm(reply.object_id)
 
+        for reply in streamed_replies:
+            reply.network_bytes = (
+                reply.message_bytes
+                + object_reader.bytes_for(reply.object_ids)
+            )
+            upstream_duration_ms = max(
+                reply.delivered_at_ms - reply.created_at_ms,
+                0.0,
+            )
+            if upstream_duration_ms == 0.0:
+                upstream_duration_ms = object_reader.pull_ms_for(reply.owner_key)
+                if streamed_replies:
+                    upstream_duration_ms += upstream_pull_ms / len(streamed_replies)
+            downstream_bytes = downstream_bytes_by_id.get(
+                reply.reply_to_message_id, 0
+            )
+            downstream_duration = (
+                reply.downstream_ms
+                if reply.downstream_ms is not None
+                else downstream_duration_ms
+            )
+            _record_network_profile(
+                "upstream",
+                upstream_duration_ms,
+                node_id=reply.node_id,
+                sender_node_id=reply.node_id,
+                receiver_node_id="server",
+                network_bytes=reply.network_bytes,
+            )
+            _record_network_profile(
+                "downstream",
+                downstream_duration,
+                node_id=reply.node_id,
+                sender_node_id="server",
+                receiver_node_id=reply.node_id,
+                network_bytes=downstream_bytes,
+            )
+            _record_network_profile(
+                "combined",
+                upstream_duration_ms + downstream_duration,
+                node_id=reply.node_id,
+                sender_node_id=None,
+                receiver_node_id=None,
+                network_bytes=reply.network_bytes + downstream_bytes,
+            )
+
         _record_server_profile(
             "network_upstream",
             upstream_pull_ms + object_reader.pull_ms,
@@ -828,6 +976,9 @@ class FedAvgStreaming(FedAvg):
                 "batch_idx": batch_idx,
                 "replies": len(streamed_replies),
                 "chunks_in_message": len(batch_entries),
+                "network_bytes": sum(
+                    reply.network_bytes for reply in streamed_replies
+                ),
             },
         )
         _record_server_profile(
@@ -842,6 +993,7 @@ class FedAvgStreaming(FedAvg):
 
         after_mb = process.memory_info().rss / (1024**2)
         log(INFO, "Aggregation memory after (layerwise streamed): %.2f MB", after_mb)
+        publish_profile_summary()
         gc.collect()
 
     def configure_train(
@@ -1199,13 +1351,16 @@ class FedAvgStreaming(FedAvg):
                     msg_ids = [
                         msg_id for msg_id in grid.push_messages(messages) if msg_id
                     ]
+                    downstream_bytes_by_id = grid.pop_pushed_message_sizes(msg_ids)
+                    downstream_duration_ms = (perf_counter() - push_start) * 1000.0
                     _record_server_profile(
                         "network_downstream",
-                        (perf_counter() - push_start) * 1000.0,
+                        downstream_duration_ms,
                         {
                             "expected_replies": len(msg_ids),
                             "batch_idx": batch_idx,
                             "mode": "layerwise_streamed_objects",
+                            "network_bytes": sum(downstream_bytes_by_id.values()),
                         },
                     )
                     self._aggregate_streamed_upload_replies(
@@ -1222,6 +1377,10 @@ class FedAvgStreaming(FedAvg):
                         offload_dir=offload_dir,
                         chunk_count_by_layer=chunk_count_by_layer,
                         layer_names=layer_names,
+                        downstream_bytes_by_id=downstream_bytes_by_id,
+                        downstream_duration_ms=(
+                            downstream_duration_ms / max(len(msg_ids), 1)
+                        ),
                     )
                     log_upload_progress(batch_idx)
 

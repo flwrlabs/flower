@@ -29,6 +29,11 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     Status,
 )
+from flwr.common.profiling import (
+    ProfileRecorder,
+    clear_active_profiler,
+    set_active_profiler,
+)
 from flwr.common.serde import message_from_proto
 from flwr.common.typing import Run, RunStatus
 from flwr.server.superlink.linkstate import (
@@ -145,6 +150,27 @@ class TestInMemoryGrid(unittest.TestCase):
         # Assert
         self.assertEqual(len(msg_res_ids), 2)
         self.assertEqual(msg_res_ids, [str(ids) for ids in msg_ids])
+
+    def test_pop_pushed_message_sizes_consumes_sizes(self) -> None:
+        """Pushed message sizes are available once and then removed."""
+        profiler = ProfileRecorder(run_id=1)
+        set_active_profiler(profiler)
+        try:
+            msg = Message(
+                RecordDict({"config": ConfigRecord({"value": 1})}),
+                1,
+                "query",
+            )
+            self.state.store_message_ins.side_effect = [str(uuid4())]
+
+            msg_ids = list(self.grid.push_messages([msg]))
+            sizes = self.grid.pop_pushed_message_sizes(msg_ids)
+
+            self.assertEqual(set(sizes), set(msg_ids))
+            self.assertGreater(sizes[msg_ids[0]], 0)
+            self.assertEqual(self.grid.pop_pushed_message_sizes(msg_ids), {})
+        finally:
+            clear_active_profiler()
 
     def test_pull_messages_with_given_message_ids(self) -> None:
         """Test pulling messages with specific message IDs."""
