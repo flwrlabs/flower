@@ -14,7 +14,12 @@
 # ==============================================================================
 """Reusable protobuf-over-HTTP client interceptors."""
 
+from .runtime_token import RuntimeTokenHttpInterceptor
 from .runtime_version import RuntimeVersionHttpInterceptor
 from .superexec_auth import SuperExecAuthHttpInterceptor
 
-__all__ = ["RuntimeVersionHttpInterceptor", "SuperExecAuthHttpInterceptor"]
+__all__ = [
+    "RuntimeTokenHttpInterceptor",
+    "RuntimeVersionHttpInterceptor",
+    "SuperExecAuthHttpInterceptor",
+]
