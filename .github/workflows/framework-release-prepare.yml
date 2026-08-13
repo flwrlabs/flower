@@ -126,68 +126,23 @@ jobs:
         id: automation
         env:
           BRANCH: ${{ steps.release.outputs.branch }}
-          GH_TOKEN: ${{ github.token }}
           RELEASE_SOURCE_SHA: ${{ steps.release.outputs.release-source-sha }}
         shell: bash
         run: |
           set -euo pipefail
 
-          set +e
-          git ls-remote --exit-code --heads origin "refs/heads/${BRANCH}" >/dev/null
-          branch_status=$?
-          set -e
-
-          case "${branch_status}" in
-            0)
-              prs="$(
-                gh pr list \
-                  --repo "${GITHUB_REPOSITORY}" \
-                  --head "${BRANCH}" \
-                  --state open \
-                  --limit 2 \
-                  --json number,baseRefName
-              )"
-              pr_count="$(jq 'length' <<< "${prs}")"
-              if [[ "${pr_count}" -ne 1 ]]; then
-                echo "Automation branch ${BRANCH} must have exactly one open release PR; found ${pr_count}." >&2
-                exit 1
-              fi
-
-              pr_base="$(jq -r '.[0].baseRefName' <<< "${prs}")"
-              if [[ "${pr_base}" != "main" ]]; then
-                echo "Release PR for ${BRANCH} targets '${pr_base}', expected 'main'." >&2
-                exit 1
-              fi
-
-              git fetch --no-tags origin \
-                "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
-              git switch --create "${BRANCH}" --track "origin/${BRANCH}"
-
-              echo "mode=refresh" >> "${GITHUB_OUTPUT}"
-              echo "pr-number=$(jq -r '.[0].number' <<< "${prs}")" >> "${GITHUB_OUTPUT}"
-              ;;
-            2)
-              previous_prs="$(
-                gh pr list \
-                  --repo "${GITHUB_REPOSITORY}" \
-                  --head "${BRANCH}" \
-                  --state all \
-                  --limit 1 \
-                  --json number
-              )"
-              if [[ "$(jq 'length' <<< "${previous_prs}")" -ne 0 ]]; then
-                echo "Found an existing PR for missing automation branch ${BRANCH}; refusing to recreate it." >&2
-                exit 1
-              fi
-
-              git switch --create "${BRANCH}" "${RELEASE_SOURCE_SHA}"
-              echo "mode=create" >> "${GITHUB_OUTPUT}"
-              ;;
-            *)
-              echo "Unable to check automation branch ${BRANCH}." >&2
-              exit "${branch_status}"
-              ;;
-          esac
+          remote_branch="$(
+            git ls-remote --heads origin "refs/heads/${BRANCH}"
+          )"
+          if [[ -n "${remote_branch}" ]]; then
+            git fetch --no-tags origin \
+              "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+            git switch --create "${BRANCH}" --track "origin/${BRANCH}"
+            echo "mode=refresh" >> "${GITHUB_OUTPUT}"
+          else
+            git switch --create "${BRANCH}" "${RELEASE_SOURCE_SHA}"
+            echo "mode=create" >> "${GITHUB_OUTPUT}"
+          fi
 
       - name: Bootstrap Python
         uses: ./.github/actions/bootstrap
@@ -251,21 +206,12 @@ jobs:
           git commit -m "feat(framework): Prepare ${VERSION} release"
           echo "changed=true" >> "${GITHUB_OUTPUT}"
 
-      - name: Push release changes
-        if: ${{ steps.release-commit.outputs.changed == 'true' }}
+      - name: Publish release preparation
         env:
           BRANCH: ${{ steps.release.outputs.branch }}
-          GH_TOKEN: ${{ secrets.FLWRMACHINE_TOKEN }}
-        run: |
-          gh auth setup-git
-          git push origin "HEAD:${BRANCH}"
-
-      - name: Create or refresh release PR
-        env:
-          BRANCH: ${{ steps.release.outputs.branch }}
+          CHANGED: ${{ steps.release-commit.outputs.changed }}
           GH_TOKEN: ${{ secrets.FLWRMACHINE_TOKEN }}
           MODE: ${{ steps.automation.outputs.mode }}
-          PR_NUMBER: ${{ steps.automation.outputs.pr-number }}
           RELEASE_SOURCE_SHA: ${{ steps.release.outputs.release-source-sha }}
           VERSION: ${{ steps.release.outputs.version }}
         shell: bash
@@ -280,6 +226,11 @@ jobs:
             echo '<!-- framework-release-metadata:end -->'
           } > "${body_file}"
 
+          if [[ "${CHANGED}" == "true" ]]; then
+            gh auth setup-git
+            git push origin "HEAD:${BRANCH}"
+          fi
+
           if [[ "${MODE}" == "create" ]]; then
             gh pr create \
               --repo "${GITHUB_REPOSITORY}" \
@@ -289,7 +240,7 @@ jobs:
               --body-file "${body_file}" \
               --draft
           else
-            gh pr edit "${PR_NUMBER}" \
+            gh pr edit "${BRANCH}" \
               --repo "${GITHUB_REPOSITORY}" \
               --body-file "${body_file}"
           fi
