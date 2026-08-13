@@ -703,8 +703,6 @@ class FedAvgStreaming(FedAvg):
         offload_dir: str,
         chunk_count_by_layer: dict[str, int],
         layer_names: list[str],
-        downstream_bytes_by_id: dict[str, int],
-        downstream_duration_ms: float,
     ) -> None:
         """Apply one aggregated upload chunk to the server state."""
         layer_idx = int(entry["layer_idx"])

@@ -109,3 +109,27 @@ def test_streamed_upload_accepts_downstream_profile_arguments() -> None:
         downstream_bytes_by_id={},
         downstream_duration_ms=0.0,
     )
+
+
+def test_apply_aggregated_upload_chunk_has_no_network_arguments() -> None:
+    """Applying an aggregate remains independent of transport profiling."""
+    strategy = FedAvgStreaming(initial_state_dict={"layer": torch.zeros(2)})
+    state_dict = {"layer": torch.zeros(2)}
+    strategy._apply_aggregated_upload_chunk(  # pylint: disable=protected-access
+        entry={
+            "layer_idx": 0,
+            "layer_name": "layer",
+            "start": 0,
+            "end": 2,
+            "is_last_chunk": True,
+        },
+        chunk_tensor=torch.ones(2),
+        state_dict=state_dict,
+        aggregated_layers={},
+        offload_enabled=False,
+        offload_dir="",
+        chunk_count_by_layer={"layer": 1},
+        layer_names=["layer"],
+    )
+
+    assert torch.equal(state_dict["layer"], torch.ones(2))
