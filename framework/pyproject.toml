@@ -43,6 +43,7 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.26.0,<3.0.0",
+    "dp-accounting>=0.6.0,<0.7.0",
     "grpcio>=1.70.0,<2.0.0",
     "grpcio-health-checking>=1.70.0,<2.0.0",
     "protobuf>=5.28.0,<7.0.0",
