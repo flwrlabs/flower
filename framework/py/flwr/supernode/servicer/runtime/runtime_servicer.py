@@ -100,8 +100,7 @@ class SuperNodeRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
         """Pull messages for ClientApp; currently returns exactly one message."""
         task = get_authenticated_task()
         state = self.state_factory.state()
-        store = self.objectstore_factory.store()
-        return runtime_handlers.pull_messages(request, state, store, task)
+        return runtime_handlers.pull_messages(request, state, task)
 
     def PushMessages(
         self, request: PushAppMessagesRequest, context: grpc.ServicerContext
@@ -150,5 +149,6 @@ class SuperNodeRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
         self, request: ConfirmMessageReceivedRequest, context: grpc.ServicerContext
     ) -> ConfirmMessageReceivedResponse:
         """Confirm message received."""
-        store = self.objectstore_factory.store()
-        return runtime_handlers.confirm_message_received(request, store)
+        return runtime_handlers.confirm_message_received(
+            request, self.state_factory.state()
+        )
