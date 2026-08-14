@@ -153,6 +153,12 @@ class ControlStub:
     ]
     """List Federations"""
 
+    ListApps: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppsRequest,
+        flwr.proto.control_pb2.ListAppsResponse,
+    ]
+    """List Apps in a Federation"""
+
     ShowFederation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
         flwr.proto.control_pb2.ShowFederationResponse,
@@ -356,6 +362,12 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.ListFederationsResponse,
     ]
     """List Federations"""
+
+    ListApps: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppsRequest,
+        flwr.proto.control_pb2.ListAppsResponse,
+    ]
+    """List Apps in a Federation"""
 
     ShowFederation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
@@ -600,6 +612,14 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ListFederationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListFederationsResponse]]:
         """List Federations"""
+
+    @abc.abstractmethod
+    def ListApps(
+        self,
+        request: flwr.proto.control_pb2.ListAppsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListAppsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAppsResponse]]:
+        """List Apps in a Federation"""
 
     @abc.abstractmethod
     def ShowFederation(
