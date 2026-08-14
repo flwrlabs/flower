@@ -49,3 +49,18 @@ def test_postgresql_url_from_environment_rejects_missing_values() -> None:
                 "FLWR_POSTGRES_DATABASE": "platform",
             }
         )
+
+
+@pytest.mark.parametrize("port", ["not-a-port", "0", "65536"])
+def test_postgresql_url_from_environment_rejects_invalid_port(port: str) -> None:
+    """Reject non-integer and out-of-range PostgreSQL ports."""
+    with pytest.raises(ValueError, match="FLWR_POSTGRES_PORT"):
+        postgresql_url_from_environment(
+            {
+                "FLWR_POSTGRES_USER": "platform-owner",
+                "FLWR_POSTGRES_PASSWORD": "password",
+                "FLWR_POSTGRES_HOST": "postgres.internal",
+                "FLWR_POSTGRES_PORT": port,
+                "FLWR_POSTGRES_DATABASE": "platform",
+            }
+        )
