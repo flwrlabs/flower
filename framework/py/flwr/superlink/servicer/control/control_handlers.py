@@ -78,6 +78,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppsRequest,
+    ListAppsResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
     ListConnectorsRequest,
@@ -519,9 +521,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         # be bundled locally and submitted through the regular `flwr run` path.
         components = fab_config["tool"]["flwr"]["app"].get("components", {})
         is_agentapp_bundle = "agentapp" in components
-        primary_task_type = (
-            TaskType.AGENT_APP if is_agentapp_bundle else TaskType.SERVER_APP
-        )
+        app_type = TaskType.AGENT_APP if is_agentapp_bundle else TaskType.SERVER_APP
+        primary_task_type = app_type
         resolved_federation_config = None
         runtime = RunTime.DEPLOYMENT
         sim_cfg = state.federation_manager.get_simulation_config(federation_id)
@@ -580,6 +581,14 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 f"fab_id={fab_id}, fab_version={fab_version}, "
                 f"fab_hash={fab_hash}, primary_task_type={primary_task_type}.",
             )
+
+        state.upsert_app(
+            federation_id=federation_id,
+            app_id=f"@{fab_id}",
+            fab_hash=fab_hash,
+            app_type=app_type,
+            created_by=flwr_aid,
+        )
 
         run = state.get_run_info(run_ids=[run_id])[0]
         series_id = run.series_id
@@ -1284,6 +1293,16 @@ def list_federations(
             for fed in federations
         ]
     )
+
+
+def list_apps(
+    request: ListAppsRequest, account: AccountInfo, state: LinkState
+) -> ListAppsResponse:
+    """List apps associated with a federation."""
+    federation_id = request.federation_id
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    limit = request.limit if request.HasField("limit") else None
+    return ListAppsResponse(apps=state.list_apps(federation_id, limit))
 
 
 def show_federation(

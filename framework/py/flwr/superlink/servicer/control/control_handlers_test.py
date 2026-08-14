@@ -21,6 +21,7 @@ from unittest.mock import Mock, patch
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    ListAppsRequest,
     ListAutomationsRequest,
     StartAutomationRequest,
     StartRunRequest,
@@ -32,12 +33,14 @@ from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     AutomationStatus,
+    TaskType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.superlink.federation import NoOpFederationManager
 
 from .control_handlers import (
+    list_apps,
     list_automations,
     start_automation,
     start_run,
@@ -83,6 +86,11 @@ class TestControlHandlers(unittest.TestCase):
 
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
+        apps = self.state.list_apps(NOOP_FEDERATION_ID)
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type) for app in apps],
+            [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
+        )
 
     def test_start_run_rejects_unknown_fab_hash(self) -> None:
         """Test StartRun rejects an unknown FAB hash."""
@@ -93,6 +101,27 @@ class TestControlHandlers(unittest.TestCase):
             start_run(request, self.account, self.state, None)
 
         self.assertEqual(error.exception.code, ApiErrorCode.FAB_DOWNLOAD_FAILURE)
+
+    def test_list_apps(self) -> None:
+        """List apps associated with the requested federation."""
+        self.state.upsert_app(
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/demo",
+            fab_hash="fab-hash",
+            app_type=TaskType.SERVER_APP,
+            created_by=self.account.flwr_aid,
+        )
+
+        response = list_apps(
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID, limit=1),
+            self.account,
+            self.state,
+        )
+
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type) for app in response.apps],
+            [("@flwr/demo", "fab-hash", TaskType.SERVER_APP)],
+        )
 
     def test_start_automation_normalizes_start_at_to_utc(self) -> None:
         """Normalize the automation start time to UTC."""
