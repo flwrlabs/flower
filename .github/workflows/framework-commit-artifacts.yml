@@ -31,14 +31,27 @@ jobs:
 
       - name: Check Docker-relevant changes
         id: docker-changes
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.ARTIFACT_AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.ARTIFACT_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACT_AWS_SECRET_KEY_ID }}
+          ARTIFACT_BUCKET: ${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}
         run: |
-          if git diff --quiet "${{ github.event.before }}" "${GITHUB_SHA}" -- \
+          BEFORE_SHA="${{ github.event.before }}"
+          if git diff --quiet "${BEFORE_SHA}" "${GITHUB_SHA}" -- \
             framework/py/ \
             framework/pyproject.toml \
             framework/docker/ \
             framework/dev/build-docker-image-matrix.py \
             framework/dev/release/resolve-docker-matrix.py; then
-            echo "required=false" >> "$GITHUB_OUTPUT"
+            # Only reuse when the previous commit's digest index exists.
+            if [[ -z "${BEFORE_SHA}" || "${BEFORE_SHA}" =~ ^0{40}$ ]]; then
+              echo "required=true" >> "$GITHUB_OUTPUT"
+            elif aws s3 ls "s3://${ARTIFACT_BUCKET}/framework/commits/${BEFORE_SHA}/digests.json" > /dev/null 2>&1; then
+              echo "required=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "required=true" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "required=true" >> "$GITHUB_OUTPUT"
           fi
