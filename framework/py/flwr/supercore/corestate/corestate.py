@@ -118,19 +118,19 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Store a FAB and return its canonical SHA-256 hash."""
 
     @abstractmethod
-    def get_fab(self, fab_hash: str) -> Fab | None:
-        """Return the FAB for the given hash, if present."""
-
-    @abstractmethod
-    def upsert_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
+        fab: Fab,
         federation_id: str,
         app_id: str,
-        fab_hash: str,
         app_type: str,
-        created_by: str,
-    ) -> bool:
-        """Create or update an app associated with a federation."""
+        added_by: str,
+    ) -> str:
+        """Atomically store a FAB and associate its app with a federation."""
+
+    @abstractmethod
+    def get_fab(self, fab_hash: str) -> Fab | None:
+        """Return the FAB for the given hash, if present."""
 
     @abstractmethod
     def list_apps(
@@ -140,7 +140,7 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def delete_app(self, federation_id: str, app_id: str) -> bool:
-        """Delete an app association from a federation."""
+        """Delete an app association; the referenced FAB remains in state."""
 
     @abstractmethod
     def upsert_connector(

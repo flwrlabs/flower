@@ -416,6 +416,61 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             session.execute(stmt)
         return fab_hash
 
+    def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        fab: Fab,
+        federation_id: str,
+        app_id: str,
+        app_type: str,
+        added_by: str,
+    ) -> str:
+        """Atomically store a FAB and associate its app with a federation."""
+        if not all((federation_id, app_id, app_type, added_by)):
+            raise ValueError(
+                "Federation ID, app ID, app type, and added by are required"
+            )
+        fab_hash = hashlib.sha256(fab.content).hexdigest()
+        if fab.hash_str and fab.hash_str != fab_hash:
+            raise ValueError(
+                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+            )
+        # Keep launch behavior: last write wins for metadata under the same
+        # content hash.
+        fab_stmt = self.dialect_insert(FabModel).values(
+            fab_hash=fab_hash,
+            content=fab.content,
+            verifications=json.dumps(fab.verifications),
+        )
+        fab_stmt = fab_stmt.on_conflict_do_update(
+            index_elements=[FabModel.fab_hash],
+            set_={
+                "content": fab_stmt.excluded.content,
+                "verifications": fab_stmt.excluded.verifications,
+            },
+        )
+        app_stmt = self.dialect_insert(FederationAppModel).values(
+            federation_id=federation_id,
+            app_id=app_id,
+            fab_hash=fab_hash,
+            app_type=app_type,
+            added_by=added_by,
+            added_at=now(),
+        )
+        app_stmt = app_stmt.on_conflict_do_update(
+            index_elements=[
+                FederationAppModel.federation_id,
+                FederationAppModel.app_id,
+            ],
+            set_={
+                "fab_hash": app_stmt.excluded.fab_hash,
+                "app_type": app_stmt.excluded.app_type,
+            },
+        )
+        with self.session() as session:
+            session.execute(fab_stmt)
+            session.execute(app_stmt)
+        return fab_hash
+
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
         with self.session() as session:
@@ -430,39 +485,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 verifications=json.loads(row.verifications),
             )
 
-    def upsert_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self,
-        federation_id: str,
-        app_id: str,
-        fab_hash: str,
-        app_type: str,
-        created_by: str,
-    ) -> bool:
-        """Create or update an app associated with a federation."""
-        if not all((federation_id, app_id, fab_hash, app_type, created_by)):
-            return False
-        stmt = self.dialect_insert(FederationAppModel).values(
-            federation_id=federation_id,
-            app_id=app_id,
-            fab_hash=fab_hash,
-            app_type=app_type,
-            created_by=created_by,
-            created_at=now(),
-        )
-        stmt = stmt.on_conflict_do_update(
-            index_elements=[
-                FederationAppModel.federation_id,
-                FederationAppModel.app_id,
-            ],
-            set_={
-                "fab_hash": stmt.excluded.fab_hash,
-                "app_type": stmt.excluded.app_type,
-            },
-        )
-        with self.session() as session:
-            session.execute(stmt)
-        return True
-
     def list_apps(
         self, federation_id: str, limit: int | None = None
     ) -> Sequence[AppInfo]:
@@ -475,7 +497,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             select(FederationAppModel)
             .where(FederationAppModel.federation_id == federation_id)
             .order_by(
-                FederationAppModel.created_at.desc(),
+                FederationAppModel.added_at.desc(),
                 FederationAppModel.app_id.desc(),
             )
         )
@@ -495,7 +517,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             ]
 
     def delete_app(self, federation_id: str, app_id: str) -> bool:
-        """Delete an app association from a federation."""
+        """Delete an app association; the referenced FAB remains in state."""
         if not federation_id or not app_id:
             return False
         with self.session() as session:

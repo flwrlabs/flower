@@ -45,6 +45,7 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorRecord
 
 from . import CoreState
@@ -86,44 +87,38 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         mock_datetime.now.side_effect = timestamps
         return stack
 
-    def test_upsert_list_and_delete_apps(self) -> None:
-        """Federation apps can be upserted, listed, limited, and deleted."""
+    def test_store_list_and_delete_apps(self) -> None:
+        """Federation apps can be stored, listed, limited, and deleted."""
         state = self.state_factory()
 
-        self.assertTrue(
-            state.upsert_app(
-                federation_id="@me/fed-a",
-                app_id="@me/server",
-                fab_hash="server-hash",
-                app_type=TaskType.SERVER_APP,
-                created_by="account-a",
-            )
+        server_hash = state.store_app(
+            fab=Fab("", b"server", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-a",
         )
-        self.assertTrue(
-            state.upsert_app(
-                federation_id="@me/fed-a",
-                app_id="@me/z-agent",
-                fab_hash="agent-hash",
-                app_type=TaskType.AGENT_APP,
-                created_by="account-a",
-            )
+        agent_hash = state.store_app(
+            fab=Fab("", b"agent", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/z-agent",
+            app_type=TaskType.AGENT_APP,
+            added_by="account-a",
         )
-        self.assertTrue(
-            state.upsert_app(
-                federation_id="@me/fed-b",
-                app_id="@me/other",
-                fab_hash="other-hash",
-                app_type=TaskType.SERVER_APP,
-                created_by="account-b",
-            )
+        state.store_app(
+            fab=Fab("", b"other", {}),
+            federation_id="@me/fed-b",
+            app_id="@me/other",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-b",
         )
 
         apps = state.list_apps("@me/fed-a")
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
             [
-                ("@me/z-agent", "agent-hash", TaskType.AGENT_APP),
-                ("@me/server", "server-hash", TaskType.SERVER_APP),
+                ("@me/z-agent", agent_hash, TaskType.AGENT_APP),
+                ("@me/server", server_hash, TaskType.SERVER_APP),
             ],
         )
         self.assertEqual(
@@ -134,18 +129,16 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         with self.assertRaises(AssertionError):
             state.list_apps("@me/fed-a", limit=-1)
 
-        self.assertTrue(
-            state.upsert_app(
-                federation_id="@me/fed-a",
-                app_id="@me/server",
-                fab_hash="updated-hash",
-                app_type=TaskType.SERVER_APP,
-                created_by="account-c",
-            )
+        updated_hash = state.store_app(
+            fab=Fab("", b"updated", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-c",
         )
         updated = state.list_apps("@me/fed-a")
         self.assertEqual(len(updated), 2)
-        self.assertEqual(updated[1].fab_hash, "updated-hash")
+        self.assertEqual(updated[1].fab_hash, updated_hash)
 
         self.assertFalse(state.delete_app("@me/fed-b", "@me/server"))
         self.assertTrue(state.delete_app("@me/fed-a", "@me/server"))
@@ -154,6 +147,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [app.app_id for app in state.list_apps("@me/fed-a")],
             ["@me/z-agent"],
         )
+        self.assertIsNotNone(state.get_fab(updated_hash))
 
     def test_connector_upsert_get_and_delete(self) -> None:
         """A connector can be created, updated, retrieved, and deleted."""

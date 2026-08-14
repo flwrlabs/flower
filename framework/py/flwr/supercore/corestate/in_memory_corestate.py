@@ -94,14 +94,14 @@ class AutomationRecord:
 
 @dataclass(frozen=True)
 class FederationAppRecord:
-    """Record containing a federation app and its creation metadata."""
+    """Record containing a federation app and its association metadata."""
 
     federation_id: str
     app_id: str
     fab_hash: str
     app_type: str
-    created_by: str
-    created_at: datetime
+    added_by: str
+    added_at: datetime
 
 
 @dataclass
@@ -327,6 +327,44 @@ class InMemoryCoreState(
             )
         return fab_hash
 
+    def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        fab: Fab,
+        federation_id: str,
+        app_id: str,
+        app_type: str,
+        added_by: str,
+    ) -> str:
+        """Atomically store a FAB and associate its app with a federation."""
+        if not all((federation_id, app_id, app_type, added_by)):
+            raise ValueError(
+                "Federation ID, app ID, app type, and added by are required"
+            )
+        fab_hash = hashlib.sha256(fab.content).hexdigest()
+        if fab.hash_str and fab.hash_str != fab_hash:
+            raise ValueError(
+                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+            )
+        key = (federation_id, app_id)
+        with self.lock_fab_store, self.lock_federation_app_store:
+            # Keep launch behavior: last write wins for metadata under the same
+            # content hash.
+            self.fab_store[fab_hash] = Fab(
+                hash_str=fab_hash,
+                content=fab.content,
+                verifications=dict(fab.verifications),
+            )
+            existing = self.federation_app_store.get(key)
+            self.federation_app_store[key] = FederationAppRecord(
+                federation_id=federation_id,
+                app_id=app_id,
+                fab_hash=fab_hash,
+                app_type=app_type,
+                added_by=existing.added_by if existing else added_by,
+                added_at=existing.added_at if existing else now(),
+            )
+        return fab_hash
+
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
         with self.lock_fab_store:
@@ -339,30 +377,6 @@ class InMemoryCoreState(
                 content=fab.content,
                 verifications=dict(fab.verifications),
             )
-
-    def upsert_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self,
-        federation_id: str,
-        app_id: str,
-        fab_hash: str,
-        app_type: str,
-        created_by: str,
-    ) -> bool:
-        """Create or update an app associated with a federation."""
-        if not all((federation_id, app_id, fab_hash, app_type, created_by)):
-            return False
-        key = (federation_id, app_id)
-        with self.lock_federation_app_store:
-            existing = self.federation_app_store.get(key)
-            self.federation_app_store[key] = FederationAppRecord(
-                federation_id=federation_id,
-                app_id=app_id,
-                fab_hash=fab_hash,
-                app_type=app_type,
-                created_by=existing.created_by if existing else created_by,
-                created_at=existing.created_at if existing else now(),
-            )
-        return True
 
     def list_apps(
         self, federation_id: str, limit: int | None = None
@@ -379,7 +393,7 @@ class InMemoryCoreState(
                 if record.federation_id == federation_id
             ]
             records.sort(
-                key=lambda record: (record.created_at, record.app_id), reverse=True
+                key=lambda record: (record.added_at, record.app_id), reverse=True
             )
             if limit is not None:
                 records = records[:limit]
@@ -393,7 +407,7 @@ class InMemoryCoreState(
             ]
 
     def delete_app(self, federation_id: str, app_id: str) -> bool:
-        """Delete an app association from a federation."""
+        """Delete an app association; the referenced FAB remains in state."""
         if not federation_id or not app_id:
             return False
         with self.lock_federation_app_store:
