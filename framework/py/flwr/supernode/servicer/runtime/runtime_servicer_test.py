@@ -18,7 +18,6 @@
 import unittest
 from unittest.mock import Mock, patch
 
-import grpc
 from parameterized import parameterized
 
 from flwr.app import Context
@@ -49,6 +48,7 @@ from flwr.proto.runtime_pb2 import (  # pylint:disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -227,6 +227,66 @@ class TestSuperNodeRuntimeServicer(unittest.TestCase):
         self.mock_state.get_run_series_context.assert_called_once_with(run.series_id)
         self.mock_state.activate_task.assert_called_once_with(task_id=task_id)
 
+    @parameterized.expand(  # type: ignore
+        [
+            (
+                "run_not_found",
+                (False, False, False, False),
+                ApiErrorCode.RUN_ID_NOT_FOUND,
+            ),
+            (
+                "context_not_found",
+                (True, False, False, False),
+                ApiErrorCode.RUNTIME_RUN_SERIES_CONTEXT_NOT_FOUND,
+            ),
+            (
+                "fab_not_found",
+                (True, True, False, False),
+                ApiErrorCode.RUNTIME_FAB_NOT_FOUND,
+            ),
+            (
+                "task_start_failed",
+                (True, True, True, False),
+                ApiErrorCode.RUNTIME_TASK_START_FAILED,
+            ),
+        ]
+    )
+    def test_servicer_pull_task_input_raises_flower_error(
+        self,
+        _name: str,
+        conditions: tuple[bool, bool, bool, bool],
+        expected_code: ApiErrorCode,
+    ) -> None:
+        """PullTaskInput should raise the relevant FlowerError."""
+        run_exists, context_exists, fab_exists, task_started = conditions
+        run_id = 61016
+        task_id = 123
+        run = Run.create_empty(run_id=run_id)
+        run.fab_hash = "fab-hash"
+        run.series_id = 777
+        self.mock_state.get_run.return_value = run if run_exists else None
+        self.mock_state.get_run_series_context.return_value = (
+            Mock() if context_exists else None
+        )
+        self.mock_state.get_fab.return_value = (
+            Fab(hash_str="fab-hash", content=b"fab-content", verifications={})
+            if fab_exists
+            else None
+        )
+        self.mock_state.activate_task.return_value = task_started
+
+        with (
+            patch(
+                "flwr.supernode.servicer.runtime.runtime_servicer."
+                "get_authenticated_task",
+                return_value=Mock(task_id=task_id, run_id=run_id),
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            self.servicer.PullTaskInput(PullTaskInputRequest(), Mock())
+
+        self.assertEqual(error.exception.code, expected_code)
+
     def test_servicer_push_task_output_finishes_task(self) -> None:
         """PushTaskOutput should finish the authenticated task."""
         run_id = 61016
@@ -287,8 +347,6 @@ class TestSuperNodeRuntimeServicer(unittest.TestCase):
     ) -> None:
         """PushMessages should reject anything other than one message/tree."""
         run_id = 61016
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
         message = make_message(
             metadata=self.maker.metadata(),
             content=self.maker.recorddict(1, 1, 1),
@@ -298,17 +356,18 @@ class TestSuperNodeRuntimeServicer(unittest.TestCase):
             message_object_trees=[get_object_tree(message)] * object_tree_count,
         )
 
-        with patch(
-            "flwr.supernode.servicer.runtime.runtime_servicer."
-            "get_authenticated_task",
-            return_value=Mock(run_id=run_id),
+        with (
+            patch(
+                "flwr.supernode.servicer.runtime.runtime_servicer."
+                "get_authenticated_task",
+                return_value=Mock(run_id=run_id),
+            ),
+            self.assertRaises(FlowerError) as error,
         ):
-            with self.assertRaises(grpc.RpcError):
-                self.servicer.PushMessages(request, context)
+            self.servicer.PushMessages(request, Mock())
 
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.INVALID_ARGUMENT,
-            "Runtime.PushMessages expects exactly one message and one object tree.",
+        self.assertEqual(
+            error.exception.code, ApiErrorCode.RUNTIME_INVALID_MESSAGE_COUNT
         )
         self.mock_state.record_message_processing_end.assert_not_called()
         self.mock_state.store_message_and_object_tree.assert_not_called()
@@ -352,6 +411,32 @@ class TestSuperNodeRuntimeServicer(unittest.TestCase):
         self.assertEqual(session_id, "session-id")
         self.assertEqual(list(response.objects_to_push), ["object-id"])
         self.assertEqual(response.session_id, "session-id")
+
+    def test_servicer_push_messages_rejects_mismatched_run_id(self) -> None:
+        """PushMessages should reject messages from another run."""
+        message = make_message(
+            metadata=self.maker.metadata(),
+            content=self.maker.recorddict(1, 1, 1),
+        )
+        request = PushAppMessagesRequest(
+            messages_list=[message_to_proto(message)],
+            message_object_trees=[get_object_tree(message)],
+        )
+
+        with (
+            patch(
+                "flwr.supernode.servicer.runtime.runtime_servicer."
+                "get_authenticated_task",
+                return_value=Mock(run_id=message.metadata.run_id + 1),
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            self.servicer.PushMessages(request, Mock())
+
+        self.assertEqual(
+            error.exception.code, ApiErrorCode.RUNTIME_MESSAGE_RUN_ID_MISMATCH
+        )
+        self.mock_state.store_message_and_object_tree.assert_not_called()
 
     def test_push_object_uses_state(self) -> None:
         """PushObject should delegate session validation and storage to state."""
@@ -398,36 +483,34 @@ class TestSuperNodeRuntimeServicer(unittest.TestCase):
                 "start_automation",
                 "StartAutomation",
                 StartAutomationRequest(),
-                "Only AgentApp and ServerApp tasks can create automations.",
+                ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
             ),
             (
                 "get_connector",
                 "GetConnector",
                 GetConnectorRequest(),
-                "Connector credentials are not available to this task.",
+                ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE,
             ),
             (
                 "get_nodes",
                 "GetNodes",
                 GetNodesRequest(),
-                "This endpoint is only available to ServerApp tasks.",
+                ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
             ),
         ]
     )
     def test_server_side_endpoint_permission_denied(
-        self, _case_name: str, method_name: str, request: object, detail: str
+        self,
+        _case_name: str,
+        method_name: str,
+        request: object,
+        expected_code: ApiErrorCode,
     ) -> None:
         """Server-side endpoints should be unavailable to ClientApp tasks."""
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
+        with self.assertRaises(FlowerError) as error:
+            getattr(self.servicer, method_name)(request, Mock())
 
-        with self.assertRaises(grpc.RpcError):
-            getattr(self.servicer, method_name)(request, context)
-
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.PERMISSION_DENIED,
-            detail,
-        )
+        self.assertEqual(error.exception.code, expected_code)
 
     @parameterized.expand([(True,), (False,)])  # type: ignore
     def test_send_task_heartbeat(self, success: bool) -> None:
