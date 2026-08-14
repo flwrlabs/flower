@@ -121,7 +121,12 @@ class RdpAccountant:
 
         projected = self._new_backend(self._orders)
         self._replay(projected)
-        projected.compose(self._to_backend_event(event), count)
+        backend_event = self._to_backend_event(event)
+        if not projected.supports(backend_event):
+            raise ValueError(
+                "The configured RDP backend does not support this privacy event."
+            )
+        projected.compose(backend_event, count)
         return bool(projected.get_epsilon(self._config.target_delta) > epsilon_limit)
 
     def state_dict(self) -> dict[str, object]:
