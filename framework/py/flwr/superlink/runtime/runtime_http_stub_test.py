@@ -22,21 +22,9 @@ from flwr.supercore.protobuf.client import ProtobufClient
 from flwr.superlink.runtime import RuntimeHttpStub
 
 _UNARY_UNARY_PATHS = (
-    "send-task-heartbeat",
-    "pull-task-input",
-    "push-task-output",
-    "push-object",
-    "pull-object",
-    "confirm-message-received",
     "push-logs",
-    "push-messages",
-    "pull-messages",
     "get-nodes",
 )
-_RESPONSE_NAME_OVERRIDES = {
-    "push-messages": "PushAppMessagesResponse",
-    "pull-messages": "PullAppMessagesResponse",
-}
 
 
 @pytest.mark.parametrize(
@@ -58,7 +46,4 @@ def test_serverapp_runtime_method(endpoint: str) -> None:
     assert call.call_args.kwargs["path"] == f"/v1/runtime/{endpoint}"
     assert call.call_args.kwargs["rpc_method"] == f"/flwr.proto.Runtime/{method_name}"
     assert call.call_args.kwargs["request"] is request
-    expected_response_name = _RESPONSE_NAME_OVERRIDES.get(
-        endpoint, f"{method_name}Response"
-    )
-    assert call.call_args.kwargs["response_type"].__name__ == expected_response_name
+    assert call.call_args.kwargs["response_type"].__name__ == f"{method_name}Response"
