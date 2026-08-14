@@ -38,23 +38,24 @@ jobs:
           ARTIFACT_BUCKET: ${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}
         run: |
           BEFORE_SHA="${{ github.event.before }}"
+          BEFORE_SHA="${{ github.event.before }}"
+
+          required=true
           if git diff --quiet "${BEFORE_SHA}" "${GITHUB_SHA}" -- \
-            framework/py/ \
-            framework/pyproject.toml \
-            framework/docker/ \
-            framework/dev/build-docker-image-matrix.py \
-            framework/dev/release/resolve-docker-matrix.py; then
-            # Only reuse when the previous commit's digest index exists.
-            if [[ -z "${BEFORE_SHA}" || "${BEFORE_SHA}" =~ ^0{40}$ ]]; then
-              echo "required=true" >> "$GITHUB_OUTPUT"
-            elif aws s3 ls "s3://${ARTIFACT_BUCKET}/framework/commits/${BEFORE_SHA}/digests.json" > /dev/null 2>&1; then
-              echo "required=false" >> "$GITHUB_OUTPUT"
-            else
-              echo "required=true" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "required=true" >> "$GITHUB_OUTPUT"
+              framework/py/ \
+              framework/pyproject.toml \
+              framework/docker/ \
+              framework/dev/build-docker-image-matrix.py \
+              framework/dev/release/resolve-docker-matrix.py &&
+            aws s3api head-object \
+              --bucket "${ARTIFACT_BUCKET}" \
+              --key "framework/commits/${BEFORE_SHA}/digests.json" \
+              > /dev/null 2>&1
+          then
+            required=false
           fi
+
+          echo "required=${required}" >> "$GITHUB_OUTPUT"
 
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
