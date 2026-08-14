@@ -56,12 +56,11 @@ erDiagram
   }
 
   federation_agent {
-    VARCHAR id PK
-    VARCHAR app_id
+    VARCHAR app_id PK
+    VARCHAR federation_id PK
     TIMESTAMP created_at
     VARCHAR created_by
     VARCHAR fab_hash
-    VARCHAR federation_id
   }
 
   logs {

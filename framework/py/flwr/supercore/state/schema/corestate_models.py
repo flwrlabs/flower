@@ -28,7 +28,6 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
     String,
     Table,
-    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -130,9 +129,6 @@ class FederationAgent(FlwrBase):
 
     __tablename__ = "federation_agent"
     __table_args__ = (
-        UniqueConstraint(
-            "federation_id", "app_id", name="uq_federation_agent_federation_id_app_id"
-        ),
         Index(
             "idx_federation_agent_federation_id_created_at",
             "federation_id",
@@ -140,9 +136,10 @@ class FederationAgent(FlwrBase):
         ),
     )
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
-    federation_id: Mapped[str] = mapped_column(String, nullable=False)
-    app_id: Mapped[str] = mapped_column(String, nullable=False)
+    federation_id: Mapped[str] = mapped_column(
+        String, primary_key=True, nullable=False
+    )
+    app_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     fab_hash: Mapped[str] = mapped_column(String, nullable=False)
     created_by: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
