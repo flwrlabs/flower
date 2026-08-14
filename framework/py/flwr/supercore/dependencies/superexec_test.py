@@ -20,16 +20,16 @@ import pytest
 from fastapi import FastAPI, Request
 
 from flwr.proto.runtime_pb2 import ClaimTaskRequest  # pylint: disable=E0611
-from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.constant import (
     SUPEREXEC_AUTH_BODY_SHA256_HEADER,
     SUPEREXEC_AUTH_NONCE_HEADER,
     SUPEREXEC_AUTH_SIGNATURE_HEADER,
     SUPEREXEC_AUTH_TIMESTAMP_HEADER,
 )
+from flwr.supercore.corestate import CoreState
 from flwr.supercore.error import ApiErrorCode, FlowerError
 
-from .superexec import SuperExecAuthDependency
+from .superexec import authenticate_superexec_request
 
 _METHOD = "/flwr.proto.Runtime/ClaimTask"
 _HEADERS = {
@@ -71,9 +71,9 @@ def test_superexec_auth_is_optional() -> None:
     request, _ = _make_request(None)
 
     with patch(
-        "flwr.superlink.dependencies.superexec.verify_superexec_request"
+        "flwr.supercore.dependencies.superexec.verify_superexec_request"
     ) as verify:
-        SuperExecAuthDependency(_METHOD)(request, Mock(spec=LinkState))
+        authenticate_superexec_request(request, Mock(spec=CoreState), _METHOD)
 
     verify.assert_not_called()
 
@@ -81,19 +81,19 @@ def test_superexec_auth_is_optional() -> None:
 def test_superexec_auth_verifies_request() -> None:
     """Pass HTTP authentication fields to the shared verifier."""
     request, protobuf_request = _make_request(b"master-secret")
-    state = Mock(spec=LinkState)
+    state = Mock(spec=CoreState)
 
     with (
         patch(
-            "flwr.superlink.dependencies.superexec.derive_auth_secret",
+            "flwr.supercore.dependencies.superexec.derive_auth_secret",
             return_value=b"derived-secret",
         ),
         patch(
-            "flwr.superlink.dependencies.superexec.verify_superexec_request",
+            "flwr.supercore.dependencies.superexec.verify_superexec_request",
             return_value=True,
         ) as verify,
     ):
-        SuperExecAuthDependency(_METHOD)(request, state)
+        authenticate_superexec_request(request, state, _METHOD)
 
     verify.assert_called_once_with(
         request=protobuf_request,
@@ -113,12 +113,12 @@ def test_superexec_auth_rejects_failed_verification() -> None:
 
     with (
         patch(
-            "flwr.superlink.dependencies.superexec.verify_superexec_request",
+            "flwr.supercore.dependencies.superexec.verify_superexec_request",
             return_value=False,
         ),
         pytest.raises(FlowerError) as exc_info,
     ):
-        SuperExecAuthDependency(_METHOD)(request, Mock(spec=LinkState))
+        authenticate_superexec_request(request, Mock(spec=CoreState), _METHOD)
 
     assert exc_info.value.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
     assert exc_info.value.message == (f"SuperExec authentication failed for {_METHOD}.")
@@ -147,11 +147,11 @@ def test_superexec_auth_rejects_invalid_header_count_or_value(
 
     with (
         patch(
-            "flwr.superlink.dependencies.superexec.verify_superexec_request"
+            "flwr.supercore.dependencies.superexec.verify_superexec_request"
         ) as verify,
         pytest.raises(FlowerError) as exc_info,
     ):
-        SuperExecAuthDependency(_METHOD)(request, Mock(spec=LinkState))
+        authenticate_superexec_request(request, Mock(spec=CoreState), _METHOD)
 
     assert exc_info.value.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
     verify.assert_not_called()
