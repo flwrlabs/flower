@@ -175,10 +175,9 @@ class TestSuperNodeRuntimeAuthIntegration(unittest.TestCase):  # pylint: disable
             self._get_nodes.with_call(request=GetNodesRequest())
 
         assert err.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-        assert (
-            err.exception.details()
-            == "This endpoint is only available to ServerApp tasks."
-        )
+        flower_error = FlowerError.from_json(err.exception.details())
+        assert flower_error is not None
+        assert flower_error.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
 
 
 class TestSuperNodeRuntimeAuthIntegrationWithoutSuperExecSecret(unittest.TestCase):
