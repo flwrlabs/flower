@@ -37,7 +37,11 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.logger import log
-from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AppInfo,
+    Automation,
+    StartRunRequest,
+)
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
@@ -88,6 +92,18 @@ class AutomationRecord:
     start_run_request: StartRunRequest
 
 
+@dataclass(frozen=True)
+class FederationAppRecord:
+    """Record containing a federation app and its creation metadata."""
+
+    federation_id: str
+    app_id: str
+    fab_hash: str
+    app_type: str
+    created_by: str
+    created_at: datetime
+
+
 @dataclass
 class ObjectPushSession:
     """In-memory object push session."""
@@ -107,6 +123,8 @@ class InMemoryCoreState(
         self._object_store = object_store
         self.fab_store: dict[str, Fab] = {}
         self.lock_fab_store = Lock()
+        self.federation_app_store: dict[tuple[str, str], FederationAppRecord] = {}
+        self.lock_federation_app_store = Lock()
         self.connector_store: dict[tuple[str, str], ConnectorRecord] = {}
         self.lock_connector_store = Lock()
         self.run_connector_store: dict[int, set[str]] = {}
@@ -320,6 +338,67 @@ class InMemoryCoreState(
                 hash_str=fab.hash_str,
                 content=fab.content,
                 verifications=dict(fab.verifications),
+            )
+
+    def upsert_app(
+        self,
+        federation_id: str,
+        app_id: str,
+        fab_hash: str,
+        app_type: str,
+        created_by: str,
+    ) -> bool:
+        """Create or update an app associated with a federation."""
+        if not all((federation_id, app_id, fab_hash, app_type, created_by)):
+            return False
+        key = (federation_id, app_id)
+        with self.lock_federation_app_store:
+            existing = self.federation_app_store.get(key)
+            self.federation_app_store[key] = FederationAppRecord(
+                federation_id=federation_id,
+                app_id=app_id,
+                fab_hash=fab_hash,
+                app_type=app_type,
+                created_by=existing.created_by if existing else created_by,
+                created_at=existing.created_at if existing else now(),
+            )
+        return True
+
+    def list_apps(
+        self, federation_id: str, limit: int | None = None
+    ) -> Sequence[AppInfo]:
+        """List apps associated with a federation, newest first."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if not federation_id or limit == 0:
+            return []
+        with self.lock_federation_app_store:
+            records = [
+                record
+                for record in self.federation_app_store.values()
+                if record.federation_id == federation_id
+            ]
+            records.sort(
+                key=lambda record: (record.created_at, record.app_id), reverse=True
+            )
+            if limit is not None:
+                records = records[:limit]
+            return [
+                AppInfo(
+                    app_id=record.app_id,
+                    fab_hash=record.fab_hash,
+                    app_type=record.app_type,
+                )
+                for record in records
+            ]
+
+    def delete_app(self, federation_id: str, app_id: str) -> bool:
+        """Delete an app association from a federation."""
+        if not federation_id or not app_id:
+            return False
+        with self.lock_federation_app_store:
+            return (
+                self.federation_app_store.pop((federation_id, app_id), None) is not None
             )
 
     def upsert_connector(

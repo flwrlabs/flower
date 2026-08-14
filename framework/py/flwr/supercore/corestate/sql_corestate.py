@@ -57,7 +57,11 @@ from flwr.common.constant import (
 from flwr.common.logger import log
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
-from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AppInfo,
+    Automation,
+    StartRunRequest,
+)
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
@@ -80,6 +84,9 @@ from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.corestate_models import (
+    FederationApp as FederationAppModel,
+)
 from flwr.supercore.state.schema.corestate_models import NonceStore as NonceStoreModel
 from flwr.supercore.state.schema.corestate_models import (
     ObjectPushSession as ObjectPushSessionModel,
@@ -422,6 +429,85 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 content=row.content,
                 verifications=json.loads(row.verifications),
             )
+
+    def upsert_app(
+        self,
+        federation_id: str,
+        app_id: str,
+        fab_hash: str,
+        app_type: str,
+        created_by: str,
+    ) -> bool:
+        """Create or update an app associated with a federation."""
+        if not all((federation_id, app_id, fab_hash, app_type, created_by)):
+            return False
+        stmt = self.dialect_insert(FederationAppModel).values(
+            federation_id=federation_id,
+            app_id=app_id,
+            fab_hash=fab_hash,
+            app_type=app_type,
+            created_by=created_by,
+            created_at=now(),
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[
+                FederationAppModel.federation_id,
+                FederationAppModel.app_id,
+            ],
+            set_={
+                "fab_hash": stmt.excluded.fab_hash,
+                "app_type": stmt.excluded.app_type,
+            },
+        )
+        with self.session() as session:
+            session.execute(stmt)
+        return True
+
+    def list_apps(
+        self, federation_id: str, limit: int | None = None
+    ) -> Sequence[AppInfo]:
+        """List apps associated with a federation, newest first."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if not federation_id or limit == 0:
+            return []
+        query = (
+            select(FederationAppModel)
+            .where(FederationAppModel.federation_id == federation_id)
+            .order_by(
+                FederationAppModel.created_at.desc(),
+                FederationAppModel.app_id.desc(),
+            )
+        )
+        if limit is not None:
+            query = query.limit(limit)
+        with self.session() as session:
+            apps = session.scalars(
+                query.execution_options(populate_existing=True)
+            ).all()
+            return [
+                AppInfo(
+                    app_id=app.app_id,
+                    fab_hash=app.fab_hash,
+                    app_type=app.app_type,
+                )
+                for app in apps
+            ]
+
+    def delete_app(self, federation_id: str, app_id: str) -> bool:
+        """Delete an app association from a federation."""
+        if not federation_id or not app_id:
+            return False
+        with self.session() as session:
+            deleted_app_id = session.scalar(
+                delete(FederationAppModel)
+                .where(
+                    FederationAppModel.federation_id == federation_id,
+                    FederationAppModel.app_id == app_id,
+                )
+                .returning(FederationAppModel.app_id)
+            )
+            return deleted_app_id is not None
 
     def upsert_connector(
         self,

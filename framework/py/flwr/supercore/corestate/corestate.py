@@ -21,7 +21,11 @@ from datetime import datetime
 from typing import Literal
 
 from flwr.app import Context, Message
-from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AppInfo,
+    Automation,
+    StartRunRequest,
+)
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
@@ -116,6 +120,27 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
+
+    @abstractmethod
+    def upsert_app(
+        self,
+        federation_id: str,
+        app_id: str,
+        fab_hash: str,
+        app_type: str,
+        created_by: str,
+    ) -> bool:
+        """Create or update an app associated with a federation."""
+
+    @abstractmethod
+    def list_apps(
+        self, federation_id: str, limit: int | None = None
+    ) -> Sequence[AppInfo]:
+        """List apps associated with a federation, newest first."""
+
+    @abstractmethod
+    def delete_app(self, federation_id: str, app_id: str) -> bool:
+        """Delete an app association from a federation."""
 
     @abstractmethod
     def upsert_connector(
