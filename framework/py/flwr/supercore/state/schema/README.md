@@ -55,6 +55,15 @@ erDiagram
     VARCHAR verifications
   }
 
+  federation_agent {
+    VARCHAR id PK
+    VARCHAR app_id
+    TIMESTAMP created_at
+    VARCHAR created_by
+    VARCHAR fab_hash "nullable"
+    VARCHAR federation_id
+  }
+
   logs {
     BIGINT run_id FK "nullable"
     VARCHAR log "nullable"
