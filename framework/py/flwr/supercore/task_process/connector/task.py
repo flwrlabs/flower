@@ -34,6 +34,7 @@ from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_loads
 
+from .http import ConnectorApiError
 from .registry import (
     get_connector_ref,
     invoke_connector,
@@ -70,7 +71,7 @@ def handle_task(
     name = cast(str, request_message.payload["name"])
     connector_ref = get_connector_ref(name)
     uses_credentials = requires_connector_credentials(name)
-    credential_failure = False
+    credential_failure_message = None
     try:
         credentials: JSONObject | None = None
         config: JSONObject | None = None
@@ -92,8 +93,13 @@ def handle_task(
         }
     except Exception as ex:  # pylint: disable=broad-exception-caught
         if uses_credentials:
-            response = _make_error_response(None)
-            credential_failure = True
+            safe_error = ex if isinstance(ex, ConnectorApiError) else None
+            response = _make_error_response(safe_error)
+            credential_failure_message = (
+                str(safe_error)
+                if safe_error is not None
+                else "Credential-backed connector execution failed."
+            )
         else:
             response = _make_error_response(ex)
             raise
@@ -104,8 +110,8 @@ def handle_task(
 
     # Raise outside the except block so the secret-bearing exception is not retained
     # as context on the sanitized error.
-    if credential_failure:
-        raise RuntimeError("Credential-backed connector execution failed.")
+    if credential_failure_message is not None:
+        raise RuntimeError(credential_failure_message)
 
 
 def _pull_connector_request(stub: RuntimeStub) -> ConnectorRequest:

@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 # Copyright 2023 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,54 +12,44 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Update the changelog using PR titles."""
+"""Update a Framework release changelog using PR titles."""
 
-
+import argparse
+import json
 import re
-import time
+import subprocess
+import tomllib
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
-from sys import argv
-from typing import Optional
+from typing import Any, cast
 
 import git
 from git import Commit
-from github import Github
-from github.PullRequest import PullRequest
-from github.Repository import Repository
-from packaging.version import Version
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
 
 
 REPO_NAME = "flwrlabs/flower"
-ROOT_DIR = Path(__file__).parents[2]  # Path to the root of the repository
-CHANGELOG_FILE = ROOT_DIR / "framework" / "docs" / "source" / "ref-changelog.md"
-CHANGELOG_SECTION_HEADER = "### Changelog entry"
+MAX_WORKERS = 8
 
-# Load the TOML configuration
+ROOT_DIR = Path(__file__).parents[2]
+
+CHANGELOG_DIR = ROOT_DIR / "framework" / "docs" / "source" / "changelog"
+CHANGELOG_INDEX = CHANGELOG_DIR / "index.md"
+
+CACHE_DIR = ROOT_DIR / ".cache" / "update_changelog"
+PR_CACHE_DIR = CACHE_DIR / "prs"
+STATE_FILE = CACHE_DIR / "state.json"
+
 with (ROOT_DIR / "dev" / "changelog_config.toml").open("rb") as toml_f:
     CONFIG = tomllib.load(toml_f)
 
-# Extract types, project, and scope from the config
 TYPES = "|".join(CONFIG["type"])
 PROJECTS = "|".join(CONFIG["project"]) + "|\\*"
 SCOPE = CONFIG["scope"]
-ALLOWED_VERBS = CONFIG["allowed_verbs"]
+PATTERN = CONFIG["pattern_template"].format(types=TYPES, projects=PROJECTS, scope=SCOPE)
 
-# Construct the pattern
-PATTERN_TEMPLATE = CONFIG["pattern_template"]
-PATTERN = PATTERN_TEMPLATE.format(types=TYPES, projects=PROJECTS, scope=SCOPE)
+LOCAL_REPO = git.Repo(ROOT_DIR)
 
-# Local git repository
-LOCAL_REPO = git.Repo(search_parent_directories=True)
-
-# Map PR types to sections in the changelog
 PR_TYPE_TO_SECTION = {
     "feat": "### New features",
     "docs": "### Documentation improvements",
@@ -70,388 +59,318 @@ PR_TYPE_TO_SECTION = {
     "refactor": "### Other changes",
     "unknown": "### Unknown changes",
 }
-SKIPPED_CHANGELOG_PROJECTS = {"datasets", "hub", "intelligence"}
 
-# Maximum number of workers in the thread pool
-MAX_WORKERS = int(argv[2]) if len(argv) > 2 else 10
-TAG_PATTERN = re.compile(r"(?:v|framework-)(?P<version>\d+\.\d+\.\d+)$")
+SKIPPED_CHANGELOG_PROJECTS = {
+    "datasets",
+    "hub",
+    "intelligence",
+}
 
-
-@dataclass(frozen=True)
-class ReleaseTag:
-    """Structured representation of a release git tag and changelog version."""
-
-    git_tag: str
-    version: Version
-
-    @property
-    def changelog_version(self) -> str:
-        """Return the version string used in changelog headings."""
-        return f"v{self.version}"
+IGNORED_TOPIC_LABELS = {"Maintainer", "Contributor", "Bot", "General"}
+PR_NUMBER_PATTERN = re.compile(r"\(#(\d+)\)$")
+COAUTHOR_PATTERN = re.compile(
+    r"^Co-authored-by:\s*(.+?)\s*<[^>]+>\s*$", re.IGNORECASE | re.MULTILINE
+)
 
 
-def _parse_release_tag(tag: str) -> Optional[ReleaseTag]:
-    """Parse a supported git release tag."""
-    match = TAG_PATTERN.fullmatch(tag)
-    if match is None:
-        return None
-    return ReleaseTag(git_tag=tag, version=Version(match.group("version")))
+def _get_previous_release_tag(source_sha: str) -> str:
+    """Return the latest Framework release tag on the source's mainline history."""
+    return cast(
+        str,
+        LOCAL_REPO.git.describe(
+            "--first-parent",
+            "--tags",
+            "--abbrev=0",
+            "--match=framework-*",
+            source_sha,
+        ),
+    ).strip()
 
 
-def _get_latest_release_tag(gh_api: Github) -> tuple[Repository, Optional[ReleaseTag]]:
-    """Retrieve the latest supported git release tag from the repository."""
-    repo = gh_api.get_repo(REPO_NAME)
-    parsed_tags = [
-        (tag_ref, release_tag)
-        for tag_ref in LOCAL_REPO.tags
-        if (release_tag := _parse_release_tag(tag_ref.name)) is not None
-    ]
-    if not parsed_tags:
-        return repo, None
-    _, latest_release_tag = max(
-        parsed_tags, key=lambda item: item[0].commit.committed_datetime
-    )
-    return repo, latest_release_tag
+def _get_commits(previous_release_tag: str, source_sha: str) -> list[Commit]:
+    """Return commits in the release range, ordered from oldest to newest."""
+    commits = list(LOCAL_REPO.iter_commits(f"{previous_release_tag}..{source_sha}"))
+    commits.reverse()
+    return commits
 
 
-def _add_shortlog(new_changelog_version: str, shortlog: str) -> None:
-    """Update the markdown file with the new version or update existing logs."""
-    token = f"<!---TOKEN_{new_changelog_version}-->"
-    entry = (
-        "\n### Thanks to our contributors\n\n"
-        "We would like to give our special thanks to all the contributors "
-        "who made the new version of Flower possible "
-        f"(in `git shortlog` order):\n\n{shortlog} {token}"
-    )
-    current_date = date.today()
-
-    with open(CHANGELOG_FILE, encoding="utf-8") as file:
-        content = file.readlines()
-
-    token_exists = any(token in line for line in content)
-    shortlog_exists = True
-
-    with open(CHANGELOG_FILE, "w", encoding="utf-8") as file:
-        for line in content:
-            if token in line:
-                token_exists = True
-                file.write(line)
-            elif "## Unreleased" in line and not token_exists:
-                # Add the new entry under "## Unreleased"
-                file.write(f"## {new_changelog_version} ({current_date})\n{entry}\n")
-                shortlog_exists = False
-                token_exists = True
-            else:
-                file.write(line)
-
-    if shortlog_exists:
-        print("Shortlog already exists in the changelog, skipping addition.")
-    else:
-        print("Shortlog added to the changelog.")
-
-
-def _git_commits_since_tag(git_tag: str) -> list[Commit]:
-    """Get a set of commits since a given git tag."""
-    return list(LOCAL_REPO.iter_commits(f"{git_tag}..origin/main"))
-
-
-def _get_contributors_from_commits(api: Github, commits: list[Commit]) -> set[str]:
-    """Get a set of contributors from a set of commits."""
-    # Get authors and co-authors from the commits
-    contributors: set[str] = set()
-    coauthor_names_emails: set[tuple[str, str]] = set()
-    coauthor_pattern = r"Co-authored-by:\s*(.+?)\s*<(.+?)>"
-
+def _get_pr_numbers(commits: list[Commit]) -> list[int]:
+    """Extract unique PR numbers from squash commit summaries."""
+    pr_numbers: list[int] = []
+    seen: set[int] = set()
     for commit in commits:
-        if commit.author.name is None:
-            continue
-        if "[bot]" in commit.author.name:
-            continue
-        # Find co-authors in the commit message
-        matches: list[str] = re.findall(coauthor_pattern, commit.message)
-
-        contributors.add(commit.author.name)
-        if matches:
-            coauthor_names_emails.update(matches)
-
-    # Get full names of the GitHub usernames
-    def _get_user(username: str, email: str) -> Optional[str]:
-        try:
-            user = api.get_user(username)
-            if user.email == email:
-                return user.name
-            print(f"Email mismatch for user {username}: {email} != {user.email}")
-        except Exception:  # pylint: disable=broad-exception-caught
-            print(
-                f"Failed to retrieve GitHub profile for user '{username}' <{email}>. "
-                f"Using '{username}' directly in the changelog."
-            )
-            return username
-        return None
-
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        for name in executor.map(lambda x: _get_user(*x), coauthor_names_emails):
-            if name:
-                contributors.add(name)
-
-    # Remove Copilot from the contributors list if present
-    contributors.discard("Copilot")
-    return contributors
+        match = PR_NUMBER_PATTERN.search(cast(str, commit.summary))
+        if match:
+            number = int(match.group(1))
+            if number not in seen:
+                seen.add(number)
+                pr_numbers.append(number)
+    return pr_numbers
 
 
-def _get_pull_requests_since_tag(
-    api: Github, repo: Repository, release_tag: ReleaseTag
-) -> tuple[str, set[PullRequest]]:
-    """Get a list of pull requests merged into the main branch since a given git tag."""
-    prs = set()
-
-    print(f"Retrieving commits since tag '{release_tag.git_tag}'...")
-    commits = _git_commits_since_tag(release_tag.git_tag)
-
-    print("Retrieving contributors...")
-    contributors = _get_contributors_from_commits(api, commits)
-    print(f"Found following contributors:\n{', '.join(sorted(contributors))}\n")
-
-    print("Retrieving pull requests...")
-    commit_shas = {commit.hexsha for commit in commits}
-    for pr_info in repo.get_pulls(
-        state="closed", sort="updated", direction="desc", base="main"
-    ):
-        if pr_info.merge_commit_sha in commit_shas:
-            prs.add(pr_info)
-        if len(prs) == len(commit_shas):
-            break
-
-    shortlog = ", ".join([f"`{name}`" for name in sorted(contributors)])
-    return shortlog, prs
+def _is_bot(name: str) -> bool:
+    """Return whether a contributor name belongs to a bot."""
+    return "[bot]" in name.casefold() or name.casefold() == "copilot"
 
 
-def _format_pr_reference(title: str, number: int, url: str) -> str:
-    """Format a pull request reference as a markdown list item."""
-    parts = title.strip().replace("*", "").split("`")
-    formatted_parts = []
-
-    for i, part in enumerate(parts):
-        if i % 2 == 0:
-            # Even index parts are normal text, ensure we do not add extra bold if empty
-            if part.strip():
-                formatted_parts.append(f"**{part.strip()}**")
-            else:
-                formatted_parts.append("")
-        else:
-            # Odd index parts are inline code
-            formatted_parts.append(f"`{part.strip()}`")
-
-    # Join parts with spaces but avoid extra spaces
-    formatted_title = " ".join(filter(None, formatted_parts))
-    return f"- {formatted_title} ([#{number}]({url}))"
+def _get_contributors(commits: list[Commit]) -> list[str]:
+    """Collect commit authors and co-authors in deterministic shortlog order."""
+    contributors: set[str] = set()
+    for commit in commits:
+        if commit.author.name and not _is_bot(commit.author.name):
+            contributors.add(commit.author.name)
+        contributors.update(
+            name.strip()
+            for name in COAUTHOR_PATTERN.findall(cast(str, commit.message))
+            if not _is_bot(name.strip())
+        )
+    return sorted(contributors)
 
 
-def _extract_changelog_entry(
-    pr_info: PullRequest,
-) -> dict[str, str]:
-    """Extract the changelog entry from a pull request's body."""
-    # Use regex search to find matches
-    match = re.search(PATTERN, pr_info.title)
+def _fetch_pr(number: int) -> None:
+    """Cache GitHub metadata and the full diff for a PR."""
+    PR_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    metadata_file = PR_CACHE_DIR / f"{number}.json"
+    diff_file = PR_CACHE_DIR / f"{number}.diff"
 
-    # Extract the topic label
-    topic = ""
-    for label in pr_info.labels:
-        if label.name not in ["Maintainer", "Contributor", "Bot", "General"]:
-            topic = label.name
-            break
+    if metadata_file.exists() and diff_file.exists():
+        return
 
+    metadata = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "view",
+            str(number),
+            "--repo",
+            REPO_NAME,
+            "--json",
+            "number,title,body,url,author,labels,mergedAt",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    diff = subprocess.run(
+        ["gh", "pr", "diff", str(number), "--repo", REPO_NAME],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+    metadata_file.write_text(metadata, encoding="utf-8")
+    diff_file.write_text(diff, encoding="utf-8")
+
+
+def _load_pr(number: int) -> dict[str, Any]:
+    """Load cached PR metadata."""
+    with (PR_CACHE_DIR / f"{number}.json").open(encoding="utf-8") as cache_file:
+        return cast(dict[str, Any], json.load(cache_file))
+
+
+def _parse_pr_title(pr: dict[str, Any]) -> dict[str, str]:
+    """Extract changelog grouping information from a pull request."""
+    topic = next(
+        (
+            label["name"]
+            for label in pr["labels"]
+            if label["name"] not in IGNORED_TOPIC_LABELS
+        ),
+        "",
+    )
+    match = re.search(PATTERN, pr["title"])
     if match:
-        # Extract components from the regex groups
-        pr_type = match.group(1)
-        pr_project = match.group(2)
-        pr_scope = match.group(3)  # Correctly capture optional sub-scope
-        pr_subject = match.group(
-            4
-        )  # Capture subject starting with uppercase and no terminal period
         return {
-            "type": pr_type,
-            "project": pr_project,
-            "scope": pr_scope,
-            "subject": pr_subject,
+            "type": match.group(1),
+            "project": match.group(2),
+            "scope": match.group(3) or "",
+            "subject": match.group(4),
             "topic": topic,
         }
-
     return {
         "type": "unknown",
         "project": "unknown",
         "scope": "unknown",
         "subject": "unknown",
+        "topic": topic,
     }
 
 
-def _update_changelog(
-    prs: set[PullRequest],
-    previous_changelog_version: str,
-    new_changelog_version: Optional[str],
-) -> bool:
-    """Update the changelog file with entries from provided pull requests."""
-    with open(CHANGELOG_FILE, "r+", encoding="utf-8") as file:
-        content = file.read()
-        unreleased_index = content.find(
-            "\n## Unreleased\n"
-        )  # Avoid finding `## Unreleased` in other text
-        if unreleased_index == -1 and new_changelog_version:
-            unreleased_index = content.find(
-                f"## {new_changelog_version}"
-            )  # Try to find the new tag if Unreleased not found
-        elif unreleased_index != -1:
-            unreleased_index += 1  # Skip the newline (\n) character
-
-        if unreleased_index == -1:
-            print("Unreleased header not found in the changelog.")
-            return False
-
-        # Find the end of the Unreleased section
-        end_index = content.find(
-            f"## {previous_changelog_version}", unreleased_index + 1
-        )
-        if end_index == -1:
-            print(
-                "Previous changelog version "
-                f"'{previous_changelog_version}' not found in the changelog."
-            )
-            return False
-
-        for section in PR_TYPE_TO_SECTION.values():
-            if content.find(section, unreleased_index, end_index) == -1:
-                content = content[:end_index] + f"\n{section}\n\n" + content[end_index:]
-                end_index = content.find(f"## {previous_changelog_version}", end_index)
-        topic_to_section = {}
-
-        prs_sorted = sorted(
-            prs,
-            key=lambda pr: (
-                pr.merged_at or pr.updated_at or pr.closed_at,
-                pr.number,
-            ),
-        )
-
-        for pr_info in prs_sorted:
-            parsed_title = _extract_changelog_entry(pr_info)
-
-            # Skip if the PR is already in changelog
-            if f"#{pr_info.number}]" in content:
-                continue
-
-            # Skip PRs for non-framework projects.
-            if parsed_title["project"] in SKIPPED_CHANGELOG_PROJECTS:
-                continue
-
-            # Create the topic if not found
-            if (topic := parsed_title.get("topic")) and topic not in topic_to_section:
-                section = f"### {topic}"
-                if content.find(section, unreleased_index, end_index) == -1:
-                    content = (
-                        content[:end_index] + f"\n{section}\n\n" + content[end_index:]
-                    )
-                    end_index = content.find(
-                        f"## {previous_changelog_version}", end_index
-                    )
-                topic_to_section[topic] = section
-
-            # Find section to insert
-            pr_type = parsed_title.get("type", "unknown")
-            if topic:
-                section = topic_to_section[topic]
-            else:
-                section = PR_TYPE_TO_SECTION.get(pr_type, "### Unknown changes")
-            insert_index = content.find(section, unreleased_index, end_index)
-
-            pr_reference = _format_pr_reference(
-                pr_info.title, pr_info.number, pr_info.html_url
-            )
-            content = _insert_entry_no_desc(
-                content,
-                pr_reference,
-                insert_index,
-            )
-
-            # Find the end of the Unreleased section
-            end_index = content.find(f"## {previous_changelog_version}", end_index)
-
-        # Check for repeated PRs
-        _check_repeated_prs(content)
-
-        # Finalize content update
-        file.seek(0)
-        file.write(content)
-        file.truncate()
-    return True
+def _format_pr_reference(pr: dict[str, Any]) -> str:
+    """Format a pull request reference as a Markdown list item."""
+    parts = pr["title"].strip().replace("*", "").split("`")
+    formatted_parts = []
+    for index, part in enumerate(parts):
+        if not part.strip():
+            continue
+        if index % 2 == 0:
+            formatted_parts.append(f"**{part.strip()}**")
+        else:
+            formatted_parts.append(f"`{part.strip()}`")
+    formatted_title = " ".join(formatted_parts)
+    return f"- {formatted_title} ([#{pr['number']}]({pr['url']}))"
 
 
-def _check_repeated_prs(content: str) -> None:
-    """Check for repeated PRs in the changelog."""
-    found_pairs = re.findall(
-        r"\[#(\d+)\]\(https://github.com/flwrlabs/flower/pull/(\d+)\)", content
+def _contributor_entry(contributors: list[str]) -> str:
+    """Build the contributor section for a release changelog."""
+    shortlog = ", ".join(f"`{name}`" for name in contributors)
+    return (
+        "### Thanks to our contributors\n\n"
+        "We would like to give our special thanks to all the contributors who made "
+        "the new version of Flower possible (in `git shortlog` order):\n\n"
+        f"{shortlog}"
     )
 
-    count_prs = {}
-    for pr, pr_http in found_pairs:
-        if pr_http != pr:
-            print(f"PR #{pr} has inconsistent http link.")
-        if pr not in count_prs:
-            count_prs[pr] = 0
-        count_prs[pr] += 1
-    for pr, count in count_prs.items():
-        if count > 1:
-            print(f"PR #{pr} is repeated {count} times.")
 
-
-def _insert_entry_no_desc(
-    content: str, pr_reference: str, unreleased_index: int
-) -> str:
-    """Insert a changelog entry for a pull request with no specific description."""
-    insert_index = content.find("\n", unreleased_index) + 1
-    content = (
-        content[:insert_index] + "\n" + pr_reference + "\n" + content[insert_index:]
+def _refresh_contributors(content: str, contributors: list[str]) -> str:
+    """Replace the contributor section in a release changelog."""
+    section = "### Thanks to our contributors"
+    section_start = content.index(section)
+    section_end = content.find("\n### ", section_start + len(section))
+    if section_end == -1:
+        section_end = len(content)
+    return (
+        f"{content[:section_start]}"
+        f"{_contributor_entry(contributors)}\n"
+        f"{content[section_end:]}"
     )
-    return content
 
 
-def _fetch_origin() -> None:
-    """Fetch the latest changes from the origin."""
-    LOCAL_REPO.remote("origin").fetch()
+def _section_for_pr(parsed_title: dict[str, str]) -> str:
+    """Return the changelog section for parsed PR metadata."""
+    if parsed_title["topic"]:
+        return f"### {parsed_title['topic']}"
+    return PR_TYPE_TO_SECTION.get(parsed_title["type"], PR_TYPE_TO_SECTION["unknown"])
+
+
+def _entry_sort_key(pr: dict[str, Any]) -> tuple[datetime, int]:
+    """Return a stable chronological sort key for a PR."""
+    merged_at = pr.get("mergedAt")
+    merged = (
+        datetime.fromisoformat(merged_at.replace("Z", "+00:00"))
+        if merged_at
+        else datetime.min.replace(tzinfo=UTC)
+    )
+    return merged, pr["number"]
+
+
+def _append_entry(content: str, section: str, entry: str) -> str:
+    """Add an entry to a section, creating the section when necessary."""
+    if section not in content:
+        return f"{content.rstrip()}\n\n{section}\n\n{entry}\n"
+
+    insert_at = content.index("\n", content.index(section)) + 1
+    return f"{content[:insert_at]}\n{entry}\n{content[insert_at:]}"
+
+
+def _update_release_file(
+    version: str, contributors: list[str], prs: list[dict[str, Any]]
+) -> None:
+    """Create a release changelog or add uncovered PRs to an existing one."""
+    release_file = CHANGELOG_DIR / f"v{version}.md"
+    if release_file.exists():
+        content = _refresh_contributors(
+            release_file.read_text(encoding="utf-8"), contributors
+        )
+    else:
+        sections = "\n\n".join(dict.fromkeys(PR_TYPE_TO_SECTION.values()))
+        content = (
+            f"## v{version} ({date.today()})\n\n"
+            f"{_contributor_entry(contributors)}\n\n"
+            f"{sections}\n"
+        )
+
+    for pr in sorted(prs, key=_entry_sort_key):
+        if f"#{pr['number']}]" in content:
+            continue
+        parsed_title = _parse_pr_title(pr)
+        if parsed_title["project"] in SKIPPED_CHANGELOG_PROJECTS:
+            continue
+        content = _append_entry(
+            content, _section_for_pr(parsed_title), _format_pr_reference(pr)
+        )
+
+    release_file.write_text(f"{content.rstrip()}\n", encoding="utf-8")
+
+
+def _update_index(version: str) -> None:
+    """Include a release changelog at the top of the changelog index."""
+    include = f"```{{include}} v{version}.md\n```"
+    content = CHANGELOG_INDEX.read_text(encoding="utf-8")
+    if include in content:
+        return
+    heading_end = content.index("\n", content.index("# Changelog")) + 1
+    content = f"{content[:heading_end]}\n{include}\n{content[heading_end:]}"
+    CHANGELOG_INDEX.write_text(content, encoding="utf-8")
+
+
+def _load_previous_pr_numbers() -> set[int]:
+    """Load PR numbers from the previous state, if present."""
+    if not STATE_FILE.exists():
+        return set()
+    with STATE_FILE.open(encoding="utf-8") as state_file:
+        return set(json.load(state_file)["pr_numbers"])
+
+
+def _write_state(
+    version: str,
+    source_sha: str,
+    previous_release_tag: str,
+    pr_numbers: list[int],
+    previous_pr_numbers: set[int],
+) -> None:
+    """Write the current release range state."""
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    state = {
+        "version": version,
+        "source_sha": source_sha,
+        "previous_release_tag": previous_release_tag,
+        "pr_numbers": pr_numbers,
+        "new_pr_numbers": [
+            number for number in pr_numbers if number not in previous_pr_numbers
+        ],
+    }
+    STATE_FILE.write_text(f"{json.dumps(state, indent=2)}\n", encoding="utf-8")
+
+
+def _parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--version", required=True, help="Target release version")
+    parser.add_argument(
+        "--source-sha", required=True, help="Exact release source commit SHA"
+    )
+    return parser.parse_args()
 
 
 def main() -> None:
-    """Update changelog using the descriptions of PRs since the latest tag."""
-    start = time.time()
+    """Update a release changelog for an exact source commit."""
+    args = _parse_args()
 
-    # Initialize GitHub Client with provided token (as argument)
-    gh_api = Github(argv[1])
+    print("Fetching origin and tags...")
+    LOCAL_REPO.git.fetch("origin", "--tags")
 
-    # Fetch the latest changes from the origin
-    print("Fetching the latest changes from the origin...")
-    _fetch_origin()
+    previous_release_tag = _get_previous_release_tag(args.source_sha)
+    commits = _get_commits(previous_release_tag, args.source_sha)
+    pr_numbers = _get_pr_numbers(commits)
+    contributors = _get_contributors(commits)
+    previous_pr_numbers = _load_previous_pr_numbers()
 
-    # Get the repository and the latest tag
-    print("Retrieving the latest tag...")
-    repo, latest_release_tag = _get_latest_release_tag(gh_api)
-    if not latest_release_tag:
-        print("No tags found in the repository.")
-        return
+    print(f"Caching {len(pr_numbers)} pull requests...")
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        list(executor.map(_fetch_pr, pr_numbers))
+    prs = [_load_pr(number) for number in pr_numbers]
 
-    # Get the shortlog and the pull requests since the latest tag
-    shortlog, prs = _get_pull_requests_since_tag(gh_api, repo, latest_release_tag)
-
-    # Update the changelog
-    print("Updating the changelog...")
-    new_changelog_version = (
-        f"v{latest_release_tag.version.major}.{latest_release_tag.version.minor + 1}.0"
+    _write_state(
+        args.version,
+        args.source_sha,
+        previous_release_tag,
+        pr_numbers,
+        previous_pr_numbers,
     )
-    if _update_changelog(
-        prs,
-        latest_release_tag.changelog_version,
-        new_changelog_version,
-    ):
-        _add_shortlog(new_changelog_version, shortlog)
-        print(f"Changelog updated successfully in {time.time() - start:.2f}s.")
+    _update_release_file(args.version, contributors, prs)
+    _update_index(args.version)
+    print(f"Updated changelog for v{args.version}.")
 
 
 if __name__ == "__main__":
