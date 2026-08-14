@@ -55,9 +55,10 @@ erDiagram
     VARCHAR verifications
   }
 
-  federation_agent {
+  federation_app {
     VARCHAR app_id PK
     VARCHAR federation_id PK
+    VARCHAR app_type
     TIMESTAMP created_at
     VARCHAR created_by
     VARCHAR fab_hash
