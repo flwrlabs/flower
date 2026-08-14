@@ -38,7 +38,6 @@ jobs:
           ARTIFACT_BUCKET: ${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}
         run: |
           BEFORE_SHA="${{ github.event.before }}"
-          BEFORE_SHA="${{ github.event.before }}"
 
           required=true
           if git diff --quiet "${BEFORE_SHA}" "${GITHUB_SHA}" -- \
