@@ -22,7 +22,6 @@ from .privacy_accounting import (
     PrivacySpent,
     SamplingMethod,
 )
-from .rdp_accountant import RdpAccountant
 
 __all__ = [
     "GaussianPrivacyEvent",
@@ -30,6 +29,5 @@ __all__ = [
     "PrivacyAccountant",
     "PrivacyConfig",
     "PrivacySpent",
-    "RdpAccountant",
     "SamplingMethod",
 ]
