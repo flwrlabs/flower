@@ -18,8 +18,6 @@
 
 from logging import DEBUG, ERROR
 
-import grpc
-
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
