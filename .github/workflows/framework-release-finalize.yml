@@ -1,0 +1,145 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+name: Finalize Framework Release
+
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  finalize-framework-release:
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'automation/release/framework-')
+    name: Finalize Framework release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout merged release bookkeeping
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          persist-credentials: false
+
+      - name: Bootstrap
+        uses: ./.github/actions/bootstrap
+
+      - name: Read release metadata
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          version="$(sed -n 's/^- Release version: `\([^`]*\)`$/\1/p' <<< "${PR_BODY}")"
+          release_source_sha="$(sed -n 's/^- Release source SHA: `\([^`]*\)`$/\1/p' <<< "${PR_BODY}")"
+
+          echo "VERSION=${version}" >> "${GITHUB_ENV}"
+          echo "RELEASE_SOURCE_SHA=${release_source_sha}" >> "${GITHUB_ENV}"
+          echo "RELEASE_SERIES=${version%.*}" >> "${GITHUB_ENV}"
+
+      - name: Download commit artifacts
+        run: |
+          mkdir -p release-artifacts
+          curl --fail --location --silent --show-error \
+            "https://artifact.flower.ai/framework/commits/${RELEASE_SOURCE_SHA}/flwr-${VERSION}-py3-none-any.whl" \
+            --output "release-artifacts/flwr-${VERSION}-py3-none-any.whl"
+          curl --fail --location --silent --show-error \
+            "https://artifact.flower.ai/framework/commits/${RELEASE_SOURCE_SHA}/flwr-${VERSION}.tar.gz" \
+            --output "release-artifacts/flwr-${VERSION}.tar.gz"
+          curl --fail --location --silent --show-error \
+            "https://artifact.flower.ai/framework/commits/${RELEASE_SOURCE_SHA}/digests.json" \
+            --output release-artifacts/digests.json
+
+      - name: Create release references
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/tags/framework-${VERSION}" \
+            -f sha="${RELEASE_SOURCE_SHA}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/heads/release/framework-${RELEASE_SERIES}" \
+            -f sha="${RELEASE_SOURCE_SHA}"
+
+      - name: Copy Python artifacts to the stable location
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.ARTIFACT_AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.ARTIFACT_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACT_AWS_SECRET_KEY_ID }}
+        run: |
+          aws s3 cp \
+            --content-disposition "attachment" \
+            --cache-control "no-cache" \
+            "release-artifacts/flwr-${VERSION}-py3-none-any.whl" \
+            "s3://${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}/py/release/v${VERSION}/flwr-${VERSION}-py3-none-any.whl"
+          aws s3 cp \
+            --content-disposition "attachment" \
+            --cache-control "no-cache" \
+            "release-artifacts/flwr-${VERSION}.tar.gz" \
+            "s3://${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}/py/release/v${VERSION}/flwr-${VERSION}.tar.gz"
+
+      - name: Publish Python artifacts
+        env:
+          PYPI_REPOSITORY_PASSWORD: ${{ secrets.PYPI_REPOSITORY_PASSWORD }}
+          PYPI_REPOSITORY_USERNAME: ${{ vars.PYPI_REPOSITORY_USERNAME }}
+          PYPI_REPOSITORY_URL: ${{ vars.PYPI_REPOSITORY_URL }}
+        run: |
+          publish_args=(
+            --username "${PYPI_REPOSITORY_USERNAME}"
+            --password "${PYPI_REPOSITORY_PASSWORD}"
+          )
+          if [[ -n "${PYPI_REPOSITORY_URL}" ]]; then
+            publish_args=(--publish-url "${PYPI_REPOSITORY_URL}" "${publish_args[@]}")
+          fi
+          uv publish \
+            "${publish_args[@]}" \
+            "release-artifacts/flwr-${VERSION}-py3-none-any.whl" \
+            "release-artifacts/flwr-${VERSION}.tar.gz"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Login to Docker registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ${{ vars.DOCKER_IMAGE_REGISTRY }}
+          username: ${{ vars.DOCKER_IMAGE_REGISTRY_USER }}
+          password: ${{ secrets.DOCKER_IMAGE_REGISTRY_PASSWORD }}
+
+      - name: Promote Docker images
+        run: |
+          while IFS= read -r image; do
+            repository="$(jq -r '.repository' <<< "${image}")"
+            index_digest="$(jq -r '.index_digest' <<< "${image}")"
+            tag_args=()
+
+            while IFS= read -r unstable_tag; do
+              tag_suffix="${unstable_tag#"${repository}:unstable"}"
+              tag_args+=(-t "${repository}:${VERSION}${tag_suffix}")
+            done < <(jq -r '.tags[]' <<< "${image}")
+
+            docker buildx imagetools create \
+              "${tag_args[@]}" \
+              "${repository}@${index_digest}"
+          done < <(jq -c '.images[]' release-artifacts/digests.json)
+
+      - name: Dispatch Framework docs
+        run: |
+          gh workflow run framework-docs.yml \
+            --repo "${GITHUB_REPOSITORY}" \
+            --ref "release/framework-${RELEASE_SERIES}"
+
+      - name: Generate release notes
+        run: ./framework/dev/get-latest-changelog.sh "${VERSION}" > release-body.md
+
+      - name: Publish GitHub Release
+        run: |
+          gh release create "framework-${VERSION}" \
+            "release-artifacts/flwr-${VERSION}-py3-none-any.whl" \
+            "release-artifacts/flwr-${VERSION}.tar.gz" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "Flower ${VERSION}" \
+            --notes-file release-body.md
