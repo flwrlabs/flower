@@ -23,8 +23,38 @@ jobs:
     timeout-minutes: 5
     outputs:
       whl_path: ${{ steps.artifacts.outputs.WHL_PATH }}
+      docker-required: ${{ steps.docker-changes.outputs.required }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check Docker-relevant changes
+        id: docker-changes
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.ARTIFACT_AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.ARTIFACT_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACT_AWS_SECRET_KEY_ID }}
+          ARTIFACT_BUCKET: ${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}
+        run: |
+          BEFORE_SHA="${{ github.event.before }}"
+
+          required=true
+          if git diff --quiet "${BEFORE_SHA}" "${GITHUB_SHA}" -- \
+              framework/py/ \
+              framework/pyproject.toml \
+              framework/docker/ \
+              framework/dev/build-docker-image-matrix.py \
+              framework/dev/release/resolve-docker-matrix.py &&
+            aws s3api head-object \
+              --bucket "${ARTIFACT_BUCKET}" \
+              --key "framework/commits/${BEFORE_SHA}/digests.json" \
+              > /dev/null 2>&1
+          then
+            required=false
+          fi
+
+          echo "required=${required}" >> "$GITHUB_OUTPUT"
 
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
@@ -59,7 +89,30 @@ jobs:
             s3://${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}/framework/commits/${GITHUB_SHA}/ \
             --recursive
 
+      - name: Reuse previous Docker artifact index
+        if: steps.docker-changes.outputs.required == 'false'
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.ARTIFACT_AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.ARTIFACT_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACT_AWS_SECRET_KEY_ID }}
+        run: |
+          aws s3 cp \
+            s3://${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}/framework/commits/${{ github.event.before }}/digests.json \
+            digests.previous.json
+
+          jq \
+            --arg commit_sha "${GITHUB_SHA}" \
+            '.commit_sha = $commit_sha' \
+            digests.previous.json > digests.json
+
+          aws s3 cp \
+            --content-disposition "attachment" \
+            --cache-control "no-cache" \
+            digests.json \
+            s3://${{ secrets.ARTIFACT_AWS_BUCKET_NAME }}/framework/commits/${GITHUB_SHA}/digests.json
+
   prepare-docker-build-matrix:
+    if: needs.package-distributions.outputs.docker-required == 'true'
     name: Collect Docker build parameters
     runs-on: ubuntu-24.04
     timeout-minutes: 5
