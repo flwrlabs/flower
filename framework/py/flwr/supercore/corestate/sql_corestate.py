@@ -430,7 +430,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 verifications=json.loads(row.verifications),
             )
 
-    def upsert_app(
+    def upsert_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         federation_id: str,
         app_id: str,

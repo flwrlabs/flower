@@ -122,7 +122,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Return the FAB for the given hash, if present."""
 
     @abstractmethod
-    def upsert_app(
+    def upsert_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         federation_id: str,
         app_id: str,
