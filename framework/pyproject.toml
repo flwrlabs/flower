@@ -141,7 +141,6 @@ dev = [
     "pyroma==4.2",
     "check-wheel-contents==0.6.3",
     "GitPython==3.1.50",
-    "PyGithub==2.1.1",
     "licensecheck==2025.1.0",
     "pre-commit==3.5.0",
     "sphinx-substitution-extensions==2022.2.16",
@@ -161,7 +160,7 @@ devtool = { path = "../dev", editable = true }
 [tool.uv.build-backend]
 module-name = "flwr"
 module-root = "py"
-source-exclude = ["py/**/*_test.py"]
+source-exclude = ["py/**/*_test.py", "py/**/*_test_utils.py"]
 
 [tool.devtool.protoc]
 proto_root = "proto"
