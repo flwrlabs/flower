@@ -58,9 +58,9 @@ erDiagram
   federation_app {
     VARCHAR app_id PK
     VARCHAR federation_id PK
+    TIMESTAMP added_at
+    VARCHAR added_by
     VARCHAR app_type
-    TIMESTAMP created_at
-    VARCHAR created_by
     VARCHAR fab_hash
   }
 
