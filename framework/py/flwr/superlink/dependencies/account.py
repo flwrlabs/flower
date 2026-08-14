@@ -19,7 +19,11 @@ from fastapi.security.utils import get_authorization_scheme_param
 
 from flwr.common.constant import ACCESS_TOKEN_KEY
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.error import (
+    ApiErrorCode,
+    BearerAuthenticationError,
+    FlowerError,
+)
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
 
@@ -45,10 +49,7 @@ class AccountAccessDependency:
         """Return the authenticated account for a request."""
         authorization_headers = request.headers.getlist("authorization")
         if len(authorization_headers) > 1:
-            raise FlowerError(
-                ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-                "Expected at most one Authorization header with a Bearer token.",
-            )
+            raise BearerAuthenticationError()
 
         metadata: list[tuple[str, str]] = []
         if authorization_headers:
@@ -56,35 +57,19 @@ class AccountAccessDependency:
                 authorization_headers[0]
             )
             if scheme.lower() != "bearer" or not access_token:
-                raise FlowerError(
-                    ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-                    "Authorization header does not contain a Bearer token.",
-                )
+                raise BearerAuthenticationError()
             metadata = [(ACCESS_TOKEN_KEY, access_token)]
 
         valid_token, account = self.authn_plugin.validate_tokens_in_metadata(metadata)
         if not valid_token:
-            raise FlowerError(
-                ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-                "Access token validation failed.",
-            )
+            raise BearerAuthenticationError()
 
-        return self._require_account(
-            account=account,
-            missing_account_detail="Token validated, but account info not found",
-        )
+        return self._require_account(account)
 
-    def _require_account(
-        self,
-        account: AccountInfo | None,
-        missing_account_detail: str,
-    ) -> AccountInfo:
+    def _require_account(self, account: AccountInfo | None) -> AccountInfo:
         """Require account information from the authentication plugin."""
         if account is None:
-            raise FlowerError(
-                ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-                f"{missing_account_detail}: authentication plugin returned no account.",
-            )
+            raise BearerAuthenticationError()
         return account
 
 

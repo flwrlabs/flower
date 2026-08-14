@@ -165,11 +165,7 @@ def test_list_runs_rejects_invalid_token_without_refresh() -> None:
     )
 
     assert response.status_code == 401
-    assert response.json() == {
-        "code": ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-        "public_message": "Authentication failed.",
-        "public_details": None,
-    }
+    assert response.json() == {"detail": "Not authenticated"}
     assert response.headers["www-authenticate"] == "Bearer"
     assert "x-access-token" not in response.headers
     assert "x-refresh-token" not in response.headers
