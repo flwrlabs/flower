@@ -23,7 +23,7 @@ from flwr.common.constant import ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, FlowerError
 
-from .account import AccountAccessDependency, get_account, get_authn_plugin
+from .account import AccountAccessDependency, get_account
 
 
 def _make_request(
@@ -165,27 +165,6 @@ def test_account_access_dependency_rejects_unauthenticated_requests(
     assert exc_info.value.message == detail
     assert "access-token" not in exc_info.value.message
     authn_plugin.refresh_tokens.assert_not_called()
-
-
-def test_get_authn_plugin_returns_configured_plugin() -> None:
-    """get_authn_plugin should return the configured authentication plugin."""
-    app = FastAPI()
-    authn_plugin = Mock()
-    app.state.account_access_dep = AccountAccessDependency(authn_plugin)
-
-    assert get_authn_plugin(_make_app_request(app)) is authn_plugin
-
-
-def test_get_authn_plugin_raises_when_plugin_is_missing() -> None:
-    """get_authn_plugin should fail clearly when the app is not configured."""
-    with pytest.raises(FlowerError) as exc_info:
-        get_authn_plugin(_make_app_request(FastAPI()))
-
-    assert exc_info.value.code == ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED
-    assert exc_info.value.message == (
-        "SuperLink authentication is not initialized: expected ControlAuthnPlugin, "
-        "got None."
-    )
 
 
 def test_get_account_raises_when_authentication_middleware_did_not_run() -> None:
