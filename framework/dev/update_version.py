@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import argparse
-import json
 import re
-import subprocess
 import sys
 from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any
 
 try:
     import tomllib
@@ -33,6 +30,29 @@ DOCKER_READMES = {
     "framework/docker/superexec/README.md": "superexec",
     "framework/docker/superlink/README.md": "superlink",
     "framework/docker/supernode/README.md": "supernode",
+}
+DOCKER_TAG_GROUPS = {
+    "base": (
+        ("{version}-py3.13-alpine3.22",),
+        ("{version}-py3.13-ubuntu24.04",),
+        ("{version}-py3.12-ubuntu24.04",),
+        ("{version}-py3.11-ubuntu24.04",),
+    ),
+    "superlink": (
+        ("{version}", "{version}-py3.13-alpine3.22"),
+        ("{version}-py3.13-ubuntu24.04", "latest"),
+    ),
+    "supernode": (
+        ("{version}", "{version}-py3.13-alpine3.22"),
+        ("{version}-py3.13-ubuntu24.04", "latest"),
+        ("{version}-py3.12-ubuntu24.04",),
+        ("{version}-py3.11-ubuntu24.04",),
+    ),
+    "superexec": (
+        ("{version}", "{version}-py3.13-ubuntu24.04", "latest"),
+        ("{version}-py3.12-ubuntu24.04",),
+        ("{version}-py3.11-ubuntu24.04",),
+    ),
 }
 VERSION_RE = r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
 
@@ -108,75 +128,39 @@ def _update_example(content: str, path: Path, released: str) -> str:
     return _set_toml_string(content, "version", f"{major}.{minor}.{patch + 1}", path)
 
 
-def _docker_matrix(root: Path, released: str) -> dict[str, Any]:
-    """Load stable tags from the existing Docker matrix generator."""
-    command = [
-        sys.executable,
-        str(root / "framework/dev/build-docker-image-matrix.py"),
-        "--flwr-version",
-        released,
-        "--matrix",
-        "stable",
-    ]
-    try:
-        output = subprocess.run(
-            command, cwd=root, check=True, capture_output=True, text=True
-        ).stdout
-        return json.loads(output)
-    except (OSError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
-        raise ValueError("Failed to generate the stable Docker matrix") from exc
-
-
-def _docker_tag_groups(
-    matrix: dict[str, Any], repository: str, released: str
-) -> list[list[str]]:
+def _docker_tag_groups(image_name: str, released: str) -> list[list[str]]:
     """Return README tag groups in display order."""
-    images = (
-        matrix["base"]["images"] if repository == "base" else matrix["binary"]["images"]
-    )
-    if repository != "base":
-        images = [
-            image
-            for image in images
-            if image["namespace_repository"] == f"flwr/{repository}"
-        ]
-
-    groups = []
-    for image in reversed(images):
-        tags = image["tags_encoded"].splitlines()
-        tags.sort(key=lambda tag: (tag != released, tag == "latest"))
-        groups.append(tags)
-    if not groups:
-        raise ValueError(f"No Docker tags found for flwr/{repository}")
-    return groups
+    return [
+        [tag.format(version=released) for tag in group]
+        for group in DOCKER_TAG_GROUPS[image_name]
+    ]
 
 
 def _update_docker_readme(
     content: str,
-    repository: str,
+    image_name: str,
     released: str,
     next_version: str,
     nightly_date: str,
-    matrix: dict[str, Any],
 ) -> str:
     """Add the release tags and move latest away from the previous release."""
-    groups = _docker_tag_groups(matrix, repository, released)
+    groups = _docker_tag_groups(image_name, released)
 
-    if repository != "base":
+    if image_name != "base":
         latest = next(group for group in groups if "latest" in group)
         points_to = " and ".join(f"`{tag}`" for tag in latest if tag != "latest")
         content = _replace(
             content,
             r"^(?P<prefix>- `latest`\r?\n  - points to ).+$",
             rf"\g<prefix>{points_to}",
-            f"latest description in flwr/{repository} README",
+            f"latest description in flwr/{image_name} README",
         )
 
     content = _replace(
         content,
         r"^(?P<prefix>- `nightly`, `<version>\.dev<YYYYMMDD>` e\.g\. `)[^`]+`$",
         rf"\g<prefix>{next_version}.dev{nightly_date}`",
-        f"nightly tag in flwr/{repository} README",
+        f"nightly tag in flwr/{image_name} README",
     )
 
     # Remove `latest` from historical release tag lines.
@@ -197,7 +181,7 @@ def _update_docker_readme(
             re.MULTILINE,
         )
         if nightly is None:
-            raise ValueError(f"Nightly block not found in flwr/{repository} README")
+            raise ValueError(f"Nightly block not found in flwr/{image_name} README")
         content = content[: nightly.end()] + tag_block + content[nightly.end() :]
 
     latest_lines = [
@@ -205,9 +189,9 @@ def _update_docker_readme(
         for line in content.splitlines()
         if re.match(r"^- `\d+\.\d+\.\d+", line) and "`latest`" in line
     ]
-    expected = 0 if repository == "base" else 1
+    expected = 0 if image_name == "base" else 1
     if len(latest_lines) != expected:
-        raise ValueError(f"Unexpected latest tags in flwr/{repository} README")
+        raise ValueError(f"Unexpected latest tags in flwr/{image_name} README")
     return content
 
 
@@ -271,11 +255,10 @@ def _collect_updates(
     for path in examples:
         updates[path] = _update_example(_read(path), path, released)
 
-    matrix = _docker_matrix(root, released)
-    for relative, repository in DOCKER_READMES.items():
+    for relative, image_name in DOCKER_READMES.items():
         path = root / relative
         updates[path] = _update_docker_readme(
-            _read(path), repository, released, next_version, nightly_date, matrix
+            _read(path), image_name, released, next_version, nightly_date
         )
     return updates
 
