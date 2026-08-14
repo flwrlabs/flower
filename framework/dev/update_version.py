@@ -128,39 +128,39 @@ def _update_example(content: str, path: Path, released: str) -> str:
     return _set_toml_string(content, "version", f"{major}.{minor}.{patch + 1}", path)
 
 
-def _docker_tag_groups(image_name: str, released: str) -> list[list[str]]:
+def _docker_tag_groups(repository: str, released: str) -> list[list[str]]:
     """Return README tag groups in display order."""
     return [
         [tag.format(version=released) for tag in group]
-        for group in DOCKER_TAG_GROUPS[image_name]
+        for group in DOCKER_TAG_GROUPS[repository]
     ]
 
 
 def _update_docker_readme(
     content: str,
-    image_name: str,
+    repository: str,
     released: str,
     next_version: str,
     nightly_date: str,
 ) -> str:
     """Add the release tags and move latest away from the previous release."""
-    groups = _docker_tag_groups(image_name, released)
+    groups = _docker_tag_groups(repository, released)
 
-    if image_name != "base":
+    if repository != "base":
         latest = next(group for group in groups if "latest" in group)
         points_to = " and ".join(f"`{tag}`" for tag in latest if tag != "latest")
         content = _replace(
             content,
             r"^(?P<prefix>- `latest`\r?\n  - points to ).+$",
             rf"\g<prefix>{points_to}",
-            f"latest description in flwr/{image_name} README",
+            f"latest description in flwr/{repository} README",
         )
 
     content = _replace(
         content,
         r"^(?P<prefix>- `nightly`, `<version>\.dev<YYYYMMDD>` e\.g\. `)[^`]+`$",
         rf"\g<prefix>{next_version}.dev{nightly_date}`",
-        f"nightly tag in flwr/{image_name} README",
+        f"nightly tag in flwr/{repository} README",
     )
 
     # Remove `latest` from historical release tag lines.
@@ -181,7 +181,7 @@ def _update_docker_readme(
             re.MULTILINE,
         )
         if nightly is None:
-            raise ValueError(f"Nightly block not found in flwr/{image_name} README")
+            raise ValueError(f"Nightly block not found in flwr/{repository} README")
         content = content[: nightly.end()] + tag_block + content[nightly.end() :]
 
     latest_lines = [
@@ -189,9 +189,9 @@ def _update_docker_readme(
         for line in content.splitlines()
         if re.match(r"^- `\d+\.\d+\.\d+", line) and "`latest`" in line
     ]
-    expected = 0 if image_name == "base" else 1
+    expected = 0 if repository == "base" else 1
     if len(latest_lines) != expected:
-        raise ValueError(f"Unexpected latest tags in flwr/{image_name} README")
+        raise ValueError(f"Unexpected latest tags in flwr/{repository} README")
     return content
 
 
@@ -255,10 +255,10 @@ def _collect_updates(
     for path in examples:
         updates[path] = _update_example(_read(path), path, released)
 
-    for relative, image_name in DOCKER_READMES.items():
+    for relative, repository in DOCKER_READMES.items():
         path = root / relative
         updates[path] = _update_docker_readme(
-            _read(path), image_name, released, next_version, nightly_date
+            _read(path), repository, released, next_version, nightly_date
         )
     return updates
 
