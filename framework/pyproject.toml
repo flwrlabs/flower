@@ -160,7 +160,7 @@ devtool = { path = "../dev", editable = true }
 [tool.uv.build-backend]
 module-name = "flwr"
 module-root = "py"
-source-exclude = ["py/**/*_test.py"]
+source-exclude = ["py/**/*_test.py", "py/**/*_test_utils.py"]
 
 [tool.devtool.protoc]
 proto_root = "proto"

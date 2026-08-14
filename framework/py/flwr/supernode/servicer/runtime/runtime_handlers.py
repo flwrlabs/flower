@@ -56,7 +56,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.object_store import ObjectStore
 from flwr.supernode.nodestate import NodeState
 
 
@@ -162,7 +161,6 @@ def push_task_output(
 def pull_messages(
     request: PullAppMessagesRequest,
     state: NodeState,
-    store: ObjectStore,
     task: Task,
 ) -> PullAppMessagesResponse:
     """Pull messages for ClientApp; currently returns exactly one message."""
@@ -180,7 +178,7 @@ def pull_messages(
     state.record_message_processing_start(message_id=message.metadata.message_id)
 
     # Retrieve the object tree for the message
-    object_tree = store.get_object_tree(message.metadata.message_id)
+    object_tree = state.object_store.get_object_tree(message.metadata.message_id)
 
     return PullAppMessagesResponse(
         messages_list=[message_to_proto(message)],
@@ -297,12 +295,12 @@ def pull_object(
 
 def confirm_message_received(
     request: ConfirmMessageReceivedRequest,
-    store: ObjectStore,
+    state: NodeState,
 ) -> ConfirmMessageReceivedResponse:
     """Confirm message received."""
     log(DEBUG, "Runtime.ConfirmMessageReceived")
 
     # Delete the message object
-    store.delete(request.message_object_id)
+    state.object_store.delete(request.message_object_id)
 
     return ConfirmMessageReceivedResponse()
