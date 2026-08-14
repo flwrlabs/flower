@@ -12,28 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""FastAPI task-token authentication dependency for Runtime routes."""
+"""FastAPI task-token authentication dependency for SuperLink Runtime routes."""
 
 from typing import Annotated
 
 from fastapi import Depends, Request, Security
-from fastapi.security import APIKeyHeader
 
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
-from flwr.supercore.constant import TASK_TOKEN_HEADER
-from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.dependencies.task import TaskTokenDependency, authenticate_task
 
 from .linkstate import get_linkstate
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
-_task_token_scheme = APIKeyHeader(
-    name=TASK_TOKEN_HEADER,
-    scheme_name="RuntimeTaskToken",
-    description="Task token issued by the Runtime API.",
-    auto_error=False,
-)
-TaskTokenDependency = Annotated[str | None, Security(_task_token_scheme)]
 
 
 def get_task(
@@ -42,18 +33,7 @@ def get_task(
     state: LinkStateDependency,
 ) -> Task:
     """Return the task authenticated by the Runtime task-token header."""
-    if len(request.headers.getlist(TASK_TOKEN_HEADER)) != 1:
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
-            "Runtime task-token authentication failed.",
-        )
-    task = state.get_task_by_token(token) if token else None
-    if task is None:
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
-            "Runtime task-token authentication failed.",
-        )
-    return task
+    return authenticate_task(request, token, state)
 
 
 TaskDependency = Annotated[Task, Security(get_task)]
