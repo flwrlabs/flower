@@ -153,11 +153,11 @@ class ControlStub:
     ]
     """List Federations"""
 
-    ListAgents: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.control_pb2.ListAgentsRequest,
-        flwr.proto.control_pb2.ListAgentsResponse,
+    ListApps: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppsRequest,
+        flwr.proto.control_pb2.ListAppsResponse,
     ]
-    """List AgentApps in a Federation"""
+    """List Apps in a Federation"""
 
     ShowFederation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
@@ -363,11 +363,11 @@ class ControlAsyncStub:
     ]
     """List Federations"""
 
-    ListAgents: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.control_pb2.ListAgentsRequest,
-        flwr.proto.control_pb2.ListAgentsResponse,
+    ListApps: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListAppsRequest,
+        flwr.proto.control_pb2.ListAppsResponse,
     ]
-    """List AgentApps in a Federation"""
+    """List Apps in a Federation"""
 
     ShowFederation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
@@ -614,12 +614,12 @@ class ControlServicer(metaclass=abc.ABCMeta):
         """List Federations"""
 
     @abc.abstractmethod
-    def ListAgents(
+    def ListApps(
         self,
-        request: flwr.proto.control_pb2.ListAgentsRequest,
+        request: flwr.proto.control_pb2.ListAppsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.control_pb2.ListAgentsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAgentsResponse]]:
-        """List AgentApps in a Federation"""
+    ) -> typing.Union[flwr.proto.control_pb2.ListAppsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAppsResponse]]:
+        """List Apps in a Federation"""
 
     @abc.abstractmethod
     def ShowFederation(

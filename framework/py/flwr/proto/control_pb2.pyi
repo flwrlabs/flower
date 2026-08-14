@@ -858,25 +858,28 @@ class ListFederationsResponse(google.protobuf.message.Message):
 global___ListFederationsResponse = ListFederationsResponse
 
 @typing.final
-class AgentInfo(google.protobuf.message.Message):
+class AppInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     APP_ID_FIELD_NUMBER: builtins.int
     FAB_HASH_FIELD_NUMBER: builtins.int
+    APP_TYPE_FIELD_NUMBER: builtins.int
     app_id: builtins.str
     fab_hash: builtins.str
+    app_type: builtins.str
     def __init__(
         self,
         *,
         app_id: builtins.str = ...,
         fab_hash: builtins.str = ...,
+        app_type: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "fab_hash", b"fab_hash"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "app_type", b"app_type", "fab_hash", b"fab_hash"]) -> None: ...
 
-global___AgentInfo = AgentInfo
+global___AppInfo = AppInfo
 
 @typing.final
-class ListAgentsRequest(google.protobuf.message.Message):
+class ListAppsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FEDERATION_ID_FIELD_NUMBER: builtins.int
@@ -893,23 +896,23 @@ class ListAgentsRequest(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "federation_id", b"federation_id", "limit", b"limit"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
 
-global___ListAgentsRequest = ListAgentsRequest
+global___ListAppsRequest = ListAppsRequest
 
 @typing.final
-class ListAgentsResponse(google.protobuf.message.Message):
+class ListAppsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    AGENTS_FIELD_NUMBER: builtins.int
+    APPS_FIELD_NUMBER: builtins.int
     @property
-    def agents(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___AgentInfo]: ...
+    def apps(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___AppInfo]: ...
     def __init__(
         self,
         *,
-        agents: collections.abc.Iterable[global___AgentInfo] | None = ...,
+        apps: collections.abc.Iterable[global___AppInfo] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["agents", b"agents"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["apps", b"apps"]) -> None: ...
 
-global___ListAgentsResponse = ListAgentsResponse
+global___ListAppsResponse = ListAppsResponse
 
 @typing.final
 class ShowFederationRequest(google.protobuf.message.Message):

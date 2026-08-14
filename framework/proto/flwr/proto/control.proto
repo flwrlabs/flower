@@ -95,8 +95,8 @@ service Control {
   rpc ListFederations(ListFederationsRequest)
       returns (ListFederationsResponse) {}
 
-  // List AgentApps in a Federation
-  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse) {}
+  // List Apps in a Federation
+  rpc ListApps(ListAppsRequest) returns (ListAppsResponse) {}
 
   // Show Federation
   rpc ShowFederation(ShowFederationRequest) returns (ShowFederationResponse) {}
@@ -295,15 +295,16 @@ message ListNodesResponse {
 message ListFederationsRequest {}
 message ListFederationsResponse { repeated Federation federations = 1; }
 
-message AgentInfo {
+message AppInfo {
   string app_id = 1;
   string fab_hash = 2;
+  string app_type = 3;
 }
-message ListAgentsRequest {
+message ListAppsRequest {
   string federation_id = 1;
   optional uint64 limit = 2;
 }
-message ListAgentsResponse { repeated AgentInfo agents = 1; }
+message ListAppsResponse { repeated AppInfo apps = 1; }
 
 message ShowFederationRequest { string federation_name = 1; }
 message ShowFederationResponse {
