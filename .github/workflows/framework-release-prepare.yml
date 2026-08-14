@@ -1,5 +1,5 @@
 # Copyright 2026 Flower Labs GmbH. All Rights Reserved.
-name: Prepare Framework Minor Release
+name: Framework Prepare Minor Release
 
 on:
   workflow_dispatch:
@@ -18,15 +18,10 @@ permissions:
   pull-requests: read
 
 jobs:
-  authorize-manual-trigger:
-    name: Authorize manual trigger
-    uses: ./.github/workflows/_repo-authorize-manual-trigger.yml
-
   prepare-release:
     name: Prepare Framework release
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    needs: authorize-manual-trigger
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
