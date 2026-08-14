@@ -136,9 +136,7 @@ class FederationAgent(FlwrBase):
         ),
     )
 
-    federation_id: Mapped[str] = mapped_column(
-        String, primary_key=True, nullable=False
-    )
+    federation_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     app_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     fab_hash: Mapped[str] = mapped_column(String, nullable=False)
     created_by: Mapped[str] = mapped_column(String, nullable=False)
