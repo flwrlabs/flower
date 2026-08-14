@@ -399,4 +399,24 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_403_FORBIDDEN,
         public_message="Connector is not available to this run.",
     ),
+    ApiErrorCode.RUNTIME_RUN_SERIES_CONTEXT_NOT_FOUND: ApiErrorSpec(
+        status_code=StatusCode.NOT_FOUND,
+        http_status_code=status.HTTP_404_NOT_FOUND,
+        public_message="Run series context not found.",
+    ),
+    ApiErrorCode.RUNTIME_FAB_NOT_FOUND: ApiErrorSpec(
+        status_code=StatusCode.NOT_FOUND,
+        http_status_code=status.HTTP_404_NOT_FOUND,
+        public_message="FAB not found.",
+    ),
+    ApiErrorCode.RUNTIME_INVALID_MESSAGE_COUNT: ApiErrorSpec(
+        status_code=StatusCode.INVALID_ARGUMENT,
+        http_status_code=status.HTTP_400_BAD_REQUEST,
+        public_message="Invalid number of messages or message object trees.",
+    ),
+    ApiErrorCode.RUNTIME_MESSAGE_RUN_ID_MISMATCH: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Message run ID does not match the authenticated task.",
+    ),
 }
