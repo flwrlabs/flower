@@ -24,6 +24,7 @@ CORESTATE_TABLE_NAMES = {
     "series_context",
     "series_runs",
     "automation",
+    "federation_app",
     "connector",
     "connector_oauth_session",
     "run_connector",
