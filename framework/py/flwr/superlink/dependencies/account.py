@@ -19,11 +19,7 @@ from fastapi.security.utils import get_authorization_scheme_param
 
 from flwr.common.constant import ACCESS_TOKEN_KEY
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.error import (
-    ApiErrorCode,
-    BearerAuthenticationError,
-    FlowerError,
-)
+from flwr.supercore.error import ApiErrorCode, BearerAuthenticationError, FlowerError
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
 

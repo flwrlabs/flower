@@ -21,11 +21,7 @@ from fastapi import FastAPI, Request
 
 from flwr.common.constant import ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.error import (
-    ApiErrorCode,
-    BearerAuthenticationError,
-    FlowerError,
-)
+from flwr.supercore.error import ApiErrorCode, BearerAuthenticationError, FlowerError
 
 from .account import AccountAccessDependency, get_account
 
