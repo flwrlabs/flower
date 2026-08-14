@@ -82,7 +82,7 @@ class SuperNodeRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
         """Pull Message, Context, and Run."""
         task = get_authenticated_task()
         return runtime_handlers.pull_task_input(
-            request, self.state_factory.state(), task, context
+            request, self.state_factory.state(), task
         )
 
     def PushTaskOutput(
@@ -107,15 +107,13 @@ class SuperNodeRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
     ) -> PushAppMessagesResponse:
         """Push messages for ClientApp; currently accepts exactly one message."""
         task = get_authenticated_task()
-        return runtime_handlers.push_messages(
-            request, self.state_factory.state(), task, context
-        )
+        return runtime_handlers.push_messages(request, self.state_factory.state(), task)
 
     def GetNodes(
         self, request: GetNodesRequest, context: grpc.ServicerContext
     ) -> GetNodesResponse:
         """Get available nodes."""
-        return runtime_handlers.get_nodes(request, context)
+        return runtime_handlers.get_nodes(request)
 
     def StartAutomation(
         self,
@@ -123,13 +121,13 @@ class SuperNodeRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
         context: grpc.ServicerContext,
     ) -> StartAutomationResponse:
         """Reject automation requests from ClientApp tasks."""
-        return runtime_handlers.start_automation(request, context)
+        return runtime_handlers.start_automation(request)
 
     def GetConnector(
         self, request: GetConnectorRequest, context: grpc.ServicerContext
     ) -> GetConnectorResponse:
         """Reject connector credential requests from ClientApp tasks."""
-        return runtime_handlers.get_connector(request, context)
+        return runtime_handlers.get_connector(request)
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext
