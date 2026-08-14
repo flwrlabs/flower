@@ -143,7 +143,7 @@ class FederationAgent(FlwrBase):
     id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     federation_id: Mapped[str] = mapped_column(String, nullable=False)
     app_id: Mapped[str] = mapped_column(String, nullable=False)
-    fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    fab_hash: Mapped[str] = mapped_column(String, nullable=False)
     created_by: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 

@@ -60,7 +60,7 @@ erDiagram
     VARCHAR app_id
     TIMESTAMP created_at
     VARCHAR created_by
-    VARCHAR fab_hash "nullable"
+    VARCHAR fab_hash
     VARCHAR federation_id
   }
 
