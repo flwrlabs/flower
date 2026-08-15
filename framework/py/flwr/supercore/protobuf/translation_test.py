@@ -21,7 +21,10 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from .translation import ProtobufTranslationMiddleware
 
 
-@pytest.mark.parametrize("result", ["invalid", b"invalid", bytearray(b"invalid")])
+@pytest.mark.parametrize(
+    "result",
+    ["invalid", b"invalid", bytearray(b"invalid"), memoryview(b"invalid")],
+)
 def test_response_for_rejects_scalar_iterables(result: object) -> None:
     """Reject scalar byte and text values instead of treating them as streams."""
     with pytest.raises(FlowerError) as exc_info:
