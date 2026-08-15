@@ -495,8 +495,8 @@ class SqlPersistentObjectStoreTestMixin(unittest.TestCase):
     def test_mutation_session_locks_each_database(self) -> None:
         """Ensure nested mutations acquire a lock for each database."""
         store = self.object_store_factory()
-        with tempfile.NamedTemporaryFile(suffix=".db") as database_file:
-            second_store = SqlObjectStore(database_file.name)
+        with tempfile.TemporaryDirectory() as database_dir:
+            second_store = SqlObjectStore(f"{database_dir}/second.db")
             second_store.initialize()
             store._lock_objectstore_mutation = Mock()  # type: ignore[method-assign]
             second_store._lock_objectstore_mutation = Mock()  # type: ignore[method-assign]
