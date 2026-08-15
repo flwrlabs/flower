@@ -36,7 +36,7 @@ class SubprocessExecutor:
         args = [
             TASK_TYPE_TO_COMMAND[spec.task_type],
             TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],
-            spec.appio_api_address,
+            spec.runtime_api_address,
             "--token",
             spec.token,
         ]

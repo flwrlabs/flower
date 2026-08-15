@@ -20,30 +20,27 @@ from copy import deepcopy
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject, JSONValue
 
-from . import automation, browser_use, github, notion, slack, web_fetch, web_search
+from . import automation, browser_use, web_fetch, web_search
 from .definition import (
     ConnectorDefinition,
     ConnectorExecutionContext,
     ConnectorExecutor,
     ConnectorHandler,
 )
-from .oauth import OAuthConnectorProvider
+from .loader import load_connectors
+from .oauth import OAuthFlow
 
 ConnectorToolFactory = Callable[[], JSONObject]
 
 
-CONNECTORS: tuple[ConnectorDefinition, ...] = (
-    slack.CONNECTOR,
-    github.CONNECTOR,
-    notion.CONNECTOR,
-)
+CONNECTORS: tuple[ConnectorDefinition, ...] = load_connectors()
 _CONNECTORS_BY_REF = {connector.ref: connector for connector in CONNECTORS}
 
-OAUTH_CONNECTOR_PROVIDERS: tuple[OAuthConnectorProvider, ...] = tuple(
-    connector.oauth_provider
+OAUTH_FLOWS: dict[str, OAuthFlow] = {
+    connector.ref: connector.oauth_flow
     for connector in CONNECTORS
-    if connector.oauth_provider is not None
-)
+    if connector.oauth_flow is not None
+}
 _CONNECTOR_HANDLERS: dict[str, ConnectorHandler] = {
     web_search.WEB_SEARCH_CONNECTOR_NAME: web_search.search,
     web_fetch.WEB_FETCH_CONNECTOR_NAME: web_fetch.invoke_web_fetch_provider,
@@ -126,12 +123,12 @@ def get_builtin_connector_tool(name: str) -> JSONObject:
     return make_tool()
 
 
-def get_oauth_connector_provider(connector_ref: str) -> OAuthConnectorProvider:
-    """Return the OAuth provider registered for a connector reference."""
-    for provider in OAUTH_CONNECTOR_PROVIDERS:
-        if provider.connector_ref == connector_ref:
-            return provider
-    raise ValueError(f"Unsupported OAuth connector '{connector_ref}'.")
+def get_oauth_flow(connector_ref: str) -> OAuthFlow:
+    """Return the OAuth flow registered for a connector reference."""
+    flow = OAUTH_FLOWS.get(connector_ref)
+    if flow is None:
+        raise ValueError(f"Unsupported OAuth connector '{connector_ref}'.")
+    return flow
 
 
 def has_builtin_connector(name: str) -> bool:

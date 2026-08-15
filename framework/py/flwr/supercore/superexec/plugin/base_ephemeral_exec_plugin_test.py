@@ -39,12 +39,12 @@ def _get_task(*, task_id: int = 1, task_type: str = TaskType.SERVER_APP) -> Mock
 
 class _EphemeralExecPlugin(BaseEphemeralExecPlugin):
     command = "flwr-serverapp"
-    appio_api_address_arg = "--serverappio-api-address"
+    runtime_api_address_arg = "--serverappio-api-address"
 
 
 def _get_ephemeral_plugin() -> _EphemeralExecPlugin:
     return _EphemeralExecPlugin(
-        appio_api_address="127.0.0.1:9091",
+        runtime_api_address="127.0.0.1:9091",
         get_run=_get_run,
         insecure=True,
         root_certificates_path=None,

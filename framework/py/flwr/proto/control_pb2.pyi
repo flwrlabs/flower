@@ -858,6 +858,63 @@ class ListFederationsResponse(google.protobuf.message.Message):
 global___ListFederationsResponse = ListFederationsResponse
 
 @typing.final
+class AppInfo(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    APP_ID_FIELD_NUMBER: builtins.int
+    FAB_HASH_FIELD_NUMBER: builtins.int
+    APP_TYPE_FIELD_NUMBER: builtins.int
+    app_id: builtins.str
+    fab_hash: builtins.str
+    app_type: builtins.str
+    def __init__(
+        self,
+        *,
+        app_id: builtins.str = ...,
+        fab_hash: builtins.str = ...,
+        app_type: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "app_type", b"app_type", "fab_hash", b"fab_hash"]) -> None: ...
+
+global___AppInfo = AppInfo
+
+@typing.final
+class ListAppsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_ID_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    federation_id: builtins.str
+    limit: builtins.int
+    def __init__(
+        self,
+        *,
+        federation_id: builtins.str = ...,
+        limit: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "limit", b"limit"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "federation_id", b"federation_id", "limit", b"limit"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+
+global___ListAppsRequest = ListAppsRequest
+
+@typing.final
+class ListAppsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    APPS_FIELD_NUMBER: builtins.int
+    @property
+    def apps(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___AppInfo]: ...
+    def __init__(
+        self,
+        *,
+        apps: collections.abc.Iterable[global___AppInfo] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["apps", b"apps"]) -> None: ...
+
+global___ListAppsResponse = ListAppsResponse
+
+@typing.final
 class ShowFederationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

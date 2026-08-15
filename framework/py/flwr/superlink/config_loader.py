@@ -15,42 +15,22 @@
 """Load SuperLink configuration and config-driven components."""
 
 
+import os
 import sys
-from collections.abc import Callable
 from dataclasses import dataclass
-from logging import WARN
-from pathlib import Path
-from typing import TypeVar, cast
 
-import yaml
-
-from flwr.common.constant import (
-    AUTHN_TYPE_YAML_KEY,
-    AUTHZ_TYPE_YAML_KEY,
-    AuthnType,
-    AuthzType,
-    EventLogWriterType,
-)
+from flwr.common.constant import AuthnType, EventLogWriterType
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.common.logger import log
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.license_plugin import LicensePlugin
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.artifact_provider import ArtifactProvider
-from flwr.superlink.auth_plugin import (
-    ControlAuthnPlugin,
-    ControlAuthzPlugin,
-    NoOpControlAuthnPlugin,
-    NoOpControlAuthzPlugin,
-)
+from flwr.superlink.auth_plugin import ControlAuthnPlugin, NoOpControlAuthnPlugin
 from flwr.superlink.federation import FederationManager, NoOpFederationManager
-
-P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
 
 try:
     from flwr.ee import (
         get_control_authn_ee_plugins,
-        get_control_authz_ee_plugins,
         get_ee_federation_manager,
         get_ee_linkstate_factory,
         get_ee_objectstore_factory,
@@ -59,10 +39,6 @@ except ImportError:
 
     def get_control_authn_ee_plugins() -> dict[str, type[ControlAuthnPlugin]]:
         """Return all Control API authentication plugins for EE."""
-        return {}
-
-    def get_control_authz_ee_plugins() -> dict[str, type[ControlAuthzPlugin]]:
-        """Return all Control API authorization plugins for EE."""
         return {}
 
     def get_ee_federation_manager() -> FederationManager:
@@ -86,7 +62,7 @@ except ImportError:
 class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     """Configuration needed to start the SuperLink lifespan."""
 
-    serverappio_address: str
+    runtime_address: str
     control_address: str
     health_server_address: str | None
     enable_http_api: bool
@@ -95,10 +71,9 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     port: int
     insecure: bool
     certificates: tuple[bytes, bytes, bytes] | None
-    appio_certificates: tuple[bytes, bytes, bytes] | None
+    runtime_certificates: tuple[bytes, bytes, bytes] | None
     superexec_auth_secret: bytes | None
     authn_plugin: ControlAuthnPlugin
-    authz_plugin: ControlAuthzPlugin
     event_log_plugin: EventLogWriterPlugin | None
     enable_event_log: bool
     artifact_provider: ArtifactProvider | None
@@ -110,7 +85,7 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     ssl_certfile: str | None
     database: str
     isolation: str
-    appio_ssl_ca_certfile: str | None
+    runtime_ssl_ca_certfile: str | None
     runtime_dependency_install: bool
 
 
@@ -190,64 +165,15 @@ def get_control_authn_plugins() -> dict[str, type[ControlAuthnPlugin]]:
     return ee_dict | {AuthnType.NOOP: NoOpControlAuthnPlugin}
 
 
-def get_control_authz_plugins() -> dict[str, type[ControlAuthzPlugin]]:
-    """Return all Control API authorization plugins."""
-    ee_dict: dict[str, type[ControlAuthzPlugin]] = get_control_authz_ee_plugins()
-    return ee_dict | {AuthzType.NOOP: NoOpControlAuthzPlugin}
+def load_control_authn_plugin() -> ControlAuthnPlugin:
+    """Obtain the configured authentication plugin."""
+    if os.getenv("FLWR_OIDC_ENABLED", "0") != "1":
+        return NoOpControlAuthnPlugin()
 
-
-def load_control_auth_plugins(
-    config_path: str | None, verify_tls_cert: bool
-) -> tuple[ControlAuthnPlugin, ControlAuthzPlugin]:
-    """Obtain Control API authentication and authorization plugins."""
-    # Load NoOp plugins if no config path is provided
-    if config_path is None:
-        config_path = ""
-        config = {
-            "authentication": {AUTHN_TYPE_YAML_KEY: AuthnType.NOOP},
-            "authorization": {AUTHZ_TYPE_YAML_KEY: AuthzType.NOOP},
-        }
-    # Load YAML file
-    else:
-        with Path(config_path).expanduser().open("r", encoding="utf-8") as file:
-            config = yaml.safe_load(file)
-
-    def _load_plugin(
-        section: str, yaml_key: str, loader: Callable[[], dict[str, type[P]]]
-    ) -> P:
-        section_cfg = config.get(section, {})
-        auth_plugin_name = section_cfg.get(yaml_key, "")
-        try:
-            plugins: dict[str, type[P]] = loader()
-            plugin_cls: type[P] = plugins[auth_plugin_name]
-            return plugin_cls(Path(cast(str, config_path)), verify_tls_cert)
-        except KeyError:
-            if auth_plugin_name:
-                sys.exit(
-                    f"{yaml_key}: {auth_plugin_name} is not supported. "
-                    f"Please provide a valid {section} type in the configuration."
-                )
-            sys.exit(f"No {section} type is provided in the configuration.")
-
-    # Warn deprecated auth_type key
-    if authn_type := config["authentication"].pop("auth_type", None):
-        log(
-            WARN,
-            "The `auth_type` key in the authentication configuration is deprecated. "
-            "Use `%s` instead.",
-            AUTHN_TYPE_YAML_KEY,
+    try:
+        plugin_cls = get_control_authn_plugins()[AuthnType.OIDC]
+    except KeyError:
+        sys.exit(
+            "OIDC account authentication is unavailable in this Flower distribution."
         )
-        config["authentication"][AUTHN_TYPE_YAML_KEY] = authn_type
-
-    authn_plugin = _load_plugin(
-        section="authentication",
-        yaml_key=AUTHN_TYPE_YAML_KEY,
-        loader=get_control_authn_plugins,
-    )
-    authz_plugin = _load_plugin(
-        section="authorization",
-        yaml_key=AUTHZ_TYPE_YAML_KEY,
-        loader=get_control_authz_plugins,
-    )
-
-    return authn_plugin, authz_plugin
+    return plugin_cls()

@@ -30,7 +30,7 @@ from .types import ExecutionSpec, LaunchResultStatus
 def _execution_spec(**overrides: Any) -> ExecutionSpec:
     base: dict[str, Any] = {
         "task_type": TaskType.CLIENT_APP,
-        "appio_api_address": "127.0.0.1:9094",
+        "runtime_api_address": "127.0.0.1:9094",
         "token": "token",
         "insecure": True,
         "root_certificates_path": None,

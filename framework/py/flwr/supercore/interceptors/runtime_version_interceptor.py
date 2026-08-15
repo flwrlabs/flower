@@ -28,7 +28,10 @@ from flwr.common.logger import log
 from flwr.supercore.constant import VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
 from flwr.supercore.exit import ExitCode, flwr_exit
-from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
+from flwr.supercore.runtime_version_compatibility import (
+    RuntimeVersionMetadata,
+    get_runtime_version_incompatibility_exit_message,
+)
 from flwr.supercore.utils import get_metadata_str
 
 
@@ -56,17 +59,7 @@ class RuntimeVersionClientInterceptor(
     def _get_incompat_exit_message(self, grpc_error: grpc.RpcError) -> str | None:
         """Return the exit message for a runtime-version rejection, if present."""
         details = grpc_error.details() if hasattr(grpc_error, "details") else None
-        flower_error = FlowerError.from_json(details)
-        if (
-            flower_error is None
-            or flower_error.code != ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
-        ):
-            return None
-
-        exit_message = flower_error.message
-        if flower_error.public_details:
-            exit_message += f"\n{flower_error.public_details}"
-        return exit_message
+        return get_runtime_version_incompatibility_exit_message(details)
 
     def _maybe_exit_on_incompat_error(self, grpc_error: grpc.RpcError) -> None:
         """Exit on runtime-version rejections encoded as FlowerError JSON."""
@@ -246,7 +239,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
         return method_handler
 
 
-def create_serverappio_runtime_version_server_interceptor(
+def create_superlink_runtime_version_server_interceptor(
     connection_name: str = "Caller <-> SuperLink Runtime API",
     send_warning_metadata: bool = False,
     reject_incompatible: bool = True,
@@ -260,7 +253,7 @@ def create_serverappio_runtime_version_server_interceptor(
     )
 
 
-def create_clientappio_runtime_version_server_interceptor(
+def create_supernode_runtime_version_server_interceptor(
     connection_name: str = "Caller <-> SuperNode Runtime API",
     send_warning_metadata: bool = False,
     reject_incompatible: bool = True,
