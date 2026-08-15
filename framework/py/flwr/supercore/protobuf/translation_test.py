@@ -14,19 +14,18 @@
 # ==============================================================================
 """Tests for protobuf HTTP translation helpers."""
 
+import pytest
+
 from flwr.supercore.error import ApiErrorCode, FlowerError
 
 from .translation import ProtobufTranslationMiddleware
 
 
-def test_response_for_rejects_scalar_iterables() -> None:
+@pytest.mark.parametrize("result", ["invalid", b"invalid", bytearray(b"invalid")])
+def test_response_for_rejects_scalar_iterables(result: object) -> None:
     """Reject scalar byte and text values instead of treating them as streams."""
-    for result in ("invalid", b"invalid", bytearray(b"invalid")):
-        try:
-            ProtobufTranslationMiddleware._response_for(  # pylint: disable=W0212
-                result
-            )
-        except FlowerError as exc:
-            assert exc.code == ApiErrorCode.INVALID_HANDLER_RESPONSE
-        else:
-            raise AssertionError("Expected invalid handler response error")
+    with pytest.raises(FlowerError) as exc_info:
+        ProtobufTranslationMiddleware._response_for(  # pylint: disable=W0212
+            result
+        )
+    assert exc_info.value.code == ApiErrorCode.INVALID_HANDLER_RESPONSE
