@@ -1280,6 +1280,8 @@ def list_federations(
                 description=fed.description,
                 archived=fed.archived,
                 simulation=fed.simulation,
+                can_invite_members=fed.can_invite_members,
+                can_add_supernodes=fed.can_add_supernodes,
             )
             for fed in federations
         ]
@@ -1316,6 +1318,8 @@ def show_federation(
         archived=details.archived,
         simulation=details.simulation,
         config=details.config,
+        can_invite_members=details.can_invite_members,
+        can_add_supernodes=details.can_add_supernodes,
     )
     return ShowFederationResponse(federation=federation_proto, now=now().isoformat())
 
@@ -1370,6 +1374,8 @@ def create_federation(
             description=federation.description,
             members=federation.members,
             simulation=federation.simulation,
+            can_invite_members=federation.can_invite_members,
+            can_add_supernodes=federation.can_add_supernodes,
         )
     )
 

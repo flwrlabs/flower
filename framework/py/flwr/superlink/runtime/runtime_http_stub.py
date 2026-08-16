@@ -18,27 +18,9 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
 )
-from flwr.proto.message_pb2 import (  # pylint: disable=E0611
-    ConfirmMessageReceivedRequest,
-    ConfirmMessageReceivedResponse,
-    PullObjectRequest,
-    PullObjectResponse,
-    PushObjectRequest,
-    PushObjectResponse,
-)
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
-    PullAppMessagesRequest,
-    PullAppMessagesResponse,
-    PullTaskInputRequest,
-    PullTaskInputResponse,
-    PushAppMessagesRequest,
-    PushAppMessagesResponse,
-    PushTaskOutputRequest,
-    PushTaskOutputResponse,
-    SendTaskHeartbeatRequest,
-    SendTaskHeartbeatResponse,
 )
 from flwr.supercore.runtime import RuntimeHttpStub as CoreRuntimeHttpStub
 
@@ -48,64 +30,6 @@ from flwr.supercore.runtime import RuntimeHttpStub as CoreRuntimeHttpStub
 class RuntimeHttpStub(CoreRuntimeHttpStub):
     """Protobuf-over-HTTP client for SuperLink Runtime API methods."""
 
-    def SendTaskHeartbeat(
-        self, request: SendTaskHeartbeatRequest
-    ) -> SendTaskHeartbeatResponse:
-        """Send a heartbeat for a claimed task."""
-        return self._unary_unary(
-            path="/v1/runtime/send-task-heartbeat",
-            rpc_method="/flwr.proto.Runtime/SendTaskHeartbeat",
-            request=request,
-            response_type=SendTaskHeartbeatResponse,
-        )
-
-    def PullTaskInput(self, request: PullTaskInputRequest) -> PullTaskInputResponse:
-        """Pull the input for a claimed task."""
-        return self._unary_unary(
-            path="/v1/runtime/pull-task-input",
-            rpc_method="/flwr.proto.Runtime/PullTaskInput",
-            request=request,
-            response_type=PullTaskInputResponse,
-        )
-
-    def PushTaskOutput(self, request: PushTaskOutputRequest) -> PushTaskOutputResponse:
-        """Push the output of a claimed task."""
-        return self._unary_unary(
-            path="/v1/runtime/push-task-output",
-            rpc_method="/flwr.proto.Runtime/PushTaskOutput",
-            request=request,
-            response_type=PushTaskOutputResponse,
-        )
-
-    def PushObject(self, request: PushObjectRequest) -> PushObjectResponse:
-        """Push an object to the Runtime API."""
-        return self._unary_unary(
-            path="/v1/runtime/push-object",
-            rpc_method="/flwr.proto.Runtime/PushObject",
-            request=request,
-            response_type=PushObjectResponse,
-        )
-
-    def PullObject(self, request: PullObjectRequest) -> PullObjectResponse:
-        """Pull an object from the Runtime API."""
-        return self._unary_unary(
-            path="/v1/runtime/pull-object",
-            rpc_method="/flwr.proto.Runtime/PullObject",
-            request=request,
-            response_type=PullObjectResponse,
-        )
-
-    def ConfirmMessageReceived(
-        self, request: ConfirmMessageReceivedRequest
-    ) -> ConfirmMessageReceivedResponse:
-        """Confirm that a message and its objects were received."""
-        return self._unary_unary(
-            path="/v1/runtime/confirm-message-received",
-            rpc_method="/flwr.proto.Runtime/ConfirmMessageReceived",
-            request=request,
-            response_type=ConfirmMessageReceivedResponse,
-        )
-
     def PushLogs(self, request: PushLogsRequest) -> PushLogsResponse:
         """Push task logs to the Runtime API."""
         return self._unary_unary(
@@ -113,24 +37,6 @@ class RuntimeHttpStub(CoreRuntimeHttpStub):
             rpc_method="/flwr.proto.Runtime/PushLogs",
             request=request,
             response_type=PushLogsResponse,
-        )
-
-    def PushMessages(self, request: PushAppMessagesRequest) -> PushAppMessagesResponse:
-        """Push ServerApp messages to the Runtime API."""
-        return self._unary_unary(
-            path="/v1/runtime/push-messages",
-            rpc_method="/flwr.proto.Runtime/PushMessages",
-            request=request,
-            response_type=PushAppMessagesResponse,
-        )
-
-    def PullMessages(self, request: PullAppMessagesRequest) -> PullAppMessagesResponse:
-        """Pull ServerApp messages from the Runtime API."""
-        return self._unary_unary(
-            path="/v1/runtime/pull-messages",
-            rpc_method="/flwr.proto.Runtime/PullMessages",
-            request=request,
-            response_type=PullAppMessagesResponse,
         )
 
     def GetNodes(self, request: GetNodesRequest) -> GetNodesResponse:
