@@ -58,13 +58,30 @@ jobs:
 
       - name: Create release references
         run: |
-          # Create the release tag and maintenance branch at the pinned source commit.
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
-            -f ref="refs/tags/framework-${VERSION}" \
-            -f sha="${RELEASE_SOURCE_SHA}"
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
-            -f ref="refs/heads/release/framework-${RELEASE_SERIES}" \
-            -f sha="${RELEASE_SOURCE_SHA}"
+          # Make retries safe by creating a missing ref or accepting a matching one.
+          create_or_verify_ref() {
+            local ref="$1"
+            local existing_sha
+
+            existing_sha="$(
+              gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref#refs/}" \
+                --jq '.object.sha' 2>/dev/null || true
+            )"
+            if [[ -z "${existing_sha}" ]]; then
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+                -f ref="${ref}" \
+                -f sha="${RELEASE_SOURCE_SHA}"
+            elif [[ "${existing_sha}" != "${RELEASE_SOURCE_SHA}" ]]; then
+              echo "${ref} points to ${existing_sha}, expected ${RELEASE_SOURCE_SHA}." >&2
+              exit 1
+            else
+              echo "${ref} already points to ${RELEASE_SOURCE_SHA}; continuing."
+            fi
+          }
+
+          # Create or verify the release tag and maintenance branch.
+          create_or_verify_ref "refs/tags/framework-${VERSION}"
+          create_or_verify_ref "refs/heads/release/framework-${RELEASE_SERIES}"
 
       - name: Copy Python artifacts to the stable location
         env:
@@ -87,11 +104,13 @@ jobs:
       - name: Publish Python artifacts
         env:
           PYPI_REPOSITORY_PASSWORD: ${{ secrets.PYPI_REPOSITORY_PASSWORD }}
+          PYPI_REPOSITORY_CHECK_URL: ${{ vars.PYPI_REPOSITORY_CHECK_URL }}
           PYPI_REPOSITORY_USERNAME: ${{ vars.PYPI_REPOSITORY_USERNAME }}
           PYPI_REPOSITORY_URL: ${{ vars.PYPI_REPOSITORY_URL }}
         run: |
-          # Configure PyPI credentials and an optional custom repository endpoint.
+          # Configure PyPI credentials and an optional custom upload endpoint.
           publish_args=(
+            --check-url "${PYPI_REPOSITORY_CHECK_URL}"
             --username "${PYPI_REPOSITORY_USERNAME}"
             --password "${PYPI_REPOSITORY_PASSWORD}"
           )
