@@ -12,28 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower federation type definitions."""
-
-
-from dataclasses import dataclass
-
-from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-from flwr.proto.federation_pb2 import Member  # pylint: disable=E0611
-from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
-from flwr.supercore.run import Run
-
-
-@dataclass
-class Federation:  # pylint: disable=R0902
-    """Federation details."""
-
-    id: str
-    description: str
-    members: list[Member]
-    nodes: list[NodeInfo]
-    runs: list[Run]
-    archived: bool
-    simulation: bool
-    config: SimulationConfig | None
-    can_invite_members: bool
-    can_add_supernodes: bool
+"""FastAPI dependencies for SuperNode."""

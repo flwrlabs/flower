@@ -29,6 +29,18 @@ from .base import FlowerError
 from .catalog import API_ERROR_MAP
 
 INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error."
+NOT_AUTHENTICATED_DETAIL = "Not authenticated"
+
+
+class BearerAuthenticationError(HTTPException):
+    """Represent failed HTTP Bearer authentication."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=NOT_AUTHENTICATED_DETAIL,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 async def http_error_translator(
