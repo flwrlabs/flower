@@ -14,13 +14,18 @@
 # ==============================================================================
 """FastAPI dependency for Control API account authentication."""
 
+from collections.abc import Awaitable, Callable
+
 from fastapi import Request
 from fastapi.security.utils import get_authorization_scheme_param
+from starlette.concurrency import run_in_threadpool
 
 from flwr.common.constant import ACCESS_TOKEN_KEY
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, BearerAuthenticationError, FlowerError
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
+
+HttpAccountAuthenticator = Callable[[Request], Awaitable[AccountInfo]]
 
 
 class AccountAccessDependency:
@@ -35,14 +40,25 @@ class AccountAccessDependency:
             ...
     """
 
-    def __init__(self, authn_plugin: ControlAuthnPlugin) -> None:
+    def __init__(
+        self,
+        authn_plugin: ControlAuthnPlugin,
+        http_authenticator: HttpAccountAuthenticator | None = None,
+    ) -> None:
         self.authn_plugin = authn_plugin
+        self.http_authenticator = http_authenticator
 
-    def __call__(
+    async def __call__(
         self,
         request: Request,
     ) -> AccountInfo:
         """Return the authenticated account for a request."""
+        if self.http_authenticator is not None:
+            return await self.http_authenticator(request)
+        return await run_in_threadpool(self._authenticate_with_plugin, request)
+
+    def _authenticate_with_plugin(self, request: Request) -> AccountInfo:
+        """Authenticate through the legacy synchronous plugin contract."""
         authorization_headers = request.headers.getlist("authorization")
         if len(authorization_headers) > 1:
             raise BearerAuthenticationError()

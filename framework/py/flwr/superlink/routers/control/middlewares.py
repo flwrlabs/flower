@@ -144,5 +144,5 @@ class ControlAuthenticationMiddleware(BaseHTTPMiddleware):
                 f"AccountAccessDependency, got {type(account_access).__name__}.",
             )
 
-        request.state.account = await run_in_threadpool(account_access, request)
+        request.state.account = await account_access(request)
         return await call_next(request)

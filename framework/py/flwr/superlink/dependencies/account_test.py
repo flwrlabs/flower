@@ -14,7 +14,8 @@
 # ==============================================================================
 """Tests for the Control API account dependency."""
 
-from unittest.mock import Mock
+import asyncio
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import FastAPI, Request
@@ -69,7 +70,7 @@ def test_account_access_dependency_returns_authenticated_account(scheme: str) ->
             (REFRESH_TOKEN_KEY.encode(), b"legacy-refresh-token"),
         ),
     )
-    result = AccountAccessDependency(authn_plugin)(request)
+    result = asyncio.run(AccountAccessDependency(authn_plugin)(request))
 
     assert result is account
     authn_plugin.validate_tokens_in_metadata.assert_called_once_with(
@@ -84,7 +85,7 @@ def test_account_access_dependency_allows_plugin_to_accept_missing_header() -> N
     account = AccountInfo(flwr_aid="aid", account_name="account")
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
 
-    result = AccountAccessDependency(authn_plugin)(_make_request(()))
+    result = asyncio.run(AccountAccessDependency(authn_plugin)(_make_request(())))
 
     assert result is account
     authn_plugin.validate_tokens_in_metadata.assert_called_once_with([])
@@ -106,7 +107,9 @@ def test_account_access_dependency_rejects_invalid_authorization_header(
     authn_plugin = Mock()
 
     with pytest.raises(BearerAuthenticationError) as exc_info:
-        AccountAccessDependency(authn_plugin)(_make_request(authorization_headers))
+        asyncio.run(
+            AccountAccessDependency(authn_plugin)(_make_request(authorization_headers))
+        )
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "Not authenticated"
@@ -128,7 +131,7 @@ def test_account_access_dependency_rejects_legacy_headers_without_bearer() -> No
     )
 
     with pytest.raises(BearerAuthenticationError) as exc_info:
-        AccountAccessDependency(authn_plugin)(request)
+        asyncio.run(AccountAccessDependency(authn_plugin)(request))
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "Not authenticated"
@@ -153,13 +156,32 @@ def test_account_access_dependency_rejects_unauthenticated_requests(
     authn_plugin.validate_tokens_in_metadata.return_value = (valid_token, account)
 
     with pytest.raises(BearerAuthenticationError) as exc_info:
-        AccountAccessDependency(authn_plugin)(_make_request())
+        asyncio.run(AccountAccessDependency(authn_plugin)(_make_request()))
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "Not authenticated"
     assert exc_info.value.headers == {"WWW-Authenticate": "Bearer"}
     assert "access-token" not in exc_info.value.detail
     authn_plugin.refresh_tokens.assert_not_called()
+
+
+def test_account_access_dependency_uses_injected_http_authenticator() -> None:
+    """Prefer an injected async HTTP authenticator over the legacy plugin."""
+    authn_plugin = Mock()
+    account = AccountInfo(flwr_aid="aid", account_name="account")
+    http_authenticator = AsyncMock(return_value=account)
+    request = _make_request()
+
+    result = asyncio.run(
+        AccountAccessDependency(
+            authn_plugin,
+            http_authenticator=http_authenticator,
+        )(request)
+    )
+
+    assert result is account
+    http_authenticator.assert_awaited_once_with(request)
+    authn_plugin.validate_tokens_in_metadata.assert_not_called()
 
 
 def test_get_account_raises_when_authentication_middleware_did_not_run() -> None:
