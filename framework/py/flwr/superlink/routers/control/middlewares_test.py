@@ -31,7 +31,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunsRequest,
     ListRunsResponse,
 )
-from flwr.supercore.error import ApiErrorCode
 from flwr.supercore.event_log.typing import LogEntry
 from flwr.supercore.license_plugin import LicensePlugin
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
@@ -124,10 +123,7 @@ def test_license_middleware_rejects_invalid_license(
 
     assert response.status_code == 403
     assert response.json() == {
-        "code": ApiErrorCode.LICENSE_CHECK_FAILED,
-        "public_message": "License check failed. Please contact the SuperLink "
-        "administrator.",
-        "public_details": None,
+        "detail": "License check failed. Please contact the SuperLink administrator.",
     }
     license_plugin.check_license.assert_called_once_with()
 

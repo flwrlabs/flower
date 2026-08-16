@@ -160,6 +160,10 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         response = await call_next(request)
 
+        # HTTP errors use the shared JSON contract and are already complete.
+        if response.status_code >= 400:
+            return response
+
         if not hasattr(request.state, "protobuf_response"):
             raise FlowerError(
                 ApiErrorCode.INVALID_PROTOBUF_RESPONSE,

@@ -63,11 +63,27 @@ def test_http_error_translator_mapped_flower_error() -> None:
     _assert_json_response(
         response,
         spec.http_status_code,
-        {
-            "code": ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
-            "public_message": spec.public_message,
-            "public_details": None,
-        },
+        {"detail": spec.public_message},
+    )
+    assert b"internal diagnostic message" not in response.body
+
+
+def test_http_error_translator_prefers_public_details() -> None:
+    """Prefer specific public details over the catalog's generic message."""
+    public_details = "The requested federation name is invalid."
+    response = _run_translator(
+        FlowerError(
+            ApiErrorCode.INVALID_FEDERATION_NAME,
+            "internal diagnostic message",
+            public_details=public_details,
+        )
+    )
+
+    spec = API_ERROR_MAP[ApiErrorCode.INVALID_FEDERATION_NAME]
+    _assert_json_response(
+        response,
+        spec.http_status_code,
+        {"detail": public_details},
     )
     assert b"internal diagnostic message" not in response.body
 
@@ -85,11 +101,7 @@ def test_http_error_translator_adds_bearer_authentication_challenge() -> None:
     _assert_json_response(
         response,
         spec.http_status_code,
-        {
-            "code": ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-            "public_message": spec.public_message,
-            "public_details": None,
-        },
+        {"detail": spec.public_message},
     )
     assert response.headers["www-authenticate"] == "Bearer"
     assert b"internal authentication failure" not in response.body
@@ -102,11 +114,7 @@ def test_http_error_translator_unmapped_flower_error() -> None:
     _assert_json_response(
         response,
         status.HTTP_500_INTERNAL_SERVER_ERROR,
-        {
-            "code": 999,
-            "public_message": INTERNAL_SERVER_ERROR_MESSAGE,
-            "public_details": None,
-        },
+        {"detail": INTERNAL_SERVER_ERROR_MESSAGE},
     )
     assert b"internal diagnostic message" not in response.body
 
@@ -128,12 +136,7 @@ def test_http_error_translator_entitlement_error_preserves_error_message() -> No
     _assert_json_response(
         response,
         spec.http_status_code,
-        {
-            "code": ApiErrorCode.ENTITLEMENT_ERROR,
-            "public_message": spec.public_message,
-            "public_details": error_message,
-            "entitlement_code": entitlement_code,
-        },
+        {"detail": error_message},
     )
     assert b"internal diagnostic message" not in response.body
 
