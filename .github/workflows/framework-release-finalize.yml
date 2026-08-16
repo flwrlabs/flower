@@ -144,8 +144,10 @@ jobs:
 
       - name: Generate release notes
         run: |
-          # Extract the prepared changelog entry for the GitHub Release description.
-          ./framework/dev/get-latest-changelog.sh "${VERSION}" > release-body.md
+          # Remove the version heading and its following blank line.
+          sed '1,2d' \
+            "framework/docs/source/changelog/v${VERSION}.md" \
+            > release-body.md
 
       - name: Publish GitHub Release
         run: |
