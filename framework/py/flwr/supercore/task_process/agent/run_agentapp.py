@@ -61,7 +61,7 @@ from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.typing import JSONObject
 from flwr.superlink.grid import GrpcGrid
 
-from .context_items import append_items
+from .context_items import append_items, is_last_item
 from .session import RuntimeAgentConnectors, RuntimeAgentResponses, RuntimeAgentSession
 
 _AGENT_INPUT_KEY = "agent.input"
@@ -192,15 +192,15 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         )
 
         agent_input = context.run_config.get(_AGENT_INPUT_KEY)
-        if agent_input is not None:
-            if not isinstance(agent_input, str):
-                raise ValueError("context.run_config['agent.input'] must be a string.")
-            if agent_input:
-                item: JSONObject = {
-                    "type": "message",
-                    "role": "user",
-                    "content": agent_input,
-                }
+        if agent_input is not None and not isinstance(agent_input, str):
+            raise ValueError("context.run_config['agent.input'] must be a string.")
+        if agent_input:
+            item: JSONObject = {
+                "type": "message",
+                "role": "user",
+                "content": agent_input,
+            }
+            if not is_last_item(context, item):
                 append_items(context, [item])
 
         log(

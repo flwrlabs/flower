@@ -68,6 +68,7 @@ from flwr.supercore.state.schema.linkstate_models import MessageRes as MessageRe
 from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
+from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import (
     int64_to_uint64,
     simulation_config_from_json,
@@ -942,6 +943,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 self._refresh_run_series_context(
                     run_id=run_id,
                     series_id=resolved_series_id,
+                    initial_context_item=initial_context_item,
                 )
                 session.execute(
                     insert(RunModel).values(

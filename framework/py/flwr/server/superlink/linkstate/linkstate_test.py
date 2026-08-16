@@ -179,6 +179,32 @@ class StateTest(CoreStateTest):
         assert run.flwr_aid == "i1r9f"
         assert run.series_id > 0
 
+    def test_create_run_persists_initial_context_item(self) -> None:
+        """Test an initial item is persisted with the run series context."""
+        state = self.state_factory()
+        item = {"type": "message", "role": "user", "content": "Hello"}
+
+        run_id = state.create_run(
+            None,
+            None,
+            "9f86d08",
+            {"agent.input": "Hello"},
+            "@me/health",
+            None,
+            "i1r9f",
+            TaskType.AGENT_APP,
+            initial_context_item=item,
+        )
+
+        run = state.get_run_info(run_ids=[run_id])[0]
+        context = state.get_run_series_context(run.series_id)
+
+        assert context is not None
+        self.assertEqual(
+            [json.loads(value) for value in context.state["items"]["json"]],
+            [item],
+        )
+
     def test_create_run_uses_existing_series_id(self) -> None:
         """Test create_run links the run to an existing run series."""
         # Prepare

@@ -17,15 +17,17 @@
 
 import abc
 from collections.abc import Sequence
-from typing import Literal
+from typing import Literal, cast
 
-from flwr.app import Context, Message, RecordDict
+from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_dumps
 from flwr.superlink.federation import FederationManager
 
 
@@ -275,6 +277,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         primary_task_type: str,
         series_id: int | None = None,
         series_description: str | None = None,
+        initial_context_item: JSONObject | None = None,
         connector_refs: Sequence[str] = (),
     ) -> int:
         """Create a new run.
@@ -305,6 +308,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Optional description for a newly created run series. Ignored when
             `series_id` refers to an existing run series. `None` means no
             description was provided; an empty string is an explicit description.
+        initial_context_item : JSONObject | None (default: None)
+            Optional item to append to the run series context when creating the run.
         connector_refs : Sequence[str] (default: ())
             Connector references the run is allowed to invoke.
 
@@ -446,6 +451,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         self,
         run_id: int,
         series_id: int,
+        initial_context_item: JSONObject | None = None,
     ) -> None:
         """Initialize or refresh the Context for a run series."""
         context = Context(
@@ -458,4 +464,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
         )
         if existing_context := self.get_run_series_context(series_id):
             context.state = existing_context.state
+        if initial_context_item is not None:
+            record = context.state.setdefault("items", ConfigRecord({"json": []}))
+            items = cast(list[str], record["json"])
+            items.append(strict_json_dumps(initial_context_item, compact=True))
         self.set_run_series_context(series_id=series_id, context=context)
