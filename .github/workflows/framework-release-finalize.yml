@@ -32,11 +32,9 @@ jobs:
         uses: ./.github/actions/bootstrap
 
       - name: Read release metadata
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          version="$(sed -n 's/^- Release version: `\([^`]*\)`$/\1/p' <<< "${PR_BODY}")"
-          release_source_sha="$(sed -n 's/^- Release source SHA: `\([^`]*\)`$/\1/p' <<< "${PR_BODY}")"
+          version="$(jq -r '.version' .github/framework-release.json)"
+          release_source_sha="$(jq -r '.release_source_sha' .github/framework-release.json)"
 
           echo "VERSION=${version}" >> "${GITHUB_ENV}"
           echo "RELEASE_SOURCE_SHA=${release_source_sha}" >> "${GITHUB_ENV}"
