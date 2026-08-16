@@ -28,21 +28,20 @@ jobs:
           persist-credentials: false
 
       - name: Read release metadata
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
         shell: bash
         run: |
-          # Read the release version from the machine-managed PR description.
-          version="$(sed -n 's/^- Release version: `\([^`]*\)`$/\1/p' <<< "${PR_BODY}")"
+          # Read the release version from the machine-managed metadata file.
+          metadata_file=".github/framework-release.json"
+          version="$(jq --raw-output '.version // empty' "${metadata_file}")"
           if [[ -z "${version}" ]]; then
-            echo "::error::Unable to read the release version from the PR description."
+            echo "::error file=${metadata_file}::Unable to read the release version."
             exit 1
           fi
 
-          # Read the pinned source commit from the PR description.
-          release_source_sha="$(sed -n 's/^- Release source SHA: `\([^`]*\)`$/\1/p' <<< "${PR_BODY}")"
+          # Read the pinned source commit from the metadata file.
+          release_source_sha="$(jq --raw-output '.release_source_sha // empty' "${metadata_file}")"
           if [[ -z "${release_source_sha}" ]]; then
-            echo "::error::Unable to read the release source SHA from the PR description."
+            echo "::error file=${metadata_file}::Unable to read the release source SHA."
             exit 1
           fi
 
