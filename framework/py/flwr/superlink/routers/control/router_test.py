@@ -150,6 +150,33 @@ def test_protobuf_route_passes_through_validation_error() -> None:
     assert isinstance(payload["detail"], list)
 
 
+def test_protobuf_route_rejects_non_json_error_response() -> None:
+    """Reject non-JSON errors instead of bypassing protobuf validation."""
+    app = FastAPI()
+
+    @app.post("/v1/control/list-runs")
+    def list_runs() -> Response:
+        return Response(
+            content="Conflict.",
+            status_code=status.HTTP_409_CONFLICT,
+            media_type="text/plain",
+        )
+
+    app.add_middleware(ProtobufTranslationMiddleware)
+    app.middleware("http")(http_error_translator)
+
+    response = TestClient(app).post(
+        "/v1/control/list-runs",
+        content=ListRunsRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == 500
+    assert response.headers["content-type"] == "application/json"
+    assert response.json() == {"detail": "Invalid protobuf response."}
+    assert b"Conflict" not in response.content
+
+
 def test_non_protobuf_request_in_state_returns_internal_error() -> None:
     """The protobuf request dependency rejects a non-protobuf state value."""
     app = FastAPI()

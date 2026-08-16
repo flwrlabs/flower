@@ -160,9 +160,17 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         response = await call_next(request)
 
-        # HTTP errors use the shared JSON contract and are already complete.
+        # Only completed JSON errors can bypass protobuf response translation.
         if response.status_code >= 400:
-            return response
+            content_type = response.headers.get("content-type", "")
+            media_type = content_type.partition(";")[0].strip().lower()
+            if media_type == "application/json" or media_type.endswith("+json"):
+                return response
+            raise FlowerError(
+                ApiErrorCode.INVALID_PROTOBUF_RESPONSE,
+                "Protobuf route returned a non-JSON HTTP error response with "
+                f"Content-Type {content_type!r}.",
+            )
 
         if not hasattr(request.state, "protobuf_response"):
             raise FlowerError(
