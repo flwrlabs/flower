@@ -33,15 +33,18 @@ jobs:
 
       - name: Read release metadata
         run: |
+          # Load immutable release metadata from the merged release PR.
           version="$(jq -r '.version' .github/framework-release.json)"
           release_source_sha="$(jq -r '.release_source_sha' .github/framework-release.json)"
 
+          # Export release metadata for subsequent workflow steps.
           echo "VERSION=${version}" >> "${GITHUB_ENV}"
           echo "RELEASE_SOURCE_SHA=${release_source_sha}" >> "${GITHUB_ENV}"
           echo "RELEASE_SERIES=${version%.*}" >> "${GITHUB_ENV}"
 
       - name: Download commit artifacts
         run: |
+          # Download commit-addressed packages and container digest metadata.
           mkdir -p release-artifacts
           curl --fail --location --silent --show-error \
             "https://artifact.flower.ai/framework/commits/${RELEASE_SOURCE_SHA}/flwr-${VERSION}-py3-none-any.whl" \
@@ -55,6 +58,7 @@ jobs:
 
       - name: Create release references
         run: |
+          # Create the release tag and maintenance branch at the pinned source commit.
           gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
             -f ref="refs/tags/framework-${VERSION}" \
             -f sha="${RELEASE_SOURCE_SHA}"
@@ -68,6 +72,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.ARTIFACT_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.ARTIFACT_AWS_SECRET_KEY_ID }}
         run: |
+          # Copy the wheel and source distribution to their stable release paths.
           aws s3 cp \
             --content-disposition "attachment" \
             --cache-control "no-cache" \
@@ -85,6 +90,7 @@ jobs:
           PYPI_REPOSITORY_USERNAME: ${{ vars.PYPI_REPOSITORY_USERNAME }}
           PYPI_REPOSITORY_URL: ${{ vars.PYPI_REPOSITORY_URL }}
         run: |
+          # Configure PyPI credentials and an optional custom repository endpoint.
           publish_args=(
             --username "${PYPI_REPOSITORY_USERNAME}"
             --password "${PYPI_REPOSITORY_PASSWORD}"
@@ -92,6 +98,8 @@ jobs:
           if [[ -n "${PYPI_REPOSITORY_URL}" ]]; then
             publish_args=(--publish-url "${PYPI_REPOSITORY_URL}" "${publish_args[@]}")
           fi
+
+          # Publish the wheel and source distribution.
           uv publish \
             "${publish_args[@]}" \
             "release-artifacts/flwr-${VERSION}-py3-none-any.whl" \
@@ -109,16 +117,19 @@ jobs:
 
       - name: Promote Docker images
         run: |
+          # Process each built image recorded in the digest manifest.
           while IFS= read -r image; do
             repository="$(jq -r '.repository' <<< "${image}")"
             index_digest="$(jq -r '.index_digest' <<< "${image}")"
             tag_args=()
 
+            # Derive stable version tags from every unstable tag variant.
             while IFS= read -r unstable_tag; do
               tag_suffix="${unstable_tag#"${repository}:unstable"}"
               tag_args+=(-t "${repository}:${VERSION}${tag_suffix}")
             done < <(jq -r '.tags[]' <<< "${image}")
 
+            # Promote the immutable multi-platform image without rebuilding it.
             docker buildx imagetools create \
               "${tag_args[@]}" \
               "${repository}@${index_digest}"
@@ -126,15 +137,19 @@ jobs:
 
       - name: Dispatch Framework docs
         run: |
+          # Build documentation from the newly created maintenance branch.
           gh workflow run framework-docs.yml \
             --repo "${GITHUB_REPOSITORY}" \
             --ref "release/framework-${RELEASE_SERIES}"
 
       - name: Generate release notes
-        run: ./framework/dev/get-latest-changelog.sh "${VERSION}" > release-body.md
+        run: |
+          # Extract the prepared changelog entry for the GitHub Release description.
+          ./framework/dev/get-latest-changelog.sh "${VERSION}" > release-body.md
 
       - name: Publish GitHub Release
         run: |
+          # Publish the packages and changelog under the Framework release tag.
           gh release create "framework-${VERSION}" \
             "release-artifacts/flwr-${VERSION}-py3-none-any.whl" \
             "release-artifacts/flwr-${VERSION}.tar.gz" \
