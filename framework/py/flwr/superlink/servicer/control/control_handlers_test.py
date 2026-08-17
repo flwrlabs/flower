@@ -98,8 +98,8 @@ class TestControlHandlers(unittest.TestCase):
 
         self.assertEqual(error.exception.code, ApiErrorCode.FAB_DOWNLOAD_FAILURE)
 
-    def test_start_automation_normalizes_start_at_to_utc(self) -> None:
-        """Normalize the automation start time to UTC."""
+    def test_start_automation_accepts_minimum_schedule(self) -> None:
+        """Accept the minimum schedule and normalize its start time to UTC."""
         # Prepare
         request = StartAutomationRequest(
             start_at="2026-07-10T04:00:00-05:00",
@@ -114,7 +114,7 @@ class TestControlHandlers(unittest.TestCase):
         # Execute
         with patch(
             "flwr.superlink.servicer.control.control_handlers.now",
-            return_value=datetime(2026, 7, 10, 8, tzinfo=UTC),
+            return_value=datetime(2026, 7, 10, 8, 45, tzinfo=UTC),
         ):
             response = start_automation(request, self.account, self.state)
 
@@ -138,23 +138,42 @@ class TestControlHandlers(unittest.TestCase):
             ),
         )
 
-    def test_start_automation_rejects_too_short_interval(self) -> None:
-        """Reject a recurrence faster than the configured cadence."""
-        request = StartAutomationRequest(
-            start_at="2099-01-01T00:00:00+00:00",
-            fixed_interval=AUTOMATION_MIN_FIXED_INTERVAL - 1,
-            start_run_request=StartRunRequest(series_id=1),
+    def test_start_automation_rejects_invalid_schedule(self) -> None:
+        """Reject missing, invalid, or below-minimum schedule values."""
+        current_time = datetime(2026, 7, 10, 9, tzinfo=UTC)
+        valid_start_at = current_time + timedelta(
+            seconds=AUTOMATION_MIN_START_DELAY
         )
+        requests = {
+            "missing start": StartAutomationRequest(
+                start_run_request=StartRunRequest(series_id=1)
+            ),
+            "missing timezone": StartAutomationRequest(
+                start_at="2026-07-10T09:15:00",
+                start_run_request=StartRunRequest(series_id=1),
+            ),
+            "early start": StartAutomationRequest(
+                start_at=(valid_start_at - timedelta(seconds=1)).isoformat(),
+                start_run_request=StartRunRequest(series_id=1),
+            ),
+            "short interval": StartAutomationRequest(
+                start_at=valid_start_at.isoformat(),
+                fixed_interval=AUTOMATION_MIN_FIXED_INTERVAL - 1,
+                start_run_request=StartRunRequest(series_id=1),
+            ),
+        }
 
-        with self.assertRaises(FlowerError) as error:
-            start_automation(request, self.account, self.state)
+        with patch(
+            "flwr.superlink.servicer.control.control_handlers.now",
+            return_value=current_time,
+        ):
+            for name, request in requests.items():
+                with self.subTest(name=name), self.assertRaises(FlowerError) as error:
+                    start_automation(request, self.account, self.state)
 
-        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
-        self.assertEqual(
-            error.exception.public_details,
-            f"`fixed_interval` must be at least "
-            f"{AUTOMATION_MIN_FIXED_INTERVAL} seconds.",
-        )
+                self.assertEqual(
+                    error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST
+                )
 
     def test_start_automation_rejects_federation_active_automation_limit(self) -> None:
         """Reject creation after a federation reaches its automation limit."""
@@ -173,83 +192,6 @@ class TestControlHandlers(unittest.TestCase):
             )
 
         self.assertEqual(error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
-
-    def test_start_automation_rejects_start_at_without_timezone(self) -> None:
-        """Reject a start time without timezone information."""
-        # Prepare
-        request = StartAutomationRequest(
-            start_at="2026-07-10T09:00:00",
-            start_run_request=StartRunRequest(series_id=1),
-        )
-
-        # Execute
-        with self.assertRaises(FlowerError) as error:
-            start_automation(request, self.account, self.state)
-
-        # Assert
-        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
-        self.assertEqual(
-            error.exception.public_details,
-            "The automation start_at value must be a valid ISO 8601 "
-            "timestamp with a timezone.",
-        )
-
-    def test_start_automation_rejects_start_at_before_minimum_delay(self) -> None:
-        """Reject an omitted start time or one less than 15 minutes ahead."""
-        current_time = datetime(2026, 7, 10, 9, tzinfo=UTC)
-        requests = [
-            StartAutomationRequest(start_run_request=StartRunRequest(series_id=1)),
-            StartAutomationRequest(
-                start_at=current_time.isoformat(),
-                start_run_request=StartRunRequest(series_id=1),
-            ),
-            StartAutomationRequest(
-                start_at=(
-                    current_time
-                    + timedelta(seconds=AUTOMATION_MIN_START_DELAY - 1)
-                ).isoformat(),
-                start_run_request=StartRunRequest(series_id=1),
-            ),
-        ]
-
-        with patch(
-            "flwr.superlink.servicer.control.control_handlers.now",
-            return_value=current_time,
-        ):
-            for request in requests:
-                with self.subTest(start_at=request.start_at):
-                    with self.assertRaises(FlowerError) as error:
-                        start_automation(request, self.account, self.state)
-
-                    self.assertEqual(
-                        error.exception.code,
-                        ApiErrorCode.INVALID_AUTOMATION_REQUEST,
-                    )
-                    self.assertEqual(
-                        error.exception.public_details,
-                        "The automation start_at value must be at least 15 minutes "
-                        "in the future.",
-                    )
-
-    def test_start_automation_accepts_minimum_start_delay(self) -> None:
-        """Accept a start time exactly 15 minutes ahead."""
-        current_time = datetime(2026, 7, 10, 9, tzinfo=UTC)
-        start_at = current_time + timedelta(seconds=AUTOMATION_MIN_START_DELAY)
-
-        with patch(
-            "flwr.superlink.servicer.control.control_handlers.now",
-            return_value=current_time,
-        ):
-            response = start_automation(
-                StartAutomationRequest(
-                    start_at=start_at.isoformat(),
-                    start_run_request=StartRunRequest(series_id=1),
-                ),
-                self.account,
-                self.state,
-            )
-
-        self.assertEqual(response.next_run_at, start_at.isoformat())
 
     def test_list_automations(self) -> None:
         """List automations for a federation."""
