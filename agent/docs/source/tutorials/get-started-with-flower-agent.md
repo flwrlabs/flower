@@ -1,136 +1,158 @@
-# Get started with Flower Agent
+# Chat in your terminal
 
-Welcome to Flower Agent!
+Use Flower Chat to run AgentApps from your terminal. In this tutorial, you'll
+sign in to SuperGrid, stream a response, switch agents, and see how Flower
+groups messages into a conversation.
 
-In this tutorial, you'll chat with Flower's built-in AgentApp on SuperGrid. You
-won't need to write any code or provide model credentials. By the end, you'll
-have used Flower Chat and seen how its main pieces fit together.
+Prefer the browser? Start with [Chat in your browser](quickstart.md).
 
 ```{note}
-Flower Agent is experimental. Its APIs and runtime behavior may change between releases.
+This tutorial targets Flower 1.34.0. Flower Agent and `flwr chat` are
+experimental and may change between releases.
 ```
 
 ## Prerequisites
 
-You need:
+You'll need:
 
-- [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- a Flower SuperGrid account with access to Flower Agent
-- a terminal where you can run the Flower CLI
+- [uv](https://docs.astral.sh/uv/getting-started/installation/);
+- Python 3.11 or newer;
+- a Flower account with Flower Agent access; and
+- a terminal that can open the browser-based login flow.
 
-Let's get started! 🌼
+You don't need to provide model credentials for a SuperGrid run.
 
-## Run Flower with uvx
+## Check the Flower version
 
-The `uvx` command runs Flower in an isolated environment, so you don't need to
-create or activate a virtual environment. Check that the CLI is available:
+Use `uvx` to run the documented version in an isolated environment:
 
 ```console
-$ uvx flwr --version
+$ uvx --from flwr==1.34.0 flwr --version
+flwr, version 1.34.0
 ```
 
-`uvx` downloads Flower the first time you run it and reuses the cached
-environment for later commands.
+Running an explicit version keeps every command in this tutorial on the same
+CLI. If the package isn't available, check [Feature
+status](../reference/feature-status.md) and follow the package or installation
+instructions for your Flower environment.
 
-## Log in to SuperGrid
+## Configure and log in to SuperGrid
 
-Now connect the Flower CLI to your SuperGrid account using the built-in
-`supergrid` connection.
-
-The Flower CLI includes this connection when it creates
-`~/.flwr/config.toml`. If you already have a custom configuration that doesn't
-define `supergrid`, add:
+Flower creates `~/.flwr/config.toml` the first time a CLI command needs it. The
+default file includes this connection:
 
 ```toml
 [superlink.supergrid]
 address = "supergrid.flower.ai"
 ```
 
-Log in:
+If you maintain a custom file, ensure that section exists. Then log in:
 
 ```console
-$ uvx flwr login supergrid
+$ uvx --from flwr==1.34.0 flwr login supergrid
 ```
 
-Follow the authentication link shown by the command. The CLI stores the
+Open the printed authentication link and complete sign-in. The CLI stores the
 resulting account credentials for later SuperGrid commands.
 
 ## Start a chat
 
-Open the interactive Flower Agent chat:
-
 ```console
-$ uvx flwr chat
+$ uvx --from flwr==1.34.0 flwr chat
 ```
 
-The command connects to SuperGrid and opens Flower Chat. When the `❯` prompt
-appears, try asking:
+```{figure} ../_static/screenshots/flwr-chat.png
+:alt: Flower Chat terminal interface with Flower Agent selected and an empty prompt.
 
-```console
-❯ Explain Flower Agent in one sentence.
+Flower Chat shows the selected agent above the prompt.
 ```
 
-Flower's built-in AgentApp handles the prompt, and its reply streams directly
-into the chat. After it finishes, you can submit another prompt. Each prompt is
-handled independently, so include any context the AgentApp needs in the prompt.
+Flower verifies your stored login before opening the full-screen interface. At
+the `❯` prompt, ask:
+
+```text
+Explain Flower Agent in one sentence.
+```
+
+The selected AgentApp starts a SuperGrid run. Its response, reasoning summary,
+and supported tool activity can stream into the transcript. When the run
+finishes, the prompt becomes available again.
+
+If the interface does not open, follow [Troubleshoot AgentApp
+runs](../how-to-guides/troubleshoot-agent-runs.md) before changing your project
+or account connectors.
+
+## Continue the conversation
+
+Ask a follow-up that depends on the previous response:
+
+```text
+Rewrite that explanation for a ten-year-old.
+```
+
+Flower keeps both runs in the same run series. The default Flower Agent replays
+the stored messages, so it can use the earlier answer. Custom AgentApps need to
+implement that behavior themselves; a run series doesn't automatically give
+the model access to earlier messages.
+
+## Select another agent
+
+Type `@` at the start of an empty prompt. The completion menu lists agents
+available in the federation configured for the `supergrid` connection. Select
+one, add a request, and press {kbd}`Enter`:
+
+```text
+@publisher/agent Describe what you can help me with.
+```
+
+Only a leading app spec selects an agent. After a successful selection, the
+label above the prompt changes. Selecting a different agent starts a new run
+series, so context from the previous agent is not mixed into the new one.
+
+If no agent appears, verify the current federation and account entitlement in
+[Use agents and
+federations](../how-to-guides/use-agents-and-federations.md).
 
 ## Use chat commands
 
-Type `/` at the prompt to open the command menu. Flower Chat can autocomplete
-these commands:
+Type `/` to open the command menu:
 
-- Enter `/help` to list the available commands.
-- Enter `/new` to start a new conversation.
-- Enter `/quit` to leave the chat.
+- `/help` lists available commands;
+- `/new` makes the next message start a new run series; and
+- `/quit` leaves Flower Chat.
 
-You can also press {kbd}`Ctrl+C`. If Flower Agent is replying, this stops the
-current run and returns you to the prompt. If you've started typing, it clears
-the prompt; from an empty prompt, it leaves the chat.
+You can also press {kbd}`Ctrl+C`:
+
+- during a run, it requests that the run stop;
+- with a draft, it clears the prompt; and
+- from an empty idle prompt, it exits.
+
+The CLI does not currently restore an older run series interactively after you
+leave. Use the SuperGrid browser to inspect saved conversations.
 
 ## What happened
 
-Each message starts an `AgentApp` run on SuperGrid. The `flwr chat` command:
+Each submitted message started one `AgentApp` run. SuperGrid supplied:
 
-1. sends your message to the built-in AgentApp
-1. groups successive runs into the same run series until you enter `/new`
-1. streams the AgentApp's reply back to your terminal
+- an `AgentSession` for model and connector calls;
+- a Flower `Context` containing run configuration and persistent series state;
+- the selected AgentApp, resolved from its app spec or FAB hash; and
+- a federation in which the run and its series are stored.
 
-Behind the scenes, SuperGrid supplies the app with an `AgentSession` and a
-Flower `Context`. The `AgentSession` is the app's interface to runtime-provided
-model and connector capabilities, while the `Context` contains its run
-configuration and state.
-
-The run series keeps related runs together in SuperGrid, but it doesn't provide
-conversation history to the model. The built-in AgentApp forwards only the
-current prompt, so repeat any details an answer should take into account.
-
-## Final remarks
-
-Congratulations, you've completed your first interactive Flower Agent session
-on SuperGrid! 🎉
-
-You ran Flower with `uvx`, authenticated with SuperGrid, and chatted with the
-built-in AgentApp from your terminal. The same runtime will also run AgentApps
-you write yourself. You only need to provide the agent logic and project
-configuration.
+Read [Use agents and
+federations](../how-to-guides/use-agents-and-federations.md) for the full mental
+model.
 
 ## Next steps
 
-- [Write your first AgentApp](write-your-first-agentapp.md) to create a custom
-  Flower Agent project.
-- [Understand the AgentApp
-  runtime](../explanations/agentapp-runtime.md) to learn how a run is executed.
-- [Use connectors](../explanations/use-connectors.md) to let a model search
-  the web.
+- [Write your first AgentApp](write-your-first-agentapp.md).
+- [Use connectors](../explanations/use-connectors.md).
 - [Run an AgentApp on
-  SuperGrid](../how-to-guides/run-on-supergrid.md) to learn how to configure,
-  observe, and stop a run.
-- [Run an AgentApp with a local
-  SuperLink](../how-to-guides/run-with-local-superlink.md) for local
-  development.
+  SuperGrid](../how-to-guides/run-on-supergrid.md).
 
 ```{tip}
 If you get stuck, join the Flower community on [Flower
 Discuss](https://discuss.flower.ai/) or [Flower
-Slack](https://flower.ai/join-slack). We'd be happy to help!
+Slack](https://flower.ai/join-slack). Include safe run identifiers, but never
+include credentials or provider tokens.
 ```
