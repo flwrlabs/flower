@@ -52,14 +52,15 @@ Paper profiles differ: CIFAR-10 uses round decay `lr * 0.998^round`, momentum 0.
 
 ## Environment Setup
 
-Python 3.12 is recommended.
+Python 3.12 is recommended. On this cluster the system `python3.12` has no
+`ensurepip`, so use `uv` (or pyenv) rather than `python3.12 -m venv`.
 
 ```bash
 cd baselines/ssfl
-python3.12 -m venv .venv
+uv venv --python 3.12 .venv
 source .venv/bin/activate
-pip install -e .
-# optional: pip install -e ".[dev]"
+uv pip install -e .
+# optional: uv pip install -e ".[dev]"
 ```
 
 ## Running the Experiments
