@@ -453,6 +453,55 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     @parameterized.expand(  # type: ignore
         [
+            (True, False),
+            (False, True),
+            (True, True),
+        ]
+    )
+    def test_start_run_rejects_connectors_for_capable_federation(
+        self,
+        can_invite_members: bool,
+        can_add_supernodes: bool,
+    ) -> None:
+        """StartRun should restrict connectors to personal-style federations."""
+        self.state.upsert_connector(
+            flwr_aid=self.aid,
+            connector_ref="slack",
+            credentials_json="{}",
+            config_json="{}",
+        )
+        request = StartRunRequest(
+            federation=NOOP_FEDERATION_ID,
+            connector_refs=["slack"],
+        )
+
+        with (
+            patch.object(
+                connector_registry,
+                "OAUTH_FLOWS",
+                {"slack": _OAuthFlow()},
+            ),
+            patch.object(
+                self.state.federation_manager,
+                "get_details",
+                return_value=SimpleNamespace(
+                    can_invite_members=can_invite_members,
+                    can_add_supernodes=can_add_supernodes,
+                ),
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            self.servicer.StartRun(request, Mock())
+
+        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST)
+        self.assertEqual(
+            error.exception.public_details,
+            "Connectors are currently available only in your personal workspace.",
+        )
+        self.assertEqual(list(self.state.get_run_info()), [])
+
+    @parameterized.expand(  # type: ignore
+        [
             ("unknown", "unknown", ApiErrorCode.CONNECTOR_NOT_FOUND),
             ("empty", "  ", ApiErrorCode.INVALID_CONNECTOR_REQUEST),
             ("other_account", "slack", ApiErrorCode.CONNECTOR_NOT_FOUND),

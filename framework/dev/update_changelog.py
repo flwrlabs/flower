@@ -67,9 +67,20 @@ SKIPPED_CHANGELOG_PROJECTS = {
 }
 
 IGNORED_TOPIC_LABELS = {"Maintainer", "Contributor", "Bot", "General"}
+IGNORED_CONTRIBUTOR_LOGINS = {
+    "copilot",
+    "flwrmachine",
+    "github-actions[bot]",
+}
+CONTRIBUTOR_NAME_ALIASES = {
+    "William Lindskog-Munzing": "William Lindskog",
+}
 PR_NUMBER_PATTERN = re.compile(r"\(#(\d+)\)$")
 COAUTHOR_PATTERN = re.compile(
-    r"^Co-authored-by:\s*(.+?)\s*<[^>]+>\s*$", re.IGNORECASE | re.MULTILINE
+    r"^Co-authored-by:\s*(.+?)\s*<([^>]+)>\s*$", re.IGNORECASE | re.MULTILINE
+)
+GITHUB_NOREPLY_EMAIL_PATTERN = re.compile(
+    r"^(?:\d+\+)?([^@]+)@users\.noreply\.github\.com$", re.IGNORECASE
 )
 
 
@@ -108,22 +119,36 @@ def _get_pr_numbers(commits: list[Commit]) -> list[int]:
     return pr_numbers
 
 
-def _is_bot(name: str) -> bool:
-    """Return whether a contributor name belongs to a bot."""
-    return "[bot]" in name.casefold() or name.casefold() == "copilot"
+def _is_ignored_contributor(name: str, email: str) -> bool:
+    """Return whether a contributor identity belongs to an ignored account."""
+    match = GITHUB_NOREPLY_EMAIL_PATTERN.fullmatch(email.strip())
+    github_login = match.group(1).casefold() if match else ""
+    return (
+        "[bot]" in name.casefold()
+        or github_login.endswith("[bot]")
+        or github_login in IGNORED_CONTRIBUTOR_LOGINS
+    )
+
+
+def _canonical_contributor_name(name: str) -> str:
+    """Return the preferred display name for a contributor."""
+    stripped_name = name.strip()
+    return CONTRIBUTOR_NAME_ALIASES.get(stripped_name, stripped_name)
 
 
 def _get_contributors(commits: list[Commit]) -> list[str]:
     """Collect commit authors and co-authors in deterministic shortlog order."""
     contributors: set[str] = set()
     for commit in commits:
-        if commit.author.name and not _is_bot(commit.author.name):
-            contributors.add(commit.author.name)
-        contributors.update(
-            name.strip()
-            for name in COAUTHOR_PATTERN.findall(cast(str, commit.message))
-            if not _is_bot(name.strip())
-        )
+        if (
+            commit.author.name
+            and commit.author.email
+            and not _is_ignored_contributor(commit.author.name, commit.author.email)
+        ):
+            contributors.add(_canonical_contributor_name(commit.author.name))
+        for name, email in COAUTHOR_PATTERN.findall(cast(str, commit.message)):
+            if not _is_ignored_contributor(name, email):
+                contributors.add(_canonical_contributor_name(name))
     return sorted(contributors)
 
 
@@ -236,6 +261,19 @@ def _refresh_contributors(content: str, contributors: list[str]) -> str:
     )
 
 
+def _refresh_release_date(content: str, version: str, release_date: date) -> str:
+    """Replace the date in a release changelog heading."""
+    heading_pattern = re.compile(
+        rf"\A## v{re.escape(version)} \(\d{{4}}-\d{{2}}-\d{{2}}\)"
+    )
+    refreshed_content, replacement_count = heading_pattern.subn(
+        f"## v{version} ({release_date})", content, count=1
+    )
+    if replacement_count != 1:
+        raise ValueError(f"Invalid release heading for v{version}")
+    return refreshed_content
+
+
 def _section_for_pr(parsed_title: dict[str, str]) -> str:
     """Return the changelog section for parsed PR metadata."""
     if parsed_title["topic"]:
@@ -269,9 +307,10 @@ def _update_release_file(
     """Create a release changelog or add uncovered PRs to an existing one."""
     release_file = CHANGELOG_DIR / f"v{version}.md"
     if release_file.exists():
-        content = _refresh_contributors(
-            release_file.read_text(encoding="utf-8"), contributors
+        content = _refresh_release_date(
+            release_file.read_text(encoding="utf-8"), version, date.today()
         )
+        content = _refresh_contributors(content, contributors)
     else:
         sections = "\n\n".join(dict.fromkeys(PR_TYPE_TO_SECTION.values()))
         content = (
