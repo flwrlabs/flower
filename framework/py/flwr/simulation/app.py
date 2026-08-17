@@ -186,10 +186,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         # Upload any remaining logs before pushing final output
         if log_uploader:
             flush_logs(log_queue)
-
-        # Stop authenticated background calls before finishing the task, which revokes
-        # its token.
-        if log_uploader:
             stop_log_uploader(log_queue, log_uploader)
 
         if heartbeat_sender and heartbeat_sender.is_running:

@@ -55,7 +55,12 @@ def add_exit_handler(exit_handler: Callable[[], None]) -> None:
 
 
 def trigger_exit_handlers() -> None:
-    """Trigger all registered exit handlers in LIFO order."""
+    """Trigger registered exit handlers in LIFO order.
+
+    Handlers registered before this call are removed from the registry before
+    execution. Each handler is invoked at most once, and handlers registered
+    while callbacks are running remain registered for a subsequent call.
+    """
     with _lock_handlers:
         handlers = list(reversed(registered_exit_handlers))
         registered_exit_handlers.clear()

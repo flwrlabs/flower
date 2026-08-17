@@ -105,8 +105,6 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
 
         if log_uploader:
             flush_logs(log_queue)
-
-        if log_uploader:
             stop_log_uploader(log_queue, log_uploader)
 
         if heartbeat_sender and heartbeat_sender.is_running:
