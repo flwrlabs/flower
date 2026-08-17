@@ -276,4 +276,4 @@ answer had to handle.
 - Use [Connect accounts](../how-to-guides/connect-accounts.md) before adding an
   account connector, and remember that those runs are personal-workspace-only.
 - Expose `start_automation` only when the app must honor explicit future or
-  recurring requests.
+  recurring requests; see [Create automations](../how-to-guides/create-automations.md).
