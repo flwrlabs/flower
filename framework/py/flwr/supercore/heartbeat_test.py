@@ -20,7 +20,7 @@ import time
 import unittest
 from unittest.mock import Mock
 
-from flwr.common.constant import HEARTBEAT_CALL_TIMEOUT
+from flwr.common.constant import TASK_WORKER_CALL_TIMEOUT
 from flwr.proto.runtime_pb2 import SendTaskHeartbeatResponse  # pylint: disable=E0611
 
 from .heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
@@ -126,7 +126,7 @@ class TestHeartbeatSender(unittest.TestCase):
 
         self.assertEqual(
             stub.SendTaskHeartbeat.call_args.kwargs["timeout"],
-            HEARTBEAT_CALL_TIMEOUT,
+            TASK_WORKER_CALL_TIMEOUT,
         )
 
     def test_heartbeat_fail_and_retry(self) -> None:

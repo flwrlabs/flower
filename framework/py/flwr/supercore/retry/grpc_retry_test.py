@@ -15,6 +15,7 @@
 """Tests for gRPC retry utilities."""
 
 
+import threading
 from unittest.mock import Mock, patch
 
 import grpc
@@ -31,15 +32,50 @@ class _UnauthenticatedError(grpc.RpcError):  # type: ignore[misc]
         return grpc.StatusCode.UNAUTHENTICATED
 
 
+class _UnavailableError(grpc.RpcError):  # type: ignore[misc]
+    """gRPC error reporting an unavailable endpoint."""
+
+    def code(self) -> grpc.StatusCode:
+        """Return the gRPC status code."""
+        return grpc.StatusCode.UNAVAILABLE
+
+
 @patch("flwr.supercore.retry.grpc_retry.os.kill")
 def test_unauthenticated_does_not_signal_when_retries_disabled(
     mock_kill: Mock,
 ) -> None:
     """Late background RPC failures must not interrupt graceful shutdown."""
     retry_invoker = make_simple_grpc_retry_invoker()
-    retry_invoker.max_tries = 1
+    retry_invoker.disable_retries()
 
     with pytest.raises(_UnauthenticatedError):
         retry_invoker.invoke(Mock(side_effect=_UnauthenticatedError()))
 
     mock_kill.assert_not_called()
+
+
+def test_disable_retries_interrupts_grpc_backoff() -> None:
+    """Executor shutdown must not wait for an active gRPC retry backoff."""
+    retry_invoker = make_simple_grpc_retry_invoker()
+    target_called = threading.Event()
+    errors: list[grpc.RpcError] = []
+
+    def target() -> None:
+        target_called.set()
+        raise _UnavailableError
+
+    def invoke() -> None:
+        try:
+            retry_invoker.invoke(target)
+        except grpc.RpcError as err:
+            errors.append(err)
+
+    thread = threading.Thread(target=invoke)
+    thread.start()
+    assert target_called.wait(timeout=1.0)
+
+    retry_invoker.disable_retries()
+    thread.join(timeout=1.0)
+
+    assert not thread.is_alive()
+    assert len(errors) == 1

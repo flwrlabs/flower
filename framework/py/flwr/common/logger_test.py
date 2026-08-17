@@ -21,7 +21,9 @@ import time
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from queue import Queue
+from unittest.mock import Mock
 
+from .constant import TASK_WORKER_CALL_TIMEOUT
 from .logger import (
     FLOWER_LOGGER,
     configure_superlink_log_file,
@@ -29,6 +31,8 @@ from .logger import (
     flush_logs,
     mirror_output_to_queue,
     restore_output,
+    start_log_uploader,
+    stop_log_uploader,
 )
 
 
@@ -114,6 +118,19 @@ def test_flush_logs_returns_false_when_queue_does_not_drain() -> None:
     # Assert
     assert not result
     assert not log_queue.empty()
+
+
+def test_log_uploader_uses_bounded_rpc() -> None:
+    """Task log uploads must not block executor shutdown indefinitely."""
+    log_queue: Queue[str | None] = Queue()
+    log_queue.put("Test message")
+    stub = Mock()
+
+    uploader = start_log_uploader(log_queue, node_id=1, run_id=2, stub=stub)
+    stop_log_uploader(log_queue, uploader, timeout=1.0)
+
+    assert not uploader.is_alive()
+    assert stub.PushLogs.call_args.kwargs["timeout"] == TASK_WORKER_CALL_TIMEOUT
 
 
 def test_configure_superlink_log_file(tmp_path: Path) -> None:

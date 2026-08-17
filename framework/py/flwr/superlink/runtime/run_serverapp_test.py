@@ -99,8 +99,8 @@ def test_exit_stops_background_workers_before_task_output() -> None:
         exit_handler = register_signal_handlers.call_args.kwargs["exit_handlers"][0]
         exit_handler()
 
-    assert call_order == ["flush", "stop_logs", "stop_heartbeat", "push_output"]
-    assert flush_logs.call_args.kwargs["timeout"] == pytest.approx(0.5)
-    assert stop_log_uploader.call_args.kwargs["timeout"] == pytest.approx(0.25)
-    assert heartbeat_sender.stop.call_args.kwargs["timeout"] == pytest.approx(0.1)
+    assert call_order == ["stop_heartbeat", "flush", "stop_logs", "push_output"]
+    assert heartbeat_sender.stop.call_args.kwargs["timeout"] == pytest.approx(2.0)
+    assert flush_logs.call_args.kwargs["timeout"] == pytest.approx(1.75)
+    assert stop_log_uploader.call_args.kwargs["timeout"] == pytest.approx(1.6)
     assert grid._stub.PushTaskOutput.call_args.kwargs["timeout"] == pytest.approx(3.5)

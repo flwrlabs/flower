@@ -105,10 +105,13 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     def on_exit() -> None:
         log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
 
-        grid._retry_invoker.max_tries = 1
+        grid._retry_invoker.disable_retries()
         started_at = time.monotonic()
         cleanup_deadline = started_at + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
         exit_deadline = started_at + EXIT_HANDLER_TIMEOUT_SECONDS
+
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop(timeout=max(0.0, cleanup_deadline - time.monotonic()))
 
         if log_uploader:
             flush_logs(
@@ -120,10 +123,6 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                 log_uploader,
                 timeout=max(0.0, cleanup_deadline - time.monotonic()),
             )
-
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop(timeout=max(0.0, cleanup_deadline - time.monotonic()))
-
         # Push the task output last because finishing the task revokes its token.
         pushoutput_req = PushTaskOutputRequest(
             context=context_to_proto(context) if context else None,

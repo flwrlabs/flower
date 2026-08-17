@@ -27,6 +27,7 @@ from flwr.common.constant import (
     HEARTBEAT_CALL_TIMEOUT,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_RANDOM_RANGE,
+    TASK_WORKER_CALL_TIMEOUT,
 )
 
 # pylint: disable=E0611
@@ -144,7 +145,7 @@ def make_task_heartbeat_fn_grpc(
     def fn() -> bool:
         # Call Runtime API
         try:
-            res = stub.SendTaskHeartbeat(req, timeout=HEARTBEAT_CALL_TIMEOUT)
+            res = stub.SendTaskHeartbeat(req, timeout=TASK_WORKER_CALL_TIMEOUT)
         except grpc.RpcError as e:
             status_code = e.code()  # pylint: disable=E1101
             if status_code == grpc.StatusCode.UNAVAILABLE:

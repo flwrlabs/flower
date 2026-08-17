@@ -39,6 +39,7 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
     shutdown_requested = False
     system_healthy = threading.Event()
     system_healthy.set()  # Initially, the connection is healthy
+    retry_wait_cancelled = threading.Event()
     retry_invoker: RetryInvoker
 
     def _on_success(retry_state: RetryState) -> None:
@@ -114,9 +115,16 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
             # Avoid sequential waits if the system is healthy
             system_healthy.wait(wait_time)
 
+        if retry_wait_cancelled.is_set():
+            return
+
         remaining_time = wait_time - (time.monotonic() - start)
         if remaining_time > 0:
-            time.sleep(remaining_time)
+            retry_wait_cancelled.wait(remaining_time)
+
+    def _cancel_wait() -> None:
+        retry_wait_cancelled.set()
+        system_healthy.set()
 
     retry_invoker = RetryInvoker(
         wait_gen_factory=lambda: exponential(max_delay=MAX_RETRY_DELAY),
@@ -128,6 +136,7 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
         on_giveup=_on_giveup,
         should_giveup=_should_giveup_fn,
         wait_function=_wait,
+        cancel_wait_function=_cancel_wait,
     )
     return retry_invoker
 

@@ -98,10 +98,14 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         log(DEBUG, "[flwr-serverapp] Will push ServerApp task output")
 
         # Set Grpc max retries to 1 to avoid blocking on exit
-        grid._retry_invoker.max_tries = 1
+        grid._retry_invoker.disable_retries()
         started_at = time.monotonic()
         cleanup_deadline = started_at + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
         exit_deadline = started_at + EXIT_HANDLER_TIMEOUT_SECONDS
+
+        # Stop authenticated background workers before pushing final output.
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop(timeout=max(0.0, cleanup_deadline - time.monotonic()))
 
         # Upload any remaining logs before pushing final output
         if log_uploader:
@@ -114,10 +118,6 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
                 log_uploader,
                 timeout=max(0.0, cleanup_deadline - time.monotonic()),
             )
-
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop(timeout=max(0.0, cleanup_deadline - time.monotonic()))
-
         # Push final status and context (if available)
         pushoutput_req = PushTaskOutputRequest(
             context=context_to_proto(context) if context else None,

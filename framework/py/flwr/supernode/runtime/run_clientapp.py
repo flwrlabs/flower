@@ -123,7 +123,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
     def on_exit() -> None:
         # Set Grpc max retries to 1 to avoid blocking on exit
-        retry_invoker.max_tries = 1
+        retry_invoker.disable_retries()
         started_at = time.monotonic()
         cleanup_deadline = started_at + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
         exit_deadline = started_at + EXIT_HANDLER_TIMEOUT_SECONDS

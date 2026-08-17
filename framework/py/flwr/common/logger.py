@@ -37,7 +37,7 @@ from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 
-from .constant import LOG_UPLOAD_INTERVAL
+from .constant import LOG_UPLOAD_INTERVAL, TASK_WORKER_CALL_TIMEOUT
 
 # Create logger
 LOGGER_NAME = "flwr"
@@ -408,7 +408,7 @@ def _log_uploader(
                 logs=msgs,
             )
             try:
-                stub.PushLogs(req)
+                stub.PushLogs(req, timeout=TASK_WORKER_CALL_TIMEOUT)
                 msgs.clear()
             except grpc.RpcError as e:
                 # Ignore minor network errors

@@ -128,6 +128,45 @@ def test_max_tries(mock_sleep: MagicMock) -> None:
     mock_sleep.assert_called_once_with(0.1)
 
 
+def test_disable_retries_interrupts_wait() -> None:
+    """Disabling retries should stop waiting and cap an active invocation."""
+    target = Mock(side_effect=[ValueError("first"), TypeError])
+    invoker: RetryInvoker
+
+    def disable_retries(_wait_time: float) -> None:
+        invoker.disable_retries()
+
+    invoker = RetryInvoker(
+        lambda: constant(0.1),
+        ValueError,
+        max_tries=3,
+        max_time=None,
+        wait_function=disable_retries,
+    )
+
+    with pytest.raises(ValueError, match="first"):
+        invoker.invoke(target)
+
+    assert target.call_count == 1
+
+
+def test_disable_retries_calls_wait_canceller() -> None:
+    """Disabling retries should interrupt a wait already in progress."""
+    cancel_wait = Mock()
+    invoker = RetryInvoker(
+        lambda: constant(0.1),
+        ValueError,
+        max_tries=None,
+        max_time=None,
+        cancel_wait_function=cancel_wait,
+    )
+
+    invoker.disable_retries()
+
+    assert invoker.max_tries == 1
+    cancel_wait.assert_called_once_with()
+
+
 def test_max_time(mock_time: MagicMock, mock_sleep: MagicMock) -> None:
     """Check termination after `max_time`."""
     # Prepare

@@ -153,6 +153,8 @@ class RetryInvoker:
         for different execution environments. If set to `None`, the `wait_function`
         defaults to `time.sleep`, which is ideal for synchronous operations. Custom
         functions should manage execution flow to prevent blocking or interference.
+    cancel_wait_function: Optional[Callable[[], None]] (default: None)
+        A function that interrupts an active retry wait when retries are disabled.
 
     Examples
     --------
@@ -181,6 +183,7 @@ class RetryInvoker:
         jitter: Callable[[float], float] | None = full_jitter,
         should_giveup: Callable[[Exception], bool] | None = None,
         wait_function: Callable[[float], None] | None = None,
+        cancel_wait_function: Callable[[], None] | None = None,
     ) -> None:
         self.wait_gen_factory = wait_gen_factory
         self.recoverable_exceptions = recoverable_exceptions
@@ -191,9 +194,16 @@ class RetryInvoker:
         self.on_giveup = on_giveup
         self.jitter = jitter
         self.should_giveup = should_giveup
+        self.cancel_wait_function = cancel_wait_function
         if wait_function is None:
             wait_function = time.sleep
         self.wait_function = wait_function
+
+    def disable_retries(self) -> None:
+        """Disable further retries and interrupt an active retry wait."""
+        self.max_tries = 1
+        if self.cancel_wait_function is not None:
+            self.cancel_wait_function()
 
     # pylint: disable-next=too-many-locals
     def invoke(
@@ -267,7 +277,9 @@ class RetryInvoker:
             except self.recoverable_exceptions as err:
                 state.exception = err
                 # Check if giveup event should be triggered
-                max_tries_exceeded = try_cnt == self.max_tries
+                max_tries_exceeded = (
+                    self.max_tries is not None and try_cnt >= self.max_tries
+                )
                 max_time_exceeded = (
                     self.max_time is not None and elapsed_time >= self.max_time
                 )
@@ -299,6 +311,11 @@ class RetryInvoker:
 
                 # Sleep
                 self.wait_function(state.actual_wait)
+
+                # `disable_retries` can lower the limit while the wait is active.
+                if self.max_tries is not None and try_cnt >= self.max_tries:
+                    try_call_event_handler(self.on_giveup)
+                    raise err
             else:
                 # Trigger success event
                 try_call_event_handler(self.on_success)
