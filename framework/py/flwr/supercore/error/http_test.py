@@ -24,7 +24,11 @@ from starlette.datastructures import State
 from .base import ApiErrorCode, FlowerError
 from .catalog import API_ERROR_MAP
 from .exceptions import EntitlementError
-from .http import INTERNAL_SERVER_ERROR_MESSAGE, http_error_translator
+from .http import (
+    INTERNAL_SERVER_ERROR_MESSAGE,
+    BearerAuthenticationError,
+    http_error_translator,
+)
 
 
 def _run_translator(exception: Exception) -> Response:
@@ -148,6 +152,18 @@ def test_http_error_translator_http_exception() -> None:
         status.HTTP_418_IM_A_TEAPOT,
         {"detail": {"message": "short and stout"}},
     )
+
+
+def test_http_error_translator_bearer_authentication_error() -> None:
+    """Translate Bearer authentication failures using FastAPI's error contract."""
+    response = _run_translator(BearerAuthenticationError())
+
+    _assert_json_response(
+        response,
+        status.HTTP_401_UNAUTHORIZED,
+        {"detail": "Not authenticated"},
+    )
+    assert response.headers["www-authenticate"] == "Bearer"
 
 
 def test_http_error_translator_unexpected_error() -> None:

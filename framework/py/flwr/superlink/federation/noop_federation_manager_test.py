@@ -143,6 +143,8 @@ def test_get_details_with_valid_federation() -> None:
     assert result.archived is False
     assert result.simulation is True
     assert result.config == expected_config
+    assert result.can_invite_members is False
+    assert result.can_add_supernodes is False
 
 
 def test_get_details_with_invalid_federation() -> None:
@@ -183,6 +185,8 @@ def test_get_details_with_no_runs() -> None:
     assert len(result.runs) == 0
     assert result.archived is False
     assert result.simulation is False
+    assert result.can_invite_members is False
+    assert result.can_add_supernodes is False
 
 
 def test_exists() -> None:
@@ -272,6 +276,8 @@ def test_get_federations() -> None:
     assert result2[0].description == NOOP_FEDERATION_DESCRIPTION
     assert result2[0].archived is False
     assert result2[0].simulation is False
+    assert result2[0].can_invite_members is False
+    assert result2[0].can_add_supernodes is False
 
 
 def test_simulation_runtime_flag_is_reflected() -> None:
