@@ -138,6 +138,8 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
             heartbeat_sender.stop(timeout=max(0.0, cleanup_deadline - time.monotonic()))
 
         # Push final status and context (if available)
+        # Do not use the one-second worker deadline: give this critical final write
+        # the remaining exit-handler budget.
         push_task_output(
             stub=stub,
             context=context,

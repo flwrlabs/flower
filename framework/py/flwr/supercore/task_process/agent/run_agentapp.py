@@ -132,6 +132,8 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             details=details,
         )
         try:
+            # Do not use the one-second worker deadline: give this critical final
+            # write the remaining exit-handler budget.
             grid._stub.PushTaskOutput(
                 pushoutput_req,
                 timeout=max(0.0, exit_deadline - time.monotonic()),

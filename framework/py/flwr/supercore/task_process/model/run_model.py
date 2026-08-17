@@ -92,6 +92,8 @@ def run_model(  # pylint: disable=too-many-locals
             details=details,
         )
         try:
+            # Do not use the one-second worker deadline: give this critical final
+            # write the remaining exit-handler budget.
             stub.PushTaskOutput(
                 pushoutput_req,
                 timeout=max(0.0, exit_deadline - time.monotonic()),
