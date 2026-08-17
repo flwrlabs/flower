@@ -147,7 +147,7 @@ If it reports that the component cannot be loaded, check all three names:
 Ensure you have logged in, then submit the project and stream its logs:
 
 ```console
-$ uvx --from flwr==1.34.0 flwr login supergrid
+$ uv run flwr login supergrid
 $ uv run flwr run . supergrid --stream
 ```
 
@@ -171,8 +171,8 @@ Open SuperGrid to inspect the structured response and persisted context. If the
 run fails, use the printed ID with:
 
 ```console
-$ uvx --from flwr==1.34.0 flwr list --run-id <run-id> supergrid
-$ uvx --from flwr==1.34.0 flwr log <run-id> supergrid --show
+$ uv run flwr list --run-id <run-id> supergrid
+$ uv run flwr log <run-id> supergrid --show
 ```
 
 ## Understand this app's limits
