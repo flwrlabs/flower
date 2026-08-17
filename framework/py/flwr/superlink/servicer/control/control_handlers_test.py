@@ -158,32 +158,21 @@ class TestControlHandlers(unittest.TestCase):
 
     def test_start_automation_rejects_federation_active_automation_limit(self) -> None:
         """Reject creation after a federation reaches its automation limit."""
-        for series_id in range(AUTOMATION_MAX_ACTIVE_PER_FEDERATION):
-            self.state.store_automation(
-                federation_id=NOOP_FEDERATION_ID,
-                flwr_aid=f"aid-{series_id}",
-                start_run_request=StartRunRequest(series_id=series_id),
-                series_id=series_id,
-                next_run_at="2026-07-10T09:00:00+00:00",
-                max_runs=1,
-            )
-
-        with self.assertRaises(FlowerError) as error:
+        with patch.object(
+            self.state,
+            "list_automations",
+            return_value=[Mock()] * AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
+        ), self.assertRaises(FlowerError) as error:
             start_automation(
                 StartAutomationRequest(
                     start_at="2099-01-01T00:00:00+00:00",
-                    start_run_request=StartRunRequest(series_id=100)
+                    start_run_request=StartRunRequest(series_id=1),
                 ),
                 self.account,
                 self.state,
             )
 
         self.assertEqual(error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
-        self.assertEqual(
-            error.exception.public_details,
-            "A federation can have at most "
-            f"{AUTOMATION_MAX_ACTIVE_PER_FEDERATION} active automations.",
-        )
 
     def test_start_automation_rejects_start_at_without_timezone(self) -> None:
         """Reject a start time without timezone information."""

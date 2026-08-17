@@ -742,7 +742,34 @@ def start_automation(  # pylint: disable=too-many-locals
         )
 
     # Resolve the first scheduled run time.
-    if not request.HasField("start_at"):
+    if request.HasField("start_at"):
+        try:
+            start_at = datetime.fromisoformat(request.start_at)
+            if start_at.tzinfo is None:
+                raise ValueError("Timezone is required.")
+            next_run_at = start_at.astimezone(UTC).isoformat()
+        except ValueError as e:
+            raise FlowerError(
+                ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+                f"Invalid automation start_at value: {request.start_at}",
+                public_details=(
+                    "The automation start_at value must be a valid ISO 8601 "
+                    "timestamp with a timezone."
+                ),
+            ) from e
+        earliest_start_at = now() + timedelta(seconds=AUTOMATION_MIN_START_DELAY)
+        if start_at < earliest_start_at:
+            raise FlowerError(
+                ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+                "Automation start_at must be at least "
+                f"{AUTOMATION_MIN_START_DELAY} seconds in the future: "
+                f"{request.start_at}",
+                public_details=(
+                    "The automation start_at value must be at least "
+                    f"{AUTOMATION_MIN_START_DELAY // 60} minutes in the future."
+                ),
+            )
+    else:
         raise FlowerError(
             ApiErrorCode.INVALID_AUTOMATION_REQUEST,
             "Automation start_at is required and must be at least "
@@ -752,32 +779,6 @@ def start_automation(  # pylint: disable=too-many-locals
                 f"{AUTOMATION_MIN_START_DELAY // 60} minutes in the future."
             ),
         )
-    try:
-        start_at = datetime.fromisoformat(request.start_at)
-        if start_at.tzinfo is None:
-            raise ValueError("Timezone is required.")
-    except ValueError as e:
-        raise FlowerError(
-            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
-            f"Invalid automation start_at value: {request.start_at}",
-            public_details=(
-                "The automation start_at value must be a valid ISO 8601 "
-                "timestamp with a timezone."
-            ),
-        ) from e
-    start_at = start_at.astimezone(UTC)
-    earliest_start_at = now() + timedelta(seconds=AUTOMATION_MIN_START_DELAY)
-    if start_at < earliest_start_at:
-        raise FlowerError(
-            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
-            "Automation start_at must be at least "
-            f"{AUTOMATION_MIN_START_DELAY} seconds in the future: {request.start_at}",
-            public_details=(
-                "The automation start_at value must be at least "
-                f"{AUTOMATION_MIN_START_DELAY // 60} minutes in the future."
-            ),
-        )
-    next_run_at = start_at.isoformat()
 
     # Resolve recurrence settings and the default one-shot behavior.
     fixed_interval = (
