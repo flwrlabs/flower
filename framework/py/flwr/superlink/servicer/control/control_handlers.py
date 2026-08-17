@@ -165,10 +165,11 @@ from flwr.superlink.federation.noop_federation_manager import NoOpFederationMana
 class InvalidConnectorRequestError(FlowerError):
     """Exception raised when a connector request is invalid."""
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, public_details: str | None = None) -> None:
         super().__init__(
             ApiErrorCode.INVALID_CONNECTOR_REQUEST,
             f"Invalid connector request: {reason}.",
+            public_details=public_details,
         )
 
 
@@ -508,6 +509,17 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             f"Account with ID '{flwr_aid}' is not a member of the "
             f"federation '{federation_id}'.",
         )
+
+    if connector_refs:
+        federation = state.federation_manager.get_details(federation_id)
+        if federation.can_invite_members or federation.can_add_supernodes:
+            raise InvalidConnectorRequestError(
+                "connector refs are not supported for this federation",
+                public_details=(
+                    "Connectors are currently available only in your personal "
+                    "workspace."
+                ),
+            )
 
     try:
         # Validate user config overrides matches keys in run config in FAB
@@ -1280,6 +1292,8 @@ def list_federations(
                 description=fed.description,
                 archived=fed.archived,
                 simulation=fed.simulation,
+                can_invite_members=fed.can_invite_members,
+                can_add_supernodes=fed.can_add_supernodes,
             )
             for fed in federations
         ]
@@ -1316,6 +1330,8 @@ def show_federation(
         archived=details.archived,
         simulation=details.simulation,
         config=details.config,
+        can_invite_members=details.can_invite_members,
+        can_add_supernodes=details.can_add_supernodes,
     )
     return ShowFederationResponse(federation=federation_proto, now=now().isoformat())
 
@@ -1370,6 +1386,8 @@ def create_federation(
             description=federation.description,
             members=federation.members,
             simulation=federation.simulation,
+            can_invite_members=federation.can_invite_members,
+            can_add_supernodes=federation.can_add_supernodes,
         )
     )
 

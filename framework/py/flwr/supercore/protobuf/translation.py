@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import cast
 
-from fastapi import Request
+from fastapi import Depends, Request
 from fastapi.responses import Response, StreamingResponse
 from google.protobuf.message import DecodeError, Message
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -236,3 +236,6 @@ def get_protobuf_request(request: Request) -> Message:
             f"Message, got {type(protobuf_request).__name__}.",
         )
     return protobuf_request
+
+
+PROTOBUF_REQUEST_DEPENDENCY = Depends(get_protobuf_request)
