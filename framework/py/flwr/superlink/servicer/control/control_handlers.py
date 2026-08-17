@@ -509,6 +509,14 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             f"federation '{federation_id}'.",
         )
 
+    if connector_refs:
+        federation = state.federation_manager.get_details(federation_id)
+        if federation.can_invite_members or federation.can_add_supernodes:
+            raise InvalidConnectorRequestError(
+                "connector refs are only supported for federations where member "
+                "invitations and adding SuperNodes are disabled"
+            )
+
     try:
         # Validate user config overrides matches keys in run config in FAB
         fab_config = get_fab_config(fab_file)
