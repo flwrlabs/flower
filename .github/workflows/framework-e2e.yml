@@ -27,24 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # Temporary check for https://github.com/flwrlabs/flower/pull/7897.
-      - name: Test release bot PR lookup without read:org
-        if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork }}
-        env:
-          GH_TOKEN: ${{ secrets.FLWRMACHINE_TOKEN }}
-        run: |
-          pr_number="$(
-            gh pr list \
-              --repo "${GITHUB_REPOSITORY}" \
-              --head "${GITHUB_HEAD_REF}" \
-              --state open \
-              --limit 1 \
-              --json number \
-              --jq '.[0].number'
-          )"
-          test -n "${pr_number}"
-          echo "Resolved PR #${pr_number} with FLWRMACHINE_TOKEN."
-
       - name: Filter changed paths
         id: filter
         uses: dorny/paths-filter@v3
