@@ -17,6 +17,7 @@
 
 import importlib
 import sys
+from dataclasses import fields
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -29,13 +30,37 @@ from flwr.common.constant import (
     TRANSPORT_TYPE_GRPC_RERE,
 )
 from flwr.supercore.version import package_version
+from flwr.supernode.nodestate import NodeStateFactory
 
 from .flower_supernode import (
+    SuperNodeLifespan,
+    SuperNodeLifespanConfig,
     _parse_args_run_supernode,
     _parse_supernode_lifespan_config,
 )
 
 flower_supernode_module = importlib.import_module("flwr.supernode.cli.flower_supernode")
+
+
+def test_supernode_lifespan_starts_existing_supernode_lifecycle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Delegate startup with the shared NodeStateFactory and parsed config."""
+    config = Mock(spec=SuperNodeLifespanConfig)
+    config_values = {
+        field.name: Mock(name=field.name) for field in fields(SuperNodeLifespanConfig)
+    }
+    for name, value in config_values.items():
+        setattr(config, name, value)
+    state_factory = Mock(spec=NodeStateFactory)
+    start = Mock()
+    monkeypatch.setattr(flower_supernode_module, "start_client_internal", start)
+
+    lifespan = SuperNodeLifespan(config, state_factory)
+    lifespan.startup()
+    lifespan.startup()
+
+    start.assert_called_once_with(state_factory=state_factory, **config_values)
 
 
 @pytest.mark.parametrize("flag", ["--version", "-V"])

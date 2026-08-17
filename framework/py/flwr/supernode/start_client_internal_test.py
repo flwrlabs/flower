@@ -29,6 +29,8 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
 )
+from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supernode.nodestate import NodeStateFactory
 
 from .start_client_internal import (
     FAB_VERIFICATION_ERROR,
@@ -434,6 +436,7 @@ def _run_until_connection_start(
         # Raising there keeps this test focused on the setup performed before it.
         with pytest.raises(_StopAfterSuperExecLaunch):
             start_client_internal(
+                state_factory=NodeStateFactory(ObjectStoreFactory()),
                 server_address="127.0.0.1:9092",
                 node_config={},
                 root_certificates=None,

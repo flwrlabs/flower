@@ -47,10 +47,12 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import try_obtain_optional_runtime_server_certificates
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
+from flwr.supernode.nodestate import NodeStateFactory
 from flwr.supernode.start_client_internal import start_client_internal
 
 
@@ -76,6 +78,46 @@ class SuperNodeLifespanConfig:  # pylint: disable=too-many-instance-attributes
     trusted_entities: dict[str, str] | None
     superexec_auth_secret: bytes | None
     runtime_dependency_install: bool
+
+
+class SuperNodeLifespan:
+    """Own the shared state and existing SuperNode lifecycle."""
+
+    def __init__(
+        self,
+        config: SuperNodeLifespanConfig,
+        state_factory: NodeStateFactory,
+    ) -> None:
+        self.config = config
+        self.state_factory = state_factory
+        self._started = False
+
+    def startup(self) -> None:
+        """Run the existing blocking SuperNode lifecycle."""
+        if self._started:
+            return
+        self._started = True
+
+        config = self.config
+        start_client_internal(
+            state_factory=self.state_factory,
+            server_address=config.server_address,
+            transport=config.transport,
+            root_certificates=config.root_certificates,
+            insecure=config.insecure,
+            authentication_keys=config.authentication_keys,
+            max_retries=config.max_retries,
+            max_wait_time=config.max_wait_time,
+            node_config=config.node_config,
+            isolation=config.isolation,
+            runtime_api_address=config.runtime_api_address,
+            runtime_certificates=config.runtime_certificates,
+            runtime_root_certificates_path=config.runtime_root_certificates_path,
+            health_server_address=config.health_server_address,
+            trusted_entities=config.trusted_entities,
+            superexec_auth_secret=config.superexec_auth_secret,
+            runtime_dependency_install=config.runtime_dependency_install,
+        )
 
 
 def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
@@ -152,24 +194,9 @@ def flower_supernode() -> None:
 
     log(DEBUG, "Isolation mode: %s", config.isolation)
 
-    start_client_internal(
-        server_address=config.server_address,
-        transport=config.transport,
-        root_certificates=config.root_certificates,
-        insecure=config.insecure,
-        authentication_keys=config.authentication_keys,
-        max_retries=config.max_retries,
-        max_wait_time=config.max_wait_time,
-        node_config=config.node_config,
-        isolation=config.isolation,
-        runtime_api_address=config.runtime_api_address,
-        runtime_certificates=config.runtime_certificates,
-        runtime_root_certificates_path=config.runtime_root_certificates_path,
-        health_server_address=config.health_server_address,
-        trusted_entities=config.trusted_entities,
-        superexec_auth_secret=config.superexec_auth_secret,
-        runtime_dependency_install=config.runtime_dependency_install,
-    )
+    objectstore_factory = ObjectStoreFactory()
+    state_factory = NodeStateFactory(objectstore_factory=objectstore_factory)
+    SuperNodeLifespan(config, state_factory).startup()
 
 
 def _parse_args_run_supernode() -> argparse.ArgumentParser:
