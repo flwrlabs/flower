@@ -1170,6 +1170,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(response.federation.name, NOOP_FEDERATION_ID)
         self.assertFalse(response.federation.simulation)
+        self.assertFalse(response.federation.can_invite_members)
+        self.assertFalse(response.federation.can_add_supernodes)
 
     def test_list_federations_includes_simulation_flag(self) -> None:
         """Test ListFederations surfaces the federation simulation flag."""
@@ -1190,6 +1192,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(len(response.federations), 1)
         self.assertTrue(response.federations[0].simulation)
+        self.assertFalse(response.federations[0].can_invite_members)
+        self.assertFalse(response.federations[0].can_add_supernodes)
 
     def test_create_federation_success(self) -> None:
         """Test CreateFederation succeeds when federation_manager.create_federation
@@ -1211,6 +1215,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             description=description,
             members=mock_members,
             simulation=True,
+            can_invite_members=True,
+            can_add_supernodes=True,
         )
         manager_calls = Mock()
 
@@ -1261,6 +1267,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(response.federation.members[0].account.id, self.aid)
         self.assertEqual(response.federation.members[0].role, "owner")
         self.assertTrue(response.federation.simulation)
+        self.assertTrue(response.federation.can_invite_members)
+        self.assertTrue(response.federation.can_add_supernodes)
 
     def test_create_federation_fails_on_manager_error(self) -> None:
         """Test CreateFederation raises when federation_manager.create_federation

@@ -34,11 +34,13 @@ message Federation {
   string name = 1;
   repeated NodeInfo nodes = 2;
   repeated Run runs = 3;
-  string description = 4;      // Added in v1.26.0
-  repeated Member members = 5; // Added in v1.27.0
-  bool archived = 6;           // Added in v1.27.0
-  bool simulation = 7;         // Added in v1.28.0
-  SimulationConfig config = 8; // Added in v1.28.0
+  string description = 4;       // Added in v1.26.0
+  repeated Member members = 5;  // Added in v1.27.0
+  bool archived = 6;            // Added in v1.27.0
+  bool simulation = 7;          // Added in v1.28.0
+  SimulationConfig config = 8;  // Added in v1.28.0
+  bool can_invite_members = 9;  // Added in v1.34.0
+  bool can_add_supernodes = 10; // Added in v1.34.0
 }
 
 message Invitation {
