@@ -194,7 +194,8 @@ def list_connectors(
     flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     _validate_federation_membership_in_request(state, flwr_aid, request.federation)
-    if not _federation_supports_connectors(state, request.federation):
+    federation = state.federation_manager.get_details(request.federation)
+    if federation.can_invite_members or federation.can_add_supernodes:
         return ListConnectorsResponse()
 
     connectors: list[Connector] = []
@@ -1691,12 +1692,6 @@ def _validate_federation_membership_in_request(
             ApiErrorCode.FEDERATION_NOT_FOUND,
             message=f"`{flwr_aid}` is not a member of federation `{federation_id}`.",
         )
-
-
-def _federation_supports_connectors(state: LinkState, federation_id: str) -> bool:
-    """Return whether the federation temporarily supports connector access."""
-    federation = state.federation_manager.get_details(federation_id)
-    return not federation.can_invite_members and not federation.can_add_supernodes
 
 
 def _with_last_run_statuses(
