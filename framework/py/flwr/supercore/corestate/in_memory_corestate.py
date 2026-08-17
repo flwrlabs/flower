@@ -558,11 +558,15 @@ class InMemoryCoreState(
     ) -> Automation:
         """Store an automation and return its metadata."""
         with self.lock_automation_store:
-            if max_active is not None and sum(
-                record.automation.federation == federation_id
-                and record.automation.status == AutomationStatus.ACTIVE
-                for record in self.automation_store.values()
-            ) >= max_active:
+            if (
+                max_active is not None
+                and sum(
+                    record.automation.federation == federation_id
+                    and record.automation.status == AutomationStatus.ACTIVE
+                    for record in self.automation_store.values()
+                )
+                >= max_active
+            ):
                 raise FlowerError(
                     ApiErrorCode.INVALID_AUTOMATION_REQUEST,
                     f"Federation {federation_id} has reached the active automation "
