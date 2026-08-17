@@ -87,7 +87,7 @@ class HeartbeatSender:
         timeout : Optional[float] (default: None)
             Maximum time in seconds to wait for the sender thread to stop.
         """
-        if not self._thread.is_alive():
+        if self._thread.ident is None:
             raise RuntimeError("Heartbeat sender is not running.")
         self._stop_event.set()
         self._thread.join(timeout=timeout)

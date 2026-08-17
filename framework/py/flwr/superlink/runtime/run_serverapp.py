@@ -48,7 +48,7 @@ from flwr.server.run_serverapp import run as run_
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import (
     EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS,
-    EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS,
+    EXIT_HANDLER_TIMEOUT_SECONDS,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
@@ -99,7 +99,9 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
 
         # Set Grpc max retries to 1 to avoid blocking on exit
         grid._retry_invoker.max_tries = 1
-        cleanup_deadline = time.monotonic() + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
+        started_at = time.monotonic()
+        cleanup_deadline = started_at + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
+        exit_deadline = started_at + EXIT_HANDLER_TIMEOUT_SECONDS
 
         # Upload any remaining logs before pushing final output
         if log_uploader:
@@ -125,7 +127,7 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         try:
             grid._stub.PushTaskOutput(
                 pushoutput_req,
-                timeout=EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS,
+                timeout=max(0.0, exit_deadline - time.monotonic()),
             )
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))

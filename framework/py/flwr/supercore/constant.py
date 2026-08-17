@@ -133,10 +133,10 @@ DEFAULT_FEDERATION_SIMULATION = "workspace"
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
 TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
-# Keep graceful cleanup bounded so final task output can still be attempted before
-# the force-exit watchdog fires.
-EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS = FORCE_EXIT_TIMEOUT_SECONDS - 2
-EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS = 1
+# Keep background cleanup short and reserve most of the force-exit window for the
+# critical final task output RPC, with margin for local cleanup and scheduling.
+EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS = 1
+EXIT_HANDLER_TIMEOUT_SECONDS = FORCE_EXIT_TIMEOUT_SECONDS - 0.5
 
 # Constants for message processing timing
 MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS = 3600

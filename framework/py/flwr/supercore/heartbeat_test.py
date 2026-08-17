@@ -101,6 +101,21 @@ class TestHeartbeatSender(unittest.TestCase):
         sender._thread.join(timeout=1.0)
         self.assertFalse(sender._thread.is_alive())
 
+    def test_stop_after_sender_thread_exits(self) -> None:
+        """Test that stop tolerates a sender thread that has already exited."""
+        sender: HeartbeatSender
+
+        def heartbeat_fn() -> bool:
+            sender._stop_event.set()
+            return True
+
+        sender = HeartbeatSender(heartbeat_fn)
+        sender.start()
+        sender._thread.join(timeout=1.0)
+        self.assertFalse(sender._thread.is_alive())
+
+        sender.stop(timeout=0.01)
+
     def test_grpc_heartbeat_uses_timeout(self) -> None:
         """Test that gRPC heartbeats have a deadline."""
         stub = Mock()

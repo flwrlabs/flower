@@ -18,7 +18,7 @@
 from queue import Queue
 from unittest.mock import Mock, patch
 
-from flwr.supercore.constant import EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS
+import pytest
 
 from .run_serverapp import run_serverapp
 
@@ -76,7 +76,7 @@ def test_exit_stops_background_workers_before_task_output() -> None:
         patch("flwr.superlink.runtime.run_serverapp.cleanup_app_runtime_environment"),
         patch(
             "flwr.superlink.runtime.run_serverapp.time.monotonic",
-            side_effect=[10.0, 10.5, 11.5, 12.0],
+            side_effect=[10.0, 10.5, 10.75, 10.9, 11.0],
         ),
     ):
         flush_logs.side_effect = lambda *args, **kwargs: call_order.append("flush")
@@ -100,10 +100,7 @@ def test_exit_stops_background_workers_before_task_output() -> None:
         exit_handler()
 
     assert call_order == ["flush", "stop_logs", "stop_heartbeat", "push_output"]
-    assert flush_logs.call_args.kwargs["timeout"] == 2.5
-    assert stop_log_uploader.call_args.kwargs["timeout"] == 1.5
-    assert heartbeat_sender.stop.call_args.kwargs["timeout"] == 1.0
-    assert (
-        grid._stub.PushTaskOutput.call_args.kwargs["timeout"]
-        == EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS
-    )
+    assert flush_logs.call_args.kwargs["timeout"] == pytest.approx(0.5)
+    assert stop_log_uploader.call_args.kwargs["timeout"] == pytest.approx(0.25)
+    assert heartbeat_sender.stop.call_args.kwargs["timeout"] == pytest.approx(0.1)
+    assert grid._stub.PushTaskOutput.call_args.kwargs["timeout"] == pytest.approx(3.5)

@@ -33,7 +33,7 @@ from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import (
     EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS,
-    EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS,
+    EXIT_HANDLER_TIMEOUT_SECONDS,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc import create_channel, on_channel_state_change
@@ -75,7 +75,9 @@ def run_connector(  # pylint: disable=too-many-locals
         log(DEBUG, "[flwr-connector] Will push Connector task output")
 
         retry_invoker.max_tries = 1
-        cleanup_deadline = time.monotonic() + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
+        started_at = time.monotonic()
+        cleanup_deadline = started_at + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
+        exit_deadline = started_at + EXIT_HANDLER_TIMEOUT_SECONDS
 
         # Stop heartbeats before finishing the task, which revokes its token.
         if heartbeat_sender and heartbeat_sender.is_running:
@@ -88,7 +90,7 @@ def run_connector(  # pylint: disable=too-many-locals
         try:
             stub.PushTaskOutput(
                 pushoutput_req,
-                timeout=EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS,
+                timeout=max(0.0, exit_deadline - time.monotonic()),
             )
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))

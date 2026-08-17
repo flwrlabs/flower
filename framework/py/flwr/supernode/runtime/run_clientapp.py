@@ -48,7 +48,7 @@ from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import (
     EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS,
-    EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS,
+    EXIT_HANDLER_TIMEOUT_SECONDS,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.fab import Fab
@@ -124,7 +124,9 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     def on_exit() -> None:
         # Set Grpc max retries to 1 to avoid blocking on exit
         retry_invoker.max_tries = 1
-        cleanup_deadline = time.monotonic() + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
+        started_at = time.monotonic()
+        cleanup_deadline = started_at + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
+        exit_deadline = started_at + EXIT_HANDLER_TIMEOUT_SECONDS
 
         # Stop heartbeats before finishing the task, which revokes its token.
         if heartbeat_sender is not None and heartbeat_sender.is_running:
@@ -136,7 +138,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
             context=context,
             sub_status=sub_status,
             details=details,
-            timeout=EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS,
+            timeout=max(0.0, exit_deadline - time.monotonic()),
         )
 
         channel.close()
