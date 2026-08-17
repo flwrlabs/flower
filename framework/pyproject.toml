@@ -58,6 +58,7 @@ dependencies = [
     "rich>=14.0.0,<15.0.0",
     "pyyaml>=6.0.2,<7.0.0",
     "requests>=2.33.0,<3.0.0",
+    "httpx>=0.28.1,<1.0.0",
     "click>=8.0.0,<9.0.0",
     "packaging>=24.0,<26.0",
     "SQLAlchemy[asyncio]>=2.0.45,<3.0.0",
@@ -140,7 +141,6 @@ dev = [
     "pyroma==4.2",
     "check-wheel-contents==0.6.3",
     "GitPython==3.1.50",
-    "PyGithub==2.1.1",
     "licensecheck==2025.1.0",
     "pre-commit==3.5.0",
     "sphinx-substitution-extensions==2022.2.16",
@@ -160,7 +160,7 @@ devtool = { path = "../dev", editable = true }
 [tool.uv.build-backend]
 module-name = "flwr"
 module-root = "py"
-source-exclude = ["py/**/*_test.py"]
+source-exclude = ["py/**/*_test.py", "py/**/*_test_utils.py"]
 
 [tool.devtool.protoc]
 proto_root = "proto"

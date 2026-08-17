@@ -19,7 +19,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 
@@ -30,12 +30,12 @@ class TestSimulationIoConnection(unittest.TestCase):
     """Tests for `SimulationIoConnection`."""
 
     @patch("flwr.simulation.simulationio_connection.wrap_stub")
-    @patch("flwr.simulation.simulationio_connection.ServerAppIoStub")
+    @patch("flwr.simulation.simulationio_connection.RuntimeStub")
     @patch("flwr.simulation.simulationio_connection.create_channel")
     def test_connect_adds_client_interceptors(
         self,
         mock_create_channel: Mock,
-        _mock_serverappio_stub: Mock,
+        _mock_runtime_stub: Mock,
         _mock_wrap_stub: Mock,
     ) -> None:
         """`_connect` should pass version and token interceptors to create_channel."""
@@ -50,7 +50,7 @@ class TestSimulationIoConnection(unittest.TestCase):
         assert interceptors is not None
         self.assertEqual(len(interceptors), 2)
         self.assertIsInstance(interceptors[0], RuntimeVersionClientInterceptor)
-        self.assertIsInstance(interceptors[1], AppIoTokenClientInterceptor)
+        self.assertIsInstance(interceptors[1], RuntimeTokenClientInterceptor)
 
     def test_init_requires_token(self) -> None:
         """`SimulationIoConnection` should require token values."""

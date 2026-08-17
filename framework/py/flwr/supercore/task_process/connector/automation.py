@@ -39,7 +39,8 @@ def make_start_automation_tool() -> JSONObject:
                 "start_at": {
                     "type": "string",
                     "description": (
-                        "When to start, for example 2026-07-28T12:00:00+00:00."
+                        "When to start, at least 15 minutes in the future, for "
+                        "example 2026-07-28T12:00:00+00:00."
                     ),
                 },
                 "fixed_interval": {

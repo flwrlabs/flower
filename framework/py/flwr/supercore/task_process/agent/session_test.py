@@ -18,14 +18,14 @@
 from unittest.mock import Mock, patch
 
 from flwr.common.serde import user_config_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    CreateTaskRequest,
-    CreateTaskResponse,
-)
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
     StartAutomationResponse,
     StartRunRequest,
+)
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    CreateTaskRequest,
+    CreateTaskResponse,
 )
 from flwr.supercore.constant import AUTOMATION_MIN_FIXED_INTERVAL, TaskType
 from flwr.supercore.json_message.connector_message import (
@@ -36,7 +36,7 @@ from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TO
 from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject
 
-from .session import RuntimeAgentResponses
+from .session import RuntimeAgentConnectors, RuntimeAgentResponses
 
 
 def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
@@ -52,12 +52,31 @@ def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
     properties = parameters["properties"]
     assert isinstance(properties, dict)
     assert set(properties) == expected_properties
-    assert properties["fixed_interval"]["minimum"] == AUTOMATION_MIN_FIXED_INTERVAL
+    fixed_interval = properties["fixed_interval"]
+    assert isinstance(fixed_interval, dict)
+    assert fixed_interval["minimum"] == AUTOMATION_MIN_FIXED_INTERVAL
     assert parameters["required"] == ["input", "start_at"]
 
 
+def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
+    """One connector reference can advertise multiple model-facing tools."""
+    connectors = RuntimeAgentConnectors(Mock())
+    tools: list[JSONObject] = [
+        {"type": "function", "name": "example_search"},
+        {"type": "function", "name": "example_read"},
+    ]
+
+    with patch(
+        "flwr.supercore.task_process.agent.session.get_connector_tools",
+        return_value=tools,
+    ) as get_connector_tools:
+        assert connectors.tools(["example"]) == tools
+
+    get_connector_tools.assert_called_once_with("example")
+
+
 def test_call_automation_embeds_input_in_control_request() -> None:
-    """Embed model input in the Control request sent to ServerAppIo."""
+    """Embed model input in the Control request sent to the Runtime API."""
     # Prepare
     stub = Mock()
     stub.StartAutomation.return_value = StartAutomationResponse()

@@ -39,7 +39,7 @@ from flwr.common.constant import (
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
-    SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
+    SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
     EventLogWriterType,
@@ -81,7 +81,7 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import (
     get_client_tls_args,
-    try_obtain_optional_appio_server_certificates,
+    try_obtain_optional_runtime_server_certificates,
 )
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import get_popen_detach_kwargs
@@ -91,11 +91,11 @@ from flwr.superlink.config_loader import (
     SuperLinkLifespanConfig,
     get_federation_manager,
     get_objectstore_linkstate_factories,
-    load_control_auth_plugins,
+    load_control_authn_plugin,
     load_control_event_log_plugin,
 )
 from flwr.superlink.servicer.control import run_control_api_grpc
-from flwr.superlink.servicer.serverappio import run_serverappio_api_grpc
+from flwr.superlink.servicer.runtime import run_runtime_api_grpc
 
 try:
     from flwr.ee import (
@@ -140,7 +140,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self.superexec_process: subprocess.Popen[bytes] | None = None
         self.objectstore_factory = state_factory.objectstore_factory
         self.state_factory = state_factory
-        self._serverappio_server: grpc.Server | None = None
+        self._runtime_server: grpc.Server | None = None
         self._started = False
 
     def startup(self) -> None:
@@ -153,7 +153,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self.state_factory.state()
 
         self._start_control_api()
-        self._start_serverappio_api()
+        self._start_runtime_api()
         self._start_fleet_api()
         self._start_superexec_if_needed()
         self._start_health_server_if_needed()
@@ -183,7 +183,7 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
 
         self.grpc_servers.clear()
         self.superexec_process = None
-        self._serverappio_server = None
+        self._runtime_server = None
         self._started = False
 
     def wait_until_background_thread_exits(self) -> None:
@@ -204,24 +204,23 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             objectstore_factory=self.objectstore_factory,
             certificates=config.certificates,
             authn_plugin=config.authn_plugin,
-            authz_plugin=config.authz_plugin,
             event_log_plugin=config.event_log_plugin,
             artifact_provider=config.artifact_provider,
             fleet_api_type=config.fleet_api_type,
         )
         self.grpc_servers.append(control_server)
 
-    def _start_serverappio_api(self) -> None:
+    def _start_runtime_api(self) -> None:
         config = self.config
-        serverappio_server: grpc.Server = run_serverappio_api_grpc(
-            address=config.serverappio_address,
+        runtime_server: grpc.Server = run_runtime_api_grpc(
+            address=config.runtime_address,
             state_factory=self.state_factory,
             objectstore_factory=self.objectstore_factory,
-            certificates=config.appio_certificates,
+            certificates=config.runtime_certificates,
             superexec_auth_secret=config.superexec_auth_secret,
         )
-        self._serverappio_server = serverappio_server
-        self.grpc_servers.append(serverappio_server)
+        self._runtime_server = runtime_server
+        self.grpc_servers.append(runtime_server)
 
     def _start_fleet_api(self) -> None:
         config = self.config
@@ -278,14 +277,14 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         if config.isolation != ISOLATION_MODE_SUBPROCESS:
             return
 
-        if self._serverappio_server is None:
-            raise RuntimeError("ServerAppIo server is not started.")
+        if self._runtime_server is None:
+            raise RuntimeError("Runtime API server is not started.")
 
-        appio_address = resolve_bind_address(self._serverappio_server.bound_address)
+        runtime_address = resolve_bind_address(self._runtime_server.bound_address)
         command = _get_superexec_command(
-            appio_address=appio_address,
-            appio_certificates=config.appio_certificates,
-            appio_root_certificates_path=config.appio_ssl_ca_certfile,
+            runtime_address=runtime_address,
+            runtime_certificates=config.runtime_certificates,
+            runtime_root_certificates_path=config.runtime_ssl_ca_certfile,
             parent_pid=os.getpid(),
             runtime_dependency_install=config.runtime_dependency_install,
         )
@@ -361,14 +360,14 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         args.control_api_address = args.exec_api_address
 
     # Parse IP addresses
-    serverappio_address, _, _ = _format_address(args.serverappio_api_address)
+    runtime_address, _, _ = _format_address(args.runtime_api_address)
     control_address, _, _ = _format_address(args.control_api_address)
     health_server_address = None
     if args.health_server_address is not None:
         health_server_address, _, _ = _format_address(args.health_server_address)
 
     # Obtain certificates
-    certificates, appio_certificates = _obtain_superlink_certificates(args)
+    certificates, runtime_certificates = _obtain_superlink_certificates(args)
 
     # Load SuperExec auth secret
     superexec_auth_secret: bytes | None = None
@@ -397,25 +396,12 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
                     f"Failed to load SuperExec authentication secret: {err}",
                 )
 
-    # Disable the account auth TLS check if args.disable_oidc_tls_cert_verification is
-    # provided
-    verify_tls_cert = not getattr(args, "disable_oidc_tls_cert_verification", None)
-
-    event_log_plugin: EventLogWriterPlugin | None = None
-    # Load the auth plugin if the args.account_auth_config is provided
-    if cfg_path := getattr(args, "user_auth_config", None):
-        log(
-            WARN,
-            "The `--user-auth-config` flag is deprecated and will be removed in a "
-            "future release. Please use `--account-auth-config` instead.",
-        )
-        args.account_auth_config = cfg_path
-    cfg_path = getattr(args, "account_auth_config", None)
-    authn_plugin, authz_plugin = load_control_auth_plugins(cfg_path, verify_tls_cert)
-    if cfg_path is not None:
-        # Enable event logging if the args.enable_event_log is True
-        if args.enable_event_log:
-            event_log_plugin = load_control_event_log_plugin()
+    authn_plugin = load_control_authn_plugin()
+    event_log_plugin = (
+        load_control_event_log_plugin()
+        if getattr(args, "enable_event_log", False)
+        else None
+    )
 
     # Load artifact provider if the args.artifact_provider_config is provided
     artifact_provider = None
@@ -480,7 +466,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
 
     return SuperLinkLifespanConfig(
-        serverappio_address=serverappio_address,
+        runtime_address=runtime_address,
         control_address=control_address,
         health_server_address=health_server_address,
         enable_http_api=args.enable_http_api,
@@ -489,10 +475,9 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         port=args.port,
         insecure=args.insecure,
         certificates=certificates,
-        appio_certificates=appio_certificates,
+        runtime_certificates=runtime_certificates,
         superexec_auth_secret=superexec_auth_secret,
         authn_plugin=authn_plugin,
-        authz_plugin=authz_plugin,
         event_log_plugin=event_log_plugin,
         enable_event_log=getattr(args, "enable_event_log", False),
         artifact_provider=artifact_provider,
@@ -504,13 +489,13 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         ssl_certfile=args.ssl_certfile,
         database=args.database,
         isolation=args.isolation,
-        appio_ssl_ca_certfile=args.appio_ssl_ca_certfile,
+        runtime_ssl_ca_certfile=args.runtime_ssl_ca_certfile,
         runtime_dependency_install=args.runtime_dependency_install,
     )
 
 
 def flower_superlink() -> None:
-    """Run Flower SuperLink (ServerAppIo API and Fleet API)."""
+    """Run Flower SuperLink (Runtime API and Fleet API)."""
     warn_if_flwr_update_available(process_name="flower-superlink")
 
     config = _parse_superlink_lifespan_config()
@@ -597,7 +582,7 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
 
     # Uvicorn workers must stay at 1 while the lifespan starts gRPC servers. With
     # multiple workers, every worker process would try to bind the same Control,
-    # Fleet, and ServerAppIo ports.
+    # Fleet and Runtime API ports.
     uvicorn.run(
         app=fastapi_app,
         host=lifespan_config.host,
@@ -623,7 +608,7 @@ def _validate_http_api_args(args: argparse.Namespace) -> None:
 def _obtain_superlink_certificates(
     args: argparse.Namespace,
 ) -> tuple[tuple[bytes, bytes, bytes] | None, tuple[bytes, bytes, bytes] | None]:
-    """Return Fleet/Control and ServerAppIo certificate tuples."""
+    """Return Fleet/Control and Runtime API certificate tuples."""
     if args.insecure:
         log(
             WARN,
@@ -633,24 +618,24 @@ def _obtain_superlink_certificates(
         )
         return None, None
     certificates = try_obtain_server_certificates(args)
-    appio_certificates = try_obtain_optional_appio_server_certificates(args)
-    return certificates, appio_certificates
+    runtime_certificates = try_obtain_optional_runtime_server_certificates(args)
+    return certificates, runtime_certificates
 
 
 def _get_superexec_command(
-    appio_address: str,
-    appio_certificates: tuple[bytes, bytes, bytes] | None,
-    appio_root_certificates_path: str | None,
+    runtime_address: str,
+    runtime_certificates: tuple[bytes, bytes, bytes] | None,
+    runtime_root_certificates_path: str | None,
     parent_pid: int,
     runtime_dependency_install: bool,
 ) -> list[str]:
     """Return the auto-launched SuperExec command for ServerApp subprocesses."""
     command = ["flower-superexec"]
     command += get_client_tls_args(
-        insecure=appio_certificates is None,
-        root_certificates_path=appio_root_certificates_path,
+        insecure=runtime_certificates is None,
+        root_certificates_path=runtime_root_certificates_path,
     )
-    command += ["--appio-api-address", appio_address]
+    command += ["--appio-api-address", runtime_address]
     command += ["--plugin-type", ExecPluginType.SERVER_APP]
     command += ["--parent-pid", str(parent_pid)]
     if runtime_dependency_install:
@@ -751,7 +736,7 @@ def _run_fleet_api_grpc_adapter(
 
 
 def _parse_args_run_superlink() -> argparse.ArgumentParser:
-    """Parse command line arguments for both ServerAppIo API and Fleet API."""
+    """Parse command line arguments for both Runtime API and Fleet API."""
     parser = argparse.ArgumentParser(
         description="Start a Flower SuperLink",
     )
@@ -765,7 +750,7 @@ def _parse_args_run_superlink() -> argparse.ArgumentParser:
     _add_args_common(parser=parser)
     add_ee_args_superlink(parser=parser)
     _add_args_http_api(parser=parser)
-    _add_args_serverappio_api(parser=parser)
+    _add_args_runtime_api(parser=parser)
     _add_args_fleet_api(parser=parser)
     _add_args_control_api(parser=parser)
     add_args_health(parser=parser)
@@ -900,34 +885,37 @@ def _add_args_http_api(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:
+def _add_args_runtime_api(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--serverappio-api-address",
         "--simulationio-api-address",
-        dest="serverappio_api_address",
-        default=SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
-        help="ServerAppIo API (gRPC) server address (IPv4, IPv6, or a domain name). "
+        dest="runtime_api_address",
+        default=SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
+        help="Runtime API (gRPC) server address (IPv4, IPv6, or a domain name). "
         "`--simulationio-api-address` is accepted as a deprecated alias. "
-        f"By default, it is set to {SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS}.",
+        f"By default, it is set to {SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS}.",
     )
     parser.add_argument(
         "--appio-ssl-certfile",
-        help="ServerAppIo API server TLS certificate file (as a path str) "
+        dest="runtime_ssl_certfile",
+        help="Runtime API server TLS certificate file (as a path str) "
         "to create a secure connection. The certificate must include SANs for "
-        "the AppIO API address used by SuperExec.",
+        "the Runtime API address used by SuperExec.",
         type=str,
         default=None,
     )
     parser.add_argument(
         "--appio-ssl-keyfile",
-        help="ServerAppIo API server TLS private key file (as a path str) "
+        dest="runtime_ssl_keyfile",
+        help="Runtime API server TLS private key file (as a path str) "
         "to create a secure connection.",
         type=str,
     )
     parser.add_argument(
         "--appio-ssl-ca-certfile",
+        dest="runtime_ssl_ca_certfile",
         help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
-        "the ServerAppIo API server certificate. This is not a client certificate "
+        "the Runtime API server certificate. This is not a client certificate "
         "for mTLS.",
         type=str,
     )

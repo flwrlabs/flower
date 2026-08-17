@@ -130,6 +130,7 @@ from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     AUTOMATION_MAX_ACTIVE_PER_USER,
     AUTOMATION_MIN_FIXED_INTERVAL,
+    AUTOMATION_MIN_START_DELAY,
     DEFAULT_FEDERATION_SIMULATION,
     FLWR_SUPERGRID_API_URL,
     NOOP_FEDERATION_ID,
@@ -167,10 +168,11 @@ from flwr.superlink.federation.noop_federation_manager import NoOpFederationMana
 class InvalidConnectorRequestError(FlowerError):
     """Exception raised when a connector request is invalid."""
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, public_details: str | None = None) -> None:
         super().__init__(
             ApiErrorCode.INVALID_CONNECTOR_REQUEST,
             f"Invalid connector request: {reason}.",
+            public_details=public_details,
         )
 
 
@@ -188,16 +190,16 @@ def list_connectors(
     account: AccountInfo,
     state: LinkState,
 ) -> ListConnectorsResponse:
-    """List user-connectable OAuth providers and account connection status."""
+    """List user-connectable OAuth connectors and account connection status."""
     log(INFO, "ControlServicer.ListConnectors")
     _ = request
 
     connectors: list[Connector] = []
-    for provider in sorted(
-        connector_registry.OAUTH_CONNECTOR_PROVIDERS,
+    for flow in sorted(
+        connector_registry.OAUTH_FLOWS.values(),
         key=lambda item: item.connector_ref,
     ):
-        connector_ref = provider.connector_ref
+        connector_ref = flow.connector_ref
         connected = (
             state.get_connector(flwr_aid=account.flwr_aid, connector_ref=connector_ref)
             is not None
@@ -205,8 +207,8 @@ def list_connectors(
         connectors.append(
             Connector(
                 connector_ref=connector_ref,
-                display_name=provider.display_name,
-                description=provider.description,
+                display_name=flow.display_name,
+                description=flow.description,
                 connected=connected,
             )
         )
@@ -224,11 +226,11 @@ def disconnect_connector(
     if not connector_ref:
         raise InvalidConnectorRequestError("connector_ref is required")
     try:
-        connector_registry.get_oauth_connector_provider(connector_ref)
+        connector_registry.get_oauth_flow(connector_ref)
     except ValueError:
         raise FlowerError(
             ApiErrorCode.CONNECTOR_NOT_FOUND,
-            f"OAuth provider for connector '{connector_ref}' was not found.",
+            f"OAuth flow for connector '{connector_ref}' was not found.",
         ) from None
 
     deleted = state.delete_connector(
@@ -256,19 +258,19 @@ def begin_connector_oauth(
     if not redirect_uri:
         raise InvalidConnectorRequestError("redirect_uri is required")
     try:
-        provider = connector_registry.get_oauth_connector_provider(connector_ref)
+        flow = connector_registry.get_oauth_flow(connector_ref)
     except ValueError:
         raise FlowerError(
             ApiErrorCode.CONNECTOR_NOT_FOUND,
-            f"OAuth provider for connector '{connector_ref}' was not found.",
+            f"OAuth flow for connector '{connector_ref}' was not found.",
         ) from None
     try:
-        redirect_uri = provider.resolve_redirect_uri(redirect_uri)
+        redirect_uri = flow.resolve_redirect_uri(redirect_uri)
     except ValueError as err:
         raise InvalidConnectorRequestError(
             "redirect_uri is not allowed for this connector"
         ) from err
-    # Provider implementations can raise arbitrary exceptions; sanitize them.
+    # OAuth flows can raise arbitrary exceptions; sanitize them.
     except Exception as err:  # pylint: disable=broad-exception-caught
         raise ConnectorFailureError(
             f"Connector '{connector_ref}' failed to resolve redirect URI "
@@ -287,12 +289,12 @@ def begin_connector_oauth(
     pkce_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
     expires_at = now() + OAUTH_SESSION_TTL
     try:
-        authorization_url = provider.build_authorization_url(
+        authorization_url = flow.build_authorization_url(
             redirect_uri=redirect_uri,
             state=oauth_state,
             pkce_challenge=pkce_challenge,
         )
-    # Provider implementations can raise arbitrary exceptions; sanitize them.
+    # OAuth flows can raise arbitrary exceptions; sanitize them.
     except Exception as err:  # pylint: disable=broad-exception-caught
         raise ConnectorFailureError(
             f"Connector '{connector_ref}' failed to build authorization URL "
@@ -369,11 +371,11 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
 
     connector_ref = session.connector_ref.strip().lower()
     try:
-        provider = connector_registry.get_oauth_connector_provider(connector_ref)
+        flow = connector_registry.get_oauth_flow(connector_ref)
     except ValueError:
         raise FlowerError(
             ApiErrorCode.CONNECTOR_NOT_FOUND,
-            f"OAuth provider for connector '{connector_ref}' was not found.",
+            f"OAuth flow for connector '{connector_ref}' was not found.",
         ) from None
     claimed = state.complete_connector_oauth_session(
         oauth_session_id=session.oauth_session_id,
@@ -386,12 +388,12 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals
         )
 
     try:
-        credentials, config = provider.exchange_code(
+        credentials, config = flow.exchange_code(
             code=authorization_code,
             redirect_uri=session.redirect_uri,
             pkce_verifier=session.pkce_verifier,
         )
-    # Provider implementations can raise arbitrary exceptions; sanitize them.
+    # OAuth flows can raise arbitrary exceptions; sanitize them.
     except Exception as err:  # pylint: disable=broad-exception-caught
         raise ConnectorFailureError(
             f"Connector '{connector_ref}' failed to exchange authorization code "
@@ -430,11 +432,11 @@ def validate_run_connector_refs(
         raise InvalidConnectorRequestError("connector_ref is required")
     for connector_ref in canonical_refs:
         try:
-            connector_registry.get_oauth_connector_provider(connector_ref)
+            connector_registry.get_oauth_flow(connector_ref)
         except ValueError:
             raise FlowerError(
                 ApiErrorCode.CONNECTOR_NOT_FOUND,
-                f"OAuth provider for connector '{connector_ref}' was not found.",
+                f"OAuth flow for connector '{connector_ref}' was not found.",
             ) from None
         connector = state.get_connector(account.flwr_aid, connector_ref)
         if connector is None:
@@ -510,6 +512,17 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             f"Account with ID '{flwr_aid}' is not a member of the "
             f"federation '{federation_id}'.",
         )
+
+    if connector_refs:
+        federation = state.federation_manager.get_details(federation_id)
+        if federation.can_invite_members or federation.can_add_supernodes:
+            raise InvalidConnectorRequestError(
+                "connector refs are not supported for this federation",
+                public_details=(
+                    "Connectors are currently available only in your personal "
+                    "workspace."
+                ),
+            )
 
     try:
         # Validate user config overrides matches keys in run config in FAB
@@ -729,23 +742,42 @@ def start_automation(  # pylint: disable=too-many-locals
         )
 
     # Resolve the first scheduled run time.
-    if request.HasField("start_at"):
-        try:
-            start_at = datetime.fromisoformat(request.start_at)
-            if start_at.tzinfo is None:
-                raise ValueError("Timezone is required.")
-            next_run_at = start_at.astimezone(UTC).isoformat()
-        except ValueError as e:
-            raise FlowerError(
-                ApiErrorCode.INVALID_AUTOMATION_REQUEST,
-                f"Invalid automation start_at value: {request.start_at}",
-                public_details=(
-                    "The automation start_at value must be a valid ISO 8601 "
-                    "timestamp with a timezone."
-                ),
-            ) from e
-    else:
-        next_run_at = now().isoformat()
+    if not request.HasField("start_at"):
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "Automation start_at is required and must be at least "
+            f"{AUTOMATION_MIN_START_DELAY} seconds in the future.",
+            public_details=(
+                "The automation start_at value must be at least "
+                f"{AUTOMATION_MIN_START_DELAY // 60} minutes in the future."
+            ),
+        )
+    try:
+        start_at = datetime.fromisoformat(request.start_at)
+        if start_at.tzinfo is None:
+            raise ValueError("Timezone is required.")
+    except ValueError as e:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            f"Invalid automation start_at value: {request.start_at}",
+            public_details=(
+                "The automation start_at value must be a valid ISO 8601 "
+                "timestamp with a timezone."
+            ),
+        ) from e
+    start_at = start_at.astimezone(UTC)
+    earliest_start_at = now() + timedelta(seconds=AUTOMATION_MIN_START_DELAY)
+    if start_at < earliest_start_at:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "Automation start_at must be at least "
+            f"{AUTOMATION_MIN_START_DELAY} seconds in the future: {request.start_at}",
+            public_details=(
+                "The automation start_at value must be at least "
+                f"{AUTOMATION_MIN_START_DELAY // 60} minutes in the future."
+            ),
+        )
+    next_run_at = start_at.isoformat()
 
     # Resolve recurrence settings and the default one-shot behavior.
     fixed_interval = (
@@ -1305,6 +1337,8 @@ def list_federations(
                 description=fed.description,
                 archived=fed.archived,
                 simulation=fed.simulation,
+                can_invite_members=fed.can_invite_members,
+                can_add_supernodes=fed.can_add_supernodes,
             )
             for fed in federations
         ]
@@ -1341,6 +1375,8 @@ def show_federation(
         archived=details.archived,
         simulation=details.simulation,
         config=details.config,
+        can_invite_members=details.can_invite_members,
+        can_add_supernodes=details.can_add_supernodes,
     )
     return ShowFederationResponse(federation=federation_proto, now=now().isoformat())
 
@@ -1395,6 +1431,8 @@ def create_federation(
             description=federation.description,
             members=federation.members,
             simulation=federation.simulation,
+            can_invite_members=federation.can_invite_members,
+            can_add_supernodes=federation.can_add_supernodes,
         )
     )
 

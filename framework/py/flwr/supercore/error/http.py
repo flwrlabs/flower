@@ -29,6 +29,18 @@ from .base import FlowerError
 from .catalog import API_ERROR_MAP
 
 INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error."
+NOT_AUTHENTICATED_DETAIL = "Not authenticated"
+
+
+class BearerAuthenticationError(HTTPException):
+    """Represent failed HTTP Bearer authentication."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=NOT_AUTHENTICATED_DETAIL,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 async def http_error_translator(
@@ -49,9 +61,11 @@ async def http_error_translator(
             error_spec = API_ERROR_MAP[err.code]
             http_status = error_spec.http_status_code
             public_message = error_spec.public_message
+            http_headers = error_spec.http_headers
         except (ValueError, KeyError):
             http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
             public_message = INTERNAL_SERVER_ERROR_MESSAGE
+            http_headers = None
 
         # Log error as is
         msg = f"[{request.url.path}][ApiError:{err.code}] {err.message}"
@@ -60,6 +74,7 @@ async def http_error_translator(
         return Response(
             status_code=http_status,
             content=err.to_json(public_message),
+            headers=http_headers,
             media_type="application/json",
         )
     except HTTPException as err:

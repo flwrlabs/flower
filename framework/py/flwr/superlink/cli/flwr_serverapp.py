@@ -20,7 +20,7 @@ from logging import DEBUG, INFO
 from queue import Queue
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+from flwr.common.constant import SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
 from flwr.common.logger import log, mirror_output_to_queue, restore_output
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.superlink.runtime import run_serverapp
@@ -38,12 +38,11 @@ def flwr_serverapp() -> None:
     log(INFO, "Start `flwr-serverapp` process")
     log(
         DEBUG,
-        "`flwr-serverapp` will attempt to connect to SuperLink's "
-        "ServerAppIo API at %s",
-        args.serverappio_api_address,
+        "`flwr-serverapp` will attempt to connect to SuperLink's Runtime API at %s",
+        args.runtime_api_address,
     )
     run_serverapp(
-        serverappio_api_address=args.serverappio_api_address,
+        runtime_api_address=args.runtime_api_address,
         log_queue=log_queue,
         token=token,
         insecure=args.insecure,
@@ -65,10 +64,11 @@ def _parse_args_run_flwr_serverapp() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--serverappio-api-address",
-        default=SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        dest="runtime_api_address",
+        default=SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
         type=str,
-        help="Address of SuperLink's ServerAppIo API (IPv4, IPv6, or a domain name)."
-        f"By default, it is set to {SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
+        help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name)."
+        f"By default, it is set to {SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS}.",
     )
     add_args_flwr_app_common(parser=parser)
     return parser

@@ -41,7 +41,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message.
 
-        Usually, the ServerAppIo API calls this to schedule instructions.
+        Usually, the Runtime API calls this to schedule instructions.
 
         Stores the value of the `message` in the link state and, if successful,
         returns the `message_id` (str) of the `message`. If, for any reason,
@@ -91,7 +91,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
     def get_message_res(self, message_ids: set[str]) -> list[Message]:
         """Get reply Messages for the given Message IDs.
 
-        This method is typically called by the ServerAppIo API to obtain
+        This method is typically called by the Runtime API to obtain
         results (type Message) for previously scheduled instructions (type Message).
         For each message_id passed, this method returns one of the following responses:
 

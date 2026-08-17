@@ -30,9 +30,8 @@ from flwr.common.constant import (
 )
 
 # pylint: disable=E0611
-from flwr.proto.appio_pb2 import SendTaskHeartbeatRequest
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.proto.runtime_pb2 import SendTaskHeartbeatRequest
+from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.retry import RetryInvoker, exponential
 
 # pylint: enable=E0611
@@ -119,13 +118,13 @@ class HeartbeatSender:
 
 
 def make_task_heartbeat_fn_grpc(
-    stub: ServerAppIoStub | ClientAppIoStub,
+    stub: RuntimeStub,
 ) -> Callable[[], bool]:
     """Get the function to send a heartbeat to gRPC endpoint from a task executor.
 
     Parameters
     ----------
-    stub : ServerAppIoStub | ClientAppIoStub
+    stub : RuntimeStub
         gRPC stub to send the heartbeat.
 
     Returns
@@ -137,7 +136,7 @@ def make_task_heartbeat_fn_grpc(
     req = SendTaskHeartbeatRequest()
 
     def fn() -> bool:
-        # Call ServerAppIo API
+        # Call Runtime API
         try:
             res = stub.SendTaskHeartbeat(req)
         except grpc.RpcError as e:

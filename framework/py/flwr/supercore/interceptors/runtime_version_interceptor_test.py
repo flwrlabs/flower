@@ -24,7 +24,7 @@ from unittest.mock import Mock, patch
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.proto.appio_pb2 import GetNodesRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
     FLWR_PACKAGE_NAME_METADATA_KEY,
@@ -36,10 +36,10 @@ from flwr.supercore.exit import ExitCode
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
-    create_clientappio_runtime_version_server_interceptor,
     create_control_runtime_version_server_interceptor,
     create_fleet_runtime_version_server_interceptor,
-    create_serverappio_runtime_version_server_interceptor,
+    create_superlink_runtime_version_server_interceptor,
+    create_supernode_runtime_version_server_interceptor,
 )
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 
@@ -151,7 +151,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
     def test_attach_runtime_version_headers(self) -> None:
         """The interceptor should add the shared version metadata keys."""
         details = _make_call_details(
-            "/flwr.proto.ServerAppIo/GetNodes",
+            "/flwr.proto.Runtime/GetNodes",
             (("x-test", "value"),),
         )
         captured: dict[str, list[tuple[str, str | bytes]]] = {}
@@ -182,7 +182,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
     ) -> None:
         """Fail fast when runtime-version keys are already present outbound."""
         details = _make_call_details(
-            "/flwr.proto.ServerAppIo/GetNodes",
+            "/flwr.proto.Runtime/GetNodes",
             ((FLWR_PACKAGE_NAME_METADATA_KEY, "old"), ("x-test", "value")),
         )
         with self.assertRaisesRegex(
@@ -204,9 +204,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
         ) as flwr_exit_mock:
             response = self.interceptor.intercept_unary_unary(
                 continuation=lambda _details, _request: rpc_error,
-                client_call_details=_make_call_details(
-                    "/flwr.proto.ServerAppIo/GetNodes"
-                ),
+                client_call_details=_make_call_details("/flwr.proto.Runtime/GetNodes"),
                 request=GetNodesRequest(),
             )
 
@@ -235,9 +233,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
         ):
             self.interceptor.intercept_unary_unary(
                 continuation=continuation,
-                client_call_details=_make_call_details(
-                    "/flwr.proto.ServerAppIo/GetNodes"
-                ),
+                client_call_details=_make_call_details("/flwr.proto.Runtime/GetNodes"),
                 request=GetNodesRequest(),
             )
 
@@ -264,9 +260,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
         ):
             self.interceptor.intercept_unary_unary(
                 continuation=continuation,
-                client_call_details=_make_call_details(
-                    "/flwr.proto.ServerAppIo/GetNodes"
-                ),
+                client_call_details=_make_call_details("/flwr.proto.Runtime/GetNodes"),
                 request=GetNodesRequest(),
             )
 
@@ -280,7 +274,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
     def setUp(self) -> None:
         """Create a baseline interceptor for each test."""
         self.interceptor = RuntimeVersionServerInterceptor(
-            connection_name="flwr-simulation <-> SuperLink ServerAppIo API",
+            connection_name="flwr-simulation <-> SuperLink Runtime API",
             local_metadata=RuntimeVersionMetadata.from_local_component(
                 "SuperLink",
                 package_name_value="flwr",
@@ -304,7 +298,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
     def test_missing_metadata_is_tolerated(self) -> None:
         """Missing runtime metadata should pass during rollout."""
         intercepted = self._intercept(
-            "/flwr.proto.ServerAppIo/GetNodes",
+            "/flwr.proto.Runtime/GetNodes",
             (),
         )
 
@@ -316,7 +310,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
     def test_unparseable_peer_version_is_warned(self) -> None:
         """Explicit unparseable peer versions should set trailing metadata."""
         intercepted = self._intercept(
-            "/flwr.proto.ServerAppIo/GetNodes",
+            "/flwr.proto.Runtime/GetNodes",
             _make_runtime_metadata("main"),
         )
 
@@ -328,7 +322,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
     def test_incompatible_metadata_is_warned(self) -> None:
         """Different major.minor versions should set trailing metadata."""
         intercepted = self._intercept(
-            "/flwr.proto.ServerAppIo/GetNodes",
+            "/flwr.proto.Runtime/GetNodes",
             _make_runtime_metadata("1.30.1"),
         )
 
@@ -347,7 +341,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
     def test_package_name_mismatch_preserves_warning_details(self) -> None:
         """Non-version incompatibilities should preserve diagnostic details."""
         intercepted = self._intercept(
-            "/flwr.proto.ServerAppIo/GetNodes",
+            "/flwr.proto.Runtime/GetNodes",
             _make_runtime_metadata_with_package("custom-flwr", "1.29.0"),
         )
 
@@ -364,7 +358,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
     def test_incompatible_metadata_is_rejected(self) -> None:
         """Reject mode should abort with a structured FlowerError."""
         self.interceptor = RuntimeVersionServerInterceptor(
-            connection_name="flwr-simulation <-> SuperLink ServerAppIo API",
+            connection_name="flwr-simulation <-> SuperLink Runtime API",
             local_metadata=RuntimeVersionMetadata.from_local_component(
                 "SuperLink",
                 package_name_value="flwr",
@@ -373,7 +367,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             reject_incompatible=True,
         )
         intercepted = self._intercept(
-            "/flwr.proto.ServerAppIo/GetNodes",
+            "/flwr.proto.Runtime/GetNodes",
             _make_runtime_metadata("1.30.1"),
         )
         context = Mock(spec=grpc.ServicerContext)
@@ -396,14 +390,14 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             "simulation version 1.30.1.",
         )
 
-    def test_serverappio_factory_rejects_incompatible_by_default(self) -> None:
-        """ServerAppIo factory should reject different major.minor by default."""
-        interceptor = create_serverappio_runtime_version_server_interceptor()
+    def test_superlink_runtime_factory_rejects_incompatible_by_default(self) -> None:
+        """SuperLink Runtime factory should reject different major.minor."""
+        interceptor = create_superlink_runtime_version_server_interceptor()
         self.assertTrue(interceptor._reject_incompatible)  # pylint: disable=W0212
 
-    def test_clientappio_factory_rejects_incompatible_by_default(self) -> None:
-        """ClientAppIo factory should reject different major.minor by default."""
-        interceptor = create_clientappio_runtime_version_server_interceptor()
+    def test_supernode_runtime_factory_rejects_incompatible_by_default(self) -> None:
+        """SuperNode Runtime factory should reject different major.minor."""
+        interceptor = create_supernode_runtime_version_server_interceptor()
         self.assertTrue(interceptor._reject_incompatible)  # pylint: disable=W0212
 
     def test_fleet_factory_observes_by_default(self) -> None:
@@ -436,7 +430,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         """Compatible peer version should not set trailing metadata for unary
         handlers."""
         intercepted = self._intercept(
-            "/flwr.proto.ServerAppIo/GetNodes",
+            "/flwr.proto.Runtime/GetNodes",
             _make_runtime_metadata("1.29.7"),
         )
 
@@ -449,7 +443,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         """Incompatible peer version should set trailing metadata for stream
         handlers."""
         intercepted = self._intercept(
-            "/flwr.proto.ServerAppIo/PullTaskIns",
+            "/flwr.proto.Runtime/PullTaskIns",
             _make_runtime_metadata("1.30.1"),
             stream=True,
         )
@@ -463,7 +457,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         """Compatible peer version should not set trailing metadata for stream
         handlers."""
         intercepted = self._intercept(
-            "/flwr.proto.ServerAppIo/PullTaskIns",
+            "/flwr.proto.Runtime/PullTaskIns",
             _make_runtime_metadata("1.29.7"),
             stream=True,
         )

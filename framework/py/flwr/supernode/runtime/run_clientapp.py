@@ -35,7 +35,8 @@ from flwr.common.serde import (
     message_to_proto,
     run_from_proto,
 )
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -43,8 +44,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesRequest,
     PushTaskOutputRequest,
 )
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.fab import Fab
@@ -65,7 +65,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     push_objects,
 )
 from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
@@ -79,7 +79,7 @@ from flwr.supercore.telemetry import EventType, event
 
 
 def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
-    clientappio_api_address: str,
+    runtime_api_address: str,
     token: str,
     insecure: bool,
     certificates: bytes | None = None,
@@ -94,16 +94,16 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     event(EventType.FLWR_CLIENTAPP_RUN_ENTER)
 
     channel = create_channel(
-        server_address=clientappio_api_address,
+        server_address=runtime_api_address,
         insecure=insecure,
         root_certificates=certificates,
         interceptors=[
             RuntimeVersionClientInterceptor(component_name="flwr-clientapp"),
-            AppIoTokenClientInterceptor(token),
+            RuntimeTokenClientInterceptor(token),
         ],
     )
     channel.subscribe(on_channel_state_change)
-    stub = ClientAppIoStub(channel)
+    stub = RuntimeStub(channel)
     retry_invoker = make_simple_grpc_retry_invoker()
     wrap_stub(stub, retry_invoker)
 
@@ -234,7 +234,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     )
 
 
-def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
+def pull_task_input(stub: RuntimeStub) -> tuple[Message, Context, Run, Fab]:
     """Pull TaskInput from SuperNode."""
     # Pull Context, Run and FAB
     res: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
@@ -244,6 +244,8 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
 
     # Pull and inflate the message
     pull_msg_res: PullAppMessagesResponse = stub.PullMessages(PullAppMessagesRequest())
+    if not pull_msg_res.messages_list:
+        raise RuntimeError("No messages received from Runtime API")
     run_id = context.run_id
     node = Node(node_id=context.node_id)
     object_tree = pull_msg_res.message_object_trees[0]
@@ -262,7 +264,7 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
     return message, context, run, fab
 
 
-def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> None:
+def push_message(stub: RuntimeStub, message: Message, context: Context) -> None:
     """Push reply message to SuperNode."""
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
@@ -300,7 +302,7 @@ def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> N
 
 
 def push_task_output(  # pylint: disable=R0913, R0917
-    stub: ClientAppIoStub,
+    stub: RuntimeStub,
     context: Context | None,
     sub_status: str,
     details: str,

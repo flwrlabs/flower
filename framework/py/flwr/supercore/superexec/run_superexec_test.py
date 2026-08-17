@@ -62,7 +62,7 @@ def _run_superexec_one_launch(
         run_superexec_module.run_superexec(
             plugin_class=Mock(return_value=plugin),
             stub_class=Mock(return_value=stub),
-            appio_api_address="127.0.0.1:9091",
+            runtime_api_address="127.0.0.1:9091",
             insecure=True,
         )
 
@@ -84,7 +84,7 @@ def test_run_superexec_adds_runtime_version_interceptor(
     superexec_auth_secret: bytes | None,
     expected_interceptor_types: tuple[type[object], ...],
 ) -> None:
-    """SuperExec should attach runtime version metadata to AppIO calls."""
+    """SuperExec should attach runtime version metadata to Runtime API calls."""
     channel = Mock()
     stub = Mock()
     stub.PullPendingTasks.side_effect = KeyboardInterrupt()
@@ -102,7 +102,7 @@ def test_run_superexec_adds_runtime_version_interceptor(
         run_superexec_module.run_superexec(
             plugin_class=Mock(),
             stub_class=Mock(return_value=stub),
-            appio_api_address="127.0.0.1:9091",
+            runtime_api_address="127.0.0.1:9091",
             insecure=True,
             superexec_auth_secret=superexec_auth_secret,
         )
@@ -136,7 +136,7 @@ def test_run_superexec_passes_executor_config_to_factory(
         run_superexec_module.run_superexec(
             plugin_class=Mock(),
             stub_class=Mock(return_value=stub),
-            appio_api_address="127.0.0.1:9091",
+            runtime_api_address="127.0.0.1:9091",
             insecure=True,
             executor_type=ExecutorType.KUBERNETES,
             executor_config=executor_config,

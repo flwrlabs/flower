@@ -116,8 +116,8 @@ from .control_handlers import (
 from .control_servicer import ControlServicer
 
 
-class _OAuthProvider:
-    """Minimal OAuth provider for Control servicer tests."""
+class _OAuthFlow:
+    """Minimal OAuth flow for Control servicer tests."""
 
     connector_ref = "slack"
     display_name = "Slack"
@@ -187,7 +187,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
             ),
             objectstore_factory=objectstore_factory,
-            authn_plugin=(authn_plugin := NoOpControlAuthnPlugin(Mock(), False)),
+            authn_plugin=(authn_plugin := NoOpControlAuthnPlugin()),
         )
         account_info = authn_plugin.validate_tokens_in_metadata([])[1]
         assert account_info is not None
@@ -245,8 +245,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_connector_oauth_flow(self) -> None:
         """Begin and complete a single-use OAuth flow."""
-        provider = _OAuthProvider()
-        with patch.object(connector_registry, "OAUTH_CONNECTOR_PROVIDERS", (provider,)):
+        flow = _OAuthFlow()
+        with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
             oauth_session_id, oauth_state = self._begin_connector_oauth()
             request = CompleteConnectorOAuthRequest(
                 oauth_session_id=oauth_session_id,
@@ -265,7 +265,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 json.loads(connector.credentials_json),
                 {"access_token": "access-secret"},
             )
-            self.assertEqual(provider.exchanged_codes, ["authorization-code"])
+            self.assertEqual(flow.exchanged_codes, ["authorization-code"])
 
             with self.assertRaises(FlowerError) as exc_info:
                 self.servicer.CompleteConnectorOAuth(request, Mock())
@@ -275,7 +275,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_list_and_disconnect_connectors_are_account_scoped(self) -> None:
         """List and disconnect only the authenticated account's connector."""
-        provider = _OAuthProvider()
+        flow = _OAuthFlow()
         for flwr_aid in (self.aid, "other-account"):
             self.assertTrue(
                 self.state.upsert_connector(
@@ -286,7 +286,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 )
             )
 
-        with patch.object(connector_registry, "OAUTH_CONNECTOR_PROVIDERS", (provider,)):
+        with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
             response = self.servicer.ListConnectors(ListConnectorsRequest(), Mock())
             self.assertEqual(len(response.connectors), 1)
             self.assertTrue(response.connectors[0].connected)
@@ -304,8 +304,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_connector_oauth_rejects_invalid_or_expired_session(self) -> None:
         """Reject invalid state and expired OAuth sessions before exchange."""
-        provider = _OAuthProvider()
-        with patch.object(connector_registry, "OAUTH_CONNECTOR_PROVIDERS", (provider,)):
+        flow = _OAuthFlow()
+        with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
             oauth_session_id, _ = self._begin_connector_oauth()
             with self.assertRaises(FlowerError) as invalid_state:
                 self.servicer.CompleteConnectorOAuth(
@@ -343,13 +343,13 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             expired_session.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST
         )
-        self.assertEqual(provider.exchanged_codes, [])
+        self.assertEqual(flow.exchanged_codes, [])
 
-    def test_connector_oauth_provider_failure_is_sanitized(self) -> None:
-        """Hide authorization codes from provider failure errors."""
-        provider = _OAuthProvider(fail_exchange=True)
+    def test_connector_oauth_flow_failure_is_sanitized(self) -> None:
+        """Hide authorization codes from OAuth flow failure errors."""
+        flow = _OAuthFlow(fail_exchange=True)
         sensitive_code = "sensitive-authorization-code"
-        with patch.object(connector_registry, "OAUTH_CONNECTOR_PROVIDERS", (provider,)):
+        with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
             oauth_session_id, oauth_state = self._begin_connector_oauth()
             with self.assertRaises(FlowerError) as exc_info:
                 self.servicer.CompleteConnectorOAuth(
@@ -408,7 +408,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
         """StartRun should bind canonical connected OAuth connector refs."""
-        provider = _OAuthProvider()
+        flow = _OAuthFlow()
         self.state.upsert_connector(
             flwr_aid=self.aid,
             connector_ref="slack",
@@ -424,8 +424,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         with (
             patch.object(
                 connector_registry,
-                "OAUTH_CONNECTOR_PROVIDERS",
-                (provider,),
+                "OAUTH_FLOWS",
+                {"slack": flow},
             ),
             patch(
                 "flwr.superlink.servicer.control.control_handlers.get_fab_config",
@@ -446,6 +446,55 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
     @parameterized.expand(  # type: ignore
         [
+            (True, False),
+            (False, True),
+            (True, True),
+        ]
+    )
+    def test_start_run_rejects_connectors_for_capable_federation(
+        self,
+        can_invite_members: bool,
+        can_add_supernodes: bool,
+    ) -> None:
+        """StartRun should restrict connectors to personal-style federations."""
+        self.state.upsert_connector(
+            flwr_aid=self.aid,
+            connector_ref="slack",
+            credentials_json="{}",
+            config_json="{}",
+        )
+        request = StartRunRequest(
+            federation=NOOP_FEDERATION_ID,
+            connector_refs=["slack"],
+        )
+
+        with (
+            patch.object(
+                connector_registry,
+                "OAUTH_FLOWS",
+                {"slack": _OAuthFlow()},
+            ),
+            patch.object(
+                self.state.federation_manager,
+                "get_details",
+                return_value=SimpleNamespace(
+                    can_invite_members=can_invite_members,
+                    can_add_supernodes=can_add_supernodes,
+                ),
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            self.servicer.StartRun(request, Mock())
+
+        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST)
+        self.assertEqual(
+            error.exception.public_details,
+            "Connectors are currently available only in your personal workspace.",
+        )
+        self.assertEqual(list(self.state.get_run_info()), [])
+
+    @parameterized.expand(  # type: ignore
+        [
             ("unknown", "unknown", ApiErrorCode.CONNECTOR_NOT_FOUND),
             ("empty", "  ", ApiErrorCode.INVALID_CONNECTOR_REQUEST),
             ("other_account", "slack", ApiErrorCode.CONNECTOR_NOT_FOUND),
@@ -458,7 +507,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         expected_code: ApiErrorCode,
     ) -> None:
         """StartRun should reject invalid, unknown, and other-account refs."""
-        provider = _OAuthProvider()
+        flow = _OAuthFlow()
         if connector_ref == "slack":
             self.state.upsert_connector(
                 flwr_aid="other-account",
@@ -471,8 +520,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         with (
             patch.object(
                 connector_registry,
-                "OAUTH_CONNECTOR_PROVIDERS",
-                (provider,),
+                "OAUTH_FLOWS",
+                {"slack": flow},
             ),
             self.assertRaises(FlowerError) as error,
         ):
@@ -1170,6 +1219,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(response.federation.name, NOOP_FEDERATION_ID)
         self.assertFalse(response.federation.simulation)
+        self.assertFalse(response.federation.can_invite_members)
+        self.assertFalse(response.federation.can_add_supernodes)
 
     def test_list_federations_includes_simulation_flag(self) -> None:
         """Test ListFederations surfaces the federation simulation flag."""
@@ -1181,7 +1232,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 objectstore_factory,
             ),
             objectstore_factory=objectstore_factory,
-            authn_plugin=NoOpControlAuthnPlugin(Mock(), False),
+            authn_plugin=NoOpControlAuthnPlugin(),
         )
 
         response: ListFederationsResponse = servicer.ListFederations(
@@ -1190,6 +1241,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(len(response.federations), 1)
         self.assertTrue(response.federations[0].simulation)
+        self.assertFalse(response.federations[0].can_invite_members)
+        self.assertFalse(response.federations[0].can_add_supernodes)
 
     def test_create_federation_success(self) -> None:
         """Test CreateFederation succeeds when federation_manager.create_federation
@@ -1211,6 +1264,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             description=description,
             members=mock_members,
             simulation=True,
+            can_invite_members=True,
+            can_add_supernodes=True,
         )
         manager_calls = Mock()
 
@@ -1261,6 +1316,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(response.federation.members[0].account.id, self.aid)
         self.assertEqual(response.federation.members[0].role, "owner")
         self.assertTrue(response.federation.simulation)
+        self.assertTrue(response.federation.can_invite_members)
+        self.assertTrue(response.federation.can_add_supernodes)
 
     def test_create_federation_fails_on_manager_error(self) -> None:
         """Test CreateFederation raises when federation_manager.create_federation
@@ -1896,7 +1953,7 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
                 FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
             ),
             objectstore_factory=objectstore_factory,
-            authn_plugin=(authn_plugin := NoOpControlAuthnPlugin(Mock(), False)),
+            authn_plugin=(authn_plugin := NoOpControlAuthnPlugin()),
         )
         account_info = authn_plugin.validate_tokens_in_metadata([])[1]
         assert account_info is not None

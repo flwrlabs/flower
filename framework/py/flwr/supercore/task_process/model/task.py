@@ -21,12 +21,12 @@ import time
 from typing import cast
 
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
 )
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.task_process.usage import TaskUsageRecorder
@@ -38,7 +38,7 @@ from .provider import ModelProviderError, invoke_model_provider
 _DEFAULT_TASK_EVENT_BATCH_SIZE = 16
 
 
-def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
+def handle_task(stub: RuntimeStub, task_id: int, run_id: int) -> None:
     """Run one model task request."""
     request_message = _pull_model_request(stub)
     is_stream = request_message.payload.get("stream") is True
@@ -94,7 +94,7 @@ def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
             _push_model_response(response)
 
 
-def _pull_model_request(stub: ServerAppIoStub) -> ModelRequest:
+def _pull_model_request(stub: RuntimeStub) -> ModelRequest:
     """Pull one model request, waiting until it becomes available."""
     # Keep polling until flwr-agentapp produces a request. If it exits, cleanup
     # forces flwr-model to stop, with auth handling revoked tokens.

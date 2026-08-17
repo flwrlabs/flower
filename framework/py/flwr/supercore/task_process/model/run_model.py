@@ -23,18 +23,18 @@ import grpc
 
 from flwr.common.constant import SubStatus
 from flwr.common.logger import log
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushTaskOutputRequest,
 )
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 from flwr.supercore.retry import RetryInvoker, make_simple_grpc_retry_invoker, wrap_stub
@@ -44,7 +44,7 @@ from .task import handle_task
 
 
 def run_model(  # pylint: disable=too-many-locals
-    serverappio_api_address: str,
+    runtime_api_address: str,
     token: str,
     insecure: bool,
     certificates: bytes | None = None,
@@ -55,8 +55,8 @@ def run_model(  # pylint: disable=too-many-locals
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
 
-    channel, stub, retry_invoker = _create_serverappio_stub(
-        serverappio_api_address=serverappio_api_address,
+    channel, stub, retry_invoker = _create_runtime_stub(
+        runtime_api_address=runtime_api_address,
         token=token,
         insecure=insecure,
         certificates=certificates,
@@ -131,25 +131,25 @@ def run_model(  # pylint: disable=too-many-locals
     flwr_exit(exit_code, event_type=EventType.FLWR_MODEL_RUN_LEAVE)
 
 
-def _create_serverappio_stub(
+def _create_runtime_stub(
     *,
-    serverappio_api_address: str,
+    runtime_api_address: str,
     token: str,
     insecure: bool,
     certificates: bytes | None,
-) -> tuple[grpc.Channel, ServerAppIoStub, RetryInvoker]:
-    """Create a ServerAppIo stub authenticated as the model task."""
+) -> tuple[grpc.Channel, RuntimeStub, RetryInvoker]:
+    """Create a Runtime stub authenticated as the model task."""
     channel = create_channel(
-        server_address=serverappio_api_address,
+        server_address=runtime_api_address,
         insecure=insecure,
         root_certificates=certificates,
         interceptors=[
             RuntimeVersionClientInterceptor(component_name="flwr-model"),
-            AppIoTokenClientInterceptor(token),
+            RuntimeTokenClientInterceptor(token),
         ],
     )
     channel.subscribe(on_channel_state_change)
-    stub = ServerAppIoStub(channel)
+    stub = RuntimeStub(channel)
     retry_invoker = make_simple_grpc_retry_invoker()
     wrap_stub(stub, retry_invoker)
     return channel, stub, retry_invoker

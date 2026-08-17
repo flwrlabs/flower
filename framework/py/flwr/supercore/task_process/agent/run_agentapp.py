@@ -42,12 +42,12 @@ from flwr.common.serde import (
     run_from_proto,
     user_config_to_proto,
 )
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushTaskOutputRequest,
 )
-from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
@@ -68,7 +68,7 @@ _AGENT_INPUT_KEY = "agent.input"
 
 
 def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
-    serverappio_api_address: str,
+    runtime_api_address: str,
     log_queue: Queue[str | None],
     token: str,
     insecure: bool,
@@ -81,9 +81,9 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
 
-    # Initialize the ServerAppIo connection.
+    # Initialize the Runtime API connection.
     grid = GrpcGrid(
-        serverappio_service_address=serverappio_api_address,
+        runtime_api_address=runtime_api_address,
         insecure=insecure,
         root_certificates=certificates,
         token=token,

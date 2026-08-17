@@ -79,12 +79,9 @@ SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "supergrid.flower.ai")
 # Control API constants
 OAUTH_SESSION_TTL = timedelta(minutes=10)
 RUN_SERIES_DESCRIPTION_MAX_LENGTH = 80
+AUTOMATION_MIN_START_DELAY = 15 * 60  # 15 minutes
 AUTOMATION_MIN_FIXED_INTERVAL = 15 * 60  # 15 minutes
 AUTOMATION_MAX_ACTIVE_PER_USER = 10
-UNAUTHENTICATED_PATHS = {
-    "/v1/control/get-login-details",
-    "/v1/control/get-auth-tokens",
-}
 
 # Specification for app publishing
 APP_PUBLISH_ALLOWED_LICENSE_FILES = ("LICENSE", "LICENSE.md")
@@ -142,6 +139,9 @@ TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exi
 
 # Constants for message processing timing
 MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS = 3600
+
+# Runtime auth constants
+TASK_TOKEN_HEADER = "flwr-task-token"
 
 # SuperExec auth constants
 SUPEREXEC_AUTH_TIMESTAMP_HEADER = "flwr-superexec-ts"

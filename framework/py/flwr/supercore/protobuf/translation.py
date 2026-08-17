@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import cast
 
-from fastapi import Request
+from fastapi import Depends, Request
 from fastapi.responses import Response, StreamingResponse
 from google.protobuf.message import DecodeError, Message
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -31,8 +31,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationRequest,
     CreateFederationRequest,
     CreateInvitationRequest,
-    GetAuthTokensRequest,
-    GetLoginDetailsRequest,
     GetRunSeriesRequest,
     ListAutomationsRequest,
     ListFederationsRequest,
@@ -52,6 +50,29 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopRunRequest,
     UnregisterNodeRequest,
 )
+from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ConfirmMessageReceivedRequest,
+    PullObjectRequest,
+    PushObjectRequest,
+)
+from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    ClaimTaskRequest,
+    CreateTaskRequest,
+    GetConnectorRequest,
+    GetNodesRequest,
+    PullAppMessagesRequest,
+    PullPendingTasksRequest,
+    PullTaskInputRequest,
+    PullTaskMessageRequest,
+    PushAppMessagesRequest,
+    PushTaskEventsRequest,
+    PushTaskMessageRequest,
+    PushTaskOutputRequest,
+    RecordTaskUsageRequest,
+    SendTaskHeartbeatRequest,
+)
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
@@ -70,8 +91,6 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/start-automation"): StartAutomationRequest,
     ("POST", "/v1/control/list-automations"): ListAutomationsRequest,
     ("POST", "/v1/control/stop-automation"): StopAutomationRequest,
-    ("POST", "/v1/control/get-login-details"): GetLoginDetailsRequest,
-    ("POST", "/v1/control/get-auth-tokens"): GetAuthTokensRequest,
     ("POST", "/v1/control/register-node"): RegisterNodeRequest,
     ("POST", "/v1/control/unregister-node"): UnregisterNodeRequest,
     ("POST", "/v1/control/list-nodes"): ListNodesRequest,
@@ -97,6 +116,29 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
         "POST",
         "/v1/control/configure-simulation-federation",
     ): ConfigureSimulationFederationRequest,
+    ("POST", "/v1/runtime/pull-pending-tasks"): PullPendingTasksRequest,
+    ("POST", "/v1/runtime/claim-task"): ClaimTaskRequest,
+    ("POST", "/v1/runtime/get-run"): GetRunRequest,
+    ("POST", "/v1/runtime/send-task-heartbeat"): SendTaskHeartbeatRequest,
+    ("POST", "/v1/runtime/pull-task-input"): PullTaskInputRequest,
+    ("POST", "/v1/runtime/push-task-output"): PushTaskOutputRequest,
+    ("POST", "/v1/runtime/push-object"): PushObjectRequest,
+    ("POST", "/v1/runtime/pull-object"): PullObjectRequest,
+    (
+        "POST",
+        "/v1/runtime/confirm-message-received",
+    ): ConfirmMessageReceivedRequest,
+    ("POST", "/v1/runtime/create-task"): CreateTaskRequest,
+    ("POST", "/v1/runtime/start-automation"): StartAutomationRequest,
+    ("POST", "/v1/runtime/push-task-message"): PushTaskMessageRequest,
+    ("POST", "/v1/runtime/push-task-events"): PushTaskEventsRequest,
+    ("POST", "/v1/runtime/pull-task-message"): PullTaskMessageRequest,
+    ("POST", "/v1/runtime/record-task-usage"): RecordTaskUsageRequest,
+    ("POST", "/v1/runtime/get-connector"): GetConnectorRequest,
+    ("POST", "/v1/runtime/push-logs"): PushLogsRequest,
+    ("POST", "/v1/runtime/push-messages"): PushAppMessagesRequest,
+    ("POST", "/v1/runtime/pull-messages"): PullAppMessagesRequest,
+    ("POST", "/v1/runtime/get-nodes"): GetNodesRequest,
 }
 
 
@@ -194,3 +236,6 @@ def get_protobuf_request(request: Request) -> Message:
             f"Message, got {type(protobuf_request).__name__}.",
         )
     return protobuf_request
+
+
+PROTOBUF_REQUEST_DEPENDENCY = Depends(get_protobuf_request)

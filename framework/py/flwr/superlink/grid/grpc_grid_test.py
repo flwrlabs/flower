@@ -30,7 +30,7 @@ from flwr.app.error import Error
 from flwr.app.message import Message
 from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import message_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     PullAppMessagesRequest,
     PushAppMessagesRequest,
@@ -41,7 +41,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
 )
 from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
+    RuntimeTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 from flwr.supercore.run import Run
@@ -55,7 +55,7 @@ class TestGrpcGrid(unittest.TestCase):
     """Tests for `GrpcGrid` class."""
 
     def setUp(self) -> None:
-        """Initialize mock GrpcServerAppIoStub and Grid instance before each test."""
+        """Initialize mock RuntimeStub and Grid instance before each test."""
         self.mock_stub = Mock()
         self.mock_channel = Mock()
         self.mock_run = Run.create_empty(61016)
@@ -68,7 +68,7 @@ class TestGrpcGrid(unittest.TestCase):
         self.grid.set_run(self.mock_run)
 
     def test_init_grpc_grid(self) -> None:
-        """Test GrpcServerAppIoStub initialization."""
+        """Test RuntimeStub initialization."""
         # Assert
         self.assertEqual(self.grid.run.run_id, 61016)
         self.assertEqual(self.grid.run.fab_id, "mock/mock")
@@ -267,12 +267,12 @@ class TestGrpcGrid(unittest.TestCase):
             self.grid.set_run(61016)  # type: ignore[arg-type]
 
     @patch("flwr.superlink.grid.grpc_grid.wrap_stub")
-    @patch("flwr.superlink.grid.grpc_grid.ServerAppIoStub")
+    @patch("flwr.superlink.grid.grpc_grid.RuntimeStub")
     @patch("flwr.superlink.grid.grpc_grid.create_channel")
     def test_connect_adds_client_interceptors(
         self,
         mock_create_channel: Mock,
-        _mock_serverappio_stub: Mock,
+        _mock_runtime_stub: Mock,
         _mock_wrap_stub: Mock,
     ) -> None:
         """`_connect` should pass client interceptors to create_channel."""
@@ -287,7 +287,7 @@ class TestGrpcGrid(unittest.TestCase):
         assert interceptors is not None
         self.assertEqual(len(interceptors), 2)
         self.assertIsInstance(interceptors[0], RuntimeVersionClientInterceptor)
-        self.assertIsInstance(interceptors[1], AppIoTokenClientInterceptor)
+        self.assertIsInstance(interceptors[1], RuntimeTokenClientInterceptor)
         # pylint: disable-next=protected-access
         self.assertEqual(interceptors[0]._metadata.component_name, "flwr-serverapp")
 
