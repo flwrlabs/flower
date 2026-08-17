@@ -42,9 +42,11 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
+    PushTaskEventsRequest,
     PushTaskOutputRequest,
 )
 from flwr.proto.runtime_pb2_grpc import RuntimeStub
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.fab import Fab
@@ -188,6 +190,14 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         client_app: ClientApp = load_client_app_fn(
             run.fab_id, run.fab_version, fab.hash_str
         )
+
+        def _push_event(event: TaskEvent) -> None:
+            try:
+                stub.PushTaskEvents(PushTaskEventsRequest(events=[event]))
+            except Exception as ex:  # pylint: disable=broad-exception-caught
+                log(DEBUG, "Failed to push task event: %s", ex)
+
+        client_app._event_callback = _push_event  # pylint: disable=protected-access
 
         # Execute ClientApp
         reply_message = client_app(message=message, context=context)

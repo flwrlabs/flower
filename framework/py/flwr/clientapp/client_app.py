@@ -18,6 +18,7 @@
 import inspect
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from typing import Any
 
 from flwr.app import Context, Message
 from flwr.app.message_type import MessageType
@@ -27,8 +28,18 @@ from flwr.client.message_handler.message_handler import (
     handle_legacy_message_from_msgtype,
 )
 from flwr.client.mod.utils import make_ffn
+from flwr.common.fl_event import (
+    FL_NODE_EVALUATE_COMPLETED,
+    FL_NODE_EVALUATE_FAILED,
+    FL_NODE_EVALUATE_STARTED,
+    FL_NODE_FIT_COMPLETED,
+    FL_NODE_FIT_FAILED,
+    FL_NODE_FIT_STARTED,
+    make_task_event,
+)
 from flwr.common.logger import warn_deprecated_feature
 from flwr.compat.client.client import Client
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 
 from .typing import ClientAppCallable, Mod
 
@@ -81,6 +92,14 @@ def _empty_lifespan(_: Context) -> Iterator[None]:
     yield
 
 
+def _parse_server_round(group_id: str) -> int | None:
+    """Parse a group ID string as a server round number."""
+    try:
+        return int(group_id)
+    except ValueError:
+        return None
+
+
 class ClientAppException(Exception):
     """Exception raised when an exception is raised while executing a ClientApp."""
 
@@ -111,9 +130,11 @@ class ClientApp:
         self,
         client_fn: ClientFnExt | None = None,  # Only for backward compatibility
         mods: list[Mod] | None = None,
+        event_callback: Callable[[TaskEvent], None] | None = None,
     ) -> None:
         self._mods: list[Mod] = mods if mods is not None else []
         self._registered_funcs: dict[str, ClientAppCallable] = {}
+        self._event_callback: Callable[[TaskEvent], None] | None = event_callback
 
         # Create wrapper function for `handle`
         self._call: ClientAppCallable | None = None
@@ -125,9 +146,58 @@ class ClientApp:
                 message: Message,
                 context: Context,
             ) -> Message:  # pylint: disable=invalid-name
-                out_message = handle_legacy_message_from_msgtype(
-                    client_fn=client_fn, message=message, context=context
-                )
+                message_type = message.metadata.message_type
+                node_id = message.metadata.dst_node_id
+                server_round = _parse_server_round(message.metadata.group_id)
+
+                def _emit(event: str, metadata: dict[str, Any] | None = None) -> None:
+                    if self._event_callback is not None:
+                        self._event_callback(
+                            make_task_event(
+                                event,
+                                node_id=node_id,
+                                server_round=server_round,
+                                metadata=metadata,
+                            )
+                        )
+
+                if message_type == MessageType.TRAIN:
+                    _emit(FL_NODE_FIT_STARTED)
+                    try:
+                        out_message = handle_legacy_message_from_msgtype(
+                            client_fn=client_fn, message=message, context=context
+                        )
+                        _emit(FL_NODE_FIT_COMPLETED)
+                    except Exception as exc:
+                        _emit(
+                            FL_NODE_FIT_FAILED,
+                            metadata={
+                                "error": type(exc).__name__,
+                                "details": str(exc),
+                            },
+                        )
+                        raise
+                elif message_type == MessageType.EVALUATE:
+                    _emit(FL_NODE_EVALUATE_STARTED)
+                    try:
+                        out_message = handle_legacy_message_from_msgtype(
+                            client_fn=client_fn, message=message, context=context
+                        )
+                        _emit(FL_NODE_EVALUATE_COMPLETED)
+                    except Exception as exc:
+                        _emit(
+                            FL_NODE_EVALUATE_FAILED,
+                            metadata={
+                                "error": type(exc).__name__,
+                                "details": str(exc),
+                            },
+                        )
+                        raise
+                else:
+                    out_message = handle_legacy_message_from_msgtype(
+                        client_fn=client_fn, message=message, context=context
+                    )
+
                 return out_message
 
             # Wrap mods around the wrapped handle function
