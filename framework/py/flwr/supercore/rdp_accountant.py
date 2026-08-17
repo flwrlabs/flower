@@ -334,5 +334,5 @@ def _validate_epsilon(epsilon: float) -> None:
 
 
 def _validate_positive_epsilon(name: str, epsilon: float) -> None:
-    if not isfinite(epsilon) or epsilon <= 0:
+    if isinstance(epsilon, bool) or not isfinite(epsilon) or epsilon <= 0:
         raise ValueError(f"{name} must be positive and finite.")
