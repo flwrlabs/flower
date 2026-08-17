@@ -487,6 +487,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             self.servicer.StartRun(request, Mock())
 
         self.assertEqual(error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST)
+        self.assertEqual(
+            error.exception.public_details,
+            "Connectors are currently available only in your personal workspace.",
+        )
         self.assertEqual(list(self.state.get_run_info()), [])
 
     @parameterized.expand(  # type: ignore
