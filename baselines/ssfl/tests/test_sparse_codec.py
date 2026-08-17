@@ -50,9 +50,10 @@ def test_unpack_rejects_stale_packed_length():
     packed[first_key] = packed[first_key][: max(1, packed[first_key].numel() // 2)]
     try:
         unpack_state_dict(packed, masks)
-        assert False, "expected ValueError"
     except ValueError as exc:
         assert "Packed length mismatch" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
 
 
 def test_dense_sparse_local_update_equivalence():

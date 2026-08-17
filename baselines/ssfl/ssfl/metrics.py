@@ -33,9 +33,16 @@ def aggregate_train_metrics(
 
     for record in records:
         metrics = record["metrics"]
-        weight = float(metrics[weighting_key])
+        if not isinstance(metrics, MetricRecord):
+            raise TypeError("Expected a MetricRecord under the 'metrics' key")
+        weight_value = metrics[weighting_key]
+        if not isinstance(weight_value, (int, float)):
+            raise TypeError(f"Weighting metric {weighting_key!r} must be scalar")
+        weight = float(weight_value)
         weight_denom += weight
         for key, value in metrics.items():
+            if not isinstance(value, (int, float)):
+                raise TypeError(f"Metric {key!r} must be scalar")
             value_f = float(value)
             if key in sum_keys or key == weighting_key:
                 totals[key] = totals.get(key, 0.0) + value_f
@@ -45,7 +52,7 @@ def aggregate_train_metrics(
                 # Default: sample-weighted mean for unknown scalar metrics
                 weighted_sums[key] = weighted_sums.get(key, 0.0) + value_f * weight
 
-    out: dict[str, float] = {}
+    out: dict[str, int | float | list[int] | list[float]] = {}
     out.update(totals)
     if weight_denom > 0:
         for key, value in weighted_sums.items():

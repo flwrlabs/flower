@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from ssfl.data import label_column_for_dataset, labels_from_batch, load_federated_dataset
+from ssfl.data import (
+    label_column_for_dataset,
+    labels_from_batch,
+    load_federated_dataset,
+)
 
 
 def test_label_column_names() -> None:

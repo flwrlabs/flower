@@ -5,12 +5,14 @@ from __future__ import annotations
 from collections import OrderedDict
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.nn.utils.prune as prune
+from torch import nn
+from torch.nn import functional as F
+from torch.nn.utils import prune
 
 
 class BasicBlock(nn.Module):
+    """Basic residual block for CIFAR ResNet models."""
+
     expansion = 1
 
     def __init__(self, in_planes, planes, stride=1):
@@ -38,6 +40,7 @@ class BasicBlock(nn.Module):
             )
 
     def forward(self, x):
+        """Run the block's forward pass."""
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
         out += self.shortcut(x)
@@ -45,6 +48,8 @@ class BasicBlock(nn.Module):
 
 
 class Bottleneck(nn.Module):
+    """Bottleneck residual block for deeper CIFAR ResNet models."""
+
     expansion = 4
 
     def __init__(self, in_planes, planes, stride=1):
@@ -74,6 +79,7 @@ class Bottleneck(nn.Module):
             )
 
     def forward(self, x):
+        """Run the block's forward pass."""
         out = F.relu(self.bn1(self.conv1(x)))
         out = F.relu(self.bn2(self.conv2(out)))
         out = self.bn3(self.conv3(out))
@@ -82,6 +88,8 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
+    """CIFAR ResNet backbone."""
+
     def __init__(self, block, num_blocks, class_num=10):
         super().__init__()
         self.in_planes = 64
@@ -102,12 +110,13 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+        """Compute class logits for an input batch."""
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.layer4(out)
-        out = F.avg_pool2d(out, 4)
+        out = F.avg_pool2d(out, 4)  # pylint: disable=not-callable
         out = out.view(out.size(0), -1)
         return self.linear(out)
 
@@ -173,12 +182,20 @@ class SparseModel(nn.Module):
         self.add_module("model", model)
         self.pruned_layers: set[str] = set()
 
+    def _wrapped_model(self) -> nn.Module:
+        model = self._modules["model"]
+        if model is None:
+            raise RuntimeError("Wrapped model is missing")
+        return model
+
     def forward(self, x):
-        return self._modules["model"].forward(x)
+        """Delegate inference to the wrapped model."""
+        return self._wrapped_model().forward(x)
 
     def apply_masks(self, masks: dict[str, torch.Tensor]) -> None:
+        """Apply binary pruning masks to eligible layers."""
         self.remove_pruning()
-        for name, module in self._modules["model"].named_modules():
+        for name, module in self._wrapped_model().named_modules():
             if isinstance(module, (nn.Conv2d, nn.Linear)):
                 param_name = f"{name}.weight"
                 if param_name in masks and masks[param_name] is not None:
@@ -187,14 +204,16 @@ class SparseModel(nn.Module):
                     self.pruned_layers.add(name)
 
     def remove_pruning(self) -> None:
-        for name, module in self._modules["model"].named_modules():
+        """Make pruned weights permanent and remove pruning hooks."""
+        for name, module in self._wrapped_model().named_modules():
             if name in self.pruned_layers and prune.is_pruned(module):
                 prune.remove(module, "weight")
         self.pruned_layers.clear()
 
     def state_dict(self, *args, **kwargs):
+        """Return a flat state dictionary with masks applied."""
         kwargs.pop("destination", None)
-        pruned_state_dict = self._modules["model"].state_dict(*args, **kwargs)
+        pruned_state_dict = self._wrapped_model().state_dict(*args, **kwargs)
         flat_state_dict = OrderedDict()
         for key, value in pruned_state_dict.items():
             if key.endswith(".weight_mask"):
@@ -207,7 +226,8 @@ class SparseModel(nn.Module):
                 flat_state_dict[key] = value
         return flat_state_dict
 
-    def load_state_dict(self, state_dict, strict=True):
+    def load_state_dict(self, state_dict, strict=True, assign=False):
+        """Load a flat state dictionary into the wrapped model."""
         pruned_load_dict = OrderedDict()
         for key, value in state_dict.items():
             base_name = key.rsplit(".", 1)[0]
@@ -215,18 +235,32 @@ class SparseModel(nn.Module):
                 pruned_load_dict[f"{base_name}.weight_orig"] = value
             else:
                 pruned_load_dict[key] = value
-        return self._modules["model"].load_state_dict(pruned_load_dict, strict=False)
+        return self._wrapped_model().load_state_dict(
+            pruned_load_dict, strict=False, assign=assign
+        )
 
-    def named_parameters(self, prefix: str = "", recurse: bool = True):
-        return self._modules["model"].named_parameters(prefix=prefix, recurse=recurse)
+    def named_parameters(
+        self,
+        prefix: str = "",
+        recurse: bool = True,
+        remove_duplicate: bool = True,
+    ):
+        """Iterate over parameters of the wrapped model."""
+        return self._wrapped_model().named_parameters(
+            prefix=prefix,
+            recurse=recurse,
+            remove_duplicate=remove_duplicate,
+        )
 
     def named_modules(self, memo=None, prefix: str = "", remove_duplicate: bool = True):
-        return self._modules["model"].named_modules(
+        """Iterate over modules of the wrapped model."""
+        return self._wrapped_model().named_modules(
             memo=memo, prefix=prefix, remove_duplicate=remove_duplicate
         )
 
 
 def create_model(model_name: str, num_classes: int) -> SparseModel:
+    """Create a supported sparse CIFAR model."""
     if model_name == "resnet18":
         backbone = customized_resnet18(class_num=num_classes)
     elif model_name == "resnet50":
@@ -237,6 +271,7 @@ def create_model(model_name: str, num_classes: int) -> SparseModel:
 
 
 def prunable_parameter_names(model: nn.Module) -> list[str]:
+    """List weight parameters eligible for pruning."""
     names = []
     for name, module in model.named_modules():
         if isinstance(module, (nn.Conv2d, nn.Linear)):
@@ -245,6 +280,7 @@ def prunable_parameter_names(model: nn.Module) -> list[str]:
 
 
 def num_classes_for_dataset(dataset_name: str) -> int:
+    """Return the number of classes in a supported dataset."""
     if dataset_name == "cifar10":
         return 10
     if dataset_name == "cifar100":

@@ -4,11 +4,7 @@ from __future__ import annotations
 
 import torch
 
-from ssfl.mask import (
-    create_mask_from_scores,
-    get_mean_saliency_scores,
-    mask_digest,
-)
+from ssfl.mask import create_mask_from_scores, get_mean_saliency_scores, mask_digest
 
 
 def test_uniform_mean_saliency():

@@ -12,15 +12,16 @@ class WandbSession:
     """No-op unless wandb-mode is online/offline and wandb is installed."""
 
     def __init__(self) -> None:
-        self._run = None
+        self._run: Any | None = None
         self.enabled = False
 
     def start(self, cfg: dict[str, Any]) -> None:
+        """Start an optional W&B run from the application config."""
         mode = str(cfg.get("wandb-mode", "disabled")).lower()
         if mode in {"", "disabled", "off", "false", "none"}:
             return
         try:
-            import wandb
+            import wandb  # pylint: disable=import-outside-toplevel
         except ImportError:
             # Flower's per-run env only installs main deps; don't crash paper runs
             # if wandb is missing — local summary.json / metrics.jsonl still work.
@@ -34,26 +35,39 @@ class WandbSession:
             return
 
         run_name = str(cfg.get("wandb-run-name", "")).strip() or None
-        self._run = wandb.init(
-            project=str(cfg.get("wandb-project", "ssfl-flower")),
-            name=run_name,
-            mode=mode if mode in {"online", "offline"} else "offline",
-            config=dict(cfg),
-        )
+        entity = str(cfg.get("wandb-entity", "")).strip() or None
+        project = str(cfg.get("wandb-project", "ssfl-flower"))
+        init_kwargs: dict[str, Any] = {
+            "project": project,
+            "name": run_name,
+            "mode": mode if mode in {"online", "offline"} else "offline",
+            "config": dict(cfg),
+        }
+        if entity:
+            init_kwargs["entity"] = entity
+        self._run = wandb.init(**init_kwargs)
         self.enabled = True
-        log(INFO, "W&B logging enabled (mode=%s, project=%s)", mode, cfg.get("wandb-project"))
+        log(
+            INFO,
+            "W&B logging enabled (mode=%s, entity=%s, project=%s)",
+            mode,
+            entity or "(default)",
+            project,
+        )
 
     def log(self, metrics: dict[str, Any], step: int | None = None) -> None:
+        """Log metrics when a W&B run is active."""
         if not self.enabled or self._run is None:
             return
-        import wandb
+        import wandb  # pylint: disable=import-outside-toplevel
 
         wandb.log(metrics, step=step)
 
     def finish(self) -> None:
+        """Finish the active W&B run, if any."""
         if not self.enabled or self._run is None:
             return
-        import wandb
+        import wandb  # pylint: disable=import-outside-toplevel
 
         wandb.finish()
         self.enabled = False

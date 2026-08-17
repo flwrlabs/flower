@@ -19,6 +19,7 @@ fraction-train = 0.1
 fraction-evaluate = 0.0
 local-epochs = 5
 batch-size = 16
+max-partition-samples = 0
 learning-rate = 0.1
 lr-scheduler = "default"
 lr-decay = 0.998
@@ -40,7 +41,8 @@ save-model = true
 save-checkpoints = true
 save-metrics = true
 checkpoint-dir = "outputs/cifar10_paper"
-# Use "offline" for local W&B files without cloud login; "online" to sync.
+# Offline logging requires no W&B account. Override with wandb-mode="online"
+# and wandb-entity="<your-entity>" to sync to your own account.
 wandb-mode = "offline"
 wandb-project = "ssfl-flower"
 wandb-run-name = "C10_SSFL_dns0.5_seed550"
