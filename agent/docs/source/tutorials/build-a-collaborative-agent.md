@@ -295,6 +295,160 @@ replays only message items on the next run, so connector events and orphaned
 function outputs are not treated as conversation messages.
 ```
 
+### Copy the complete file
+
+If you prefer to start from the finished version, expand the block below and
+copy it into `research_agent/agent_app.py`.
+
+```{raw} html
+<details>
+<summary><strong>Complete <code>research_agent/agent_app.py</code></strong></summary>
+```
+
+```python
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from flwr.agentapp import AgentApp, AgentSession
+from flwr.app import Context
+
+MODEL = "openai/gpt-5.6-sol"
+TOOL_REFS = ("web_search", "web_fetch")
+MAX_TOOL_TURNS = 3
+
+app = AgentApp()
+
+
+def message_text(content: Any) -> str:
+    """Normalize a stored Responses message to plain text."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(
+            part["text"]
+            for part in content
+            if isinstance(part, dict) and isinstance(part.get("text"), str)
+        )
+    raise TypeError("Message content must be text or a list of text parts")
+
+
+def conversation_messages(context: Context) -> list[dict[str, Any]]:
+    """Replay only user and assistant messages from the run series."""
+    messages: list[dict[str, Any]] = []
+    items = context.state.config_records.get("items", {}).get("json", [])
+    for item_json in items:
+        item = json.loads(item_json)
+        if item.get("type") != "message":
+            continue
+        messages.append(
+            {
+                "type": "message",
+                "role": item["role"],
+                "content": message_text(item["content"]),
+            }
+        )
+    return messages
+
+
+def private_response(
+    agent: AgentSession,
+    context: Context,
+    request: dict[str, Any],
+) -> dict[str, Any]:
+    """Make a planning request without retaining its draft model output."""
+    had_items = "items" in context.state
+    previous_items = list(context.state["items"].get("json", ())) if had_items else None
+    try:
+        return agent.responses.create(request)
+    finally:
+        if had_items:
+            context.state["items"]["json"] = previous_items
+        elif "items" in context.state:
+            del context.state["items"]
+
+
+def connector_error_output(
+    tool_call: dict[str, Any], exc: RuntimeError
+) -> dict[str, Any]:
+    """Return an error item the model can handle in its next turn."""
+    return {
+        "type": "function_call_output",
+        "call_id": tool_call["call_id"],
+        "output": json.dumps({"error": str(exc)}),
+    }
+
+
+@app.main()
+def main(agent: AgentSession, context: Context) -> None:
+    """Research the configured prompt with a bounded connector loop."""
+    prompt = context.run_config.get("agent.input")
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise ValueError("agent.input must be a non-empty string")
+
+    input_items = conversation_messages(context)
+    if not any(
+        item["role"] == "user" and item["content"].strip() == prompt.strip()
+        for item in input_items
+    ):
+        input_items.append(
+            {"type": "message", "role": "user", "content": prompt.strip()}
+        )
+
+    tools = agent.connectors.tools(TOOL_REFS)
+
+    for _ in range(MAX_TOOL_TURNS):
+        response = private_response(
+            agent,
+            context,
+            {
+                "model": MODEL,
+                "input": input_items,
+                "instructions": (
+                    "Research the user's question using public sources when useful. "
+                    "Request all independent tool calls for a turn together."
+                ),
+                "tools": tools,
+                "tool_choice": "auto",
+                "stream": False,
+            },
+        )
+        tool_calls = [
+            dict(item)
+            for item in response.get("output", [])
+            if isinstance(item, dict) and item.get("type") == "function_call"
+        ]
+        if not tool_calls:
+            break
+
+        function_outputs = []
+        for tool_call in tool_calls:
+            try:
+                function_outputs.append(agent.connectors.call(tool_call))
+            except RuntimeError as exc:
+                function_outputs.append(connector_error_output(tool_call, exc))
+
+        input_items.extend(tool_calls)
+        input_items.extend(function_outputs)
+
+    agent.responses.create(
+        {
+            "model": MODEL,
+            "input": input_items,
+            "instructions": (
+                "Answer the user's question from the available evidence. "
+                "Mention any failed source access and do not invent results."
+            ),
+            "stream": True,
+        }
+    )
+```
+
+```{raw} html
+</details>
+```
+
 ## Build and run
 
 ```console
