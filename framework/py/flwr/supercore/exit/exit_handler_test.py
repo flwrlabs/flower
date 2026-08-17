@@ -43,6 +43,19 @@ def test_trigger_exit_handlers() -> None:
     assert execution_order == [3, 2, 1]
 
 
+def test_exit_handler_can_run_after_existing_handlers() -> None:
+    """Test that low-priority cleanup runs after existing handlers."""
+    execution_order = []
+
+    add_exit_handler(lambda: execution_order.append(1))
+    add_exit_handler(lambda: execution_order.append(3), run_after_existing=True)
+    add_exit_handler(lambda: execution_order.append(2))
+
+    trigger_exit_handlers()
+
+    assert execution_order == [2, 1, 3]
+
+
 def test_trigger_exit_handlers_clears_list() -> None:
     """Test that trigger_exit_handlers clears the registered handlers."""
     # Prepare

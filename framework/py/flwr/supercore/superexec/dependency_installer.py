@@ -245,7 +245,10 @@ def _register_runtime_env_cleanup(runtime_env_dir: Path) -> None:
     def _clean() -> None:
         cleanup_app_runtime_environment(runtime_env_dir)
 
-    add_exit_handler(_clean)
+    # Task executors register their output handlers before dependency installation.
+    # Run environment cleanup afterwards so a slow deletion cannot prevent the final
+    # task status from being reported.
+    add_exit_handler(_clean, run_after_existing=True)
 
 
 def cleanup_app_runtime_environment(runtime_env_dir: Path | None) -> None:
