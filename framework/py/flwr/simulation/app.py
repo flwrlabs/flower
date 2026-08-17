@@ -18,6 +18,7 @@
 import argparse
 import importlib.util
 import os
+import time
 from dataclasses import replace
 from logging import DEBUG, ERROR, INFO, WARNING
 from queue import Queue
@@ -64,7 +65,11 @@ from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import NOOP_FEDERATION_ID
+from flwr.supercore.constant import (
+    EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS,
+    EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS,
+    NOOP_FEDERATION_ID,
+)
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.superexec.dependency_installer import (
@@ -182,14 +187,22 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         # Set Grpc max retries to 1 to avoid blocking on exit
         conn._retry_invoker.max_tries = 1
+        cleanup_deadline = time.monotonic() + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
 
         # Upload any remaining logs before pushing final output
         if log_uploader:
-            flush_logs(log_queue)
-            stop_log_uploader(log_queue, log_uploader)
+            flush_logs(
+                log_queue,
+                timeout=max(0.0, cleanup_deadline - time.monotonic()),
+            )
+            stop_log_uploader(
+                log_queue,
+                log_uploader,
+                timeout=max(0.0, cleanup_deadline - time.monotonic()),
+            )
 
         if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
+            heartbeat_sender.stop(timeout=max(0.0, cleanup_deadline - time.monotonic()))
 
         # Push final status and context (if available)
         out_req = PushTaskOutputRequest(
@@ -199,7 +212,10 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             clientapp_runtime=metrics.clientapp_runtime,
         )
         try:
-            conn._stub.PushTaskOutput(out_req)
+            conn._stub.PushTaskOutput(
+                out_req,
+                timeout=EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS,
+            )
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
 

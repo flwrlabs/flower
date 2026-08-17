@@ -79,12 +79,18 @@ class HeartbeatSender:
             raise RuntimeError("Cannot start a stopped heartbeat sender.")
         self._thread.start()
 
-    def stop(self) -> None:
-        """Stop the heartbeat sender."""
+    def stop(self, timeout: float | None = None) -> None:
+        """Stop the heartbeat sender.
+
+        Parameters
+        ----------
+        timeout : Optional[float] (default: None)
+            Maximum time in seconds to wait for the sender thread to stop.
+        """
         if not self._thread.is_alive():
             raise RuntimeError("Heartbeat sender is not running.")
         self._stop_event.set()
-        self._thread.join()
+        self._thread.join(timeout=timeout)
 
     @property
     def is_running(self) -> bool:
@@ -138,7 +144,7 @@ def make_task_heartbeat_fn_grpc(
     def fn() -> bool:
         # Call Runtime API
         try:
-            res = stub.SendTaskHeartbeat(req)
+            res = stub.SendTaskHeartbeat(req, timeout=HEARTBEAT_CALL_TIMEOUT)
         except grpc.RpcError as e:
             status_code = e.code()  # pylint: disable=E1101
             if status_code == grpc.StatusCode.UNAVAILABLE:

@@ -15,11 +15,15 @@
 """Tests for heartbeat sender."""
 
 
+import threading
 import time
 import unittest
 from unittest.mock import Mock
 
-from .heartbeat import HeartbeatSender
+from flwr.common.constant import HEARTBEAT_CALL_TIMEOUT
+from flwr.proto.runtime_pb2 import SendTaskHeartbeatResponse  # pylint: disable=E0611
+
+from .heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 
 
 # pylint: disable=protected-access
@@ -72,6 +76,43 @@ class TestHeartbeatSender(unittest.TestCase):
         self.assertLess(time.time() - current, 0.2)
         self.mock_heartbeat_fn.assert_called_once()
         self.assertFalse(self.heartbeat_sender._thread.is_alive())
+
+    def test_stop_respects_timeout(self) -> None:
+        """Test that stop returns when the heartbeat function is blocked."""
+        heartbeat_started = threading.Event()
+        release_heartbeat = threading.Event()
+
+        def heartbeat_fn() -> bool:
+            heartbeat_started.set()
+            release_heartbeat.wait()
+            return True
+
+        sender = HeartbeatSender(heartbeat_fn)
+        sender.start()
+        self.assertTrue(heartbeat_started.wait(timeout=1.0))
+
+        started_at = time.monotonic()
+        sender.stop(timeout=0.01)
+
+        self.assertLess(time.monotonic() - started_at, 0.2)
+        self.assertTrue(sender._thread.is_alive())
+
+        release_heartbeat.set()
+        sender._thread.join(timeout=1.0)
+        self.assertFalse(sender._thread.is_alive())
+
+    def test_grpc_heartbeat_uses_timeout(self) -> None:
+        """Test that gRPC heartbeats have a deadline."""
+        stub = Mock()
+        stub.SendTaskHeartbeat.return_value = SendTaskHeartbeatResponse(success=True)
+
+        heartbeat_fn = make_task_heartbeat_fn_grpc(stub)
+        self.assertTrue(heartbeat_fn())
+
+        self.assertEqual(
+            stub.SendTaskHeartbeat.call_args.kwargs["timeout"],
+            HEARTBEAT_CALL_TIMEOUT,
+        )
 
     def test_heartbeat_fail_and_retry(self) -> None:
         """Test that the heartbeat function is retried on failure."""

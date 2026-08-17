@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import time
 from logging import DEBUG, ERROR
 
 import grpc
@@ -30,6 +31,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.constant import (
+    EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS,
+    EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS,
+)
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
@@ -73,10 +78,11 @@ def run_model(  # pylint: disable=too-many-locals
 
         # Set Grpc max retries to 1 to avoid blocking on exit
         retry_invoker.max_tries = 1
+        cleanup_deadline = time.monotonic() + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
 
         # Stop heartbeats before finishing the task, which revokes its token.
         if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
+            heartbeat_sender.stop(timeout=max(0.0, cleanup_deadline - time.monotonic()))
 
         # Push final status
         pushoutput_req = PushTaskOutputRequest(
@@ -84,7 +90,10 @@ def run_model(  # pylint: disable=too-many-locals
             details=details,
         )
         try:
-            stub.PushTaskOutput(pushoutput_req)
+            stub.PushTaskOutput(
+                pushoutput_req,
+                timeout=EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS,
+            )
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
 

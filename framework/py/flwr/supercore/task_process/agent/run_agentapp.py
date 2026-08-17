@@ -14,7 +14,7 @@
 # ==============================================================================
 """Flower AgentApp process."""
 
-
+import time
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
@@ -49,6 +49,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputRequest,
 )
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.constant import (
+    EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS,
+    EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS,
+)
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.object_ref import load_app
@@ -102,13 +106,21 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
 
         grid._retry_invoker.max_tries = 1
+        cleanup_deadline = time.monotonic() + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
 
         if log_uploader:
-            flush_logs(log_queue)
-            stop_log_uploader(log_queue, log_uploader)
+            flush_logs(
+                log_queue,
+                timeout=max(0.0, cleanup_deadline - time.monotonic()),
+            )
+            stop_log_uploader(
+                log_queue,
+                log_uploader,
+                timeout=max(0.0, cleanup_deadline - time.monotonic()),
+            )
 
         if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
+            heartbeat_sender.stop(timeout=max(0.0, cleanup_deadline - time.monotonic()))
 
         # Push the task output last because finishing the task revokes its token.
         pushoutput_req = PushTaskOutputRequest(
@@ -117,7 +129,10 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             details=details,
         )
         try:
-            grid._stub.PushTaskOutput(pushoutput_req)
+            grid._stub.PushTaskOutput(
+                pushoutput_req,
+                timeout=EXIT_HANDLER_OUTPUT_TIMEOUT_SECONDS,
+            )
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
 

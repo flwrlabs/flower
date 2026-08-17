@@ -34,7 +34,7 @@ from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
 )
 
-from .run_clientapp import pull_task_input, run_clientapp
+from .run_clientapp import pull_task_input, push_task_output, run_clientapp
 
 
 class TestRunClientApp(unittest.TestCase):
@@ -94,3 +94,17 @@ class TestRunClientApp(unittest.TestCase):
         self.assertEqual(
             flwr_exit.call_args.kwargs["code"], ExitCode.TASK_PROC_EXCEPTION
         )
+
+    def test_push_task_output_uses_timeout(self) -> None:
+        """Test that final task output can be bounded during shutdown."""
+        stub = Mock()
+
+        push_task_output(
+            stub=stub,
+            context=None,
+            sub_status="COMPLETED",
+            details="",
+            timeout=1.0,
+        )
+
+        self.assertEqual(stub.PushTaskOutput.call_args.kwargs["timeout"], 1.0)
