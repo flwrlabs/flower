@@ -69,17 +69,20 @@ def test_exit_stops_background_workers_before_task_output() -> None:
             "flwr.superlink.runtime.run_serverapp.register_signal_handlers"
         ) as register_signal_handlers,
         patch("flwr.superlink.runtime.run_serverapp.flwr_exit"),
-        patch("flwr.superlink.runtime.run_serverapp.flush_logs") as flush_logs,
         patch(
             "flwr.superlink.runtime.run_serverapp.stop_log_uploader"
         ) as stop_log_uploader,
-        patch("flwr.superlink.runtime.run_serverapp.cleanup_app_runtime_environment"),
+        patch(
+            "flwr.superlink.runtime.run_serverapp.cleanup_app_runtime_environment"
+        ) as cleanup_runtime_environment,
         patch(
             "flwr.superlink.runtime.run_serverapp.time.monotonic",
-            side_effect=[10.0, 10.5, 10.75, 10.9, 11.0],
+            side_effect=[10.0, 10.5, 10.75, 11.0],
         ),
     ):
-        flush_logs.side_effect = lambda *args, **kwargs: call_order.append("flush")
+        grid._retry_invoker.disable_retries.side_effect = lambda: call_order.append(
+            "disable_retries"
+        )
         stop_log_uploader.side_effect = lambda *args, **kwargs: call_order.append(
             "stop_logs"
         )
@@ -88,6 +91,10 @@ def test_exit_stops_background_workers_before_task_output() -> None:
         )
         grid._stub.PushTaskOutput.side_effect = lambda *args, **kwargs: (
             call_order.append("push_output")
+        )
+        grid.close.side_effect = lambda: call_order.append("close")
+        cleanup_runtime_environment.side_effect = (
+            lambda *_args, **_kwargs: call_order.append("cleanup")
         )
 
         run_serverapp(
@@ -99,8 +106,14 @@ def test_exit_stops_background_workers_before_task_output() -> None:
         exit_handler = register_signal_handlers.call_args.kwargs["exit_handlers"][0]
         exit_handler()
 
-    assert call_order == ["stop_heartbeat", "flush", "stop_logs", "push_output"]
+    assert call_order == [
+        "disable_retries",
+        "stop_heartbeat",
+        "stop_logs",
+        "push_output",
+        "close",
+        "cleanup",
+    ]
     assert heartbeat_sender.stop.call_args.kwargs["timeout"] == pytest.approx(2.0)
-    assert flush_logs.call_args.kwargs["timeout"] == pytest.approx(1.75)
-    assert stop_log_uploader.call_args.kwargs["timeout"] == pytest.approx(1.6)
+    assert stop_log_uploader.call_args.kwargs["timeout"] == pytest.approx(1.75)
     assert grid._stub.PushTaskOutput.call_args.kwargs["timeout"] == pytest.approx(3.5)

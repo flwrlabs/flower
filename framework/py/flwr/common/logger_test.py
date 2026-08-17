@@ -168,6 +168,37 @@ def test_log_uploader_retries_after_deadline_expiry() -> None:
     assert requests[0] == requests[1]
 
 
+def test_log_uploader_retries_retained_batch_during_stop() -> None:
+    """The stop sentinel must not discard a retained final log batch."""
+    log_queue: Queue[str | None] = Queue()
+    log_queue.put("Final message")
+    first_attempt_started = threading.Event()
+    release_first_attempt = threading.Event()
+    requests = []
+
+    def push_logs(request: object, **_kwargs: object) -> None:
+        requests.append(request)
+        if len(requests) == 1:
+            first_attempt_started.set()
+            assert release_first_attempt.wait(timeout=1.0)
+        if len(requests) < 3:
+            raise _DeadlineExceededError
+
+    stub = Mock()
+    stub.PushLogs.side_effect = push_logs
+    uploader = start_log_uploader(log_queue, node_id=1, run_id=2, stub=stub)
+    assert first_attempt_started.wait(timeout=1.0)
+
+    # Queue the stop sentinel while the first upload still owns the retained batch.
+    log_queue.put(None)
+    release_first_attempt.set()
+    uploader.join(timeout=2.0)
+
+    assert not uploader.is_alive()
+    assert len(requests) == 3
+    assert requests[0] == requests[1] == requests[2]
+
+
 def test_configure_superlink_log_file(tmp_path: Path) -> None:
     """Test configuring timed file rotation for SuperLink logs."""
     # Prepare

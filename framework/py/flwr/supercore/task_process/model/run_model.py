@@ -76,7 +76,7 @@ def run_model(  # pylint: disable=too-many-locals
     def on_exit() -> None:
         log(DEBUG, "[flwr-model] Will push Model task output")
 
-        # Set Grpc max retries to 1 to avoid blocking on exit
+        # Disable retries and interrupt active backoff before bounded shutdown.
         retry_invoker.disable_retries()
         started_at = time.monotonic()
         cleanup_deadline = started_at + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS

@@ -33,7 +33,7 @@ from flwr.common.config import (
     get_project_dir,
 )
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
-from flwr.common.logger import flush_logs, log, start_log_uploader, stop_log_uploader
+from flwr.common.logger import log, start_log_uploader, stop_log_uploader
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -105,6 +105,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     def on_exit() -> None:
         log(DEBUG, "[flwr-agentapp] Will push AgentApp task output")
 
+        # Disable retries and interrupt active backoff before bounded shutdown.
         grid._retry_invoker.disable_retries()
         started_at = time.monotonic()
         cleanup_deadline = started_at + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
@@ -113,11 +114,8 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         if heartbeat_sender and heartbeat_sender.is_running:
             heartbeat_sender.stop(timeout=max(0.0, cleanup_deadline - time.monotonic()))
 
+        # Drain queued logs and stop the uploader within the cleanup budget.
         if log_uploader:
-            flush_logs(
-                log_queue,
-                timeout=max(0.0, cleanup_deadline - time.monotonic()),
-            )
             stop_log_uploader(
                 log_queue,
                 log_uploader,

@@ -74,6 +74,7 @@ def run_connector(  # pylint: disable=too-many-locals
     def on_exit() -> None:
         log(DEBUG, "[flwr-connector] Will push Connector task output")
 
+        # Disable retries and interrupt active backoff before bounded shutdown.
         retry_invoker.disable_retries()
         started_at = time.monotonic()
         cleanup_deadline = started_at + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS

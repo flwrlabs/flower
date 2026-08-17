@@ -419,7 +419,7 @@ def _log_uploader(
                 ):
                     raise e
 
-        if exit_flag:
+        if exit_flag and not msgs:
             break
 
         time.sleep(LOG_UPLOAD_INTERVAL)

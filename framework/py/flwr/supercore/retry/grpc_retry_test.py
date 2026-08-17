@@ -22,6 +22,7 @@ import grpc
 import pytest
 
 from .grpc_retry import make_simple_grpc_retry_invoker
+from .retry_invoker import RetryState
 
 
 class _UnauthenticatedError(grpc.RpcError):  # type: ignore[misc]
@@ -54,15 +55,14 @@ def test_unauthenticated_does_not_signal_when_retries_disabled(
     mock_kill.assert_not_called()
 
 
-@patch("flwr.supercore.retry.grpc_retry.time.sleep")
 @patch("flwr.supercore.retry.grpc_retry.os.kill")
 def test_unauthenticated_signals_when_max_tries_is_one(
     mock_kill: Mock,
-    _mock_sleep: Mock,
 ) -> None:
     """A configured one-attempt limit must not look like executor shutdown."""
     retry_invoker = make_simple_grpc_retry_invoker()
     retry_invoker.max_tries = 1
+    mock_kill.side_effect = lambda *_args: retry_invoker.disable_retries()
 
     with pytest.raises(_UnauthenticatedError):
         retry_invoker.invoke(Mock(side_effect=_UnauthenticatedError()))
@@ -95,3 +95,40 @@ def test_disable_retries_interrupts_grpc_backoff() -> None:
 
     assert not thread.is_alive()
     assert len(errors) == 1
+
+
+def test_disable_retries_interrupts_all_grpc_backoffs() -> None:
+    """Shutdown must wake every invocation sharing the retry coordinator."""
+    retry_invoker = make_simple_grpc_retry_invoker()
+    retry_invoker.jitter = lambda _wait_time: 60.0
+    backoff_barrier = threading.Barrier(3)
+    errors: list[grpc.RpcError] = []
+    original_on_backoff = retry_invoker.on_backoff
+    assert original_on_backoff is not None
+
+    def on_backoff(retry_state: RetryState) -> None:
+        original_on_backoff(retry_state)
+        backoff_barrier.wait(timeout=1.0)
+
+    retry_invoker.on_backoff = on_backoff
+
+    def target() -> None:
+        raise _UnavailableError
+
+    def invoke() -> None:
+        try:
+            retry_invoker.invoke(target)
+        except grpc.RpcError as err:
+            errors.append(err)
+
+    threads = [threading.Thread(target=invoke) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    backoff_barrier.wait(timeout=1.0)
+
+    retry_invoker.disable_retries()
+    for thread in threads:
+        thread.join(timeout=1.0)
+
+    assert all(not thread.is_alive() for thread in threads)
+    assert len(errors) == 2
