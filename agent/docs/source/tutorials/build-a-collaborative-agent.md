@@ -42,6 +42,12 @@ __pycache__/
 
 ## Configure the project
 
+The project configuration has three jobs:
+
+- pin the Flower version used by the AgentApp;
+- provide a default `agent.input` value for each run; and
+- tell Flower where to load the `AgentApp` object.
+
 Create `pyproject.toml`:
 
 ```toml
@@ -75,7 +81,19 @@ agentapp = "research_agent.agent_app:app"
 
 ## Implement the AgentApp
 
-Create `research_agent/agent_app.py`:
+Build `research_agent/agent_app.py` one section at a time. Add the following
+snippets in order.
+
+### Define the app and its limits
+
+Every `AgentApp` entry point receives two objects:
+
+- `AgentSession` provides model responses and connector calls;
+- `Context` provides run configuration and state shared by the run series.
+
+Keep the model, connector set, and tool-turn limit near the top of the file.
+The turn limit is a safety boundary: the model can request more work, but it
+cannot keep the app in an unbounded tool loop.
 
 ```python
 from __future__ import annotations
@@ -91,8 +109,19 @@ TOOL_REFS = ("web_search", "web_fetch")
 MAX_TOOL_TURNS = 3
 
 app = AgentApp()
+```
 
+### Rebuild conversation input
 
+Each chat message starts a new run. Flower keeps the runs together in a run
+series, but the model sees only the input passed to `agent.responses.create`.
+To support follow-up questions, the AgentApp must replay the stored user and
+assistant messages.
+
+The run-series state also contains tool activity. Load only items whose type is
+`message`, and normalize their content to plain text:
+
+```python
 def message_text(content: Any) -> str:
     """Normalize a stored Responses message to plain text."""
     if isinstance(content, str):
@@ -122,8 +151,24 @@ def conversation_messages(context: Context) -> list[dict[str, Any]]:
             }
         )
     return messages
+```
 
+`message_text` handles both plain strings and Responses-style text parts. It
+raises an error for an unexpected shape instead of silently sending incomplete
+history to the model.
 
+### Keep planning responses private
+
+`agent.responses.create` retains response items in `Context` so that an
+assistant answer can become part of the conversation. The first responses in
+this app are different: they are private planning turns in which the model can
+request tools.
+
+Snapshot the stored items before a planning request and restore them afterward.
+The tool calls still remain in the local `input_items` list for the current
+run, but draft model output does not become conversation history:
+
+```python
 def private_response(
     agent: AgentSession,
     context: Context,
@@ -139,8 +184,16 @@ def private_response(
             context.state["items"]["json"] = previous_items
         elif "items" in context.state:
             del context.state["items"]
+```
 
+### Let the model recover from connector failures
 
+A connector can fail after the model has requested it. The next model turn
+still needs an output for that call ID. Convert the exception into a
+`function_call_output` item so the model can explain the limitation or finish
+with the evidence it already has:
+
+```python
 def connector_error_output(
     tool_call: dict[str, Any], exc: RuntimeError
 ) -> dict[str, Any]:
@@ -150,8 +203,20 @@ def connector_error_output(
         "call_id": tool_call["call_id"],
         "output": json.dumps({"error": str(exc)}),
     }
+```
 
+### Orchestrate the tool loop
 
+The main function now connects these pieces. It has four phases:
+
+1. Validate `agent.input` and rebuild the conversation messages.
+1. Ask Flower for the `web_search` and `web_fetch` tool schemas.
+1. Execute up to `MAX_TOOL_TURNS` rounds of model-requested function calls.
+1. Make one final model request without tools and stream the answer.
+
+Add the entry point:
+
+```python
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
     """Research the configured prompt with a bounded connector loop."""
@@ -217,24 +282,12 @@ def main(agent: AgentSession, context: Context) -> None:
     )
 ```
 
-## Follow the control flow
-
 The runtime records the current `agent.input` as a user message before calling
-the app. `conversation_messages` loads user and assistant messages from the
-series so follow-up runs can use them.
-
-Each tool turn then:
-
-1. obtains the registered `web_search` and `web_fetch` schemas;
-1. lets the model request zero, one, or several function calls;
-1. executes every requested call;
-1. turns a connector failure into model-readable output; and
-1. adds calls and outputs to the next request.
-
-The planning response is private because its draft output is removed from
-conversation state. The final request has no tools and streams one clean answer.
-`MAX_TOOL_TURNS` prevents an untrusted model decision from creating an unbounded
-loop.
+the app. The duplicate check prevents the same prompt from being appended
+again. Within the loop, the app keeps every requested call next to its output,
+including failures, so the next model turn has a complete sequence. The final
+request omits `tools`, which forces the app to finish with one answer instead of
+starting another connector round.
 
 ```{note}
 The connector activity itself is still recorded for run inspection. The app
