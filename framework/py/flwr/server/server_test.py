@@ -16,6 +16,8 @@
 
 
 import numpy as np
+import pytest
+from unittest.mock import Mock
 
 from flwr.common import (
     Code,
@@ -30,10 +32,25 @@ from flwr.common import (
     GetPropertiesRes,
     Parameters,
     ReconnectIns,
+    Scalar,
     Status,
     ndarray_to_bytes,
 )
+from flwr.common.fl_event import (
+    FL_ROUND_COMPLETED,
+    FL_ROUND_EVALUATE_COMPLETED,
+    FL_ROUND_EVALUATE_STARTED,
+    FL_ROUND_FAILED,
+    FL_ROUND_FIT_COMPLETED,
+    FL_ROUND_FIT_FAILED,
+    FL_ROUND_FIT_STARTED,
+    FL_ROUND_STARTED,
+    FL_RUN_COMPLETED,
+    FL_RUN_FAILED,
+    FL_RUN_STARTED,
+)
 from flwr.server.client_manager import SimpleClientManager
+from flwr.server.strategy import FedAvg
 
 from .client_proxy import ClientProxy
 from .server import Server, evaluate_clients, fit_clients
@@ -114,6 +131,101 @@ class FailingClient(ClientProxy):
     ) -> DisconnectRes:
         """Raise a NotImplementedError to simulate failure in the client."""
         raise NotImplementedError()
+
+
+class EventClient(SuccessClient):
+    """Client that supports parameter initialization for event tests."""
+
+    def get_parameters(
+        self, ins: GetParametersIns, timeout: float | None, group_id: int | None
+    ) -> GetParametersRes:
+        """Return empty parameters."""
+        return GetParametersRes(
+            status=Status(code=Code.OK, message="Success"),
+            parameters=Parameters(tensors=[], tensor_type=""),
+        )
+
+
+class FailingFitClient(EventClient):
+    """Client that fails during fit for event tests."""
+
+    def fit(self, ins: FitIns, timeout: float | None, group_id: int | None) -> FitRes:
+        """Raise an exception to simulate a fit failure."""
+        raise RuntimeError("fit failed")
+
+
+class FailingAggregateStrategy(FedAvg):
+    """Strategy that raises during aggregation for event tests."""
+
+    def aggregate_fit(
+        self,
+        server_round: int,
+        results: list[tuple[ClientProxy, FitRes]],
+        failures: list[tuple[ClientProxy, FitRes] | BaseException],
+    ) -> tuple[Parameters | None, dict[str, Scalar]]:
+        """Raise an exception to simulate an aggregation failure."""
+        raise RuntimeError("aggregate failed")
+
+
+def test_fit_emits_lifecycle_events() -> None:
+    """Test that ``Server.fit`` emits the expected lifecycle events."""
+    # Prepare
+    client_manager = SimpleClientManager()
+    client_manager.register(EventClient("1"))
+    callback = Mock()
+    server = Server(
+        client_manager=client_manager,
+        strategy=FedAvg(
+            min_fit_clients=1, min_evaluate_clients=1, min_available_clients=1
+        ),
+        event_callback=callback,
+    )
+
+    # Execute
+    history, _ = server.fit(num_rounds=1, timeout=None)
+
+    # Assert
+    assert history is not None
+    events = [call.args[0].event for call in callback.call_args_list]
+    assert events == [
+        FL_RUN_STARTED,
+        FL_ROUND_STARTED,
+        FL_ROUND_FIT_STARTED,
+        FL_ROUND_FIT_COMPLETED,
+        FL_ROUND_EVALUATE_STARTED,
+        FL_ROUND_EVALUATE_COMPLETED,
+        FL_ROUND_COMPLETED,
+        FL_RUN_COMPLETED,
+    ]
+
+
+def test_fit_emits_failed_events_on_exception() -> None:
+    """Test that ``Server.fit`` emits failed events when training raises."""
+    # Prepare
+    client_manager = SimpleClientManager()
+    client_manager.register(EventClient("1"))
+    callback = Mock()
+    server = Server(
+        client_manager=client_manager,
+        strategy=FailingAggregateStrategy(
+            min_fit_clients=1, min_evaluate_clients=1, min_available_clients=1
+        ),
+        event_callback=callback,
+    )
+
+    # Execute and assert
+    with pytest.raises(RuntimeError, match="aggregate failed"):
+        server.fit(num_rounds=1, timeout=None)
+
+    events = [call.args[0].event for call in callback.call_args_list]
+    assert events == [
+        FL_RUN_STARTED,
+        FL_ROUND_STARTED,
+        FL_ROUND_FIT_STARTED,
+        FL_ROUND_FIT_FAILED,
+        FL_ROUND_FAILED,
+        FL_RUN_FAILED,
+    ]
 
 
 def test_fit_clients() -> None:

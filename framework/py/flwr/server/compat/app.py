@@ -18,6 +18,7 @@
 from logging import INFO
 
 from flwr.common.logger import log
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.client_manager import ClientManager
 from flwr.server.history import History
 from flwr.server.server import Server, init_defaults, run_fl
@@ -70,6 +71,14 @@ def start_grid(  # pylint: disable=too-many-arguments, too-many-locals
         strategy=strategy,
         client_manager=client_manager,
     )
+
+    def _push_task_event(event: TaskEvent) -> None:
+        grid.push_task_events([event])
+
+    initialized_server._event_callback = (
+        _push_task_event  # pylint: disable=protected-access
+    )
+
     log(
         INFO,
         "Starting Flower ServerApp, config: %s",

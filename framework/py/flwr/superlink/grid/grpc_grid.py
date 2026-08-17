@@ -16,7 +16,7 @@
 
 
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from logging import DEBUG, ERROR, WARNING
 from typing import cast
 
@@ -43,8 +43,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
+    PushTaskEventsRequest,
 )
 from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.serverapp.grid import Grid
 from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
 from flwr.supercore.date import now
@@ -419,6 +421,13 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
             # Sleep
             time.sleep(3)
         return ret
+
+    def push_task_events(self, events: Sequence[TaskEvent]) -> None:
+        """Push task events to the Runtime API."""
+        event_list = list(events)
+        if not event_list:
+            return
+        self._stub.PushTaskEvents(PushTaskEventsRequest(events=event_list))
 
     def close(self) -> None:
         """Disconnect from the SuperLink if connected."""

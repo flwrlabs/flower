@@ -29,6 +29,7 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     Status,
 )
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.common.serde import message_from_proto
 from flwr.server.superlink.linkstate import (
     InMemoryLinkState,
@@ -143,6 +144,24 @@ class TestInMemoryGrid(unittest.TestCase):
 
         # Assert
         self.assertEqual(len(node_ids), self.num_nodes)
+
+    def test_push_task_events_sets_run_id_and_stores(self) -> None:
+        """Test pushing task events sets the run ID and stores them."""
+        # Prepare
+        events = [
+            TaskEvent(event="fl.run.started", data='{"type":"fl.run.started"}'),
+            TaskEvent(event="fl.run.completed", data='{"type":"fl.run.completed"}'),
+        ]
+
+        # Execute
+        self.grid.push_task_events(events)
+
+        # Assert
+        self.state.store_task_events.assert_called_once()
+        stored_events = self.state.store_task_events.call_args.args[0]
+        self.assertEqual(len(stored_events), 2)
+        self.assertEqual(stored_events[0].run_id, self.mock_run.run_id)
+        self.assertEqual(stored_events[1].run_id, self.mock_run.run_id)
 
     def test_push_messages_valid(self) -> None:
         """Test pushing valid messages."""

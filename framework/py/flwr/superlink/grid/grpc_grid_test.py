@@ -34,7 +34,9 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     PullAppMessagesRequest,
     PushAppMessagesRequest,
+    PushTaskEventsRequest,
 )
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import PULL_MAX_TIME, PULL_MAX_TRIES_PER_OBJECT
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -343,6 +345,31 @@ class TestGrpcGrid(unittest.TestCase):
         self.assertEqual(messages[0].error.code, ErrorCode.MESSAGE_UNAVAILABLE)
         self.assertEqual(messages[0].metadata.reply_to_message_id, ins.object_id)
         self.mock_stub.ConfirmMessageReceived.assert_not_called()
+
+    def test_push_task_events_calls_stub(self) -> None:
+        """Test pushing task events forwards them to the Runtime stub."""
+        # Prepare
+        events = [
+            TaskEvent(
+                event="fl.node.fit.started", data='{"type":"fl.node.fit.started"}'
+            ),
+            TaskEvent(
+                event="fl.node.fit.completed", data='{"type":"fl.node.fit.completed"}'
+            ),
+        ]
+
+        # Execute
+        self.grid.push_task_events(events)
+        args, kwargs = self.mock_stub.PushTaskEvents.call_args
+
+        # Assert
+        self.mock_stub.GetRun.assert_not_called()
+        self.assertEqual(len(args), 1)
+        self.assertEqual(len(kwargs), 0)
+        self.assertIsInstance(args[0], PushTaskEventsRequest)
+        self.assertEqual(len(args[0].events), 2)
+        self.assertEqual(args[0].events[0].event, events[0].event)
+        self.assertEqual(args[0].events[1].event, events[1].event)
 
     @parameterized.expand(  # type: ignore
         [

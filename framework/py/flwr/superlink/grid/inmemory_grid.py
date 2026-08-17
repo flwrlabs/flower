@@ -16,7 +16,7 @@
 
 
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import cast
 from uuid import uuid4
 
@@ -24,6 +24,7 @@ from flwr.app import Message, RecordDict
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.logger import warn_deprecated_feature
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.serverapp.grid import Grid
 from flwr.supercore.run import Run
@@ -171,3 +172,13 @@ class InMemoryGrid(Grid):
             # Sleep
             time.sleep(self.pull_interval)
         return ret
+
+    def push_task_events(self, events: Sequence[TaskEvent]) -> None:
+        """Push task events to state."""
+        event_list = list(events)
+        if not event_list:
+            return
+        run_id = cast(Run, self._run).run_id
+        for event in event_list:
+            event.run_id = run_id
+        self.state.store_task_events(event_list)
