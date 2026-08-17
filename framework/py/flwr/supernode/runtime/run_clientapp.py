@@ -121,6 +121,10 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         # Set Grpc max retries to 1 to avoid blocking on exit
         retry_invoker.max_tries = 1
 
+        # Stop heartbeats before finishing the task, which revokes its token.
+        if heartbeat_sender is not None and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
         # Push final status and context (if available)
         push_task_output(
             stub=stub,
@@ -129,9 +133,6 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
             details=details,
         )
 
-        # Stop heartbeat sender
-        if heartbeat_sender is not None and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
         channel.close()
 
         cleanup_app_runtime_environment(runtime_env_dir)

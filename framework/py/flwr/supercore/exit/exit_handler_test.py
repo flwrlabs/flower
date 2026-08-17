@@ -86,3 +86,19 @@ def test_trigger_exit_handlers_ignores_exceptions() -> None:
 
     # Assert - all handlers should have been called in LIFO order
     assert execution_order == [3, 2, 1]
+
+
+def test_trigger_exit_handlers_is_reentrant() -> None:
+    """Test that a nested exit does not deadlock on the handler registry lock."""
+    execution_order = []
+
+    def handler() -> None:
+        execution_order.append(1)
+        trigger_exit_handlers()
+        execution_order.append(2)
+
+    add_exit_handler(handler)
+
+    trigger_exit_handlers()
+
+    assert execution_order == [1, 2]

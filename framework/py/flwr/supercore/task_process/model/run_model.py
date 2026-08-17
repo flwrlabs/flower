@@ -74,6 +74,10 @@ def run_model(  # pylint: disable=too-many-locals
         # Set Grpc max retries to 1 to avoid blocking on exit
         retry_invoker.max_tries = 1
 
+        # Stop heartbeats before finishing the task, which revokes its token.
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
         # Push final status
         pushoutput_req = PushTaskOutputRequest(
             sub_status=sub_status,
@@ -83,10 +87,6 @@ def run_model(  # pylint: disable=too-many-locals
             stub.PushTaskOutput(pushoutput_req)
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
-
-        # Stop heartbeat sender
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
 
         # Close the Grpc connection
         channel.close()

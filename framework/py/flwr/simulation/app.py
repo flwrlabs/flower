@@ -187,6 +187,14 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         if log_uploader:
             flush_logs(log_queue)
 
+        # Stop authenticated background calls before finishing the task, which revokes
+        # its token.
+        if log_uploader:
+            stop_log_uploader(log_queue, log_uploader)
+
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
         # Push final status and context (if available)
         out_req = PushTaskOutputRequest(
             context=context_to_proto(context) if context else None,
@@ -198,14 +206,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             conn._stub.PushTaskOutput(out_req)
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
-
-        # Stop log uploader for this run and upload final logs
-        if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
-
-        # Stop heartbeat sender
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
 
         # Close the gRPC connection
         conn._disconnect()

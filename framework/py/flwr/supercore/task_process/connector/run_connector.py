@@ -71,6 +71,10 @@ def run_connector(  # pylint: disable=too-many-locals
 
         retry_invoker.max_tries = 1
 
+        # Stop heartbeats before finishing the task, which revokes its token.
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
         pushoutput_req = PushTaskOutputRequest(
             sub_status=sub_status,
             details=details,
@@ -79,9 +83,6 @@ def run_connector(  # pylint: disable=too-many-locals
             stub.PushTaskOutput(pushoutput_req)
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
-
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
 
         channel.close()
 

@@ -106,6 +106,13 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         if log_uploader:
             flush_logs(log_queue)
 
+        if log_uploader:
+            stop_log_uploader(log_queue, log_uploader)
+
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
+        # Push the task output last because finishing the task revokes its token.
         pushoutput_req = PushTaskOutputRequest(
             context=context_to_proto(context) if context else None,
             sub_status=sub_status,
@@ -115,12 +122,6 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             grid._stub.PushTaskOutput(pushoutput_req)
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
-
-        if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
-
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
 
         grid.close()
 

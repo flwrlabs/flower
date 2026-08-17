@@ -57,10 +57,15 @@ def add_exit_handler(exit_handler: Callable[[], None]) -> None:
 def trigger_exit_handlers() -> None:
     """Trigger all registered exit handlers in LIFO order."""
     with _lock_handlers:
-        for handler in reversed(registered_exit_handlers):
-            try:
-                handler()
-            except Exception:  # pylint: disable=broad-exception-caught
-                # Ignore exceptions in exit handlers
-                pass
+        handlers = list(reversed(registered_exit_handlers))
         registered_exit_handlers.clear()
+
+    # Run handlers without holding the registry lock. A handler can be interrupted by
+    # a signal which triggers exit handling again, so holding this non-reentrant lock
+    # while invoking callbacks can deadlock the process.
+    for handler in handlers:
+        try:
+            handler()
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Ignore exceptions in exit handlers
+            pass
