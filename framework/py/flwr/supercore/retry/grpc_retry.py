@@ -35,7 +35,9 @@ from .retry_invoker import RetryInvoker, RetryState, exponential
 def make_simple_grpc_retry_invoker() -> RetryInvoker:
     """Create a simple gRPC retry invoker."""
     lock = threading.Lock()
-    retry_state_lock = threading.Lock()
+    # Retry callbacks can be interrupted by SIGINT on the main thread. The signal
+    # handler disables retries synchronously, so cancellation must be reentrant.
+    retry_state_lock = threading.RLock()
     shutdown_lock = threading.Lock()
     shutdown_requested = False
     system_healthy = threading.Event()

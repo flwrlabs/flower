@@ -16,6 +16,7 @@
 
 
 import threading
+from collections.abc import Callable
 from unittest.mock import Mock, patch
 
 import grpc
@@ -39,6 +40,20 @@ class _UnavailableError(grpc.RpcError):  # type: ignore[misc]
     def code(self) -> grpc.StatusCode:
         """Return the gRPC status code."""
         return grpc.StatusCode.UNAVAILABLE
+
+
+class _ReentrantClearEvent(threading.Event):
+    """Event which invokes a callback while its caller still holds a lock."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.on_clear: Callable[[], None] | None = None
+
+    def clear(self) -> None:
+        """Clear the event, then simulate a synchronous signal callback."""
+        super().clear()
+        if self.on_clear is not None:
+            self.on_clear()
 
 
 @patch("flwr.supercore.retry.grpc_retry.os.kill")
@@ -132,3 +147,33 @@ def test_disable_retries_interrupts_all_grpc_backoffs() -> None:
 
     assert all(not thread.is_alive() for thread in threads)
     assert len(errors) == 2
+
+
+def test_disable_retries_is_reentrant_from_retry_callback() -> None:
+    """A signal during a retry callback must not deadlock shutdown."""
+    system_healthy = _ReentrantClearEvent()
+    retry_wait_cancelled = threading.Event()
+    with patch(
+        "flwr.supercore.retry.grpc_retry.threading.Event",
+        side_effect=[system_healthy, retry_wait_cancelled],
+    ):
+        retry_invoker = make_simple_grpc_retry_invoker()
+
+    system_healthy.on_clear = retry_invoker.disable_retries
+    errors: list[grpc.RpcError] = []
+
+    def target() -> None:
+        raise _UnavailableError
+
+    def invoke() -> None:
+        try:
+            retry_invoker.invoke(target)
+        except grpc.RpcError as err:
+            errors.append(err)
+
+    thread = threading.Thread(target=invoke, daemon=True)
+    thread.start()
+    thread.join(timeout=1.0)
+
+    assert not thread.is_alive()
+    assert len(errors) == 1
