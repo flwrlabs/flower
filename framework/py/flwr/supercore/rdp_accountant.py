@@ -46,6 +46,8 @@ class RdpAccountant:
         orders: tuple[float, ...] | None = None,
     ) -> None:
         self._config = config
+        if orders is not None:
+            orders = _validate_orders(orders)
         self._backend = self._new_backend(orders)
         self._orders = tuple(float(order) for order in self._backend.orders)
         self._compositions: list[tuple[GaussianPrivacyEvent, int]] = []
@@ -250,12 +252,18 @@ def _parse_config(value: object) -> PrivacyConfig:
 
 
 def _parse_orders(value: object) -> tuple[float, ...]:
-    if not isinstance(value, list) or not value:
-        raise ValueError("Accountant state orders must be a non-empty list.")
+    if not isinstance(value, list):
+        raise ValueError("Accountant state orders must be a list.")
     try:
         orders = tuple(float(order) for order in value)
     except (TypeError, ValueError) as exc:
         raise ValueError("Accountant state contains invalid RDP orders.") from exc
+    return _validate_orders(orders)
+
+
+def _validate_orders(orders: tuple[float, ...]) -> tuple[float, ...]:
+    if not orders:
+        raise ValueError("RDP orders must be non-empty.")
     if any(not isfinite(order) or order <= 1 for order in orders):
         raise ValueError("Every RDP order must be finite and greater than 1.")
     return orders
