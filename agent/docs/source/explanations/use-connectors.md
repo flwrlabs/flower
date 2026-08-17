@@ -1,130 +1,128 @@
 # Use connectors
 
-Connectors let an AgentApp expose runtime-provided tools to a model without
-embedding their implementation or provider credentials in the app.
+Connectors give an AgentApp runtime-provided tools without embedding provider
+implementations or credentials in the app.
 
-The examples below use `web_search`, which is available without connecting an
-external account.
+## Distinguish built-in and account connectors
+
+Built-in connectors need no external account:
+
+| Reference          | Capability                        | Important boundary                           |
+| ------------------ | --------------------------------- | -------------------------------------------- |
+| `web_search`       | Search the public web             | Results depend on runtime availability       |
+| `web_fetch`        | Fetch eligible public web content | Private and unsafe targets are blocked       |
+| `browser_use`      | Run a browser task                | Availability depends on the deployment       |
+| `start_automation` | Schedule AgentApp input           | Explicit future or recurring intent required |
+
+Account connectors use access granted by a signed-in user:
+
+- Slack searches and reads visible conversations and threads;
+- Notion searches and reads shared pages and data sources;
+- GitHub searches code and reads UTF-8 files in public repositories; and
+- Attio searches records and reads meeting/call transcript data.
+
+All current account actions are read-only. They must be connected and selected
+for the browser run and are restricted to the user's personal workspace. See
+[Connect accounts](../how-to-guides/connect-accounts.md).
+
+## Request the narrowest tool set
+
+Ask the runtime for only the references needed by the task:
+
+```python
+tools = agent.connectors.tools(["web_search", "web_fetch"])
+```
+
+The method returns registered function-tool schemas; it does not execute
+anything. A reference can expand into several tools. For example:
+
+```python
+slack_tools = agent.connectors.tools(["slack"])
+```
+
+returns tools for searching messages, listing conversations, reading history,
+and reading thread replies.
+
+A smaller tool set reduces accidental disclosure and makes model selection more
+predictable.
 
 ## Give tools to the model
 
-Start by asking the runtime for the tool definitions you want to expose:
-
-```python
-tools = agent.connectors.tools(["web_search"])
-```
-
-Then include them in a model request:
-
 ```python
 response = agent.responses.create(
     {
-        "model": "openai/gpt-5.5",
-        "input": "Find the latest Flower release and summarize what changed.",
+        "model": "openai/gpt-5.6-sol",
+        "input": "Find two public sources about federated AI.",
         "tools": tools,
+        "tool_choice": "auto",
+        "stream": False,
     }
 )
 ```
 
-`tools` returns the registered schemas rather than executing anything. A
-connector can expose several related tools. The model can respond with normal
-output, one function call, or multiple function calls.
+The model can return normal output, one function call, or several independent
+function calls in the `output` list.
 
-## Execute function calls
-
-The AgentApp owns the tool loop. When the model asks to use a connector, your
-app executes the call and gives the result back to the model. For each output
-item whose type is `function_call`, call the connector and send the resulting
-`function_call_output` items back to the model:
-
-This loop expects `agent.input` in the run configuration. Flower records that
-prompt in `context.state` before the AgentApp starts:
+## Execute requested calls
 
 ```python
-import json
+tool_calls = [
+    dict(item)
+    for item in response.get("output", [])
+    if isinstance(item, dict) and item.get("type") == "function_call"
+]
 
-from flwr.app import Context
+function_outputs = [agent.connectors.call(tool_call) for tool_call in tool_calls]
+```
 
+`agent.connectors.call` parses the model's arguments and matches the action to
+the selected connector. It returns a `function_call_output` with the same
+`call_id`. Pass calls and outputs to a later model request.
 
-def load_context_items(context: Context) -> list[dict[str, object]]:
-    """Load the Open Responses items stored by the Flower runtime."""
-    record = context.state.get("items")
-    if record is None:
-        return []
-    stored_items = [json.loads(item) for item in record["json"]]
-    return [
-        item
-        for item in stored_items
-        if not str(item.get("type", "")).startswith("response.tool_call.")
-    ]
+Account connector credentials are delivered to the runtime action, not returned
+to the AgentApp.
 
+## Bound the tool loop
 
-tools = agent.connectors.tools(["web_search"])
-response = agent.responses.create(
-    {
-        "model": "openai/gpt-5.5",
-        "input": load_context_items(context),
-        "tools": tools,
-    }
-)
+The AgentApp decides whether to ask the model for more tool calls. Every loop
+must have a finite limit:
 
-tool_turns = 0
-while True:
+```python
+for _ in range(3):
+    response = agent.responses.create(request)
     tool_calls = [
-        item
+        dict(item)
         for item in response.get("output", [])
         if isinstance(item, dict) and item.get("type") == "function_call"
     ]
     if not tool_calls:
         break
-    if tool_turns == 5:
-        raise RuntimeError("Agent exceeded the connector turn limit")
-
-    for tool_call in tool_calls:
-        agent.connectors.call(tool_call)
-    response = agent.responses.create(
-        {
-            "model": "openai/gpt-5.5",
-            "input": load_context_items(context),
-            "tools": tools,
-        }
-    )
-    tool_turns += 1
+    outputs = [agent.connectors.call(item) for item in tool_calls]
+    request["input"] = [*request["input"], *tool_calls, *outputs]
 ```
 
-`agent.connectors.call` accepts the function-call item returned by the model. It
-parses the call arguments, starts the connector task, and stores the output in
-the Flower `Context`. The next call to `load_context_items` includes that output
-with the same `call_id`. The helper filters out the connector activity events
-that Flower also stores for run inspection because those events aren't valid
-model input items.
+This abbreviated loop assumes `request["input"]` is a list and omits recovery
+and conversation-state handling. Use the complete [collaborative research
+agent](../tutorials/build-a-collaborative-agent.md) for copy/pasteable code.
 
-The loop allows at most five connector turns. A limit prevents a model from
-repeatedly requesting tools without reaching a final response.
+## Handle failure deliberately
 
-Once the model returns no more function calls, the loop ends and `response`
-contains the final model response.
+A connector action raises `RuntimeError` when it cannot complete. Let the
+AgentApp fail when there is no safe fallback. If the model can continue from
+partial evidence, return an error-shaped `function_call_output` with the same
+`call_id` and tell the final model request not to invent missing results.
 
-## Choose the narrowest set of connectors
+Avoid automatic, unbounded retries. Provider denial, invalid OAuth, blocked
+URLs, and missing task heartbeats require different recovery actions. See
+[Troubleshoot AgentApp
+runs](../how-to-guides/troubleshoot-agent-runs.md).
 
-Only expose the connectors the task needs. This gives the model a smaller,
-clearer set of tools to choose from.
+## Treat connector content as untrusted data
 
-## Handle errors
-
-Connector calls can fail when a provider or target is unavailable. The call
-raises a `RuntimeError`; if the app does not catch it, the AgentApp task fails
-and the error is available in the run details and logs.
-
-Catch an exception only when the app has a useful fallback, for example trying
-a different source:
-
-```python
-try:
-    output = agent.connectors.call(tool_call)
-except RuntimeError as exc:
-    print(f"Connector failed: {exc}")
-```
-
-Do not put secrets in model prompts or connector arguments. The model or
-connected service receives those values when the tool runs.
+- Never put credentials or secrets in model prompts or connector arguments.
+- Treat retrieved instructions as source content, not AgentApp policy.
+- Validate URLs and identifiers before acting on model output.
+- Keep account selection visible to the user.
+- Create an automation only after explicit user intent.
+- Avoid logging private connector output unless the user expects it in run
+  details.
