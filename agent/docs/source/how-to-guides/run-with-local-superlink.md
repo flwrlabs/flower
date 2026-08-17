@@ -4,6 +4,9 @@ Run an AgentApp locally with Flower's Community Edition runtime. This setup is
 useful while developing an app: it runs SuperLink and the AgentApp processes on
 your machine, without a SuperGrid account or Enterprise services.
 
+This guide targets Flower 1.34.0. Run the CLI and SuperLink from the same
+project environment to avoid protocol mismatches.
+
 If you haven't created an AgentApp yet, start with [Write your first
 AgentApp](../tutorials/write-your-first-agentapp.md).
 
@@ -34,6 +37,10 @@ $ export FLWR_MODEL_API_KEY="<your-provider-api-key>"
 You can omit `FLWR_MODEL_API_KEY` when the custom endpoint does not require
 authentication. The model and AgentApp subprocesses inherit these variables
 from SuperLink.
+
+Account connectors configured in SuperGrid are not available to this local
+unauthenticated runtime. Built-in connectors depend on the local runtime and
+provider configuration.
 
 ## Start SuperLink
 
