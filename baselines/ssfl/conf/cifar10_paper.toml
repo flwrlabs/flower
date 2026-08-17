@@ -1,0 +1,46 @@
+# Paper-scale CIFAR-10 parity profile (ResNet-18, density 0.5, seed 550).
+#
+# Matches the legacy README recipe:
+#   client_num_in_total=100, frac=0.1, epochs=5, batch_size=16,
+#   lr=0.1, scheduler=default, partition_alpha=0.3, dense_ratio=0.5, seed=550
+#
+# Legacy used comm_round=1000 but executed 999 training rounds
+# (range(1, comm_round)). Flower uses 999 here for that parity.
+#
+# Outputs (under checkpoint-dir):
+#   summary.json       - final accuracy/loss, mask digest, config, comm totals
+#   metrics.jsonl      - per-eval / per-train event log
+#   init_*.pt / round_*_*.pt / final_*.pt - model + mask checkpoints
+#   wandb/             - if wandb-mode=offline|online
+
+num-server-rounds = 999
+num-clients = 100
+fraction-train = 0.1
+fraction-evaluate = 0.0
+local-epochs = 5
+batch-size = 16
+learning-rate = 0.1
+lr-scheduler = "default"
+lr-decay = 0.998
+momentum = 0.0
+weight-decay = 0.0005
+max-grad-norm = 10.0
+dataset = "cifar10"
+model = "resnet18"
+partition-alpha = 0.3
+partition-method = "balanced-dirichlet"
+dense-ratio = 0.5
+saliency-method = "ssfl"
+saliency-batches = 1
+saliency-weighting = "uniform"
+seed = 550
+transport = "sparse"
+evaluate-every = 10
+save-model = true
+save-checkpoints = true
+save-metrics = true
+checkpoint-dir = "outputs/cifar10_paper"
+# Use "offline" for local W&B files without cloud login; "online" to sync.
+wandb-mode = "offline"
+wandb-project = "ssfl-flower"
+wandb-run-name = "C10_SSFL_dns0.5_seed550"
