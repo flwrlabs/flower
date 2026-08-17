@@ -128,7 +128,7 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
-    AUTOMATION_MAX_ACTIVE_PER_USER,
+    AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
     AUTOMATION_MIN_FIXED_INTERVAL,
     AUTOMATION_MIN_START_DELAY,
     DEFAULT_FEDERATION_SIMULATION,
@@ -824,26 +824,26 @@ def start_automation(  # pylint: disable=too-many-locals
 
     # Resolve the account-scoped federation and run configuration.
     flwr_aid = account.flwr_aid
-    active_automations = state.list_automations(
-        flwr_aids=[flwr_aid],
-        statuses=[AutomationStatus.ACTIVE],
-        order_by="updated_at",
-        limit=AUTOMATION_MAX_ACTIVE_PER_USER,
-    )
-    if len(active_automations) >= AUTOMATION_MAX_ACTIVE_PER_USER:
-        raise FlowerError(
-            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
-            f"Account {flwr_aid} has reached the active automation limit of "
-            f"{AUTOMATION_MAX_ACTIVE_PER_USER}.",
-            public_details=(
-                "You can have at most "
-                f"{AUTOMATION_MAX_ACTIVE_PER_USER} active automations."
-            ),
-        )
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     federation_id = _resolve_federation_id(
         state, account.account_name, start_run_request.federation
     )
+    active_automations = state.list_automations(
+        federations=[federation_id],
+        statuses=[AutomationStatus.ACTIVE],
+        order_by="updated_at",
+        limit=AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
+    )
+    if len(active_automations) >= AUTOMATION_MAX_ACTIVE_PER_FEDERATION:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            f"Federation {federation_id} has reached the active automation limit of "
+            f"{AUTOMATION_MAX_ACTIVE_PER_FEDERATION}.",
+            public_details=(
+                "A federation can have at most "
+                f"{AUTOMATION_MAX_ACTIVE_PER_FEDERATION} active automations."
+            ),
+        )
     stored_start_run_request = StartRunRequest()
     stored_start_run_request.CopyFrom(start_run_request)
     stored_start_run_request.federation = federation_id

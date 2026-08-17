@@ -457,7 +457,6 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         automation_ids: Sequence[int] | None = None,
-        flwr_aids: Sequence[str] | None = None,
         federations: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
@@ -470,8 +469,6 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         automation_ids : Sequence[int] | None (default: None)
             Automation IDs to filter by.
-        flwr_aids : Sequence[str] | None (default: None)
-            FLWR account IDs to filter by.
         federations : Sequence[str] | None (default: None)
             Federation IDs to filter by.
         statuses : Sequence[str] | None (default: None)

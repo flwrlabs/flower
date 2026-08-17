@@ -695,23 +695,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(stopped[0].next_run_at, due_at)
 
-        other_account = self.store_automation(
-            state,
-            series_id=4,
-            federation_id="@me/fed-a",
-            flwr_aid="aid-b",
-        )
-        account_automations = state.list_automations(
-            flwr_aids=["aid-b"], order_by="updated_at"
-        )
-        self.assertEqual(
-            [automation.automation_id for automation in account_automations],
-            [other_account.automation_id],
-        )
-        self.assertEqual(
-            state.list_automations(flwr_aids=[], order_by="updated_at"), []
-        )
-
     def test_advance_and_finish_automation(self) -> None:
         """Automation advance should update records and finish terminally."""
         state = self.state_factory()

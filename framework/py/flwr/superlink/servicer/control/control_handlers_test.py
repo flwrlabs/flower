@@ -30,7 +30,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
-    AUTOMATION_MAX_ACTIVE_PER_USER,
+    AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
     AUTOMATION_MIN_FIXED_INTERVAL,
     AUTOMATION_MIN_START_DELAY,
     FLWR_IN_MEMORY_DB_NAME,
@@ -156,12 +156,12 @@ class TestControlHandlers(unittest.TestCase):
             f"{AUTOMATION_MIN_FIXED_INTERVAL} seconds.",
         )
 
-    def test_start_automation_rejects_user_active_automation_limit(self) -> None:
-        """Reject creation after a user reaches the active automation limit."""
-        for series_id in range(AUTOMATION_MAX_ACTIVE_PER_USER):
+    def test_start_automation_rejects_federation_active_automation_limit(self) -> None:
+        """Reject creation after a federation reaches its automation limit."""
+        for series_id in range(AUTOMATION_MAX_ACTIVE_PER_FEDERATION):
             self.state.store_automation(
                 federation_id=NOOP_FEDERATION_ID,
-                flwr_aid=self.account.flwr_aid,
+                flwr_aid=f"aid-{series_id}",
                 start_run_request=StartRunRequest(series_id=series_id),
                 series_id=series_id,
                 next_run_at="2026-07-10T09:00:00+00:00",
@@ -181,45 +181,9 @@ class TestControlHandlers(unittest.TestCase):
         self.assertEqual(error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
         self.assertEqual(
             error.exception.public_details,
-            f"You can have at most {AUTOMATION_MAX_ACTIVE_PER_USER} "
-            "active automations.",
+            "A federation can have at most "
+            f"{AUTOMATION_MAX_ACTIVE_PER_FEDERATION} active automations.",
         )
-
-    def test_start_automation_limit_ignores_other_users_and_stopped(self) -> None:
-        """Count only the requesting user's active automations."""
-        stopped_id = None
-        for series_id in range(AUTOMATION_MAX_ACTIVE_PER_USER):
-            automation = self.state.store_automation(
-                federation_id=NOOP_FEDERATION_ID,
-                flwr_aid=self.account.flwr_aid,
-                start_run_request=StartRunRequest(series_id=series_id),
-                series_id=series_id,
-                next_run_at="2026-07-10T09:00:00+00:00",
-                max_runs=1,
-            )
-            stopped_id = automation.automation_id
-        assert stopped_id is not None
-        self.state.stop_automation(stopped_id)
-        for series_id in range(AUTOMATION_MAX_ACTIVE_PER_USER):
-            self.state.store_automation(
-                federation_id=NOOP_FEDERATION_ID,
-                flwr_aid="other-user",
-                start_run_request=StartRunRequest(series_id=series_id + 100),
-                series_id=series_id + 100,
-                next_run_at="2026-07-10T09:00:00+00:00",
-                max_runs=1,
-            )
-
-        response = start_automation(
-            StartAutomationRequest(
-                start_at="2099-01-01T00:00:00+00:00",
-                start_run_request=StartRunRequest(series_id=200),
-            ),
-            self.account,
-            self.state,
-        )
-
-        self.assertGreater(response.automation_id, 0)
 
     def test_start_automation_rejects_start_at_without_timezone(self) -> None:
         """Reject a start time without timezone information."""
