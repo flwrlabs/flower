@@ -90,14 +90,9 @@ class SuperNodeLifespan:
     ) -> None:
         self.config = config
         self.state_factory = state_factory
-        self._started = False
 
     def startup(self) -> None:
         """Run the existing blocking SuperNode lifecycle."""
-        if self._started:
-            return
-        self._started = True
-
         config = self.config
         start_client_internal(
             state_factory=self.state_factory,

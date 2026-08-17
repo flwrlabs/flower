@@ -58,7 +58,6 @@ def test_supernode_lifespan_starts_existing_supernode_lifecycle(
 
     lifespan = SuperNodeLifespan(config, state_factory)
     lifespan.startup()
-    lifespan.startup()
 
     start.assert_called_once_with(state_factory=state_factory, **config_values)
 
