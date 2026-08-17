@@ -36,6 +36,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteAppRequest,
+    DeleteAppResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -299,6 +301,15 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("ListApps is not implemented.")
         raise NotImplementedError("ListApps is not implemented.")
+
+    def DeleteApp(
+        self, request: DeleteAppRequest, context: grpc.ServicerContext
+    ) -> DeleteAppResponse:
+        """Delete an app from a federation."""
+        _ = request
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("DeleteApp is not implemented.")
+        raise NotImplementedError("DeleteApp is not implemented.")
 
     def ShowFederation(
         self, request: ShowFederationRequest, context: grpc.ServicerContext
