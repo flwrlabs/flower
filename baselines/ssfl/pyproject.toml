@@ -34,6 +34,13 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["ssfl"]
 
+# Flower 1.33 and flwr-datasets 0.6.0 disagree on rich; prefer Flower's pin.
+[tool.uv]
+override-dependencies = [
+    "rich>=14.0.0,<15.0.0",
+    "datasets>=2.14.6,<5.0.0",
+]
+
 [tool.isort]
 profile = "black"
 known_first_party = ["flwr", "ssfl"]
