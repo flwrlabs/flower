@@ -39,6 +39,7 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
     shutdown_requested = False
     system_healthy = threading.Event()
     system_healthy.set()  # Initially, the connection is healthy
+    retry_invoker: RetryInvoker
 
     def _on_success(retry_state: RetryState) -> None:
         system_healthy.set()
@@ -71,6 +72,11 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
         if e.code() == grpc.StatusCode.PERMISSION_DENIED:  # type: ignore
             raise RunNotRunningException
         if e.code() == grpc.StatusCode.UNAUTHENTICATED:  # type: ignore
+            # Exit handlers disable retries before stopping background RPC workers.
+            # A late response from one of those workers must not interrupt the final
+            # task-output RPC with a nested shutdown signal.
+            if retry_invoker.max_tries == 1:
+                return True
             # Authentication failures should trigger shutdown rather than retrying
             # This can occur, for example, when the user runs `flwr stop`
             # Note: On Windows, `os.kill` terminates the process abruptly, not ideal
@@ -112,7 +118,7 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
         if remaining_time > 0:
             time.sleep(remaining_time)
 
-    return RetryInvoker(
+    retry_invoker = RetryInvoker(
         wait_gen_factory=lambda: exponential(max_delay=MAX_RETRY_DELAY),
         recoverable_exceptions=grpc.RpcError,
         max_tries=None,
@@ -123,6 +129,7 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
         should_giveup=_should_giveup_fn,
         wait_function=_wait,
     )
+    return retry_invoker
 
 
 def wrap_stub(
