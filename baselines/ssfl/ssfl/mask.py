@@ -47,7 +47,7 @@ def get_weighted_mean_saliency_scores(
         k: v.clone().detach() * (weights[0] / total_w)
         for k, v in scores_gathered[0].items()
     }
-    for score_dict, weight in zip(scores_gathered[1:], weights[1:]):
+    for score_dict, weight in zip(scores_gathered[1:], weights[1:], strict=True):
         scale = weight / total_w
         for key, value in score_dict.items():
             contrib = value * scale
@@ -74,6 +74,7 @@ def create_mask_from_scores(
 
     all_scores = torch.cat([v.flatten() for v in scores_dict.values()])
     num_params_to_keep = int(len(all_scores) * keep_ratio)
+    threshold: float | torch.Tensor
     if num_params_to_keep < 1:
         threshold = float("inf")
     else:
@@ -115,8 +116,10 @@ def mask_digest(masks: dict[str, torch.Tensor]) -> str:
 
 
 def masks_to_cpu_uint8(masks: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    """Move masks to CPU and encode them as unsigned bytes."""
     return {k: v.detach().cpu().to(torch.uint8) for k, v in masks.items()}
 
 
 def masks_from_uint8(masks: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    """Decode byte masks as floating-point tensors."""
     return {k: v.detach().to(torch.float32) for k, v in masks.items()}

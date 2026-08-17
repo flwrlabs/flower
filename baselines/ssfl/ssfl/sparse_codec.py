@@ -62,10 +62,12 @@ def unpack_state_dict(
 
 
 def packed_numel(packed: dict[str, torch.Tensor]) -> int:
+    """Count scalar values in a packed state dictionary."""
     return int(sum(t.numel() for t in packed.values()))
 
 
 def dense_numel(state_dict: dict[str, torch.Tensor]) -> int:
+    """Count scalar values in a dense state dictionary."""
     return int(sum(t.numel() for t in state_dict.values()))
 
 
@@ -73,6 +75,7 @@ def compression_ratio(
     state_dict: dict[str, torch.Tensor],
     packed: dict[str, torch.Tensor],
 ) -> float:
+    """Return packed values as a fraction of dense values."""
     dense = dense_numel(state_dict)
     if dense == 0:
         return 1.0

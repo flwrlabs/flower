@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
+import random
 from collections.abc import Iterable
 from logging import INFO
 from typing import Optional
 
-from flwr.app import ArrayRecord, ConfigRecord, Message, MessageType, MetricRecord, RecordDict
+import torch
+
+from flwr.app import (
+    ArrayRecord,
+    ConfigRecord,
+    Message,
+    MessageType,
+    MetricRecord,
+    RecordDict,
+)
 from flwr.common import log
 from flwr.serverapp import Grid
 from flwr.serverapp.strategy import FedAvg
-
 from ssfl.mask import apply_mask_to_state_dict
 from ssfl.metrics import aggregate_train_metrics
 from ssfl.sparse_codec import pack_state_dict, unpack_state_dict
@@ -23,7 +32,7 @@ class SSFLStrategy(FedAvg):
         self,
         *,
         node_to_client_id: dict[int, int],
-        masks: dict[str, object] | None = None,
+        masks: dict[str, torch.Tensor] | None = None,
         mask_version: str = "",
         sample_seed: int = 550,
         transport: str = "dense",
@@ -43,14 +52,13 @@ class SSFLStrategy(FedAvg):
     def configure_train(
         self, server_round: int, arrays: ArrayRecord, config: ConfigRecord, grid: Grid
     ) -> Iterable[Message]:
+        """Configure a training round with deterministic client sampling."""
         if self.fraction_train == 0.0:
             return []
 
         available = set(grid.get_node_ids())
         eligible_client_ids = sorted(
-            cid
-            for nid, cid in self.node_to_client_id.items()
-            if nid in available
+            cid for nid, cid in self.node_to_client_id.items() if nid in available
         )
         if not eligible_client_ids:
             raise RuntimeError("No discovery-mapped clients are available for training")
@@ -62,8 +70,6 @@ class SSFLStrategy(FedAvg):
         sample_size = min(sample_size, len(eligible_client_ids))
 
         # Deterministic sampling by stable client ID.
-        import random
-
         rng = random.Random(self.sample_seed + server_round)
         selected_client_ids = sorted(rng.sample(eligible_client_ids, sample_size))
         node_ids = [self.client_id_to_node[cid] for cid in selected_client_ids]
@@ -88,7 +94,7 @@ class SSFLStrategy(FedAvg):
             if self.masks is None:
                 raise RuntimeError("Sparse transport requires an installed global mask")
             dense = arrays.to_torch_state_dict()
-            packed = pack_state_dict(dense, self.masks)  # type: ignore[arg-type]
+            packed = pack_state_dict(dense, self.masks)
             arrays_to_send = ArrayRecord(packed)
 
         record = RecordDict(
@@ -104,6 +110,7 @@ class SSFLStrategy(FedAvg):
         server_round: int,
         replies: Iterable[Message],
     ) -> tuple[Optional[ArrayRecord], Optional[MetricRecord]]:
+        """Aggregate client updates and reapply the global mask."""
         reply_list = list(replies)
         if self.transport == "sparse":
             if self.masks is None:
@@ -111,8 +118,13 @@ class SSFLStrategy(FedAvg):
             for reply in reply_list:
                 if reply.has_error():
                     continue
-                packed = reply.content[self.arrayrecord_key].to_torch_state_dict()
-                dense = unpack_state_dict(packed, self.masks)  # type: ignore[arg-type]
+                array_record = reply.content[self.arrayrecord_key]
+                if not isinstance(array_record, ArrayRecord):
+                    raise TypeError(
+                        f"Expected ArrayRecord under {self.arrayrecord_key!r}"
+                    )
+                packed = array_record.to_torch_state_dict()
+                dense = unpack_state_dict(packed, self.masks)
                 reply.content[self.arrayrecord_key] = ArrayRecord(dense)
 
         arrays, metrics = super().aggregate_train(server_round, reply_list)
@@ -121,5 +133,5 @@ class SSFLStrategy(FedAvg):
 
         # Re-enforce the static mask after aggregation.
         state = arrays.to_torch_state_dict()
-        masked = apply_mask_to_state_dict(state, self.masks)  # type: ignore[arg-type]
+        masked = apply_mask_to_state_dict(state, self.masks)
         return ArrayRecord(masked), metrics

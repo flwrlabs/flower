@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
-import torch
-from flwr.app import ArrayRecord, ConfigRecord, Context, Message, MetricRecord, RecordDict
-from flwr.clientapp import ClientApp
+from collections.abc import Sized
+from typing import cast
 
+import torch
+
+from flwr.app import (
+    ArrayRecord,
+    ConfigRecord,
+    Context,
+    Message,
+    MetricRecord,
+    RecordDict,
+)
+from flwr.clientapp import ClientApp
 from ssfl.data import first_batches, load_partition_dataloaders
 from ssfl.mask import mask_digest, masks_from_uint8, masks_to_cpu_uint8
 from ssfl.model import create_model, num_classes_for_dataset
@@ -15,6 +25,20 @@ from ssfl.sparse_codec import pack_state_dict, unpack_state_dict
 from ssfl.training import count_nonzero_params, sparsity_from_state_dict, train_local
 
 app = ClientApp()
+
+
+def _array_record(records: RecordDict, key: str = "arrays") -> ArrayRecord:
+    record = records[key]
+    if not isinstance(record, ArrayRecord):
+        raise TypeError(f"Expected ArrayRecord under {key!r}")
+    return record
+
+
+def _config_record(records: RecordDict, key: str = "config") -> ConfigRecord:
+    record = records[key]
+    if not isinstance(record, ConfigRecord):
+        raise TypeError(f"Expected ConfigRecord under {key!r}")
+    return record
 
 
 def _run_config(context: Context) -> dict:
@@ -46,7 +70,7 @@ def _device() -> torch.device:
 def _load_masks_from_state(context: Context) -> dict[str, torch.Tensor] | None:
     if "ssfl-mask" not in context.state:
         return None
-    mask_record: ArrayRecord = context.state["ssfl-mask"]
+    mask_record = _array_record(context.state, "ssfl-mask")
     return masks_from_uint8(mask_record.to_torch_state_dict())
 
 
@@ -64,7 +88,7 @@ def saliency(msg: Message, context: Context) -> Message:
     device = _device()
 
     model = create_model(model_name, num_classes_for_dataset(dataset_name))
-    model.load_state_dict(msg.content["arrays"].to_torch_state_dict())
+    model.load_state_dict(_array_record(msg.content).to_torch_state_dict())
     model.to(device)
 
     trainloader, _ = load_partition_dataloaders(
@@ -75,6 +99,7 @@ def saliency(msg: Message, context: Context) -> Message:
         partition_alpha=float(cfg["partition-alpha"]),
         seed=int(cfg["seed"]),
         data_path=str(cfg.get("data-path", "")),
+        max_partition_samples=int(cfg.get("max-partition-samples", 0)),
     )
     n_batches = int(cfg["saliency-batches"])
     batches = first_batches(trainloader, n_batches)
@@ -87,7 +112,7 @@ def saliency(msg: Message, context: Context) -> Message:
     metrics = MetricRecord(
         {
             "client-id": float(client_id),
-            "num-examples": float(len(trainloader.dataset)),
+            "num-examples": float(len(cast(Sized, trainloader.dataset))),
             "num-score-tensors": float(len(scores)),
         }
     )
@@ -98,14 +123,12 @@ def saliency(msg: Message, context: Context) -> Message:
 @app.query("install_mask")
 def install_mask(msg: Message, context: Context) -> Message:
     """Persist the global static mask in ClientApp context state."""
-    masks_uint8 = msg.content["arrays"].to_torch_state_dict()
+    masks_uint8 = _array_record(msg.content).to_torch_state_dict()
     masks = masks_from_uint8(masks_uint8)
     digest = mask_digest(masks)
-    expected = str(msg.content["config"].get("mask-version", ""))
+    expected = str(_config_record(msg.content).get("mask-version", ""))
     if expected and digest != expected:
-        raise ValueError(
-            f"Mask digest mismatch: got {digest}, expected {expected}"
-        )
+        raise ValueError(f"Mask digest mismatch: got {digest}, expected {expected}")
 
     context.state["ssfl-mask"] = ArrayRecord(masks_to_cpu_uint8(masks))
     context.state["ssfl-mask-meta"] = ConfigRecord(
@@ -129,14 +152,15 @@ def train(msg: Message, context: Context) -> Message:
     """Local masked SGD training for one federated round."""
     cfg = _run_config(context)
     client_id = _stable_client_id(context)
-    server_round = int(msg.content["config"]["server-round"])
+    train_config = _config_record(msg.content)
+    server_round = int(cast(int | float | str, train_config["server-round"]))
     seed_everything(client_round_seed(int(cfg["seed"]), client_id, server_round))
 
     dataset_name = str(cfg["dataset"])
     model_name = str(cfg["model"])
     device = _device()
 
-    requested_mask = str(msg.content["config"].get("mask-version", ""))
+    requested_mask = str(train_config.get("mask-version", ""))
     masks = _load_masks_from_state(context)
     if masks is None:
         raise RuntimeError(
@@ -149,8 +173,8 @@ def train(msg: Message, context: Context) -> Message:
             f"local={local_digest}, requested={requested_mask}"
         )
 
-    transport = str(msg.content["config"].get("transport", cfg.get("transport", "dense")))
-    incoming = msg.content["arrays"].to_torch_state_dict()
+    transport = str(train_config.get("transport", cfg.get("transport", "dense")))
+    incoming = _array_record(msg.content).to_torch_state_dict()
     if transport == "sparse":
         state_in = unpack_state_dict(incoming, masks)
     elif transport == "dense":
@@ -169,13 +193,19 @@ def train(msg: Message, context: Context) -> Message:
         partition_alpha=float(cfg["partition-alpha"]),
         seed=int(cfg["seed"]),
         data_path=str(cfg.get("data-path", "")),
+        max_partition_samples=int(cfg.get("max-partition-samples", 0)),
     )
 
     train_loss, final_lr = train_local(
         model,
         trainloader,
         epochs=int(cfg["local-epochs"]),
-        lr=float(msg.content["config"].get("lr", cfg["learning-rate"])),
+        lr=float(
+            cast(
+                int | float | str,
+                train_config.get("lr", cfg["learning-rate"]),
+            )
+        ),
         momentum=float(cfg["momentum"]),
         weight_decay=float(cfg["weight-decay"]),
         max_grad_norm=float(cfg["max-grad-norm"]),
@@ -196,7 +226,7 @@ def train(msg: Message, context: Context) -> Message:
     metrics = MetricRecord(
         {
             "train_loss": float(train_loss),
-            "num-examples": float(len(trainloader.dataset)),
+            "num-examples": float(len(cast(Sized, trainloader.dataset))),
             "learning_rate": float(final_lr),
             "comm_params": float(count_nonzero_params(state)),
             "arrayrecord_payload_bytes": float(model_record.count_bytes()),

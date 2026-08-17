@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timezone
 from logging import INFO
 from pathlib import Path
 from typing import Any
 
 import torch
-from flwr.app import ArrayRecord, ConfigRecord, Context, Message, MetricRecord, RecordDict
+
+from flwr.app import (
+    ArrayRecord,
+    ConfigRecord,
+    Context,
+    Message,
+    MetricRecord,
+    RecordDict,
+)
 from flwr.common import log
 from flwr.serverapp import Grid, ServerApp
-
 from ssfl.comm_stats import CommStats
 from ssfl.data import load_centralized_testloader
 from ssfl.mask import (
@@ -32,6 +40,26 @@ from ssfl.wandb_utils import WandbSession
 app = ServerApp()
 
 
+def _array_record(records: RecordDict, key: str = "arrays") -> ArrayRecord:
+    record = records[key]
+    if not isinstance(record, ArrayRecord):
+        raise TypeError(f"Expected ArrayRecord under {key!r}")
+    return record
+
+
+def _metric_record(records: RecordDict, key: str = "metrics") -> MetricRecord:
+    record = records[key]
+    if not isinstance(record, MetricRecord):
+        raise TypeError(f"Expected MetricRecord under {key!r}")
+    return record
+
+
+def _metric_float(value: object) -> float:
+    if not isinstance(value, (int, float)):
+        raise TypeError("Expected a scalar numeric metric")
+    return float(value)
+
+
 def _device(prefer_cpu: bool = True) -> torch.device:
     if prefer_cpu or not torch.cuda.is_available():
         return torch.device("cpu")
@@ -48,13 +76,11 @@ def _cfg_bool(cfg: dict, key: str, default: bool = False) -> bool:
 
 
 def _wait_for_nodes(grid: Grid, expected: int, timeout_s: float = 120.0) -> list[int]:
-    import time
-
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         node_ids = list(grid.get_node_ids())
         if len(node_ids) >= expected:
-            return sorted(node_ids)
+            return sorted(node_ids)[:expected]
         time.sleep(0.5)
     node_ids = list(grid.get_node_ids())
     raise RuntimeError(
@@ -96,15 +122,15 @@ def _run_saliency_discovery(
             errors.append((reply.metadata.src_node_id, reply.error.reason))
             continue
         src = int(reply.metadata.src_node_id)
-        metrics = reply.content["metrics"]
-        client_id = int(metrics["client-id"])
+        metrics = _metric_record(reply.content)
+        client_id = int(_metric_float(metrics["client-id"]))
         if client_id in node_to_client.values():
             raise RuntimeError(f"Duplicate client-id {client_id} in saliency replies")
         node_to_client[src] = client_id
-        score_record = reply.content["arrays"]
+        score_record = _array_record(reply.content)
         uplink_bytes += int(score_record.count_bytes())
         score_dicts.append(score_record.to_torch_state_dict())
-        weights.append(float(metrics["num-examples"]))
+        weights.append(_metric_float(metrics["num-examples"]))
 
     if errors:
         raise RuntimeError(f"Saliency discovery failed for nodes: {errors}")
@@ -125,7 +151,7 @@ def _install_masks(
     node_ids: list[int],
     timeout: float,
 ) -> int:
-    """Install masks on all clients. Returns downlink payload bytes (sum over clients)."""
+    """Install masks and return total client downlink payload bytes."""
     mask_record = ArrayRecord(masks_to_cpu_uint8(masks))
     per_client_bytes = int(mask_record.count_bytes())
     config = ConfigRecord({"mask-version": digest, "phase": "install_mask"})
@@ -172,7 +198,9 @@ def _save_checkpoint(
     server_round: int | str,
 ) -> None:
     directory.mkdir(parents=True, exist_ok=True)
-    stem = f"round_{server_round}" if isinstance(server_round, int) else str(server_round)
+    stem = (
+        f"round_{server_round}" if isinstance(server_round, int) else str(server_round)
+    )
     torch.save(arrays.to_torch_state_dict(), directory / f"{stem}_model.pt")
     torch.save(masks_to_cpu_uint8(masks), directory / f"{stem}_mask.pt")
     (directory / f"{stem}_mask_version.txt").write_text(digest + "\n")
@@ -186,11 +214,16 @@ def _append_jsonl(path: Path, record: dict[str, Any]) -> None:
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 @app.main()
 def main(grid: Grid, context: Context) -> None:
+    """Run SSFL mask discovery and federated training."""
+    # This function intentionally keeps the complete server lifecycle together.
+    # pylint: disable=too-many-locals,too-many-statements
     cfg = context.run_config
     seed = int(cfg["seed"])
     seed_everything(seed)
@@ -213,11 +246,17 @@ def main(grid: Grid, context: Context) -> None:
 
     comm = CommStats()
     comm.notes.append(
-        "Values are ArrayRecord payload bytes, not full serialized Message / wire bytes."
+        "Values are ArrayRecord payload bytes, not full serialized "
+        "Message / wire bytes."
     )
 
-    log(INFO, "SSFL ServerApp starting (dataset=%s, model=%s, clients=%s)",
-        dataset_name, model_name, num_clients)
+    log(
+        INFO,
+        "SSFL ServerApp starting (dataset=%s, model=%s, clients=%s)",
+        dataset_name,
+        model_name,
+        num_clients,
+    )
     if save_metrics:
         log(INFO, "Metrics will be written under %s", checkpoint_dir)
 
@@ -232,8 +271,8 @@ def main(grid: Grid, context: Context) -> None:
     # Distributed mask discovery.
     log(INFO, "Starting saliency discovery on all clients...")
     discovery_downlink = int(arrays.count_bytes()) * len(node_ids)
-    node_to_client, score_dicts, sample_weights, discovery_uplink = _run_saliency_discovery(
-        grid, arrays=arrays, node_ids=node_ids, timeout=timeout
+    node_to_client, score_dicts, sample_weights, discovery_uplink = (
+        _run_saliency_discovery(grid, arrays=arrays, node_ids=node_ids, timeout=timeout)
     )
     comm.discovery_downlink_payload_bytes = discovery_downlink
     comm.discovery_uplink_payload_bytes = discovery_uplink
@@ -323,15 +362,12 @@ def main(grid: Grid, context: Context) -> None:
         min_available_nodes=min(2, num_clients),
     )
 
-    evaluate_fn = None
     if int(cfg["evaluate-every"]) > 0:
 
-        def evaluate_fn(server_round: int, arrays: ArrayRecord) -> MetricRecord | None:
+        def _evaluate_fn(server_round: int, arrays: ArrayRecord) -> MetricRecord | None:
             if server_round != 0 and server_round % int(cfg["evaluate-every"]) != 0:
                 return None
-            eval_model = create_model(
-                model_name, num_classes_for_dataset(dataset_name)
-            )
+            eval_model = create_model(model_name, num_classes_for_dataset(dataset_name))
             state = arrays.to_torch_state_dict()
             eval_model.load_state_dict(state)
             testloader = load_centralized_testloader(
@@ -374,6 +410,10 @@ def main(grid: Grid, context: Context) -> None:
                 }
             )
 
+        evaluate_fn = _evaluate_fn
+    else:
+        evaluate_fn = None
+
     result = strategy.start(
         grid=grid,
         initial_arrays=arrays,
@@ -387,10 +427,10 @@ def main(grid: Grid, context: Context) -> None:
     for round_idx, round_metrics in sorted(result.train_metrics_clientapp.items()):
         if "arrayrecord_payload_bytes" in round_metrics:
             comm.train_uplink_payload_bytes += int(
-                float(round_metrics["arrayrecord_payload_bytes"])
+                _metric_float(round_metrics["arrayrecord_payload_bytes"])
             )
         if "comm_params" in round_metrics:
-            comm.train_comm_params += int(float(round_metrics["comm_params"]))
+            comm.train_comm_params += int(_metric_float(round_metrics["comm_params"]))
         if save_metrics:
             train_record = {
                 "event": "train",
@@ -420,9 +460,7 @@ def main(grid: Grid, context: Context) -> None:
         log(INFO, "Saved final checkpoint under %s", checkpoint_dir)
 
     if save_metrics:
-        eval_points = [
-            row for row in metrics_history if row.get("event") == "eval"
-        ]
+        eval_points = [row for row in metrics_history if row.get("event") == "eval"]
         final_eval = eval_points[-1] if eval_points else {}
         summary = {
             "started_at": started_at,

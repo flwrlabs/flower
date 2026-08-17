@@ -9,6 +9,7 @@ import torch
 
 
 def seed_everything(seed: int) -> None:
+    """Seed Python, NumPy, and PyTorch random number generators."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)

@@ -49,9 +49,7 @@ def test_legacy_mask_utils_parity_when_available():
         from api.sparsity.saliency_utils import (
             create_mask_from_scores as legacy_create_mask,
         )
-        from api.sparsity.saliency_utils import (
-            get_mean_saliency_scores as legacy_mean,
-        )
+        from api.sparsity.saliency_utils import get_mean_saliency_scores as legacy_mean
     except Exception:
         pytest.skip("Legacy SSFL package not importable")
 

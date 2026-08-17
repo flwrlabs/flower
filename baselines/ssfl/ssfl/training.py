@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import torch
-import torch.nn as nn
-import torch.optim.lr_scheduler as lr_scheduler
+from torch import nn
+from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 
+from ssfl.data import labels_from_batch
 from ssfl.model import SparseModel, prunable_parameter_names
 
 
@@ -91,6 +92,7 @@ def evaluate_model(
     device: torch.device | None = None,
     masks: dict[str, torch.Tensor] | None = None,
 ) -> dict[str, float]:
+    """Evaluate a model and return loss, accuracy, and sample count."""
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -125,12 +127,14 @@ def evaluate_model(
 
 
 def count_nonzero_params(state_dict: dict[str, torch.Tensor]) -> int:
+    """Count nonzero values across a model state dictionary."""
     return int(sum(torch.count_nonzero(t).item() for t in state_dict.values()))
 
 
 def sparsity_from_state_dict(
     state_dict: dict[str, torch.Tensor], model: nn.Module
 ) -> float:
+    """Calculate the percentage of zero-valued prunable weights."""
     prunable = prunable_parameter_names(model)
     total_zeros = 0
     total_weights = 0
@@ -148,8 +152,6 @@ def sparsity_from_state_dict(
 def _unpack_batch(batch) -> tuple[torch.Tensor, torch.Tensor]:
     if isinstance(batch, dict):
         # HuggingFace / Flower Datasets batches (CIFAR-10: label; CIFAR-100: fine_label)
-        from ssfl.data import labels_from_batch
-
         if "img" in batch:
             return batch["img"], labels_from_batch(batch)
         if "image" in batch:

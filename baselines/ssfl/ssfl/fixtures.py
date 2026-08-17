@@ -95,7 +95,7 @@ def generate_stage_oracle(
     weight_decay: float = 0.0005,
 ) -> dict:
     """
-    Full stage-level oracle for Phase-0/1 parity gates:
+    Generate a full stage-level oracle for Phase-0/1 parity gates.
 
     init model → local saliency → global mask → masked local updates → FedAvg.
     """
@@ -110,7 +110,7 @@ def generate_stage_oracle(
     mapping = fixture["partition_map"]
     masked_init = apply_mask_to_state_dict(init_state, masks)
 
-    local_updates: list[tuple[float, OrderedDict[str, torch.Tensor]]] = []
+    local_updates: list[tuple[float, dict[str, torch.Tensor]]] = []
     local_states = []
 
     for client_id in range(n_clients):
@@ -119,9 +119,7 @@ def generate_stage_oracle(
         batch_x, batch_y = fixture["client_batches"][client_id]
         xs = batch_x.repeat(2, 1, 1, 1)
         ys = batch_y.repeat(2)
-        loader = DataLoader(
-            TensorDataset(xs, ys), batch_size=batch_size, shuffle=False
-        )
+        loader = DataLoader(TensorDataset(xs, ys), batch_size=batch_size, shuffle=False)
         train_local(
             model,
             loader,
@@ -160,6 +158,7 @@ def generate_stage_oracle(
 def save_fixture(
     fixture: dict, out_dir: str | Path, name: str = "small_mask_fixture.pt"
 ) -> Path:
+    """Save the reproducibility subset of a fixture."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     path = out / name

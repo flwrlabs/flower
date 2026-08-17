@@ -7,10 +7,17 @@ from typing import Any
 
 import numpy as np
 import torch
+from datasets import load_dataset
 from flwr_datasets import FederatedDataset
 from torch.utils.data import DataLoader, Subset
 from torchvision.datasets import CIFAR10, CIFAR100
-from torchvision.transforms import Compose, Normalize, RandomCrop, RandomHorizontalFlip, ToTensor
+from torchvision.transforms import (
+    Compose,
+    Normalize,
+    RandomCrop,
+    RandomHorizontalFlip,
+    ToTensor,
+)
 
 from ssfl.partitioner import BalancedDirichletPartitioner, partition_data_dirichlet
 
@@ -19,8 +26,7 @@ CIFAR10_STD = [0.24703233, 0.24348505, 0.26158768]
 CIFAR100_MEAN = [0.5071, 0.4867, 0.4408]
 CIFAR100_STD = [0.2675, 0.2565, 0.2761]
 
-_fds_cache: FederatedDataset | None = None
-_fds_key: tuple[Any, ...] | None = None
+_fds_cache: dict[tuple[Any, ...], FederatedDataset] = {}
 _local_index_cache: dict[tuple[Any, ...], dict[int, list[int]]] = {}
 
 
@@ -90,9 +96,13 @@ def _torchvision_cifar(dataset_name: str, root: str, train: bool, transform):
     root_path = Path(root).expanduser().resolve()
     root_path.mkdir(parents=True, exist_ok=True)
     if dataset_name == "cifar10":
-        return CIFAR10(root=str(root_path), train=train, download=True, transform=transform)
+        return CIFAR10(
+            root=str(root_path), train=train, download=True, transform=transform
+        )
     if dataset_name == "cifar100":
-        return CIFAR100(root=str(root_path), train=train, download=True, transform=transform)
+        return CIFAR100(
+            root=str(root_path), train=train, download=True, transform=transform
+        )
     raise ValueError(f"Unsupported dataset: {dataset_name}")
 
 
@@ -128,10 +138,11 @@ def load_federated_dataset(
     partition_alpha: float,
     seed: int,
 ) -> FederatedDataset:
-    global _fds_cache, _fds_key
+    """Load and cache a partitioned Flower dataset."""
     key = (dataset_name, num_partitions, partition_alpha, seed)
-    if _fds_cache is not None and _fds_key == key:
-        return _fds_cache
+    cached = _fds_cache.get(key)
+    if cached is not None:
+        return cached
 
     partitioner = BalancedDirichletPartitioner(
         num_partitions=num_partitions,
@@ -144,8 +155,8 @@ def load_federated_dataset(
         partitioners={"train": partitioner},
         seed=seed,
     )
-    _fds_cache = fds
-    _fds_key = key
+    _fds_cache.clear()
+    _fds_cache[key] = fds
     return fds
 
 
@@ -159,6 +170,7 @@ def load_partition_dataloaders(
     seed: int,
     val_fraction: float = 0.0,
     data_path: str | None = None,
+    max_partition_samples: int = 0,
 ) -> tuple[DataLoader, DataLoader | None]:
     """
     Load a client's train (and optional local val) DataLoader.
@@ -178,12 +190,13 @@ def load_partition_dataloaders(
             seed=seed,
             val_fraction=val_fraction,
             data_path=resolved_path,
+            max_partition_samples=max_partition_samples,
         )
 
-    fds = load_federated_dataset(
-        dataset_name, num_partitions, partition_alpha, seed
-    )
+    fds = load_federated_dataset(dataset_name, num_partitions, partition_alpha, seed)
     partition = fds.load_partition(partition_id)
+    if 0 < max_partition_samples < len(partition):
+        partition = partition.select(range(max_partition_samples))
     train_transform = _transforms(dataset_name, train=True)
 
     if val_fraction > 0:
@@ -216,6 +229,7 @@ def _load_local_partition_dataloaders(
     seed: int,
     val_fraction: float,
     data_path: str,
+    max_partition_samples: int,
 ) -> tuple[DataLoader, DataLoader | None]:
     if partition_id < 0 or partition_id >= num_partitions:
         raise ValueError(
@@ -229,6 +243,8 @@ def _load_local_partition_dataloaders(
         partition_alpha=partition_alpha,
         seed=seed,
     )[partition_id]
+    if max_partition_samples > 0:
+        indices = indices[:max_partition_samples]
 
     train_transform = _transforms(dataset_name, train=True)
     full_train = _torchvision_cifar(
@@ -271,6 +287,7 @@ def load_centralized_testloader(
     batch_size: int = 128,
     data_path: str | None = None,
 ) -> DataLoader:
+    """Load the centralized test split."""
     resolved_path = _normalize_data_path(data_path)
     test_transform = _transforms(dataset_name, train=False)
     if resolved_path is not None:
@@ -279,14 +296,14 @@ def load_centralized_testloader(
         )
         return DataLoader(test_ds, batch_size=batch_size, shuffle=False)
 
-    from datasets import load_dataset
-
     ds = load_dataset(_dataset_hub_name(dataset_name), split="test")
     ds = ds.with_transform(lambda batch: _apply_transforms(batch, test_transform))
     return DataLoader(ds, batch_size=batch_size, shuffle=False)
 
 
-def first_batches(trainloader: DataLoader, n: int) -> list[tuple[torch.Tensor, torch.Tensor]]:
+def first_batches(
+    trainloader: DataLoader, n: int
+) -> list[tuple[torch.Tensor, torch.Tensor]]:
     """Take the first n batches from a dataloader (for saliency)."""
     batches = []
     iterator = iter(trainloader)

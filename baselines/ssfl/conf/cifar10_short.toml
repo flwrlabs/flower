@@ -6,6 +6,7 @@ fraction-train = 0.1
 fraction-evaluate = 0.0
 local-epochs = 5
 batch-size = 16
+max-partition-samples = 0
 learning-rate = 0.1
 lr-scheduler = "default"
 lr-decay = 0.998
