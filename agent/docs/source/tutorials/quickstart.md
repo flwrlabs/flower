@@ -4,9 +4,7 @@ Use the browser to get your first Flower Agent response in less than 5 minutes. 
 don't need to install Flower or provide a model API key.
 
 ```{note}
-The browser interface is experimental and may change. Check [Feature
-status](../reference/feature-status.md) for the version and current status of
-the capabilities used here.
+The browser interface is experimental and may change between releases.
 ```
 
 ## Before you start
@@ -125,5 +123,3 @@ private source content in a support report.
 - Prefer a terminal workflow? [Chat in your
   terminal](get-started-with-flower-agent.md) introduces `flwr chat`.
 - [Write your first AgentApp](write-your-first-agentapp.md).
-- Check [Feature status](../reference/feature-status.md) before designing around
-  an experimental or limited capability.

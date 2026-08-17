@@ -20,9 +20,8 @@ When you're ready to build:
   smallest useful custom app.
 
 ```{note}
-Flower Agent is experimental. Check [Feature status](reference/feature-status.md)
-before relying on a capability. It shows what is available, limited, or planned
-and when each capability was last verified.
+Flower Agent is experimental. Its interfaces and behavior may change between
+releases.
 ```
 
 ## Understand the pieces
@@ -65,13 +64,6 @@ how-to-guides/run-with-local-superlink
 
 explanations/agentapp-runtime
 explanations/use-connectors
-```
-
-```{toctree}
-:caption: Reference
-:maxdepth: 1
-
-reference/feature-status
 ```
 
 ## Documentation boundaries

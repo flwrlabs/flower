@@ -138,6 +138,3 @@ Built-in tools such as `web_search` and `web_fetch` are chosen in AgentApp code.
 Slack, Notion, GitHub, and Attio are account connectors selected for a browser
 run. Flower 1.34.0 rejects account-connector references for a collaborative
 federation; run that task in your personal workspace instead.
-
-Check [Feature status](../reference/feature-status.md) before designing around
-an account connector or personal-workspace restriction.

@@ -32,8 +32,7 @@ flwr, version 1.34.0
 ```
 
 Running an explicit version keeps every command in this tutorial on the same
-CLI. If the package isn't available, check [Feature
-status](../reference/feature-status.md) and follow the package or installation
+CLI. If the package isn't available, follow the package or installation
 instructions for your Flower environment.
 
 ## Configure and log in to SuperGrid
