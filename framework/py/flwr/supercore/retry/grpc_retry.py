@@ -76,7 +76,7 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
             # Exit handlers disable retries before stopping background RPC workers.
             # A late response from one of those workers must not interrupt the final
             # task-output RPC with a nested shutdown signal.
-            if retry_invoker.max_tries == 1:
+            if retry_invoker.retries_disabled:
                 return True
             # Authentication failures should trigger shutdown rather than retrying
             # This can occur, for example, when the user runs `flwr stop`

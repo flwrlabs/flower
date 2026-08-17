@@ -195,12 +195,14 @@ class RetryInvoker:
         self.jitter = jitter
         self.should_giveup = should_giveup
         self.cancel_wait_function = cancel_wait_function
+        self.retries_disabled = False
         if wait_function is None:
             wait_function = time.sleep
         self.wait_function = wait_function
 
     def disable_retries(self) -> None:
         """Disable further retries and interrupt an active retry wait."""
+        self.retries_disabled = True
         self.max_tries = 1
         if self.cancel_wait_function is not None:
             self.cancel_wait_function()

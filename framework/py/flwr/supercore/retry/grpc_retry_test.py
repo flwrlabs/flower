@@ -54,6 +54,22 @@ def test_unauthenticated_does_not_signal_when_retries_disabled(
     mock_kill.assert_not_called()
 
 
+@patch("flwr.supercore.retry.grpc_retry.time.sleep")
+@patch("flwr.supercore.retry.grpc_retry.os.kill")
+def test_unauthenticated_signals_when_max_tries_is_one(
+    mock_kill: Mock,
+    _mock_sleep: Mock,
+) -> None:
+    """A configured one-attempt limit must not look like executor shutdown."""
+    retry_invoker = make_simple_grpc_retry_invoker()
+    retry_invoker.max_tries = 1
+
+    with pytest.raises(_UnauthenticatedError):
+        retry_invoker.invoke(Mock(side_effect=_UnauthenticatedError()))
+
+    mock_kill.assert_called_once()
+
+
 def test_disable_retries_interrupts_grpc_backoff() -> None:
     """Executor shutdown must not wait for an active gRPC retry backoff."""
     retry_invoker = make_simple_grpc_retry_invoker()
