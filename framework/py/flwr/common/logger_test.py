@@ -23,6 +23,8 @@ from pathlib import Path
 from queue import Queue
 from unittest.mock import Mock
 
+import grpc
+
 from .constant import TASK_WORKER_CALL_TIMEOUT
 from .logger import (
     FLOWER_LOGGER,
@@ -34,6 +36,14 @@ from .logger import (
     start_log_uploader,
     stop_log_uploader,
 )
+
+
+class _DeadlineExceededError(grpc.RpcError):  # type: ignore[misc]
+    """gRPC error reporting an expired call deadline."""
+
+    def code(self) -> grpc.StatusCode:
+        """Return the gRPC status code."""
+        return grpc.StatusCode.DEADLINE_EXCEEDED
 
 
 def test_mirror_output_to_queue() -> None:
@@ -131,6 +141,31 @@ def test_log_uploader_uses_bounded_rpc() -> None:
 
     assert not uploader.is_alive()
     assert stub.PushLogs.call_args.kwargs["timeout"] == TASK_WORKER_CALL_TIMEOUT
+
+
+def test_log_uploader_retries_after_deadline_expiry() -> None:
+    """A transient upload deadline must not terminate the uploader."""
+    log_queue: Queue[str | None] = Queue()
+    log_queue.put("Test message")
+    upload_succeeded = threading.Event()
+    requests = []
+
+    def push_logs(request: object, **_kwargs: object) -> None:
+        requests.append(request)
+        if len(requests) == 1:
+            raise _DeadlineExceededError
+        upload_succeeded.set()
+
+    stub = Mock()
+    stub.PushLogs.side_effect = push_logs
+    uploader = start_log_uploader(log_queue, node_id=1, run_id=2, stub=stub)
+
+    assert upload_succeeded.wait(timeout=2.0)
+    stop_log_uploader(log_queue, uploader, timeout=1.0)
+
+    assert not uploader.is_alive()
+    assert len(requests) == 2
+    assert requests[0] == requests[1]
 
 
 def test_configure_superlink_log_file(tmp_path: Path) -> None:
