@@ -41,15 +41,15 @@ def downgrade() -> None:
     op.create_table(
         "logs",
         sa.Column("timestamp", sa.Float(), nullable=True),
-        sa.Column("run_id", sa.Integer(), nullable=True),
-        sa.Column("node_id", sa.Integer(), nullable=True),
+        sa.Column("run_id", sa.BigInteger(), nullable=True),
+        sa.Column("node_id", sa.BigInteger(), nullable=True),
         sa.Column("log", sa.String(), nullable=True),
         sa.ForeignKeyConstraint(["run_id"], ["run.run_id"]),
         sa.UniqueConstraint("timestamp", "run_id", "node_id"),
     )
     op.create_table(
         "context",
-        sa.Column("run_id", sa.Integer(), nullable=True),
+        sa.Column("run_id", sa.BigInteger(), nullable=True),
         sa.Column("context", sa.LargeBinary(), nullable=True),
         sa.ForeignKeyConstraint(["run_id"], ["run.run_id"]),
         sa.UniqueConstraint("run_id"),
