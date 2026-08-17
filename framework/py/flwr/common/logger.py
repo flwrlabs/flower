@@ -411,13 +411,15 @@ def _log_uploader(
                 stub.PushLogs(req, timeout=TASK_WORKER_CALL_TIMEOUT)
                 msgs.clear()
             except grpc.RpcError as e:
-                # Ignore minor network errors
+                # Ignore minor network errors. A deadline leaves delivery ambiguous:
+                # the server may already have appended this non-idempotent batch, so
+                # discard it instead of risking duplicate logs on a retry.
                 # pylint: disable-next=no-member
-                if e.code() not in (
-                    grpc.StatusCode.UNAVAILABLE,
-                    grpc.StatusCode.DEADLINE_EXCEEDED,
-                ):
-                    raise e
+                status_code = e.code()
+                if status_code == grpc.StatusCode.DEADLINE_EXCEEDED:
+                    msgs.clear()
+                elif status_code != grpc.StatusCode.UNAVAILABLE:
+                    raise
 
         if exit_flag and not msgs:
             break

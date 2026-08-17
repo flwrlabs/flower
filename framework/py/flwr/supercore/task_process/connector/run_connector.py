@@ -22,7 +22,7 @@ from logging import DEBUG, ERROR
 
 import grpc
 
-from flwr.common.constant import SubStatus
+from flwr.common.constant import TASK_WORKER_CALL_TIMEOUT, SubStatus
 from flwr.common.logger import log
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
@@ -105,7 +105,10 @@ def run_connector(  # pylint: disable=too-many-locals
     )
 
     try:
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
+        heartbeat_sender = HeartbeatSender(
+            make_task_heartbeat_fn_grpc(stub),
+            call_timeout=TASK_WORKER_CALL_TIMEOUT,
+        )
         heartbeat_sender.start()
 
         log(DEBUG, "[flwr-connector] Pull task input")

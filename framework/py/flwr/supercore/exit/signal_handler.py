@@ -17,7 +17,7 @@
 
 import signal
 from collections.abc import Callable
-from threading import Lock, Thread
+from threading import RLock, Thread
 from types import FrameType
 
 from grpc import Server
@@ -65,7 +65,8 @@ def register_signal_handlers(
     """
     default_handlers: dict[int, Callable[[int, FrameType], None]] = {}
     is_exiting = False
-    lock = Lock()
+    # A second signal can synchronously interrupt this main-thread critical section.
+    lock = RLock()
 
     def _wait_to_stop() -> None:
         if grpc_servers is not None:

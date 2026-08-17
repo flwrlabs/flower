@@ -54,13 +54,19 @@ class HeartbeatSender:
         Function used to send a heartbeat signal. It should return True if the heartbeat
         succeeds, or False if it fails. Any internal exceptions (e.g., gRPC errors)
         should be handled within this function to ensure boolean return values.
+    call_timeout : float (default: HEARTBEAT_CALL_TIMEOUT)
+        Maximum expected duration of one heartbeat call, used to keep the interval
+        between heartbeat starts stable.
     """
 
     def __init__(
         self,
         heartbeat_fn: Callable[[], bool],
+        *,
+        call_timeout: float = HEARTBEAT_CALL_TIMEOUT,
     ) -> None:
         self.heartbeat_fn = heartbeat_fn
+        self._call_timeout = call_timeout
         self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._retry_invoker = RetryInvoker(
@@ -105,9 +111,9 @@ class HeartbeatSender:
             self._retry_invoker.invoke(self._heartbeat)
 
             # Calculate the interval for the next heartbeat
-            # Formula: next_interval = (interval - timeout) * random.uniform(0.7, 0.9)
+            # Account for the RPC deadline when spacing heartbeat starts.
             rd = random.uniform(*HEARTBEAT_RANDOM_RANGE)
-            next_interval: float = HEARTBEAT_DEFAULT_INTERVAL - HEARTBEAT_CALL_TIMEOUT
+            next_interval: float = HEARTBEAT_DEFAULT_INTERVAL - self._call_timeout
             next_interval *= HEARTBEAT_BASE_MULTIPLIER + rd
 
             # Wait for the calculated interval or exit early if stopped

@@ -15,7 +15,7 @@
 """Tests for exit handler functions."""
 
 
-from .exit_handler import add_exit_handler, trigger_exit_handlers
+from .exit_handler import _lock_handlers, add_exit_handler, trigger_exit_handlers
 
 
 def test_trigger_exit_handlers() -> None:
@@ -115,3 +115,14 @@ def test_trigger_exit_handlers_is_reentrant() -> None:
     trigger_exit_handlers()
 
     assert execution_order == [1, 2]
+
+
+def test_exit_handler_registry_lock_is_reentrant() -> None:
+    """A signal inside the registry critical section must not deadlock exit."""
+    with _lock_handlers:
+        # pylint: disable-next=consider-using-with
+        reacquired = _lock_handlers.acquire(blocking=False)
+        if reacquired:
+            _lock_handlers.release()
+
+    assert reacquired

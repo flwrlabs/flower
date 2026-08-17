@@ -15,6 +15,7 @@
 """Tests for `RetryInvoker`."""
 
 
+import threading
 from collections.abc import Generator
 from unittest.mock import MagicMock, Mock, patch
 
@@ -165,6 +166,30 @@ def test_disable_retries_calls_wait_canceller() -> None:
 
     assert invoker.max_tries == 1
     cancel_wait.assert_called_once_with()
+
+
+def test_disable_retries_reenters_state_update() -> None:
+    """A signal during a retry-state update must not deadlock shutdown."""
+    invoker = RetryInvoker(
+        lambda: constant(0.1),
+        ValueError,
+        max_tries=None,
+        max_time=None,
+    )
+    thread_finished = threading.Event()
+
+    def disable_while_locked() -> None:
+        with invoker._state_lock:  # pylint: disable=protected-access
+            invoker.disable_retries()
+        thread_finished.set()
+
+    thread = threading.Thread(target=disable_while_locked, daemon=True)
+    thread.start()
+    thread.join(timeout=1.0)
+
+    assert thread_finished.is_set()
+    assert not thread.is_alive()
+    assert invoker.retries_disabled
 
 
 def test_max_time(mock_time: MagicMock, mock_sleep: MagicMock) -> None:

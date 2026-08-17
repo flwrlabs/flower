@@ -26,7 +26,9 @@ SIGNAL_TO_EXIT_CODE: dict[int, int] = {
     signal.SIGTERM: ExitCode.GRACEFUL_EXIT_SIGTERM,
 }
 registered_exit_handlers: list[Callable[[], None]] = []
-_lock_handlers = threading.Lock()
+# Python signal handlers run synchronously on the main thread and can interrupt this
+# critical section, so nested exit handling must be able to reacquire the lock.
+_lock_handlers = threading.RLock()
 
 # SIGQUIT is not available on Windows
 if hasattr(signal, "SIGQUIT"):
@@ -73,9 +75,8 @@ def trigger_exit_handlers() -> None:
         handlers = list(reversed(registered_exit_handlers))
         registered_exit_handlers.clear()
 
-    # Run handlers without holding the registry lock. A handler can be interrupted by
-    # a signal which triggers exit handling again, so holding this non-reentrant lock
-    # while invoking callbacks can deadlock the process.
+    # Run handlers without holding the registry lock. This keeps registration and
+    # nested exit handling independent of long-running callbacks.
     for handler in handlers:
         try:
             handler()

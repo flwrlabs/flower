@@ -26,7 +26,12 @@ from flwr.cli.install import install_from_fab
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common.config import get_project_dir
-from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatus
+from flwr.common.constant import (
+    RUNTIME_DEPENDENCY_INSTALL,
+    TASK_WORKER_CALL_TIMEOUT,
+    ErrorCode,
+    SubStatus,
+)
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -153,7 +158,10 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
     try:
         # Start task heartbeat
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
+        heartbeat_sender = HeartbeatSender(
+            make_task_heartbeat_fn_grpc(stub),
+            call_timeout=TASK_WORKER_CALL_TIMEOUT,
+        )
         heartbeat_sender.start()
 
         # Pull Message, Context, Run and FAB from SuperNode

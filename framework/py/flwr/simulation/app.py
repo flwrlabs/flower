@@ -38,6 +38,7 @@ from flwr.common.config import (
 from flwr.common.constant import (
     RUNTIME_DEPENDENCY_INSTALL,
     SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
+    TASK_WORKER_CALL_TIMEOUT,
     SubStatus,
 )
 from flwr.common.logger import (
@@ -229,7 +230,10 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
     try:
         # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(conn._stub))
+        heartbeat_sender = HeartbeatSender(
+            make_task_heartbeat_fn_grpc(conn._stub),
+            call_timeout=TASK_WORKER_CALL_TIMEOUT,
+        )
         heartbeat_sender.start()
 
         # Pull SimulationInputs from LinkState

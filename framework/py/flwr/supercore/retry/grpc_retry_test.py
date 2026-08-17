@@ -15,8 +15,8 @@
 """Tests for gRPC retry utilities."""
 
 
+import inspect
 import threading
-from collections.abc import Callable
 from unittest.mock import Mock, patch
 
 import grpc
@@ -40,20 +40,6 @@ class _UnavailableError(grpc.RpcError):  # type: ignore[misc]
     def code(self) -> grpc.StatusCode:
         """Return the gRPC status code."""
         return grpc.StatusCode.UNAVAILABLE
-
-
-class _ReentrantClearEvent(threading.Event):
-    """Event which invokes a callback while its caller still holds a lock."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.on_clear: Callable[[], None] | None = None
-
-    def clear(self) -> None:
-        """Clear the event, then simulate a synchronous signal callback."""
-        super().clear()
-        if self.on_clear is not None:
-            self.on_clear()
 
 
 @patch("flwr.supercore.retry.grpc_retry.os.kill")
@@ -151,29 +137,21 @@ def test_disable_retries_interrupts_all_grpc_backoffs() -> None:
 
 def test_disable_retries_is_reentrant_from_retry_callback() -> None:
     """A signal during a retry callback must not deadlock shutdown."""
-    system_healthy = _ReentrantClearEvent()
-    retry_wait_cancelled = threading.Event()
-    with patch(
-        "flwr.supercore.retry.grpc_retry.threading.Event",
-        side_effect=[system_healthy, retry_wait_cancelled],
-    ):
-        retry_invoker = make_simple_grpc_retry_invoker()
+    retry_invoker = make_simple_grpc_retry_invoker()
+    on_backoff = retry_invoker.on_backoff
+    assert on_backoff is not None
+    retry_wait_state = inspect.getclosurevars(on_backoff).nonlocals["retry_wait_state"]
+    thread_finished = threading.Event()
 
-    system_healthy.on_clear = retry_invoker.disable_retries
-    errors: list[grpc.RpcError] = []
+    def disable_while_locked() -> None:
+        # Simulate SIGINT while a retry callback owns the state condition.
+        with retry_wait_state._condition:  # pylint: disable=protected-access
+            retry_invoker.disable_retries()
+        thread_finished.set()
 
-    def target() -> None:
-        raise _UnavailableError
-
-    def invoke() -> None:
-        try:
-            retry_invoker.invoke(target)
-        except grpc.RpcError as err:
-            errors.append(err)
-
-    thread = threading.Thread(target=invoke, daemon=True)
+    thread = threading.Thread(target=disable_while_locked, daemon=True)
     thread.start()
     thread.join(timeout=1.0)
 
+    assert thread_finished.is_set()
     assert not thread.is_alive()
-    assert len(errors) == 1

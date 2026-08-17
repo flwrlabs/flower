@@ -25,6 +25,8 @@ from unittest.mock import Mock
 
 import grpc
 
+from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
+
 from .constant import TASK_WORKER_CALL_TIMEOUT
 from .logger import (
     FLOWER_LOGGER,
@@ -44,6 +46,14 @@ class _DeadlineExceededError(grpc.RpcError):  # type: ignore[misc]
     def code(self) -> grpc.StatusCode:
         """Return the gRPC status code."""
         return grpc.StatusCode.DEADLINE_EXCEEDED
+
+
+class _UnavailableError(grpc.RpcError):  # type: ignore[misc]
+    """gRPC error reporting an unavailable endpoint."""
+
+    def code(self) -> grpc.StatusCode:
+        """Return the gRPC status code."""
+        return grpc.StatusCode.UNAVAILABLE
 
 
 def test_mirror_output_to_queue() -> None:
@@ -143,16 +153,18 @@ def test_log_uploader_uses_bounded_rpc() -> None:
     assert stub.PushLogs.call_args.kwargs["timeout"] == TASK_WORKER_CALL_TIMEOUT
 
 
-def test_log_uploader_retries_after_deadline_expiry() -> None:
-    """A transient upload deadline must not terminate the uploader."""
+def test_log_uploader_does_not_retry_after_deadline_expiry() -> None:
+    """An ambiguously delivered timed-out batch must not be duplicated."""
     log_queue: Queue[str | None] = Queue()
-    log_queue.put("Test message")
+    log_queue.put("Timed-out message")
+    first_attempt_finished = threading.Event()
     upload_succeeded = threading.Event()
-    requests = []
+    requests: list[PushLogsRequest] = []
 
-    def push_logs(request: object, **_kwargs: object) -> None:
+    def push_logs(request: PushLogsRequest, **_kwargs: object) -> None:
         requests.append(request)
         if len(requests) == 1:
+            first_attempt_finished.set()
             raise _DeadlineExceededError
         upload_succeeded.set()
 
@@ -160,12 +172,15 @@ def test_log_uploader_retries_after_deadline_expiry() -> None:
     stub.PushLogs.side_effect = push_logs
     uploader = start_log_uploader(log_queue, node_id=1, run_id=2, stub=stub)
 
+    assert first_attempt_finished.wait(timeout=1.0)
+    log_queue.put("Next message")
     assert upload_succeeded.wait(timeout=2.0)
     stop_log_uploader(log_queue, uploader, timeout=1.0)
 
     assert not uploader.is_alive()
     assert len(requests) == 2
-    assert requests[0] == requests[1]
+    assert list(requests[0].logs) == ["Timed-out message"]
+    assert list(requests[1].logs) == ["Next message"]
 
 
 def test_log_uploader_retries_retained_batch_during_stop() -> None:
@@ -174,15 +189,15 @@ def test_log_uploader_retries_retained_batch_during_stop() -> None:
     log_queue.put("Final message")
     first_attempt_started = threading.Event()
     release_first_attempt = threading.Event()
-    requests = []
+    requests: list[PushLogsRequest] = []
 
-    def push_logs(request: object, **_kwargs: object) -> None:
+    def push_logs(request: PushLogsRequest, **_kwargs: object) -> None:
         requests.append(request)
         if len(requests) == 1:
             first_attempt_started.set()
             assert release_first_attempt.wait(timeout=1.0)
         if len(requests) < 3:
-            raise _DeadlineExceededError
+            raise _UnavailableError
 
     stub = Mock()
     stub.PushLogs.side_effect = push_logs

@@ -32,22 +32,64 @@ from flwr.supercore.run import RunNotRunningException
 from .retry_invoker import RetryInvoker, RetryState, exponential
 
 
+class _RetryWaitState:
+    """Coordinate retry health and cancellation with reentrant synchronization."""
+
+    def __init__(self) -> None:
+        self._condition = threading.Condition(threading.RLock())
+        self._system_healthy = True
+        self._cancelled = False
+
+    @property
+    def cancelled(self) -> bool:
+        """Return whether retry waits have been cancelled."""
+        with self._condition:
+            return self._cancelled
+
+    def mark_healthy(self) -> None:
+        """Mark the system healthy and wake waiting invocations."""
+        with self._condition:
+            self._system_healthy = True
+            self._condition.notify_all()
+
+    def mark_unhealthy(self) -> None:
+        """Mark the system unhealthy unless shutdown already cancelled retries."""
+        with self._condition:
+            if not self._cancelled:
+                self._system_healthy = False
+
+    def wait_until_healthy_or_cancelled(self, timeout: float) -> None:
+        """Wait until another invocation succeeds, shutdown starts, or timeout."""
+        with self._condition:
+            self._condition.wait_for(
+                lambda: self._system_healthy or self._cancelled,
+                timeout=timeout,
+            )
+
+    def wait_until_cancelled(self, timeout: float) -> None:
+        """Wait until shutdown cancels retries or timeout expires."""
+        with self._condition:
+            self._condition.wait_for(lambda: self._cancelled, timeout=timeout)
+
+    def cancel(self) -> None:
+        """Cancel retry waits permanently and wake all current waiters."""
+        with self._condition:
+            self._cancelled = True
+            self._system_healthy = True
+            self._condition.notify_all()
+
+
 def make_simple_grpc_retry_invoker() -> RetryInvoker:
     """Create a simple gRPC retry invoker."""
     lock = threading.Lock()
-    # Retry callbacks can be interrupted by SIGINT on the main thread. The signal
-    # handler disables retries synchronously, so cancellation must be reentrant.
-    retry_state_lock = threading.RLock()
-    shutdown_lock = threading.Lock()
+    retry_wait_state = _RetryWaitState()
+    # Signal handlers can synchronously re-enter authentication failure handling.
+    shutdown_lock = threading.RLock()
     shutdown_requested = False
-    system_healthy = threading.Event()
-    system_healthy.set()  # Initially, the connection is healthy
-    retry_wait_cancelled = threading.Event()
     retry_invoker: RetryInvoker
 
     def _on_success(retry_state: RetryState) -> None:
-        with retry_state_lock:
-            system_healthy.set()
+        retry_wait_state.mark_healthy()
         if retry_state.tries > 1:
             log(
                 INFO,
@@ -57,17 +99,13 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
             )
 
     def _on_backoff(retry_state: RetryState) -> None:
-        with retry_state_lock:
-            if not retry_wait_cancelled.is_set():
-                system_healthy.clear()
+        retry_wait_state.mark_unhealthy()
         log(
             DEBUG, "Connection attempt failed with exception: %s", retry_state.exception
         )
 
     def _on_giveup(retry_state: RetryState) -> None:
-        with retry_state_lock:
-            if not retry_wait_cancelled.is_set():
-                system_healthy.clear()
+        retry_wait_state.mark_unhealthy()
         if retry_state.tries > 1:
             log(
                 WARN,
@@ -97,7 +135,7 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
                     return True
                 shutdown_requested = True
             os.kill(os.getpid(), signal.SIGINT)
-            retry_wait_cancelled.wait(FORCE_EXIT_TIMEOUT_SECONDS + 1)
+            retry_wait_state.wait_until_cancelled(FORCE_EXIT_TIMEOUT_SECONDS + 1)
             return False
         if e.code() == grpc.StatusCode.UNAVAILABLE:  # type: ignore
             # Check if this is an SSL handshake failure - these should fail fast
@@ -109,13 +147,13 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
         return True
 
     def _wait(wait_time: float) -> None:
-        if retry_wait_cancelled.is_set():
+        if retry_wait_state.cancelled:
             return
 
         # Use a lock to prevent multiple gRPC calls from retrying concurrently,
         # which is unnecessary since they are all likely to fail.
         with lock:
-            if retry_wait_cancelled.is_set():
+            if retry_wait_state.cancelled:
                 return
 
             # Log the wait time
@@ -127,21 +165,19 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
 
             start = time.monotonic()
             # Avoid sequential waits if the system is healthy
-            system_healthy.wait(wait_time)
+            retry_wait_state.wait_until_healthy_or_cancelled(wait_time)
 
-        if retry_wait_cancelled.is_set():
+        if retry_wait_state.cancelled:
             return
 
         remaining_time = wait_time - (time.monotonic() - start)
         if remaining_time > 0:
-            retry_wait_cancelled.wait(remaining_time)
+            retry_wait_state.wait_until_cancelled(remaining_time)
 
     def _cancel_wait() -> None:
-        # Keep the healthy event set after cancellation so all current and future
+        # Keep the state healthy after cancellation so all current and future
         # waiters return, even if another invocation gives up concurrently.
-        with retry_state_lock:
-            retry_wait_cancelled.set()
-            system_healthy.set()
+        retry_wait_state.cancel()
 
     retry_invoker = RetryInvoker(
         wait_gen_factory=lambda: exponential(max_delay=MAX_RETRY_DELAY),

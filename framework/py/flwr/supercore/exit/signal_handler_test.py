@@ -15,8 +15,10 @@
 """Tests for signal handler utils."""
 
 
+import inspect
 import os
 import signal
+import threading
 import unittest
 from unittest.mock import Mock, patch
 
@@ -65,3 +67,27 @@ class TestExitHandlers(unittest.TestCase):
 
         # Assert
         self.assertIn(handler, registered_exit_handlers)
+
+    def test_signal_handler_reenters_exiting_guard(self) -> None:
+        """A nested signal inside the guard must not deadlock shutdown."""
+        with (
+            patch("flwr.supercore.exit.signal_handler.signal.signal") as mock_signal,
+            patch("flwr.supercore.exit.signal_handler.flwr_exit") as mock_flwr_exit,
+        ):
+            register_signal_handlers(EventType.PING)
+            graceful_exit_handler = mock_signal.call_args_list[0].args[1]
+            guard = inspect.getclosurevars(graceful_exit_handler).nonlocals["lock"]
+            thread_finished = threading.Event()
+
+            def invoke_while_locked() -> None:
+                with guard:
+                    graceful_exit_handler(signal.SIGTERM, Mock())
+                thread_finished.set()
+
+            thread = threading.Thread(target=invoke_while_locked, daemon=True)
+            thread.start()
+            thread.join(timeout=1.0)
+
+        self.assertTrue(thread_finished.is_set())
+        self.assertFalse(thread.is_alive())
+        mock_flwr_exit.assert_called_once()

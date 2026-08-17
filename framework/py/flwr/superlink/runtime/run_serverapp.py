@@ -31,7 +31,11 @@ from flwr.common.config import (
     get_project_config,
     get_project_dir,
 )
-from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
+from flwr.common.constant import (
+    RUNTIME_DEPENDENCY_INSTALL,
+    TASK_WORKER_CALL_TIMEOUT,
+    SubStatus,
+)
 from flwr.common.logger import log, start_log_uploader, stop_log_uploader
 from flwr.common.serde import (
     context_from_proto,
@@ -143,7 +147,10 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
 
     try:
         # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(grid._stub))
+        heartbeat_sender = HeartbeatSender(
+            make_task_heartbeat_fn_grpc(grid._stub),
+            call_timeout=TASK_WORKER_CALL_TIMEOUT,
+        )
         heartbeat_sender.start()
 
         # Pull task input from SuperLink
