@@ -150,6 +150,8 @@ def test_rejects_unsafe_accounting_inputs() -> None:
         RdpAccountant(_config()).compose(_event(population_size=2_000))
     with pytest.raises(ValueError, match="max_epsilon"):
         RdpAccountant(_config()).would_exceed(_event(), max_epsilon=True)
+    with pytest.raises(ValueError, match="epsilon"):
+        RdpAccountant(_config()).get_delta(True)
     for orders in ((), (float("nan"),), (float("inf"),), (1.0,)):
         with pytest.raises(ValueError, match="RDP order"):
             RdpAccountant(_config(), orders)

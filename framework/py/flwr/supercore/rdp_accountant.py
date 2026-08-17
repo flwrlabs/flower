@@ -329,7 +329,7 @@ def _validate_delta(delta: float) -> None:
 
 
 def _validate_epsilon(epsilon: float) -> None:
-    if not isfinite(epsilon) or epsilon < 0:
+    if isinstance(epsilon, bool) or not isfinite(epsilon) or epsilon < 0:
         raise ValueError("epsilon must be non-negative and finite.")
 
 
