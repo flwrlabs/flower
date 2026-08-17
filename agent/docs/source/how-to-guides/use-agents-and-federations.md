@@ -51,8 +51,16 @@ later commands.
 
 The following `uv run` examples use the Flower version installed in your local
 project environment. To stay consistent with the rest of this guide, ensure
-that environment has `flwr==1.34.0` installed. Without `--federation`,
-SuperGrid selects the account's default federation:
+that environment has `flwr==1.34.0` installed.
+
+Flower selects the federation in this order:
+
+1. The value passed with `--federation`.
+1. The `federation` configured for the selected SuperLink connection.
+1. The account's default federation when neither is set.
+
+With no command-line option, this command uses the configured federation or
+falls back to the account default:
 
 ```console
 $ uv run flwr run . supergrid
