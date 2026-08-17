@@ -407,7 +407,7 @@ class InMemoryCoreState(
             ]
 
     def delete_app(self, federation_id: str, app_id: str) -> bool:
-        """Delete an app association; the referenced FAB remains in state."""
+        """Delete one federation-app association; its FAB remains in state."""
         if not federation_id or not app_id:
             return False
         with self.lock_federation_app_store:

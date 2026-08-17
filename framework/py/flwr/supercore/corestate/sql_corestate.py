@@ -500,13 +500,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 FederationAppModel.added_at.desc(),
                 FederationAppModel.app_id.desc(),
             )
+            .execution_options(populate_existing=True)
         )
         if limit is not None:
             query = query.limit(limit)
         with self.session() as session:
-            apps = session.scalars(
-                query.execution_options(populate_existing=True)
-            ).all()
+            apps = session.scalars(query).all()
             return [
                 AppInfo(
                     app_id=app.app_id,
@@ -517,7 +516,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             ]
 
     def delete_app(self, federation_id: str, app_id: str) -> bool:
-        """Delete an app association; the referenced FAB remains in state."""
+        """Delete one federation-app association; its FAB remains in state."""
         if not federation_id or not app_id:
             return False
         with self.session() as session:
