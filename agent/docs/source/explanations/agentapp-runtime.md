@@ -85,7 +85,8 @@ The main function also receives a Flower `Context`:
 
 - `context.run_config` contains defaults from `pyproject.toml` fused with
   per-run overrides;
-- `context.state` stores records persisted for the run series; and
+- `context.state` stores records persisted for the run series, and its public
+  `config_records` view selects stored `ConfigRecord` values; and
 - `context.run_id` identifies the current run.
 
 If `agent.input` is a non-empty string, the runtime records it as an Open
@@ -100,7 +101,9 @@ send to the model. A safe conversation loader selects only message items:
 import json
 
 messages = []
-for item_json in context.state.config_records.get("items", {}).get("json", []):
+items_record = context.state.config_records.get("items")
+items = items_record.get("json", []) if items_record is not None else []
+for item_json in items:
     item = json.loads(item_json)
     if item.get("type") == "message":
         messages.append(item)

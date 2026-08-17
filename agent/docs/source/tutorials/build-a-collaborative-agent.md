@@ -118,8 +118,10 @@ series, but the model sees only the input passed to `agent.responses.create`.
 To support follow-up questions, the AgentApp must replay the stored user and
 assistant messages.
 
-The run-series state also contains tool activity. Load only items whose type is
-`message`, and normalize their content to plain text:
+`Context.state` is a `RecordDict`. Its `config_records` property is the public,
+typed view of stored `ConfigRecord` values, including the runtime's `items`
+record. The run-series state also contains tool activity, so load only items
+whose type is `message` and normalize their content to plain text:
 
 ```python
 def message_text(content: Any) -> str:
@@ -138,7 +140,8 @@ def message_text(content: Any) -> str:
 def conversation_messages(context: Context) -> list[dict[str, Any]]:
     """Replay only user and assistant messages from the run series."""
     messages: list[dict[str, Any]] = []
-    items = context.state.config_records.get("items", {}).get("json", [])
+    items_record = context.state.config_records.get("items")
+    items = items_record.get("json", []) if items_record is not None else []
     for item_json in items:
         item = json.loads(item_json)
         if item.get("type") != "message":
@@ -164,9 +167,10 @@ assistant answer can become part of the conversation. The first responses in
 this app are different: they are private planning turns in which the model can
 request tools.
 
-Snapshot the stored items before a planning request and restore them afterward.
-The tool calls still remain in the local `input_items` list for the current
-run, but draft model output does not become conversation history:
+Use the same `config_records` view to snapshot the stored items before a
+planning request and restore them afterward. The tool calls still remain in the
+local `input_items` list for the current run, but draft model output does not
+become conversation history:
 
 ```python
 def private_response(
@@ -175,15 +179,17 @@ def private_response(
     request: dict[str, Any],
 ) -> dict[str, Any]:
     """Make a planning request without retaining its draft model output."""
-    had_items = "items" in context.state
-    previous_items = list(context.state["items"].get("json", ())) if had_items else None
+    items_record = context.state.config_records.get("items")
+    previous_items = (
+        list(items_record.get("json", ())) if items_record is not None else []
+    )
     try:
         return agent.responses.create(request)
     finally:
-        if had_items:
-            context.state["items"]["json"] = previous_items
-        elif "items" in context.state:
-            del context.state["items"]
+        if items_record is not None:
+            items_record["json"] = previous_items
+        elif "items" in context.state.config_records:
+            del context.state.config_records["items"]
 ```
 
 ### Let the model recover from connector failures
@@ -337,7 +343,8 @@ def message_text(content: Any) -> str:
 def conversation_messages(context: Context) -> list[dict[str, Any]]:
     """Replay only user and assistant messages from the run series."""
     messages: list[dict[str, Any]] = []
-    items = context.state.config_records.get("items", {}).get("json", [])
+    items_record = context.state.config_records.get("items")
+    items = items_record.get("json", []) if items_record is not None else []
     for item_json in items:
         item = json.loads(item_json)
         if item.get("type") != "message":
@@ -358,15 +365,17 @@ def private_response(
     request: dict[str, Any],
 ) -> dict[str, Any]:
     """Make a planning request without retaining its draft model output."""
-    had_items = "items" in context.state
-    previous_items = list(context.state["items"].get("json", ())) if had_items else None
+    items_record = context.state.config_records.get("items")
+    previous_items = (
+        list(items_record.get("json", ())) if items_record is not None else []
+    )
     try:
         return agent.responses.create(request)
     finally:
-        if had_items:
-            context.state["items"]["json"] = previous_items
-        elif "items" in context.state:
-            del context.state["items"]
+        if items_record is not None:
+            items_record["json"] = previous_items
+        elif "items" in context.state.config_records:
+            del context.state.config_records["items"]
 
 
 def connector_error_output(
@@ -454,7 +463,7 @@ def main(agent: AgentSession, context: Context) -> None:
 ```console
 $ uv sync
 $ uv run flwr build
-$ uvx --from flwr==1.34.0 flwr login supergrid
+$ uv run flwr login supergrid
 $ uv run flwr run . supergrid --stream
 ```
 
