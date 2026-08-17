@@ -15,9 +15,8 @@
 """Flower CoreState."""
 
 
-from .corestate import AutomationLimitError, CoreState
+from .corestate import CoreState
 
 __all__ = [
-    "AutomationLimitError",
     "CoreState",
 ]

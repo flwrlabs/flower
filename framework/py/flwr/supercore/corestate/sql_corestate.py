@@ -72,6 +72,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_models import Automation as AutomationModel
@@ -108,7 +109,7 @@ from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
-from .corestate import AutomationLimitError, CoreState
+from .corestate import CoreState
 from .utils import (
     context_from_bytes,
     context_to_bytes,
@@ -800,7 +801,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             with self.session() as session:
                 automation = session.scalars(stmt).one_or_none()
                 if automation is None:
-                    raise AutomationLimitError
+                    raise FlowerError(
+                        ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+                        f"Federation {federation_id} has reached the active automation "
+                        f"limit of {max_active}.",
+                        public_details=(
+                            f"A federation can have at most {max_active} active "
+                            "automations."
+                        ),
+                    )
                 return _automation_from_model(automation)
         except IntegrityError as exc:
             raise ValueError(f"Could not store automation: {exc}") from exc

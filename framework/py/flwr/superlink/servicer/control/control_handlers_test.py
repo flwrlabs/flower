@@ -36,7 +36,6 @@ from flwr.supercore.constant import (
     NOOP_FEDERATION_ID,
     AutomationStatus,
 )
-from flwr.supercore.corestate import AutomationLimitError
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.superlink.federation import NoOpFederationManager
@@ -179,7 +178,9 @@ class TestControlHandlers(unittest.TestCase):
             patch.object(
                 self.state,
                 "store_automation",
-                side_effect=AutomationLimitError,
+                side_effect=FlowerError(
+                    ApiErrorCode.INVALID_AUTOMATION_REQUEST, "Limit reached."
+                ),
             ),
             self.assertRaises(FlowerError) as error,
         ):

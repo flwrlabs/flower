@@ -45,9 +45,10 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.typing import ConnectorRecord
 
-from . import AutomationLimitError, CoreState
+from . import CoreState
 from .utils_test import create_task_message
 
 
@@ -702,8 +703,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         self.store_automation(state, series_id=1, max_active=1)
 
-        with self.assertRaises(AutomationLimitError):
+        with self.assertRaises(FlowerError) as error:
             self.store_automation(state, series_id=2, max_active=1)
+        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
 
     def test_advance_and_finish_automation(self) -> None:
         """Automation advance should update records and finish terminally."""

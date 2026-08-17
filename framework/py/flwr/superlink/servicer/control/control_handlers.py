@@ -127,7 +127,6 @@ from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.corestate import AutomationLimitError
 from flwr.supercore.constant import (
     AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
     AUTOMATION_MIN_FIXED_INTERVAL,
@@ -844,16 +843,6 @@ def start_automation(  # pylint: disable=too-many-locals
             max_runs=max_runs,
             max_active=AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
         )
-    except AutomationLimitError as e:
-        raise FlowerError(
-            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
-            f"Federation {federation_id} has reached the active automation limit of "
-            f"{AUTOMATION_MAX_ACTIVE_PER_FEDERATION}.",
-            public_details=(
-                "A federation can have at most "
-                f"{AUTOMATION_MAX_ACTIVE_PER_FEDERATION} active automations."
-            ),
-        ) from e
     except ValueError as e:
         raise FlowerError(
             ApiErrorCode.FAILED_TO_CREATE_RUN,

@@ -32,10 +32,6 @@ from ..constant import AutomationStatus
 from ..object_store import ObjectStore
 
 
-class AutomationLimitError(Exception):
-    """Raised when a federation has reached its active automation limit."""
-
-
 class CoreState(ABC):  # pylint: disable=R0904
     """Abstract base class for core state."""
 
@@ -432,7 +428,7 @@ class CoreState(ABC):  # pylint: disable=R0904
 
         Raises
         ------
-        AutomationLimitError
+        FlowerError
             If the federation is already at `max_active`.
         """
 
