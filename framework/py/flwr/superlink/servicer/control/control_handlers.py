@@ -127,6 +127,7 @@ from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.corestate import AutomationLimitError
 from flwr.supercore.constant import (
     AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
     AUTOMATION_MIN_FIXED_INTERVAL,
@@ -826,22 +827,7 @@ def start_automation(  # pylint: disable=too-many-locals
     federation_id = _resolve_federation_id(
         state, account.account_name, start_run_request.federation
     )
-    active_automations = state.list_automations(
-        federations=[federation_id],
-        statuses=[AutomationStatus.ACTIVE],
-        order_by="updated_at",
-        limit=AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
-    )
-    if len(active_automations) >= AUTOMATION_MAX_ACTIVE_PER_FEDERATION:
-        raise FlowerError(
-            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
-            f"Federation {federation_id} has reached the active automation limit of "
-            f"{AUTOMATION_MAX_ACTIVE_PER_FEDERATION}.",
-            public_details=(
-                "A federation can have at most "
-                f"{AUTOMATION_MAX_ACTIVE_PER_FEDERATION} active automations."
-            ),
-        )
+    _validate_federation_membership_in_request(state, flwr_aid, federation_id)
     stored_start_run_request = StartRunRequest()
     stored_start_run_request.CopyFrom(start_run_request)
     stored_start_run_request.federation = federation_id
@@ -856,7 +842,18 @@ def start_automation(  # pylint: disable=too-many-locals
             next_run_at=next_run_at,
             fixed_interval=fixed_interval,
             max_runs=max_runs,
+            max_active=AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
         )
+    except AutomationLimitError as e:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            f"Federation {federation_id} has reached the active automation limit of "
+            f"{AUTOMATION_MAX_ACTIVE_PER_FEDERATION}.",
+            public_details=(
+                "A federation can have at most "
+                f"{AUTOMATION_MAX_ACTIVE_PER_FEDERATION} active automations."
+            ),
+        ) from e
     except ValueError as e:
         raise FlowerError(
             ApiErrorCode.FAILED_TO_CREATE_RUN,

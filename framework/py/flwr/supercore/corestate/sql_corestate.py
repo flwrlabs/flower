@@ -108,7 +108,7 @@ from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
-from .corestate import CoreState
+from .corestate import AutomationLimitError, CoreState
 from .utils import (
     context_from_bytes,
     context_to_bytes,
@@ -761,29 +761,46 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
+        max_active: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
         current = now()
-        stmt = (
-            insert(AutomationModel)
-            .values(
-                federation_id=federation_id,
-                status=AutomationStatus.ACTIVE,
-                series_id=uint64_to_int64(series_id),
-                flwr_aid=flwr_aid,
-                start_run_request=start_run_request.SerializeToString(),
-                created_at=current,
-                updated_at=current,
-                next_run_at=datetime.fromisoformat(next_run_at),
-                fixed_interval=fixed_interval,
-                remaining_runs=max_runs,
-                stopped_at=None,
+        values = {
+            "federation_id": federation_id,
+            "status": AutomationStatus.ACTIVE,
+            "series_id": uint64_to_int64(series_id),
+            "flwr_aid": flwr_aid,
+            "start_run_request": start_run_request.SerializeToString(),
+            "created_at": current,
+            "updated_at": current,
+            "next_run_at": datetime.fromisoformat(next_run_at),
+            "fixed_interval": fixed_interval,
+            "remaining_runs": max_runs,
+            "stopped_at": None,
+        }
+        stmt = insert(AutomationModel).values(**values)
+        if max_active is not None:
+            active_count = (
+                select(func.count())
+                .select_from(AutomationModel)
+                .where(
+                    AutomationModel.federation_id == federation_id,
+                    AutomationModel.status == AutomationStatus.ACTIVE,
+                )
+                .scalar_subquery()
             )
-            .returning(AutomationModel)
-        )
+            stmt = insert(AutomationModel).from_select(
+                list(values),
+                select(*(literal(value) for value in values.values())).where(
+                    active_count < max_active
+                ),
+            )
+        stmt = stmt.returning(AutomationModel)
         try:
             with self.session() as session:
-                automation = session.scalars(stmt).one()
+                automation = session.scalars(stmt).one_or_none()
+                if automation is None:
+                    raise AutomationLimitError
                 return _automation_from_model(automation)
         except IntegrityError as exc:
             raise ValueError(f"Could not store automation: {exc}") from exc

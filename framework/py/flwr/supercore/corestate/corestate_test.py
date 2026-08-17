@@ -47,7 +47,7 @@ from flwr.supercore.constant import (
 from flwr.supercore.date import now
 from flwr.supercore.typing import ConnectorRecord
 
-from . import CoreState
+from . import AutomationLimitError, CoreState
 from .utils_test import create_task_message
 
 
@@ -276,6 +276,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         next_run_at: str | None = None,
         fixed_interval: int | None = None,
         max_runs: int | None = 1,
+        max_active: int | None = None,
     ) -> Automation:
         """Store a minimal automation."""
         return state.store_automation(
@@ -289,6 +290,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             next_run_at=next_run_at or now().isoformat(),
             fixed_interval=fixed_interval,
             max_runs=max_runs,
+            max_active=max_active,
         )
 
     def test_preregister_object_tree(self) -> None:
@@ -694,6 +696,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [automation.automation_id for automation in stopped], [due.automation_id]
         )
         self.assertEqual(stopped[0].next_run_at, due_at)
+
+    def test_store_automation_enforces_active_limit(self) -> None:
+        """Automation storage should atomically enforce the active limit."""
+        state = self.state_factory()
+        self.store_automation(state, series_id=1, max_active=1)
+
+        with self.assertRaises(AutomationLimitError):
+            self.store_automation(state, series_id=2, max_active=1)
 
     def test_advance_and_finish_automation(self) -> None:
         """Automation advance should update records and finish terminally."""

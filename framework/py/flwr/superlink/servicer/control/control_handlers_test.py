@@ -30,13 +30,13 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
-    AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
     AUTOMATION_MIN_FIXED_INTERVAL,
     AUTOMATION_MIN_START_DELAY,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     AutomationStatus,
 )
+from flwr.supercore.corestate import AutomationLimitError
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.superlink.federation import NoOpFederationManager
@@ -178,8 +178,8 @@ class TestControlHandlers(unittest.TestCase):
         with (
             patch.object(
                 self.state,
-                "list_automations",
-                return_value=[Mock()] * AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
+                "store_automation",
+                side_effect=AutomationLimitError,
             ),
             self.assertRaises(FlowerError) as error,
         ):
@@ -193,6 +193,27 @@ class TestControlHandlers(unittest.TestCase):
             )
 
         self.assertEqual(error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
+
+    def test_start_automation_rejects_non_member(self) -> None:
+        """Reject creation when the account is not a federation member."""
+        with (
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=False
+            ),
+            patch.object(self.state, "store_automation") as store_automation,
+            self.assertRaises(FlowerError) as error,
+        ):
+            start_automation(
+                StartAutomationRequest(
+                    start_at="2099-01-01T00:00:00+00:00",
+                    start_run_request=StartRunRequest(series_id=1),
+                ),
+                self.account,
+                self.state,
+            )
+
+        self.assertEqual(error.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
+        store_automation.assert_not_called()
 
     def test_list_automations(self) -> None:
         """List automations for a federation."""

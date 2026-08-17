@@ -32,6 +32,10 @@ from ..constant import AutomationStatus
 from ..object_store import ObjectStore
 
 
+class AutomationLimitError(Exception):
+    """Raised when a federation has reached its active automation limit."""
+
+
 class CoreState(ABC):  # pylint: disable=R0904
     """Abstract base class for core state."""
 
@@ -394,6 +398,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
+        max_active: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata.
 
@@ -417,11 +422,18 @@ class CoreState(ABC):  # pylint: disable=R0904
         max_runs : int | None (default: None)
             Maximum number of runs, if finite. The value initializes the
             persisted `remaining_runs` counter.
+        max_active : int | None (default: None)
+            Maximum number of active automations allowed in the federation.
 
         Returns
         -------
         Automation
             Stored automation metadata.
+
+        Raises
+        ------
+        AutomationLimitError
+            If the federation is already at `max_active`.
         """
 
     @abstractmethod

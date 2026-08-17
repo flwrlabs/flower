@@ -52,7 +52,7 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
-from .corestate import CoreState
+from .corestate import AutomationLimitError, CoreState
 from .utils import (
     generate_rand_int_from_bytes,
     validate_task_event_data,
@@ -553,9 +553,16 @@ class InMemoryCoreState(
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
+        max_active: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
         with self.lock_automation_store:
+            if max_active is not None and sum(
+                record.automation.federation == federation_id
+                and record.automation.status == AutomationStatus.ACTIVE
+                for record in self.automation_store.values()
+            ) >= max_active:
+                raise AutomationLimitError
             current = now()
             automation_id = self._next_automation_id
             self._next_automation_id += 1
