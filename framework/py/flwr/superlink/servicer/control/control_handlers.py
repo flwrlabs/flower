@@ -195,6 +195,8 @@ def list_connectors(
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
     _validate_federation_membership_in_request(state, flwr_aid, request.federation)
     federation = state.federation_manager.get_details(request.federation)
+    # Until connectors are federation-scoped, expose account-scoped connectors only
+    # in the personal agent federation, identified by its disabled capabilities.
     if federation.can_invite_members or federation.can_add_supernodes:
         return ListConnectorsResponse()
 
