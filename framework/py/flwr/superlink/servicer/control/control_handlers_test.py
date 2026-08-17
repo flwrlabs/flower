@@ -141,9 +141,7 @@ class TestControlHandlers(unittest.TestCase):
     def test_start_automation_rejects_invalid_schedule(self) -> None:
         """Reject missing, invalid, or below-minimum schedule values."""
         current_time = datetime(2026, 7, 10, 9, tzinfo=UTC)
-        valid_start_at = current_time + timedelta(
-            seconds=AUTOMATION_MIN_START_DELAY
-        )
+        valid_start_at = current_time + timedelta(seconds=AUTOMATION_MIN_START_DELAY)
         requests = {
             "missing start": StartAutomationRequest(
                 start_run_request=StartRunRequest(series_id=1)
@@ -177,11 +175,14 @@ class TestControlHandlers(unittest.TestCase):
 
     def test_start_automation_rejects_federation_active_automation_limit(self) -> None:
         """Reject creation after a federation reaches its automation limit."""
-        with patch.object(
-            self.state,
-            "list_automations",
-            return_value=[Mock()] * AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
-        ), self.assertRaises(FlowerError) as error:
+        with (
+            patch.object(
+                self.state,
+                "list_automations",
+                return_value=[Mock()] * AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
             start_automation(
                 StartAutomationRequest(
                     start_at="2099-01-01T00:00:00+00:00",
