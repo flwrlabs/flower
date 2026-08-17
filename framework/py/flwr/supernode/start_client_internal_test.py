@@ -436,7 +436,9 @@ def _run_until_connection_start(
         # Raising there keeps this test focused on the setup performed before it.
         with pytest.raises(_StopAfterSuperExecLaunch):
             start_client_internal(
-                state_factory=NodeStateFactory(ObjectStoreFactory()),
+                state_factory=NodeStateFactory(
+                    objectstore_factory=ObjectStoreFactory()
+                ),
                 server_address="127.0.0.1:9092",
                 node_config={},
                 root_certificates=None,
