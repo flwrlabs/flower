@@ -129,12 +129,16 @@ def message_text(content: Any) -> str:
     if isinstance(content, str):
         return content
     if isinstance(content, list):
-        return "\n".join(
-            part["text"]
-            for part in content
-            if isinstance(part, dict) and isinstance(part.get("text"), str)
-        )
-    raise TypeError("Message content must be text or a list of text parts")
+        parts = []
+        for part in content:
+            if not isinstance(part, dict):
+                raise TypeError("Message content parts must be objects")
+            value = part.get("text", part.get("refusal"))
+            if not isinstance(value, str):
+                raise TypeError("Message content parts must contain text or refusal")
+            parts.append(value)
+        return "\n".join(parts)
+    raise TypeError("Message content must be text or a list of content parts")
 
 
 def conversation_messages(context: Context) -> list[dict[str, Any]]:
@@ -156,9 +160,9 @@ def conversation_messages(context: Context) -> list[dict[str, Any]]:
     return messages
 ```
 
-`message_text` handles both plain strings and Responses-style text parts. It
-raises an error for an unexpected shape instead of silently sending incomplete
-history to the model.
+`message_text` handles plain strings and Responses-style text or refusal parts.
+It raises an error for an unexpected shape instead of silently sending
+incomplete history to the model.
 
 ### Keep planning responses private
 
@@ -257,10 +261,13 @@ def main(agent: AgentSession, context: Context) -> None:
                 "stream": False,
             },
         )
-        tool_calls = [
+        response_output = [
             dict(item)
             for item in response.get("output", [])
-            if isinstance(item, dict) and item.get("type") == "function_call"
+            if isinstance(item, dict)
+        ]
+        tool_calls = [
+            item for item in response_output if item.get("type") == "function_call"
         ]
         if not tool_calls:
             break
@@ -272,7 +279,7 @@ def main(agent: AgentSession, context: Context) -> None:
             except RuntimeError as exc:
                 function_outputs.append(connector_error_output(tool_call, exc))
 
-        input_items.extend(tool_calls)
+        input_items.extend(response_output)
         input_items.extend(function_outputs)
 
     agent.responses.create(
@@ -290,10 +297,11 @@ def main(agent: AgentSession, context: Context) -> None:
 
 The runtime records the current `agent.input` as a user message before calling
 the app. The duplicate check prevents the same prompt from being appended
-again. Within the loop, the app keeps every requested call next to its output,
-including failures, so the next model turn has a complete sequence. The final
-request omits `tools`, which forces the app to finish with one answer instead of
-starting another connector round.
+again. Within the loop, the app keeps the complete model output, including
+reasoning items and every requested call, next to the connector output. This
+gives the next model turn a complete sequence even when a connector fails. The
+final request omits `tools`, which forces the app to finish with one answer
+instead of starting another connector round.
 
 ```{note}
 The connector activity itself is still recorded for run inspection. The app
@@ -332,12 +340,16 @@ def message_text(content: Any) -> str:
     if isinstance(content, str):
         return content
     if isinstance(content, list):
-        return "\n".join(
-            part["text"]
-            for part in content
-            if isinstance(part, dict) and isinstance(part.get("text"), str)
-        )
-    raise TypeError("Message content must be text or a list of text parts")
+        parts = []
+        for part in content:
+            if not isinstance(part, dict):
+                raise TypeError("Message content parts must be objects")
+            value = part.get("text", part.get("refusal"))
+            if not isinstance(value, str):
+                raise TypeError("Message content parts must contain text or refusal")
+            parts.append(value)
+        return "\n".join(parts)
+    raise TypeError("Message content must be text or a list of content parts")
 
 
 def conversation_messages(context: Context) -> list[dict[str, Any]]:
@@ -423,10 +435,13 @@ def main(agent: AgentSession, context: Context) -> None:
                 "stream": False,
             },
         )
-        tool_calls = [
+        response_output = [
             dict(item)
             for item in response.get("output", [])
-            if isinstance(item, dict) and item.get("type") == "function_call"
+            if isinstance(item, dict)
+        ]
+        tool_calls = [
+            item for item in response_output if item.get("type") == "function_call"
         ]
         if not tool_calls:
             break
@@ -438,7 +453,7 @@ def main(agent: AgentSession, context: Context) -> None:
             except RuntimeError as exc:
                 function_outputs.append(connector_error_output(tool_call, exc))
 
-        input_items.extend(tool_calls)
+        input_items.extend(response_output)
         input_items.extend(function_outputs)
 
     agent.responses.create(
