@@ -16,6 +16,7 @@
 
 
 import signal
+import threading
 import time
 import unittest
 from unittest.mock import Mock, patch
@@ -23,9 +24,19 @@ from unittest.mock import Mock, patch
 import httpx
 import pytest
 
+from flwr.common.constant import (
+    HEARTBEAT_BASE_MULTIPLIER,
+    HEARTBEAT_CALL_TIMEOUT,
+    HEARTBEAT_DEFAULT_INTERVAL,
+    TASK_WORKER_CALL_TIMEOUT,
+)
 from flwr.proto.runtime_pb2 import SendTaskHeartbeatResponse  # pylint: disable=E0611
 
-from .heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
+from .heartbeat import (
+    HeartbeatSender,
+    make_task_heartbeat_fn_grpc,
+    make_task_heartbeat_fn_http,
+)
 
 
 def _http_status_error(status_code: int) -> httpx.HTTPStatusError:
@@ -87,6 +98,82 @@ class TestHeartbeatSender(unittest.TestCase):
         self.assertLess(time.time() - current, 0.2)
         self.mock_heartbeat_fn.assert_called_once()
         self.assertFalse(self.heartbeat_sender._thread.is_alive())
+
+    def test_stop_respects_timeout(self) -> None:
+        """Test that stop returns when the heartbeat function is blocked."""
+        heartbeat_started = threading.Event()
+        release_heartbeat = threading.Event()
+
+        def heartbeat_fn() -> bool:
+            heartbeat_started.set()
+            release_heartbeat.wait()
+            return True
+
+        sender = HeartbeatSender(heartbeat_fn)
+        sender.start()
+        self.assertTrue(heartbeat_started.wait(timeout=1.0))
+
+        started_at = time.monotonic()
+        sender.stop(timeout=0.01)
+
+        self.assertLess(time.monotonic() - started_at, 0.2)
+        self.assertTrue(sender._thread.is_alive())
+
+        release_heartbeat.set()
+        sender._thread.join(timeout=1.0)
+        self.assertFalse(sender._thread.is_alive())
+
+    def test_stop_after_sender_thread_exits(self) -> None:
+        """Test that stop tolerates a sender thread that has already exited."""
+        sender: HeartbeatSender
+
+        def heartbeat_fn() -> bool:
+            sender._stop_event.set()
+            return True
+
+        sender = HeartbeatSender(heartbeat_fn)
+        sender.start()
+        sender._thread.join(timeout=1.0)
+        self.assertFalse(sender._thread.is_alive())
+
+        sender.stop(timeout=0.01)
+
+    def test_grpc_heartbeat_uses_timeout(self) -> None:
+        """Test that gRPC heartbeats have a deadline."""
+        stub = Mock()
+        stub.SendTaskHeartbeat.return_value = SendTaskHeartbeatResponse(success=True)
+
+        heartbeat_fn = make_task_heartbeat_fn_grpc(stub)
+        self.assertTrue(heartbeat_fn())
+
+        self.assertEqual(
+            stub.SendTaskHeartbeat.call_args.kwargs["timeout"],
+            TASK_WORKER_CALL_TIMEOUT,
+        )
+
+    def test_heartbeat_interval_accounts_for_rpc_timeout(self) -> None:
+        """Test that a shorter RPC deadline does not increase heartbeat load."""
+        self.assertEqual(self.heartbeat_sender._call_timeout, HEARTBEAT_CALL_TIMEOUT)
+        sender = HeartbeatSender(
+            Mock(return_value=True), call_timeout=TASK_WORKER_CALL_TIMEOUT
+        )
+
+        def stop_after_wait(_timeout: float) -> bool:
+            sender._stop_event.set()
+            return True
+
+        with (
+            patch("flwr.supercore.heartbeat.random.uniform", return_value=0.0),
+            patch.object(
+                sender._stop_event, "wait", side_effect=stop_after_wait
+            ) as mock_wait,
+        ):
+            sender._run()
+
+        expected_interval = (
+            HEARTBEAT_DEFAULT_INTERVAL - TASK_WORKER_CALL_TIMEOUT
+        ) * HEARTBEAT_BASE_MULTIPLIER
+        mock_wait.assert_called_once_with(expected_interval)
 
     def test_heartbeat_fail_and_retry(self) -> None:
         """Test that the heartbeat function is retried on failure."""
