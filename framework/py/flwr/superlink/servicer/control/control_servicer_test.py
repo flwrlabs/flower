@@ -45,7 +45,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationRequest,
     CreateInvitationRequest,
     CreateInvitationResponse,
-    DeleteAppRequest,
     DisconnectConnectorRequest,
     GetRunSeriesRequest,
     ListConnectorsRequest,
@@ -208,19 +207,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             flwr_aid,
             TaskType.SERVER_APP,
         )
-
-    def test_delete_app_is_unimplemented(self) -> None:
-        """Test that DeleteApp exposes the unimplemented scaffold."""
-        context = Mock()
-
-        with self.assertRaisesRegex(NotImplementedError, "DeleteApp"):
-            self.servicer.DeleteApp(
-                DeleteAppRequest(federation_id="federation-id", app_id="app-id"),
-                context,
-            )
-
-        context.set_code.assert_called_once_with(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details.assert_called_once_with("DeleteApp is not implemented.")
 
     def _create_dummy_run_series(
         self,
