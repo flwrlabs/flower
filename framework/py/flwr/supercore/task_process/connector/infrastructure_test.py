@@ -32,11 +32,19 @@ class ExampleApiError(ConnectorApiError):
     provider = "Example"
 
 
-def test_account_connector_input_schemas_are_strict() -> None:
+def test_connector_input_schemas_are_strict() -> None:
     """Connector schemas should reject unknown arguments."""
     for connector in CONNECTORS:
         for action in connector.provider.actions:
-            assert action.input_schema["additionalProperties"] is False
+            tool_name = action.tool_name(connector.ref)
+            assert "additionalProperties" in action.input_schema, (
+                f"Connector action '{tool_name}' input schema must define "
+                "additionalProperties."
+            )
+            assert action.input_schema["additionalProperties"] is False, (
+                f"Connector action '{tool_name}' input schema must set "
+                "additionalProperties to false."
+            )
 
 
 def test_string_property_rejects_empty_values() -> None:
