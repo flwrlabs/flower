@@ -26,12 +26,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 
-from .client import (
-    ProtobufCall,
-    ProtobufClient,
-    ProtobufRequestContext,
-    create_protobuf_client,
-)
+from .client import ProtobufCall, ProtobufClient, ProtobufRequestContext
 
 _PATH = "/v1/runtime/claim-task"
 _METHOD = "/flwr.proto.Runtime/ClaimTask"
@@ -211,31 +206,29 @@ def test_context_manager_returns_client_and_closes_client() -> None:
     client_class.return_value.close.assert_called_once_with()
 
 
-def test_create_protobuf_client_uses_plain_http_when_insecure() -> None:
+def test_from_server_address_uses_plain_http_when_insecure() -> None:
     """Create an unverified HTTP client in insecure mode."""
-    client_class = Mock()
+    with patch("flwr.supercore.protobuf.client.httpx.Client") as http_client:
+        client = ProtobufClient.from_server_address(
+            server_address="127.0.0.1:8000",
+            insecure=True,
+            root_certificates=None,
+            interceptors=[],
+        )
 
-    create_protobuf_client(
-        client_class=client_class,
-        server_address="127.0.0.1:8000",
-        insecure=True,
-        root_certificates=None,
-        interceptors=[],
-    )
-
-    client_class.assert_called_once_with(
-        "http://127.0.0.1:8000", interceptors=[], verify=False
+    assert client._base_url == "http://127.0.0.1:8000"  # pylint: disable=W0212
+    http_client.assert_called_once_with(
+        verify=False, timeout=30.0, follow_redirects=True
     )
 
 
 @pytest.mark.parametrize("root_certificates", [b"certificate", "ca.pem"])
-def test_create_protobuf_client_rejects_certificates_when_insecure(
+def test_from_server_address_rejects_certificates_when_insecure(
     root_certificates: bytes | str,
 ) -> None:
     """Reject root certificates for a plaintext connection."""
     with pytest.raises(ValueError, match="root_certificates.*insecure"):
-        create_protobuf_client(
-            client_class=Mock(),
+        ProtobufClient.from_server_address(
             server_address="127.0.0.1:8000",
             insecure=True,
             root_certificates=root_certificates,
@@ -243,42 +236,41 @@ def test_create_protobuf_client_rejects_certificates_when_insecure(
         )
 
 
-def test_create_protobuf_client_uses_certificate_path() -> None:
+def test_from_server_address_uses_certificate_path() -> None:
     """Pass a CA certificate path to the HTTP client."""
-    client_class = Mock()
+    with patch("flwr.supercore.protobuf.client.httpx.Client") as http_client:
+        client = ProtobufClient.from_server_address(
+            server_address="api.example:443",
+            insecure=False,
+            root_certificates="ca.pem",
+            interceptors=[],
+        )
 
-    create_protobuf_client(
-        client_class=client_class,
-        server_address="api.example:443",
-        insecure=False,
-        root_certificates="ca.pem",
-        interceptors=[],
+    assert client._base_url == "https://api.example:443"  # pylint: disable=W0212
+    http_client.assert_called_once_with(
+        verify="ca.pem", timeout=30.0, follow_redirects=True
     )
 
-    client_class.assert_called_once_with(
-        "https://api.example:443", interceptors=[], verify="ca.pem"
-    )
 
-
-def test_create_protobuf_client_loads_certificate_bytes(
+def test_from_server_address_loads_certificate_bytes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Load in-memory CA certificates into an SSL context."""
-    client_class = Mock()
     context = Mock(spec=ssl.SSLContext)
     ssl_context = Mock(return_value=context)
     monkeypatch.setattr(ssl, "SSLContext", ssl_context)
 
-    create_protobuf_client(
-        client_class=client_class,
-        server_address="api.example:443",
-        insecure=False,
-        root_certificates=b"certificate",
-        interceptors=[],
-    )
+    with patch("flwr.supercore.protobuf.client.httpx.Client") as http_client:
+        client = ProtobufClient.from_server_address(
+            server_address="api.example:443",
+            insecure=False,
+            root_certificates=b"certificate",
+            interceptors=[],
+        )
 
+    assert client._base_url == "https://api.example:443"  # pylint: disable=W0212
     ssl_context.assert_called_once_with(ssl.PROTOCOL_TLS_CLIENT)
     context.load_verify_locations.assert_called_once_with(cadata="certificate")
-    client_class.assert_called_once_with(
-        "https://api.example:443", interceptors=[], verify=context
+    http_client.assert_called_once_with(
+        verify=context, timeout=30.0, follow_redirects=True
     )
