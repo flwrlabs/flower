@@ -19,6 +19,7 @@ import random
 import signal
 import threading
 from collections.abc import Callable
+from http import HTTPStatus
 
 import grpc
 import httpx
@@ -170,7 +171,10 @@ def make_task_heartbeat_fn_http(
         except httpx.TransportError:
             return False
         except httpx.HTTPStatusError as err:
-            if err.response.status_code in (503, 504):
+            if err.response.status_code in (
+                HTTPStatus.SERVICE_UNAVAILABLE,  # 503
+                HTTPStatus.GATEWAY_TIMEOUT,  # 504
+            ):
                 return False
             raise
 
