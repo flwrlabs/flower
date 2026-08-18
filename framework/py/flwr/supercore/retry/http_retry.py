@@ -18,7 +18,7 @@ import os
 import signal
 import threading
 import time
-from logging import DEBUG, ERROR, INFO, WARN
+from logging import DEBUG, ERROR, INFO, WARNING
 
 import httpx
 
@@ -65,7 +65,7 @@ def make_simple_http_retry_invoker() -> RetryInvoker:
         system_healthy.clear()
         if retry_state.tries > 1:
             log(
-                WARN,
+                WARNING,
                 "Giving up reconnection after %.2f seconds and %s tries.",
                 retry_state.elapsed_time,
                 retry_state.tries,
@@ -96,7 +96,7 @@ def make_simple_http_retry_invoker() -> RetryInvoker:
     def _wait(wait_time: float) -> None:
         with lock:
             log(
-                WARN,
+                WARNING,
                 "Connection attempt failed, retrying in %.2f seconds",
                 wait_time,
             )

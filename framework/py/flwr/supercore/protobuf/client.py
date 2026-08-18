@@ -130,24 +130,29 @@ class ProtobufClient:
     ) -> ResponseT:
         """Send a unary request and parse its unary protobuf response."""
         path = path if path.startswith("/") else f"/{path}"
-        http_request = self._client.build_request(
-            method="POST",
-            url=f"{self._base_url}{path}",
-            content=request.SerializeToString(deterministic=True),
-            headers={
-                "content-type": PROTOBUF_MEDIA_TYPE,
-                "accept": PROTOBUF_MEDIA_TYPE,
-            },
-        )
-        context = ProtobufRequestContext(
-            rpc_method=rpc_method,
-            message=request,
-            request=http_request,
-        )
+        content = request.SerializeToString(deterministic=True)
+
+        def send() -> httpx.Response:
+            http_request = self._client.build_request(
+                method="POST",
+                url=f"{self._base_url}{path}",
+                content=content,
+                headers={
+                    "content-type": PROTOBUF_MEDIA_TYPE,
+                    "accept": PROTOBUF_MEDIA_TYPE,
+                },
+            )
+            context = ProtobufRequestContext(
+                rpc_method=rpc_method,
+                message=request,
+                request=http_request,
+            )
+            return self._send_and_raise(context)
+
         response = (
-            self._retry_invoker.invoke(self._send_and_raise, context)
+            self._retry_invoker.invoke(send)
             if self._retry_invoker is not None
-            else self._send_and_raise(context)
+            else send()
         )
 
         result = response_type()
