@@ -169,6 +169,10 @@ def make_task_heartbeat_fn_http(
             res = stub.SendTaskHeartbeat(req)
         except httpx.TransportError:
             return False
+        except httpx.HTTPStatusError as err:
+            if err.response.status_code in (503, 504):
+                return False
+            raise
 
         if not res.success:
             signal.raise_signal(signal.SIGINT)
