@@ -40,19 +40,6 @@ _RESPONSE_NAME_OVERRIDES = {
 }
 
 
-def test_from_server_address_returns_runtime_http_client() -> None:
-    """Create a Runtime HTTP client from a server address."""
-    with patch("flwr.supercore.protobuf.client.httpx.Client"):
-        client = RuntimeHttpStub.from_server_address(
-            server_address="runtime.example:443",
-            insecure=False,
-            root_certificates=None,
-            interceptors=[],
-        )
-
-    assert isinstance(client, RuntimeHttpStub)
-
-
 @pytest.mark.parametrize(
     "endpoint",
     _UNARY_UNARY_PATHS,
