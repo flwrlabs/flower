@@ -468,21 +468,37 @@ class GrpcGrid(Grid):
                     message.metadata.__dict__["_network_upstream_bytes"] = (
                         upstream_bytes
                     )
-                # Network delivery metrics are attached to the lightweight reply message
-                # held in LinkState (and serialized in `msg_proto`). Preserve only the
-                # downstream timing as internal metadata so strategy reply validation is
-                # not affected by extra MetricRecords.
-                proto_msg = message_from_proto(msg_proto)
-                if proto_msg.has_content():
-                    net_delivery_record = proto_msg.content.metric_records.get(
+                # Prefer the inflated object tree for object-backed replies. Keep the
+                # lightweight protobuf fallback for messages carrying inline content.
+                net_delivery_record = None
+                if message.has_content():
+                    net_delivery_record = message.content.metric_records.get(
                         "_flwr_network_delivery"
                     )
-                    if net_delivery_record is not None:
-                        downstream_ms = net_delivery_record.get("downstream_ms")
-                        if isinstance(downstream_ms, (int, float)):
-                            message.metadata.__dict__["_network_downstream_ms"] = float(
-                                downstream_ms
-                            )
+                if net_delivery_record is None:
+                    proto_msg = message_from_proto(msg_proto)
+                    if proto_msg.has_content():
+                        net_delivery_record = proto_msg.content.metric_records.get(
+                            "_flwr_network_delivery"
+                        )
+                if net_delivery_record is not None:
+                    downstream_ms = net_delivery_record.get("downstream_ms")
+                    if isinstance(downstream_ms, (int, float)):
+                        message.metadata.__dict__["_network_downstream_ms"] = float(
+                            downstream_ms
+                        )
+                    if (
+                        message.has_content()
+                        and "_flwr_network_delivery" in message.content.metric_records
+                    ):
+                        del message.content.metric_records["_flwr_network_delivery"]
+                if track_network_bytes:
+                    # Capture this after the reply's objects have been inflated and
+                    # confirmed. Strategies can use the per-message value instead of
+                    # assigning one batch-level timestamp to every reply.
+                    message.metadata.__dict__["_network_delivered_at_ms"] = (
+                        time.time() * 1000.0
+                    )
                 message.metadata.__dict__["_message_id"] = msg_id
                 inflated_msgs.append(message)
 

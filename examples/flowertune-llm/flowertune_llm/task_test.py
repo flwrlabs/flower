@@ -1,5 +1,6 @@
 """Tests for task artifact cleanup helpers."""
 
+import json
 import os
 import pickle
 import subprocess
@@ -28,6 +29,7 @@ omegaconf_stub.DictConfig = DictConfig
 sys.modules.setdefault("omegaconf", omegaconf_stub)
 
 from flowertune_llm import task as task_module  # noqa: E402
+from flowertune_llm import dcp_converter  # noqa: E402
 
 
 def _write_layer_file(path: Path, name: str, tensor: torch.Tensor) -> None:
@@ -41,7 +43,6 @@ def test_run_torchtitan_training_cleans_successful_dcp_handoff(
     """Successful DCP training should leave cache but remove per-round DCP copies."""
     layer_base = tmp_path / "layers"
     workspace = tmp_path / "workspace"
-    dump_folder = tmp_path / "dump"
     context = Context(
         run_id=10,
         node_id=20,
@@ -52,7 +53,7 @@ def test_run_torchtitan_training_cleans_successful_dcp_handoff(
             "client.workspace": str(workspace),
             "client.train-steps": 5,
             "model.name": "test/model",
-            "trainer.dump-folder": str(dump_folder),
+            "trainer.dump-folder": "",
             "trainer.torchtitan.dcp-enabled": True,
         },
     )
@@ -159,6 +160,44 @@ def test_layerwise_dcp_dry_run_renders_job_side_conversion(tmp_path) -> None:
     assert "flowertune_llm.dcp_converter" in script_text
     assert "FLWR_TORCHTITAN_INPUT_LAYERS_DIR" in script_text
     assert "FLWR_TORCHTITAN_OUTPUT_LAYERS_READY" in script_text
+    assert "FLWR_TORCHTITAN_CONVERSION_PROFILE" in script_text
+    assert str(layer_directory / "torchtitan_conversion_profile.jsonl") in script_text
+
+
+def test_dcp_converter_records_phase_profile(tmp_path, monkeypatch) -> None:
+    """The job-side converter records duration and peak RSS telemetry."""
+    profile_path = tmp_path / "conversion.jsonl"
+    monkeypatch.setenv("FLWR_TORCHTITAN_CONVERSION_PROFILE", str(profile_path))
+    monkeypatch.setattr(
+        dcp_converter,
+        "convert_layer_directory_to_dcp",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "dcp_converter",
+            "--direction",
+            "to-dcp",
+            "--input-dir",
+            str(tmp_path / "input"),
+            "--output-dir",
+            str(tmp_path / "output"),
+        ],
+    )
+
+    dcp_converter.main()
+
+    events = [json.loads(line) for line in profile_path.read_text().splitlines()]
+    assert [event["event"] for event in events] == ["start", "end"]
+    assert events[0]["phase"] == "to_dcp"
+    assert events[1]["success"] is True
+    assert events[1]["duration_ms"] >= 0
+    assert events[1]["max_rss_mb"] > 0
+    metrics = task_module.read_conversion_profile(str(profile_path))
+    assert metrics["profile.client.dcp.to_dcp.ms"] >= 0
+    assert metrics["profile.client.dcp.to_dcp.mem_mb"] > 0
 
 
 def test_dcp_converter_reads_and_publishes_layer_files(tmp_path, monkeypatch) -> None:

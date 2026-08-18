@@ -6,6 +6,8 @@ from unittest.mock import MagicMock
 
 import torch
 
+from flwr.common import MetricRecord, RecordDict
+from flwr.common.message import Message
 from flwr.common.profiling import (
     ProfileRecorder,
     clear_active_profiler,
@@ -20,7 +22,9 @@ from flowertune_llm.fedavgstreaming import (
     FedAvgStreaming,
     _batch_entries_by_size,
     _build_layer_chunk_entries,
+    _downstream_duration_from_message,
     _record_network_profile,
+    _record_profile_replies,
 )
 
 
@@ -89,8 +93,58 @@ def test_record_network_profile_preserves_endpoint_and_bytes() -> None:
     assert entries[0]["receiver_node_id"] == "server"
 
 
-def test_streamed_upload_accepts_downstream_profile_arguments() -> None:
-    """The streamed upload helper accepts the metadata supplied by ``start``."""
+def test_layerwise_download_uses_standard_network_definitions() -> None:
+    """Layerwise replies must report downstream, upstream, and their sum."""
+    instruction = Message(RecordDict(), dst_node_id=7, message_type="train")
+    reply = Message(
+        RecordDict({"metrics": MetricRecord({"profile.client.train.ms": 1.0})}),
+        reply_to=instruction,
+    )
+    reply.metadata.created_at = 10.0
+    reply.metadata.__dict__["_network_delivered_at_ms"] = 10_500.0
+    reply.metadata.__dict__["_network_upstream_bytes"] = 2 * 1024
+    reply.metadata.__dict__["_network_downstream_bytes"] = 1024
+    reply.metadata.__dict__["_network_downstream_ms"] = 200.0
+
+    profiler = ProfileRecorder(run_id=1)
+    set_active_profiler(profiler)
+    try:
+        _record_profile_replies([reply])
+    finally:
+        clear_active_profiler()
+
+    entries = profiler.summarize()["entries"]
+    upstream = next(entry for entry in entries if entry["task"] == "upstream")
+    downstream = next(entry for entry in entries if entry["task"] == "downstream")
+    combined = next(entry for entry in entries if entry["task"] == "combined")
+    assert upstream["avg_ms"] == 500.0
+    assert downstream["avg_ms"] == 200.0
+    assert combined["avg_ms"] == 700.0
+    assert combined["avg_ms"] == upstream["avg_ms"] + downstream["avg_ms"]
+    assert downstream["total_network_mb"] == 1024.0 / (1024.0**2)
+    assert upstream["total_network_mb"] == 2 * 1024.0 / (1024.0**2)
+    assert combined["total_network_mb"] == 3 * 1024.0 / (1024.0**2)
+
+
+def test_streamed_reply_reads_downstream_sidecar_from_inline_content() -> None:
+    """Raw streamed replies must read delivery timing from their protobuf content."""
+    reply = Message(
+        RecordDict(
+            {
+                "_flwr_network_delivery": MetricRecord(
+                    {"downstream_ms": 321.0}
+                )
+            }
+        ),
+        dst_node_id=7,
+        message_type="train",
+    )
+
+    assert _downstream_duration_from_message(reply) == 321.0
+
+
+def test_streamed_upload_accepts_downstream_profile_bytes() -> None:
+    """The streamed upload helper accepts the payload metadata supplied by ``start``."""
     strategy = FedAvgStreaming(initial_state_dict={})
     strategy._aggregate_streamed_upload_replies(  # pylint: disable=protected-access
         grid=MagicMock(),
@@ -107,7 +161,6 @@ def test_streamed_upload_accepts_downstream_profile_arguments() -> None:
         chunk_count_by_layer={},
         layer_names=[],
         downstream_bytes_by_id={},
-        downstream_duration_ms=0.0,
     )
 
 

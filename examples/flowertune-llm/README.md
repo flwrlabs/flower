@@ -178,6 +178,7 @@ For script-template parameterization (matching job-template workflows), these ke
 - `output_layers_dir` -> `output_layers_dir`
 - `dcp_conversion_command` -> `dcp_conversion_command`
 - `dcp_to_layers_command` -> `dcp_to_layers_command`
+- `conversion_profile_path` -> `conversion_profile_path`
 - `flowertune_llm_root` -> `flowertune_llm_root`
 
 When using `trainer.backend=torchtitan` with layerwise DCP enabled, the
@@ -186,6 +187,9 @@ job. Custom scheduler templates must include the same conversion blocks and
 invoke `dcp_conversion_command` before creating the `step-0` symlink, then
 invoke `dcp_to_layers_command` before moving the final checkpoint to
 `FLWR_TORCHTITAN_OUTPUT_DCP_DIR`.
+The generated templates also export `FLWR_TORCHTITAN_CONVERSION_PROFILE`; the
+conversion worker writes JSONL phase telemetry there, and the ClientApp reports
+conversion duration and peak RSS as `profile.client.dcp.*` metrics.
 
 Dry-run (render scripts/config but skip submission/training):
 

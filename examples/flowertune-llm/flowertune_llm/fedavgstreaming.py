@@ -309,6 +309,7 @@ def _batch_entries_by_size(
 
 
 def _record_profile_replies(replies: list[Message]) -> None:
+    """Record reply metrics using the standard Flower network definitions."""
     profiler = get_active_profiler()
     if profiler is None or not replies:
         return
@@ -318,6 +319,19 @@ def _record_profile_replies(replies: list[Message]) -> None:
     )
     record_profile_metrics_from_messages(replies)
     publish_profile_summary()
+
+
+def _downstream_duration_from_message(message: Message) -> float | None:
+    """Read the downstream timing sidecar from a lightweight reply message."""
+    if not message.has_content():
+        return None
+    delivery_record = message.content.metric_records.get("_flwr_network_delivery")
+    if delivery_record is None:
+        return None
+    duration_ms = delivery_record.get("downstream_ms")
+    if not isinstance(duration_ms, (int, float)):
+        return None
+    return max(float(duration_ms), 0.0)
 
 
 def _record_server_profile(task: str, duration_ms: float, metadata: dict[str, Any]) -> None:
@@ -766,7 +780,6 @@ class FedAvgStreaming(FedAvg):
         chunk_count_by_layer: dict[str, int],
         layer_names: list[str],
         downstream_bytes_by_id: dict[str, int],
-        downstream_duration_ms: float,
     ) -> None:
         """Pull reply objects one array at a time and aggregate incrementally."""
         if not msg_ids:
@@ -805,6 +818,10 @@ class FedAvgStreaming(FedAvg):
                 time.sleep(pull_interval)
                 continue
 
+            # This timestamp is taken before pulling the reply's child objects.
+            # Add those object-pull durations below exactly once.
+            replies_received_at_ms = time.time() * 1000.0
+
             for msg_proto, msg_tree in zip(
                 res.messages_list, res.message_object_trees, strict=True
             ):
@@ -823,6 +840,13 @@ class FedAvgStreaming(FedAvg):
                     msg_tree.object_id,
                     owner_key=owner_key,
                 )
+                # Streamed replies are pulled from the raw ServerAppIo response, so
+                # the delivery sidecar is inline in ``msg_proto`` rather than part of
+                # the object tree. Keep the object-tree fallback for compatibility,
+                # but prefer the lightweight reply metadata when present.
+                sidecar_downstream_ms = _downstream_duration_from_message(light_msg)
+                if sidecar_downstream_ms is not None:
+                    downstream_ms = sidecar_downstream_ms
                 streamed_replies.append(
                     _StreamedReply(
                         object_id=msg_tree.object_id,
@@ -835,7 +859,7 @@ class FedAvgStreaming(FedAvg):
                             + len(msg_tree.SerializeToString())
                         ),
                         created_at_ms=float(light_msg.metadata.created_at) * 1000.0,
-                        delivered_at_ms=time.time() * 1000.0,
+                        delivered_at_ms=replies_received_at_ms,
                         downstream_ms=downstream_ms,
                         array_refs=array_refs,
                         metrics=metrics,
@@ -930,18 +954,9 @@ class FedAvgStreaming(FedAvg):
             upstream_duration_ms = max(
                 reply.delivered_at_ms - reply.created_at_ms,
                 0.0,
-            )
-            if upstream_duration_ms == 0.0:
-                upstream_duration_ms = object_reader.pull_ms_for(reply.owner_key)
-                if streamed_replies:
-                    upstream_duration_ms += upstream_pull_ms / len(streamed_replies)
+            ) + object_reader.pull_ms_for(reply.owner_key)
             downstream_bytes = downstream_bytes_by_id.get(
                 reply.reply_to_message_id, 0
-            )
-            downstream_duration = (
-                reply.downstream_ms
-                if reply.downstream_ms is not None
-                else downstream_duration_ms
             )
             _record_network_profile(
                 "upstream",
@@ -951,22 +966,23 @@ class FedAvgStreaming(FedAvg):
                 receiver_node_id="server",
                 network_bytes=reply.network_bytes,
             )
-            _record_network_profile(
-                "downstream",
-                downstream_duration,
-                node_id=reply.node_id,
-                sender_node_id="server",
-                receiver_node_id=reply.node_id,
-                network_bytes=downstream_bytes,
-            )
-            _record_network_profile(
-                "combined",
-                upstream_duration_ms + downstream_duration,
-                node_id=reply.node_id,
-                sender_node_id=None,
-                receiver_node_id=None,
-                network_bytes=reply.network_bytes + downstream_bytes,
-            )
+            if reply.downstream_ms is not None:
+                _record_network_profile(
+                    "downstream",
+                    reply.downstream_ms,
+                    node_id=reply.node_id,
+                    sender_node_id="server",
+                    receiver_node_id=reply.node_id,
+                    network_bytes=downstream_bytes,
+                )
+                _record_network_profile(
+                    "combined",
+                    upstream_duration_ms + reply.downstream_ms,
+                    node_id=reply.node_id,
+                    sender_node_id=None,
+                    receiver_node_id=None,
+                    network_bytes=reply.network_bytes + downstream_bytes,
+                )
 
         _record_server_profile(
             "network_upstream",
@@ -1352,10 +1368,10 @@ class FedAvgStreaming(FedAvg):
                         msg_id for msg_id in grid.push_messages(messages) if msg_id
                     ]
                     downstream_bytes_by_id = grid.pop_pushed_message_sizes(msg_ids)
-                    downstream_duration_ms = (perf_counter() - push_start) * 1000.0
+                    downstream_enqueue_ms = (perf_counter() - push_start) * 1000.0
                     _record_server_profile(
                         "network_downstream",
-                        downstream_duration_ms,
+                        downstream_enqueue_ms,
                         {
                             "expected_replies": len(msg_ids),
                             "batch_idx": batch_idx,
@@ -1378,9 +1394,6 @@ class FedAvgStreaming(FedAvg):
                         chunk_count_by_layer=chunk_count_by_layer,
                         layer_names=layer_names,
                         downstream_bytes_by_id=downstream_bytes_by_id,
-                        downstream_duration_ms=(
-                            downstream_duration_ms / max(len(msg_ids), 1)
-                        ),
                     )
                     log_upload_progress(batch_idx)
 

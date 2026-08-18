@@ -29,6 +29,7 @@ from flowertune_llm.task import (
     load_state_dict_from_layer_files,
     parse_chunk_ranges,
     remove_empty_dirs_up_to,
+    read_conversion_profile,
     run_torchtitan_training,
     sanitize_layer_name,
     shape_from_text,
@@ -508,16 +509,22 @@ def train(msg: Message, context: Context):
         )
         output_fingerprint = state_dict_fingerprint_from_layer_paths(layer_paths)
         t1 = perf_counter()
-        metrics = MetricRecord(
-            {
-                "train_loss": 0.0,
-                "num-examples": 1,
-                "profile.client.train.ms": (t1 - t0) * 1000.0,
-                "model.input_fingerprint": input_fingerprint,
-                "model.output_fingerprint": output_fingerprint,
-                "model.fingerprint_delta": output_fingerprint - input_fingerprint,
-            }
+        metrics_dict = {
+            "train_loss": 0.0,
+            "num-examples": 1,
+            "profile.client.train.ms": (t1 - t0) * 1000.0,
+            "model.input_fingerprint": input_fingerprint,
+            "model.output_fingerprint": output_fingerprint,
+            "model.fingerprint_delta": output_fingerprint - input_fingerprint,
+        }
+        metrics_dict.update(
+            read_conversion_profile(
+                os.path.join(
+                    layer_dir(context), "torchtitan_conversion_profile.jsonl"
+                )
+            )
         )
+        metrics = MetricRecord(metrics_dict)
         return Message(
             content=RecordDict({"arrays": ArrayRecord(), "metrics": metrics}),
             reply_to=msg,

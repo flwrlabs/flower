@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from logging import ERROR, WARNING
 
-from flwr.common import Context, Message, log, now
+from flwr.common import Context, Message, RecordDict, log, now
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
@@ -346,12 +346,16 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if (
                     ins_enqueued_at_ms is not None
                     and clientapp_delivered_at_ms is not None
-                    and message_res.has_content()
                 ):
                     downstream_ms = max(
                         float(clientapp_delivered_at_ms) - float(ins_enqueued_at_ms),
                         0.0,
                     )
+                    # Object-backed replies have no inline content in LinkState.
+                    # Carry this small internal sidecar in the protobuf response;
+                    # the object tree remains unchanged.
+                    if not message_res.has_content():
+                        message_res.content = RecordDict()
                     metric_record = message_res.content.metric_records.get(
                         "_flwr_network_delivery"
                     )
@@ -380,6 +384,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         message_id
                     )
                     del self.message_res_store[message_res_id]
+                self.delivery_timings.pop(message_id, None)
 
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
 import os
 import pickle
 import re
@@ -10,6 +10,7 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from textwrap import dedent
 from typing import TYPE_CHECKING, Any
 
@@ -97,6 +98,34 @@ def _python_module_command(
         shlex.quote(part)
         for part in [*executable, "-m", module, *arguments]
     )
+
+
+def read_conversion_profile(profile_path: str) -> dict[str, float]:
+    """Read successful DCP conversion phase metrics from a JSONL profile."""
+    metrics: dict[str, float] = {}
+    if not os.path.exists(profile_path):
+        return metrics
+
+    with open(profile_path, encoding="utf-8") as file:
+        for line in file:
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if (
+                event.get("event") != "end"
+                or not event.get("success")
+                or not isinstance(event.get("phase"), str)
+            ):
+                continue
+            phase = event["phase"]
+            duration_ms = event.get("duration_ms")
+            max_rss_mb = event.get("max_rss_mb")
+            if isinstance(duration_ms, (int, float)):
+                metrics[f"profile.client.dcp.{phase}.ms"] = float(duration_ms)
+            if isinstance(max_rss_mb, (int, float)):
+                metrics[f"profile.client.dcp.{phase}.mem_mb"] = float(max_rss_mb)
+    return metrics
 
 
 def training_disabled(context: Context) -> bool:
@@ -847,6 +876,9 @@ def run_torchtitan_training(
     )
     output_dir = os.path.join(layer_dir(context), "torchtitan")
     os.makedirs(output_dir, exist_ok=True)
+    conversion_profile_path = os.path.join(
+        os.path.dirname(output_dir), "torchtitan_conversion_profile.jsonl"
+    )
     input_state_path = os.path.join(output_dir, "input_state.pt")
     output_state_path = os.path.join(output_dir, "output_state.pt")
     input_dcp_dir = os.path.join(output_dir, "input_state.dcp")
@@ -919,11 +951,9 @@ def run_torchtitan_training(
     client_workspace = os.path.abspath(
         os.path.expandvars(os.path.expanduser(client_workspace))
     )
-    dump_folder = _config_str(
-        context,
-        "trainer.dump-folder",
-        os.path.join(output_dir, "dump"),
-    )
+    dump_folder = _config_str(context, "trainer.dump-folder", "").strip()
+    if not dump_folder:
+        dump_folder = os.path.join(output_dir, "dump")
     config_filename = _config_str(
         context,
         "trainer.torchtitan.config-filename",
@@ -997,6 +1027,7 @@ def run_torchtitan_training(
         "FLWR_TORCHTITAN_DCP_CONVERSION_DIR": conversion_dir,
         "FLWR_TORCHTITAN_OUTPUT_LAYERS_DIR": output_layer_dir,
         "FLWR_TORCHTITAN_OUTPUT_LAYERS_READY": output_layers_ready,
+        "FLWR_TORCHTITAN_CONVERSION_PROFILE": conversion_profile_path,
         "FLWR_FLOWERTUNE_LLM_ROOT": FLOWERTUNE_LLM_ROOT,
         "FLWR_RUN_ID": str(context.run_id),
         "FLWR_NODE_ID": str(context.node_id),
@@ -1082,6 +1113,7 @@ def run_torchtitan_training(
         "dcp_conversion_dir": conversion_dir,
         "output_layers_dir": output_layer_dir,
         "output_layers_ready": output_layers_ready,
+        "conversion_profile_path": conversion_profile_path,
         "flowertune_llm_root": FLOWERTUNE_LLM_ROOT,
         "dcp_conversion_command": dcp_conversion_command,
         "dcp_to_layers_command": dcp_to_layers_command,
@@ -1224,6 +1256,7 @@ def run_torchtitan_training(
     _remove_path(output_dcp_dir)
     _remove_path(step0_dcp_dir)
     _remove_path(output_layers_ready)
+    _remove_path(conversion_profile_path)
 
     if layerwise_dcp:
         if cache_available:

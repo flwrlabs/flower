@@ -485,6 +485,23 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 0
         assert state.num_message_res() == 0
 
+    def test_delivery_timings_are_available_to_other_state_instances(self) -> None:
+        """Delivery anchors must survive LinkState process boundaries."""
+        state = self.state_factory()
+        message_id = "delivery-timing-test"
+
+        state.record_instruction_enqueued(message_id, 100.0)
+        state.record_clientapp_delivered(0, message_id, 250.0)
+        state.record_reply_enqueued(message_id, 300.0)
+        state.record_serverapp_delivered(0, message_id, 450.0)
+
+        assert state.get_delivery_timings(message_id) == {
+            "ins_enqueued_at_ms": 100.0,
+            "clientapp_delivered_at_ms": 250.0,
+            "res_enqueued_at_ms": 300.0,
+            "serverapp_delivered_at_ms": 450.0,
+        }
+
     def test_get_message_ids_from_run_id(self) -> None:
         """Test get_message_ids_from_run_id."""
         # Prepare
@@ -1855,7 +1872,7 @@ class SqliteInMemoryStateTest(StateTest, unittest.TestCase):
         result = state.query("SELECT name FROM sqlite_schema;")
 
         # Assert
-        assert len(result) == 20
+        assert len(result) == 22
 
 
 class SqliteFileBasedTest(StateTest, unittest.TestCase):
@@ -1884,7 +1901,7 @@ class SqliteFileBasedTest(StateTest, unittest.TestCase):
         result = state.query("SELECT name FROM sqlite_schema;")
 
         # Assert
-        assert len(result) == 20
+        assert len(result) == 22
 
 
 if __name__ == "__main__":

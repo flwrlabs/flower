@@ -315,7 +315,9 @@ class ProfileRecorder:
                 }
             )
 
-        # Derive combined network time per round from measured upstream/downstream.
+        # Derive active server network time per round from measured
+        # upstream/downstream events. These events can occur multiple times per
+        # round, so sum their durations instead of adding per-event averages.
         by_round: dict[int | None, dict[str, float]] = {}
         for entry in entries:
             if entry["round"] is None:
@@ -324,21 +326,29 @@ class ProfileRecorder:
             if round_id not in by_round:
                 by_round[round_id] = {}
             if entry["scope"] == "server" and entry["task"] == "network_upstream":
-                by_round[round_id]["upstream_avg"] = entry["avg_ms"]
+                by_round[round_id]["upstream_ms"] = (
+                    by_round[round_id].get("upstream_ms", 0.0)
+                    + entry["avg_ms"] * entry["count"]
+                )
                 if isinstance(entry.get("total_network_mb"), (int, float)):
-                    by_round[round_id]["upstream_network_mb"] = entry[
-                        "total_network_mb"
-                    ]
+                    by_round[round_id]["upstream_network_mb"] = (
+                        by_round[round_id].get("upstream_network_mb", 0.0)
+                        + entry["total_network_mb"]
+                    )
             if entry["scope"] == "server" and entry["task"] == "network_downstream":
-                by_round[round_id]["downstream_avg"] = entry["avg_ms"]
+                by_round[round_id]["downstream_ms"] = (
+                    by_round[round_id].get("downstream_ms", 0.0)
+                    + entry["avg_ms"] * entry["count"]
+                )
                 if isinstance(entry.get("total_network_mb"), (int, float)):
-                    by_round[round_id]["downstream_network_mb"] = entry[
-                        "total_network_mb"
-                    ]
+                    by_round[round_id]["downstream_network_mb"] = (
+                        by_round[round_id].get("downstream_network_mb", 0.0)
+                        + entry["total_network_mb"]
+                    )
 
         for round_id, values in by_round.items():
-            if "upstream_avg" in values and "downstream_avg" in values:
-                network_ms = max(values["upstream_avg"] + values["downstream_avg"], 0.0)
+            if "upstream_ms" in values and "downstream_ms" in values:
+                network_ms = max(values["upstream_ms"] + values["downstream_ms"], 0.0)
                 entries.append(
                     {
                         "scope": "server",
@@ -577,7 +587,15 @@ def record_network_delivery_metrics_from_messages(
             client_node_id = msg.metadata.src_node_id
             # Upstream: SuperNode reply enqueue at SuperLink -> ServerApp delivery.
             created_at_ms = float(msg.metadata.created_at) * 1000.0
-            upstream_ms = max(delivered_at_ms - created_at_ms, 0.0)
+            message_delivered_at_ms = msg.metadata.__dict__.get(
+                "_network_delivered_at_ms", delivered_at_ms
+            )
+            if not isinstance(message_delivered_at_ms, (int, float)):
+                message_delivered_at_ms = delivered_at_ms
+            upstream_ms = max(
+                float(message_delivered_at_ms) - created_at_ms,
+                0.0,
+            )
             upstream_bytes = msg.metadata.__dict__.get("_network_upstream_bytes")
             upstream_metadata: dict[str, Any] = {
                 "sender_node_id": client_node_id,

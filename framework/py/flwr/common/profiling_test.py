@@ -16,7 +16,14 @@
 
 import unittest
 
-from .profiling import ProfileRecorder
+from .message import Message
+from .profiling import (
+    ProfileRecorder,
+    clear_active_profiler,
+    record_network_delivery_metrics_from_messages,
+    set_active_profiler,
+)
+from .record import MetricRecord, RecordDict
 
 
 class TestProfileRecorder(unittest.TestCase):
@@ -117,3 +124,74 @@ class TestProfileRecorder(unittest.TestCase):
         self.assertAlmostEqual(summary["first_event_ts_ms"], 1000.0)
         self.assertAlmostEqual(summary["last_event_ts_ms"], 1440.0)
         self.assertAlmostEqual(summary["total_execution_ms"], 440.0)
+
+    def test_derived_network_sums_multiple_events(self) -> None:
+        """Derived server network time must not discard repeated transfers."""
+        recorder = ProfileRecorder(run_id=1)
+        recorder.record(
+            "server",
+            "network_downstream",
+            1,
+            None,
+            10.0,
+            {"network_bytes": 1024},
+        )
+        recorder.record(
+            "server",
+            "network_downstream",
+            1,
+            None,
+            20.0,
+            {"network_bytes": 2048},
+        )
+        recorder.record(
+            "server",
+            "network_upstream",
+            1,
+            None,
+            30.0,
+            {"network_bytes": 4096},
+        )
+        recorder.record(
+            "server",
+            "network_upstream",
+            1,
+            None,
+            40.0,
+            {"network_bytes": 8192},
+        )
+
+        entry = next(
+            entry
+            for entry in recorder.summarize()["entries"]
+            if entry["task"] == "network"
+        )
+        self.assertAlmostEqual(entry["avg_ms"], 100.0)
+        self.assertAlmostEqual(entry["total_network_mb"], 15.0 / 1024.0)
+
+    def test_network_delivery_prefers_per_message_timestamp(self) -> None:
+        """Upstream timing must not use the end of a multi-reply pull batch."""
+        instruction = Message(RecordDict(), dst_node_id=7, message_type="train")
+        reply = Message(
+            RecordDict({"metrics": MetricRecord()}),
+            reply_to=instruction,
+        )
+        reply.metadata.created_at = 10.0
+        reply.metadata.__dict__["_network_delivered_at_ms"] = 10_500.0
+        reply.metadata.__dict__["_network_upstream_bytes"] = 1024
+
+        recorder = ProfileRecorder(run_id=1)
+        set_active_profiler(recorder)
+        try:
+            record_network_delivery_metrics_from_messages(
+                [reply], delivered_at_ms=50_000.0
+            )
+        finally:
+            clear_active_profiler()
+
+        entry = next(
+            entry
+            for entry in recorder.summarize()["entries"]
+            if entry["scope"] == "network" and entry["task"] == "upstream"
+        )
+        self.assertAlmostEqual(entry["avg_ms"], 500.0)

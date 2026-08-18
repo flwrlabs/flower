@@ -402,6 +402,11 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
         request = PullAppMessagesRequest(message_ids=[str(msg_id)], run_id=run_id)
 
+        self.state.record_instruction_enqueued(
+            message_ins.metadata.message_id, 1_000.0
+        )
+        self.state.record_clientapp_delivered(run_id, message_ins.metadata.message_id, 1_250.0)
+
         # Execute
         response, call = self._pull_messages.with_call(request=request)
 
@@ -418,6 +423,14 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             assert set(obj_ids_registered) == set(object_ids_in_response)
             # Assert the root node of the object tree is the message
             assert reply_msg.object_id == object_tree.object_id
+            sidecar = message_from_proto(response.messages_list[0])
+            assert sidecar.has_content()
+            assert (
+                sidecar.content.metric_records["_flwr_network_delivery"][
+                    "downstream_ms"
+                ]
+                == 250.0
+            )
         else:
             assert len(response.messages_list) == 0
             assert len(response.message_object_trees) == 0

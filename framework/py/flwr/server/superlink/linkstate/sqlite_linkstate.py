@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from logging import ERROR, WARNING
 from typing import Any, cast
 
-from flwr.common import Context, Message, Metadata, log, now
+from flwr.common import Context, Message, Metadata, RecordDict, log, now
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
@@ -184,6 +184,17 @@ CREATE TABLE IF NOT EXISTS message_res(
 """
 
 
+SQL_CREATE_TABLE_DELIVERY_TIMINGS = """
+CREATE TABLE IF NOT EXISTS delivery_timings(
+    message_id                    TEXT PRIMARY KEY,
+    ins_enqueued_at_ms            REAL,
+    clientapp_delivered_at_ms     REAL,
+    res_enqueued_at_ms            REAL,
+    serverapp_delivered_at_ms     REAL
+);
+"""
+
+
 class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
     """SQLite-based LinkState implementation."""
 
@@ -207,6 +218,7 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
             SQL_CREATE_TABLE_CONTEXT,
             SQL_CREATE_TABLE_MESSAGE_INS,
             SQL_CREATE_TABLE_MESSAGE_RES,
+            SQL_CREATE_TABLE_DELIVERY_TIMINGS,
             SQL_CREATE_TABLE_NODE,
             SQL_CREATE_TABLE_PUBLIC_KEY,
             SQL_CREATE_INDEX_ONLINE_UNTIL,
@@ -571,12 +583,16 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
                 if (
                     ins_enqueued_at_ms is not None
                     and clientapp_delivered_at_ms is not None
-                    and message_res.has_content()
                 ):
                     downstream_ms = max(
                         float(clientapp_delivered_at_ms) - float(ins_enqueued_at_ms),
                         0.0,
                     )
+                    # Object-backed replies have no inline content in LinkState.
+                    # Carry this small internal sidecar in the protobuf response;
+                    # the object tree remains unchanged.
+                    if not message_res.has_content():
+                        message_res.content = RecordDict()
                     metric_record = message_res.content.metric_records.get(
                         "_flwr_network_delivery"
                     )
@@ -645,6 +661,10 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
         with self.conn:
             self.conn.execute(query_1, data)
             self.conn.execute(query_2, data)
+            self.conn.execute(
+                f"DELETE FROM delivery_timings WHERE message_id IN ({placeholders});",
+                data,
+            )
 
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
@@ -1358,54 +1378,43 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
 
     def record_instruction_enqueued(self, message_id: str, enqueued_at_ms: float) -> None:
         """Record when a ServerApp instruction is enqueued at SuperLink."""
-        with self._delivery_lock:
-            timings = self._delivery_timings.setdefault(
-                message_id,
-                {
-                    "ins_enqueued_at_ms": None,
-                    "clientapp_delivered_at_ms": None,
-                    "res_enqueued_at_ms": None,
-                    "serverapp_delivered_at_ms": None,
-                },
-            )
-            timings["ins_enqueued_at_ms"] = enqueued_at_ms
+        self._set_delivery_timing(message_id, "ins_enqueued_at_ms", enqueued_at_ms)
 
     def record_reply_enqueued(self, message_id: str, enqueued_at_ms: float) -> None:
         """Record when a SuperNode reply is enqueued at SuperLink."""
-        with self._delivery_lock:
-            timings = self._delivery_timings.setdefault(
-                message_id,
-                {
-                    "ins_enqueued_at_ms": None,
-                    "clientapp_delivered_at_ms": None,
-                    "res_enqueued_at_ms": None,
-                    "serverapp_delivered_at_ms": None,
-                },
-            )
-            timings["res_enqueued_at_ms"] = enqueued_at_ms
+        self._set_delivery_timing(message_id, "res_enqueued_at_ms", enqueued_at_ms)
 
     def record_clientapp_delivered(
         self, run_id: int, message_id: str, delivered_at_ms: float
     ) -> None:
         """Record when an instruction is delivered to ClientApp runtime."""
         del run_id  # Unused in SQLite implementation.
-        with self._delivery_lock:
-            timings = self._delivery_timings.setdefault(
-                message_id,
-                {
-                    "ins_enqueued_at_ms": None,
-                    "clientapp_delivered_at_ms": None,
-                    "res_enqueued_at_ms": None,
-                    "serverapp_delivered_at_ms": None,
-                },
-            )
-            timings["clientapp_delivered_at_ms"] = delivered_at_ms
+        self._set_delivery_timing(
+            message_id, "clientapp_delivered_at_ms", delivered_at_ms
+        )
 
     def record_serverapp_delivered(
         self, run_id: int, message_id: str, delivered_at_ms: float
     ) -> None:
         """Record when a reply is delivered to ServerApp runtime."""
         del run_id  # Unused in SQLite implementation.
+        self._set_delivery_timing(
+            message_id, "serverapp_delivered_at_ms", delivered_at_ms
+        )
+
+    def _set_delivery_timing(
+        self, message_id: str, column: str, timestamp_ms: float
+    ) -> None:
+        """Persist one delivery anchor for visibility across SuperLink processes."""
+        valid_columns = {
+            "ins_enqueued_at_ms",
+            "clientapp_delivered_at_ms",
+            "res_enqueued_at_ms",
+            "serverapp_delivered_at_ms",
+        }
+        if column not in valid_columns:
+            raise ValueError(f"Unknown delivery timing column: {column}")
+
         with self._delivery_lock:
             timings = self._delivery_timings.setdefault(
                 message_id,
@@ -1416,20 +1425,45 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
                     "serverapp_delivered_at_ms": None,
                 },
             )
-            timings["serverapp_delivered_at_ms"] = delivered_at_ms
+            timings[column] = timestamp_ms
+            if self._conn is None:
+                return
+            with self.conn:
+                self.conn.execute(
+                    f"""
+                    INSERT INTO delivery_timings (message_id, {column})
+                    VALUES (?, ?)
+                    ON CONFLICT(message_id) DO UPDATE SET {column} = excluded.{column};
+                    """,
+                    (message_id, timestamp_ms),
+                )
 
     def get_delivery_timings(self, message_id: str) -> dict[str, float | None]:
         """Get delivery timing anchors for a specific instruction message ID."""
         with self._delivery_lock:
-            timings = self._delivery_timings.get(message_id)
-            if timings is None:
-                return {
-                    "ins_enqueued_at_ms": None,
-                    "clientapp_delivered_at_ms": None,
-                    "res_enqueued_at_ms": None,
-                    "serverapp_delivered_at_ms": None,
-                }
-            return dict(timings)
+            if self._conn is not None:
+                row = self.conn.execute(
+                    """
+                    SELECT ins_enqueued_at_ms, clientapp_delivered_at_ms,
+                           res_enqueued_at_ms, serverapp_delivered_at_ms
+                    FROM delivery_timings
+                    WHERE message_id = ?;
+                    """,
+                    (message_id,),
+                ).fetchone()
+                if row is not None:
+                    return dict(row)
+            return dict(
+                self._delivery_timings.get(
+                    message_id,
+                    {
+                        "ins_enqueued_at_ms": None,
+                        "clientapp_delivered_at_ms": None,
+                        "res_enqueued_at_ms": None,
+                        "serverapp_delivered_at_ms": None,
+                    },
+                )
+            )
 
 
 def message_to_dict(message: Message) -> dict[str, Any]:
