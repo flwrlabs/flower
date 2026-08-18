@@ -29,6 +29,8 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
 )
+from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supernode.nodestate import NodeStateFactory
 
 from .start_client_internal import (
     FAB_VERIFICATION_ERROR,
@@ -418,6 +420,7 @@ def _run_until_connection_start(
     bound_address: str = "127.0.0.1:9094",
 ) -> tuple[Mock, Mock]:
     """Run startup only far enough to inspect Runtime API and SuperExec wiring."""
+    state_factory = NodeStateFactory(objectstore_factory=ObjectStoreFactory())
     with (
         patch(
             "flwr.supernode.start_client_internal.run_runtime_api_grpc"
@@ -434,6 +437,7 @@ def _run_until_connection_start(
         # Raising there keeps this test focused on the setup performed before it.
         with pytest.raises(_StopAfterSuperExecLaunch):
             start_client_internal(
+                state_factory=state_factory,
                 server_address="127.0.0.1:9092",
                 node_config={},
                 root_certificates=None,
@@ -444,6 +448,11 @@ def _run_until_connection_start(
                 runtime_root_certificates_path=runtime_root_certificates_path,
             )
 
+    assert run_runtime.call_args.kwargs["state_factory"] is state_factory
+    assert (
+        run_runtime.call_args.kwargs["objectstore_factory"]
+        is state_factory.objectstore_factory
+    )
     return run_runtime, popen
 
 
