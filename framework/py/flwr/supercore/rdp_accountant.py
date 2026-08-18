@@ -14,7 +14,6 @@
 # ==============================================================================
 """Renyi differential privacy accountant."""
 
-from importlib import metadata
 from math import isfinite
 from typing import Any, cast
 
@@ -136,7 +135,6 @@ class RdpAccountant:
         return {
             "schema_version": _STATE_SCHEMA_VERSION,
             "backend": _ACCOUNTING_METHOD,
-            "backend_version": metadata.version("dp-accounting"),
             "config": {
                 "target_delta": self._config.target_delta,
                 "population_size": self._config.population_size,
