@@ -14,7 +14,6 @@
 # ==============================================================================
 """Shared Runtime API clients."""
 
-from .client import create_runtime_http_stub as create_runtime_http_stub
 from .runtime_http_stub import RuntimeHttpStub as RuntimeHttpStub
 
-__all__ = ["RuntimeHttpStub", "create_runtime_http_stub"]
+__all__ = ["RuntimeHttpStub"]

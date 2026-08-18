@@ -27,6 +27,7 @@ from google.protobuf.message import DecodeError, Message
 from .constants import PROTOBUF_MEDIA_TYPE
 
 ResponseT = TypeVar("ResponseT", bound=Message)
+ProtobufClientT = TypeVar("ProtobufClientT", bound="ProtobufClient")
 
 
 @dataclass(frozen=True)
@@ -141,3 +142,33 @@ class ProtobufClient:
     def __exit__(self, *_exc_info: object) -> None:
         """Close this client when leaving a context manager."""
         self.close()
+
+
+def create_protobuf_client(
+    client_class: type[ProtobufClientT],
+    server_address: str,
+    insecure: bool,
+    root_certificates: bytes | str | None,
+    interceptors: Sequence[ProtobufClientInterceptor],
+) -> ProtobufClientT:
+    """Create a protobuf-over-HTTP client."""
+    if insecure and root_certificates is not None:
+        raise ValueError(
+            "Invalid configuration: 'root_certificates' should not be provided "
+            "when 'insecure' is set to True."
+        )
+
+    scheme = "http" if insecure else "https"
+    verify: ssl.SSLContext | str | bool = not insecure
+    if not insecure and root_certificates is not None:
+        if isinstance(root_certificates, str):
+            verify = root_certificates
+        else:
+            verify = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            verify.load_verify_locations(cadata=root_certificates.decode("ascii"))
+
+    return client_class(
+        f"{scheme}://{server_address}",
+        interceptors=interceptors,
+        verify=verify,
+    )
