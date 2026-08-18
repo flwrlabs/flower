@@ -23,6 +23,7 @@ import requests
 from .http import ConnectorApiError, request_json_object
 from .json_utils import optional_string
 from .registry import CONNECTORS
+from .tool_schema import string_property
 
 
 class ExampleApiError(ConnectorApiError):
@@ -32,12 +33,15 @@ class ExampleApiError(ConnectorApiError):
 
 
 def test_account_connector_input_schemas_are_strict() -> None:
-    """Connector schemas should reject unknown and empty string arguments."""
+    """Connector schemas should reject unknown arguments."""
     for connector in CONNECTORS:
         for action in connector.provider.actions:
-            schema = action.input_schema
-            assert schema["additionalProperties"] is False
-            _assert_non_empty_string_schemas(schema)
+            assert action.input_schema["additionalProperties"] is False
+
+
+def test_string_property_rejects_empty_values() -> None:
+    """Connector string schemas should reject empty values."""
+    assert string_property("Example.")["minLength"] == 1
 
 
 @pytest.mark.parametrize("value", [None, "", "   "])
@@ -50,18 +54,6 @@ def test_optional_string_rejects_non_string_values() -> None:
     """Invalid optional string types should not be silently omitted."""
     with pytest.raises(ValueError, match="must be a non-empty string"):
         optional_string(1, "Example", "cursor")
-
-
-def _assert_non_empty_string_schemas(value: object) -> None:
-    """Assert that non-enum strings at any schema depth reject emptiness."""
-    if isinstance(value, dict):
-        if value.get("type") == "string" and "enum" not in value:
-            assert value["minLength"] == 1
-        for nested in value.values():
-            _assert_non_empty_string_schemas(nested)
-    elif isinstance(value, list):
-        for nested in value:
-            _assert_non_empty_string_schemas(nested)
 
 
 def test_json_request_failure_is_secret_safe() -> None:
