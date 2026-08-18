@@ -135,9 +135,9 @@ agent change.
 1. An executor starts the isolated AgentApp process and loads its FAB
 1. Flower initializes `AgentSession` and the persisted `Context`
 1. The main function creates model and connector child tasks as needed
-1. Flower persists context and structured activity after each operation
-1. Returning completes the task. An exception or stop request records the
-   corresponding terminal state
+1. Flower streams structured activity while model and connector operations run
+1. During shutdown, Flower pushes the resulting `Context` once and records
+   whether the task completed, failed, or stopped
 
 ## AgentApp and other Flower Apps
 
