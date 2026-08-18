@@ -231,22 +231,22 @@ class RdpAccountant:
 
 
 def _parse_config(value: object) -> PrivacyConfig:
-    config = _as_dict(value, "config")
+    config = _require_dict(value, "config")
     try:
         max_epsilon_value = config["max_epsilon"]
         return PrivacyConfig(
-            target_delta=_as_float(config["target_delta"], "target_delta"),
-            population_size=_as_int(config["population_size"], "population_size"),
+            target_delta=_require_float(config["target_delta"], "target_delta"),
+            population_size=_require_int(config["population_size"], "population_size"),
             neighboring_relation=NeighboringRelation(
-                _as_str(config["neighboring_relation"], "neighboring_relation")
+                _require_str(config["neighboring_relation"], "neighboring_relation")
             ),
             sampling_method=SamplingMethod(
-                _as_str(config["sampling_method"], "sampling_method")
+                _require_str(config["sampling_method"], "sampling_method")
             ),
             max_epsilon=(
                 None
                 if max_epsilon_value is None
-                else _as_float(max_epsilon_value, "max_epsilon")
+                else _require_float(max_epsilon_value, "max_epsilon")
             ),
         )
     except (KeyError, TypeError, ValueError) as exc:
@@ -277,18 +277,18 @@ def _parse_compositions(value: object) -> list[tuple[GaussianPrivacyEvent, int]]
     compositions: list[tuple[GaussianPrivacyEvent, int]] = []
     try:
         for composition_value in value:
-            composition = _as_dict(composition_value, "composition")
-            event_value = _as_dict(composition["event"], "event")
+            composition = _require_dict(composition_value, "composition")
+            event_value = _require_dict(composition["event"], "event")
             event = GaussianPrivacyEvent(
-                noise_multiplier=_as_float(
+                noise_multiplier=_require_float(
                     event_value["noise_multiplier"], "noise_multiplier"
                 ),
-                sample_size=_as_int(event_value["sample_size"], "sample_size"),
-                population_size=_as_int(
+                sample_size=_require_int(event_value["sample_size"], "sample_size"),
+                population_size=_require_int(
                     event_value["population_size"], "population_size"
                 ),
             )
-            count = _as_int(composition["count"], "count")
+            count = _require_int(composition["count"], "count")
             _validate_count(count)
             compositions.append((event, count))
     except (KeyError, TypeError, ValueError) as exc:
@@ -296,25 +296,25 @@ def _parse_compositions(value: object) -> list[tuple[GaussianPrivacyEvent, int]]
     return compositions
 
 
-def _as_dict(value: object, name: str) -> dict[str, object]:
+def _require_dict(value: object, name: str) -> dict[str, object]:
     if not isinstance(value, dict):
         raise ValueError(f"Accountant state {name} must be a dictionary.")
     return cast(dict[str, object], value)
 
 
-def _as_int(value: object, name: str) -> int:
+def _require_int(value: object, name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError(f"Accountant state {name} must be an integer.")
     return value
 
 
-def _as_float(value: object, name: str) -> float:
+def _require_float(value: object, name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (float, int)):
         raise ValueError(f"Accountant state {name} must be numeric.")
     return float(value)
 
 
-def _as_str(value: object, name: str) -> str:
+def _require_str(value: object, name: str) -> str:
     if not isinstance(value, str):
         raise ValueError(f"Accountant state {name} must be a string.")
     return value
