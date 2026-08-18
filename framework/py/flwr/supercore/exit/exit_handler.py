@@ -35,7 +35,9 @@ if hasattr(signal, "SIGQUIT"):
     SIGNAL_TO_EXIT_CODE[signal.SIGQUIT] = ExitCode.GRACEFUL_EXIT_SIGQUIT
 
 
-def add_exit_handler(exit_handler: Callable[[], None]) -> None:
+def add_exit_handler(
+    exit_handler: Callable[[], None], *, run_after_existing: bool = False
+) -> None:
     """Add an exit handler to be called on graceful exit.
 
     This function allows you to register additional exit handlers
@@ -46,14 +48,20 @@ def add_exit_handler(exit_handler: Callable[[], None]) -> None:
     exit_handler : Callable[[], None]
         A callable that takes no arguments and performs cleanup or
         other actions before the application exits.
+    run_after_existing : bool (default: False)
+        If True, run this handler after all handlers currently registered.
 
     Notes
     -----
-    The registered exit handlers will be called in LIFO order, i.e.,
-    the last registered handler will be the first to be called.
+    By default, registered exit handlers are called in LIFO order. A handler
+    added with ``run_after_existing=True`` is placed before existing handlers in
+    the registry so it runs after them when the registry is reversed.
     """
     with _lock_handlers:
-        registered_exit_handlers.append(exit_handler)
+        if run_after_existing:
+            registered_exit_handlers.insert(0, exit_handler)
+        else:
+            registered_exit_handlers.append(exit_handler)
 
 
 def trigger_exit_handlers() -> None:
