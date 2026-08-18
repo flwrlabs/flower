@@ -33,6 +33,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateInvitationResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppsRequest,
+    ListAppsResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
     ListFederationsRequest,
@@ -201,6 +203,16 @@ def list_federations(
 ) -> ListFederationsResponse:
     """List federations."""
     return control_handlers.list_federations(request, account, linkstate)
+
+
+@router.post("/list-apps")
+def list_apps(
+    request: Annotated[ListAppsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListAppsResponse:
+    """List apps associated with a federation."""
+    return control_handlers.list_apps(request, account, linkstate)
 
 
 @router.post("/show-federation")
