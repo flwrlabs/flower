@@ -165,3 +165,38 @@ def test_flower_supernode_checks_for_update(
         flower_supernode_module.flower_supernode()
 
     assert captured == ["update", "flower-supernode"]
+
+
+def test_flower_supernode_injects_state_factory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperNode should pass its state factory into the internal startup path."""
+    config = Mock()
+    objectstore_factory = Mock()
+    state_factory = Mock()
+    start_client_internal = Mock()
+
+    monkeypatch.setattr(
+        flower_supernode_module, "warn_if_flwr_update_available", Mock()
+    )
+    monkeypatch.setattr(flower_supernode_module, "event", Mock())
+    monkeypatch.setattr(
+        flower_supernode_module,
+        "_parse_supernode_lifespan_config",
+        Mock(return_value=config),
+    )
+    monkeypatch.setattr(
+        flower_supernode_module,
+        "ObjectStoreFactory",
+        Mock(return_value=objectstore_factory),
+    )
+    node_state_factory = Mock(return_value=state_factory)
+    monkeypatch.setattr(flower_supernode_module, "NodeStateFactory", node_state_factory)
+    monkeypatch.setattr(
+        flower_supernode_module, "start_client_internal", start_client_internal
+    )
+
+    flower_supernode_module.flower_supernode()
+
+    node_state_factory.assert_called_once_with(objectstore_factory=objectstore_factory)
+    assert start_client_internal.call_args.kwargs["state_factory"] is state_factory

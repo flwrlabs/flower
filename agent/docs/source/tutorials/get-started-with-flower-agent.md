@@ -122,7 +122,7 @@ Type `/` to open the command menu:
 
 You can also press {kbd}`Ctrl+C`:
 
-- during a run, it requests that the run stop;
+- during a run, it requests the run to stop;
 - with a draft, it clears the prompt; and
 - from an empty idle prompt, it exits.
 

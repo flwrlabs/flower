@@ -159,6 +159,18 @@ class ControlStub:
     ]
     """List Apps in a Federation"""
 
+    StoreApp: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StoreAppRequest,
+        flwr.proto.control_pb2.StoreAppResponse,
+    ]
+    """Store App in a Federation"""
+
+    DeleteApp: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DeleteAppRequest,
+        flwr.proto.control_pb2.DeleteAppResponse,
+    ]
+    """Delete App from a Federation"""
+
     ShowFederation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
         flwr.proto.control_pb2.ShowFederationResponse,
@@ -368,6 +380,18 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.ListAppsResponse,
     ]
     """List Apps in a Federation"""
+
+    StoreApp: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.StoreAppRequest,
+        flwr.proto.control_pb2.StoreAppResponse,
+    ]
+    """Store App in a Federation"""
+
+    DeleteApp: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DeleteAppRequest,
+        flwr.proto.control_pb2.DeleteAppResponse,
+    ]
+    """Delete App from a Federation"""
 
     ShowFederation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
@@ -620,6 +644,22 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ListAppsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListAppsResponse]]:
         """List Apps in a Federation"""
+
+    @abc.abstractmethod
+    def StoreApp(
+        self,
+        request: flwr.proto.control_pb2.StoreAppRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.StoreAppResponse, collections.abc.Awaitable[flwr.proto.control_pb2.StoreAppResponse]]:
+        """Store App in a Federation"""
+
+    @abc.abstractmethod
+    def DeleteApp(
+        self,
+        request: flwr.proto.control_pb2.DeleteAppRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.DeleteAppResponse, collections.abc.Awaitable[flwr.proto.control_pb2.DeleteAppResponse]]:
+        """Delete App from a Federation"""
 
     @abc.abstractmethod
     def ShowFederation(

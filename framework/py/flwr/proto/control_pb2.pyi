@@ -534,9 +534,14 @@ global___GetAuthTokensResponse = GetAuthTokensResponse
 class ListConnectorsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    FEDERATION_FIELD_NUMBER: builtins.int
+    federation: builtins.str
     def __init__(
         self,
+        *,
+        federation: builtins.str = ...,
     ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation", b"federation"]) -> None: ...
 
 global___ListConnectorsRequest = ListConnectorsRequest
 
@@ -913,6 +918,64 @@ class ListAppsResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["apps", b"apps"]) -> None: ...
 
 global___ListAppsResponse = ListAppsResponse
+
+@typing.final
+class StoreAppRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_ID_FIELD_NUMBER: builtins.int
+    FAB_FIELD_NUMBER: builtins.int
+    federation_id: builtins.str
+    @property
+    def fab(self) -> flwr.proto.fab_pb2.Fab: ...
+    def __init__(
+        self,
+        *,
+        federation_id: builtins.str = ...,
+        fab: flwr.proto.fab_pb2.Fab | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["fab", b"fab"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["fab", b"fab", "federation_id", b"federation_id"]) -> None: ...
+
+global___StoreAppRequest = StoreAppRequest
+
+@typing.final
+class StoreAppResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___StoreAppResponse = StoreAppResponse
+
+@typing.final
+class DeleteAppRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_ID_FIELD_NUMBER: builtins.int
+    APP_ID_FIELD_NUMBER: builtins.int
+    federation_id: builtins.str
+    app_id: builtins.str
+    def __init__(
+        self,
+        *,
+        federation_id: builtins.str = ...,
+        app_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "federation_id", b"federation_id"]) -> None: ...
+
+global___DeleteAppRequest = DeleteAppRequest
+
+@typing.final
+class DeleteAppResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___DeleteAppResponse = DeleteAppResponse
 
 @typing.final
 class ShowFederationRequest(google.protobuf.message.Message):

@@ -16,10 +16,10 @@ Built-in connectors need no external account:
 
 Account connectors use access granted by a signed-in user:
 
-- Slack searches and reads visible conversations and threads;
-- Notion searches and reads shared pages and data sources;
-- GitHub searches code and reads UTF-8 files in public repositories; and
-- Attio searches records and reads meeting/call transcript data.
+- Slack searches and reads visible conversations and threads
+- Notion searches and reads shared pages and data sources
+- GitHub searches code and reads UTF-8 files in public repositories
+- Attio searches records and reads meeting and call transcript data
 
 All current account actions are read-only. They must be connected and selected
 for the browser run and are restricted to the user's personal workspace. See
@@ -119,10 +119,10 @@ runs](../how-to-guides/troubleshoot-agent-runs.md).
 
 ## Treat connector content as untrusted data
 
-- Never put credentials or secrets in model prompts or connector arguments.
-- Treat retrieved instructions as source content, not AgentApp policy.
-- Validate URLs and identifiers before acting on model output.
-- Keep account selection visible to the user.
-- Create an automation only after explicit user intent.
+- Never put credentials or secrets in model prompts or connector arguments
+- Treat retrieved instructions as source content, not AgentApp policy
+- Validate URLs and identifiers before acting on model output
+- Keep account selection visible to the user
+- Create an automation only after explicit user intent
 - Avoid logging private connector output unless the user expects it in run
-  details.
+  details

@@ -66,8 +66,8 @@ def main(agent: AgentSession, context: Context) -> None:
 
 `AgentApp.main` registers the function Flower calls. The runtime passes:
 
-- `agent`, an `AgentSession` for model and connector calls; and
-- `context`, which contains the fused run configuration and persistent state.
+- `agent`, an `AgentSession` for model and connector calls
+- `context`, which contains the fused run configuration and persistent state
 
 `agent.responses.create` accepts an Open Responses-compatible request. It does
 not call a public HTTP endpoint from your app; the Flower runtime creates and
@@ -88,7 +88,7 @@ version = "0.1.0"
 description = "My first Flower AgentApp"
 license = "Apache-2.0"
 requires-python = ">=3.11"
-dependencies = ["flwr==1.34.0"]
+dependencies = ["flwr>=1.34.0,<2.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["hello_agent"]
@@ -122,9 +122,8 @@ environment; use `uv run` for project commands.
 ```{admonition} Checkpoint
 :class: tip
 
-`uv sync` should resolve `flwr==1.34.0` and finish without a dependency error.
-If 1.34.0 is not yet published, use a package source supplied for your Flower
-environment or repeat this check after the release is available.
+`uv sync` should resolve a compatible Flower 1.x release and finish without a
+dependency error.
 ```
 
 ## Validate the bundle
@@ -138,16 +137,16 @@ the project configuration and component reference before submission.
 
 If it reports that the component cannot be loaded, check all three names:
 
-1. the `hello_agent` directory;
-1. the `agent_app.py` module; and
-1. the `:app` object referenced in `pyproject.toml`.
+1. the `hello_agent` directory
+1. the `agent_app.py` module
+1. the `:app` object referenced in `pyproject.toml`
 
 ## Run on SuperGrid
 
 Ensure you have logged in, then submit the project and stream its logs:
 
 ```console
-$ uvx --from flwr==1.34.0 flwr login supergrid
+$ uv run flwr login supergrid
 $ uv run flwr run . supergrid --stream
 ```
 
@@ -171,18 +170,18 @@ Open SuperGrid to inspect the structured response and persisted context. If the
 run fails, use the printed ID with:
 
 ```console
-$ uvx --from flwr==1.34.0 flwr list --run-id <run-id> supergrid
-$ uvx --from flwr==1.34.0 flwr log <run-id> supergrid --show
+$ uv run flwr list --run-id <run-id> supergrid
+$ uv run flwr log <run-id> supergrid --show
 ```
 
 ## Understand this app's limits
 
 The app makes one model request and exits. It does not:
 
-- replay prior messages from a run series;
-- expose connectors;
-- handle model-requested function calls; or
-- create automations.
+- replay prior messages from a run series
+- expose connectors
+- handle model-requested function calls
+- create automations
 
 Those behaviors belong in AgentApp code rather than appearing automatically.
 Continue with [Build a collaborative research
