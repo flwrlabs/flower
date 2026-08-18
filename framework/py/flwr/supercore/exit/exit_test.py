@@ -15,11 +15,12 @@
 """Tests for the exit function."""
 
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+import pytest
 from parameterized import parameterized
 
-from .exit import _get_code_url
+from .exit import _get_code_url, flwr_exit
 
 
 @parameterized.expand(  # type: ignore
@@ -39,3 +40,23 @@ def test_get_code_url(version: str, subdir: str) -> None:
             expected_url = "https://flower.ai/docs/framework/"
             expected_url += f"{subdir}ref-exit-codes/{code}.html"
             assert actual_url == expected_url
+
+
+@patch("flwr.supercore.exit.exit._try_obtain_telemetry_event", return_value=None)
+@patch("flwr.supercore.exit.exit.trigger_exit_handlers")
+@patch("flwr.supercore.exit.exit.threading.Thread")
+def test_force_exit_starts_before_exit_handlers(
+    mock_thread_cls: Mock,
+    mock_trigger_exit_handlers: Mock,
+    _mock_telemetry_event: Mock,
+) -> None:
+    """Test that blocked exit handlers cannot prevent the force-exit watchdog."""
+    call_order = []
+    mock_thread = mock_thread_cls.return_value
+    mock_thread.start.side_effect = lambda: call_order.append("watchdog")
+    mock_trigger_exit_handlers.side_effect = lambda: call_order.append("handlers")
+
+    with pytest.raises(SystemExit):
+        flwr_exit(0)
+
+    assert call_order == ["watchdog", "handlers"]

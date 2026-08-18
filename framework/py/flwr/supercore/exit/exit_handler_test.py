@@ -15,7 +15,7 @@
 """Tests for exit handler functions."""
 
 
-from .exit_handler import add_exit_handler, trigger_exit_handlers
+from .exit_handler import _lock_handlers, add_exit_handler, trigger_exit_handlers
 
 
 def test_trigger_exit_handlers() -> None:
@@ -86,3 +86,30 @@ def test_trigger_exit_handlers_ignores_exceptions() -> None:
 
     # Assert - all handlers should have been called in LIFO order
     assert execution_order == [3, 2, 1]
+
+
+def test_trigger_exit_handlers_is_reentrant() -> None:
+    """Test that a nested exit does not deadlock on the handler registry lock."""
+    execution_order = []
+
+    def handler() -> None:
+        execution_order.append(1)
+        trigger_exit_handlers()
+        execution_order.append(2)
+
+    add_exit_handler(handler)
+
+    trigger_exit_handlers()
+
+    assert execution_order == [1, 2]
+
+
+def test_exit_handler_registry_lock_is_reentrant() -> None:
+    """A signal inside the registry critical section must not deadlock exit."""
+    with _lock_handlers:
+        # pylint: disable-next=consider-using-with
+        reacquired = _lock_handlers.acquire(blocking=False)
+        if reacquired:
+            _lock_handlers.release()
+
+    assert reacquired
