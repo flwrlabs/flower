@@ -17,11 +17,12 @@
 
 from __future__ import annotations
 
+import time
 from logging import DEBUG, ERROR
 
 import grpc
 
-from flwr.common.constant import SubStatus
+from flwr.common.constant import TASK_WORKER_CALL_TIMEOUT, SubStatus
 from flwr.common.logger import log
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
@@ -30,6 +31,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.constant import (
+    EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS,
+    EXIT_HANDLER_TIMEOUT_SECONDS,
+)
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
@@ -69,19 +74,29 @@ def run_connector(  # pylint: disable=too-many-locals
     def on_exit() -> None:
         log(DEBUG, "[flwr-connector] Will push Connector task output")
 
-        retry_invoker.max_tries = 1
+        # Disable retries and interrupt active backoff before bounded shutdown.
+        retry_invoker.disable_retries()
+        started_at = time.monotonic()
+        cleanup_deadline = started_at + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
+        exit_deadline = started_at + EXIT_HANDLER_TIMEOUT_SECONDS
+
+        # Stop heartbeats before finishing the task, which revokes its token.
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop(timeout=max(0.0, cleanup_deadline - time.monotonic()))
 
         pushoutput_req = PushTaskOutputRequest(
             sub_status=sub_status,
             details=details,
         )
         try:
-            stub.PushTaskOutput(pushoutput_req)
+            # Do not use the one-second worker deadline: give this critical final
+            # write the remaining exit-handler budget.
+            stub.PushTaskOutput(
+                pushoutput_req,
+                timeout=max(0.0, exit_deadline - time.monotonic()),
+            )
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
-
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
 
         channel.close()
 
@@ -92,7 +107,10 @@ def run_connector(  # pylint: disable=too-many-locals
     )
 
     try:
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
+        heartbeat_sender = HeartbeatSender(
+            make_task_heartbeat_fn_grpc(stub),
+            call_timeout=TASK_WORKER_CALL_TIMEOUT,
+        )
         heartbeat_sender.start()
 
         log(DEBUG, "[flwr-connector] Pull task input")
