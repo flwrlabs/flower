@@ -920,6 +920,36 @@ class ListAppsResponse(google.protobuf.message.Message):
 global___ListAppsResponse = ListAppsResponse
 
 @typing.final
+class StoreAppRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_ID_FIELD_NUMBER: builtins.int
+    FAB_FIELD_NUMBER: builtins.int
+    federation_id: builtins.str
+    @property
+    def fab(self) -> flwr.proto.fab_pb2.Fab: ...
+    def __init__(
+        self,
+        *,
+        federation_id: builtins.str = ...,
+        fab: flwr.proto.fab_pb2.Fab | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["fab", b"fab"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["fab", b"fab", "federation_id", b"federation_id"]) -> None: ...
+
+global___StoreAppRequest = StoreAppRequest
+
+@typing.final
+class StoreAppResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___StoreAppResponse = StoreAppResponse
+
+@typing.final
 class DeleteAppRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

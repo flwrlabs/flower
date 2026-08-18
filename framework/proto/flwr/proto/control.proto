@@ -98,6 +98,9 @@ service Control {
   // List Apps in a Federation
   rpc ListApps(ListAppsRequest) returns (ListAppsResponse) {}
 
+  // Store App in a Federation
+  rpc StoreApp(StoreAppRequest) returns (StoreAppResponse) {}
+
   // Delete App from a Federation
   rpc DeleteApp(DeleteAppRequest) returns (DeleteAppResponse) {}
 
@@ -308,6 +311,12 @@ message ListAppsRequest {
   optional uint64 limit = 2;
 }
 message ListAppsResponse { repeated AppInfo apps = 1; }
+
+message StoreAppRequest {
+  string federation_id = 1;
+  Fab fab = 2;
+}
+message StoreAppResponse {}
 
 message DeleteAppRequest {
   string federation_id = 1;

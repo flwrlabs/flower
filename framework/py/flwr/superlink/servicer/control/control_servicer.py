@@ -84,6 +84,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StoreAppRequest,
+    StoreAppResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -301,6 +303,15 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("ListApps is not implemented.")
         raise NotImplementedError("ListApps is not implemented.")
+
+    def StoreApp(
+        self, request: StoreAppRequest, context: grpc.ServicerContext
+    ) -> StoreAppResponse:
+        """Store an app in a federation."""
+        _ = request
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("StoreApp is not implemented.")
+        raise NotImplementedError("StoreApp is not implemented.")
 
     def DeleteApp(
         self, request: DeleteAppRequest, context: grpc.ServicerContext
