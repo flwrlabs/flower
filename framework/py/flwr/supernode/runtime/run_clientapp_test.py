@@ -31,7 +31,9 @@ from flwr.supercore.exit import ExitCode
 from flwr.supercore.fab import Fab
 from flwr.supercore.interceptors import (
     RuntimeTokenClientInterceptor,
+    RuntimeTokenHttpInterceptor,
     RuntimeVersionClientInterceptor,
+    RuntimeVersionHttpInterceptor,
 )
 
 from .run_clientapp import pull_task_input, run_clientapp
@@ -73,6 +75,26 @@ class TestRunClientApp(unittest.TestCase):
         self.assertIsInstance(interceptors[1], RuntimeTokenClientInterceptor)
         # pylint: disable-next=protected-access
         self.assertEqual(interceptors[0]._metadata.component_name, "flwr-clientapp")
+
+    def test_run_clientapp_adds_http_interceptors(self) -> None:
+        """`run_clientapp` should configure its HTTP Runtime stub."""
+        with patch(
+            "flwr.supernode.runtime.run_clientapp.RuntimeHttpStub",
+            side_effect=RuntimeError,
+        ) as runtime_http_stub:
+            with self.assertRaises(RuntimeError):
+                run_clientapp(
+                    "127.0.0.1:8000",
+                    insecure=True,
+                    token="test-token",
+                    enable_http_api=True,
+                )
+
+        self.assertEqual(runtime_http_stub.call_args.args, ("http://127.0.0.1:8000",))
+        self.assertIs(runtime_http_stub.call_args.kwargs["verify"], False)
+        interceptors = runtime_http_stub.call_args.kwargs["interceptors"]
+        self.assertIsInstance(interceptors[0], RuntimeVersionHttpInterceptor)
+        self.assertIsInstance(interceptors[1], RuntimeTokenHttpInterceptor)
 
     def test_run_clientapp_exits_nonzero_on_grpc_error(self) -> None:
         """`run_clientapp` should not report success after Runtime API failures."""

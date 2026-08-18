@@ -407,6 +407,20 @@ def test_build_taskexecutor_pod_supports_clientapp_insecure_args() -> None:
     ]
 
 
+def test_build_taskexecutor_pod_forwards_http_api_flag() -> None:
+    """Test Pod construction forwards Runtime HTTP mode."""
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            _execution_spec(enable_http_api=True),
+            _executor_config(runtime_root_certificates=None),
+            None,
+            _LAUNCH_ATTEMPT_ID,
+        )
+    )
+
+    assert "--enable-http-api" in pod["spec"]["containers"][0]["args"]
+
+
 def test_build_taskexecutor_pod_supports_secure_default_trust_store() -> None:
     """Test secure Pod args can rely on container default trust store."""
     spec = _execution_spec()

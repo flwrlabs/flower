@@ -33,6 +33,7 @@ from flwr.supercore.auth import (
 from flwr.supercore.constant import EXEC_PLUGIN_SECTION, ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.runtime import RuntimeHttpStub as CoreRuntimeHttpStub
 from flwr.supercore.superexec.executor.config import (
     ExecutorConfig,
     ExecutorConfigError,
@@ -49,6 +50,9 @@ from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import disable_process_dumping
 from flwr.supercore.version import package_version
+from flwr.superlink.runtime import RuntimeHttpStub as SuperLinkRuntimeHttpStub
+
+RuntimeStubClass = type[RuntimeStub] | type[CoreRuntimeHttpStub]
 
 
 def flower_superexec() -> None:
@@ -102,7 +106,9 @@ def flower_superexec() -> None:
             ExecPluginType.SERVER_APP,
         )
 
-    plugin_class, stub_class = _get_plugin_and_stub_class(args.plugin_type)
+    plugin_class, stub_class = _get_plugin_and_stub_class(
+        args.plugin_type, args.enable_http_api
+    )
     superexec_auth_secret = None
     if args.superexec_auth_secret_file is not None:
         try:
@@ -126,7 +132,7 @@ def flower_superexec() -> None:
 
     run_superexec(
         plugin_class=plugin_class,
-        stub_class=stub_class,  # type: ignore
+        stub_class=stub_class,
         runtime_api_address=args.runtime_api_address,
         insecure=args.insecure,
         root_certificates_path=args.root_certificates,
@@ -137,6 +143,7 @@ def flower_superexec() -> None:
         runtime_dependency_install=args.runtime_dependency_install,
         executor_type=args.executor,
         executor_config=executor_config,
+        enable_http_api=args.enable_http_api,
     )
 
 
@@ -157,6 +164,12 @@ def _parse_args() -> argparse.ArgumentParser:
         type=str,
         required=True,
         help="Address of the Runtime API",
+    )
+    parser.add_argument(
+        "--enable-http-api",
+        action="store_true",
+        default=False,
+        help="EXPERIMENTAL: Connect to the Runtime API over HTTP instead of gRPC.",
     )
     parser.add_argument(
         "--plugin-type",
@@ -221,14 +234,17 @@ def _load_executor_config(
 
 def _get_plugin_and_stub_class(
     plugin_type: str,
-) -> tuple[type[ExecPlugin], type[object]]:
+    enable_http_api: bool = False,
+) -> tuple[type[ExecPlugin], RuntimeStubClass]:
     """Get the plugin class and stub class based on the plugin type."""
-    mapping: dict[str, tuple[type[ExecPlugin], type[object]]] = {
-        ExecPluginType.CLIENT_APP: (ClientAppExecPlugin, RuntimeStub),
-        ExecPluginType.SERVER_APP: (ServerAppExecPlugin, RuntimeStub),
+    clientapp_stub = CoreRuntimeHttpStub if enable_http_api else RuntimeStub
+    serverapp_stub = SuperLinkRuntimeHttpStub if enable_http_api else RuntimeStub
+    mapping: dict[str, tuple[type[ExecPlugin], RuntimeStubClass]] = {
+        ExecPluginType.CLIENT_APP: (ClientAppExecPlugin, clientapp_stub),
+        ExecPluginType.SERVER_APP: (ServerAppExecPlugin, serverapp_stub),
         ExecPluginType.SERVER_APP_EPHEMERAL: (
             ServerAppEphemeralExecPlugin,
-            RuntimeStub,
+            serverapp_stub,
         ),
     }
     if plugin_type in mapping:

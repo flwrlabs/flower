@@ -93,6 +93,14 @@ def test_launch_renders_runtime_dependency_install_flag() -> None:
     assert "--allow-runtime-dependency-installation" in popen_mock.call_args.args[0]
 
 
+def test_launch_renders_http_api_flag() -> None:
+    """Test subprocess executor forwards Runtime HTTP mode."""
+    with patch.object(subprocess, "Popen") as popen_mock:
+        SubprocessExecutor().launch(_execution_spec(enable_http_api=True))
+
+    assert "--enable-http-api" in popen_mock.call_args.args[0]
+
+
 def test_launch_renders_parent_pid_flag() -> None:
     """Test subprocess executor renders subprocess parent PID flag."""
     with patch.object(subprocess, "Popen") as popen_mock:

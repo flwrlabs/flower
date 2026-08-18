@@ -517,6 +517,8 @@ def _taskexecutor_args(
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
     ]
+    if spec.enable_http_api:
+        args.append("--enable-http-api")
 
     if spec.insecure:
         args.append("--insecure")

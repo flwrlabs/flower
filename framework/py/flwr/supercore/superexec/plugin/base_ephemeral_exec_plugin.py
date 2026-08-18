@@ -57,6 +57,8 @@ class BaseEphemeralExecPlugin(ExecPlugin):
         elif self.root_certificates_path:
             cmds += ["--root-certificates", self.root_certificates_path]
         cmds += [self.runtime_api_address_arg, self.runtime_api_address]
+        if self.enable_http_api:
+            cmds += ["--enable-http-api"]
         cmds += ["--token", token]
         cmds += ["--parent-pid", str(os.getpid())]
         if self.runtime_dependency_install:

@@ -18,6 +18,7 @@
 from logging import DEBUG, ERROR
 
 import grpc
+import httpx
 
 from flwr.app import Context, Message
 from flwr.app.error import Error
@@ -49,7 +50,11 @@ from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.fab import Fab
 from flwr.supercore.grpc import create_channel, on_channel_state_change
-from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import (
+    HeartbeatSender,
+    make_task_heartbeat_fn_grpc,
+    make_task_heartbeat_fn_http,
+)
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
@@ -66,10 +71,14 @@ from flwr.supercore.inflatable.inflatable_utils import (
 )
 from flwr.supercore.interceptors import (
     RuntimeTokenClientInterceptor,
+    RuntimeTokenHttpInterceptor,
     RuntimeVersionClientInterceptor,
+    RuntimeVersionHttpInterceptor,
 )
+from flwr.supercore.protobuf.client import ProtobufClientInterceptor
 from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.supercore.run import Run
+from flwr.supercore.runtime import RuntimeHttpStub
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
@@ -78,13 +87,15 @@ from flwr.supercore.superexec.dependency_installer import (
 from flwr.supercore.telemetry import EventType, event
 
 
-def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
+def run_clientapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
     runtime_api_address: str,
     token: str,
     insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
+    enable_http_api: bool = False,
+    root_certificates_path: str | None = None,
 ) -> None:
     """Run Flower ClientApp process."""
     # Monitor the main process in case of SIGKILL
@@ -93,19 +104,37 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
     event(EventType.FLWR_CLIENTAPP_RUN_ENTER)
 
-    channel = create_channel(
-        server_address=runtime_api_address,
-        insecure=insecure,
-        root_certificates=certificates,
-        interceptors=[
-            RuntimeVersionClientInterceptor(component_name="flwr-clientapp"),
-            RuntimeTokenClientInterceptor(token),
-        ],
-    )
-    channel.subscribe(on_channel_state_change)
-    stub = RuntimeStub(channel)
-    retry_invoker = make_simple_grpc_retry_invoker()
-    wrap_stub(stub, retry_invoker)
+    retry_invoker = None
+    stub: RuntimeStub | RuntimeHttpStub
+    if enable_http_api:
+        http_interceptors: list[ProtobufClientInterceptor] = [
+            RuntimeVersionHttpInterceptor(component_name="flwr-clientapp"),
+            RuntimeTokenHttpInterceptor(token),
+        ]
+        scheme = "http" if insecure else "https"
+        stub = RuntimeHttpStub(
+            f"{scheme}://{runtime_api_address}",
+            interceptors=http_interceptors,
+            verify=False if insecure else root_certificates_path or True,
+        )
+        close_runtime_connection = stub.close
+        heartbeat_fn = make_task_heartbeat_fn_http(stub)
+    else:
+        channel = create_channel(
+            server_address=runtime_api_address,
+            insecure=insecure,
+            root_certificates=certificates,
+            interceptors=[
+                RuntimeVersionClientInterceptor(component_name="flwr-clientapp"),
+                RuntimeTokenClientInterceptor(token),
+            ],
+        )
+        channel.subscribe(on_channel_state_change)
+        stub = RuntimeStub(channel)
+        retry_invoker = make_simple_grpc_retry_invoker()
+        wrap_stub(stub, retry_invoker)
+        close_runtime_connection = channel.close
+        heartbeat_fn = make_task_heartbeat_fn_grpc(stub)
 
     # Initialize variables for exit handler
     heartbeat_sender = None
@@ -119,7 +148,8 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
     def on_exit() -> None:
         # Set Grpc max retries to 1 to avoid blocking on exit
-        retry_invoker.max_tries = 1
+        if retry_invoker is not None:
+            retry_invoker.max_tries = 1
 
         # Push final status and context (if available)
         push_task_output(
@@ -132,7 +162,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         # Stop heartbeat sender
         if heartbeat_sender is not None and heartbeat_sender.is_running:
             heartbeat_sender.stop()
-        channel.close()
+        close_runtime_connection()
 
         cleanup_app_runtime_environment(runtime_env_dir)
 
@@ -144,7 +174,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
     try:
         # Start task heartbeat
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
+        heartbeat_sender = HeartbeatSender(heartbeat_fn)
         heartbeat_sender.start()
 
         # Pull Message, Context, Run and FAB from SuperNode
@@ -234,7 +264,9 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     )
 
 
-def pull_task_input(stub: RuntimeStub) -> tuple[Message, Context, Run, Fab]:
+def pull_task_input(
+    stub: RuntimeStub | RuntimeHttpStub,
+) -> tuple[Message, Context, Run, Fab]:
     """Pull TaskInput from SuperNode."""
     # Pull Context, Run and FAB
     res: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
@@ -264,7 +296,9 @@ def pull_task_input(stub: RuntimeStub) -> tuple[Message, Context, Run, Fab]:
     return message, context, run, fab
 
 
-def push_message(stub: RuntimeStub, message: Message, context: Context) -> None:
+def push_message(
+    stub: RuntimeStub | RuntimeHttpStub, message: Message, context: Context
+) -> None:
     """Push reply message to SuperNode."""
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
@@ -302,7 +336,7 @@ def push_message(stub: RuntimeStub, message: Message, context: Context) -> None:
 
 
 def push_task_output(  # pylint: disable=R0913, R0917
-    stub: RuntimeStub,
+    stub: RuntimeStub | RuntimeHttpStub,
     context: Context | None,
     sub_status: str,
     details: str,
@@ -317,5 +351,5 @@ def push_task_output(  # pylint: disable=R0913, R0917
                 details=details,
             )
         )
-    except grpc.RpcError as err:
+    except (grpc.RpcError, httpx.HTTPError) as err:
         log(ERROR, "Failed to push task output: %s", str(err))

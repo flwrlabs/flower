@@ -40,6 +40,8 @@ class SubprocessExecutor:
             "--token",
             spec.token,
         ]
+        if spec.enable_http_api:
+            args.append("--enable-http-api")
 
         if spec.insecure:
             args.append("--insecure")

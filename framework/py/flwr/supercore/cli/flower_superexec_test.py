@@ -24,7 +24,9 @@ import pytest
 from flwr.common.constant import ExecPluginType
 from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.constant import ExecutorType
+from flwr.supercore.runtime import RuntimeHttpStub as CoreRuntimeHttpStub
 from flwr.supercore.version import package_version
+from flwr.superlink.runtime import RuntimeHttpStub as SuperLinkRuntimeHttpStub
 
 from .flower_superexec import _parse_args
 
@@ -61,6 +63,21 @@ def test_parse_superexec_accepts_kubernetes_executor_config() -> None:
 
     assert args.executor == ExecutorType.KUBERNETES
     assert args.executor_config == "executor.yaml"
+
+
+def test_parse_superexec_accepts_http_api_flag() -> None:
+    """SuperExec should accept the temporary Runtime HTTP API flag."""
+    args = _parse_args().parse_args(
+        [
+            "--appio-api-address",
+            "127.0.0.1:8000",
+            "--plugin-type",
+            ExecPluginType.CLIENT_APP,
+            "--enable-http-api",
+        ]
+    )
+
+    assert args.enable_http_api is True
 
 
 def test_flower_superexec_checks_for_update(
@@ -117,6 +134,7 @@ def test_flower_superexec_clientapp_allows_missing_secret(
         health_server_address=None,
         runtime_dependency_install=False,
         executor=ExecutorType.SUBPROCESS,
+        enable_http_api=False,
     )
     captured: dict[str, object] = {}
 
@@ -137,7 +155,7 @@ def test_flower_superexec_clientapp_allows_missing_secret(
     monkeypatch.setattr(
         flower_superexec_module,
         "_get_plugin_and_stub_class",
-        lambda _plugin_type: (object, RuntimeStub),
+        lambda _plugin_type, _enable_http_api: (object, RuntimeStub),
     )
     monkeypatch.setattr(flower_superexec_module, "run_superexec", _run_superexec)
 
@@ -161,6 +179,7 @@ def test_flower_superexec_serverapp_allows_missing_secret(
         health_server_address=None,
         runtime_dependency_install=False,
         executor=ExecutorType.SUBPROCESS,
+        enable_http_api=False,
     )
 
     class _Parser:
@@ -182,7 +201,7 @@ def test_flower_superexec_serverapp_allows_missing_secret(
     monkeypatch.setattr(
         flower_superexec_module,
         "_get_plugin_and_stub_class",
-        lambda _plugin_type: (object, RuntimeStub),
+        lambda _plugin_type, _enable_http_api: (object, RuntimeStub),
     )
     monkeypatch.setattr(flower_superexec_module, "run_superexec", _run_superexec)
 
@@ -206,6 +225,7 @@ def test_flower_superexec_passes_executor_to_run_superexec(
         health_server_address=None,
         runtime_dependency_install=False,
         executor=ExecutorType.SUBPROCESS,
+        enable_http_api=False,
     )
     parser = Mock()
     parser.parse_args.return_value = args
@@ -222,7 +242,7 @@ def test_flower_superexec_passes_executor_to_run_superexec(
     monkeypatch.setattr(
         flower_superexec_module,
         "_get_plugin_and_stub_class",
-        lambda _plugin_type: (object, RuntimeStub),
+        lambda _plugin_type, _enable_http_api: (object, RuntimeStub),
     )
     monkeypatch.setattr(flower_superexec_module, "run_superexec", run_superexec_mock)
 
@@ -233,3 +253,22 @@ def test_flower_superexec_passes_executor_to_run_superexec(
         run_superexec_mock.call_args.kwargs["executor_type"] == ExecutorType.SUBPROCESS
     )
     assert run_superexec_mock.call_args.kwargs["executor_config"] is None
+
+
+@pytest.mark.parametrize(
+    ("plugin_type", "expected_stub"),
+    [
+        (ExecPluginType.CLIENT_APP, CoreRuntimeHttpStub),
+        (ExecPluginType.SERVER_APP, SuperLinkRuntimeHttpStub),
+        (ExecPluginType.SERVER_APP_EPHEMERAL, SuperLinkRuntimeHttpStub),
+    ],
+)
+def test_get_plugin_and_stub_class_selects_http_stub(
+    plugin_type: str, expected_stub: type[object]
+) -> None:
+    """HTTP mode should select the Runtime stub for each plugin surface."""
+    _, stub_class = flower_superexec_module._get_plugin_and_stub_class(
+        plugin_type, enable_http_api=True
+    )
+
+    assert stub_class is expected_stub

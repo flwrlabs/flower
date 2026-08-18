@@ -42,12 +42,13 @@ class _EphemeralExecPlugin(BaseEphemeralExecPlugin):
     runtime_api_address_arg = "--serverappio-api-address"
 
 
-def _get_ephemeral_plugin() -> _EphemeralExecPlugin:
+def _get_ephemeral_plugin(*, enable_http_api: bool = False) -> _EphemeralExecPlugin:
     return _EphemeralExecPlugin(
         runtime_api_address="127.0.0.1:9091",
         get_run=_get_run,
         insecure=True,
         root_certificates_path=None,
+        enable_http_api=enable_http_api,
     )
 
 
@@ -119,3 +120,18 @@ def test_launch_task_calls_cleanup_before_launch() -> None:
 
     # Assert
     assert call_log == ["cleanup", "subprocess"]
+
+
+def test_launch_task_forwards_http_api_flag() -> None:
+    """Launch should forward Runtime HTTP mode to the app process."""
+    plugin = _get_ephemeral_plugin(enable_http_api=True)
+
+    with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run"
+        ) as run,
+        patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
+    ):
+        plugin.launch_task(token="token-123", task=_get_task(task_id=5))
+
+    assert "--enable-http-api" in run.call_args.args[0]

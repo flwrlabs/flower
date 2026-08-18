@@ -194,6 +194,9 @@ def flower_supernode() -> None:
             trusted_entities=config.trusted_entities,
             superexec_auth_secret=config.superexec_auth_secret,
             runtime_dependency_install=config.runtime_dependency_install,
+            runtime_http_api_address=(
+                f"{config.host}:{config.port}" if config.enable_http_api else None
+            ),
         )
     finally:
         if http_server is not None and http_thread is not None:

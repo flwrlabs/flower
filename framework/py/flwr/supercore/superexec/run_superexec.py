@@ -16,8 +16,9 @@
 
 
 import time
+from collections.abc import Callable
 from logging import ERROR, WARNING
-from typing import Any
+from typing import Any, cast
 
 import grpc
 
@@ -38,13 +39,17 @@ from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
+    RuntimeVersionHttpInterceptor,
     SuperExecAuthClientInterceptor,
+    SuperExecAuthHttpInterceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
     RUNTIME_SUPEREXEC_METHODS,
 )
+from flwr.supercore.protobuf.client import ProtobufClient, ProtobufClientInterceptor
 from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.supercore.run import Run
+from flwr.supercore.runtime import RuntimeHttpStub
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
@@ -103,7 +108,7 @@ def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     plugin_class: type[ExecPlugin],
-    stub_class: type[RuntimeStub],
+    stub_class: type[RuntimeStub] | type[RuntimeHttpStub],
     runtime_api_address: str,
     insecure: bool,
     root_certificates_path: str | None = None,
@@ -114,6 +119,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
     executor_type: ExecutorType = ExecutorType.SUBPROCESS,
     executor_config: ExecutorConfig | None = None,
+    enable_http_api: bool = False,
 ) -> None:
     """Run Flower SuperExec.
 
@@ -147,22 +153,62 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
         The executor to use for non-ephemeral app processes.
     executor_config : Optional[ExecutorConfig] (default: None)
         Parsed executor configuration.
+    enable_http_api : bool (default: False)
+        Whether to connect to the Runtime API over HTTP instead of gRPC.
     """
     try:
         executor = get_executor(executor_type, executor_config=executor_config)
     except ValueError as err:
         flwr_exit(ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG, str(err))
 
-    interceptors: list[grpc.UnaryUnaryClientInterceptor] = [
-        RuntimeVersionClientInterceptor(component_name="SuperExec")
-    ]
-    auth_interceptor: SuperExecAuthClientInterceptor | None = None
-    if superexec_auth_secret:
-        auth_interceptor = SuperExecAuthClientInterceptor(
-            master_secret=superexec_auth_secret,
-            protected_methods=RUNTIME_SUPEREXEC_METHODS,
+    auth_interceptor: (
+        SuperExecAuthClientInterceptor | SuperExecAuthHttpInterceptor | None
+    ) = None
+    close_runtime_connection: Callable[[], None]
+    stub: RuntimeStub | RuntimeHttpStub
+    if enable_http_api:
+        http_interceptors: list[ProtobufClientInterceptor] = [
+            RuntimeVersionHttpInterceptor(component_name="SuperExec")
+        ]
+        if superexec_auth_secret:
+            auth_interceptor = SuperExecAuthHttpInterceptor(
+                master_secret=superexec_auth_secret,
+                protected_methods=RUNTIME_SUPEREXEC_METHODS,
+            )
+            http_interceptors.append(auth_interceptor)
+        validate_and_resolve_root_certificates(root_certificates_path, insecure)
+        http_stub_class = cast(type[RuntimeHttpStub], stub_class)
+        scheme = "http" if insecure else "https"
+        stub = http_stub_class(
+            f"{scheme}://{runtime_api_address}",
+            interceptors=http_interceptors,
+            verify=False if insecure else root_certificates_path or True,
         )
-        interceptors.append(auth_interceptor)
+        close_runtime_connection = cast(ProtobufClient, stub).close
+    else:
+        grpc_interceptors: list[grpc.UnaryUnaryClientInterceptor] = [
+            RuntimeVersionClientInterceptor(component_name="SuperExec")
+        ]
+        if superexec_auth_secret:
+            auth_interceptor = SuperExecAuthClientInterceptor(
+                master_secret=superexec_auth_secret,
+                protected_methods=RUNTIME_SUPEREXEC_METHODS,
+            )
+            grpc_interceptors.append(auth_interceptor)
+
+        channel = create_channel(
+            server_address=runtime_api_address,
+            insecure=insecure,
+            root_certificates=validate_and_resolve_root_certificates(
+                root_certificates_path, insecure
+            ),
+            interceptors=grpc_interceptors,
+        )
+        channel.subscribe(on_channel_state_change)
+        grpc_stub_class = cast(type[RuntimeStub], stub_class)
+        stub = grpc_stub_class(channel)
+        wrap_stub(stub, make_simple_grpc_retry_invoker())
+        close_runtime_connection = channel.close
 
     # Start monitoring the parent process if a PID is provided
     if parent_pid is not None:
@@ -174,28 +220,13 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
         health_server = run_health_server_grpc_no_tls(health_server_address)
         grpc_servers.append(health_server)
 
-    # Create the channel to the Runtime API
-    channel = create_channel(
-        server_address=runtime_api_address,
-        insecure=insecure,
-        root_certificates=validate_and_resolve_root_certificates(
-            root_certificates_path, insecure
-        ),
-        interceptors=interceptors,
-    )
-    channel.subscribe(on_channel_state_change)
-
-    # Register exit handlers to close the channel on exit
+    # Register exit handlers to close the Runtime API connection on exit
     register_signal_handlers(
         event_type=EventType.RUN_SUPEREXEC_LEAVE,
         exit_message="SuperExec terminated gracefully.",
         grpc_servers=grpc_servers,
-        exit_handlers=[lambda: channel.close()],  # pylint: disable=W0108
+        exit_handlers=[close_runtime_connection],
     )
-
-    # Create the gRPC stub for the Runtime API
-    stub = stub_class(channel)
-    wrap_stub(stub, make_simple_grpc_retry_invoker())
 
     def get_run(run_id: int) -> Run:
         _req = GetRunRequest(run_id=run_id)
@@ -210,6 +241,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
         get_run=get_run,
         runtime_dependency_install=runtime_dependency_install,
         executor=executor,
+        enable_http_api=enable_http_api,
     )
 
     # Load plugin configuration from file if provided
@@ -263,4 +295,4 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             # Sleep for a while before checking again
             time.sleep(1)
     finally:
-        channel.close()
+        close_runtime_connection()

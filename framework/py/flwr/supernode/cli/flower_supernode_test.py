@@ -192,6 +192,8 @@ def test_flower_supernode_injects_state_factory_and_manages_http_api(
     """SuperNode should share state and stop its background HTTP API."""
     config = Mock()
     config.enable_http_api = True
+    config.host = "127.0.0.1"
+    config.port = 8000
     objectstore_factory = Mock()
     state_factory = Mock()
     start_client_internal = Mock()
@@ -226,6 +228,10 @@ def test_flower_supernode_injects_state_factory_and_manages_http_api(
 
     node_state_factory.assert_called_once_with(objectstore_factory=objectstore_factory)
     assert start_client_internal.call_args.kwargs["state_factory"] is state_factory
+    assert (
+        start_client_internal.call_args.kwargs["runtime_http_api_address"]
+        == "127.0.0.1:8000"
+    )
     start_http_api.assert_called_once_with(config, state_factory)
     assert http_server.should_exit is True
     http_thread.join.assert_called_once_with()

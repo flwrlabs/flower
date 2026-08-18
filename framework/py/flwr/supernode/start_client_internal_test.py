@@ -416,6 +416,7 @@ def _run_until_connection_start(
     runtime_root_certificates_path: str | None = None,
     runtime_api_address: str = "127.0.0.1:9094",
     bound_address: str = "127.0.0.1:9094",
+    runtime_http_api_address: str | None = None,
 ) -> tuple[Mock, Mock]:
     """Run startup only far enough to inspect Runtime API and SuperExec wiring."""
     objectstore_factory = Mock()
@@ -445,6 +446,7 @@ def _run_until_connection_start(
                 runtime_api_address=runtime_api_address,
                 runtime_certificates=runtime_certificates,
                 runtime_root_certificates_path=runtime_root_certificates_path,
+                runtime_http_api_address=runtime_http_api_address,
             )
 
     assert run_runtime.call_args.kwargs["state_factory"] is state_factory
@@ -497,3 +499,12 @@ def test_start_client_internal_launches_superexec_with_bound_runtime_address() -
 
     command = popen.call_args.args[0]
     assert command[command.index("--appio-api-address") + 1] == "localhost:54321"
+
+
+def test_start_client_internal_launches_http_superexec() -> None:
+    """Subprocess SuperExec should use the Runtime HTTP endpoint when enabled."""
+    _, popen = _run_until_connection_start(runtime_http_api_address="127.0.0.1:8000")
+
+    command = popen.call_args.args[0]
+    assert "--enable-http-api" in command
+    assert command[command.index("--appio-api-address") + 1] == "127.0.0.1:8000"

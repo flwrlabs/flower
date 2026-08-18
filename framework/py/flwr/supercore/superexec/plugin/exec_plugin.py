@@ -36,6 +36,7 @@ class ExecPlugin(ABC):
         get_run: Callable[[int], Run],
         runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
         executor: Executor | None = None,
+        enable_http_api: bool = False,
     ) -> None:
         self.runtime_api_address = runtime_api_address
         self.insecure = insecure
@@ -44,6 +45,7 @@ class ExecPlugin(ABC):
         self.runtime_dependency_install = runtime_dependency_install
         # Non-ephemeral plugins use the executor to start task processes.
         self.executor = executor
+        self.enable_http_api = enable_http_api
 
     @abstractmethod
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:

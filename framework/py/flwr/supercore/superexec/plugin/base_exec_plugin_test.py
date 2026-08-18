@@ -159,6 +159,23 @@ def test_launch_task_forwards_runtime_dependency_install_flag() -> None:
     assert spec.task_id == 7
 
 
+def test_launch_task_forwards_http_api_flag() -> None:
+    """Ensure execution spec forwards Runtime HTTP mode."""
+    executor = Mock()
+    plugin = DummyExecPlugin(
+        runtime_api_address="127.0.0.1:8000",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=Mock(),
+        executor=executor,
+        enable_http_api=True,
+    )
+
+    plugin.launch_task(token="token-123", task=_get_task(task_id=7))
+
+    assert _execution_spec_from_executor(executor).enable_http_api is True
+
+
 def test_launch_task_skips_optional_runtime_flags_by_default() -> None:
     """Ensure execution spec omits optional runtime install flags by default."""
     executor = Mock()

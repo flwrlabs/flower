@@ -107,6 +107,7 @@ def start_client_internal(
     trusted_entities: dict[str, str] | None = None,
     superexec_auth_secret: bytes | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
+    runtime_http_api_address: str | None = None,
 ) -> None:
     """Start a Flower client node which connects to a Flower server.
 
@@ -171,6 +172,8 @@ def start_client_internal(
         Secret used by Runtime API SuperExec metadata auth.
     runtime_dependency_install : bool (default: False)
         Whether runtime dependency installation is allowed.
+    runtime_http_api_address : Optional[str] (default: None)
+        Runtime HTTP API address. When provided, SuperExec uses HTTP instead of gRPC.
     """
     if insecure is None:
         insecure = root_certificates is None
@@ -230,8 +233,14 @@ def start_client_internal(
     if isolation == ISOLATION_MODE_SUBPROCESS:
         # `bound_address` contains the actual address when the port is set to :0
         # which means let the OS choose a free port.
-        runtime_address = resolve_bind_address(runtime_server.bound_address)
+        runtime_address = (
+            runtime_http_api_address
+            if runtime_http_api_address is not None
+            else resolve_bind_address(runtime_server.bound_address)
+        )
         command = ["flower-superexec"]
+        if runtime_http_api_address is not None:
+            command += ["--enable-http-api"]
         command += get_client_tls_args(
             insecure=runtime_certificates is None,
             root_certificates_path=runtime_root_certificates_path,

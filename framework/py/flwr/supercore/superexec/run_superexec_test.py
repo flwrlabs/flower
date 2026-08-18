@@ -24,7 +24,9 @@ import pytest
 from flwr.supercore.constant import ExecutorType
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
+    RuntimeVersionHttpInterceptor,
     SuperExecAuthClientInterceptor,
+    SuperExecAuthHttpInterceptor,
 )
 from flwr.supercore.superexec.executor import LaunchResult, LaunchResultStatus
 
@@ -110,6 +112,53 @@ def test_run_superexec_adds_runtime_version_interceptor(
     assert tuple(type(interceptor) for interceptor in captured["interceptors"]) == (
         expected_interceptor_types
     )
+
+
+@pytest.mark.parametrize(
+    ("superexec_auth_secret", "expected_interceptor_types"),
+    [
+        (None, (RuntimeVersionHttpInterceptor,)),
+        (
+            b"superexec-secret",
+            (RuntimeVersionHttpInterceptor, SuperExecAuthHttpInterceptor),
+        ),
+    ],
+)
+def test_run_superexec_configures_http_runtime_stub(
+    monkeypatch: pytest.MonkeyPatch,
+    superexec_auth_secret: bytes | None,
+    expected_interceptor_types: tuple[type[object], ...],
+) -> None:
+    """SuperExec should create an HTTP stub with version and auth interceptors."""
+    stub = Mock()
+    stub.PullPendingTasks.side_effect = KeyboardInterrupt()
+    stub_class = Mock(return_value=stub)
+    create_channel = Mock()
+
+    monkeypatch.setattr(run_superexec_module, "create_channel", create_channel)
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+
+    with pytest.raises(KeyboardInterrupt):
+        run_superexec_module.run_superexec(
+            plugin_class=Mock(),
+            stub_class=stub_class,
+            runtime_api_address="127.0.0.1:8000",
+            insecure=True,
+            superexec_auth_secret=superexec_auth_secret,
+            enable_http_api=True,
+        )
+
+    create_channel.assert_not_called()
+    assert stub_class.call_args.args == ("http://127.0.0.1:8000",)
+    assert stub_class.call_args.kwargs["verify"] is False
+    assert (
+        tuple(
+            type(interceptor)
+            for interceptor in stub_class.call_args.kwargs["interceptors"]
+        )
+        == expected_interceptor_types
+    )
+    stub.close.assert_called_once_with()
 
 
 def test_run_superexec_passes_executor_config_to_factory(

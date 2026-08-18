@@ -52,6 +52,7 @@ def test_parse_flwr_clientapp_parses_tokenized_invocation() -> None:
             "--parent-pid",
             "1234",
             "--allow-runtime-dependency-installation",
+            "--enable-http-api",
         ]
     )
 
@@ -60,6 +61,7 @@ def test_parse_flwr_clientapp_parses_tokenized_invocation() -> None:
     assert args.insecure is True
     assert args.parent_pid == 1234
     assert args.runtime_dependency_install is True
+    assert args.enable_http_api is True
 
 
 def test_flwr_clientapp_forwards_cli_args() -> None:
@@ -71,6 +73,7 @@ def test_flwr_clientapp_forwards_cli_args() -> None:
         root_certificates=None,
         parent_pid=321,
         runtime_dependency_install=True,
+        enable_http_api=True,
     )
 
     class _Parser:
@@ -93,3 +96,5 @@ def test_flwr_clientapp_forwards_cli_args() -> None:
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321
     assert kwargs["runtime_dependency_install"] is True
+    assert kwargs["enable_http_api"] is True
+    assert kwargs["root_certificates_path"] is None

@@ -48,6 +48,8 @@ def flwr_clientapp() -> None:
         ),
         parent_pid=args.parent_pid,
         runtime_dependency_install=args.runtime_dependency_install,
+        enable_http_api=args.enable_http_api,
+        root_certificates_path=args.root_certificates,
     )
 
 
@@ -63,6 +65,12 @@ def _parse_args_run_flwr_clientapp() -> argparse.ArgumentParser:
         type=str,
         help="Address of SuperNode's Runtime API (IPv4, IPv6, or a domain name)."
         f"By default, it is set to {SUPERNODE_RUNTIME_API_DEFAULT_CLIENT_ADDRESS}.",
+    )
+    parser.add_argument(
+        "--enable-http-api",
+        action="store_true",
+        default=False,
+        help="EXPERIMENTAL: Connect to the Runtime API over HTTP instead of gRPC.",
     )
     add_args_flwr_app_common(parser=parser)
     return parser

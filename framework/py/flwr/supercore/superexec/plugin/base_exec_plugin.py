@@ -49,6 +49,7 @@ class BaseExecPlugin(ExecPlugin):
         runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
         *,
         executor: Executor,
+        enable_http_api: bool = False,
     ) -> None:
         super().__init__(
             runtime_api_address=runtime_api_address,
@@ -57,6 +58,7 @@ class BaseExecPlugin(ExecPlugin):
             get_run=get_run,
             runtime_dependency_install=runtime_dependency_install,
             executor=executor,
+            enable_http_api=enable_http_api,
         )
         self.executor: Executor = executor
 
@@ -103,6 +105,7 @@ class BaseExecPlugin(ExecPlugin):
                 self.suppress_output and task_type not in self.visible_output_task_types
             ),
             task_id=task_id,
+            enable_http_api=self.enable_http_api,
         )
 
     def _get_supported_task_type(self, task: Task) -> TaskType | None:
