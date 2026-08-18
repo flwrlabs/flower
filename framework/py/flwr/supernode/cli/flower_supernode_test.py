@@ -28,6 +28,7 @@ from flwr.common.constant import (
     SUPERNODE_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
     TRANSPORT_TYPE_GRPC_RERE,
 )
+from flwr.supercore.constant import UVICORN_DEFAULT_HOST, UVICORN_DEFAULT_PORT
 from flwr.supercore.version import package_version
 
 from .flower_supernode import (
@@ -93,6 +94,22 @@ def test_parse_supernode_lifespan_config_returns_final_defaults(
     assert config.trusted_entities is None
     assert config.superexec_auth_secret is None
     assert config.runtime_dependency_install is False
+    assert config.enable_http_api is False
+    assert config.host == UVICORN_DEFAULT_HOST
+    assert config.port == UVICORN_DEFAULT_PORT
+    assert config.runtime_ssl_certfile is None
+    assert config.runtime_ssl_keyfile is None
+
+
+def test_parse_supernode_http_api_args() -> None:
+    """SuperNode should parse its temporary Runtime HTTP API arguments."""
+    args = _parse_args_run_supernode().parse_args(
+        ["--enable-http-api", "--host", "0.0.0.0", "--port", "8080"]
+    )
+
+    assert args.enable_http_api is True
+    assert args.host == "0.0.0.0"
+    assert args.port == 8080
 
 
 def test_parse_supernode_lifespan_config_preserves_appio_tls_args(
@@ -124,6 +141,8 @@ def test_parse_supernode_lifespan_config_preserves_appio_tls_args(
 
     assert config.runtime_certificates == runtime_certificates
     assert config.runtime_root_certificates_path == "appio-ca.pem"
+    assert config.runtime_ssl_certfile == "appio-cert.pem"
+    assert config.runtime_ssl_keyfile == "appio-key.pem"
 
 
 def test_flower_supernode_checks_for_update(
@@ -167,14 +186,18 @@ def test_flower_supernode_checks_for_update(
     assert captured == ["update", "flower-supernode"]
 
 
-def test_flower_supernode_injects_state_factory(
+def test_flower_supernode_injects_state_factory_and_manages_http_api(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SuperNode should pass its state factory into the internal startup path."""
+    """SuperNode should share state and stop its background HTTP API."""
     config = Mock()
+    config.enable_http_api = True
     objectstore_factory = Mock()
     state_factory = Mock()
     start_client_internal = Mock()
+    http_server = Mock()
+    http_thread = Mock()
+    start_http_api = Mock(return_value=(http_server, http_thread))
 
     monkeypatch.setattr(
         flower_supernode_module, "warn_if_flwr_update_available", Mock()
@@ -195,8 +218,14 @@ def test_flower_supernode_injects_state_factory(
     monkeypatch.setattr(
         flower_supernode_module, "start_client_internal", start_client_internal
     )
+    monkeypatch.setattr(
+        flower_supernode_module, "_start_supernode_http_api", start_http_api
+    )
 
     flower_supernode_module.flower_supernode()
 
     node_state_factory.assert_called_once_with(objectstore_factory=objectstore_factory)
     assert start_client_internal.call_args.kwargs["state_factory"] is state_factory
+    start_http_api.assert_called_once_with(config, state_factory)
+    assert http_server.should_exit is True
+    http_thread.join.assert_called_once_with()

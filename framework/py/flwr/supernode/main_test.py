@@ -15,7 +15,12 @@
 """Tests for SuperNode FastAPI application construction."""
 
 
+from unittest.mock import Mock
+
 from fastapi.routing import iter_route_contexts
+
+from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
+from flwr.supernode.nodestate import NodeStateFactory
 
 from .main import create_app
 
@@ -31,3 +36,18 @@ def test_create_app_mounts_health_without_readiness() -> None:
 
     assert "/health" in paths
     assert "/ready" not in paths
+
+
+def test_create_app_configures_runtime_dependencies() -> None:
+    """Expose the shared state and protobuf translation to Runtime routes."""
+    state_factory = Mock(spec=NodeStateFactory)
+    secret = b"secret"
+
+    app = create_app(state_factory, secret)
+
+    assert app.state.nodestate_factory is state_factory
+    assert app.state.superexec_auth_secret is secret
+    assert any(
+        middleware.cls is ProtobufTranslationMiddleware
+        for middleware in app.user_middleware
+    )
