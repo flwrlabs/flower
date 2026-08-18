@@ -494,18 +494,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if not federation_id or limit == 0:
             return []
         query = (
-            select(FederationAppModel)
+            select(
+                FederationAppModel.app_id,
+                FederationAppModel.fab_hash,
+                FederationAppModel.app_type,
+            )
             .where(FederationAppModel.federation_id == federation_id)
             .order_by(
                 FederationAppModel.added_at.desc(),
                 FederationAppModel.app_id.desc(),
             )
-            .execution_options(populate_existing=True)
         )
         if limit is not None:
             query = query.limit(limit)
         with self.session() as session:
-            apps = session.scalars(query).all()
+            apps = session.execute(query).all()
             return [
                 AppInfo(
                     app_id=app.app_id,
