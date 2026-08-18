@@ -113,10 +113,10 @@ $ uv run flwr log <run-id> local-agent --show
 Common problems include:
 
 - **Model API key is not set:** export `FLWR_MODEL_API_KEY` in the SuperLink
-  terminal, then restart SuperLink.
+  terminal, then restart SuperLink
 - **Invalid model endpoint:** `FLWR_MODEL_API_ENDPOINT` must include the full
-  `/responses` path.
+  `/responses` path
 - **Connection refused:** confirm that SuperLink is still running and that the
-  configured address is `127.0.0.1:9093`.
+  configured address is `127.0.0.1:9093`
 - **Version mismatch:** start SuperLink and run the CLI from the same project
-  environment so they use compatible Flower versions.
+  environment so they use compatible Flower versions

@@ -7,6 +7,9 @@ Start with [Write your first
 AgentApp](../tutorials/write-your-first-agentapp.md) if you do not have a valid
 AgentApp project. This guide targets Flower 1.34.0.
 
+To run the same app without SuperGrid, see [Run an AgentApp with a local
+SuperLink](run-with-local-superlink.md).
+
 ## Prepare the CLI
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and log in:
@@ -71,8 +74,8 @@ $ uvx --from flwr==1.34.0 flwr run @publisher/agent supergrid \
     --run-config 'agent.input="Explain your task."'
 ```
 
-SuperGrid resolves the app spec to the available app or FAB. Availability can
-depend on the target federation.
+SuperGrid resolves the app spec to an available version of the app. Availability
+can depend on the target federation.
 
 ## Choose a federation
 
@@ -108,9 +111,9 @@ $ uvx --from flwr==1.34.0 flwr list --run-id <run-id> supergrid
 $ uvx --from flwr==1.34.0 flwr log <run-id> supergrid --show
 ```
 
-Omit `--show` or use `--stream` to keep following logs. Open the run in
-SuperGrid to inspect structured model output, connector activity, federation,
-and persisted context.
+`flwr log` streams by default. Use `--show` to print the available logs once.
+Open the run in SuperGrid to inspect structured model output, connector
+activity, federation, and persisted context.
 
 Process logs are useful for app output and exceptions. Connector activity is a
 better signal than a general **Working** label when diagnosing which child task
