@@ -187,9 +187,19 @@ def list_connectors(
     account: AccountInfo,
     state: LinkState,
 ) -> ListConnectorsResponse:
-    """List user-connectable OAuth connectors and account connection status."""
+    """List OAuth connectors available in the requested federation."""
     log(INFO, "ControlServicer.ListConnectors")
-    _ = request
+    if not request.federation:
+        return ListConnectorsResponse()
+
+    flwr_aid = account.flwr_aid
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+    _validate_federation_membership_in_request(state, flwr_aid, request.federation)
+    federation = state.federation_manager.get_details(request.federation)
+    # Until connectors are federation-scoped, expose account-scoped connectors only
+    # in the personal agent federation.
+    if federation.can_invite_members or federation.can_add_supernodes:
+        return ListConnectorsResponse()
 
     connectors: list[Connector] = []
     for flow in sorted(
@@ -198,7 +208,7 @@ def list_connectors(
     ):
         connector_ref = flow.connector_ref
         connected = (
-            state.get_connector(flwr_aid=account.flwr_aid, connector_ref=connector_ref)
+            state.get_connector(flwr_aid=flwr_aid, connector_ref=connector_ref)
             is not None
         )
         connectors.append(

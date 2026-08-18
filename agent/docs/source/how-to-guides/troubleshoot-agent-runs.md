@@ -40,7 +40,9 @@ sign in again.
 1. Ensure the browser flow uses the same Flower account that has Agent access.
 1. Retry one deterministic prompt in a new chat.
 
+```{caution}
 Do not copy authentication tokens from local files into a support message.
+```
 
 (agent-isnt-listed)=
 
@@ -56,8 +58,8 @@ empty.
 1. Try the default Flower Agent.
 
 An agent being available in another federation does not make it available in
-the current catalog. Persistent add/remove federation Agent management is not
-yet a shipped recovery path.
+the current catalog. Adding or removing federation Agents is still under
+development.
 
 ## Connector is unavailable
 
@@ -142,9 +144,6 @@ should not be reused.
 1. Allow an active model or browser task a reasonable completion window.
 1. Stop the run once if it is no longer making progress.
 1. Start one simplified run without optional connectors.
-
-A global **Working** label does not prove which child task is active. Use the
-structured activity and logs rather than opening duplicate runs.
 
 ## Custom AgentApp fails before responding
 

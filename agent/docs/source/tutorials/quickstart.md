@@ -1,7 +1,7 @@
 # Chat in your browser
 
-Use the browser to get your first Flower Agent response in less than 5 minutes. You
-don't need to install Flower or provide a model API key.
+Use the browser to get your first Flower Agent response. You don't need to
+install Flower or provide a model API key.
 
 ```{note}
 The browser interface is experimental and may change between releases.
@@ -9,7 +9,7 @@ The browser interface is experimental and may change between releases.
 
 ## Before you start
 
-Before you start, confirm that you have:
+Confirm that you have:
 
 - a Flower account with Flower Agent access;
 - access to the email or identity provider used to sign in;

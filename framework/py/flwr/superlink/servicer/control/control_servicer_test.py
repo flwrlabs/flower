@@ -287,7 +287,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             )
 
         with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
-            response = self.servicer.ListConnectors(ListConnectorsRequest(), Mock())
+            response = self.servicer.ListConnectors(
+                ListConnectorsRequest(federation=NOOP_FEDERATION_ID), Mock()
+            )
             self.assertEqual(len(response.connectors), 1)
             self.assertTrue(response.connectors[0].connected)
 
@@ -301,6 +303,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertIsNotNone(
             self.state.get_connector(flwr_aid="other-account", connector_ref="slack")
         )
+
+    def test_list_connectors_without_federation_returns_empty(self) -> None:
+        """ListConnectors should return no connectors without a federation."""
+        response = self.servicer.ListConnectors(ListConnectorsRequest(), Mock())
+        self.assertEqual(list(response.connectors), [])
 
     def test_connector_oauth_rejects_invalid_or_expired_session(self) -> None:
         """Reject invalid state and expired OAuth sessions before exchange."""

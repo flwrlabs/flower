@@ -6,9 +6,9 @@ connector failure, and always end its tool loop.
 
 The finished project uses the complete public `AgentSession` surface:
 
-- `agent.responses.create` for model requests;
-- `agent.connectors.tools` for runtime-provided schemas; and
-- `agent.connectors.call` for function calls.
+- `agent.responses.create` for model requests
+- `agent.connectors.tools` for runtime-provided schemas
+- `agent.connectors.call` for function calls
 
 It uses only `web_search` and `web_fetch`. Neither requires an external account.
 
@@ -44,9 +44,9 @@ __pycache__/
 
 The project configuration has three jobs:
 
-- pin the Flower version used by the AgentApp;
-- provide a default `agent.input` value for each run; and
-- tell Flower where to load the `AgentApp` object.
+- pin the Flower version used by the AgentApp
+- provide a default `agent.input` value for each run
+- tell Flower where to load the `AgentApp` object
 
 Create `pyproject.toml`:
 
@@ -88,8 +88,8 @@ snippets in order.
 
 Every `AgentApp` entry point receives two objects:
 
-- `AgentSession` provides model responses and connector calls;
-- `Context` provides run configuration and state shared by the run series.
+- `AgentSession` provides model responses and connector calls
+- `Context` provides run configuration and state shared by the run series
 
 Keep the model, connector set, and tool-turn limit near the top of the file.
 The turn limit is a safety boundary: the model can request more work, but it
@@ -118,10 +118,10 @@ series, but the model sees only the input passed to `agent.responses.create`.
 To support follow-up questions, the AgentApp must replay the stored user and
 assistant messages.
 
-`Context.state` is a `RecordDict`. Its `config_records` property is the public,
-typed view of stored `ConfigRecord` values, including the runtime's `items`
-record. The run-series state also contains tool activity, so load only items
-whose type is `message` and normalize their content to plain text:
+Flower stores run-series state in `Context.state`. Conversation items live in a
+`ConfigRecord` named `items`, which you can read through
+`context.state.config_records`. The state also contains tool activity, so load
+only items whose type is `message` and normalize their content to plain text:
 
 ```python
 def message_text(content: Any) -> str:
@@ -215,10 +215,10 @@ def connector_error_output(
 
 The main function now connects these pieces. It has four phases:
 
-1. Validate `agent.input` and rebuild the conversation messages.
-1. Ask Flower for the `web_search` and `web_fetch` tool schemas.
-1. Execute up to `MAX_TOOL_TURNS` rounds of model-requested function calls.
-1. Make one final model request without tools and stream the answer.
+1. Validate `agent.input` and rebuild the conversation messages
+1. Ask Flower for the `web_search` and `web_fetch` tool schemas
+1. Execute up to `MAX_TOOL_TURNS` rounds of model-requested function calls
+1. Make one final model request without tools and stream the answer
 
 Add the entry point:
 
@@ -485,11 +485,11 @@ answer had to handle.
 
 ## Adapt it safely
 
-- Keep `TOOL_REFS` limited to the capabilities the task needs.
-- Keep a finite tool-turn limit even when you change models.
-- Validate every required run-config value before making a model call.
-- Never put credentials in prompts or connector arguments.
+- Keep `TOOL_REFS` limited to the capabilities the task needs
+- Keep a finite tool-turn limit even when you change models
+- Validate every required run-config value before making a model call
+- Never put credentials in prompts or connector arguments
 - Connect and authorize an account before adding its connector, and remember
-  that those runs are personal-workspace-only.
+  that those runs are personal-workspace-only
 - Expose `start_automation` only when the app must honor explicit future or
-  recurring requests.
+  recurring requests
