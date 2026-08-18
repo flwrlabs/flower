@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""HTTP stub for the Runtime API."""
+"""HTTP client for the Runtime API."""
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
@@ -66,7 +66,7 @@ from flwr.supercore.protobuf.client import ProtobufClient
 
 # Match the method names exposed by the generated gRPC RuntimeStub.
 # pylint: disable=invalid-name
-class RuntimeHttpStub(ProtobufClient):
+class RuntimeHttpClient(ProtobufClient):
     """Protobuf-over-HTTP client for the Runtime API."""
 
     def PullPendingTasks(

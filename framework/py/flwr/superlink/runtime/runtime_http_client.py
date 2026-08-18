@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""HTTP stub for the SuperLink Runtime API."""
+"""HTTP client for the SuperLink Runtime API."""
 
-from flwr.supercore.runtime import RuntimeHttpStub as CoreRuntimeHttpStub
+from flwr.supercore.runtime import RuntimeHttpClient as CoreRuntimeHttpClient
 
 
 # Match the method names exposed by the generated gRPC RuntimeStub.
 # pylint: disable=invalid-name
-class RuntimeHttpStub(CoreRuntimeHttpStub):
-    """Protobuf-over-HTTP client for SuperLink Runtime API methods."""
+class RuntimeHttpClient(CoreRuntimeHttpClient):
+    """Protobuf-over-HTTP client for the SuperLink Runtime API."""

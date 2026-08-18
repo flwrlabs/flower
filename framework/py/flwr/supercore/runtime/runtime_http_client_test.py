@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the HTTP Runtime API stub."""
+"""Tests for the Runtime HTTP client."""
 
 from unittest.mock import Mock, patch
 
 import pytest
 
 from flwr.supercore.protobuf.client import ProtobufClient
-from flwr.supercore.runtime import RuntimeHttpStub
+from flwr.supercore.runtime import RuntimeHttpClient
 
 _UNARY_UNARY_PATHS = (
     "pull-pending-tasks",
@@ -58,10 +58,10 @@ def test_runtime_method(endpoint: str) -> None:
     method_name = endpoint.title().replace("-", "")
     request = Mock()
     response = Mock()
-    stub = RuntimeHttpStub("http://runtime.example")
+    client = RuntimeHttpClient("http://runtime.example")
 
     with patch.object(ProtobufClient, "_unary_unary", return_value=response) as call:
-        result = getattr(stub, method_name)(request)
+        result = getattr(client, method_name)(request)
 
     assert result is response
     call.assert_called_once()

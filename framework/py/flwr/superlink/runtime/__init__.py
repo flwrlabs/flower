@@ -16,9 +16,9 @@
 
 
 from .run_serverapp import run_serverapp
-from .runtime_http_stub import RuntimeHttpStub as RuntimeHttpStub
+from .runtime_http_client import RuntimeHttpClient as RuntimeHttpClient
 
 __all__ = [
-    "RuntimeHttpStub",
+    "RuntimeHttpClient",
     "run_serverapp",
 ]
