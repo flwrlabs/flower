@@ -33,6 +33,15 @@ _UNARY_UNARY_PATHS = (
     "confirm-message-received",
     "push-messages",
     "pull-messages",
+    "push-logs",
+    "get-nodes",
+    "create-task",
+    "start-automation",
+    "push-task-message",
+    "push-task-events",
+    "pull-task-message",
+    "record-task-usage",
+    "get-connector",
 )
 _RESPONSE_NAME_OVERRIDES = {
     "push-messages": "PushAppMessagesResponse",
