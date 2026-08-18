@@ -14,7 +14,8 @@
 # ==============================================================================
 """Tests for reusable protobuf-over-HTTP client infrastructure."""
 
-from unittest.mock import patch
+import ssl
+from unittest.mock import Mock, patch
 
 import httpx
 import pytest
@@ -23,7 +24,9 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
 )
+from flwr.supercore.interceptors import RuntimeTokenHttpInterceptor
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
+from flwr.supercore.retry import make_simple_http_retry_invoker
 
 from .client import ProtobufCall, ProtobufClient, ProtobufRequestContext
 
@@ -125,6 +128,52 @@ def test_unary_unary_raises_for_http_error() -> None:
         _call(ProtobufClient("http://api.example"))
 
 
+def test_unary_unary_uses_retry_invoker() -> None:
+    """Retry a transient HTTP response before parsing the protobuf response."""
+    retry_invoker = make_simple_http_retry_invoker()
+    retry_invoker.max_tries = 2
+    retry_invoker.jitter = None
+    retry_invoker.wait_function = lambda _: None
+
+    with patch(
+        "flwr.supercore.protobuf.client.httpx.Client.send",
+        side_effect=[_response(503), _response(200, _RESPONSE.SerializeToString())],
+    ) as send:
+        result = _call(
+            ProtobufClient(
+                "http://api.example",
+                retry_invoker=retry_invoker,
+            )
+        )
+
+    assert result == _RESPONSE
+    assert send.call_count == 2
+
+
+def test_retry_rebuilds_request_before_applying_interceptors() -> None:
+    """Apply HTTP interceptors to a fresh request on every retry attempt."""
+    retry_invoker = make_simple_http_retry_invoker()
+    retry_invoker.max_tries = 2
+    retry_invoker.jitter = None
+    retry_invoker.wait_function = lambda _: None
+    client = ProtobufClient(
+        "http://api.example",
+        interceptors=[RuntimeTokenHttpInterceptor("task-token")],
+        retry_invoker=retry_invoker,
+    )
+
+    with patch(
+        "flwr.supercore.protobuf.client.httpx.Client.send",
+        side_effect=[_response(503), _response(200, _RESPONSE.SerializeToString())],
+    ) as send:
+        result = _call(client)
+
+    assert result == _RESPONSE
+    assert send.call_count == 2
+    for call in send.call_args_list:
+        assert call.args[0].headers["flwr-task-token"] == "task-token"
+
+
 def test_unary_unary_rejects_invalid_protobuf_response() -> None:
     """Reject response bodies that are not valid protobuf messages."""
     with (
@@ -203,3 +252,73 @@ def test_context_manager_returns_client_and_closes_client() -> None:
             assert entered_client is client
 
     client_class.return_value.close.assert_called_once_with()
+
+
+def test_from_server_address_uses_plain_http_when_insecure() -> None:
+    """Create an unverified HTTP client in insecure mode."""
+    with patch("flwr.supercore.protobuf.client.httpx.Client") as http_client:
+        client = ProtobufClient.from_server_address(
+            server_address="127.0.0.1:8000",
+            insecure=True,
+            root_certificates=None,
+            interceptors=[],
+        )
+
+    assert client._base_url == "http://127.0.0.1:8000"  # pylint: disable=W0212
+    http_client.assert_called_once_with(
+        verify=False, timeout=30.0, follow_redirects=True
+    )
+
+
+@pytest.mark.parametrize("root_certificates", [b"certificate", "ca.pem"])
+def test_from_server_address_rejects_certificates_when_insecure(
+    root_certificates: bytes | str,
+) -> None:
+    """Reject root certificates for a plaintext connection."""
+    with pytest.raises(ValueError, match="root_certificates.*insecure"):
+        ProtobufClient.from_server_address(
+            server_address="127.0.0.1:8000",
+            insecure=True,
+            root_certificates=root_certificates,
+            interceptors=[],
+        )
+
+
+def test_from_server_address_uses_certificate_path() -> None:
+    """Pass a CA certificate path to the HTTP client."""
+    with patch("flwr.supercore.protobuf.client.httpx.Client") as http_client:
+        client = ProtobufClient.from_server_address(
+            server_address="api.example:443",
+            insecure=False,
+            root_certificates="ca.pem",
+            interceptors=[],
+        )
+
+    assert client._base_url == "https://api.example:443"  # pylint: disable=W0212
+    http_client.assert_called_once_with(
+        verify="ca.pem", timeout=30.0, follow_redirects=True
+    )
+
+
+def test_from_server_address_loads_certificate_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Load in-memory CA certificates into an SSL context."""
+    context = Mock(spec=ssl.SSLContext)
+    ssl_context = Mock(return_value=context)
+    monkeypatch.setattr(ssl, "SSLContext", ssl_context)
+
+    with patch("flwr.supercore.protobuf.client.httpx.Client") as http_client:
+        client = ProtobufClient.from_server_address(
+            server_address="api.example:443",
+            insecure=False,
+            root_certificates=b"certificate",
+            interceptors=[],
+        )
+
+    assert client._base_url == "https://api.example:443"  # pylint: disable=W0212
+    ssl_context.assert_called_once_with(ssl.PROTOCOL_TLS_CLIENT)
+    context.load_verify_locations.assert_called_once_with(cadata="certificate")
+    http_client.assert_called_once_with(
+        verify=context, timeout=30.0, follow_redirects=True
+    )

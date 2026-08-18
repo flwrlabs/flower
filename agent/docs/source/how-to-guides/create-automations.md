@@ -49,8 +49,8 @@ The model-facing arguments are:
 | ---------------- | -------- | ---------------------------------------------------------------- |
 | `input`          | Yes      | `agent.input` for every scheduled run                            |
 | `start_at`       | Yes      | First run time as an ISO 8601/RFC 3339 timestamp with a timezone |
-| `fixed_interval` | No       | Seconds between recurring runs; omit for one execution           |
-| `max_runs`       | No       | Maximum executions; valid only with `fixed_interval`             |
+| `fixed_interval` | No       | Seconds between recurring runs, omitted for one execution        |
+| `max_runs`       | No       | Maximum executions, valid only with `fixed_interval`             |
 
 A one-off function call can look like:
 
@@ -72,9 +72,9 @@ A bounded recurring call can look like:
 }
 ```
 
-Do not use a timezone-free value such as `2026-08-26T09:00:00`; the runtime
-rejects it. Avoid an unbounded recurrence unless the user clearly requested one
-and understands how to stop it.
+Do not use a timezone-free value such as `2026-08-26T09:00:00` because the
+runtime rejects it. Avoid an unbounded recurrence unless the user clearly
+requested one and understands how to stop it.
 
 ## Understand automation scope
 
@@ -91,11 +91,11 @@ workspace.
 
 In SuperGrid:
 
-1. open **Settings** > **Automations**;
-1. use **Active** for upcoming schedules;
-1. check the run series, next run time, remaining runs, fixed interval, and
-   status; and
-1. use **History** for completed, stopped, or failed schedules.
+1. Open **Settings** > **Automations**
+1. Use **Active** for upcoming schedules
+1. Check the run series, next run time, remaining runs, fixed interval, and
+   status
+1. Use **History** for completed, stopped, or failed schedules
 
 The settings page uses the Agent execution federation. If a newly created
 automation does not appear, first confirm that the chat and settings page show
@@ -114,7 +114,7 @@ On **Settings** > **Automations** > **Active**, select **Stop** on the relevant
 row. Wait for its status to update before leaving the page.
 
 Stopping prevents future scheduled runs. It does not stop a run that has
-already started; stop that run separately from its run details or with
+already started. Stop that run separately from its run details or with
 `flwr stop <run-id> supergrid`.
 
 There is no public CLI command for listing or stopping automations in Flower
@@ -122,11 +122,11 @@ There is no public CLI command for listing or stopping automations in Flower
 
 ## Recover from a failed schedule
 
-1. Open the run series and inspect the latest run details.
-1. Check whether the model, built-in tool, or selected account connector failed.
-1. Fix the underlying access problem before creating a replacement schedule.
-1. Stop the old active automation if it can still retry.
-1. Create a new bounded automation and verify its displayed next-run time.
+1. Open the run series and inspect the latest run details
+1. Check whether the model, built-in tool, or selected account connector failed
+1. Fix the underlying access problem before creating a replacement schedule
+1. Stop the old active automation if it can still retry
+1. Create a new bounded automation and verify its displayed next-run time
 
-Do not repeatedly create schedules while the UI is still loading; that can
+Do not repeatedly create schedules while the UI is still loading. This can
 produce duplicate future work.
