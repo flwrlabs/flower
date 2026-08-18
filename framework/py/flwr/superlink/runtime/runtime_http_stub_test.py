@@ -24,6 +24,13 @@ from flwr.superlink.runtime import RuntimeHttpStub
 _UNARY_UNARY_PATHS = (
     "push-logs",
     "get-nodes",
+    "create-task",
+    "start-automation",
+    "push-task-message",
+    "push-task-events",
+    "pull-task-message",
+    "record-task-usage",
+    "get-connector",
 )
 
 

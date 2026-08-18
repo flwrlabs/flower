@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import ssl
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol, Self, TypeVar
@@ -71,7 +72,7 @@ class ProtobufClient:
         base_url: str,
         *,
         interceptors: Sequence[ProtobufClientInterceptor] = (),
-        verify: bool | str = True,
+        verify: ssl.SSLContext | bool | str = True,
         timeout: float = 30.0,
     ) -> None:
         self._base_url = base_url.rstrip("/")
@@ -80,6 +81,36 @@ class ProtobufClient:
             verify=verify,
             timeout=timeout,
             follow_redirects=True,
+        )
+
+    @classmethod
+    def from_server_address(
+        cls,
+        server_address: str,
+        insecure: bool,
+        root_certificates: bytes | str | None,
+        interceptors: Sequence[ProtobufClientInterceptor],
+    ) -> Self:
+        """Create a protobuf-over-HTTP client from a server address."""
+        if insecure and root_certificates is not None:
+            raise ValueError(
+                "Invalid configuration: 'root_certificates' should not be provided "
+                "when 'insecure' is set to True."
+            )
+
+        scheme = "http" if insecure else "https"
+        verify: ssl.SSLContext | str | bool = not insecure
+        if not insecure and root_certificates is not None:
+            if isinstance(root_certificates, str):
+                verify = root_certificates
+            else:
+                verify = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                verify.load_verify_locations(cadata=root_certificates.decode("ascii"))
+
+        return cls(
+            f"{scheme}://{server_address}",
+            interceptors=interceptors,
+            verify=verify,
         )
 
     def _unary_unary(

@@ -78,6 +78,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppsRequest,
+    ListAppsResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
     ListConnectorsRequest,
@@ -187,9 +189,19 @@ def list_connectors(
     account: AccountInfo,
     state: LinkState,
 ) -> ListConnectorsResponse:
-    """List user-connectable OAuth connectors and account connection status."""
+    """List OAuth connectors available in the requested federation."""
     log(INFO, "ControlServicer.ListConnectors")
-    _ = request
+    if not request.federation:
+        return ListConnectorsResponse()
+
+    flwr_aid = account.flwr_aid
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+    _validate_federation_membership_in_request(state, flwr_aid, request.federation)
+    federation = state.federation_manager.get_details(request.federation)
+    # Until connectors are federation-scoped, expose account-scoped connectors only
+    # in the personal agent federation.
+    if federation.can_invite_members or federation.can_add_supernodes:
+        return ListConnectorsResponse()
 
     connectors: list[Connector] = []
     for flow in sorted(
@@ -198,7 +210,7 @@ def list_connectors(
     ):
         connector_ref = flow.connector_ref
         connected = (
-            state.get_connector(flwr_aid=account.flwr_aid, connector_ref=connector_ref)
+            state.get_connector(flwr_aid=flwr_aid, connector_ref=connector_ref)
             is not None
         )
         connectors.append(
@@ -531,9 +543,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         # be bundled locally and submitted through the regular `flwr run` path.
         components = fab_config["tool"]["flwr"]["app"].get("components", {})
         is_agentapp_bundle = "agentapp" in components
-        primary_task_type = (
-            TaskType.AGENT_APP if is_agentapp_bundle else TaskType.SERVER_APP
-        )
+        app_type = TaskType.AGENT_APP if is_agentapp_bundle else TaskType.SERVER_APP
+        primary_task_type = app_type
         resolved_federation_config = None
         runtime = RunTime.DEPLOYMENT
         sim_cfg = state.federation_manager.get_simulation_config(federation_id)
@@ -556,13 +567,19 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             fab_file,
             verification_dict,
         )
-        fab_hash = state.store_fab(fab)
+        fab_id, fab_version = get_metadata_from_config(fab_config)
+        fab_hash = state.store_app(
+            fab=fab,
+            federation_id=federation_id,
+            app_id=f"@{fab_id}",
+            app_type=app_type,
+            added_by=flwr_aid,
+        )
 
         if fab_hash != fab.hash_str:
             raise ValueError(
                 f"FAB ({fab.hash_str}) hash from request doesn't match contents"
             )
-        fab_id, fab_version = get_metadata_from_config(fab_config)
         series_id = request.series_id if request.HasField("series_id") else None
         series_description: str | None = None
         if primary_task_type == TaskType.AGENT_APP and series_id is None:
@@ -1298,6 +1315,16 @@ def list_federations(
             for fed in federations
         ]
     )
+
+
+def list_apps(
+    request: ListAppsRequest, account: AccountInfo, state: LinkState
+) -> ListAppsResponse:
+    """List apps associated with a federation."""
+    federation_id = request.federation_id
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    limit = request.limit if request.HasField("limit") else None
+    return ListAppsResponse(apps=state.list_apps(federation_id, limit))
 
 
 def show_federation(
