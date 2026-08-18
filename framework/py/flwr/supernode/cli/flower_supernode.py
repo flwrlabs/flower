@@ -142,7 +142,9 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
         runtime_api_address=args.runtime_api_address,
         runtime_certificates=runtime_certificates,
         runtime_root_certificates_path=(
-            args.runtime_ssl_ca_certfile if runtime_certificates is not None else None
+            str(Path(args.runtime_ssl_ca_certfile).expanduser())
+            if runtime_certificates is not None
+            else None
         ),
         health_server_address=args.health_server_address,
         trusted_entities=trusted_entities,
@@ -151,8 +153,16 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
         enable_http_api=args.enable_http_api,
         host=args.host,
         port=args.port,
-        runtime_ssl_certfile=args.runtime_ssl_certfile,
-        runtime_ssl_keyfile=args.runtime_ssl_keyfile,
+        runtime_ssl_certfile=(
+            str(Path(args.runtime_ssl_certfile).expanduser())
+            if runtime_certificates is not None
+            else None
+        ),
+        runtime_ssl_keyfile=(
+            str(Path(args.runtime_ssl_keyfile).expanduser())
+            if runtime_certificates is not None
+            else None
+        ),
     )
 
 
