@@ -29,6 +29,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
 )
+
 from .start_client_internal import (
     FAB_VERIFICATION_ERROR,
     _pull_and_store_message,
@@ -447,10 +448,7 @@ def _run_until_connection_start(
             )
 
     assert run_runtime.call_args.kwargs["state_factory"] is state_factory
-    assert (
-        run_runtime.call_args.kwargs["objectstore_factory"]
-        is objectstore_factory
-    )
+    assert run_runtime.call_args.kwargs["objectstore_factory"] is objectstore_factory
     return run_runtime, popen
 
 
