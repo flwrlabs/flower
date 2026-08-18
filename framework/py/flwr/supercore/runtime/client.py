@@ -31,13 +31,19 @@ def create_runtime_http_stub(
     interceptors: Sequence[ProtobufClientInterceptor],
 ) -> RuntimeHttpStubT:
     """Create a protobuf-over-HTTP Runtime API stub."""
+    if insecure and root_certificates is not None:
+        raise ValueError(
+            "Invalid configuration: 'root_certificates' should not be provided "
+            "when 'insecure' is set to True."
+        )
+
     scheme = "http" if insecure else "https"
     verify: ssl.SSLContext | str | bool = not insecure
     if not insecure and root_certificates is not None:
         if isinstance(root_certificates, str):
             verify = root_certificates
         else:
-            verify = ssl.create_default_context()
+            verify = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
             verify.load_verify_locations(cadata=root_certificates.decode("ascii"))
 
     return stub_class(

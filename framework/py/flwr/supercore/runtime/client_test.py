@@ -39,6 +39,21 @@ def test_create_runtime_http_stub_uses_plain_http_when_insecure() -> None:
     )
 
 
+@pytest.mark.parametrize("root_certificates", [b"certificate", "ca.pem"])
+def test_create_runtime_http_stub_rejects_certificates_when_insecure(
+    root_certificates: bytes | str,
+) -> None:
+    """Reject root certificates for a plaintext Runtime connection."""
+    with pytest.raises(ValueError, match="root_certificates.*insecure"):
+        create_runtime_http_stub(
+            stub_class=Mock(),
+            runtime_api_address="127.0.0.1:8000",
+            insecure=True,
+            root_certificates=root_certificates,
+            interceptors=[],
+        )
+
+
 def test_create_runtime_http_stub_uses_certificate_path() -> None:
     """Pass a CA certificate path to the HTTP client."""
     stub_class = Mock()
@@ -62,7 +77,8 @@ def test_create_runtime_http_stub_loads_certificate_bytes(
     """Load in-memory CA certificates into an SSL context."""
     stub_class = Mock()
     context = Mock(spec=ssl.SSLContext)
-    monkeypatch.setattr(ssl, "create_default_context", Mock(return_value=context))
+    ssl_context = Mock(return_value=context)
+    monkeypatch.setattr(ssl, "SSLContext", ssl_context)
 
     create_runtime_http_stub(
         stub_class=stub_class,
@@ -72,5 +88,8 @@ def test_create_runtime_http_stub_loads_certificate_bytes(
         interceptors=[],
     )
 
+    ssl_context.assert_called_once_with(ssl.PROTOCOL_TLS_CLIENT)
     context.load_verify_locations.assert_called_once_with(cadata="certificate")
-    assert stub_class.call_args.kwargs["verify"] is context
+    stub_class.assert_called_once_with(
+        "https://runtime.example:443", interceptors=[], verify=context
+    )
