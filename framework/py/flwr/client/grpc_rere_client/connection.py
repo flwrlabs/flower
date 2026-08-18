@@ -386,8 +386,9 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     finally:
         try:
             if node is not None:
-                # Disable retrying
-                retry_invoker.max_tries = 1
+                # Interrupt active retries before teardown RPCs. Merely lowering the
+                # attempt limit does not wake a call already waiting in backoff.
+                retry_invoker.disable_retries()
                 deactivate_node()
                 if self_registered:
                     unregister_node()

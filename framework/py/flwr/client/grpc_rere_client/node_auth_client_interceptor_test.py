@@ -196,10 +196,11 @@ class TestAuthenticateClientInterceptor(unittest.TestCase):
     def test_client_auth_rpc(self, grpc_call: Callable[[Any], None]) -> None:
         """Test SuperNode authentication during create node."""
         # Execute
+        retry_invoker = Mock(invoke=lambda fn, *args, **kwargs: fn(*args, **kwargs))
         with self._connection(
             self._address,
             True,
-            Mock(invoke=lambda fn, *args, **kwargs: fn(*args, **kwargs)),
+            retry_invoker,
             GRPC_MAX_MESSAGE_LENGTH,
             None,
             (self._client_private_key, self._client_public_key),
@@ -226,3 +227,5 @@ class TestAuthenticateClientInterceptor(unittest.TestCase):
             assert verify_signature(
                 self._client_public_key, timestamp.encode("ascii"), signature
             )
+
+        retry_invoker.disable_retries.assert_called_once_with()
