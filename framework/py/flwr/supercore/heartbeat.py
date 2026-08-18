@@ -160,14 +160,14 @@ def make_task_heartbeat_fn_grpc(
 
 
 def make_task_heartbeat_fn_http(
-    stub: RuntimeHttpStub,
+    client: RuntimeHttpStub,
 ) -> Callable[[], bool]:
     """Get the function to send a heartbeat to an HTTP Runtime endpoint."""
     req = SendTaskHeartbeatRequest()
 
     def fn() -> bool:
         try:
-            res = stub.SendTaskHeartbeat(req)
+            res = client.SendTaskHeartbeat(req)
         except httpx.TransportError:
             return False
         except httpx.HTTPStatusError as err:

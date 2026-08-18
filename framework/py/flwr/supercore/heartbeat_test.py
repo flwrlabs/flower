@@ -109,51 +109,51 @@ class TestHeartbeatSender(unittest.TestCase):
 
 def test_http_heartbeat_returns_true_on_success() -> None:
     """HTTP heartbeat should report a successful Runtime response."""
-    stub = Mock()
-    stub.SendTaskHeartbeat.return_value = SendTaskHeartbeatResponse(success=True)
+    client = Mock()
+    client.SendTaskHeartbeat.return_value = SendTaskHeartbeatResponse(success=True)
 
-    assert make_task_heartbeat_fn_http(stub)() is True
+    assert make_task_heartbeat_fn_http(client)() is True
 
 
 def test_http_heartbeat_returns_false_on_transport_error() -> None:
     """HTTP heartbeat should report transport errors as retryable failures."""
-    stub = Mock()
-    stub.SendTaskHeartbeat.side_effect = httpx.ConnectError(
+    client = Mock()
+    client.SendTaskHeartbeat.side_effect = httpx.ConnectError(
         "connection failed",
         request=httpx.Request("POST", "http://runtime.example"),
     )
 
-    assert make_task_heartbeat_fn_http(stub)() is False
+    assert make_task_heartbeat_fn_http(client)() is False
 
 
 @pytest.mark.parametrize("status_code", [503, 504])
 def test_http_heartbeat_returns_false_on_transient_status(status_code: int) -> None:
     """HTTP heartbeat should report transient statuses as retryable failures."""
-    stub = Mock()
-    stub.SendTaskHeartbeat.side_effect = _http_status_error(status_code)
+    client = Mock()
+    client.SendTaskHeartbeat.side_effect = _http_status_error(status_code)
 
-    assert make_task_heartbeat_fn_http(stub)() is False
+    assert make_task_heartbeat_fn_http(client)() is False
 
 
 def test_http_heartbeat_raises_non_transient_status_error() -> None:
     """HTTP heartbeat should preserve non-transient status errors."""
-    stub = Mock()
+    client = Mock()
     error = _http_status_error(500)
-    stub.SendTaskHeartbeat.side_effect = error
+    client.SendTaskHeartbeat.side_effect = error
 
     with pytest.raises(httpx.HTTPStatusError) as exc_info:
-        make_task_heartbeat_fn_http(stub)()
+        make_task_heartbeat_fn_http(client)()
 
     assert exc_info.value is error
 
 
 def test_http_heartbeat_raises_sigint_when_rejected() -> None:
     """HTTP heartbeat should trigger graceful shutdown when rejected."""
-    stub = Mock()
-    stub.SendTaskHeartbeat.return_value = SendTaskHeartbeatResponse(success=False)
+    client = Mock()
+    client.SendTaskHeartbeat.return_value = SendTaskHeartbeatResponse(success=False)
 
     with patch("flwr.supercore.heartbeat.signal.raise_signal") as raise_signal:
-        result = make_task_heartbeat_fn_http(stub)()
+        result = make_task_heartbeat_fn_http(client)()
 
     raise_signal.assert_called_once_with(signal.SIGINT)
     assert result is True
