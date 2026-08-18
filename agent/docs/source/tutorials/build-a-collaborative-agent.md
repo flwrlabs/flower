@@ -208,10 +208,10 @@ def private_response(
 
 ### Let the model recover from connector failures
 
-A connector can fail after the model has requested it. The next model turn
-still needs an output for that call ID. Convert the exception into a
-`function_call_output` item so the model can explain the limitation or finish
-with the evidence it already has:
+A connector can fail after the model has requested it, and the model can return
+malformed connector arguments. The next model turn still needs an output for
+that call ID. Convert the exception into a `function_call_output` item so the
+model can explain the limitation or finish with the evidence it already has:
 
 ```python
 def connector_error_output(
@@ -298,8 +298,13 @@ def main(agent: AgentSession, context: Context) -> None:
                 )
                 continue
             try:
+                arguments = tool_call.get("arguments")
+                if isinstance(arguments, str):
+                    arguments = json.loads(arguments)
+                if not isinstance(arguments, dict):
+                    raise ValueError("Tool call arguments must be a JSON object")
                 function_outputs.append(agent.connectors.call(tool_call))
-            except (RuntimeError, json.JSONDecodeError) as exc:
+            except (RuntimeError, ValueError) as exc:
                 function_outputs.append(connector_error_output(tool_call, exc))
 
         input_items.extend(response_output)
@@ -487,8 +492,13 @@ def main(agent: AgentSession, context: Context) -> None:
                 )
                 continue
             try:
+                arguments = tool_call.get("arguments")
+                if isinstance(arguments, str):
+                    arguments = json.loads(arguments)
+                if not isinstance(arguments, dict):
+                    raise ValueError("Tool call arguments must be a JSON object")
                 function_outputs.append(agent.connectors.call(tool_call))
-            except (RuntimeError, json.JSONDecodeError) as exc:
+            except (RuntimeError, ValueError) as exc:
                 function_outputs.append(connector_error_output(tool_call, exc))
 
         input_items.extend(response_output)
