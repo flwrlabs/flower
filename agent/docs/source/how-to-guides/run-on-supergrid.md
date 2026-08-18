@@ -24,9 +24,9 @@ Your SuperGrid account must have access to the Flower Agent runtime. The
 This guide uses `uvx flwr` for standalone CLI commands and `uv run flwr` for
 commands that need a local project's environment.
 
-If this is your first Flower Agent run, follow [Get started with Flower
-Agent](../tutorials/get-started-with-flower-agent.md) first. That tutorial uses
-the built-in AgentApp to check your account and CLI setup without a local
+If this is your first Flower Agent run, follow [Chat in your
+terminal](../tutorials/get-started-with-flower-agent.md) first. That tutorial
+uses the built-in AgentApp to check your account and CLI setup without a local
 project.
 
 ## Run a local AgentApp

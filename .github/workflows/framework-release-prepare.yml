@@ -139,6 +139,17 @@ jobs:
             echo "mode=create" >> "${GITHUB_OUTPUT}"
           fi
 
+      - name: Write release metadata
+        env:
+          RELEASE_SOURCE_SHA: ${{ steps.release.outputs.release-source-sha }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          jq -n \
+            --arg version "${VERSION}" \
+            --arg release_source_sha "${RELEASE_SOURCE_SHA}" \
+            '{version: $version, release_source_sha: $release_source_sha}' \
+            > .github/framework-release.json
+
       - name: Bootstrap Python
         uses: ./.github/actions/bootstrap
 
@@ -214,25 +225,27 @@ jobs:
           BRANCH: ${{ steps.release.outputs.branch }}
           GH_TOKEN: ${{ secrets.FLWRMACHINE_TOKEN }}
           MODE: ${{ steps.automation.outputs.mode }}
-          RELEASE_SOURCE_SHA: ${{ steps.release.outputs.release-source-sha }}
-          VERSION: ${{ steps.release.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
 
-          # Write release metadata into the PR body.
+          # Read the committed release metadata for the human-readable PR summary.
+          version="$(jq -r '.version' .github/framework-release.json)"
+          release_source_sha="$(jq -r '.release_source_sha' .github/framework-release.json)"
+
+          # Write a human-readable release summary into the PR body.
           body_file="${RUNNER_TEMP}/framework-release-pr-body.md"
           {
             echo '## Release metadata'
             echo
-            echo 'Do not edit this section manually; it is maintained by the release workflow.'
+            echo 'This summary is generated from `.github/framework-release.json`.'
             echo
-            printf -- '- Release version: `%s`\n' "${VERSION}"
-            printf -- '- Release source SHA: `%s`\n' "${RELEASE_SOURCE_SHA}"
+            printf -- '- Release version: `%s`\n' "${version}"
+            printf -- '- Release source SHA: `%s`\n' "${release_source_sha}"
             printf -- '- Release source commit: [View on GitHub](%s/%s/commit/%s)\n' \
               "${GITHUB_SERVER_URL}" \
               "${GITHUB_REPOSITORY}" \
-              "${RELEASE_SOURCE_SHA}"
+              "${release_source_sha}"
           } > "${body_file}"
 
           # Create a draft PR on the first run or refresh it on later runs.
@@ -241,7 +254,7 @@ jobs:
               --repo "${GITHUB_REPOSITORY}" \
               --base main \
               --head "${BRANCH}" \
-              --title "feat(framework): Prepare ${VERSION} release" \
+              --title "feat(framework): Prepare ${version} release" \
               --body-file "${body_file}" \
               --draft
           else
