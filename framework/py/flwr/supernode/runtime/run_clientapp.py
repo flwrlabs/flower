@@ -14,7 +14,7 @@
 # ==============================================================================
 """Flower ClientApp process."""
 
-
+import time
 from logging import DEBUG, ERROR
 
 import grpc
@@ -26,7 +26,12 @@ from flwr.cli.install import install_from_fab
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common.config import get_project_dir
-from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatus
+from flwr.common.constant import (
+    RUNTIME_DEPENDENCY_INSTALL,
+    TASK_WORKER_CALL_TIMEOUT,
+    ErrorCode,
+    SubStatus,
+)
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -46,6 +51,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.constant import (
+    EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS,
+    EXIT_HANDLER_TIMEOUT_SECONDS,
+)
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.fab import Fab
 from flwr.supercore.grpc import create_channel, on_channel_state_change
@@ -118,20 +127,27 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
-        # Set Grpc max retries to 1 to avoid blocking on exit
-        retry_invoker.max_tries = 1
+        # Disable retries and interrupt active backoff before bounded shutdown.
+        retry_invoker.disable_retries()
+        started_at = time.monotonic()
+        cleanup_deadline = started_at + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
+        exit_deadline = started_at + EXIT_HANDLER_TIMEOUT_SECONDS
+
+        # Stop heartbeats before finishing the task, which revokes its token.
+        if heartbeat_sender is not None and heartbeat_sender.is_running:
+            heartbeat_sender.stop(timeout=max(0.0, cleanup_deadline - time.monotonic()))
 
         # Push final status and context (if available)
+        # Do not use the one-second worker deadline: give this critical final write
+        # the remaining exit-handler budget.
         push_task_output(
             stub=stub,
             context=context,
             sub_status=sub_status,
             details=details,
+            timeout=max(0.0, exit_deadline - time.monotonic()),
         )
 
-        # Stop heartbeat sender
-        if heartbeat_sender is not None and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
         channel.close()
 
         cleanup_app_runtime_environment(runtime_env_dir)
@@ -144,7 +160,10 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
     try:
         # Start task heartbeat
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
+        heartbeat_sender = HeartbeatSender(
+            make_task_heartbeat_fn_grpc(stub),
+            call_timeout=TASK_WORKER_CALL_TIMEOUT,
+        )
         heartbeat_sender.start()
 
         # Pull Message, Context, Run and FAB from SuperNode
@@ -306,16 +325,19 @@ def push_task_output(  # pylint: disable=R0913, R0917
     context: Context | None,
     sub_status: str,
     details: str,
+    timeout: float | None = None,
 ) -> None:
     """Push TaskOutput to SuperNode."""
     try:
         # Push Context and final status
-        stub.PushTaskOutput(
-            PushTaskOutputRequest(
-                context=context_to_proto(context) if context else None,
-                sub_status=sub_status,
-                details=details,
-            )
+        request = PushTaskOutputRequest(
+            context=context_to_proto(context) if context else None,
+            sub_status=sub_status,
+            details=details,
         )
+        if timeout is None:
+            stub.PushTaskOutput(request)
+        else:
+            stub.PushTaskOutput(request, timeout=timeout)
     except grpc.RpcError as err:
         log(ERROR, "Failed to push task output: %s", str(err))
