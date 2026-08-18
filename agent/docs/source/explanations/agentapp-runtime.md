@@ -6,11 +6,12 @@ and provides model and connector access through an `AgentSession`.
 
 ## Where your app meets the runtime
 
-A project declares an AgentApp component in `pyproject.toml`:
+For example, if your AgentApp is defined in `your_package/agent_app.py`, declare
+it in `pyproject.toml`:
 
 ```toml
 [tool.flwr.app.components]
-agentapp = "example_agent.agent_app:app"
+agentapp = "your_package.agent_app:app"
 ```
 
 The `<module>:<attribute>` value tells Flower where to import the `AgentApp`
@@ -88,8 +89,9 @@ Alongside the `AgentSession`, your main function receives a Flower `Context`:
 - `context.state` stores records persisted for the run series
 - `context.run_id` identifies the current run
 
-The runtime stores conversation items in a `ConfigRecord` named `items`. Read
-it through `context.state.config_records` when rebuilding model input.
+The runtime stores conversation items in a `ConfigRecord` named `items`. A
+`ConfigRecord` is a specialized Python dictionary, so you can use methods such
+as `get` when reading it through `context.state.config_records`.
 
 If `agent.input` is a non-empty string, the runtime records it as an Open
 Responses user-message item before calling the AgentApp. Model output items,

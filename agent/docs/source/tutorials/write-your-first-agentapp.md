@@ -88,7 +88,7 @@ version = "0.1.0"
 description = "My first Flower AgentApp"
 license = "Apache-2.0"
 requires-python = ">=3.11"
-dependencies = ["flwr==1.34.0"]
+dependencies = ["flwr>=1.34.0,<2.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["hello_agent"]
@@ -122,9 +122,8 @@ environment; use `uv run` for project commands.
 ```{admonition} Checkpoint
 :class: tip
 
-`uv sync` should resolve `flwr==1.34.0` and finish without a dependency error.
-If 1.34.0 is not yet published, use a package source supplied for your Flower
-environment or repeat this check after the release is available.
+`uv sync` should resolve a compatible Flower 1.x release and finish without a
+dependency error.
 ```
 
 ## Validate the bundle
