@@ -145,6 +145,7 @@ model.
 ## Next steps
 
 - [Write your first AgentApp](write-your-first-agentapp.md).
+- [Build a collaborative research agent](build-a-collaborative-agent.md).
 - [Use connectors](../explanations/use-connectors.md).
 - [Run an AgentApp on
   SuperGrid](../how-to-guides/run-on-supergrid.md).

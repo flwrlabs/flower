@@ -18,6 +18,9 @@ When you're ready to build:
 
 - [Write your first AgentApp](tutorials/write-your-first-agentapp.md) builds the
   smallest useful custom app.
+- [Build a collaborative research
+  agent](tutorials/build-a-collaborative-agent.md) adds conversation context,
+  multiple connector calls, and a bounded tool loop.
 
 ```{note}
 Flower Agent is experimental. Its interfaces and behavior may change between
@@ -46,6 +49,7 @@ to see how these pieces fit together and how to select agents and federations.
 tutorials/quickstart
 tutorials/get-started-with-flower-agent
 tutorials/write-your-first-agentapp
+tutorials/build-a-collaborative-agent
 ```
 
 ```{toctree}
