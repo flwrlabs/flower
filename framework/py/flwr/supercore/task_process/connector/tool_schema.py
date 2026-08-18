@@ -42,8 +42,8 @@ def function_tool(
 
 
 def string_property(description: str) -> JSONObject:
-    """Build a string property schema."""
-    return {"type": "string", "description": description}
+    """Build a non-empty string property schema."""
+    return {"type": "string", "minLength": 1, "description": description}
 
 
 def integer_property(description: str, *, minimum: int, maximum: int) -> JSONObject:
