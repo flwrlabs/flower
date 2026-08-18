@@ -14,15 +14,13 @@
 # ==============================================================================
 """Tests for LinkState declarative models."""
 
-from typing import Any, cast
+from typing import Any
 
 import pytest
 from sqlalchemy import Column, Table, UniqueConstraint
 
 from flwr.supercore.state.schema.linkstate_models import (
-    Context,
     LinkStateBase,
-    LogsTable,
     MessageIns,
     MessageRes,
     Node,
@@ -33,8 +31,6 @@ from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metada
 LINKSTATE_TABLE_NAMES = {
     "node",
     "run",
-    "logs",
-    "context",
     "message_ins",
     "message_res",
 }
@@ -116,7 +112,6 @@ def test_declarative_metadata_covers_all_linkstate_tables() -> None:
     [
         (Node, "node_id"),
         (Run, "run_id"),
-        (Context, "run_id"),
         (MessageIns, "message_id"),
         (MessageRes, "message_id"),
     ],
@@ -126,14 +121,3 @@ def test_mapper_uses_existing_unique_identity(
 ) -> None:
     """Ensure mapped tables use an existing unique identity column."""
     assert [column.name for column in model.__mapper__.primary_key] == [identity_column]
-
-
-def test_logs_table_remains_unmapped_without_safe_identity() -> None:
-    """Ensure logs stays a table instead of using a nullable composite identity."""
-    mapped_table_names = {
-        cast(Table, mapper.local_table).name
-        for mapper in LinkStateBase.registry.mappers
-    }
-
-    assert LogsTable.primary_key.columns.values() == []
-    assert "logs" not in mapped_table_names

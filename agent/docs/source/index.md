@@ -1,38 +1,61 @@
 # Flower Agent
 
-Flower Agent provides the runtime and building blocks you need to create
-agentic applications on Flower. An `AgentApp` combines your agent logic with
-runtime-provided access to models and connectors, then runs it as a Flower App
-locally or on SuperGrid.
+Flower Agent lets you build and run agentic applications on Flower. An
+`AgentApp` contains your agent logic, while Flower supplies model access,
+connectors, run state, and a runtime that can execute the app locally or on
+SuperGrid.
 
-This documentation shows you how to:
+## Choose how to start
 
-- chat with Flower's built-in AgentApp on SuperGrid;
-- build and configure an `AgentApp`;
-- call models and connectors through an `AgentSession`;
-- understand what happens inside the AgentApp runtime;
-- run and observe your own agents on SuperGrid; and
-- run an AgentApp with a local SuperLink.
+Start with whichever interface you prefer:
+
+- [Chat in your browser](tutorials/quickstart.md) gets you to a first response
+  without a local installation or model API key.
+- [Chat in your
+  terminal](tutorials/get-started-with-flower-agent.md) introduces the `flwr chat` terminal interface.
+
+When you're ready to build:
+
+- [Write your first AgentApp](tutorials/write-your-first-agentapp.md) builds the
+  smallest useful custom app.
 
 ```{note}
-Flower Agent is experimental. Its APIs and runtime behavior may change between
+Flower Agent is experimental. Its interfaces and behavior may change between
 releases.
 ```
 
-## Start here
+## Understand the pieces
 
-New to Flower Agent? Start with [Get started with Flower
-Agent](tutorials/get-started-with-flower-agent.md). You'll chat with the built-in
-AgentApp without writing any code. When you're ready to build something of your
-own, continue with [Write your first
-AgentApp](tutorials/write-your-first-agentapp.md).
+- An **AgentApp** is packaged agent logic that Flower can execute.
+- An **agent** is an AgentApp made available for selection by an app spec such
+  as `@flwrlabs/flwr-agent` or by a specific Flower App Bundle (FAB).
+- A **run** is one execution. Related runs can share a **run series**, which the
+  chat interfaces present as a conversation.
+- A **federation** is the SuperGrid workspace in which runs execute and are
+  visible.
+- A **connector** gives an AgentApp a runtime-provided tool. Some connectors are
+  built in; account connectors use access granted by the signed-in user.
+
+Read [Use agents and federations](how-to-guides/use-agents-and-federations.md)
+to see how these pieces fit together and how to select agents and federations.
 
 ```{toctree}
 :caption: Tutorials
 :maxdepth: 1
 
+tutorials/quickstart
 tutorials/get-started-with-flower-agent
 tutorials/write-your-first-agentapp
+```
+
+```{toctree}
+:caption: How-to guides
+:maxdepth: 1
+
+how-to-guides/use-agents-and-federations
+how-to-guides/run-on-supergrid
+how-to-guides/troubleshoot-agent-runs
+how-to-guides/run-with-local-superlink
 ```
 
 ```{toctree}
@@ -43,21 +66,14 @@ explanations/agentapp-runtime
 explanations/use-connectors
 ```
 
-```{toctree}
-:caption: How-to guides
-:maxdepth: 1
-
-how-to-guides/run-on-supergrid
-how-to-guides/run-with-local-superlink
-```
-
 ## Documentation boundaries
 
-This site is compiled independently and contains Flower Agent tutorials,
-guides, concepts, examples, and operational documentation. The `flwr.agentapp`
-Python API reference remains in the Flower framework documentation, where it is
-generated from the public API and its docstrings.
+This site contains Flower Agent tutorials, guides, concepts, and operational
+documentation. The generated [`flwr.agentapp` Python API
+reference](https://flower.ai/docs/framework/ref-api/flwr.agentapp.html) remains
+in the Flower framework documentation.
 
-Design proposals and unimplemented features are not published here as product
-capabilities. They remain engineering RFCs until the corresponding behavior is
-available.
+Design proposals and partially implemented paths aren't documented as current
+capabilities. Persistent federation Agent management, Hub publishing of
+first-class AgentApps, persistent CLI conversation history, and a public Open
+Responses-compatible runtime endpoint aren't available yet.

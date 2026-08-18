@@ -45,6 +45,7 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorRecord
 
 from . import CoreState
@@ -85,6 +86,71 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         mock_datetime.now.side_effect = timestamps
         return stack
+
+    def test_store_list_and_delete_apps(self) -> None:
+        """Federation apps can be stored, listed, limited, and deleted."""
+        state = self.state_factory()
+
+        server_hash = state.store_app(
+            fab=Fab("", b"server", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-a",
+        )
+        agent_hash = state.store_app(
+            fab=Fab("", b"agent", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/z-agent",
+            app_type=TaskType.AGENT_APP,
+            added_by="account-a",
+        )
+        state.store_app(
+            fab=Fab("", b"other", {}),
+            federation_id="@me/fed-b",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-b",
+        )
+
+        apps = state.list_apps("@me/fed-a")
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type) for app in apps],
+            [
+                ("@me/z-agent", agent_hash, TaskType.AGENT_APP),
+                ("@me/server", server_hash, TaskType.SERVER_APP),
+            ],
+        )
+        self.assertEqual(
+            [app.app_id for app in state.list_apps("@me/fed-a", limit=1)],
+            ["@me/z-agent"],
+        )
+        self.assertEqual(state.list_apps("@me/fed-a", limit=0), [])
+        with self.assertRaises(AssertionError):
+            state.list_apps("@me/fed-a", limit=-1)
+
+        updated_hash = state.store_app(
+            fab=Fab("", b"updated", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-c",
+        )
+        updated = state.list_apps("@me/fed-a")
+        self.assertEqual(len(updated), 2)
+        self.assertEqual(updated[1].fab_hash, updated_hash)
+
+        self.assertTrue(state.delete_app("@me/fed-a", "@me/server"))
+        self.assertFalse(state.delete_app("@me/fed-a", "@me/server"))
+        self.assertEqual(
+            [app.app_id for app in state.list_apps("@me/fed-a")],
+            ["@me/z-agent"],
+        )
+        self.assertEqual(
+            [app.app_id for app in state.list_apps("@me/fed-b")],
+            ["@me/server"],
+        )
+        self.assertIsNotNone(state.get_fab(updated_hash))
 
     def test_connector_upsert_get_and_delete(self) -> None:
         """A connector can be created, updated, retrieved, and deleted."""
