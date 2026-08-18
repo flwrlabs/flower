@@ -70,7 +70,7 @@ def _wrap_interceptor(
 class ProtobufClient:
     """Client providing shared protobuf-over-HTTP request handling."""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         base_url: str,
         *,
@@ -89,12 +89,13 @@ class ProtobufClient:
         )
 
     @classmethod
-    def from_server_address(
+    def from_server_address(  # pylint: disable=too-many-arguments
         cls,
         server_address: str,
         insecure: bool,
         root_certificates: bytes | str | None,
         interceptors: Sequence[ProtobufClientInterceptor],
+        *,
         retry_invoker: RetryInvoker | None = None,
     ) -> Self:
         """Create a protobuf-over-HTTP client from a server address."""
