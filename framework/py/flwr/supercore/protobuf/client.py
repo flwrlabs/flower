@@ -148,7 +148,9 @@ class ProtobufClient:
                 message=request,
                 request=http_request,
             )
-            return self._send_and_raise(context)
+            http_response = self._send(context)
+            http_response.raise_for_status()
+            return http_response
 
         response = (
             self._retry_invoker.invoke(send)
