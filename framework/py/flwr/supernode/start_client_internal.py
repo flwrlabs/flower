@@ -64,7 +64,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_objects,
     push_object_contents_from_iterable,
 )
-from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
+from flwr.supercore.object_store import ObjectStore
 from flwr.supercore.primitives.asymmetric_ed25519 import (
     create_message_to_sign,
     decode_base64url,
@@ -88,6 +88,7 @@ FAB_VERIFICATION_ERROR = Error(ErrorCode.INVALID_FAB, "The FAB could not be veri
 # pylint: disable=too-many-arguments
 def start_client_internal(
     *,
+    state_factory: NodeStateFactory,
     server_address: str,
     node_config: UserConfig,
     root_certificates: bytes | str | None = None,
@@ -111,6 +112,8 @@ def start_client_internal(
 
     Parameters
     ----------
+    state_factory : NodeStateFactory
+        Factory providing the state shared by the Fleet worker and Runtime API.
     server_address : str
         The IPv4 or IPv6 address of the server. If the Flower
         server runs on the same machine on port 8080, then `server_address`
@@ -185,9 +188,7 @@ def start_client_internal(
             f"to the Flower documentation for more information: {url_v}{page}",
         )
 
-    # Initialize factories
-    object_store_factory = ObjectStoreFactory()
-    state_factory = NodeStateFactory(objectstore_factory=object_store_factory)
+    object_store_factory = state_factory.objectstore_factory
 
     if isolation == ISOLATION_MODE_SUBPROCESS:
         if superexec_auth_secret is not None:
