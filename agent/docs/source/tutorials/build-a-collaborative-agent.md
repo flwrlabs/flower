@@ -1,8 +1,8 @@
 # Build a collaborative research agent
 
-Build an AgentApp that can search and fetch public web sources, execute several
-model-requested function calls, preserve conversation messages, recover from a
-connector failure, and always end its tool loop.
+Build an AgentApp that can search and fetch public web sources through multiple
+bounded rounds of model-directed tool use. It preserves conversation messages,
+recovers from connector failures, and always ends its tool loop.
 
 The finished project uses the complete public `AgentSession` surface:
 
@@ -18,7 +18,7 @@ It uses only `web_search` and `web_fetch`. Neither requires an external account.
 $ mkdir research-agent
 $ cd research-agent
 $ mkdir research_agent
-$ touch research_agent/__init__.py
+$ touch README.md research_agent/__init__.py
 ```
 
 Create:
@@ -26,6 +26,7 @@ Create:
 ```text
 research-agent/
 ├── .gitignore
+├── README.md
 ├── pyproject.toml
 └── research_agent/
     ├── __init__.py
@@ -38,6 +39,15 @@ Add `.gitignore`:
 .venv/
 *.fab
 __pycache__/
+```
+
+Add `README.md`:
+
+```markdown
+# Research Agent
+
+A bounded Flower AgentApp that researches public web sources with `web_search`
+and `web_fetch`.
 ```
 
 ## Configure the project
@@ -244,6 +254,9 @@ def main(agent: AgentSession, context: Context) -> None:
         )
 
     tools = agent.connectors.tools(TOOL_REFS)
+    allowed_tool_names = {
+        tool["name"] for tool in tools if isinstance(tool.get("name"), str)
+    }
 
     for _ in range(MAX_TOOL_TURNS):
         response = private_response(
@@ -274,6 +287,16 @@ def main(agent: AgentSession, context: Context) -> None:
 
         function_outputs = []
         for tool_call in tool_calls:
+            if tool_call.get("name") not in allowed_tool_names:
+                function_outputs.append(
+                    connector_error_output(
+                        tool_call,
+                        RuntimeError(
+                            f"Tool {tool_call.get('name')!r} was not exposed"
+                        ),
+                    )
+                )
+                continue
             try:
                 function_outputs.append(agent.connectors.call(tool_call))
             except RuntimeError as exc:
@@ -299,9 +322,11 @@ The runtime records the current `agent.input` as a user message before calling
 the app. The duplicate check prevents the same prompt from being appended
 again. Within the loop, the app keeps the complete model output, including
 reasoning items and every requested call, next to the connector output. This
-gives the next model turn a complete sequence even when a connector fails. The
-final request omits `tools`, which forces the app to finish with one answer
-instead of starting another connector round.
+gives the next model turn a complete sequence even when a connector fails or
+the model requests a tool that was not exposed. The allowed names come from the
+tool schemas rather than `TOOL_REFS` because one connector reference can expose
+several tools. The final request omits `tools`, which forces the app to finish
+with one answer instead of starting another connector round.
 
 ```{note}
 The connector activity itself is still recorded for run inspection. The app
@@ -418,6 +443,9 @@ def main(agent: AgentSession, context: Context) -> None:
         )
 
     tools = agent.connectors.tools(TOOL_REFS)
+    allowed_tool_names = {
+        tool["name"] for tool in tools if isinstance(tool.get("name"), str)
+    }
 
     for _ in range(MAX_TOOL_TURNS):
         response = private_response(
@@ -448,6 +476,16 @@ def main(agent: AgentSession, context: Context) -> None:
 
         function_outputs = []
         for tool_call in tool_calls:
+            if tool_call.get("name") not in allowed_tool_names:
+                function_outputs.append(
+                    connector_error_output(
+                        tool_call,
+                        RuntimeError(
+                            f"Tool {tool_call.get('name')!r} was not exposed"
+                        ),
+                    )
+                )
+                continue
             try:
                 function_outputs.append(agent.connectors.call(tool_call))
             except RuntimeError as exc:
