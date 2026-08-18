@@ -118,7 +118,10 @@ def test_http_heartbeat_returns_true_on_success() -> None:
 def test_http_heartbeat_returns_false_on_transport_error() -> None:
     """HTTP heartbeat should report transport errors as retryable failures."""
     stub = Mock()
-    stub.SendTaskHeartbeat.side_effect = httpx.ConnectError("connection failed")
+    stub.SendTaskHeartbeat.side_effect = httpx.ConnectError(
+        "connection failed",
+        request=httpx.Request("POST", "http://runtime.example"),
+    )
 
     assert make_task_heartbeat_fn_http(stub)() is False
 
