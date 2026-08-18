@@ -216,7 +216,11 @@ class RdpAccountant:
                 event.sample_size,
                 gaussian_event,
             )
-        return gaussian_event
+        if self._config.sampling_method is SamplingMethod.NO_AMPLIFICATION:
+            return gaussian_event
+        raise ValueError(
+            f"Unsupported sampling method: {self._config.sampling_method}."
+        )
 
     def _validate_event(self, event: GaussianPrivacyEvent) -> None:
         if event.population_size != self._config.population_size:
