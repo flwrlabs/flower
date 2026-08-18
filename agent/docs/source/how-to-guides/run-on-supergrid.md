@@ -67,7 +67,8 @@ Do not combine a TOML run-config file and inline run-config values.
 
 ## Run a published agent
 
-Use its app spec instead of a local directory:
+After you [find or publish an AgentApp on Flower Hub](use-flower-hub.md), use
+its app spec instead of a local directory:
 
 ```console
 $ uvx --from flwr==1.34.0 flwr run @publisher/agent supergrid \
