@@ -62,6 +62,11 @@ model output items to the Flower `Context`.
 “Open Responses-compatible” describes the request and response shape used by
 `agent.responses.create`.
 
+The runtime can also expose this model capability to the AgentApp process
+through an internal HTTP endpoint. See [Use the OpenAI SDK in an
+AgentApp](../how-to-guides/use-openai-sdk.md) to call it with the standard
+OpenAI Python SDK.
+
 The default model provider at `api.flower.ai` does not currently support
 continuing with `previous_response_id`. Rebuild `input` from stored messages for
 a follow-up request instead. See **Rebuild conversation input** in [Build a

@@ -187,3 +187,7 @@ Continue with [Build a collaborative research
 agent](build-a-collaborative-agent.md) for a complete, bounded connector loop,
 or [publish the AgentApp to Flower
 Hub](../how-to-guides/use-flower-hub.md) so others can run it.
+
+To use the standard OpenAI Responses API instead of passing JSON objects to
+`agent.responses.create`, see [Use the OpenAI SDK in an
+AgentApp](../how-to-guides/use-openai-sdk.md).

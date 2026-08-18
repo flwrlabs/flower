@@ -60,6 +60,7 @@ how-to-guides/use-agents-and-federations
 how-to-guides/connect-accounts
 how-to-guides/create-automations
 how-to-guides/use-flower-hub
+how-to-guides/use-openai-sdk
 how-to-guides/run-on-supergrid
 how-to-guides/troubleshoot-agent-runs
 how-to-guides/run-with-local-superlink
@@ -81,6 +82,7 @@ reference](https://flower.ai/docs/framework/ref-api/flwr.agentapp.html) remains
 in the Flower framework documentation.
 
 Design proposals and partially implemented paths aren't documented as current
-capabilities. Persistent federation Agent management, persistent CLI
-conversation history, and a public Open Responses-compatible runtime endpoint
-aren't available yet.
+capabilities. Persistent federation Agent management and persistent CLI
+conversation history aren't available yet. The Open Responses-compatible
+runtime endpoint is internal to AgentApp processes and isn't a public API for
+external clients.
