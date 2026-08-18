@@ -165,12 +165,6 @@ class ProtobufClient:
             raise ValueError("Invalid protobuf response payload") from exc
         return result
 
-    def _send_and_raise(self, context: ProtobufRequestContext) -> httpx.Response:
-        """Send a request and raise for an HTTP error response."""
-        response = self._send(context)
-        response.raise_for_status()
-        return response
-
     def _send(self, context: ProtobufRequestContext) -> httpx.Response:
         """Send a request through the configured interceptor chain."""
 
