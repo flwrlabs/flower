@@ -35,6 +35,16 @@ _RETRYABLE_STATUS_CODES = frozenset(
         httpx.codes.GATEWAY_TIMEOUT,
     }
 )
+_RETRYABLE_TRANSPORT_ERRORS: tuple[type[httpx.TransportError], ...] = (
+    httpx.ConnectError,
+    httpx.ReadError,
+    httpx.WriteError,
+    httpx.RemoteProtocolError,
+    httpx.ConnectTimeout,
+    httpx.ReadTimeout,
+    httpx.WriteTimeout,
+    httpx.PoolTimeout,
+)
 
 
 def make_simple_http_retry_invoker() -> RetryInvoker:
@@ -109,7 +119,10 @@ def make_simple_http_retry_invoker() -> RetryInvoker:
 
     return RetryInvoker(
         wait_gen_factory=lambda: exponential(max_delay=MAX_RETRY_DELAY),
-        recoverable_exceptions=(httpx.TransportError, httpx.HTTPStatusError),
+        recoverable_exceptions=(
+            *_RETRYABLE_TRANSPORT_ERRORS,
+            httpx.HTTPStatusError,
+        ),
         max_tries=None,
         max_time=None,
         on_success=_on_success,

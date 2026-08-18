@@ -35,6 +35,15 @@ def _http_status_error(status_code: int) -> httpx.HTTPStatusError:
     )
 
 
+def _transport_error(
+    exception_type: type[httpx.TransportError],
+) -> httpx.TransportError:
+    return exception_type(
+        "Transport failed",
+        request=httpx.Request("POST", "http://api.example"),
+    )
+
+
 def _make_test_invoker() -> RetryInvoker:
     invoker = make_simple_http_retry_invoker()
     invoker.max_tries = 2
@@ -46,10 +55,14 @@ def _make_test_invoker() -> RetryInvoker:
 @pytest.mark.parametrize(
     "exception",
     [
-        httpx.ConnectError(
-            "Connection refused",
-            request=httpx.Request("POST", "http://api.example"),
-        ),
+        _transport_error(httpx.ConnectError),
+        _transport_error(httpx.ReadError),
+        _transport_error(httpx.WriteError),
+        _transport_error(httpx.RemoteProtocolError),
+        _transport_error(httpx.ConnectTimeout),
+        _transport_error(httpx.ReadTimeout),
+        _transport_error(httpx.WriteTimeout),
+        _transport_error(httpx.PoolTimeout),
         _http_status_error(httpx.codes.SERVICE_UNAVAILABLE),
         _http_status_error(httpx.codes.GATEWAY_TIMEOUT),
     ],
@@ -70,6 +83,8 @@ def test_retries_transient_http_failures(exception: Exception) -> None:
             "certificate verify failed",
             request=httpx.Request("POST", "https://api.example"),
         ),
+        _transport_error(httpx.UnsupportedProtocol),
+        _transport_error(httpx.LocalProtocolError),
     ],
 )
 def test_does_not_retry_permanent_http_failures(exception: Exception) -> None:
