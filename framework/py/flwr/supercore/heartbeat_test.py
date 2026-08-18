@@ -15,9 +15,10 @@
 """Tests for heartbeat sender."""
 
 
+import signal
 import time
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import httpx
 
@@ -104,9 +105,21 @@ def test_http_heartbeat_returns_true_on_success() -> None:
     assert make_task_heartbeat_fn_http(stub)() is True
 
 
-def test_http_heartbeat_retries_transport_errors() -> None:
-    """HTTP heartbeat should make transport failures retryable."""
+def test_http_heartbeat_returns_false_on_transport_error() -> None:
+    """HTTP heartbeat should report transport errors as retryable failures."""
     stub = Mock()
     stub.SendTaskHeartbeat.side_effect = httpx.ConnectError("connection failed")
 
     assert make_task_heartbeat_fn_http(stub)() is False
+
+
+def test_http_heartbeat_raises_sigint_when_rejected() -> None:
+    """HTTP heartbeat should trigger graceful shutdown when rejected."""
+    stub = Mock()
+    stub.SendTaskHeartbeat.return_value = SendTaskHeartbeatResponse(success=False)
+
+    with patch("flwr.supercore.heartbeat.signal.raise_signal") as raise_signal:
+        result = make_task_heartbeat_fn_http(stub)()
+
+    raise_signal.assert_called_once_with(signal.SIGINT)
+    assert result is True
