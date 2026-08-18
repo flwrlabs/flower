@@ -1,22 +1,25 @@
 # Write your first AgentApp
 
-Build a small custom AgentApp, package it as a Flower App Bundle (FAB), and run
-it on SuperGrid. The example makes one model request so you can isolate project
-configuration from connector logic.
+Welcome back!
 
-Complete [Chat in your terminal](get-started-with-flower-agent.md) first. This
-tutorial targets Flower 1.34.0.
+In the previous tutorial, you ran Flower's built-in AgentApp on SuperGrid. Now
+it's time to build one of your own. You'll create a small AgentApp, package it
+as a Flower App, and run it with a prompt you choose.
+
+If you haven't already, complete [Chat in your
+terminal](get-started-with-flower-agent.md) first. It will help you install `uv`
+and authenticate your CLI with SuperGrid.
 
 ## Create the project
+
+Start by creating a directory for your new app:
 
 ```console
 $ mkdir hello-agent
 $ cd hello-agent
-$ mkdir hello_agent
-$ touch hello_agent/__init__.py
 ```
 
-Create this file tree:
+You'll create these files:
 
 ```text
 hello-agent/
@@ -27,23 +30,23 @@ hello-agent/
 └── pyproject.toml
 ```
 
-Add the generated environment and bundles to `.gitignore`:
+First, add the virtual environment to `.gitignore` so it isn't scanned when you
+build the Flower App Bundle:
 
 ```text
 .venv/
-*.fab
-__pycache__/
 ```
 
 ## Define the AgentApp
 
-Create `hello_agent/agent_app.py`:
+Create an empty `hello_agent/__init__.py`, then add the agent logic Flower will
+run to `hello_agent/agent_app.py`:
 
 ```python
 from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
 
-MODEL = "openai/gpt-5.6-sol"
+MODEL = "openai/gpt-5.5"
 
 app = AgentApp()
 
@@ -58,24 +61,25 @@ def main(agent: AgentSession, context: Context) -> None:
     agent.responses.create(
         {
             "model": MODEL,
-            "input": prompt.strip(),
+            "input": prompt,
             "stream": True,
         }
     )
 ```
 
-`AgentApp.main` registers the function Flower calls. The runtime passes:
+`AgentApp.main` registers the function Flower calls when the task starts. The
+runtime passes two arguments:
 
-- `agent`, an `AgentSession` for model and connector calls; and
-- `context`, which contains the fused run configuration and persistent state.
+- `agent` provides access to models and connectors;
+- `context` provides the run configuration and persistent run state.
 
-`agent.responses.create` accepts an Open Responses-compatible request. It does
-not call a public HTTP endpoint from your app; the Flower runtime creates and
-manages the model task.
+The call to `agent.responses.create` uses an Open Responses-compatible request
+and returns the corresponding response object.
 
 ## Configure the Flower App
 
-Create `pyproject.toml`:
+Next, create `pyproject.toml` to tell Flower how to package, configure, and load
+your AgentApp:
 
 ```toml
 [build-system]
@@ -88,15 +92,13 @@ version = "0.1.0"
 description = "My first Flower AgentApp"
 license = "Apache-2.0"
 requires-python = ">=3.11"
-dependencies = ["flwr==1.34.0"]
+dependencies = ["flwr>=1.33.0,<2.0"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["hello_agent"]
+packages = ["."]
 
 [tool.flwr.app]
 publisher = "local"
-display-name = "Hello Agent"
-flwr-version-target = "1.34.0"
 fab-include = ["hello_agent/**/*.py"]
 
 [tool.flwr.app.config.agent]
@@ -106,84 +108,85 @@ input = "Explain why flowers turn toward light."
 agentapp = "hello_agent.agent_app:app"
 ```
 
-The component value uses `<module>:<attribute>`. Flower imports `app` from
-`hello_agent/agent_app.py`. The nested `config.agent.input` value becomes
-`context.run_config["agent.input"]`.
+The `agentapp` component is an object reference in the form
+`<module>:<attribute>`. Here, Flower imports the `app` object from
+`hello_agent/agent_app.py`. The nested `config.agent.input` value becomes the
+flattened `context.run_config["agent.input"]` entry used by the app.
 
 ## Create the environment
+
+Use `uv` to resolve the dependencies declared in `pyproject.toml`:
 
 ```console
 $ uv sync
 ```
 
-`uv` creates `.venv` and a lock file. You do not need to activate the
-environment; use `uv run` for project commands.
+`uv` creates a virtual environment in `.venv` and writes a `uv.lock` file. You
+don't need to activate the environment: `uv run` executes commands inside it.
 
-```{admonition} Checkpoint
-:class: tip
+## Check the bundle
 
-`uv sync` should resolve `flwr==1.34.0` and finish without a dependency error.
-If 1.34.0 is not yet published, use a package source supplied for your Flower
-environment or repeat this check after the release is available.
-```
-
-## Validate the bundle
+Before sending anything to SuperGrid, build the Flower App Bundle (FAB):
 
 ```console
 $ uv run flwr build
 ```
 
-The command should finish by reporting the created `.fab` path. It validates
-the project configuration and component reference before submission.
+This validates the configuration and component reference before writing a
+`.fab` file. The FAB contains the app code and metadata that SuperGrid needs to
+start the run.
 
-If it reports that the component cannot be loaded, check all three names:
+## Run the AgentApp
 
-1. the `hello_agent` directory;
-1. the `agent_app.py` module; and
-1. the `:app` object referenced in `pyproject.toml`.
-
-## Run on SuperGrid
-
-Ensure you have logged in, then submit the project and stream its logs:
+Submit the project directory through the `supergrid` connection:
 
 ```console
-$ uv run flwr login supergrid
-$ uv run flwr run . supergrid --stream
+$ uv run flwr run . supergrid
 ```
 
-Override the configured prompt for one run:
+The default prompt comes from `pyproject.toml`. Override it for one run with
+`--run-config`:
 
 ```console
 $ uv run flwr run . supergrid \
-    --run-config 'agent.input="Describe photosynthesis for a five-year-old."' \
-    --stream
+    --run-config 'agent.input="Describe photosynthesis for a five-year-old."'
 ```
 
-```{admonition} Success checkpoint
-:class: tip
+Open the printed run ID in the SuperGrid dashboard to inspect the response and
+run activity.
 
-The command prints a run ID, the AgentApp task reaches a finished state, and
-the model response appears in the run activity. Keep the run ID for
-troubleshooting.
-```
+## Make it your own
 
-Open SuperGrid to inspect the structured response and persisted context. If the
-run fails, use the printed ID with:
+The app currently makes one model request and then exits. Try changing:
 
-```console
-$ uv run flwr list --run-id <run-id> supergrid
-$ uv run flwr log <run-id> supergrid --show
-```
+- `MODEL` to another model available to your SuperGrid account;
+- `instructions`, `reasoning`, or `max_output_tokens` in the response request;
+  or
+- the app flow to make several model requests or use the connector loop
+  described in [Use connectors](../explanations/use-connectors.md).
 
-## Understand this app's limits
+Each invocation of `uv run flwr run . supergrid` builds and submits the current
+local project, so saved changes are included in the next run.
 
-The app makes one model request and exits. It does not:
+## Final remarks
 
-- replay prior messages from a run series;
-- expose connectors;
-- handle model-requested function calls; or
-- create automations.
+Congratulations, you've written and run your first custom AgentApp! 🎉
 
-Those behaviors belong in AgentApp code rather than appearing automatically.
+You now have all the pieces of a Flower Agent project:
+
+- an `AgentApp` with a registered main function;
+- an `AgentSession` for calling runtime-provided capabilities;
+- a `Context` for reading run configuration; and
+- a `pyproject.toml` that makes the app discoverable and configurable.
+
+This example deliberately keeps the agent logic small. From here, you can add
+instructions, make multiple model calls, or give the model a connector that
+lets it search the web.
+
 Continue with [Build a collaborative research
-agent](build-a-collaborative-agent.md) for a complete, bounded connector loop.
+agent](build-a-collaborative-agent.md) to add conversation context, connector
+calls, and a bounded tool loop. To learn how to configure, observe, and stop a
+run, see [Run an AgentApp on
+SuperGrid](../how-to-guides/run-on-supergrid.md). For local development, see
+[Run an AgentApp with a local
+SuperLink](../how-to-guides/run-with-local-superlink.md).
