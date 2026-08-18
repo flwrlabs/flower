@@ -19,7 +19,6 @@ import random
 import signal
 import threading
 from collections.abc import Callable
-from http import HTTPStatus
 
 import grpc
 import httpx
