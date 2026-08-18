@@ -16,15 +16,12 @@
 
 from sqlalchemy import (
     BigInteger,
-    Column,
     Float,
     ForeignKey,
     Index,
     LargeBinary,
     MetaData,
     String,
-    Table,
-    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -85,34 +82,6 @@ class Run(LinkStateBase):
     bytes_sent: Mapped[int | None] = mapped_column(BigInteger, server_default="0")
     bytes_recv: Mapped[int | None] = mapped_column(BigInteger, server_default="0")
     clientapp_runtime: Mapped[float | None] = mapped_column(Float, server_default="0.0")
-
-    __mapper_args__ = {"primary_key": [run_id]}
-
-
-# Keep logs as a Core table: it has no non-null primary key. Its nullable
-# (timestamp, run_id, node_id) unique constraint cannot provide a stable ORM
-# identity because SQL NULL values may occur in multiple rows. Map this table
-# only after the schema gains a reliable identity column or constraint.
-LogsTable = Table(
-    "logs",
-    LinkStateBase.metadata,
-    Column("timestamp", Float),
-    Column("run_id", BigInteger, ForeignKey("run.run_id")),
-    Column("node_id", BigInteger),
-    Column("log", String),
-    UniqueConstraint("timestamp", "run_id", "node_id"),
-)
-
-
-class Context(LinkStateBase):
-    """Represent a run context."""
-
-    __tablename__ = "context"
-
-    run_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("run.run_id"), unique=True, nullable=True
-    )
-    context: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
 
     __mapper_args__ = {"primary_key": [run_id]}
 

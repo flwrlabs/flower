@@ -21,7 +21,11 @@ from datetime import datetime
 from typing import Literal
 
 from flwr.app import Context, Message
-from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AppInfo,
+    Automation,
+    StartRunRequest,
+)
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
@@ -114,8 +118,52 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Store a FAB and return its canonical SHA-256 hash."""
 
     @abstractmethod
+    def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        fab: Fab,
+        federation_id: str,
+        app_id: str,
+        app_type: str,
+        added_by: str,
+    ) -> str:
+        """Atomically store a FAB and associate its app with a federation.
+
+        A federation has at most one association for each app ID. Storing the app
+        again updates its FAB hash and type while preserving when and by whom it was
+        first added.
+
+        Parameters
+        ----------
+        fab : Fab
+            FAB content and verification metadata to store.
+        federation_id : str
+            ID of the federation to associate with the app.
+        app_id : str
+            App ID, unique within the federation.
+        app_type : str
+            Type of the app.
+        added_by : str
+            ID of the account adding the app to the federation.
+
+        Returns
+        -------
+        str
+            Canonical SHA-256 hash of the stored FAB.
+        """
+
+    @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
+
+    @abstractmethod
+    def list_apps(
+        self, federation_id: str, limit: int | None = None
+    ) -> Sequence[AppInfo]:
+        """List apps associated with a federation, newest first."""
+
+    @abstractmethod
+    def delete_app(self, federation_id: str, app_id: str) -> bool:
+        """Delete one federation-app association; its FAB remains in state."""
 
     @abstractmethod
     def upsert_connector(

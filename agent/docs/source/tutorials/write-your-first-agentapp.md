@@ -6,8 +6,8 @@ In the previous tutorial, you ran Flower's built-in AgentApp on SuperGrid. Now
 it's time to build one of your own. You'll create a small AgentApp, package it
 as a Flower App, and run it with a prompt you choose.
 
-If you haven't already, complete [Get started with Flower
-Agent](get-started-with-flower-agent.md) first. It will help you install `uv`
+If you haven't already, complete [Chat in your
+terminal](get-started-with-flower-agent.md) first. It will help you install `uv`
 and authenticate your CLI with SuperGrid.
 
 ## Create the project

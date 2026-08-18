@@ -21,12 +21,47 @@ import pytest
 import requests
 
 from .http import ConnectorApiError, request_json_object
+from .json_utils import optional_string
+from .registry import CONNECTORS
+from .tool_schema import string_property
 
 
 class ExampleApiError(ConnectorApiError):
     """Test connector error."""
 
     provider = "Example"
+
+
+def test_connector_input_schemas_are_strict() -> None:
+    """Connector schemas should reject unknown arguments."""
+    for connector in CONNECTORS:
+        for action in connector.provider.actions:
+            tool_name = action.tool_name(connector.ref)
+            assert "additionalProperties" in action.input_schema, (
+                f"Connector action '{tool_name}' input schema must define "
+                "additionalProperties."
+            )
+            assert action.input_schema["additionalProperties"] is False, (
+                f"Connector action '{tool_name}' input schema must set "
+                "additionalProperties to false."
+            )
+
+
+def test_string_property_rejects_empty_values() -> None:
+    """Connector string schemas should reject empty values."""
+    assert string_property("Example.")["minLength"] == 1
+
+
+@pytest.mark.parametrize("value", [None, "", "   "])
+def test_optional_string_normalizes_blank_values(value: object) -> None:
+    """Blank optional strings should behave like omitted arguments."""
+    assert optional_string(value, "Example", "cursor") is None
+
+
+def test_optional_string_rejects_non_string_values() -> None:
+    """Invalid optional string types should not be silently omitted."""
+    with pytest.raises(ValueError, match="must be a non-empty string"):
+        optional_string(1, "Example", "cursor")
 
 
 def test_json_request_failure_is_secret_safe() -> None:
