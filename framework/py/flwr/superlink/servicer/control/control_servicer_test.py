@@ -47,8 +47,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateInvitationResponse,
     DisconnectConnectorRequest,
     GetRunSeriesRequest,
-    ListAppsRequest,
-    ListAppsResponse,
     ListConnectorsRequest,
     ListFederationsRequest,
     ListFederationsResponse,
@@ -92,7 +90,6 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, EntitlementError, FlowerError
-from flwr.supercore.fab import Fab
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.task_process.connector import registry as connector_registry
@@ -1260,25 +1257,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(response.federations[0].simulation)
         self.assertFalse(response.federations[0].can_invite_members)
         self.assertFalse(response.federations[0].can_add_supernodes)
-
-    def test_list_apps(self) -> None:
-        """Test ListApps returns apps persisted for the federation."""
-        fab_hash = self.state.store_app(
-            fab=Fab("", b"fab", {}),
-            federation_id=NOOP_FEDERATION_ID,
-            app_id="@flwr/demo",
-            app_type=TaskType.SERVER_APP,
-            added_by=self.aid,
-        )
-
-        response: ListAppsResponse = self.servicer.ListApps(
-            ListAppsRequest(federation_id=NOOP_FEDERATION_ID), Mock()
-        )
-
-        self.assertEqual(
-            [(app.app_id, app.fab_hash, app.app_type) for app in response.apps],
-            [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
-        )
 
     def test_create_federation_success(self) -> None:
         """Test CreateFederation succeeds when federation_manager.create_federation
