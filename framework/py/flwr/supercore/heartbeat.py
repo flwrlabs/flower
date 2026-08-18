@@ -28,6 +28,7 @@ from flwr.common.constant import (
     HEARTBEAT_CALL_TIMEOUT,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_RANDOM_RANGE,
+    TASK_WORKER_CALL_TIMEOUT,
 )
 
 # pylint: disable=E0611
@@ -55,13 +56,19 @@ class HeartbeatSender:
         Function used to send a heartbeat signal. It should return True if the heartbeat
         succeeds, or False if it fails. Any internal exceptions (e.g., gRPC errors)
         should be handled within this function to ensure boolean return values.
+    call_timeout : float (default: HEARTBEAT_CALL_TIMEOUT)
+        Maximum expected duration of one heartbeat call, used to keep the interval
+        between heartbeat starts stable.
     """
 
     def __init__(
         self,
         heartbeat_fn: Callable[[], bool],
+        *,
+        call_timeout: float = HEARTBEAT_CALL_TIMEOUT,
     ) -> None:
         self.heartbeat_fn = heartbeat_fn
+        self._call_timeout = call_timeout
         self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._retry_invoker = RetryInvoker(
@@ -81,12 +88,18 @@ class HeartbeatSender:
             raise RuntimeError("Cannot start a stopped heartbeat sender.")
         self._thread.start()
 
-    def stop(self) -> None:
-        """Stop the heartbeat sender."""
-        if not self._thread.is_alive():
+    def stop(self, timeout: float | None = None) -> None:
+        """Stop the heartbeat sender.
+
+        Parameters
+        ----------
+        timeout : Optional[float] (default: None)
+            Maximum time in seconds to wait for the sender thread to stop.
+        """
+        if self._thread.ident is None:
             raise RuntimeError("Heartbeat sender is not running.")
         self._stop_event.set()
-        self._thread.join()
+        self._thread.join(timeout=timeout)
 
     @property
     def is_running(self) -> bool:
@@ -100,9 +113,9 @@ class HeartbeatSender:
             self._retry_invoker.invoke(self._heartbeat)
 
             # Calculate the interval for the next heartbeat
-            # Formula: next_interval = (interval - timeout) * random.uniform(0.7, 0.9)
+            # Account for the RPC deadline when spacing heartbeat starts.
             rd = random.uniform(*HEARTBEAT_RANDOM_RANGE)
-            next_interval: float = HEARTBEAT_DEFAULT_INTERVAL - HEARTBEAT_CALL_TIMEOUT
+            next_interval: float = HEARTBEAT_DEFAULT_INTERVAL - self._call_timeout
             next_interval *= HEARTBEAT_BASE_MULTIPLIER + rd
 
             # Wait for the calculated interval or exit early if stopped
@@ -140,7 +153,7 @@ def make_task_heartbeat_fn_grpc(
     def fn() -> bool:
         # Call Runtime API
         try:
-            res = stub.SendTaskHeartbeat(req)
+            res = stub.SendTaskHeartbeat(req, timeout=TASK_WORKER_CALL_TIMEOUT)
         except grpc.RpcError as e:
             status_code = e.code()  # pylint: disable=E1101
             if status_code == grpc.StatusCode.UNAVAILABLE:
