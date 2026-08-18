@@ -172,8 +172,8 @@ def make_task_heartbeat_fn_http(
             return False
         except httpx.HTTPStatusError as err:
             if err.response.status_code in (
-                HTTPStatus.SERVICE_UNAVAILABLE,  # 503
-                HTTPStatus.GATEWAY_TIMEOUT,  # 504
+                httpx.codes.SERVICE_UNAVAILABLE,  # 503
+                httpx.codes.GATEWAY_TIMEOUT,  # 504
             ):
                 return False
             raise
