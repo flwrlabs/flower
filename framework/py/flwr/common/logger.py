@@ -37,7 +37,7 @@ from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 
-from .constant import LOG_UPLOAD_INTERVAL
+from .constant import LOG_UPLOAD_INTERVAL, TASK_WORKER_CALL_TIMEOUT
 
 # Create logger
 LOGGER_NAME = "flwr"
@@ -408,15 +408,20 @@ def _log_uploader(
                 logs=msgs,
             )
             try:
-                stub.PushLogs(req)
+                stub.PushLogs(req, timeout=TASK_WORKER_CALL_TIMEOUT)
                 msgs.clear()
             except grpc.RpcError as e:
-                # Ignore minor network errors
+                # Ignore minor network errors. A deadline leaves delivery ambiguous:
+                # the server may already have appended this non-idempotent batch, so
+                # discard it instead of risking duplicate logs on a retry.
                 # pylint: disable-next=no-member
-                if e.code() != grpc.StatusCode.UNAVAILABLE:
-                    raise e
+                status_code = e.code()
+                if status_code == grpc.StatusCode.DEADLINE_EXCEEDED:
+                    msgs.clear()
+                elif status_code != grpc.StatusCode.UNAVAILABLE:
+                    raise
 
-        if exit_flag:
+        if exit_flag and not msgs:
             break
 
         time.sleep(LOG_UPLOAD_INTERVAL)
