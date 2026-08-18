@@ -92,6 +92,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, EntitlementError, FlowerError
+from flwr.supercore.fab import Fab
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.task_process.connector import registry as connector_registry
@@ -289,7 +290,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             )
 
         with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
-            response = self.servicer.ListConnectors(ListConnectorsRequest(), Mock())
+            response = self.servicer.ListConnectors(
+                ListConnectorsRequest(federation=NOOP_FEDERATION_ID), Mock()
+            )
             self.assertEqual(len(response.connectors), 1)
             self.assertTrue(response.connectors[0].connected)
 
@@ -303,6 +306,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertIsNotNone(
             self.state.get_connector(flwr_aid="other-account", connector_ref="slack")
         )
+
+    def test_list_connectors_without_federation_returns_empty(self) -> None:
+        """ListConnectors should return no connectors without a federation."""
+        response = self.servicer.ListConnectors(ListConnectorsRequest(), Mock())
+        self.assertEqual(list(response.connectors), [])
 
     def test_connector_oauth_rejects_invalid_or_expired_session(self) -> None:
         """Reject invalid state and expired OAuth sessions before exchange."""
@@ -445,6 +453,55 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             list(self.state.get_run_connector_refs(run_id=response.run_id)),
             ["slack"],
         )
+
+    @parameterized.expand(  # type: ignore
+        [
+            (True, False),
+            (False, True),
+            (True, True),
+        ]
+    )
+    def test_start_run_rejects_connectors_for_capable_federation(
+        self,
+        can_invite_members: bool,
+        can_add_supernodes: bool,
+    ) -> None:
+        """StartRun should restrict connectors to personal-style federations."""
+        self.state.upsert_connector(
+            flwr_aid=self.aid,
+            connector_ref="slack",
+            credentials_json="{}",
+            config_json="{}",
+        )
+        request = StartRunRequest(
+            federation=NOOP_FEDERATION_ID,
+            connector_refs=["slack"],
+        )
+
+        with (
+            patch.object(
+                connector_registry,
+                "OAUTH_FLOWS",
+                {"slack": _OAuthFlow()},
+            ),
+            patch.object(
+                self.state.federation_manager,
+                "get_details",
+                return_value=SimpleNamespace(
+                    can_invite_members=can_invite_members,
+                    can_add_supernodes=can_add_supernodes,
+                ),
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            self.servicer.StartRun(request, Mock())
+
+        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST)
+        self.assertEqual(
+            error.exception.public_details,
+            "Connectors are currently available only in your personal workspace.",
+        )
+        self.assertEqual(list(self.state.get_run_info()), [])
 
     @parameterized.expand(  # type: ignore
         [
@@ -1179,6 +1236,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertAlmostEqual(retrieved_timestamp, now().timestamp(), delta=1e-1)
         self.assertEqual(response.federation.name, NOOP_FEDERATION_ID)
         self.assertFalse(response.federation.simulation)
+        self.assertFalse(response.federation.can_invite_members)
+        self.assertFalse(response.federation.can_add_supernodes)
 
     def test_list_federations_includes_simulation_flag(self) -> None:
         """Test ListFederations surfaces the federation simulation flag."""
@@ -1199,15 +1258,17 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(len(response.federations), 1)
         self.assertTrue(response.federations[0].simulation)
+        self.assertFalse(response.federations[0].can_invite_members)
+        self.assertFalse(response.federations[0].can_add_supernodes)
 
     def test_list_apps(self) -> None:
         """Test ListApps returns apps persisted for the federation."""
-        self.state.upsert_app(
+        fab_hash = self.state.store_app(
+            fab=Fab("", b"fab", {}),
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
-            fab_hash="fab-hash",
             app_type=TaskType.SERVER_APP,
-            created_by=self.aid,
+            added_by=self.aid,
         )
 
         response: ListAppsResponse = self.servicer.ListApps(
@@ -1216,7 +1277,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in response.apps],
-            [("@flwr/demo", "fab-hash", TaskType.SERVER_APP)],
+            [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
         )
 
     def test_create_federation_success(self) -> None:
@@ -1239,6 +1300,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             description=description,
             members=mock_members,
             simulation=True,
+            can_invite_members=True,
+            can_add_supernodes=True,
         )
         manager_calls = Mock()
 
@@ -1289,6 +1352,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(response.federation.members[0].account.id, self.aid)
         self.assertEqual(response.federation.members[0].role, "owner")
         self.assertTrue(response.federation.simulation)
+        self.assertTrue(response.federation.can_invite_members)
+        self.assertTrue(response.federation.can_add_supernodes)
 
     def test_create_federation_fails_on_manager_error(self) -> None:
         """Test CreateFederation raises when federation_manager.create_federation

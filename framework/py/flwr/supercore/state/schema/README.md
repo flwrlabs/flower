@@ -44,11 +44,6 @@ erDiagram
     VARCHAR state
   }
 
-  context {
-    BIGINT run_id FK "nullable"
-    BLOB context "nullable"
-  }
-
   fab {
     VARCHAR fab_hash PK
     BLOB content
@@ -58,17 +53,10 @@ erDiagram
   federation_app {
     VARCHAR app_id PK
     VARCHAR federation_id PK
+    TIMESTAMP added_at
+    VARCHAR added_by
     VARCHAR app_type
-    TIMESTAMP created_at
-    VARCHAR created_by
     VARCHAR fab_hash
-  }
-
-  logs {
-    BIGINT run_id FK "nullable"
-    VARCHAR log "nullable"
-    BIGINT node_id "nullable"
-    FLOAT timestamp "nullable"
   }
 
   message_ins {
@@ -259,8 +247,6 @@ erDiagram
     VARCHAR usage_type
   }
 
-  run ||--o| context : run_id
-  run ||--o{ logs : run_id
   run ||--o{ message_ins : run_id
   run ||--o{ message_res : run_id
   objects ||--o| object_children : parent_id

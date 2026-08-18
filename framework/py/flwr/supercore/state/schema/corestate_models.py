@@ -130,9 +130,9 @@ class FederationApp(FlwrBase):
     __tablename__ = "federation_app"
     __table_args__ = (
         Index(
-            "idx_federation_app_federation_id_created_at",
+            "idx_federation_app_federation_id_added_at",
             "federation_id",
-            "created_at",
+            "added_at",
         ),
     )
 
@@ -140,8 +140,8 @@ class FederationApp(FlwrBase):
     app_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     fab_hash: Mapped[str] = mapped_column(String, nullable=False)
     app_type: Mapped[str] = mapped_column(String, nullable=False)
-    created_by: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    added_by: Mapped[str] = mapped_column(String, nullable=False)
+    added_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
 class Connector(FlwrBase):

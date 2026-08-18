@@ -167,10 +167,11 @@ from flwr.superlink.federation.noop_federation_manager import NoOpFederationMana
 class InvalidConnectorRequestError(FlowerError):
     """Exception raised when a connector request is invalid."""
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, public_details: str | None = None) -> None:
         super().__init__(
             ApiErrorCode.INVALID_CONNECTOR_REQUEST,
             f"Invalid connector request: {reason}.",
+            public_details=public_details,
         )
 
 
@@ -188,9 +189,19 @@ def list_connectors(
     account: AccountInfo,
     state: LinkState,
 ) -> ListConnectorsResponse:
-    """List user-connectable OAuth connectors and account connection status."""
+    """List OAuth connectors available in the requested federation."""
     log(INFO, "ControlServicer.ListConnectors")
-    _ = request
+    if not request.federation:
+        return ListConnectorsResponse()
+
+    flwr_aid = account.flwr_aid
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+    _validate_federation_membership_in_request(state, flwr_aid, request.federation)
+    federation = state.federation_manager.get_details(request.federation)
+    # Until connectors are federation-scoped, expose account-scoped connectors only
+    # in the personal agent federation.
+    if federation.can_invite_members or federation.can_add_supernodes:
+        return ListConnectorsResponse()
 
     connectors: list[Connector] = []
     for flow in sorted(
@@ -199,7 +210,7 @@ def list_connectors(
     ):
         connector_ref = flow.connector_ref
         connected = (
-            state.get_connector(flwr_aid=account.flwr_aid, connector_ref=connector_ref)
+            state.get_connector(flwr_aid=flwr_aid, connector_ref=connector_ref)
             is not None
         )
         connectors.append(
@@ -511,6 +522,17 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             f"federation '{federation_id}'.",
         )
 
+    if connector_refs:
+        federation = state.federation_manager.get_details(federation_id)
+        if federation.can_invite_members or federation.can_add_supernodes:
+            raise InvalidConnectorRequestError(
+                "connector refs are not supported for this federation",
+                public_details=(
+                    "Connectors are currently available only in your personal "
+                    "workspace."
+                ),
+            )
+
     try:
         # Validate user config overrides matches keys in run config in FAB
         fab_config = get_fab_config(fab_file)
@@ -545,13 +567,19 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             fab_file,
             verification_dict,
         )
-        fab_hash = state.store_fab(fab)
+        fab_id, fab_version = get_metadata_from_config(fab_config)
+        fab_hash = state.store_app(
+            fab=fab,
+            federation_id=federation_id,
+            app_id=f"@{fab_id}",
+            app_type=app_type,
+            added_by=flwr_aid,
+        )
 
         if fab_hash != fab.hash_str:
             raise ValueError(
                 f"FAB ({fab.hash_str}) hash from request doesn't match contents"
             )
-        fab_id, fab_version = get_metadata_from_config(fab_config)
         series_id = request.series_id if request.HasField("series_id") else None
         series_description: str | None = None
         if primary_task_type == TaskType.AGENT_APP and series_id is None:
@@ -581,14 +609,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 f"fab_id={fab_id}, fab_version={fab_version}, "
                 f"fab_hash={fab_hash}, primary_task_type={primary_task_type}.",
             )
-
-        state.upsert_app(
-            federation_id=federation_id,
-            app_id=f"@{fab_id}",
-            fab_hash=fab_hash,
-            app_type=app_type,
-            created_by=flwr_aid,
-        )
 
         run = state.get_run_info(run_ids=[run_id])[0]
         series_id = run.series_id
@@ -1289,6 +1309,8 @@ def list_federations(
                 description=fed.description,
                 archived=fed.archived,
                 simulation=fed.simulation,
+                can_invite_members=fed.can_invite_members,
+                can_add_supernodes=fed.can_add_supernodes,
             )
             for fed in federations
         ]
@@ -1335,6 +1357,8 @@ def show_federation(
         archived=details.archived,
         simulation=details.simulation,
         config=details.config,
+        can_invite_members=details.can_invite_members,
+        can_add_supernodes=details.can_add_supernodes,
     )
     return ShowFederationResponse(federation=federation_proto, now=now().isoformat())
 
@@ -1389,6 +1413,8 @@ def create_federation(
             description=federation.description,
             members=federation.members,
             simulation=federation.simulation,
+            can_invite_members=federation.can_invite_members,
+            can_add_supernodes=federation.can_add_supernodes,
         )
     )
 

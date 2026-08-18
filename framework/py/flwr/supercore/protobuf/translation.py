@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import cast
 
-from fastapi import Request
+from fastapi import Depends, Request
 from fastapi.responses import Response, StreamingResponse
 from google.protobuf.message import DecodeError, Message
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -31,8 +31,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationRequest,
     CreateFederationRequest,
     CreateInvitationRequest,
-    GetAuthTokensRequest,
-    GetLoginDetailsRequest,
     GetRunSeriesRequest,
     ListAppsRequest,
     ListAutomationsRequest,
@@ -94,8 +92,6 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/start-automation"): StartAutomationRequest,
     ("POST", "/v1/control/list-automations"): ListAutomationsRequest,
     ("POST", "/v1/control/stop-automation"): StopAutomationRequest,
-    ("POST", "/v1/control/get-login-details"): GetLoginDetailsRequest,
-    ("POST", "/v1/control/get-auth-tokens"): GetAuthTokensRequest,
     ("POST", "/v1/control/register-node"): RegisterNodeRequest,
     ("POST", "/v1/control/unregister-node"): UnregisterNodeRequest,
     ("POST", "/v1/control/list-nodes"): ListNodesRequest,
@@ -242,3 +238,6 @@ def get_protobuf_request(request: Request) -> Message:
             f"Message, got {type(protobuf_request).__name__}.",
         )
     return protobuf_request
+
+
+PROTOBUF_REQUEST_DEPENDENCY = Depends(get_protobuf_request)

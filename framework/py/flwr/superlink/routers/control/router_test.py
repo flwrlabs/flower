@@ -21,13 +21,10 @@ from unittest.mock import Mock
 from fastapi import FastAPI, Request, Response
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
-from pytest import MonkeyPatch
 
 from flwr.common.constant import NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
-    GetLoginDetailsRequest,
-    GetLoginDetailsResponse,
     ListAppsRequest,
     ListAppsResponse,
     ListRunsRequest,
@@ -47,7 +44,6 @@ from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
 from flwr.superlink.routers.control.router import router
-from flwr.superlink.servicer.control import control_handlers
 
 _ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
 
@@ -208,11 +204,7 @@ def test_list_runs_rejects_invalid_token_without_refresh() -> None:
     )
 
     assert response.status_code == 401
-    assert response.json() == {
-        "code": ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
-        "public_message": "Authentication failed.",
-        "public_details": None,
-    }
+    assert response.json() == {"detail": "Not authenticated"}
     assert response.headers["www-authenticate"] == "Bearer"
     assert "x-access-token" not in response.headers
     assert "x-refresh-token" not in response.headers
@@ -235,26 +227,3 @@ def test_list_runs_rejects_non_protobuf_payload() -> None:
 
     assert response.status_code == 415
     assert response.json()["code"] == ApiErrorCode.UNSUPPORTED_CONTENT_TYPE
-
-
-def test_get_login_details_does_not_require_authentication(
-    monkeypatch: MonkeyPatch,
-) -> None:
-    """The login bootstrap endpoint remains available before authentication."""
-    authn_plugin = Mock()
-    expected = GetLoginDetailsResponse(authn_type="noop")
-    monkeypatch.setattr(
-        control_handlers,
-        "get_login_details",
-        lambda _request, _plugin: expected,
-    )
-    app = _create_app(authn_plugin=authn_plugin)
-    response = TestClient(app).post(
-        "/v1/control/get-login-details",
-        content=GetLoginDetailsRequest().SerializeToString(),
-        headers={"content-type": PROTOBUF_MEDIA_TYPE},
-    )
-
-    assert response.status_code == 200
-    assert GetLoginDetailsResponse.FromString(response.content) == expected
-    authn_plugin.validate_tokens_in_metadata.assert_not_called()

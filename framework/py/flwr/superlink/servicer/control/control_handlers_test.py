@@ -67,7 +67,13 @@ class TestControlHandlers(unittest.TestCase):
         """Test StartRun reuses a stored FAB by hash."""
         fab_content = b"stored FAB"
         fab_hash = hashlib.sha256(fab_content).hexdigest()
-        self.state.store_fab(Fab(fab_hash, fab_content, {}))
+        self.state.store_app(
+            fab=Fab(fab_hash, fab_content, {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/demo",
+            app_type=TaskType.SERVER_APP,
+            added_by=self.account.flwr_aid,
+        )
 
         with (
             patch(
@@ -104,12 +110,12 @@ class TestControlHandlers(unittest.TestCase):
 
     def test_list_apps(self) -> None:
         """List apps associated with the requested federation."""
-        self.state.upsert_app(
+        fab_hash = self.state.store_app(
+            fab=Fab("", b"fab", {}),
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
-            fab_hash="fab-hash",
             app_type=TaskType.SERVER_APP,
-            created_by=self.account.flwr_aid,
+            added_by=self.account.flwr_aid,
         )
 
         response = list_apps(
@@ -120,7 +126,7 @@ class TestControlHandlers(unittest.TestCase):
 
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in response.apps],
-            [("@flwr/demo", "fab-hash", TaskType.SERVER_APP)],
+            [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
         )
 
     def test_start_automation_normalizes_start_at_to_utc(self) -> None:

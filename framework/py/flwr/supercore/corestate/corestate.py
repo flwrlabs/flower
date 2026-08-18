@@ -118,19 +118,42 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Store a FAB and return its canonical SHA-256 hash."""
 
     @abstractmethod
-    def get_fab(self, fab_hash: str) -> Fab | None:
-        """Return the FAB for the given hash, if present."""
-
-    @abstractmethod
-    def upsert_app(
+    def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
+        fab: Fab,
         federation_id: str,
         app_id: str,
-        fab_hash: str,
         app_type: str,
-        created_by: str,
-    ) -> bool:
-        """Create or update an app associated with a federation."""
+        added_by: str,
+    ) -> str:
+        """Atomically store a FAB and associate its app with a federation.
+
+        A federation has at most one association for each app ID. Storing the app
+        again updates its FAB hash and type while preserving when and by whom it was
+        first added.
+
+        Parameters
+        ----------
+        fab : Fab
+            FAB content and verification metadata to store.
+        federation_id : str
+            ID of the federation to associate with the app.
+        app_id : str
+            App ID, unique within the federation.
+        app_type : str
+            Type of the app.
+        added_by : str
+            ID of the account adding the app to the federation.
+
+        Returns
+        -------
+        str
+            Canonical SHA-256 hash of the stored FAB.
+        """
+
+    @abstractmethod
+    def get_fab(self, fab_hash: str) -> Fab | None:
+        """Return the FAB for the given hash, if present."""
 
     @abstractmethod
     def list_apps(
@@ -140,7 +163,7 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def delete_app(self, federation_id: str, app_id: str) -> bool:
-        """Delete an app association from a federation."""
+        """Delete one federation-app association; its FAB remains in state."""
 
     @abstractmethod
     def upsert_connector(
