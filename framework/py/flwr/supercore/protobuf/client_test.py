@@ -14,7 +14,8 @@
 # ==============================================================================
 """Tests for reusable protobuf-over-HTTP client infrastructure."""
 
-from unittest.mock import patch
+import ssl
+from unittest.mock import Mock, patch
 
 import httpx
 import pytest
@@ -203,3 +204,73 @@ def test_context_manager_returns_client_and_closes_client() -> None:
             assert entered_client is client
 
     client_class.return_value.close.assert_called_once_with()
+
+
+def test_from_server_address_uses_plain_http_when_insecure() -> None:
+    """Create an unverified HTTP client in insecure mode."""
+    with patch("flwr.supercore.protobuf.client.httpx.Client") as http_client:
+        client = ProtobufClient.from_server_address(
+            server_address="127.0.0.1:8000",
+            insecure=True,
+            root_certificates=None,
+            interceptors=[],
+        )
+
+    assert client._base_url == "http://127.0.0.1:8000"  # pylint: disable=W0212
+    http_client.assert_called_once_with(
+        verify=False, timeout=30.0, follow_redirects=True
+    )
+
+
+@pytest.mark.parametrize("root_certificates", [b"certificate", "ca.pem"])
+def test_from_server_address_rejects_certificates_when_insecure(
+    root_certificates: bytes | str,
+) -> None:
+    """Reject root certificates for a plaintext connection."""
+    with pytest.raises(ValueError, match="root_certificates.*insecure"):
+        ProtobufClient.from_server_address(
+            server_address="127.0.0.1:8000",
+            insecure=True,
+            root_certificates=root_certificates,
+            interceptors=[],
+        )
+
+
+def test_from_server_address_uses_certificate_path() -> None:
+    """Pass a CA certificate path to the HTTP client."""
+    with patch("flwr.supercore.protobuf.client.httpx.Client") as http_client:
+        client = ProtobufClient.from_server_address(
+            server_address="api.example:443",
+            insecure=False,
+            root_certificates="ca.pem",
+            interceptors=[],
+        )
+
+    assert client._base_url == "https://api.example:443"  # pylint: disable=W0212
+    http_client.assert_called_once_with(
+        verify="ca.pem", timeout=30.0, follow_redirects=True
+    )
+
+
+def test_from_server_address_loads_certificate_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Load in-memory CA certificates into an SSL context."""
+    context = Mock(spec=ssl.SSLContext)
+    ssl_context = Mock(return_value=context)
+    monkeypatch.setattr(ssl, "SSLContext", ssl_context)
+
+    with patch("flwr.supercore.protobuf.client.httpx.Client") as http_client:
+        client = ProtobufClient.from_server_address(
+            server_address="api.example:443",
+            insecure=False,
+            root_certificates=b"certificate",
+            interceptors=[],
+        )
+
+    assert client._base_url == "https://api.example:443"  # pylint: disable=W0212
+    ssl_context.assert_called_once_with(ssl.PROTOCOL_TLS_CLIENT)
+    context.load_verify_locations.assert_called_once_with(cadata="certificate")
+    http_client.assert_called_once_with(
+        verify=context, timeout=30.0, follow_redirects=True
+    )
