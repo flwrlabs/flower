@@ -165,10 +165,11 @@ from flwr.superlink.federation.noop_federation_manager import NoOpFederationMana
 class InvalidConnectorRequestError(FlowerError):
     """Exception raised when a connector request is invalid."""
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, public_details: str | None = None) -> None:
         super().__init__(
             ApiErrorCode.INVALID_CONNECTOR_REQUEST,
             f"Invalid connector request: {reason}.",
+            public_details=public_details,
         )
 
 
@@ -186,9 +187,19 @@ def list_connectors(
     account: AccountInfo,
     state: LinkState,
 ) -> ListConnectorsResponse:
-    """List user-connectable OAuth connectors and account connection status."""
+    """List OAuth connectors available in the requested federation."""
     log(INFO, "ControlServicer.ListConnectors")
-    _ = request
+    if not request.federation:
+        return ListConnectorsResponse()
+
+    flwr_aid = account.flwr_aid
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+    _validate_federation_membership_in_request(state, flwr_aid, request.federation)
+    federation = state.federation_manager.get_details(request.federation)
+    # Until connectors are federation-scoped, expose account-scoped connectors only
+    # in the personal agent federation.
+    if federation.can_invite_members or federation.can_add_supernodes:
+        return ListConnectorsResponse()
 
     connectors: list[Connector] = []
     for flow in sorted(
@@ -197,7 +208,7 @@ def list_connectors(
     ):
         connector_ref = flow.connector_ref
         connected = (
-            state.get_connector(flwr_aid=account.flwr_aid, connector_ref=connector_ref)
+            state.get_connector(flwr_aid=flwr_aid, connector_ref=connector_ref)
             is not None
         )
         connectors.append(
@@ -508,6 +519,17 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             f"Account with ID '{flwr_aid}' is not a member of the "
             f"federation '{federation_id}'.",
         )
+
+    if connector_refs:
+        federation = state.federation_manager.get_details(federation_id)
+        if federation.can_invite_members or federation.can_add_supernodes:
+            raise InvalidConnectorRequestError(
+                "connector refs are not supported for this federation",
+                public_details=(
+                    "Connectors are currently available only in your personal "
+                    "workspace."
+                ),
+            )
 
     try:
         # Validate user config overrides matches keys in run config in FAB

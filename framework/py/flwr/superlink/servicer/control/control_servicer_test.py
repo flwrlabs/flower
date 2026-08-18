@@ -301,7 +301,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             )
 
         with patch.object(connector_registry, "OAUTH_FLOWS", {"slack": flow}):
-            response = self.servicer.ListConnectors(ListConnectorsRequest(), Mock())
+            response = self.servicer.ListConnectors(
+                ListConnectorsRequest(federation=NOOP_FEDERATION_ID), Mock()
+            )
             self.assertEqual(len(response.connectors), 1)
             self.assertTrue(response.connectors[0].connected)
 
@@ -315,6 +317,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertIsNotNone(
             self.state.get_connector(flwr_aid="other-account", connector_ref="slack")
         )
+
+    def test_list_connectors_without_federation_returns_empty(self) -> None:
+        """ListConnectors should return no connectors without a federation."""
+        response = self.servicer.ListConnectors(ListConnectorsRequest(), Mock())
+        self.assertEqual(list(response.connectors), [])
 
     def test_connector_oauth_rejects_invalid_or_expired_session(self) -> None:
         """Reject invalid state and expired OAuth sessions before exchange."""
@@ -457,6 +464,55 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             list(self.state.get_run_connector_refs(run_id=response.run_id)),
             ["slack"],
         )
+
+    @parameterized.expand(  # type: ignore
+        [
+            (True, False),
+            (False, True),
+            (True, True),
+        ]
+    )
+    def test_start_run_rejects_connectors_for_capable_federation(
+        self,
+        can_invite_members: bool,
+        can_add_supernodes: bool,
+    ) -> None:
+        """StartRun should restrict connectors to personal-style federations."""
+        self.state.upsert_connector(
+            flwr_aid=self.aid,
+            connector_ref="slack",
+            credentials_json="{}",
+            config_json="{}",
+        )
+        request = StartRunRequest(
+            federation=NOOP_FEDERATION_ID,
+            connector_refs=["slack"],
+        )
+
+        with (
+            patch.object(
+                connector_registry,
+                "OAUTH_FLOWS",
+                {"slack": _OAuthFlow()},
+            ),
+            patch.object(
+                self.state.federation_manager,
+                "get_details",
+                return_value=SimpleNamespace(
+                    can_invite_members=can_invite_members,
+                    can_add_supernodes=can_add_supernodes,
+                ),
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            self.servicer.StartRun(request, Mock())
+
+        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_CONNECTOR_REQUEST)
+        self.assertEqual(
+            error.exception.public_details,
+            "Connectors are currently available only in your personal workspace.",
+        )
+        self.assertEqual(list(self.state.get_run_info()), [])
 
     @parameterized.expand(  # type: ignore
         [

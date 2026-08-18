@@ -534,9 +534,14 @@ global___GetAuthTokensResponse = GetAuthTokensResponse
 class ListConnectorsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    FEDERATION_FIELD_NUMBER: builtins.int
+    federation: builtins.str
     def __init__(
         self,
+        *,
+        federation: builtins.str = ...,
     ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation", b"federation"]) -> None: ...
 
 global___ListConnectorsRequest = ListConnectorsRequest
 

@@ -247,7 +247,7 @@ message GetAuthTokensResponse {
   string refresh_token = 2;
 }
 
-message ListConnectorsRequest {}
+message ListConnectorsRequest { string federation = 1; }
 message Connector {
   string connector_ref = 1;
   string display_name = 2;
