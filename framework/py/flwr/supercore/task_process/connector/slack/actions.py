@@ -37,6 +37,7 @@ ACTIONS = (
                 ),
             },
             "required": ["query"],
+            "additionalProperties": False,
         },
     ),
     ActionDefinition(
@@ -58,6 +59,7 @@ ACTIONS = (
                         "type": "string",
                         "enum": list(SLACK_CONVERSATION_TYPES),
                     },
+                    "minItems": 1,
                     "description": "Conversation types to include.",
                 },
                 "exclude_archived": {
@@ -65,6 +67,7 @@ ACTIONS = (
                     "description": "Whether to exclude archived conversations.",
                 },
             },
+            "additionalProperties": False,
         },
     ),
     ActionDefinition(
@@ -79,6 +82,7 @@ ACTIONS = (
                 "cursor": _CURSOR,
             },
             "required": ["conversation_id"],
+            "additionalProperties": False,
         },
     ),
     ActionDefinition(
@@ -96,6 +100,7 @@ ACTIONS = (
                 "cursor": _CURSOR,
             },
             "required": ["conversation_id", "thread_ts"],
+            "additionalProperties": False,
         },
     ),
 )

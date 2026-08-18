@@ -33,7 +33,7 @@ ACTIONS = (
                 "query": string_property("Attio record search query."),
                 "objects": {
                     "type": "array",
-                    "items": {"type": "string"},
+                    "items": string_property("Attio object type."),
                     "minItems": 1,
                     "description": "Attio object types to search.",
                 },
