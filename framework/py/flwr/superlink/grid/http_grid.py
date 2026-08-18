@@ -25,11 +25,7 @@ import httpx
 from flwr.app import Message, Metadata, RecordDict
 from flwr.app.error import Error
 from flwr.app.message import make_message, remove_content_from_message
-from flwr.common.constant import (
-    CLIENT_OCTET,
-    SUPERLINK_NODE_ID,
-    ErrorCode,
-)
+from flwr.common.constant import CLIENT_OCTET, SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.logger import log, warn_deprecated_feature
 from flwr.common.serde import message_to_proto
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
