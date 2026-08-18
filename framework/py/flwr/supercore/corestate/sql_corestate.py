@@ -782,7 +782,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = insert(AutomationModel).values(**values)
         if max_active is not None:
             active_count = (
-                select(func.count())
+                select(func.count())  # pylint: disable=not-callable
                 .select_from(AutomationModel)
                 .where(
                     AutomationModel.federation_id == federation_id,
