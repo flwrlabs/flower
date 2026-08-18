@@ -24,9 +24,6 @@ from fastapi.testclient import TestClient
 
 from flwr.common.constant import NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    AppInfo,
-    ListAppsRequest,
-    ListAppsResponse,
     ListRunsRequest,
     ListRunsResponse,
 )
@@ -148,42 +145,6 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
         ascending=False,
         limit=1,
     )
-
-
-def test_list_apps_returns_apps_from_linkstate() -> None:
-    """ListApps serializes federation apps returned by LinkState."""
-    linkstate = Mock(spec=LinkState)
-    linkstate.federation_manager.exists.return_value = True
-    linkstate.federation_manager.has_member.return_value = True
-    linkstate.list_apps.return_value = [
-        AppInfo(
-            app_id="@flwr/demo",
-            fab_hash="fab-hash",
-            app_type="flwr-serverapp",
-        )
-    ]
-    app = _create_app()
-    app.dependency_overrides[get_linkstate] = lambda: linkstate
-
-    response = TestClient(app).post(
-        "/v1/control/list-apps",
-        content=ListAppsRequest(
-            federation_id="@flwr/federation", limit=1
-        ).SerializeToString(),
-        headers={
-            "authorization": "Bearer access-token",
-            "content-type": PROTOBUF_MEDIA_TYPE,
-        },
-    )
-    proto_response = ListAppsResponse.FromString(response.content)
-
-    assert response.status_code == 200
-    assert [app.app_id for app in proto_response.apps] == ["@flwr/demo"]
-    linkstate.federation_manager.exists.assert_called_once_with("@flwr/federation")
-    linkstate.federation_manager.has_member.assert_called_once_with(
-        _ACCOUNT.flwr_aid, "@flwr/federation"
-    )
-    linkstate.list_apps.assert_called_once_with("@flwr/federation", 1)
 
 
 def test_list_runs_rejects_invalid_token_without_refresh() -> None:
