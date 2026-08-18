@@ -215,7 +215,7 @@ with the evidence it already has:
 
 ```python
 def connector_error_output(
-    tool_call: dict[str, Any], exc: RuntimeError
+    tool_call: dict[str, Any], exc: Exception
 ) -> dict[str, Any]:
     """Return an error item the model can handle in its next turn."""
     return {
@@ -299,7 +299,7 @@ def main(agent: AgentSession, context: Context) -> None:
                 continue
             try:
                 function_outputs.append(agent.connectors.call(tool_call))
-            except RuntimeError as exc:
+            except (RuntimeError, json.JSONDecodeError) as exc:
                 function_outputs.append(connector_error_output(tool_call, exc))
 
         input_items.extend(response_output)
@@ -416,7 +416,7 @@ def private_response(
 
 
 def connector_error_output(
-    tool_call: dict[str, Any], exc: RuntimeError
+    tool_call: dict[str, Any], exc: Exception
 ) -> dict[str, Any]:
     """Return an error item the model can handle in its next turn."""
     return {
@@ -488,7 +488,7 @@ def main(agent: AgentSession, context: Context) -> None:
                 continue
             try:
                 function_outputs.append(agent.connectors.call(tool_call))
-            except RuntimeError as exc:
+            except (RuntimeError, json.JSONDecodeError) as exc:
                 function_outputs.append(connector_error_output(tool_call, exc))
 
         input_items.extend(response_output)
