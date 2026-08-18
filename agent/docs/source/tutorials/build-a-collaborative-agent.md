@@ -114,7 +114,7 @@ from typing import Any
 from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
 
-MODEL = "openai/gpt-5.5"
+MODEL = "openai/gpt-5.6-sol"
 TOOL_REFS = ("web_search", "web_fetch")
 MAX_TOOL_TURNS = 3
 
@@ -353,7 +353,7 @@ from typing import Any
 from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
 
-MODEL = "openai/gpt-5.5"
+MODEL = "openai/gpt-5.6-sol"
 TOOL_REFS = ("web_search", "web_fetch")
 MAX_TOOL_TURNS = 3
 
