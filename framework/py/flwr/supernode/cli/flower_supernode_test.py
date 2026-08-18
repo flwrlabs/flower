@@ -17,6 +17,7 @@
 
 import importlib
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -143,6 +144,37 @@ def test_parse_supernode_lifespan_config_preserves_appio_tls_args(
     assert config.runtime_root_certificates_path == "appio-ca.pem"
     assert config.runtime_ssl_certfile == "appio-cert.pem"
     assert config.runtime_ssl_keyfile == "appio-key.pem"
+
+
+def test_parse_supernode_lifespan_config_expands_appio_tls_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """SuperNode should pass expanded AppIO TLS paths to Uvicorn."""
+    cert_dir = tmp_path / "certs"
+    cert_dir.mkdir()
+    for filename in ("ca.pem", "cert.pem", "key.pem"):
+        (cert_dir / filename).write_bytes(filename.encode())
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "flower-supernode",
+            "--insecure",
+            "--appio-ssl-certfile",
+            "~/certs/cert.pem",
+            "--appio-ssl-keyfile",
+            "~/certs/key.pem",
+            "--appio-ssl-ca-certfile",
+            "~/certs/ca.pem",
+        ],
+    )
+
+    config = _parse_supernode_lifespan_config()
+
+    assert config.runtime_root_certificates_path == str(cert_dir / "ca.pem")
+    assert config.runtime_ssl_certfile == str(cert_dir / "cert.pem")
+    assert config.runtime_ssl_keyfile == str(cert_dir / "key.pem")
 
 
 def test_flower_supernode_checks_for_update(
