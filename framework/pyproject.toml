@@ -43,7 +43,6 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.26.0,<3.0.0",
-    "dp-accounting>=0.6.0,<0.7.0",
     "grpcio>=1.70.0,<2.0.0",
     "grpcio-health-checking>=1.70.0,<2.0.0",
     "protobuf>=5.28.0,<7.0.0",
@@ -75,6 +74,7 @@ simulation = [
     "ray==2.55.1; python_version >= '3.13' and python_version < '3.15' and sys_platform != 'win32'",
 ]
 agent = ["browser-use[core]>=0.13.1,<0.14.0", "trafilatura>=2.1.0,<3.0.0"]
+dp = ["dp-accounting>=0.6.0,<0.7.0"]
 
 [project.scripts]
 # `flwr` CLI
@@ -98,6 +98,7 @@ documentation = "https://flower.ai"
 
 [dependency-groups]
 dev = [
+    "dp-accounting>=0.6.0,<0.7.0",
     "types-dataclasses==0.6.6",
     "types-protobuf==5.29.1.20250403",
     "types-requests==2.33.0.20260518",

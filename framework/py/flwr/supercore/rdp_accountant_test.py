@@ -18,6 +18,8 @@ import json
 
 import pytest
 
+pytest.importorskip("dp_accounting")
+
 from .privacy_accounting import (
     GaussianPrivacyEvent,
     NeighboringRelation,

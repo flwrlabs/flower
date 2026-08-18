@@ -17,8 +17,13 @@
 from math import isfinite
 from typing import Any, cast
 
-from dp_accounting import dp_event, privacy_accountant
-from dp_accounting import rdp as rdp_module
+try:
+    from dp_accounting import dp_event, privacy_accountant
+    from dp_accounting import rdp as rdp_module
+except ImportError as exc:
+    raise ImportError(
+        'RDP accounting requires the optional dependency: pip install "flwr[dp]".'
+    ) from exc
 
 from .privacy_accounting import (
     GaussianPrivacyEvent,
