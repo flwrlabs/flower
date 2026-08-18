@@ -25,6 +25,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskResponse,
 )
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
+from flwr.supercore.retry import make_simple_http_retry_invoker
 
 from .client import ProtobufCall, ProtobufClient, ProtobufRequestContext
 
@@ -124,6 +125,28 @@ def test_unary_unary_raises_for_http_error() -> None:
         pytest.raises(httpx.HTTPStatusError),
     ):
         _call(ProtobufClient("http://api.example"))
+
+
+def test_unary_unary_uses_retry_invoker() -> None:
+    """Retry a transient HTTP response before parsing the protobuf response."""
+    retry_invoker = make_simple_http_retry_invoker()
+    retry_invoker.max_tries = 2
+    retry_invoker.jitter = None
+    retry_invoker.wait_function = lambda _: None
+
+    with patch(
+        "flwr.supercore.protobuf.client.httpx.Client.send",
+        side_effect=[_response(503), _response(200, _RESPONSE.SerializeToString())],
+    ) as send:
+        result = _call(
+            ProtobufClient(
+                "http://api.example",
+                retry_invoker=retry_invoker,
+            )
+        )
+
+    assert result == _RESPONSE
+    assert send.call_count == 2
 
 
 def test_unary_unary_rejects_invalid_protobuf_response() -> None:

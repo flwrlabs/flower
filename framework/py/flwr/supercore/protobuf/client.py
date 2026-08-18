@@ -19,12 +19,15 @@ from __future__ import annotations
 import ssl
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Protocol, Self, TypeVar
+from typing import TYPE_CHECKING, Protocol, Self, TypeVar
 
 import httpx
 from google.protobuf.message import DecodeError, Message
 
 from .constants import PROTOBUF_MEDIA_TYPE
+
+if TYPE_CHECKING:
+    from flwr.supercore.retry import RetryInvoker
 
 ResponseT = TypeVar("ResponseT", bound=Message)
 
@@ -74,9 +77,11 @@ class ProtobufClient:
         interceptors: Sequence[ProtobufClientInterceptor] = (),
         verify: ssl.SSLContext | bool | str = True,
         timeout: float = 30.0,
+        retry_invoker: RetryInvoker | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._interceptors = tuple(interceptors)
+        self._retry_invoker = retry_invoker
         self._client = httpx.Client(
             verify=verify,
             timeout=timeout,
@@ -90,6 +95,7 @@ class ProtobufClient:
         insecure: bool,
         root_certificates: bytes | str | None,
         interceptors: Sequence[ProtobufClientInterceptor],
+        retry_invoker: RetryInvoker | None = None,
     ) -> Self:
         """Create a protobuf-over-HTTP client from a server address."""
         if insecure and root_certificates is not None:
@@ -111,6 +117,7 @@ class ProtobufClient:
             f"{scheme}://{server_address}",
             interceptors=interceptors,
             verify=verify,
+            retry_invoker=retry_invoker,
         )
 
     def _unary_unary(
@@ -137,9 +144,11 @@ class ProtobufClient:
             message=request,
             request=http_request,
         )
-        response = self._send(context)
-        if response.is_error:
-            response.raise_for_status()
+        response = (
+            self._retry_invoker.invoke(self._send_and_raise, context)
+            if self._retry_invoker is not None
+            else self._send_and_raise(context)
+        )
 
         result = response_type()
         try:
@@ -147,6 +156,12 @@ class ProtobufClient:
         except DecodeError as exc:
             raise ValueError("Invalid protobuf response payload") from exc
         return result
+
+    def _send_and_raise(self, context: ProtobufRequestContext) -> httpx.Response:
+        """Send a request and raise for an HTTP error response."""
+        response = self._send(context)
+        response.raise_for_status()
+        return response
 
     def _send(self, context: ProtobufRequestContext) -> httpx.Response:
         """Send a request through the configured interceptor chain."""
