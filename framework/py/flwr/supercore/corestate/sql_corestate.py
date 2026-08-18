@@ -485,6 +485,59 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 verifications=json.loads(row.verifications),
             )
 
+    def upsert_app(
+        self, federation_id: str, app_id: str, app_type: str, added_by: str
+    ) -> bool:
+        """Create or update an unpinned Hub-app association."""
+        if not all((federation_id, app_id, app_type, added_by)):
+            return False
+        stmt = self.dialect_insert(FederationAppModel).values(
+            federation_id=federation_id,
+            app_id=app_id,
+            fab_hash=None,
+            app_type=app_type,
+            added_by=added_by,
+            added_at=now(),
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[
+                FederationAppModel.federation_id,
+                FederationAppModel.app_id,
+            ],
+            set_={"fab_hash": None, "app_type": stmt.excluded.app_type},
+        )
+        with self.session() as session:
+            session.execute(stmt)
+        return True
+
+    def get_app_fab(
+        self, federation_id: str, app_id: str, fab_hash: str
+    ) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
+        if not all((federation_id, app_id, fab_hash)):
+            return None
+        query = (
+            select(FabModel)
+            .join(
+                FederationAppModel,
+                FederationAppModel.fab_hash == FabModel.fab_hash,
+            )
+            .where(
+                FederationAppModel.federation_id == federation_id,
+                FederationAppModel.app_id == app_id,
+                FederationAppModel.fab_hash == fab_hash,
+            )
+        )
+        with self.session() as session:
+            row = session.scalar(query.execution_options(populate_existing=True))
+            if row is None:
+                return None
+            return Fab(
+                hash_str=row.fab_hash,
+                content=row.content,
+                verifications=json.loads(row.verifications),
+            )
+
     def list_apps(
         self, federation_id: str, limit: int | None = None
     ) -> Sequence[AppInfo]:
@@ -512,7 +565,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return [
                 AppInfo(
                     app_id=app.app_id,
-                    fab_hash=app.fab_hash,
+                    fab_hash=app.fab_hash or "",
                     app_type=app.app_type,
                 )
                 for app in apps

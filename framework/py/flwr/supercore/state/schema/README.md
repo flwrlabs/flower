@@ -56,7 +56,7 @@ erDiagram
     TIMESTAMP added_at
     VARCHAR added_by
     VARCHAR app_type
-    VARCHAR fab_hash
+    VARCHAR fab_hash "nullable"
   }
 
   message_ins {

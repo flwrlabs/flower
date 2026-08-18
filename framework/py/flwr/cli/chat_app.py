@@ -764,7 +764,7 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
 ) -> tuple[int, int | None]:
     """Start one Flower AgentApp run."""
     req = StartRunRequest(
-        app_spec=app_spec if fab_hash is None else "",
+        app_spec=app_spec,
         override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
         federation=federation or "",
     )

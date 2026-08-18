@@ -924,18 +924,16 @@ class StoreAppRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FEDERATION_ID_FIELD_NUMBER: builtins.int
-    FAB_FIELD_NUMBER: builtins.int
+    APP_ID_FIELD_NUMBER: builtins.int
     federation_id: builtins.str
-    @property
-    def fab(self) -> flwr.proto.fab_pb2.Fab: ...
+    app_id: builtins.str
     def __init__(
         self,
         *,
         federation_id: builtins.str = ...,
-        fab: flwr.proto.fab_pb2.Fab | None = ...,
+        app_id: builtins.str = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["fab", b"fab"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["fab", b"fab", "federation_id", b"federation_id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "federation_id", b"federation_id"]) -> None: ...
 
 global___StoreAppRequest = StoreAppRequest
 

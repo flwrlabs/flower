@@ -152,8 +152,20 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def upsert_app(
+        self, federation_id: str, app_id: str, app_type: str, added_by: str
+    ) -> bool:
+        """Create or update an unpinned Hub-app association."""
+
+    @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
+
+    @abstractmethod
+    def get_app_fab(
+        self, federation_id: str, app_id: str, fab_hash: str
+    ) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
 
     @abstractmethod
     def list_apps(

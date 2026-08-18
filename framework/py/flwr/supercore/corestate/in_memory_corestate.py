@@ -98,7 +98,7 @@ class FederationAppRecord:
 
     federation_id: str
     app_id: str
-    fab_hash: str
+    fab_hash: str | None
     app_type: str
     added_by: str
     added_at: datetime
@@ -378,6 +378,42 @@ class InMemoryCoreState(
                 verifications=dict(fab.verifications),
             )
 
+    def upsert_app(
+        self, federation_id: str, app_id: str, app_type: str, added_by: str
+    ) -> bool:
+        """Create or update an unpinned Hub-app association."""
+        if not all((federation_id, app_id, app_type, added_by)):
+            return False
+        key = (federation_id, app_id)
+        with self.lock_federation_app_store:
+            existing = self.federation_app_store.get(key)
+            self.federation_app_store[key] = FederationAppRecord(
+                federation_id=federation_id,
+                app_id=app_id,
+                fab_hash=None,
+                app_type=app_type,
+                added_by=existing.added_by if existing else added_by,
+                added_at=existing.added_at if existing else now(),
+            )
+        return True
+
+    def get_app_fab(
+        self, federation_id: str, app_id: str, fab_hash: str
+    ) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
+        if not all((federation_id, app_id, fab_hash)):
+            return None
+        with self.lock_fab_store, self.lock_federation_app_store:
+            app = self.federation_app_store.get((federation_id, app_id))
+            fab = self.fab_store.get(fab_hash)
+            if app is None or app.fab_hash != fab_hash or fab is None:
+                return None
+            return Fab(
+                hash_str=fab.hash_str,
+                content=fab.content,
+                verifications=dict(fab.verifications),
+            )
+
     def list_apps(
         self, federation_id: str, limit: int | None = None
     ) -> Sequence[AppInfo]:
@@ -400,7 +436,7 @@ class InMemoryCoreState(
             return [
                 AppInfo(
                     app_id=record.app_id,
-                    fab_hash=record.fab_hash,
+                    fab_hash=record.fab_hash or "",
                     app_type=record.app_type,
                 )
                 for record in records

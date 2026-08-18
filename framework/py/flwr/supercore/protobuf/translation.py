@@ -31,6 +31,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationRequest,
     CreateFederationRequest,
     CreateInvitationRequest,
+    DeleteAppRequest,
     GetRunSeriesRequest,
     ListAppsRequest,
     ListAutomationsRequest,
@@ -49,6 +50,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartRunRequest,
     StopAutomationRequest,
     StopRunRequest,
+    StoreAppRequest,
     UnregisterNodeRequest,
 )
 from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
@@ -96,6 +98,8 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/unregister-node"): UnregisterNodeRequest,
     ("POST", "/v1/control/list-nodes"): ListNodesRequest,
     ("POST", "/v1/control/list-apps"): ListAppsRequest,
+    ("POST", "/v1/control/store-app"): StoreAppRequest,
+    ("POST", "/v1/control/delete-app"): DeleteAppRequest,
     ("POST", "/v1/control/list-federations"): ListFederationsRequest,
     ("POST", "/v1/control/show-federation"): ShowFederationRequest,
     ("POST", "/v1/control/create-federation"): CreateFederationRequest,

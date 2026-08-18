@@ -31,6 +31,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteAppRequest,
+    DeleteAppResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
     ListAppsRequest,
@@ -67,6 +69,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StoreAppRequest,
+    StoreAppResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
 )
@@ -213,6 +217,27 @@ def list_apps(
 ) -> ListAppsResponse:
     """List apps associated with a federation."""
     return control_handlers.list_apps(request, account, linkstate)
+
+
+@router.post("/store-app")
+def store_app(
+    request: Annotated[StoreAppRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> StoreAppResponse:
+    """Store an app in a federation."""
+    # Temporary: pass an empty Fleet API type
+    return control_handlers.store_app(request, account, linkstate, "")
+
+
+@router.post("/delete-app")
+def delete_app(
+    request: Annotated[DeleteAppRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> DeleteAppResponse:
+    """Delete an app from a federation."""
+    return control_handlers.delete_app(request, account, linkstate)
 
 
 @router.post("/show-federation")
