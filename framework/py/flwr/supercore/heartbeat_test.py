@@ -19,7 +19,11 @@ import time
 import unittest
 from unittest.mock import Mock
 
-from .heartbeat import HeartbeatSender
+import httpx
+
+from flwr.proto.runtime_pb2 import SendTaskHeartbeatResponse  # pylint: disable=E0611
+
+from .heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
 
 
 # pylint: disable=protected-access
@@ -90,3 +94,19 @@ class TestHeartbeatSender(unittest.TestCase):
     def test_thread_is_daemon(self) -> None:
         """Test that the thread is a daemon thread."""
         self.assertTrue(self.heartbeat_sender._thread.daemon)
+
+
+def test_http_heartbeat_returns_true_on_success() -> None:
+    """HTTP heartbeat should report a successful Runtime response."""
+    stub = Mock()
+    stub.SendTaskHeartbeat.return_value = SendTaskHeartbeatResponse(success=True)
+
+    assert make_task_heartbeat_fn_http(stub)() is True
+
+
+def test_http_heartbeat_retries_transport_errors() -> None:
+    """HTTP heartbeat should make transport failures retryable."""
+    stub = Mock()
+    stub.SendTaskHeartbeat.side_effect = httpx.ConnectError("connection failed")
+
+    assert make_task_heartbeat_fn_http(stub)() is False
