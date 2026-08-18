@@ -32,6 +32,7 @@ from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     AutomationStatus,
+    TaskType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
@@ -64,7 +65,13 @@ class TestControlHandlers(unittest.TestCase):
         """Test StartRun reuses a stored FAB by hash."""
         fab_content = b"stored FAB"
         fab_hash = hashlib.sha256(fab_content).hexdigest()
-        self.state.store_fab(Fab(fab_hash, fab_content, {}))
+        self.state.store_app(
+            fab=Fab(fab_hash, fab_content, {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/demo",
+            app_type=TaskType.SERVER_APP,
+            added_by=self.account.flwr_aid,
+        )
 
         with (
             patch(
