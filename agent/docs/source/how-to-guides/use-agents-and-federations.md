@@ -26,8 +26,8 @@ visible to a model; the AgentApp must replay stored messages.
 
 **Federation**
 : A SuperGrid workspace that owns runs, run series, members, and execution
-resources. Your account has a personal workspace and can also belong to
-collaborative federations.
+resources. Your account has a personal workspace and can be a member of
+multiple collaborative federations.
 
 **Connector**
 : A runtime-provided tool. Built-in tools need no external account. Account

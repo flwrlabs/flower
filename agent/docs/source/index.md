@@ -10,7 +10,7 @@ SuperGrid.
 Start with whichever interface you prefer:
 
 - [Chat in your browser](tutorials/quickstart.md) gets you to a first response
-  in less than 5 minutes, without a local installation or model API key.
+  without a local installation or model API key.
 - [Chat in your
   terminal](tutorials/get-started-with-flower-agent.md) introduces the `flwr chat` terminal interface.
 
