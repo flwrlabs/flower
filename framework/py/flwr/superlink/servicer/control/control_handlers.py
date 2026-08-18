@@ -78,6 +78,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppsRequest,
+    ListAppsResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
     ListConnectorsRequest,
@@ -1313,6 +1315,16 @@ def list_federations(
             for fed in federations
         ]
     )
+
+
+def list_apps(
+    request: ListAppsRequest, account: AccountInfo, state: LinkState
+) -> ListAppsResponse:
+    """List apps associated with a federation."""
+    federation_id = request.federation_id
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    limit = request.limit if request.HasField("limit") else None
+    return ListAppsResponse(apps=state.list_apps(federation_id, limit))
 
 
 def show_federation(

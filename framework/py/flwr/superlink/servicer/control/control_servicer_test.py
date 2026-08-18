@@ -636,12 +636,14 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         runs = self.state.get_run_info(run_ids=[response.run_id])
         tasks = self.state.get_tasks()
+        apps = self.state.list_apps(NOOP_FEDERATION_ID)
 
         self.assertEqual(len(runs), 1)
         self.assertEqual(runs[0].primary_task_type, expected_primary_task_type)
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, expected_task_type)
+        self.assertEqual(apps[0].app_type, TaskType.SERVER_APP)
 
     def test_start_run_creates_agentapp_run_from_local_fab(self) -> None:
         """Test StartRun creates an AgentApp run for a submitted AgentApp FAB."""
@@ -683,6 +685,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         runs = self.state.get_run_info(run_ids=[response.run_id])
         tasks = self.state.get_tasks()
         series = self.state.get_run_series(series_ids=[response.series_id])
+        apps = self.state.list_apps(NOOP_FEDERATION_ID)
 
         self.assertEqual(len(runs), 1)
         self.assertEqual(runs[0].fab_id, "flwr/agent")
@@ -694,6 +697,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
         self.assertEqual(tasks[0].fab_hash, runs[0].fab_hash)
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type) for app in apps],
+            [("@flwr/agent", runs[0].fab_hash, TaskType.AGENT_APP)],
+        )
 
     def test_start_run_creates_builtin_agentapp_run_from_app_spec(self) -> None:
         """Test StartRun creates an AgentApp run for the built-in flwr agent."""

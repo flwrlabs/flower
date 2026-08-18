@@ -34,6 +34,8 @@ def optional_string(value: object, provider: str, name: str) -> str | None:
     """Validate and normalize an optional connector argument."""
     if value is None:
         return None
+    if isinstance(value, str) and not value.strip():
+        return None
     return require_string(value, provider, name)
 
 
