@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import ssl
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol, Self, TypeVar
@@ -71,7 +72,7 @@ class ProtobufClient:
         base_url: str,
         *,
         interceptors: Sequence[ProtobufClientInterceptor] = (),
-        verify: bool | str = True,
+        verify: ssl.SSLContext | bool | str = True,
         timeout: float = 30.0,
     ) -> None:
         self._base_url = base_url.rstrip("/")
