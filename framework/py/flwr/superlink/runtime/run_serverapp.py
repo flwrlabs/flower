@@ -14,7 +14,7 @@
 # ==============================================================================
 """Flower ServerApp runtime."""
 
-
+import time
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
@@ -31,8 +31,12 @@ from flwr.common.config import (
     get_project_config,
     get_project_dir,
 )
-from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
-from flwr.common.logger import flush_logs, log, start_log_uploader, stop_log_uploader
+from flwr.common.constant import (
+    RUNTIME_DEPENDENCY_INSTALL,
+    TASK_WORKER_CALL_TIMEOUT,
+    SubStatus,
+)
+from flwr.common.logger import log, start_log_uploader, stop_log_uploader
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -46,6 +50,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.run_serverapp import run as run_
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.constant import (
+    EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS,
+    EXIT_HANDLER_TIMEOUT_SECONDS,
+)
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.superexec.dependency_installer import (
@@ -93,13 +101,23 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     def on_exit() -> None:
         log(DEBUG, "[flwr-serverapp] Will push ServerApp task output")
 
-        # Set Grpc max retries to 1 to avoid blocking on exit
-        grid._retry_invoker.max_tries = 1
+        # Disable retries and interrupt active backoff before bounded shutdown.
+        grid._retry_invoker.disable_retries()
+        started_at = time.monotonic()
+        cleanup_deadline = started_at + EXIT_HANDLER_CLEANUP_TIMEOUT_SECONDS
+        exit_deadline = started_at + EXIT_HANDLER_TIMEOUT_SECONDS
 
-        # Upload any remaining logs before pushing final output
+        # Stop authenticated background workers before pushing final output.
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop(timeout=max(0.0, cleanup_deadline - time.monotonic()))
+
+        # Drain queued logs and stop the uploader within the cleanup budget.
         if log_uploader:
-            flush_logs(log_queue)
-
+            stop_log_uploader(
+                log_queue,
+                log_uploader,
+                timeout=max(0.0, cleanup_deadline - time.monotonic()),
+            )
         # Push final status and context (if available)
         pushoutput_req = PushTaskOutputRequest(
             context=context_to_proto(context) if context else None,
@@ -107,17 +125,14 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             details=details,
         )
         try:
-            grid._stub.PushTaskOutput(pushoutput_req)
+            # Do not use the one-second worker deadline: give this critical final
+            # write the remaining exit-handler budget.
+            grid._stub.PushTaskOutput(
+                pushoutput_req,
+                timeout=max(0.0, exit_deadline - time.monotonic()),
+            )
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
-
-        # Stop log uploader for this run and upload final logs
-        if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
-
-        # Stop heartbeat sender
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
 
         # Close the Grpc connection
         grid.close()
@@ -134,7 +149,10 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
 
     try:
         # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(grid._stub))
+        heartbeat_sender = HeartbeatSender(
+            make_task_heartbeat_fn_grpc(grid._stub),
+            call_timeout=TASK_WORKER_CALL_TIMEOUT,
+        )
         heartbeat_sender.start()
 
         # Pull task input from SuperLink
