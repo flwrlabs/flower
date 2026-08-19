@@ -338,11 +338,12 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def get_run_series(
+    def get_run_series(  # pylint: disable=too-many-arguments
         self,
         *,
         series_ids: Sequence[int] | None = None,
         federation_ids: Sequence[str] | None = None,
+        is_agent: bool | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -358,6 +359,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Sequence of RunSeries IDs to filter by.
         federation_ids : Optional[Sequence[str]] (default: None)
             Sequence of federation IDs to filter by.
+        is_agent : bool | None (default: None)
+            If set, filter by whether the run series belongs to an AgentApp.
         updated_before : str | None (default: None)
             If set, return only RunSeries updated before this ISO timestamp.
         limit : int | None (default: None)
@@ -402,7 +405,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         run_id: int,
         federation_id: str,
-        app_type: str,
+        is_agent: bool,
         series_id: int | None,
         description: str | None = None,
     ) -> int | None:
@@ -414,12 +417,12 @@ class CoreState(ABC):  # pylint: disable=R0904
             Run ID to associate with the run series.
         federation_id : str
             Federation ID the run series belongs to.
-        app_type : str
-            App type of the run and run series.
+        is_agent : bool
+            Whether a newly created run series belongs to an AgentApp.
         series_id : int | None
             Caller-provided series ID. If `None`, a new series ID is generated
             and creation is attempted. If set, the matching series must already
-            exist and belong to `federation_id` and `app_type`.
+            exist and belong to `federation_id`.
         description : str | None (default: None)
             Optional description for a newly created run series. Ignored when
             `series_id` refers to an existing run series. `None` means no

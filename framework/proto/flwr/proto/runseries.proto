@@ -27,5 +27,4 @@ message RunSeries {
   string updated_at = 5;
   RunStatus last_run_status = 7;
   repeated uint64 run_ids = 8;
-  string app_type = 9;
 }

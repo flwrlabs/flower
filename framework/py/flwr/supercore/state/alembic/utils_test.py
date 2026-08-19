@@ -361,9 +361,9 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
-    def test_run_series_app_type_backfill(self) -> None:
-        """Ensure existing run series derive their app type from the first run."""
-        engine = self.create_engine("run_series_app_type_backfill.db")
+    def test_run_series_is_agent_backfill(self) -> None:
+        """Ensure existing agent run series are identified from the first run."""
+        engine = self.create_engine("run_series_is_agent_backfill.db")
         try:
             self.upgrade_to_revision(engine, "a6f4d2c91b7e")
             with engine.begin() as connection:
@@ -438,10 +438,10 @@ class TestAlembicRun(unittest.TestCase):
             self.upgrade_to_revision(engine, "heads")
 
             with engine.connect() as connection:
-                app_types = connection.execute(
+                agent_statuses = connection.execute(
                     text(
                         """
-                        SELECT app_type
+                        SELECT is_agent
                         FROM run_series
                         ORDER BY series_id
                         """
@@ -449,11 +449,11 @@ class TestAlembicRun(unittest.TestCase):
                 ).scalars()
 
                 self.assertEqual(
-                    list(app_types),
+                    list(agent_statuses),
                     [
-                        TaskType.AGENT_APP,
-                        TaskType.SERVER_APP,
-                        TaskType.SERVER_APP,
+                        True,
+                        False,
+                        False,
                     ],
                 )
         finally:

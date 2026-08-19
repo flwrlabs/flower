@@ -300,7 +300,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         series_id : int | None (default: None)
             Optional run series ID. If `None`, a new run series is created for
             the federation. If set, the series must already exist and belong to
-            the federation and the app type represented by `primary_task_type`.
+            the federation.
         series_description : str | None (default: None)
             Optional description for a newly created run series. Ignored when
             `series_id` refers to an existing run series. `None` means no

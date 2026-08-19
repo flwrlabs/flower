@@ -702,11 +702,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return updated_oauth_session_id is not None
 
-    def get_run_series(  # pylint: disable=R0914
+    def get_run_series(  # pylint: disable=R0913,R0914
         self,
         *,
         series_ids: Sequence[int] | None = None,
         federation_ids: Sequence[str] | None = None,
+        is_agent: bool | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -731,6 +732,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             page_query = page_query.where(
                 RunSeriesModel.federation_id.in_(federation_ids)
             )
+        if is_agent is not None:
+            page_query = page_query.where(RunSeriesModel.is_agent.is_(is_agent))
         if updated_before is not None:
             page_query = page_query.where(
                 RunSeriesModel.updated_at < datetime.fromisoformat(updated_before)
@@ -799,7 +802,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         run_id: int,
         federation_id: str,
-        app_type: str,
+        is_agent: bool,
         series_id: int | None,
         description: str | None = None,
     ) -> int | None:
@@ -815,7 +818,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         .values(
                             series_id=uint64_to_int64(candidate),
                             federation_id=federation_id,
-                            app_type=app_type,
+                            is_agent=is_agent,
                             description=description,
                             created_at=timestamp,
                             updated_at=timestamp,
@@ -837,7 +840,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         .where(
                             RunSeriesModel.series_id == uint64_to_int64(series_id),
                             RunSeriesModel.federation_id == federation_id,
-                            RunSeriesModel.app_type == app_type,
                         )
                         .values(updated_at=now())
                         .returning(RunSeriesModel.series_id)
@@ -845,10 +847,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     if updated_series_id is None:
                         log(
                             ERROR,
-                            "Run series %d not found in federation %r with app type %r",
+                            "Run series %d not found in federation %r",
                             series_id,
                             federation_id,
-                            app_type,
                         )
                         return None
                     resolved_series_id = series_id
@@ -1839,7 +1840,6 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     return RunSeries(
         series_id=int64_to_uint64(row["series_id"]),
         federation=row["federation_id"],
-        app_type=row["app_type"],
         description=row["description"] or "",
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
@@ -1851,7 +1851,6 @@ def _run_series_from_model(model: RunSeriesModel) -> RunSeries:
     return RunSeries(
         series_id=int64_to_uint64(model.series_id),
         federation=model.federation_id,
-        app_type=model.app_type,
         description=model.description or "",
         created_at=timestamp_to_iso(model.created_at),
         updated_at=timestamp_to_iso(model.updated_at),

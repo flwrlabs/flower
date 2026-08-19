@@ -172,10 +172,10 @@ erDiagram
 
   run_series {
     BIGINT series_id PK
-    VARCHAR app_type
     TIMESTAMP created_at
     VARCHAR description "nullable"
     VARCHAR federation_id
+    BOOLEAN is_agent
     TIMESTAMP updated_at
   }
 

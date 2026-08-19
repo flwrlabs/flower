@@ -220,25 +220,29 @@ class StateTest(CoreStateTest):
 
     @parameterized.expand(  # type: ignore[untyped-decorator]
         [
-            (TaskType.AGENT_APP, TaskType.AGENT_APP),
-            (TaskType.SERVER_APP, TaskType.SERVER_APP),
-            (TaskType.SIMULATION, TaskType.SERVER_APP),
+            (TaskType.AGENT_APP, True),
+            (TaskType.SERVER_APP, False),
+            (TaskType.SIMULATION, False),
         ]
     )
-    def test_create_run_stores_series_app_type(
-        self, primary_task_type: str, expected_app_type: str
+    def test_create_run_stores_series_agent_status(
+        self, primary_task_type: str, expected_is_agent: bool
     ) -> None:
-        """Test run series stores the app type represented by its primary task."""
+        """Test run series stores whether its first run is an AgentApp."""
         state = self.state_factory()
         run_id = create_dummy_run(state, primary_task_type=primary_task_type)
         run = state.get_run_info(run_ids=[run_id])[0]
 
-        run_series = state.get_run_series(series_ids=[run.series_id])
+        matching_series = state.get_run_series(is_agent=expected_is_agent)
+        other_series = state.get_run_series(is_agent=not expected_is_agent)
 
-        self.assertEqual(run_series[0].app_type, expected_app_type)
+        self.assertEqual(
+            [entry.series_id for entry in matching_series], [run.series_id]
+        )
+        self.assertEqual(other_series, [])
 
-    def test_create_run_rejects_different_series_app_type(self) -> None:
-        """Test a run cannot join a series with a different app type."""
+    def test_create_run_preserves_initial_series_agent_status(self) -> None:
+        """Test later runs do not change a series' initial agent status."""
         state = self.state_factory()
         agent_run_id = create_dummy_run(
             state,
@@ -252,9 +256,9 @@ class StateTest(CoreStateTest):
             series_id=agent_run.series_id,
         )
 
-        self.assertEqual(server_run_id, 0)
-        run_series = state.get_run_series(series_ids=[agent_run.series_id])
-        self.assertEqual(run_series[0].run_ids, [agent_run_id])
+        self.assertNotEqual(server_run_id, 0)
+        run_series = state.get_run_series(is_agent=True)
+        self.assertEqual(run_series[0].run_ids, [agent_run_id, server_run_id])
 
     def test_claim_automation_returns_stored_run_request(self) -> None:
         """Claiming an automation should return its unresolved run request."""
@@ -2615,7 +2619,7 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
             state.store_run_in_series(
                 1,
                 "@me/fed-a",
-                app_type=TaskType.SERVER_APP,
+                is_agent=False,
                 series_id=None,
             )
         )
@@ -2623,7 +2627,7 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
             state.store_run_in_series(
                 2,
                 "@me/fed-a",
-                app_type=TaskType.SERVER_APP,
+                is_agent=False,
                 series_id=None,
                 description="",
             )

@@ -933,11 +933,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 resolved_series_id = self.store_run_in_series(
                     run_id=run_id,
                     federation_id=federation_id,
-                    app_type=(
-                        TaskType.SERVER_APP
-                        if primary_task_type == TaskType.SIMULATION
-                        else primary_task_type
-                    ),
+                    is_agent=primary_task_type == TaskType.AGENT_APP,
                     series_id=series_id,
                     description=series_description,
                 )
