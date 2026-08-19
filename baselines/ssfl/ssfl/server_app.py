@@ -431,6 +431,7 @@ def main(grid: Grid, context: Context) -> None:
     )
 
     # Aggregate reported training traffic from strategy metrics when present.
+    comm.train_downlink_payload_bytes = int(strategy.train_downlink_payload_bytes)
     for round_idx, round_metrics in sorted(result.train_metrics_clientapp.items()):
         if "arrayrecord_payload_bytes" in round_metrics:
             comm.train_uplink_payload_bytes += int(
@@ -442,6 +443,9 @@ def main(grid: Grid, context: Context) -> None:
             train_record = {
                 "event": "train",
                 "server_round": int(round_idx),
+                "comm/train_downlink_payload_bytes": float(
+                    strategy.train_downlink_by_round.get(int(round_idx), 0)
+                ),
                 **{
                     f"train/{key}": (
                         float(value) if isinstance(value, (int, float)) else value

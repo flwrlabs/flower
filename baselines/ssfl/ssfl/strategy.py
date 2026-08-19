@@ -48,6 +48,8 @@ class SSFLStrategy(FedAvg):
         if transport not in {"dense", "sparse"}:
             raise ValueError(f"Unsupported transport: {transport}")
         self.transport = transport
+        self.train_downlink_payload_bytes = 0
+        self.train_downlink_by_round: dict[int, int] = {}
 
     def configure_train(
         self, server_round: int, arrays: ArrayRecord, config: ConfigRecord, grid: Grid
@@ -96,6 +98,10 @@ class SSFLStrategy(FedAvg):
             dense = arrays.to_torch_state_dict()
             packed = pack_state_dict(dense, self.masks)
             arrays_to_send = ArrayRecord(packed)
+
+        downlink_bytes = int(arrays_to_send.count_bytes()) * len(node_ids)
+        self.train_downlink_by_round[server_round] = downlink_bytes
+        self.train_downlink_payload_bytes += downlink_bytes
 
         record = RecordDict(
             {

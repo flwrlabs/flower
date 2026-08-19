@@ -186,7 +186,9 @@ flwr run . --stream \
 ```
 
 Communication values are Flower `ArrayRecord` payload bytes; they exclude
-Flower Message framing and network-layer overhead.
+Flower Message framing and network-layer overhead. Training totals include
+both the per-round model downlink (`arrays_to_send` once per sampled client)
+and the client uplink replies.
 
 ## Expected results
 
