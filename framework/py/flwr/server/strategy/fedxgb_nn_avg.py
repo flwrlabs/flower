@@ -25,8 +25,9 @@ from logging import WARNING
 from typing import Any
 
 from flwr.common import FitRes, Scalar, ndarrays_to_parameters, parameters_to_ndarrays
-from flwr.common.logger import log, warn_deprecated_feature
 from flwr.server.client_proxy import ClientProxy
+from flwr.supercore import log
+from flwr.supercore.logger import warn_deprecated_feature
 
 from .aggregate import aggregate
 from .fedavg import FedAvg

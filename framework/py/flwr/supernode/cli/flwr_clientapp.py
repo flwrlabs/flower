@@ -20,7 +20,7 @@ from logging import DEBUG, INFO
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.constant import SUPERNODE_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.supercore.utils import mask_string
 from flwr.supernode.runtime.run_clientapp import run_clientapp
