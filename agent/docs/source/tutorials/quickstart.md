@@ -123,3 +123,4 @@ private source content in a support report.
 - Prefer a terminal workflow? [Chat in your
   terminal](get-started-with-flower-agent.md) introduces `flwr chat`.
 - [Write your first AgentApp](write-your-first-agentapp.md).
+- [Build a collaborative research agent](build-a-collaborative-agent.md).
