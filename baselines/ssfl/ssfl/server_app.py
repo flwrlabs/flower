@@ -317,7 +317,6 @@ def main(grid: Grid, context: Context) -> None:
         "comm/discovery_downlink_payload_bytes": discovery_downlink,
         "comm/discovery_uplink_payload_bytes": discovery_uplink,
     }
-    wandb_session.log(mask_metrics, step=0)
     if save_metrics:
         metrics_history.append(mask_metrics)
         _append_jsonl(checkpoint_dir / "metrics.jsonl", mask_metrics)
@@ -332,10 +331,19 @@ def main(grid: Grid, context: Context) -> None:
         "server_round": 0,
         "comm/mask_downlink_payload_bytes": mask_downlink,
     }
-    wandb_session.log(mask_install_metrics, step=0)
     if save_metrics:
         metrics_history.append(mask_install_metrics)
         _append_jsonl(checkpoint_dir / "metrics.jsonl", mask_install_metrics)
+
+    # One W&B step-0 record for discovery + mask install. Keep the step open
+    # when centralized eval will also log at round 0.
+    evaluate_every = int(cfg["evaluate-every"])
+    init_wandb = {
+        **{key: value for key, value in mask_metrics.items() if key != "event"},
+        **{key: value for key, value in mask_install_metrics.items() if key != "event"},
+        "event": "init",
+    }
+    wandb_session.log(init_wandb, step=0, commit=evaluate_every <= 0)
 
     # Apply mask to the initial global model before training rounds.
     masked_init = apply_mask_to_state_dict(arrays.to_torch_state_dict(), masks)
@@ -369,10 +377,10 @@ def main(grid: Grid, context: Context) -> None:
         min_available_nodes=min(2, num_clients),
     )
 
-    if int(cfg["evaluate-every"]) > 0:
+    if evaluate_every > 0:
 
         def _evaluate_fn(server_round: int, arrays: ArrayRecord) -> MetricRecord | None:
-            if server_round != 0 and server_round % int(cfg["evaluate-every"]) != 0:
+            if server_round != 0 and server_round % evaluate_every != 0:
                 return None
             eval_model = create_model(model_name, num_classes_for_dataset(dataset_name))
             state = arrays.to_torch_state_dict()
@@ -397,7 +405,7 @@ def main(grid: Grid, context: Context) -> None:
                 "eval/loss": metrics["loss"],
                 "eval/num_examples": metrics["num-examples"],
             }
-            wandb_session.log(eval_record, step=server_round)
+            wandb_session.log(eval_record, step=server_round, commit=True)
             if save_metrics:
                 metrics_history.append(eval_record)
                 _append_jsonl(checkpoint_dir / "metrics.jsonl", eval_record)

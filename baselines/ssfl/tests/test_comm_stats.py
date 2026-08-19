@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 
 import torch
 
@@ -59,8 +60,24 @@ def test_wandb_disabled_is_noop():
     session = WandbSession()
     session.start({"wandb-mode": "disabled"})
     assert session.enabled is False
-    session.log({"a": 1.0}, step=1)
+    session.log({"a": 1.0}, step=1, commit=False)
     session.finish()
+
+
+def test_wandb_log_forwards_commit(monkeypatch):
+    calls: list[tuple[dict, dict]] = []
+
+    class FakeWandb:
+        @staticmethod
+        def log(metrics, **kwargs):
+            calls.append((metrics, kwargs))
+
+    monkeypatch.setitem(sys.modules, "wandb", FakeWandb)
+    session = WandbSession()
+    session.enabled = True
+    session._run = object()
+    session.log({"a": 1.0}, step=0, commit=False)
+    assert calls == [({"a": 1.0}, {"step": 0, "commit": False})]
 
 
 def test_metrics_jsonl_is_replaced_on_reset(tmp_path):
