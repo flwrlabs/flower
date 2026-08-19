@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import json
 
+import torch
+
+from flwr.app import ArrayRecord, ConfigRecord
 from ssfl.comm_stats import CommStats
 from ssfl.server_app import _append_jsonl, _reset_jsonl
+from ssfl.strategy import SSFLStrategy
 from ssfl.wandb_utils import WandbSession
 
 
@@ -14,13 +18,41 @@ def test_comm_stats_totals():
         discovery_downlink_payload_bytes=100,
         discovery_uplink_payload_bytes=200,
         mask_downlink_payload_bytes=50,
+        train_downlink_payload_bytes=4000,
         train_uplink_payload_bytes=1000,
         train_comm_params=42,
     )
     d = stats.as_dict()
     assert d["one_time_discovery_and_mask_payload_bytes"] == 350.0
+    assert d["train_downlink_payload_bytes"] == 4000.0
+    assert d["train_payload_bytes"] == 5000.0
+    assert d["total_payload_bytes"] == 5350.0
     lines = stats.summary_lines()
     assert any("Communication summary" in line for line in lines)
+    assert any("train downlink:" in line for line in lines)
+
+
+class _FakeGrid:
+    def get_node_ids(self) -> list[int]:
+        return [10, 20, 30]
+
+
+def test_configure_train_counts_downlink_once_per_destination():
+    arrays = ArrayRecord({"w": torch.ones(4)})
+    strategy = SSFLStrategy(
+        node_to_client_id={10: 0, 20: 1, 30: 2},
+        sample_seed=0,
+        transport="dense",
+        fraction_train=1.0,
+        min_train_nodes=1,
+    )
+    messages = list(
+        strategy.configure_train(1, arrays, ConfigRecord({}), _FakeGrid())  # type: ignore[arg-type]
+    )
+    expected = int(arrays.count_bytes()) * 3
+    assert len(messages) == 3
+    assert strategy.train_downlink_payload_bytes == expected
+    assert strategy.train_downlink_by_round[1] == expected
 
 
 def test_wandb_disabled_is_noop():
