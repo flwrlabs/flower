@@ -55,7 +55,7 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.utils.validator import validate_message
-from flwr.supercore.constant import NodeStatus
+from flwr.supercore.constant import NodeStatus, TaskType
 from flwr.supercore.corestate.sql_corestate import SqlCoreState
 from flwr.supercore.corestate.utils import timestamp_to_iso
 from flwr.supercore.date import now
@@ -933,6 +933,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 resolved_series_id = self.store_run_in_series(
                     run_id=run_id,
                     federation_id=federation_id,
+                    app_type=(
+                        TaskType.SERVER_APP
+                        if primary_task_type == TaskType.SIMULATION
+                        else primary_task_type
+                    ),
                     series_id=series_id,
                     description=series_description,
                 )

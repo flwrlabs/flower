@@ -402,6 +402,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         run_id: int,
         federation_id: str,
+        app_type: str,
         series_id: int | None,
         description: str | None = None,
     ) -> int | None:
@@ -413,10 +414,12 @@ class CoreState(ABC):  # pylint: disable=R0904
             Run ID to associate with the run series.
         federation_id : str
             Federation ID the run series belongs to.
+        app_type : str
+            App type of the run and run series.
         series_id : int | None
             Caller-provided series ID. If `None`, a new series ID is generated
             and creation is attempted. If set, the matching series must already
-            exist and belong to `federation_id`.
+            exist and belong to `federation_id` and `app_type`.
         description : str | None (default: None)
             Optional description for a newly created run series. Ignored when
             `series_id` refers to an existing run series. `None` means no

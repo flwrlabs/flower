@@ -69,6 +69,7 @@ class RunSeries(FlwrBase):
 
     series_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
     federation_id: Mapped[str] = mapped_column(String, nullable=False)
+    app_type: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)

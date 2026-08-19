@@ -42,7 +42,7 @@ from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
-from flwr.supercore.constant import NodeStatus
+from flwr.supercore.constant import NodeStatus, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
@@ -660,6 +660,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             resolved_series_id = self.store_run_in_series(
                 run_id=run_id,
                 federation_id=federation_id,
+                app_type=(
+                    TaskType.SERVER_APP
+                    if primary_task_type == TaskType.SIMULATION
+                    else primary_task_type
+                ),
                 series_id=series_id,
                 description=series_description,
             )

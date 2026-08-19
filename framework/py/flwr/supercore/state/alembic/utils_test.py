@@ -361,6 +361,104 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_run_series_app_type_backfill(self) -> None:
+        """Ensure existing run series derive their app type from the first run."""
+        engine = self.create_engine("run_series_app_type_backfill.db")
+        try:
+            self.upgrade_to_revision(engine, "a6f4d2c91b7e")
+            with engine.begin() as connection:
+                for identifier, task_type in enumerate(
+                    (
+                        TaskType.AGENT_APP,
+                        TaskType.SERVER_APP,
+                        TaskType.SIMULATION,
+                    ),
+                    start=1,
+                ):
+                    connection.execute(
+                        text(
+                            """
+                            INSERT INTO task (
+                                task_id, type, run_id, pending_at
+                            ) VALUES (
+                                :task_id, :task_type, :run_id, :pending_at
+                            )
+                            """
+                        ),
+                        {
+                            "task_id": identifier,
+                            "task_type": task_type,
+                            "run_id": identifier,
+                            "pending_at": "2026-08-19T10:00:00+00:00",
+                        },
+                    )
+                    connection.execute(
+                        text(
+                            """
+                            INSERT INTO run (
+                                run_id, primary_task_id, series_id
+                            ) VALUES (
+                                :run_id, :task_id, :series_id
+                            )
+                            """
+                        ),
+                        {
+                            "run_id": identifier,
+                            "task_id": identifier,
+                            "series_id": identifier,
+                        },
+                    )
+                    connection.execute(
+                        text(
+                            """
+                            INSERT INTO run_series (
+                                series_id, federation_id, created_at, updated_at
+                            ) VALUES (
+                                :series_id, :federation_id, :created_at, :updated_at
+                            )
+                            """
+                        ),
+                        {
+                            "series_id": identifier,
+                            "federation_id": "@me/fed",
+                            "created_at": "2026-08-19T10:00:00+00:00",
+                            "updated_at": "2026-08-19T10:00:00+00:00",
+                        },
+                    )
+                    connection.execute(
+                        text(
+                            """
+                            INSERT INTO series_runs (series_id, run_id)
+                            VALUES (:series_id, :run_id)
+                            """
+                        ),
+                        {"series_id": identifier, "run_id": identifier},
+                    )
+
+            self.upgrade_to_revision(engine, "heads")
+
+            with engine.connect() as connection:
+                app_types = connection.execute(
+                    text(
+                        """
+                        SELECT app_type
+                        FROM run_series
+                        ORDER BY series_id
+                        """
+                    )
+                ).scalars()
+
+                self.assertEqual(
+                    list(app_types),
+                    [
+                        TaskType.AGENT_APP,
+                        TaskType.SERVER_APP,
+                        TaskType.SERVER_APP,
+                    ],
+                )
+        finally:
+            engine.dispose()
+
     def test_primary_task_backfill_populates_historical_runs(self) -> None:
         """Ensure historical runs get backfilled primary tasks during migration."""
         engine = self.create_engine("primary_task_backfill.db")

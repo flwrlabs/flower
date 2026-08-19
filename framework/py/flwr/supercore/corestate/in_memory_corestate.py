@@ -588,6 +588,7 @@ class InMemoryCoreState(
         self,
         run_id: int,
         federation_id: str,
+        app_type: str,
         series_id: int | None,
         description: str | None = None,
     ) -> int | None:
@@ -608,6 +609,15 @@ class InMemoryCoreState(
                         federation_id,
                     )
                     return None
+                if existing.app_type != app_type:
+                    log(
+                        ERROR,
+                        "Run series %d has app type %r, not %r",
+                        series_id,
+                        existing.app_type,
+                        app_type,
+                    )
+                    return None
                 run_series = existing
                 resolved_series_id = series_id
 
@@ -621,6 +631,7 @@ class InMemoryCoreState(
                 run_series = RunSeries(
                     series_id=new_series_id,
                     federation=federation_id,
+                    app_type=app_type,
                     description=description if description is not None else "",
                     created_at=timestamp,
                     updated_at=timestamp,

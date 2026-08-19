@@ -38,11 +38,13 @@ class RunSeries(google.protobuf.message.Message):
     UPDATED_AT_FIELD_NUMBER: builtins.int
     LAST_RUN_STATUS_FIELD_NUMBER: builtins.int
     RUN_IDS_FIELD_NUMBER: builtins.int
+    APP_TYPE_FIELD_NUMBER: builtins.int
     series_id: builtins.int
     federation: builtins.str
     description: builtins.str
     created_at: builtins.str
     updated_at: builtins.str
+    app_type: builtins.str
     @property
     def last_run_status(self) -> flwr.proto.run_pb2.RunStatus: ...
     @property
@@ -57,8 +59,9 @@ class RunSeries(google.protobuf.message.Message):
         updated_at: builtins.str = ...,
         last_run_status: flwr.proto.run_pb2.RunStatus | None = ...,
         run_ids: collections.abc.Iterable[builtins.int] | None = ...,
+        app_type: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["last_run_status", b"last_run_status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "description", b"description", "federation", b"federation", "last_run_status", b"last_run_status", "run_ids", b"run_ids", "series_id", b"series_id", "updated_at", b"updated_at"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["app_type", b"app_type", "created_at", b"created_at", "description", b"description", "federation", b"federation", "last_run_status", b"last_run_status", "run_ids", b"run_ids", "series_id", b"series_id", "updated_at", b"updated_at"]) -> None: ...
 
 global___RunSeries = RunSeries

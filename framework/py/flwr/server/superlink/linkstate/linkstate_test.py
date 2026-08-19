@@ -218,6 +218,44 @@ class StateTest(CoreStateTest):
         runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
         self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
 
+    @parameterized.expand(
+        [
+            (TaskType.AGENT_APP, TaskType.AGENT_APP),
+            (TaskType.SERVER_APP, TaskType.SERVER_APP),
+            (TaskType.SIMULATION, TaskType.SERVER_APP),
+        ]
+    )
+    def test_create_run_stores_series_app_type(
+        self, primary_task_type: str, expected_app_type: str
+    ) -> None:
+        """Test run series stores the app type represented by its primary task."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state, primary_task_type=primary_task_type)
+        run = state.get_run_info(run_ids=[run_id])[0]
+
+        run_series = state.get_run_series(series_ids=[run.series_id])
+
+        self.assertEqual(run_series[0].app_type, expected_app_type)
+
+    def test_create_run_rejects_different_series_app_type(self) -> None:
+        """Test a run cannot join a series with a different app type."""
+        state = self.state_factory()
+        agent_run_id = create_dummy_run(
+            state,
+            primary_task_type=TaskType.AGENT_APP,
+        )
+        agent_run = state.get_run_info(run_ids=[agent_run_id])[0]
+
+        server_run_id = create_dummy_run(
+            state,
+            primary_task_type=TaskType.SERVER_APP,
+            series_id=agent_run.series_id,
+        )
+
+        self.assertEqual(server_run_id, 0)
+        run_series = state.get_run_series(series_ids=[agent_run.series_id])
+        self.assertEqual(run_series[0].run_ids, [agent_run_id])
+
     def test_claim_automation_returns_stored_run_request(self) -> None:
         """Claiming an automation should return its unresolved run request."""
         state = self.state_factory()
@@ -2573,9 +2611,22 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
     def test_run_series_distinguishes_missing_and_empty_descriptions(self) -> None:
         """Missing and explicitly empty descriptions remain distinct in SQL."""
         state = self.state_factory()
-        self.assertIsNotNone(state.store_run_in_series(1, "@me/fed-a", series_id=None))
         self.assertIsNotNone(
-            state.store_run_in_series(2, "@me/fed-a", series_id=None, description="")
+            state.store_run_in_series(
+                1,
+                "@me/fed-a",
+                app_type=TaskType.SERVER_APP,
+                series_id=None,
+            )
+        )
+        self.assertIsNotNone(
+            state.store_run_in_series(
+                2,
+                "@me/fed-a",
+                app_type=TaskType.SERVER_APP,
+                series_id=None,
+                description="",
+            )
         )
 
         rows = state.query("SELECT description FROM run_series")

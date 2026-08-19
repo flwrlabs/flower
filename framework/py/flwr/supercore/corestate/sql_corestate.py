@@ -799,6 +799,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         run_id: int,
         federation_id: str,
+        app_type: str,
         series_id: int | None,
         description: str | None = None,
     ) -> int | None:
@@ -814,6 +815,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         .values(
                             series_id=uint64_to_int64(candidate),
                             federation_id=federation_id,
+                            app_type=app_type,
                             description=description,
                             created_at=timestamp,
                             updated_at=timestamp,
@@ -835,6 +837,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         .where(
                             RunSeriesModel.series_id == uint64_to_int64(series_id),
                             RunSeriesModel.federation_id == federation_id,
+                            RunSeriesModel.app_type == app_type,
                         )
                         .values(updated_at=now())
                         .returning(RunSeriesModel.series_id)
@@ -842,9 +845,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     if updated_series_id is None:
                         log(
                             ERROR,
-                            "Run series %d not found in federation %r",
+                            "Run series %d not found in federation %r with app type %r",
                             series_id,
                             federation_id,
+                            app_type,
                         )
                         return None
                     resolved_series_id = series_id
@@ -1835,6 +1839,7 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     return RunSeries(
         series_id=int64_to_uint64(row["series_id"]),
         federation=row["federation_id"],
+        app_type=row["app_type"],
         description=row["description"] or "",
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
@@ -1846,6 +1851,7 @@ def _run_series_from_model(model: RunSeriesModel) -> RunSeries:
     return RunSeries(
         series_id=int64_to_uint64(model.series_id),
         federation=model.federation_id,
+        app_type=model.app_type,
         description=model.description or "",
         created_at=timestamp_to_iso(model.created_at),
         updated_at=timestamp_to_iso(model.updated_at),

@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from flwr.proto import run_pb2 as flwr_dot_proto_dot_run__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1a\x66lwr/proto/runseries.proto\x12\nflwr.proto\x1a\x14\x66lwr/proto/run.proto\"\xb0\x01\n\tRunSeries\x12\x11\n\tseries_id\x18\x01 \x01(\x04\x12\x12\n\nfederation\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\x12\n\ncreated_at\x18\x04 \x01(\t\x12\x12\n\nupdated_at\x18\x05 \x01(\t\x12.\n\x0flast_run_status\x18\x07 \x01(\x0b\x32\x15.flwr.proto.RunStatus\x12\x0f\n\x07run_ids\x18\x08 \x03(\x04\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1a\x66lwr/proto/runseries.proto\x12\nflwr.proto\x1a\x14\x66lwr/proto/run.proto\"\xc2\x01\n\tRunSeries\x12\x11\n\tseries_id\x18\x01 \x01(\x04\x12\x12\n\nfederation\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\x12\n\ncreated_at\x18\x04 \x01(\t\x12\x12\n\nupdated_at\x18\x05 \x01(\t\x12.\n\x0flast_run_status\x18\x07 \x01(\x0b\x32\x15.flwr.proto.RunStatus\x12\x0f\n\x07run_ids\x18\x08 \x03(\x04\x12\x10\n\x08\x61pp_type\x18\t \x01(\tb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,5 +33,5 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'flwr.proto.runseries_pb2', 
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_RUNSERIES']._serialized_start=65
-  _globals['_RUNSERIES']._serialized_end=241
+  _globals['_RUNSERIES']._serialized_end=259
 # @@protoc_insertion_point(module_scope)

@@ -219,6 +219,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         cast(Any, self.state).run_series_store[series_id] = RunSeries(
             series_id=series_id,
             federation=federation_id,
+            app_type=TaskType.SERVER_APP,
             description=f"series {series_id}",
             created_at="2026-05-29T00:00:00+00:00",
             updated_at=updated_at,
@@ -994,6 +995,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Assert
         self.assertEqual([entry.series_id for entry in response.entries], [1])
+        self.assertEqual(response.entries[0].app_type, TaskType.SERVER_APP)
 
     def test_get_run_series_returns_context(self) -> None:
         """Test GetRunSeries returns series metadata and shared Context."""
@@ -1018,6 +1020,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         # Assert
         self.assertEqual(response.series.series_id, series_id)
+        self.assertEqual(response.series.app_type, TaskType.SERVER_APP)
         self.assertEqual(response.series.last_run_status.status, Status.PENDING)
         self.assertTrue(response.HasField("context"))
         self.assertEqual(response.context.series_id, series_id)
