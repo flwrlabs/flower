@@ -1505,6 +1505,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
+        reply_to_message_ids: Sequence[str] | None = None,
         limit: int | None = None,
         order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
@@ -1517,11 +1518,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return []
         if dst_task_ids is not None and not dst_task_ids:
             return []
+        if reply_to_message_ids is not None and not reply_to_message_ids:
+            return []
 
         with self.session():
             self._cleanup_expired_task_tokens()
             self._cleanup_invalid_task_messages()
-            rows = self._claim_task_message_models(dst_task_ids, order_by, limit)
+            rows = self._claim_task_message_models(
+                dst_task_ids, reply_to_message_ids, order_by, limit
+            )
             snapshots = [_task_message_snapshot_from_model(row) for row in rows]
         return [_task_message_from_snapshot(row) for row in snapshots]
 
@@ -1560,6 +1565,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         *,
         run_id: int | None = None,
+        task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
@@ -1571,6 +1577,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         if run_id is not None:
             query = query.where(TaskEventModel.run_id == uint64_to_int64(run_id))
+        if task_ids is not None:
+            if not task_ids:
+                return []
+            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
+            query = query.where(TaskEventModel.task_id.in_(sint64_task_ids))
 
         with self.session() as session:
             rows = session.scalars(query).all()
@@ -1579,6 +1590,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def _claim_task_message_models(
         self,
         dst_task_ids: Sequence[int] | None,
+        reply_to_message_ids: Sequence[str] | None,
         order_by: Literal["created_at"] | None,
         limit: int | None,
     ) -> list[TaskMessageModel]:
@@ -1589,6 +1601,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if dst_task_ids is not None:
             sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
             query = query.where(TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids))
+        if reply_to_message_ids is not None:
+            query = query.where(
+                TaskMessageModel.reply_to_message_id.in_(reply_to_message_ids)
+            )
         if order_by is not None:
             query = query.order_by(TaskMessageModel.created_at.asc())
         if limit is not None:
@@ -1614,6 +1630,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
                 delete_query = delete_query.where(
                     TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids)
+                )
+            if reply_to_message_ids is not None:
+                delete_query = delete_query.where(
+                    TaskMessageModel.reply_to_message_id.in_(reply_to_message_ids)
                 )
 
         returning_query = delete_query.returning(TaskMessageModel)

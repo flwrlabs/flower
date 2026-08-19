@@ -49,6 +49,7 @@ from flwr.superlink.routers.control.middlewares import (
     ControlEventLogMiddleware,
     ControlLicenseMiddleware,
 )
+from flwr.superlink.routers.runtime import responses_router
 from flwr.superlink.routers.runtime import router as runtime_router
 
 try:
@@ -183,6 +184,7 @@ def create_app(
     # SuperLink APIs
     fastapi_app.include_router(control_router)
     fastapi_app.include_router(runtime_router)
+    fastapi_app.include_router(responses_router)
 
     # Extension hooks
     extensions.configure_app(fastapi_app)

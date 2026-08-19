@@ -1694,6 +1694,38 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(pulled[0].metadata.message_id, msg_1.metadata.message_id)
         self.assertEqual(pulled_next[0].metadata.message_id, msg_2.metadata.message_id)
 
+    def test_get_task_message_filters_by_reply(self) -> None:
+        """A reply-specific claim should not consume another request's reply."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert src_task_id is not None and dst_task_id is not None
+        reply_1 = create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            reply_to_message_id="request-1",
+        )
+        reply_2 = create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            reply_to_message_id="request-2",
+        )
+        self.assertTrue(state.store_task_message(reply_1))
+        self.assertTrue(state.store_task_message(reply_2))
+
+        pulled_2 = state.get_task_message(
+            dst_task_ids=[dst_task_id], reply_to_message_ids=["request-2"]
+        )
+        pulled_1 = state.get_task_message(
+            dst_task_ids=[dst_task_id], reply_to_message_ids=["request-1"]
+        )
+
+        self.assertEqual(pulled_2[0].metadata.message_id, reply_2.metadata.message_id)
+        self.assertEqual(pulled_1[0].metadata.message_id, reply_1.metadata.message_id)
+
     def test_store_and_get_task_events(self) -> None:
         """Task events should round-trip in assigned ID order."""
         # Prepare: Create one run with a task and two valid task events.
@@ -1723,6 +1755,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             run_id=run_id, after_task_event_id=events[0].id
         )
         no_new = state.get_task_events(run_id=run_id, after_task_event_id=latest_id)
+        filtered = state.get_task_events(run_id=run_id, task_ids=[task_id])
+        excluded = state.get_task_events(run_id=run_id, task_ids=[task_id + 1])
 
         # Assert: Events keep assigned ID order and cursor filtering works.
         self.assertEqual(len(events), 2)
@@ -1743,6 +1777,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(latest_id, events[1].id)
         self.assertEqual(after_first, [events[1]])
         self.assertEqual(no_new, [])
+        self.assertEqual(filtered, events)
+        self.assertEqual(excluded, [])
 
     @parameterized.expand(  # type: ignore
         [

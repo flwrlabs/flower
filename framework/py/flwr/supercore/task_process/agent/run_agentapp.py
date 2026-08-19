@@ -15,6 +15,7 @@
 """Flower AgentApp process."""
 
 
+import os
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
@@ -65,6 +66,8 @@ from .context_items import append_items
 from .session import RuntimeAgentConnectors, RuntimeAgentResponses, RuntimeAgentSession
 
 _AGENT_INPUT_KEY = "agent.input"
+_RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
+_RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
 
 
 def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
@@ -235,6 +238,8 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         connectors = RuntimeAgentConnectors(responses)
         agent = RuntimeAgentSession(responses=responses, connectors=connectors)
 
+        _set_runtime_environment(runtime_api_address, token, insecure)
+
         # Load and run the AgentApp
         agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)
         if not isinstance(agent_app, AgentApp):
@@ -269,3 +274,13 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             "success": exit_code == ExitCode.SUCCESS,
         },
     )
+
+
+def _set_runtime_environment(
+    runtime_api_address: str, token: str, insecure: bool
+) -> None:
+    """Expose the Open Responses-compatible Runtime endpoint to the AgentApp."""
+    scheme = "http" if insecure else "https"
+    address = runtime_api_address.rstrip("/")
+    os.environ[_RUNTIME_BASE_URL_ENV] = f"{scheme}://{address}/v1/runtime"
+    os.environ[_RUNTIME_API_KEY_ENV] = token
