@@ -66,8 +66,9 @@ class DifferentialPrivacyFixedClippingBase(Strategy, ABC):
     num_sampled_clients : int
         The number of clients that are sampled on each round.
     accountant : PrivacyAccountant or None
-        Optional accountant used to track cumulative privacy loss. Accounted mode
-        requires no-amplification accounting and uniform FedAvg aggregation.
+        Optional accountant used to track cumulative privacy loss for model updates.
+        Training and evaluation metrics are not included. Accounted mode requires
+        no-amplification accounting and uniform FedAvg aggregation.
     """
 
     # pylint: disable=too-many-arguments,too-many-instance-attributes
@@ -290,8 +291,9 @@ class DifferentialPrivacyServerSideFixedClipping(DifferentialPrivacyFixedClippin
     num_sampled_clients : int
         The number of clients that are sampled on each round.
     accountant : PrivacyAccountant or None
-        Optional accountant used to track cumulative privacy loss. Accounted mode
-        requires no-amplification accounting and uniform FedAvg aggregation.
+        Optional accountant used to track cumulative privacy loss for model updates.
+        Training and evaluation metrics are not included. Accounted mode requires
+        no-amplification accounting and uniform FedAvg aggregation.
 
     Examples
     --------
@@ -390,8 +392,6 @@ class DifferentialPrivacyServerSideFixedClipping(DifferentialPrivacyFixedClippin
         aggregated_arrays, aggregated_metrics = self.strategy.aggregate_train(
             server_round, replies_list
         )
-        if self.accountant is not None:
-            aggregated_metrics = None
 
         # Add Gaussian noise to the aggregated arrays
         if aggregated_arrays:
@@ -423,8 +423,9 @@ class DifferentialPrivacyClientSideFixedClipping(DifferentialPrivacyFixedClippin
     num_sampled_clients : int
         The number of clients that are sampled on each round.
     accountant : PrivacyAccountant or None
-        Optional accountant used to track cumulative privacy loss. Accounted mode
-        requires no-amplification accounting and uniform FedAvg aggregation.
+        Optional accountant used to track cumulative privacy loss for model updates.
+        Training and evaluation metrics are not included. Accounted mode requires
+        no-amplification accounting and uniform FedAvg aggregation.
 
     Examples
     --------
@@ -484,8 +485,6 @@ class DifferentialPrivacyClientSideFixedClipping(DifferentialPrivacyFixedClippin
         aggregated_arrays, aggregated_metrics = self.strategy.aggregate_train(
             server_round, replies_list
         )
-        if self.accountant is not None:
-            aggregated_metrics = None
 
         # Add Gaussian noise to the aggregated arrays
         if aggregated_arrays:
