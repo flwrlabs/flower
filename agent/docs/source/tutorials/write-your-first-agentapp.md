@@ -70,8 +70,8 @@ def main(agent: AgentSession, context: Context) -> None:
 - `context`, which contains the fused run configuration and persistent state
 
 `agent.responses.create` accepts an Open Responses-compatible request. It does
-not call a public HTTP endpoint from your app; the Flower runtime creates and
-manages the model task.
+not call a public HTTP endpoint from your app; the Flower runtime sends the
+request to the configured model provider.
 
 ## Configure the Flower App
 
@@ -161,9 +161,8 @@ $ uv run flwr run . supergrid \
 ```{admonition} Success checkpoint
 :class: tip
 
-The command prints a run ID, the AgentApp task reaches a finished state, and
-the model response appears in the run activity. Keep the run ID for
-troubleshooting.
+The command prints a run ID, the run reaches a finished state, and the model
+response appears in the run activity. Keep the run ID for troubleshooting.
 ```
 
 Open SuperGrid to inspect the structured response and persisted context. If the

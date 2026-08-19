@@ -88,6 +88,19 @@ The AgentApp decides whether to ask the model for more tool calls. Every loop
 must have a finite limit:
 
 ```python
+request = {
+    "model": "openai/gpt-5.6-sol",
+    "input": [
+        {
+            "role": "user",
+            "content": "Find two public sources about federated AI.",
+        }
+    ],
+    "tools": tools,
+    "tool_choice": "auto",
+    "stream": False,
+}
+
 for _ in range(3):
     response = agent.responses.create(request)
     tool_calls = [
@@ -101,9 +114,9 @@ for _ in range(3):
     request["input"] = [*request["input"], *tool_calls, *outputs]
 ```
 
-This abbreviated loop assumes `request["input"]` is a list and omits recovery
-and conversation-state handling. Use the complete [collaborative research
-agent](../tutorials/build-a-collaborative-agent.md) for copy/pasteable code.
+This abbreviated loop omits recovery and conversation-state handling. Use the
+complete [collaborative research agent](../tutorials/build-a-collaborative-agent.md)
+for copy/pasteable code.
 
 ## Handle failure deliberately
 
