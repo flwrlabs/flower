@@ -17,7 +17,6 @@
 import logging
 import time
 from typing import Any
-from urllib.parse import urlsplit
 
 HEALTH_CHECK_PATH = "/health"
 LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
@@ -71,7 +70,8 @@ class HealthCheckAccessFilter(logging.Filter):
                 return False
         else:
             return False
-        return urlsplit(raw_path).path == HEALTH_CHECK_PATH and status_code < 400
+        path, _, _ = raw_path.partition("?")
+        return path == HEALTH_CHECK_PATH and status_code < 400
 
 
 def get_uvicorn_log_config(log_level: int) -> dict[str, Any]:

@@ -45,6 +45,7 @@ def _access_record(path: str, status_code: object) -> logging.LogRecord:
         ("/health?probe=readiness", "200", False),
         ("/health", 500, True),
         ("/v1/user/profile", 200, True),
+        ("//[", 200, True),
     ],
 )
 def test_health_check_access_filter(
