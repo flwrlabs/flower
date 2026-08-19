@@ -15,8 +15,9 @@
 """Flower SuperLink runtime."""
 
 
+from flwr.supercore.runtime import RuntimeHttpClient as RuntimeHttpClient
+
 from .run_serverapp import run_serverapp
-from .runtime_http_client import RuntimeHttpClient as RuntimeHttpClient
 
 __all__ = [
     "RuntimeHttpClient",
