@@ -19,7 +19,7 @@ from logging import DEBUG, WARNING
 from typing import cast
 
 from flwr.common.constant import SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.interceptors import (
     RuntimeTokenHttpInterceptor,
     RuntimeVersionHttpInterceptor,

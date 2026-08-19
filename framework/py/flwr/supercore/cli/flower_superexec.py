@@ -24,7 +24,7 @@ import yaml
 
 from flwr.common.args import add_args_runtime_dependency_install
 from flwr.common.constant import ExecPluginType
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
     load_superexec_auth_secret,

@@ -21,7 +21,8 @@ from queue import Queue
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.constant import SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
-from flwr.common.logger import log, mirror_output_to_queue, restore_output
+from flwr.supercore import log
+from flwr.supercore.logger import mirror_output_to_queue, restore_output
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.superlink.runtime import run_serverapp
 

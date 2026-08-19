@@ -26,7 +26,6 @@ from flwr.app import Message, Metadata, RecordDict
 from flwr.app.error import Error
 from flwr.app.message import make_message, remove_content_from_message
 from flwr.common.constant import CLIENT_OCTET, SUPERLINK_NODE_ID, ErrorCode
-from flwr.common.logger import log, warn_deprecated_feature
 from flwr.common.serde import message_to_proto
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -41,6 +40,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
 )
 from flwr.serverapp.grid import Grid
+from flwr.supercore import log
 from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE, UVICORN_DEFAULT_PORT
 from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
@@ -64,6 +64,7 @@ from flwr.supercore.interceptors import (
     RuntimeTokenHttpInterceptor,
     RuntimeVersionHttpInterceptor,
 )
+from flwr.supercore.logger import warn_deprecated_feature
 from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.run import Run
 from flwr.supercore.runtime import RuntimeHttpClient
