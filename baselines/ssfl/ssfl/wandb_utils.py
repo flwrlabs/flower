@@ -56,13 +56,28 @@ class WandbSession:
             project,
         )
 
-    def log(self, metrics: dict[str, Any], step: int | None = None) -> None:
-        """Log metrics when a W&B run is active."""
+    def log(
+        self,
+        metrics: dict[str, Any],
+        step: int | None = None,
+        commit: bool | None = None,
+    ) -> None:
+        """Log metrics when a W&B run is active.
+
+        Pass ``commit=False`` to keep the current step open so later calls can
+        add metrics at the same step. W&B otherwise treats a repeated step as
+        out-of-order and drops the extra records.
+        """
         if not self.enabled or self._run is None:
             return
         import wandb  # pylint: disable=import-outside-toplevel
 
-        wandb.log(metrics, step=step)
+        kwargs: dict[str, Any] = {}
+        if step is not None:
+            kwargs["step"] = step
+        if commit is not None:
+            kwargs["commit"] = commit
+        wandb.log(metrics, **kwargs)
 
     def finish(self) -> None:
         """Finish the active W&B run, if any."""
