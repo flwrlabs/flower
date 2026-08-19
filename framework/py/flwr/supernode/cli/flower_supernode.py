@@ -16,10 +16,13 @@
 
 
 import argparse
+import threading
 from dataclasses import dataclass
 from logging import DEBUG, INFO, WARN
 from pathlib import Path
+from time import sleep
 
+import uvicorn
 import yaml
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519
@@ -36,7 +39,6 @@ from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
-    SUPERNODE_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
 )
@@ -45,6 +47,7 @@ from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
     load_superexec_auth_secret,
 )
+from flwr.supercore.constant import UVICORN_DEFAULT_HOST, UVICORN_DEFAULT_PORT
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -71,13 +74,16 @@ class SuperNodeLifespanConfig:  # pylint: disable=too-many-instance-attributes
     max_wait_time: float | None
     node_config: UserConfig
     isolation: str
-    runtime_api_address: str
     runtime_certificates: tuple[bytes, bytes, bytes] | None
     runtime_root_certificates_path: str | None
     health_server_address: str | None
     trusted_entities: dict[str, str] | None
     superexec_auth_secret: bytes | None
     runtime_dependency_install: bool
+    host: str
+    port: int
+    runtime_ssl_certfile: str | None
+    runtime_ssl_keyfile: str | None
 
 
 def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
@@ -130,15 +136,28 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
             [args.node_config] if args.node_config else args.node_config
         ),
         isolation=args.isolation,
-        runtime_api_address=args.runtime_api_address,
         runtime_certificates=runtime_certificates,
         runtime_root_certificates_path=(
-            args.runtime_ssl_ca_certfile if runtime_certificates is not None else None
+            str(Path(args.runtime_ssl_ca_certfile).expanduser())
+            if runtime_certificates is not None
+            else None
         ),
         health_server_address=args.health_server_address,
         trusted_entities=trusted_entities,
         superexec_auth_secret=superexec_auth_secret,
         runtime_dependency_install=args.runtime_dependency_install,
+        host=args.host,
+        port=args.port,
+        runtime_ssl_certfile=(
+            str(Path(args.runtime_ssl_certfile).expanduser())
+            if runtime_certificates is not None
+            else None
+        ),
+        runtime_ssl_keyfile=(
+            str(Path(args.runtime_ssl_keyfile).expanduser())
+            if runtime_certificates is not None
+            else None
+        ),
     )
 
 
@@ -156,25 +175,65 @@ def flower_supernode() -> None:
 
     objectstore_factory = ObjectStoreFactory()
     state_factory = NodeStateFactory(objectstore_factory=objectstore_factory)
-    start_client_internal(
-        state_factory=state_factory,
-        server_address=config.server_address,
-        transport=config.transport,
-        root_certificates=config.root_certificates,
-        insecure=config.insecure,
-        authentication_keys=config.authentication_keys,
-        max_retries=config.max_retries,
-        max_wait_time=config.max_wait_time,
-        node_config=config.node_config,
-        isolation=config.isolation,
-        runtime_api_address=config.runtime_api_address,
-        runtime_certificates=config.runtime_certificates,
-        runtime_root_certificates_path=config.runtime_root_certificates_path,
-        health_server_address=config.health_server_address,
-        trusted_entities=config.trusted_entities,
-        superexec_auth_secret=config.superexec_auth_secret,
-        runtime_dependency_install=config.runtime_dependency_install,
+    http_server, http_thread = _start_supernode_http_api(config, state_factory)
+    runtime_host = f"[{config.host}]" if ":" in config.host else config.host
+
+    try:
+        start_client_internal(
+            state_factory=state_factory,
+            server_address=config.server_address,
+            transport=config.transport,
+            root_certificates=config.root_certificates,
+            insecure=config.insecure,
+            authentication_keys=config.authentication_keys,
+            max_retries=config.max_retries,
+            max_wait_time=config.max_wait_time,
+            node_config=config.node_config,
+            isolation=config.isolation,
+            runtime_api_address=f"{runtime_host}:{config.port}",
+            runtime_certificates=config.runtime_certificates,
+            runtime_root_certificates_path=config.runtime_root_certificates_path,
+            health_server_address=config.health_server_address,
+            trusted_entities=config.trusted_entities,
+            superexec_auth_secret=config.superexec_auth_secret,
+            runtime_dependency_install=config.runtime_dependency_install,
+        )
+    finally:
+        http_server.should_exit = True
+        http_thread.join()
+
+
+def _start_supernode_http_api(
+    config: SuperNodeLifespanConfig,
+    state_factory: NodeStateFactory,
+) -> tuple[uvicorn.Server, threading.Thread]:
+    """Start the Runtime HTTP API in a background thread."""
+    from flwr.supernode.main import (  # pylint: disable=import-outside-toplevel
+        create_app,
     )
+
+    server = uvicorn.Server(
+        uvicorn.Config(
+            app=create_app(
+                state_factory=state_factory,
+                superexec_auth_secret=config.superexec_auth_secret,
+            ),
+            host=config.host,
+            port=config.port,
+            reload=False,
+            access_log=True,
+            ssl_certfile=config.runtime_ssl_certfile,
+            ssl_keyfile=config.runtime_ssl_keyfile,
+            workers=1,
+        )
+    )
+    thread = threading.Thread(target=server.run, name="supernode-runtime-http-api")
+    thread.start()
+    while thread.is_alive() and not server.started:
+        sleep(0.1)
+    if not server.started:
+        raise RuntimeError("SuperNode Runtime HTTP API failed to start.")
+    return server, thread
 
 
 def _parse_args_run_supernode() -> argparse.ArgumentParser:
@@ -203,11 +262,15 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
         "that a separate independent process gets created outside of SuperNode.",
     )
     parser.add_argument(
-        "--clientappio-api-address",
-        dest="runtime_api_address",
-        default=SUPERNODE_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
-        help="Runtime API (gRPC) server address (IPv4, IPv6, or a domain name). "
-        f"By default, it is set to {SUPERNODE_RUNTIME_API_DEFAULT_SERVER_ADDRESS}.",
+        "--host",
+        default=UVICORN_DEFAULT_HOST,
+        help=f"Host for the Runtime HTTP API (default: {UVICORN_DEFAULT_HOST}).",
+    )
+    parser.add_argument(
+        "--port",
+        type=_port_int,
+        default=UVICORN_DEFAULT_PORT,
+        help=f"Port for the Runtime HTTP API (default: {UVICORN_DEFAULT_PORT}).",
     )
     parser.add_argument(
         "--appio-ssl-certfile",
@@ -250,6 +313,14 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     add_args_health(parser)
 
     return parser
+
+
+def _port_int(value: str) -> int:
+    """Parse a valid TCP port."""
+    parsed = int(value)
+    if parsed < 0 or parsed > 65535:
+        raise argparse.ArgumentTypeError("value must be between 0 and 65535")
+    return parsed
 
 
 def _parse_args_common(parser: argparse.ArgumentParser) -> None:

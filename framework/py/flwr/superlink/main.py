@@ -49,6 +49,7 @@ from flwr.superlink.routers.control.middlewares import (
     ControlEventLogMiddleware,
     ControlLicenseMiddleware,
 )
+from flwr.superlink.routers.runtime import router as runtime_router
 
 try:
     from flwr.ee import get_ee_linkstate_db as get_ee_linkstate_db
@@ -127,12 +128,12 @@ def create_app(
     # Force initialization before exposing LinkState through FastAPI dependencies
     linkstate_factory.state()
 
-    # Instantiate SuperLink lifespan for legacy gRPC server if required
+    # Instantiate the lifespan which owns the Control and Fleet gRPC servers.
     superlink_lifespan = None
-    if config and not config.disable_grpc_api:
+    if config:
         if superlink_lifespan_class is None:
             raise RuntimeError(
-                "A SuperLink lifespan class is required when legacy gRPC is enabled."
+                "A SuperLink lifespan class is required when configuration is provided."
             )
         superlink_lifespan = superlink_lifespan_class(config, linkstate_factory)
 
@@ -181,7 +182,7 @@ def create_app(
 
     # SuperLink APIs
     fastapi_app.include_router(control_router)
-    # fastapi_app.include_router(runtime.router)
+    fastapi_app.include_router(runtime_router)
 
     # Extension hooks
     extensions.configure_app(fastapi_app)

@@ -25,7 +25,6 @@ import pytest
 from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     ISOLATION_MODE_SUBPROCESS,
-    SUPERNODE_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
     TRANSPORT_TYPE_GRPC_RERE,
 )
 from flwr.supercore.version import package_version
@@ -86,7 +85,8 @@ def test_parse_supernode_lifespan_config_returns_final_defaults(
     assert config.max_wait_time is None
     assert not config.node_config
     assert config.isolation == ISOLATION_MODE_SUBPROCESS
-    assert config.runtime_api_address == SUPERNODE_RUNTIME_API_DEFAULT_SERVER_ADDRESS
+    assert config.host == flower_supernode_module.UVICORN_DEFAULT_HOST
+    assert config.port == flower_supernode_module.UVICORN_DEFAULT_PORT
     assert config.runtime_certificates is None
     assert config.runtime_root_certificates_path is None
     assert config.health_server_address is None
@@ -172,6 +172,8 @@ def test_flower_supernode_injects_state_factory(
 ) -> None:
     """SuperNode should pass its state factory into the internal startup path."""
     config = Mock()
+    config.host = "127.0.0.1"
+    config.port = 8000
     objectstore_factory = Mock()
     state_factory = Mock()
     start_client_internal = Mock()
@@ -195,8 +197,17 @@ def test_flower_supernode_injects_state_factory(
     monkeypatch.setattr(
         flower_supernode_module, "start_client_internal", start_client_internal
     )
+    http_server = Mock()
+    http_thread = Mock()
+    monkeypatch.setattr(
+        flower_supernode_module,
+        "_start_supernode_http_api",
+        Mock(return_value=(http_server, http_thread)),
+    )
 
     flower_supernode_module.flower_supernode()
 
     node_state_factory.assert_called_once_with(objectstore_factory=objectstore_factory)
     assert start_client_internal.call_args.kwargs["state_factory"] is state_factory
+    assert http_server.should_exit is True
+    http_thread.join.assert_called_once_with()

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from logging import DEBUG, ERROR
 
-import grpc
+import httpx
 
 from flwr.common.constant import SubStatus
 from flwr.common.logger import log
@@ -28,16 +28,15 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputResponse,
     PushTaskOutputRequest,
 )
-from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.supercore.grpc import create_channel, on_channel_state_change
-from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
 from flwr.supercore.interceptors import (
-    RuntimeTokenClientInterceptor,
-    RuntimeVersionClientInterceptor,
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
 )
-from flwr.supercore.retry import RetryInvoker, make_simple_grpc_retry_invoker, wrap_stub
+from flwr.supercore.retry import RetryInvoker, make_simple_http_retry_invoker
+from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.telemetry import EventType, event
 
 from .task import handle_task
@@ -54,7 +53,7 @@ def run_connector(  # pylint: disable=too-many-locals
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
 
-    channel, stub, retry_invoker = _create_runtime_stub(
+    client, retry_invoker = _create_runtime_client(
         runtime_api_address=runtime_api_address,
         token=token,
         insecure=insecure,
@@ -76,14 +75,14 @@ def run_connector(  # pylint: disable=too-many-locals
             details=details,
         )
         try:
-            stub.PushTaskOutput(pushoutput_req)
-        except grpc.RpcError as err:
+            client.PushTaskOutput(pushoutput_req)
+        except httpx.HTTPError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
 
         if heartbeat_sender and heartbeat_sender.is_running:
             heartbeat_sender.stop()
 
-        channel.close()
+        client.close()
 
     register_signal_handlers(
         event_type=EventType.FLWR_CONNECTOR_RUN_LEAVE,
@@ -92,16 +91,16 @@ def run_connector(  # pylint: disable=too-many-locals
     )
 
     try:
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_http(client))
         heartbeat_sender.start()
 
         log(DEBUG, "[flwr-connector] Pull task input")
-        task_input: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
+        task_input: PullTaskInputResponse = client.PullTaskInput(PullTaskInputRequest())
 
         event(EventType.FLWR_CONNECTOR_RUN_ENTER)
 
         handle_task(
-            stub=stub,
+            stub=client,
             task_id=task_input.task_id,
             run_id=task_input.run.run_id,
         )
@@ -122,25 +121,23 @@ def run_connector(  # pylint: disable=too-many-locals
     flwr_exit(exit_code, event_type=EventType.FLWR_CONNECTOR_RUN_LEAVE)
 
 
-def _create_runtime_stub(
+def _create_runtime_client(
     *,
     runtime_api_address: str,
     token: str,
     insecure: bool,
     certificates: bytes | None,
-) -> tuple[grpc.Channel, RuntimeStub, RetryInvoker]:
-    """Create a Runtime stub authenticated as the connector task."""
-    channel = create_channel(
+) -> tuple[RuntimeHttpClient, RetryInvoker]:
+    """Create a Runtime HTTP client authenticated as the connector task."""
+    retry_invoker = make_simple_http_retry_invoker()
+    client = RuntimeHttpClient.from_server_address(
         server_address=runtime_api_address,
         insecure=insecure,
         root_certificates=certificates,
         interceptors=[
-            RuntimeVersionClientInterceptor(component_name="flwr-connector"),
-            RuntimeTokenClientInterceptor(token),
+            RuntimeVersionHttpInterceptor(component_name="flwr-connector"),
+            RuntimeTokenHttpInterceptor(token),
         ],
+        retry_invoker=retry_invoker,
     )
-    channel.subscribe(on_channel_state_change)
-    stub = RuntimeStub(channel)
-    retry_invoker = make_simple_grpc_retry_invoker()
-    wrap_stub(stub, retry_invoker)
-    return channel, stub, retry_invoker
+    return client, retry_invoker

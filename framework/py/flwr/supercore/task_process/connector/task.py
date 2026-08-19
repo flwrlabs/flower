@@ -25,11 +25,11 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskMessageRequest,
     PushTaskMessageRequest,
 )
-from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
+from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_loads
@@ -43,7 +43,7 @@ from .registry import (
 
 
 def handle_task(
-    stub: RuntimeStub,
+    stub: RuntimeHttpClient,
     task_id: int,
     run_id: int,
 ) -> None:
@@ -114,12 +114,12 @@ def handle_task(
         raise RuntimeError(credential_failure_message)
 
 
-def _pull_connector_request(stub: RuntimeStub) -> ConnectorRequest:
+def _pull_connector_request(client: RuntimeHttpClient) -> ConnectorRequest:
     """Pull one connector request, waiting until it becomes available."""
     # Keep polling until flwr-agentapp produces a request. If it exits, cleanup
     # forces flwr-connector to stop, with auth handling revoked tokens.
     while True:
-        pull_response = stub.PullTaskMessage(PullTaskMessageRequest(limit=1))
+        pull_response = client.PullTaskMessage(PullTaskMessageRequest(limit=1))
         messages = [message_from_proto(message) for message in pull_response.messages]
         if messages:
             return ConnectorRequest.from_message(messages[0])

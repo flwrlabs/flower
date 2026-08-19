@@ -18,17 +18,14 @@
 from logging import DEBUG, WARNING
 from typing import cast
 
-import grpc
-
 from flwr.common.constant import SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
 from flwr.common.logger import log
-from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
-from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.interceptors import (
-    RuntimeTokenClientInterceptor,
-    RuntimeVersionClientInterceptor,
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
 )
-from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
+from flwr.supercore.retry import make_simple_http_retry_invoker
+from flwr.supercore.runtime import RuntimeHttpClient
 
 
 class SimulationIoConnection:
@@ -36,14 +33,14 @@ class SimulationIoConnection:
 
     Parameters
     ----------
-    runtime_api_address : str (default: "127.0.0.1:9091")
+    runtime_api_address : str (default: "127.0.0.1:8000")
         The address (URL, IPv6, IPv4) of the SuperLink Runtime API service.
     insecure : bool (default: False)
         If True, use plaintext (TLS disabled). If False, use TLS.
     root_certificates : Optional[bytes] (default: None)
         The PEM-encoded root certificates as a byte string.
         Used only when `insecure` is False. If provided, these certificates are
-        used to verify the server certificate. If None, gRPC default root
+        used to verify the server certificate. If None, system root
         certificates are used.
     token : str
         Executor token attached to all outgoing RPCs via metadata.
@@ -63,39 +60,36 @@ class SimulationIoConnection:
         self._insecure = insecure
         self._cert = root_certificates
         self._token = token
-        self._grpc_stub: RuntimeStub | None = None
-        self._channel: grpc.Channel | None = None
-        self._retry_invoker = make_simple_grpc_retry_invoker()
+        self._client: RuntimeHttpClient | None = None
+        self._retry_invoker = make_simple_http_retry_invoker()
 
     @property
     def _is_connected(self) -> bool:
         """Check if connected to the Runtime API server."""
-        return self._channel is not None
+        return self._client is not None
 
     @property
-    def _stub(self) -> RuntimeStub:
-        """Runtime API stub."""
+    def _stub(self) -> RuntimeHttpClient:
+        """Runtime API client."""
         if not self._is_connected:
             self._connect()
-        return cast(RuntimeStub, self._grpc_stub)
+        return cast(RuntimeHttpClient, self._client)
 
     def _connect(self) -> None:
         """Connect to the Runtime API."""
         if self._is_connected:
             log(WARNING, "Already connected")
             return
-        self._channel = create_channel(
+        self._client = RuntimeHttpClient.from_server_address(
             server_address=self._addr,
             insecure=self._insecure,
             root_certificates=self._cert,
             interceptors=[
-                RuntimeVersionClientInterceptor(component_name="flwr-simulation"),
-                RuntimeTokenClientInterceptor(token=self._token),
+                RuntimeVersionHttpInterceptor(component_name="flwr-simulation"),
+                RuntimeTokenHttpInterceptor(token=self._token),
             ],
+            retry_invoker=self._retry_invoker,
         )
-        self._channel.subscribe(on_channel_state_change)
-        self._grpc_stub = RuntimeStub(self._channel)
-        wrap_stub(self._grpc_stub, self._retry_invoker)
         log(DEBUG, "[Runtime] Connected to %s", self._addr)
 
     def _disconnect(self) -> None:
@@ -103,8 +97,7 @@ class SimulationIoConnection:
         if not self._is_connected:
             log(DEBUG, "Already disconnected")
             return
-        channel: grpc.Channel = self._channel
-        self._channel = None
-        self._grpc_stub = None
-        channel.close()
+        client = cast(RuntimeHttpClient, self._client)
+        self._client = None
+        client.close()
         log(DEBUG, "[Runtime] Disconnected")

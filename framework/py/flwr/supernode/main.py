@@ -26,11 +26,16 @@ from fastapi import FastAPI
 from flwr import __version__
 from flwr.common import log
 from flwr.supercore.error import http_error_translator
+from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
+from flwr.supernode.nodestate import NodeStateFactory
 from flwr.supernode.routers import runtime
 
 
-def create_app() -> FastAPI:
+def create_app(
+    state_factory: NodeStateFactory | None = None,
+    superexec_auth_secret: bytes | None = None,
+) -> FastAPI:
     """Create the SuperNode FastAPI app."""
 
     @asynccontextmanager
@@ -46,12 +51,16 @@ def create_app() -> FastAPI:
         redoc_url=None,
         lifespan=lifespan,
     )
+    fastapi_app.state.nodestate_factory = state_factory
+    fastapi_app.state.superexec_auth_secret = superexec_auth_secret
 
     # Core APIs
     fastapi_app.include_router(health.router)
 
     # SuperNode APIs
     fastapi_app.include_router(runtime.router)
+
+    fastapi_app.add_middleware(ProtobufTranslationMiddleware)
 
     # Apply the FlowerError translation layer last to make it outermost
     fastapi_app.middleware("http")(http_error_translator)
