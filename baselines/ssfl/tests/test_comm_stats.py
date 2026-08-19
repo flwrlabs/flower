@@ -7,9 +7,9 @@ import sys
 
 import torch
 
-from flwr.app import ArrayRecord, ConfigRecord
+from flwr.app import ArrayRecord, ConfigRecord, MetricRecord
 from ssfl.comm_stats import CommStats
-from ssfl.server_app import _append_jsonl, _reset_jsonl
+from ssfl.server_app import _append_jsonl, _build_train_record, _reset_jsonl
 from ssfl.strategy import SSFLStrategy
 from ssfl.wandb_utils import WandbSession
 
@@ -78,6 +78,38 @@ def test_wandb_log_forwards_commit(monkeypatch):
     session._run = object()
     session.log({"a": 1.0}, step=0, commit=False)
     assert calls == [({"a": 1.0}, {"step": 0, "commit": False})]
+
+
+def test_build_train_record_includes_payload_metrics():
+    record = _build_train_record(
+        7,
+        {"train_loss": 0.5, "learning_rate": 0.1, "arrayrecord_payload_bytes": 12},
+        downlink_bytes=40,
+    )
+    assert record["event"] == "train"
+    assert record["server_round"] == 7
+    assert record["comm/train_downlink_payload_bytes"] == 40.0
+    assert record["train/train_loss"] == 0.5
+    assert record["train/arrayrecord_payload_bytes"] == 12.0
+
+
+def test_aggregate_train_notifies_round_callback(monkeypatch):
+    seen: list[int] = []
+    metrics = MetricRecord({"train_loss": 1.0, "num-examples": 2})
+    strategy = SSFLStrategy(
+        node_to_client_id={10: 0},
+        on_train_round=lambda server_round, _metrics: seen.append(server_round),
+        fraction_train=1.0,
+        min_train_nodes=1,
+    )
+    monkeypatch.setattr(
+        "ssfl.strategy.FedAvg.aggregate_train",
+        lambda self, server_round, replies: (None, metrics),
+    )
+    arrays, got = strategy.aggregate_train(3, [])
+    assert arrays is None
+    assert got is metrics
+    assert seen == [3]
 
 
 def test_metrics_jsonl_is_replaced_on_reset(tmp_path):

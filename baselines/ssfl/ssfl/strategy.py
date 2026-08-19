@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from logging import INFO
 from typing import Optional
 
@@ -36,6 +36,7 @@ class SSFLStrategy(FedAvg):
         mask_version: str = "",
         sample_seed: int = 550,
         transport: str = "dense",
+        on_train_round: Callable[[int, MetricRecord], None] | None = None,
         **kwargs,
     ) -> None:
         kwargs.setdefault("train_metrics_aggr_fn", aggregate_train_metrics)
@@ -48,6 +49,7 @@ class SSFLStrategy(FedAvg):
         if transport not in {"dense", "sparse"}:
             raise ValueError(f"Unsupported transport: {transport}")
         self.transport = transport
+        self.on_train_round = on_train_round
         self.train_downlink_payload_bytes = 0
         self.train_downlink_by_round: dict[int, int] = {}
 
@@ -134,6 +136,8 @@ class SSFLStrategy(FedAvg):
                 reply.content[self.arrayrecord_key] = ArrayRecord(dense)
 
         arrays, metrics = super().aggregate_train(server_round, reply_list)
+        if metrics is not None and self.on_train_round is not None:
+            self.on_train_round(server_round, metrics)
         if arrays is None or self.masks is None:
             return arrays, metrics
 

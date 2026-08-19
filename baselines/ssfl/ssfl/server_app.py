@@ -225,6 +225,23 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     )
 
 
+def _build_train_record(
+    server_round: int,
+    round_metrics: dict[str, Any],
+    downlink_bytes: int,
+) -> dict[str, Any]:
+    """Build a per-round training record for JSONL and W&B."""
+    return {
+        "event": "train",
+        "server_round": int(server_round),
+        "comm/train_downlink_payload_bytes": float(downlink_bytes),
+        **{
+            f"train/{key}": (float(value) if isinstance(value, (int, float)) else value)
+            for key, value in round_metrics.items()
+        },
+    }
+
+
 @app.main()
 def main(grid: Grid, context: Context) -> None:
     """Run SSFL mask discovery and federated training."""
@@ -364,12 +381,27 @@ def main(grid: Grid, context: Context) -> None:
     # For paper-scale frac=0.1 with 100 clients, require at least 2 train nodes,
     # but prefer the natural sample size from fraction_train.
     min_train = 2 if num_clients >= 2 else 1
+
+    def _on_train_round(server_round: int, metrics: MetricRecord) -> None:
+        train_record = _build_train_record(
+            server_round,
+            dict(metrics),
+            strategy.train_downlink_by_round.get(int(server_round), 0),
+        )
+        # Keep the step open when centralized eval will also log this round.
+        will_eval = evaluate_every > 0 and int(server_round) % evaluate_every == 0
+        wandb_session.log(train_record, step=int(server_round), commit=not will_eval)
+        if save_metrics:
+            metrics_history.append(train_record)
+            _append_jsonl(checkpoint_dir / "metrics.jsonl", train_record)
+
     strategy = SSFLStrategy(
         node_to_client_id=node_to_client,
         masks=masks,
         mask_version=digest,
         sample_seed=seed,
         transport=transport,
+        on_train_round=_on_train_round,
         fraction_train=float(cfg["fraction-train"]),
         fraction_evaluate=float(cfg["fraction-evaluate"]),
         min_train_nodes=min_train,
@@ -440,29 +472,13 @@ def main(grid: Grid, context: Context) -> None:
 
     # Aggregate reported training traffic from strategy metrics when present.
     comm.train_downlink_payload_bytes = int(strategy.train_downlink_payload_bytes)
-    for round_idx, round_metrics in sorted(result.train_metrics_clientapp.items()):
+    for _round_idx, round_metrics in sorted(result.train_metrics_clientapp.items()):
         if "arrayrecord_payload_bytes" in round_metrics:
             comm.train_uplink_payload_bytes += int(
                 _metric_float(round_metrics["arrayrecord_payload_bytes"])
             )
         if "comm_params" in round_metrics:
             comm.train_comm_params += int(_metric_float(round_metrics["comm_params"]))
-        if save_metrics:
-            train_record = {
-                "event": "train",
-                "server_round": int(round_idx),
-                "comm/train_downlink_payload_bytes": float(
-                    strategy.train_downlink_by_round.get(int(round_idx), 0)
-                ),
-                **{
-                    f"train/{key}": (
-                        float(value) if isinstance(value, (int, float)) else value
-                    )
-                    for key, value in dict(round_metrics).items()
-                },
-            }
-            metrics_history.append(train_record)
-            _append_jsonl(checkpoint_dir / "metrics.jsonl", train_record)
 
     for line in comm.summary_lines():
         log(INFO, "%s", line)
