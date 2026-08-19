@@ -111,7 +111,7 @@ class ConsoleHandler(StreamHandler):
 
     def format(self, record: LogRecord) -> str:
         """Format function that adds colors to log level."""
-        seperator = " " * (8 - len(record.levelname))
+        separator = " " * (8 - len(record.levelname))
         if self.json:
             log_fmt = "{lvl='%(levelname)s', time='%(asctime)s', msg='%(message)s'}"
         else:
@@ -119,7 +119,7 @@ class ConsoleHandler(StreamHandler):
                 f"{LOG_COLORS[record.levelname] if self.colored else ''}"
                 f"%(levelname)s {'%(asctime)s' if self.timestamps else ''}"
                 f"{LOG_COLORS['RESET'] if self.colored else ''}"
-                f": {seperator} %(message)s"
+                f": {separator} %(message)s"
             )
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
