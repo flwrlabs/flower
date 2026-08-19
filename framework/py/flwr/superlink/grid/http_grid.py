@@ -104,7 +104,7 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
 
     Parameters
     ----------
-    runtime_api_address : str (default: "127.0.0.1:9091")
+    runtime_api_address : str (default: "127.0.0.1:8000")
         The address (URL, IPv6, IPv4) of the SuperLink Runtime API service.
     insecure : bool (default: False)
         If True, use plaintext (TLS disabled). If False, use TLS.
