@@ -100,18 +100,27 @@ request = {
     "tool_choice": "auto",
     "stream": False,
 }
+allowed_tool_names = {
+    tool["name"] for tool in tools if isinstance(tool.get("name"), str)
+}
 
 for _ in range(3):
     response = agent.responses.create(request)
-    tool_calls = [
+    response_output = [
         dict(item)
         for item in response.get("output", [])
-        if isinstance(item, dict) and item.get("type") == "function_call"
+        if isinstance(item, dict)
+    ]
+    tool_calls = [
+        item for item in response_output if item.get("type") == "function_call"
     ]
     if not tool_calls:
         break
+    for tool_call in tool_calls:
+        if tool_call.get("name") not in allowed_tool_names:
+            raise RuntimeError(f"Tool {tool_call.get('name')!r} was not exposed")
     outputs = [agent.connectors.call(item) for item in tool_calls]
-    request["input"] = [*request["input"], *tool_calls, *outputs]
+    request["input"] = [*request["input"], *response_output, *outputs]
 
 agent.responses.create(
     {
@@ -122,6 +131,9 @@ agent.responses.create(
 )
 ```
 
+The app checks every function name against the exposed tool schemas before
+calling a connector. It also keeps the complete model output next to the
+connector results, which preserves the context needed by the next model request.
 The final request does not include tools, so the model must produce an answer
 after consuming the available connector outputs. This abbreviated loop omits
 recovery and conversation-state handling. Use the complete [collaborative
