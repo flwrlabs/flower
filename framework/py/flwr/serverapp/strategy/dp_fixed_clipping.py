@@ -390,6 +390,8 @@ class DifferentialPrivacyServerSideFixedClipping(DifferentialPrivacyFixedClippin
         aggregated_arrays, aggregated_metrics = self.strategy.aggregate_train(
             server_round, replies_list
         )
+        if self.accountant is not None:
+            aggregated_metrics = None
 
         # Add Gaussian noise to the aggregated arrays
         if aggregated_arrays:
@@ -482,6 +484,8 @@ class DifferentialPrivacyClientSideFixedClipping(DifferentialPrivacyFixedClippin
         aggregated_arrays, aggregated_metrics = self.strategy.aggregate_train(
             server_round, replies_list
         )
+        if self.accountant is not None:
+            aggregated_metrics = None
 
         # Add Gaussian noise to the aggregated arrays
         if aggregated_arrays:

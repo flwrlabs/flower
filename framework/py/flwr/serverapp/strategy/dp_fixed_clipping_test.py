@@ -107,9 +107,10 @@ def test_successful_release_is_accounted_once(
 
     replies = [_reply(1.0, 1.0), _reply(3.0, 1.0)]
     with patch("flwr.serverapp.strategy.dp_fixed_clipping.add_gaussian_noise_inplace"):
-        arrays, _ = wrapper.aggregate_train(1, replies)
+        arrays, metrics = wrapper.aggregate_train(1, replies)
 
     assert arrays is not None
+    assert metrics is None
     np.testing.assert_allclose(arrays.to_numpy_ndarrays()[0], np.array([2.0]))
     event = accountant.compose.call_args.args[0]
     assert event == GaussianPrivacyEvent(1.0, 2, 2)
