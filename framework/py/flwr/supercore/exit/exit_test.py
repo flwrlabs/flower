@@ -15,11 +15,11 @@
 """Tests for the exit function."""
 
 
-from unittest.mock import ANY, Mock, call, patch
+from unittest.mock import patch
 
 from parameterized import parameterized
 
-from .exit import _get_code_url, flwr_exit
+from .exit import _get_code_url
 
 
 @parameterized.expand(  # type: ignore
