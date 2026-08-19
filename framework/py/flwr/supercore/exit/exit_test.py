@@ -15,11 +15,11 @@
 """Tests for the exit function."""
 
 
-from unittest.mock import patch
+from unittest.mock import ANY, Mock, call, patch
 
 from parameterized import parameterized
 
-from .exit import _get_code_url
+from .exit import _get_code_url, flwr_exit
 
 
 @parameterized.expand(  # type: ignore
@@ -39,3 +39,29 @@ def test_get_code_url(version: str, subdir: str) -> None:
             expected_url = "https://flower.ai/docs/framework/"
             expected_url += f"{subdir}ref-exit-codes/{code}.html"
             assert actual_url == expected_url
+
+
+def test_flwr_exit_starts_force_exit_timer_between_handler_phases() -> None:
+    """Test that the force-exit timer starts between handler phases."""
+    operations = Mock()
+
+    with (
+        patch("flwr.supercore.exit.exit.trigger_exit_handlers") as trigger_handlers,
+        patch("flwr.supercore.exit.exit.threading.Thread") as thread,
+        patch(
+            "flwr.supercore.exit.exit._try_obtain_telemetry_event", return_value=None
+        ),
+        patch("flwr.supercore.exit.exit.log"),
+        patch("flwr.supercore.exit.exit.sys.exit"),
+    ):
+        operations.attach_mock(trigger_handlers, "trigger_handlers")
+        operations.attach_mock(thread, "thread")
+
+        flwr_exit(0)
+
+    assert operations.mock_calls == [
+        call.trigger_handlers(run_before_force_exit=True),
+        call.thread(target=ANY, daemon=True),
+        call.thread().start(),
+        call.trigger_handlers(run_before_force_exit=False),
+    ]
