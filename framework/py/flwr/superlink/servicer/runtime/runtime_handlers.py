@@ -21,7 +21,6 @@ from logging import DEBUG, ERROR, INFO
 
 from flwr.app import Message
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
-from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -63,6 +62,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.utils.validator import validate_message
+from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError

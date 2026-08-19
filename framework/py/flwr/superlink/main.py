@@ -28,7 +28,7 @@ from fastapi.routing import APIRoute, iter_route_contexts
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from flwr.common import log
+from flwr.supercore import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import http_error_translator
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware

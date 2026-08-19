@@ -18,7 +18,7 @@
 from logging import DEBUG
 from threading import Lock
 
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import FederationManager

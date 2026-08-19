@@ -39,7 +39,6 @@ from sqlalchemy.orm import aliased
 
 from flwr.app import Message
 from flwr.app.user_config import UserConfig
-from flwr.common import log
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
@@ -55,6 +54,7 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.utils.validator import validate_message
+from flwr.supercore import log
 from flwr.supercore.constant import NodeStatus, TaskType
 from flwr.supercore.corestate.sql_corestate import SqlCoreState
 from flwr.supercore.corestate.utils import timestamp_to_iso

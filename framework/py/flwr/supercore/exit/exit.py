@@ -23,7 +23,7 @@ import time
 from logging import ERROR, INFO
 from typing import Any, NoReturn
 
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.constant import (
     FORCE_EXIT_TIMEOUT_SECONDS,
     TELEMETRY_TIMEOUT_SECONDS,

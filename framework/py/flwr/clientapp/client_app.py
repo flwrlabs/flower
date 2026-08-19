@@ -27,8 +27,8 @@ from flwr.client.message_handler.message_handler import (
     handle_legacy_message_from_msgtype,
 )
 from flwr.client.mod.utils import make_ffn
-from flwr.common.logger import warn_deprecated_feature
 from flwr.compat.client.client import Client
+from flwr.supercore.logger import warn_deprecated_feature
 
 from .typing import ClientAppCallable, Mod
 

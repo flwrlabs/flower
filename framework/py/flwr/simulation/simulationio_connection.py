@@ -21,8 +21,8 @@ from typing import cast
 import grpc
 
 from flwr.common.constant import SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
-from flwr.common.logger import log
 from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.interceptors import (
     RuntimeTokenClientInterceptor,

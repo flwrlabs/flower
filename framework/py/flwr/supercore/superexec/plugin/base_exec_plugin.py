@@ -20,8 +20,8 @@ from logging import ERROR
 from typing import ClassVar
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
-from flwr.common.logger import log
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.constant import TaskType
 from flwr.supercore.run import Run
 from flwr.supercore.superexec.executor import ExecutionSpec, Executor, LaunchResult

@@ -28,9 +28,9 @@ from flwr.cli.constant import FEDERATION_CONFIG_HELP_MESSAGE
 from flwr.cli.flower_config import read_superlink_connection
 from flwr.cli.typing import SuperLinkConnection
 from flwr.common.constant import CONN_RECONNECT_INTERVAL, CONN_REFRESH_PERIOD
-from flwr.common.logger import log as logger
 from flwr.proto.control_pb2 import StreamLogsRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore import log as logger
 
 from .utils import flwr_cli_grpc_exc_handler, init_channel_from_connection
 

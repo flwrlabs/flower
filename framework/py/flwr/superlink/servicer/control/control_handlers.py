@@ -45,7 +45,6 @@ from flwr.common.constant import (
     TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
 )
-from flwr.common.logger import log
 from flwr.common.serde import (
     context_to_proto,
     run_status_to_proto,
@@ -128,6 +127,7 @@ from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
+from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,

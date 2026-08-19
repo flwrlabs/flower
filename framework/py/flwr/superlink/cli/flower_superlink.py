@@ -46,7 +46,6 @@ from flwr.common.constant import (
     ExecPluginType,
 )
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.common.logger import configure_superlink_log_file, log
 from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
     add_FleetServicer_to_server,
 )
@@ -60,6 +59,7 @@ from flwr.server.superlink.fleet.grpc_rere.node_auth_server_interceptor import (
     NodeAuthServerInterceptor,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore import log
 from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
@@ -77,6 +77,7 @@ from flwr.supercore.interceptors import (
     RpcErrorTranslationServerInterceptor,
     create_fleet_runtime_version_server_interceptor,
 )
+from flwr.supercore.logger import configure_superlink_log_file
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import (
