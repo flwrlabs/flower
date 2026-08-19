@@ -47,10 +47,12 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import try_obtain_optional_runtime_server_certificates
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
+from flwr.supernode.nodestate import NodeStateFactory
 from flwr.supernode.start_client_internal import start_client_internal
 
 
@@ -152,7 +154,10 @@ def flower_supernode() -> None:
 
     log(DEBUG, "Isolation mode: %s", config.isolation)
 
+    objectstore_factory = ObjectStoreFactory()
+    state_factory = NodeStateFactory(objectstore_factory=objectstore_factory)
     start_client_internal(
+        state_factory=state_factory,
         server_address=config.server_address,
         transport=config.transport,
         root_certificates=config.root_certificates,
