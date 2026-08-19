@@ -22,13 +22,13 @@ from logging import DEBUG, ERROR
 import grpc
 
 from flwr.common.constant import SubStatus
-from flwr.common.logger import log
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushTaskOutputRequest,
 )
 from flwr.proto.runtime_pb2_grpc import RuntimeStub
+from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc import create_channel, on_channel_state_change

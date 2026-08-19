@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.sql.dml import Insert
 
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_SQLITE_DB_URL,
     SQL_ALLOWED_DIALECTS,

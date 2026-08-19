@@ -32,14 +32,7 @@ from flwr.app import Context, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.cli.utils import get_sha256_hash
 from flwr.clientapp import ClientApp
-from flwr.common import log
 from flwr.common.constant import RUN_ID_NUM_BYTES, TASK_ID_NUM_BYTES
-from flwr.common.logger import (
-    set_logger_propagation,
-    update_console_handler,
-    warn_deprecated_feature,
-    warn_deprecated_feature_with_example,
-)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.run_serverapp import run as _run
 from flwr.server.superlink.fleet import vce
@@ -52,12 +45,19 @@ from flwr.serverapp import Grid, ServerApp
 from flwr.simulation.ray_transport.utils import (
     enable_tf_gpu_growth as enable_gpu_growth,
 )
+from flwr.supercore import log
 from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit
+from flwr.supercore.logger import (
+    set_logger_propagation,
+    update_console_handler,
+    warn_deprecated_feature,
+    warn_deprecated_feature_with_example,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.run import Run
 from flwr.supercore.telemetry import EventType, event

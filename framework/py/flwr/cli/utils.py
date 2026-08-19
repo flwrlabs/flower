@@ -35,7 +35,6 @@ from rich.console import Console
 
 from flwr.cli.typing import SuperLinkConnection
 from flwr.common.constant import AuthnType, CliOutputFormat
-from flwr.common.logger import print_json_error, redirect_output, restore_output
 from flwr.proto.control_pb2_grpc import ControlStub  # pylint: disable=E0611
 from flwr.supercore.constant import (
     APP_PUBLISH_EXCLUDE_PATTERNS,
@@ -51,6 +50,7 @@ from flwr.supercore.grpc import (
     on_channel_state_change,
 )
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
+from flwr.supercore.logger import print_json_error, redirect_output, restore_output
 from flwr.supercore.utils import is_valid_name
 
 from .auth_plugin import CliAuthPlugin, get_cli_plugin_class

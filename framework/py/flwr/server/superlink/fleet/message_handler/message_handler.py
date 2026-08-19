@@ -17,7 +17,6 @@
 from logging import ERROR
 
 from flwr.app import Message
-from flwr.common import log
 from flwr.common.constant import (
     HEARTBEAT_MAX_INTERVAL,
     HEARTBEAT_MIN_INTERVAL,
@@ -62,6 +61,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.utils import check_abort
+from flwr.supercore import log
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
 from flwr.supercore.run import InvalidRunStatusException, Run
 

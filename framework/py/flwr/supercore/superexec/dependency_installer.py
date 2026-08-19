@@ -26,7 +26,7 @@ from logging import DEBUG, ERROR, INFO, WARNING
 from pathlib import Path
 
 from flwr.common.config import get_project_config
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.exit import add_exit_handler
 from flwr.supercore.utils import get_flwr_home
 
