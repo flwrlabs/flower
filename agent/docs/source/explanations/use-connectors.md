@@ -112,11 +112,21 @@ for _ in range(3):
         break
     outputs = [agent.connectors.call(item) for item in tool_calls]
     request["input"] = [*request["input"], *tool_calls, *outputs]
+
+agent.responses.create(
+    {
+        "model": request["model"],
+        "input": request["input"],
+        "stream": True,
+    }
+)
 ```
 
-This abbreviated loop omits recovery and conversation-state handling. Use the
-complete [collaborative research agent](../tutorials/build-a-collaborative-agent.md)
-for copy/pasteable code.
+The final request does not include tools, so the model must produce an answer
+after consuming the available connector outputs. This abbreviated loop omits
+recovery and conversation-state handling. Use the complete [collaborative
+research agent](../tutorials/build-a-collaborative-agent.md) for copy/pasteable
+code.
 
 ## Handle failure deliberately
 
