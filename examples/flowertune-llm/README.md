@@ -178,14 +178,54 @@ For script-template parameterization (matching job-template workflows), these ke
 - `output_layers_dir` -> `output_layers_dir`
 - `dcp_conversion_command` -> `dcp_conversion_command`
 - `dcp_to_layers_command` -> `dcp_to_layers_command`
+- `dcp_conversion_on_client` -> `dcp_conversion_on_client`
 - `conversion_profile_path` -> `conversion_profile_path`
 - `flowertune_llm_root` -> `flowertune_llm_root`
 
-When using `trainer.backend=torchtitan` with layerwise DCP enabled, the
-generated Slurm/Flux templates run both DCP conversions inside the training
-job. Custom scheduler templates must include the same conversion blocks and
-invoke `dcp_conversion_command` before creating the `step-0` symlink, then
-invoke `dcp_to_layers_command` before moving the final checkpoint to
+When using `trainer.backend=torchtitan` with layerwise DCP enabled, conversion
+location is controlled by `trainer.torchtitan.dcp-convert-on-client`:
+
+| `trainer.torchtitan.dcp-enabled` | `trainer.torchtitan.dcp-convert-on-client` | Conversion location |
+| --- | --- | --- |
+| `false` | `false` | No DCP conversion; the legacy full-state `.pt` path is used. |
+| `false` | `true` | Invalid; client-side conversion requires DCP to be enabled. |
+| `true` | `false` | HPC job, which keeps ClientApp memory lower. |
+| `true` | `true` | ClientApp, which is simpler for smaller models but uses more client memory. |
+
+The conversion-location option affects the layerwise DCP path. For
+`aggregation.mode='all_at_once'`, enabling DCP already performs conversion in
+the ClientApp.
+
+For the low-memory layerwise path, use these arguments together:
+
+```text
+trainer.backend='torchtitan'
+aggregation.mode='layerwise'
+trainer.torchtitan.dcp-enabled=true
+trainer.torchtitan.dcp-convert-on-client=false
+```
+
+For client-side conversion, use:
+
+```text
+trainer.backend='torchtitan'
+aggregation.mode='layerwise'
+trainer.torchtitan.dcp-enabled=true
+trainer.torchtitan.dcp-convert-on-client=true
+```
+
+With client-side conversion, the ClientApp converts layer files to DCP before
+launching the job and converts the final DCP checkpoint back to layer files
+after the job completes. The generated Slurm/Flux templates skip their
+conversion commands and only set up the `step-0` link and move the final DCP
+checkpoint. Custom scheduler templates can use the same handoff paths without
+including conversion commands.
+
+With the default `false` value, the generated Slurm/Flux templates run both
+DCP conversions inside the training job. Custom scheduler templates using
+job-side conversion must include the same conversion blocks and invoke
+`dcp_conversion_command` before creating the `step-0` symlink, then invoke
+`dcp_to_layers_command` before moving the final checkpoint to
 `FLWR_TORCHTITAN_OUTPUT_DCP_DIR`.
 The generated templates also export `FLWR_TORCHTITAN_CONVERSION_PROFILE`; the
 conversion worker writes JSONL phase telemetry there, and the ClientApp reports

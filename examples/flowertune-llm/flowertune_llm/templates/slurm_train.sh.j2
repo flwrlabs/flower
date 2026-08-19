@@ -20,6 +20,7 @@ export FLWR_TORCHTITAN_DCP_CONVERSION_DIR="{{ dcp_conversion_dir }}"
 export FLWR_TORCHTITAN_OUTPUT_LAYERS_DIR="{{ output_layers_dir }}"
 export FLWR_TORCHTITAN_OUTPUT_LAYERS_READY="{{ output_layers_ready }}"
 export FLWR_TORCHTITAN_CONVERSION_PROFILE="{{ conversion_profile_path }}"
+export FLWR_TORCHTITAN_DCP_CONVERT_ON_CLIENT="{{ dcp_conversion_on_client }}"
 export FLWR_FLOWERTUNE_LLM_ROOT="{{ flowertune_llm_root }}"
 export PYTHONPATH="${FLWR_FLOWERTUNE_LLM_ROOT}:${PYTHONPATH:-}"
 export FLWR_RUN_ID="{{ run_id }}"
@@ -36,7 +37,7 @@ export FLWR_NUM_NODES="{{ num_nodes }}"
 export FLWR_TORCHTITAN_CONFIG_FILENAME="{{ config_filename }}"
 export FLWR_TORCHTITAN_CONFIG_PATH="{{ torchtitan_config_path }}"
 
-if [ -n "${FLWR_TORCHTITAN_INPUT_LAYERS_DIR}" ] && [ ! -d "${FLWR_TORCHTITAN_INPUT_DCP_DIR}" ]; then
+if [ "${FLWR_TORCHTITAN_DCP_CONVERT_ON_CLIENT}" != "true" ] && [ -n "${FLWR_TORCHTITAN_INPUT_LAYERS_DIR}" ] && [ ! -d "${FLWR_TORCHTITAN_INPUT_DCP_DIR}" ]; then
   {{ dcp_conversion_command }}
   if [ ! -d "${FLWR_TORCHTITAN_DCP_CONVERSION_DIR}" ]; then
     echo "Layer-file to DCP conversion did not produce ${FLWR_TORCHTITAN_DCP_CONVERSION_DIR}" >&2
@@ -62,7 +63,7 @@ if [ -d "${FLWR_TORCHTITAN_INPUT_DCP_DIR}" ]; then
     echo "Expected TorchTitan DCP checkpoint not found: ${FLWR_TORCHTITAN_FINAL_DCP_DIR}" >&2
     exit 1
   fi
-  if [ -n "${FLWR_TORCHTITAN_OUTPUT_LAYERS_DIR}" ]; then
+  if [ "${FLWR_TORCHTITAN_DCP_CONVERT_ON_CLIENT}" != "true" ] && [ -n "${FLWR_TORCHTITAN_OUTPUT_LAYERS_DIR}" ]; then
     {{ dcp_to_layers_command }}
   fi
   mv "${FLWR_TORCHTITAN_FINAL_DCP_DIR}" "${FLWR_TORCHTITAN_OUTPUT_DCP_DIR}"

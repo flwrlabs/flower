@@ -163,6 +163,94 @@ def test_layerwise_dcp_dry_run_renders_job_side_conversion(tmp_path) -> None:
     assert "FLWR_TORCHTITAN_CONVERSION_PROFILE" in script_text
     assert str(layer_directory / "torchtitan_conversion_profile.jsonl") in script_text
 
+    context.run_config["trainer.torchtitan.dcp-convert-on-client"] = True
+    task_module.run_torchtitan_training(
+        cfg,
+        context,
+        None,
+        layer_paths=[str(layer_path)],
+        output_layer_dir=str(layer_directory),
+    )
+    client_script_text = script.read_text(encoding="utf-8")
+    assert 'FLWR_TORCHTITAN_DCP_CONVERT_ON_CLIENT="true"' in client_script_text
+    assert "flowertune_llm.dcp_converter" not in client_script_text
+
+
+def test_layerwise_dcp_client_conversion_runs_outside_job(
+    tmp_path, monkeypatch
+) -> None:
+    """Client-side conversion should leave the job with only DCP handoff."""
+    layer_directory = tmp_path / "layers" / "10" / "20"
+    layer_directory.mkdir(parents=True)
+    layer_path = layer_directory / "layer.a.pt"
+    _write_layer_file(layer_path, "layer.a", torch.ones(2))
+    context = Context(
+        run_id=10,
+        node_id=20,
+        node_config={},
+        state=RecordDict(),
+        run_config={
+            "aggregation.layer-write-dir": str(tmp_path / "layers"),
+            "client.workspace": str(tmp_path / "workspace"),
+            "client.train-steps": 5,
+            "model.name": "test/model",
+            "trainer.backend": "torchtitan",
+            "trainer.python-exec": "python",
+            "trainer.torchtitan.dcp-enabled": True,
+            "trainer.torchtitan.dcp-convert-on-client": True,
+            "scheduler.backend": "local",
+        },
+    )
+    cfg = types.SimpleNamespace(
+        trainer=types.SimpleNamespace(
+            torchtitan=types.SimpleNamespace(command="true", workdir="")
+        )
+    )
+    phases: list[str] = []
+
+    def fake_to_dcp(input_dir, output_dir, **_kwargs) -> None:
+        phases.append("to_dcp")
+        assert input_dir == str(layer_directory)
+        os.makedirs(output_dir, exist_ok=True)
+        Path(output_dir, "__0_0.distcp").write_bytes(b"input")
+
+    def fake_to_layers(input_dir, _reference_dir, output_dir, **kwargs) -> None:
+        phases.append("to_layers")
+        assert os.path.isdir(input_dir)
+        os.makedirs(output_dir, exist_ok=True)
+        Path(output_dir, "layer.a.pt").write_bytes(layer_path.read_bytes())
+        Path(kwargs["ready_marker"]).write_text("ready\n", encoding="utf-8")
+
+    def fake_run(*args, **kwargs):
+        env = kwargs["env"]
+        assert env["FLWR_TORCHTITAN_DCP_CONVERT_ON_CLIENT"] == "true"
+        assert os.path.isdir(env["FLWR_TORCHTITAN_INPUT_DCP_DIR"])
+        output_dir = env["FLWR_TORCHTITAN_OUTPUT_DCP_DIR"]
+        os.makedirs(output_dir, exist_ok=True)
+        Path(output_dir, "__0_0.distcp").write_bytes(b"output")
+        return subprocess.CompletedProcess(
+            args=args[0], returncode=0, stdout="", stderr=""
+        )
+
+    monkeypatch.setattr(task_module, "convert_layer_directory_to_dcp", fake_to_dcp)
+    monkeypatch.setattr(task_module, "convert_dcp_to_layer_directory", fake_to_layers)
+    monkeypatch.setattr(task_module.subprocess, "run", fake_run)
+
+    result = task_module.run_torchtitan_training(
+        cfg,
+        context,
+        None,
+        server_round=1,
+        layer_paths=[str(layer_path)],
+        output_layer_dir=str(layer_directory),
+    )
+
+    assert result is None
+    assert phases == ["to_dcp", "to_layers"]
+    assert not os.path.lexists(layer_directory / "torchtitan" / "input_state.dcp")
+    assert not os.path.lexists(layer_directory / "torchtitan" / "output_state.dcp")
+    assert not (layer_directory / "torchtitan").exists()
+
 
 def test_dcp_converter_records_phase_profile(tmp_path, monkeypatch) -> None:
     """The job-side converter records duration and peak RSS telemetry."""

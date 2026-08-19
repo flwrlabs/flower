@@ -6,10 +6,13 @@ import json
 import os
 import pickle
 import re
+import resource
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import TYPE_CHECKING, Any
@@ -128,6 +131,64 @@ def read_conversion_profile(profile_path: str) -> dict[str, float]:
     return metrics
 
 
+def _max_rss_mb() -> float:
+    """Return this process's peak resident memory in MiB."""
+    max_rss = float(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    if sys.platform == "darwin":
+        return max_rss / (1024**2)
+    return max_rss / 1024.0
+
+
+def _append_conversion_profile_event(
+    profile_path: str, event: dict[str, Any]
+) -> None:
+    """Append one client-side conversion event when profiling is enabled."""
+    if not profile_path:
+        return
+    os.makedirs(os.path.dirname(profile_path) or ".", exist_ok=True)
+    with open(profile_path, "a", encoding="utf-8") as file:
+        file.write(json.dumps(event, sort_keys=True) + "\n")
+
+
+def run_profiled_conversion(
+    profile_path: str, phase: str, function: Any
+) -> None:
+    """Run a conversion phase and persist duration/peak-RSS telemetry."""
+    started_at = time.time() * 1000.0
+    started = time.perf_counter()
+    _append_conversion_profile_event(
+        profile_path,
+        {"event": "start", "phase": phase, "timestamp_ms": started_at},
+    )
+    try:
+        function()
+    except Exception as error:
+        _append_conversion_profile_event(
+            profile_path,
+            {
+                "event": "end",
+                "phase": phase,
+                "timestamp_ms": time.time() * 1000.0,
+                "duration_ms": (time.perf_counter() - started) * 1000.0,
+                "max_rss_mb": _max_rss_mb(),
+                "success": False,
+                "error": str(error),
+            },
+        )
+        raise
+    _append_conversion_profile_event(
+        profile_path,
+        {
+            "event": "end",
+            "phase": phase,
+            "timestamp_ms": time.time() * 1000.0,
+            "duration_ms": (time.perf_counter() - started) * 1000.0,
+            "max_rss_mb": _max_rss_mb(),
+            "success": True,
+        },
+    )
+
+
 def training_disabled(context: Context) -> bool:
     """Return whether client-side training should be skipped."""
     return _as_bool(_config_value(context, "train.disable", False), default=False)
@@ -140,6 +201,22 @@ def torchtitan_dcp_enabled(context: Context) -> bool:
             context,
             "trainer.torchtitan.dcp-enabled",
             _config_value(context, "trainer.torchtitan.dcp_enabled", False),
+        ),
+        default=False,
+    )
+
+
+def torchtitan_dcp_conversion_on_client(context: Context) -> bool:
+    """Return whether layerwise DCP conversion should run in the ClientApp."""
+    return _as_bool(
+        _config_value(
+            context,
+            "trainer.torchtitan.dcp-convert-on-client",
+            _config_value(
+                context,
+                "trainer.torchtitan.dcp_convert_on_client",
+                False,
+            ),
         ),
         default=False,
     )
@@ -891,7 +968,14 @@ def run_torchtitan_training(
         ),
         default=False,
     )
+    dcp_convert_on_client = torchtitan_dcp_conversion_on_client(context)
+    if dcp_convert_on_client and not dcp_enabled:
+        raise ValueError(
+            "trainer.torchtitan.dcp-convert-on-client=true requires "
+            "trainer.torchtitan.dcp-enabled=true"
+        )
     layerwise_dcp = dcp_enabled and layer_paths is not None
+    client_layerwise_conversion = layerwise_dcp and dcp_convert_on_client
     dcp_train_spec = str(
         _config_value(
             context,
@@ -1028,6 +1112,9 @@ def run_torchtitan_training(
         "FLWR_TORCHTITAN_OUTPUT_LAYERS_DIR": output_layer_dir,
         "FLWR_TORCHTITAN_OUTPUT_LAYERS_READY": output_layers_ready,
         "FLWR_TORCHTITAN_CONVERSION_PROFILE": conversion_profile_path,
+        "FLWR_TORCHTITAN_DCP_CONVERT_ON_CLIENT": str(
+            client_layerwise_conversion
+        ).lower(),
         "FLWR_FLOWERTUNE_LLM_ROOT": FLOWERTUNE_LLM_ROOT,
         "FLWR_RUN_ID": str(context.run_id),
         "FLWR_NODE_ID": str(context.node_id),
@@ -1045,7 +1132,7 @@ def run_torchtitan_training(
 
     dcp_conversion_command = ""
     dcp_to_layers_command = ""
-    if layerwise_dcp:
+    if layerwise_dcp and not client_layerwise_conversion:
         dcp_conversion_command = _python_module_command(
             python_exec,
             "flowertune_llm.dcp_converter",
@@ -1117,6 +1204,7 @@ def run_torchtitan_training(
         "flowertune_llm_root": FLOWERTUNE_LLM_ROOT,
         "dcp_conversion_command": dcp_conversion_command,
         "dcp_to_layers_command": dcp_to_layers_command,
+        "dcp_conversion_on_client": str(client_layerwise_conversion).lower(),
         "work_dir": output_dir,
         "client_workspace": client_workspace,
         "dump_folder": dump_folder,
@@ -1263,6 +1351,20 @@ def run_torchtitan_training(
             _replace_symlink(input_dcp_dir, dcp_cache_dir)
         else:
             _remove_path(conversion_dir)
+            if client_layerwise_conversion:
+                run_profiled_conversion(
+                    conversion_profile_path,
+                    "to_dcp",
+                    lambda: convert_layer_directory_to_dcp(
+                        input_layer_dir,
+                        conversion_dir,
+                        train_spec_name=dcp_train_spec,
+                        model_args_key=dcp_model_args,
+                        dcp_threads=dcp_threads,
+                    ),
+                )
+                if conversion_dir != input_dcp_dir:
+                    _replace_symlink(input_dcp_dir, conversion_dir)
     elif dcp_enabled:
         if round_id <= 1 and cache_available:
             _replace_symlink(input_dcp_dir, dcp_cache_dir)
@@ -1396,6 +1498,20 @@ def run_torchtitan_training(
             raise FileNotFoundError(
                 "TorchTitan command completed but did not write the output DCP "
                 f"directory: {output_dcp_dir}"
+            )
+        if client_layerwise_conversion:
+            run_profiled_conversion(
+                conversion_profile_path,
+                "to_layers",
+                lambda: convert_dcp_to_layer_directory(
+                    output_dcp_dir,
+                    input_layer_dir,
+                    output_layer_dir,
+                    train_spec_name=dcp_train_spec,
+                    model_args_key=dcp_model_args,
+                    dcp_threads=dcp_threads,
+                    ready_marker=output_layers_ready,
+                ),
             )
         if not os.path.exists(output_layers_ready):
             _remove_path(output_dcp_dir)
