@@ -3,8 +3,8 @@ from logging import INFO
 import torch
 from datasets import load_dataset
 from flwr.app import Array, ArrayRecord, Context, Message, RecordDict
+from flwr.common import log
 from flwr.serverapp import Grid, ServerApp
-from flwr.supercore import log
 
 from vertical_fl.task import FEATURE_COLUMNS, ServerModel, evaluate_head_model
 

@@ -5,9 +5,9 @@ from logging import INFO, WARN
 from typing import Optional
 
 from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord
+from flwr.common import log
 from flwr.serverapp import Grid
 from flwr.serverapp.strategy import FedAvg
-from flwr.supercore import log
 
 
 class FlowerTuneLlm(FedAvg):

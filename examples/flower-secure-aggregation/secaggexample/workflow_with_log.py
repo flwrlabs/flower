@@ -2,7 +2,7 @@
 
 from logging import INFO
 
-from flwr.common import Context
+from flwr.common import Context, log
 from flwr.common.secure_aggregation.quantization import quantize
 from flwr.server import Grid, LegacyContext
 from flwr.server.workflow.constant import MAIN_PARAMS_RECORD
@@ -10,7 +10,6 @@ from flwr.server.workflow.secure_aggregation.secaggplus_workflow import (
     SecAggPlusWorkflow,
     WorkflowState,
 )
-from flwr.supercore import log
 
 from secaggexample.task import get_weights, make_net
 

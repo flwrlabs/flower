@@ -6,8 +6,8 @@ import time
 from logging import INFO
 
 from flwr.app import ConfigRecord, Context, Message, MessageType, RecordDict
+from flwr.common.logger import log
 from flwr.serverapp import Grid, ServerApp
-from flwr.supercore import log
 
 from federated_analytics.task import aggregate_features
 

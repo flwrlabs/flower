@@ -4,10 +4,10 @@ from logging import DEBUG
 from typing import List, Tuple
 
 from flwr.common import Context, Metrics, ndarrays_to_parameters
+from flwr.common.logger import update_console_handler
 from flwr.server import Grid, LegacyContext, ServerApp, ServerConfig
 from flwr.server.strategy import FedAvg
 from flwr.server.workflow import DefaultWorkflow, SecAggPlusWorkflow
-from flwr.supercore.logger import update_console_handler
 
 from secaggexample.task import get_weights, make_net
 from secaggexample.workflow_with_log import SecAggPlusWorkflowWithLogs
