@@ -71,13 +71,20 @@ tool_calls = [
     for item in response.get("output", [])
     if isinstance(item, dict) and item.get("type") == "function_call"
 ]
+allowed_tool_names = {
+    tool["name"] for tool in tools if isinstance(tool.get("name"), str)
+}
+for tool_call in tool_calls:
+    if tool_call.get("name") not in allowed_tool_names:
+        raise RuntimeError(f"Tool {tool_call.get('name')!r} was not exposed")
 
 function_outputs = [agent.connectors.call(tool_call) for tool_call in tool_calls]
 ```
 
 `agent.connectors.call` parses the model's arguments and matches the action to
-the selected connector. It returns a `function_call_output` with the same
-`call_id`. Pass calls and outputs to a later model request.
+the selected connector. The name check prevents the model from calling a tool
+that was not included in `tools`. The method returns a `function_call_output`
+with the same `call_id`. Pass calls and outputs to a later model request.
 
 Account connector credentials are delivered to the runtime action, not returned
 to the AgentApp.
