@@ -151,7 +151,7 @@ jobs:
               tag_suffix="${unstable_tag#"${repository}:unstable"}"
               tag_args+=(-t "${repository}:${VERSION}${tag_suffix}")
 
-              # Add stable aliases to the variants defined by DOCKER_TAG_GROUPS.
+              # Add stable aliases explicitly for the current release variants.
               case "${repository_name}:${tag_suffix}" in
                 "superlink:-py3.13-alpine3.22"|"supernode:-py3.13-alpine3.22")
                   tag_args+=(-t "${repository}:${VERSION}")
