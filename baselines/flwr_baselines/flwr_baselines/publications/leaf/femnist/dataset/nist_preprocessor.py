@@ -5,7 +5,7 @@ from logging import DEBUG, WARN
 from typing import Dict, Union
 
 import pandas as pd
-from flwr.supercore import log
+from flwr.common.logger import log
 from PIL import Image
 from tqdm import tqdm
 

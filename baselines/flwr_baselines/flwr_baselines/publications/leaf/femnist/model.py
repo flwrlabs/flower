@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
-from flwr.supercore import log
+from flwr.common.logger import log
 from torch import Tensor
 from torch.utils.data import DataLoader
 

@@ -7,9 +7,9 @@ from typing import Dict, List, Optional
 
 import flwr as fl
 import torch
+from flwr.common.logger import log
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.criterion import Criterion
-from flwr.supercore import log
 
 # from heterofl.utils import ModelRateManager
 

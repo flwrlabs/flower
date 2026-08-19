@@ -9,9 +9,9 @@ from secrets import token_hex
 
 from easydict import EasyDict
 
+from flwr.common import log
 from flwr.server import Server
 from flwr.server.history import History
-from flwr.supercore import log
 
 SAVE_PATH = Path(os.path.abspath(__file__)).parent.parent / "results"
 

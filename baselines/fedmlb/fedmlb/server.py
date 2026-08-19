@@ -4,11 +4,11 @@ import timeit
 from logging import INFO
 from typing import Optional
 
+from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager, SimpleClientManager
 from flwr.server.history import History
 from flwr.server.server import Server
 from flwr.server.strategy import Strategy
-from flwr.supercore import log
 
 
 class MyServer(Server):

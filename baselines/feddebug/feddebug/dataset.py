@@ -13,7 +13,7 @@ import random
 from logging import INFO
 
 import numpy as np
-from flwr.supercore import log
+from flwr.common.logger import log
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import DirichletPartitioner, IidPartitioner
 from torch.utils.data import DataLoader

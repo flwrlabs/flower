@@ -8,10 +8,10 @@ from logging import WARNING
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from flwr.common import FitRes, Scalar, ndarrays_to_parameters, parameters_to_ndarrays
+from flwr.common.logger import log
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy import FedAvg
 from flwr.server.strategy.aggregate import aggregate
-from flwr.supercore import log
 
 
 class FedXgbNnAvg(FedAvg):

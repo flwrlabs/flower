@@ -24,7 +24,6 @@ from flwr.common import (
     ndarrays_to_parameters,
     parameters_to_ndarrays,
 )
-from flwr.supercore import log
 from omegaconf import DictConfig
 
 from fedwav2vec2.models import int_model
@@ -41,7 +40,7 @@ class SpeechBrainClient(fl.client.Client):
         self.asr_brain = asr_brain
         self.dataset = dataset
 
-        log(logging.DEBUG, "Starting client %s", cid)
+        fl.common.logger.log(logging.DEBUG, "Starting client %s", cid)
 
     def get_parameters(self, _: GetParametersIns) -> GetParametersRes:
         """Return the parameters of the current net."""

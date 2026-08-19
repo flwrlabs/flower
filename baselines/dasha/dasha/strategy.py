@@ -15,11 +15,11 @@ from flwr.common import (
     ndarrays_to_parameters,
     parameters_to_ndarrays,
 )
+from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy.aggregate import weighted_loss_avg
 from flwr.server.strategy.strategy import Strategy
-from flwr.supercore import log
 
 from dasha.client import CompressionClient, DashaClient, MarinaClient
 from dasha.compressors import IdentityUnbiasedCompressor, decompress, estimate_size

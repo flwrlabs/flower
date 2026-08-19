@@ -8,7 +8,7 @@ from logging import DEBUG, INFO
 from typing import Optional, Union
 
 import wget
-from flwr.supercore import log
+from flwr.common.logger import log
 
 
 # pylint: disable=too-few-public-methods

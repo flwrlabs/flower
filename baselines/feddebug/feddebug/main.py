@@ -12,7 +12,7 @@ import flwr as fl
 import hydra
 import torch
 from flwr.common import ndarrays_to_parameters
-from flwr.supercore import log
+from flwr.common.logger import log
 from hydra.core.hydra_config import HydraConfig
 
 from feddebug import utils

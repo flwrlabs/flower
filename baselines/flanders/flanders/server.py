@@ -10,10 +10,10 @@ from typing import Any, Callable, Dict, List, Tuple, Union
 
 import numpy as np
 from flwr.common import DisconnectRes, EvaluateRes, FitRes, parameters_to_ndarrays
+from flwr.common.logger import log
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.history import History
 from flwr.server.server import Server, fit_clients
-from flwr.supercore import log
 
 from .strategy import Flanders
 from .utils import flatten_params, save_params, update_confusion_matrix
