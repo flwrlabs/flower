@@ -15,6 +15,7 @@
 """Tests for `RetryInvoker`."""
 
 
+import threading
 from collections.abc import Generator
 from unittest.mock import MagicMock, Mock, patch
 
@@ -126,6 +127,71 @@ def test_max_tries(mock_sleep: MagicMock) -> None:
         invoker.invoke(failing_function)
     # Assert 1 sleep call due to the max_tries being set to 2
     mock_sleep.assert_called_once_with(0.1)
+
+
+def test_disable_retries_interrupts_wait() -> None:
+    """Disabling retries should stop waiting and cap an active invocation."""
+    target = Mock(side_effect=[ValueError("first"), TypeError])
+    invoker: RetryInvoker
+
+    def disable_retries(_wait_time: float) -> None:
+        invoker.disable_retries()
+
+    invoker = RetryInvoker(
+        lambda: constant(0.1),
+        ValueError,
+        max_tries=3,
+        max_time=None,
+        wait_function=disable_retries,
+    )
+
+    with pytest.raises(ValueError, match="first"):
+        invoker.invoke(target)
+
+    assert target.call_count == 1
+
+
+def test_disable_retries_calls_wait_canceller() -> None:
+    """Disabling retries should interrupt a wait already in progress."""
+    cancel_wait = Mock()
+    invoker = RetryInvoker(
+        lambda: constant(0.1),
+        ValueError,
+        max_tries=None,
+        max_time=None,
+        cancel_wait_function=cancel_wait,
+    )
+
+    invoker.disable_retries()
+
+    assert invoker.max_tries == 1
+    cancel_wait.assert_called_once_with()
+
+
+def test_disable_retries_reenters_state_update() -> None:
+    """A signal during a retry-state update must not deadlock shutdown."""
+    invoker = RetryInvoker(
+        lambda: constant(0.1),
+        ValueError,
+        max_tries=None,
+        max_time=None,
+    )
+    thread_finished = threading.Event()
+
+    def disable_while_locked() -> None:
+        with invoker._state_lock:  # pylint: disable=protected-access
+            invoker.disable_retries()
+        thread_finished.set()
+
+    thread = threading.Thread(target=disable_while_locked, daemon=True)
+    thread.start()
+    assert thread_finished.wait(
+        timeout=5.0
+    ), "Retry cancellation did not finish while re-entering its state lock"
+    thread.join()
+
+    assert not thread.is_alive()
+    assert invoker.retries_disabled
 
 
 def test_max_time(mock_time: MagicMock, mock_sleep: MagicMock) -> None:
