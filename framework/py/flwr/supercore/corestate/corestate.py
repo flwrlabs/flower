@@ -120,22 +120,23 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab,
+        fab: Fab | None,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
-    ) -> str:
-        """Atomically store a FAB and associate its app with a federation.
+    ) -> str | None:
+        """Associate an app with a federation and optionally store its FAB.
 
         A federation has at most one association for each app ID. Storing the app
         again updates its FAB hash and type while preserving when and by whom it was
-        first added.
+        first added. If no FAB is provided, the association remains unpinned.
 
         Parameters
         ----------
-        fab : Fab
-            FAB content and verification metadata to store.
+        fab : Optional[Fab]
+            FAB content and verification metadata to store, or None for an
+            unpinned Hub app.
         federation_id : str
             ID of the federation to associate with the app.
         app_id : str
@@ -147,15 +148,9 @@ class CoreState(ABC):  # pylint: disable=R0904
 
         Returns
         -------
-        str
-            Canonical SHA-256 hash of the stored FAB.
+        Optional[str]
+            Canonical SHA-256 hash of the stored FAB, or None if unpinned.
         """
-
-    @abstractmethod
-    def upsert_app(
-        self, federation_id: str, app_id: str, app_type: str, added_by: str
-    ) -> bool:
-        """Create or update an unpinned Hub-app association."""
 
     @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:

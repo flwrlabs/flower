@@ -122,11 +122,12 @@ class TestControlHandlers(unittest.TestCase):
         """StartRun fetches the latest Hub FAB when the requested hash misses."""
         fab_content = b"hub FAB"
         fab_hash = hashlib.sha256(fab_content).hexdigest()
-        self.state.upsert_app(
-            NOOP_FEDERATION_ID,
-            "@flwr/demo",
-            TaskType.AGENT_APP,
-            self.account.flwr_aid,
+        self.state.store_app(
+            fab=None,
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/demo",
+            app_type=TaskType.AGENT_APP,
+            added_by=self.account.flwr_aid,
         )
 
         with (

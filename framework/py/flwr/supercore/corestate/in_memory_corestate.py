@@ -329,31 +329,34 @@ class InMemoryCoreState(
 
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab,
+        fab: Fab | None,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
-    ) -> str:
-        """Atomically store a FAB and associate its app with a federation."""
+    ) -> str | None:
+        """Associate an app with a federation and optionally store its FAB."""
         if not all((federation_id, app_id, app_type, added_by)):
             raise ValueError(
                 "Federation ID, app ID, app type, and added by are required"
             )
-        fab_hash = hashlib.sha256(fab.content).hexdigest()
-        if fab.hash_str and fab.hash_str != fab_hash:
+        fab_hash = (
+            hashlib.sha256(fab.content).hexdigest() if fab is not None else None
+        )
+        if fab is not None and fab.hash_str and fab.hash_str != fab_hash:
             raise ValueError(
                 f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
             )
         key = (federation_id, app_id)
         with self.lock_fab_store, self.lock_federation_app_store:
-            # Keep launch behavior: last write wins for metadata under the same
-            # content hash.
-            self.fab_store[fab_hash] = Fab(
-                hash_str=fab_hash,
-                content=fab.content,
-                verifications=dict(fab.verifications),
-            )
+            if fab is not None and fab_hash is not None:
+                # Keep launch behavior: last write wins for metadata under the
+                # same content hash.
+                self.fab_store[fab_hash] = Fab(
+                    hash_str=fab_hash,
+                    content=fab.content,
+                    verifications=dict(fab.verifications),
+                )
             existing = self.federation_app_store.get(key)
             self.federation_app_store[key] = FederationAppRecord(
                 federation_id=federation_id,
@@ -377,25 +380,6 @@ class InMemoryCoreState(
                 content=fab.content,
                 verifications=dict(fab.verifications),
             )
-
-    def upsert_app(
-        self, federation_id: str, app_id: str, app_type: str, added_by: str
-    ) -> bool:
-        """Create or update an unpinned Hub-app association."""
-        if not all((federation_id, app_id, app_type, added_by)):
-            return False
-        key = (federation_id, app_id)
-        with self.lock_federation_app_store:
-            existing = self.federation_app_store.get(key)
-            self.federation_app_store[key] = FederationAppRecord(
-                federation_id=federation_id,
-                app_id=app_id,
-                fab_hash=None,
-                app_type=app_type,
-                added_by=existing.added_by if existing else added_by,
-                added_at=existing.added_at if existing else now(),
-            )
-        return True
 
     def get_app_fab(
         self, federation_id: str, app_id: str, fab_hash: str

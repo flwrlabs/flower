@@ -588,13 +588,16 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         elif is_hub_app:
             fab_hash = state.store_fab(fab)
         else:
-            fab_hash = state.store_app(
+            stored_hash = state.store_app(
                 fab=fab,
                 federation_id=federation_id,
                 app_id=app_id,
                 app_type=app_type,
                 added_by=flwr_aid,
             )
+            if stored_hash is None:
+                raise ValueError("Failed to store uploaded FAB")
+            fab_hash = stored_hash
 
         if fab_hash != fab.hash_str:
             raise ValueError(
@@ -1370,13 +1373,13 @@ def add_app(
             f"Failed to read app metadata: {e}",
         ) from e
 
-    if not state.upsert_app(
-        federation_id, request.app_id, app_type, account.flwr_aid
-    ):
-        raise FlowerError(
-            ApiErrorCode.INVALID_APP_SPEC,
-            "Failed to store app association.",
-        )
+    state.store_app(
+        fab=None,
+        federation_id=federation_id,
+        app_id=request.app_id,
+        app_type=app_type,
+        added_by=account.flwr_aid,
+    )
 
     return AddAppResponse()
 

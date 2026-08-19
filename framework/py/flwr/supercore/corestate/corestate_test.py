@@ -172,13 +172,17 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertIsNotNone(state.get_fab(updated_hash))
 
-    def test_upsert_hub_app(self) -> None:
+    def test_store_unpinned_hub_app(self) -> None:
         """A Hub-app association does not require a locally stored FAB."""
         state = self.state_factory()
 
-        self.assertTrue(
-            state.upsert_app(
-                "@me/fed", "@flwr/demo", TaskType.AGENT_APP, "account-a"
+        self.assertIsNone(
+            state.store_app(
+                fab=None,
+                federation_id="@me/fed",
+                app_id="@flwr/demo",
+                app_type=TaskType.AGENT_APP,
+                added_by="account-a",
             )
         )
         self.assertEqual(
@@ -213,9 +217,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             ],
         )
 
-        self.assertTrue(
-            state.upsert_app(
-                "@me/fed", "@flwr/demo", TaskType.AGENT_APP, "account-a"
+        self.assertIsNone(
+            state.store_app(
+                fab=None,
+                federation_id="@me/fed",
+                app_id="@flwr/demo",
+                app_type=TaskType.AGENT_APP,
+                added_by="account-a",
             )
         )
         self.assertEqual(
