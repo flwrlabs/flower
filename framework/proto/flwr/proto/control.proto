@@ -99,10 +99,10 @@ service Control {
   rpc ListApps(ListAppsRequest) returns (ListAppsResponse) {}
 
   // Store App in a Federation
-  rpc StoreApp(StoreAppRequest) returns (StoreAppResponse) {}
+  rpc AddApp(AddAppRequest) returns (AddAppResponse) {}
 
   // Delete App from a Federation
-  rpc DeleteApp(DeleteAppRequest) returns (DeleteAppResponse) {}
+  rpc RemoveApp(RemoveAppRequest) returns (RemoveAppResponse) {}
 
   // Show Federation
   rpc ShowFederation(ShowFederationRequest) returns (ShowFederationResponse) {}
@@ -312,17 +312,17 @@ message ListAppsRequest {
 }
 message ListAppsResponse { repeated AppInfo apps = 1; }
 
-message StoreAppRequest {
+message AddAppRequest {
   string federation_id = 1;
   string app_id = 2;
 }
-message StoreAppResponse {}
+message AddAppResponse {}
 
-message DeleteAppRequest {
+message RemoveAppRequest {
   string federation_id = 1;
   string app_id = 2;
 }
-message DeleteAppResponse {}
+message RemoveAppResponse {}
 
 message ShowFederationRequest { string federation_name = 1; }
 message ShowFederationResponse {

@@ -920,7 +920,7 @@ class ListAppsResponse(google.protobuf.message.Message):
 global___ListAppsResponse = ListAppsResponse
 
 @typing.final
-class StoreAppRequest(google.protobuf.message.Message):
+class AddAppRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FEDERATION_ID_FIELD_NUMBER: builtins.int
@@ -935,20 +935,20 @@ class StoreAppRequest(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "federation_id", b"federation_id"]) -> None: ...
 
-global___StoreAppRequest = StoreAppRequest
+global___AddAppRequest = AddAppRequest
 
 @typing.final
-class StoreAppResponse(google.protobuf.message.Message):
+class AddAppResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     def __init__(
         self,
     ) -> None: ...
 
-global___StoreAppResponse = StoreAppResponse
+global___AddAppResponse = AddAppResponse
 
 @typing.final
-class DeleteAppRequest(google.protobuf.message.Message):
+class RemoveAppRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FEDERATION_ID_FIELD_NUMBER: builtins.int
@@ -963,17 +963,17 @@ class DeleteAppRequest(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["app_id", b"app_id", "federation_id", b"federation_id"]) -> None: ...
 
-global___DeleteAppRequest = DeleteAppRequest
+global___RemoveAppRequest = RemoveAppRequest
 
 @typing.final
-class DeleteAppResponse(google.protobuf.message.Message):
+class RemoveAppResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     def __init__(
         self,
     ) -> None: ...
 
-global___DeleteAppResponse = DeleteAppResponse
+global___RemoveAppResponse = RemoveAppResponse
 
 @typing.final
 class ShowFederationRequest(google.protobuf.message.Message):

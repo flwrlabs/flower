@@ -55,6 +55,8 @@ from flwr.common.serde import (
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
+    AddAppRequest,
+    AddAppResponse,
     AddNodeToFederationRequest,
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
@@ -70,8 +72,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
-    DeleteAppRequest,
-    DeleteAppResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -104,6 +104,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RejectInvitationResponse,
     RemoveAccountFromFederationRequest,
     RemoveAccountFromFederationResponse,
+    RemoveAppRequest,
+    RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
@@ -118,8 +120,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
-    StoreAppRequest,
-    StoreAppResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -1347,13 +1347,13 @@ def list_apps(
     return ListAppsResponse(apps=state.list_apps(federation_id, limit))
 
 
-def store_app(
-    request: StoreAppRequest,
+def add_app(
+    request: AddAppRequest,
     account: AccountInfo,
     state: LinkState,
     fleet_api_type: str | None,
-) -> StoreAppResponse:
-    """Store a Hub app in a federation."""
+) -> AddAppResponse:
+    """Add a Hub app to a federation."""
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
     if not request.app_id:
@@ -1378,18 +1378,18 @@ def store_app(
             "Failed to store app association.",
         )
 
-    return StoreAppResponse()
+    return AddAppResponse()
 
 
-def delete_app(
-    request: DeleteAppRequest, account: AccountInfo, state: LinkState
-) -> DeleteAppResponse:
-    """Delete an app from a federation."""
+def remove_app(
+    request: RemoveAppRequest, account: AccountInfo, state: LinkState
+) -> RemoveAppResponse:
+    """Remove an app from a federation."""
     _validate_federation_membership_in_request(
         state, account.flwr_aid, request.federation_id
     )
     state.delete_app(request.federation_id, request.app_id)
-    return DeleteAppResponse()
+    return RemoveAppResponse()
 
 
 def show_federation(

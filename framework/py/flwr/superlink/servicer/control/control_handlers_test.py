@@ -21,16 +21,16 @@ from unittest.mock import Mock, patch
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AddAppRequest,
+    AddAppResponse,
     AppInfo,
-    DeleteAppRequest,
-    DeleteAppResponse,
     ListAppsRequest,
     ListAutomationsRequest,
+    RemoveAppRequest,
+    RemoveAppResponse,
     StartAutomationRequest,
     StartRunRequest,
     StopAutomationRequest,
-    StoreAppRequest,
-    StoreAppResponse,
 )
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
@@ -45,13 +45,13 @@ from flwr.supercore.fab import Fab
 from flwr.superlink.federation import NoOpFederationManager
 
 from .control_handlers import (
-    delete_app,
+    add_app,
     list_apps,
     list_automations,
+    remove_app,
     start_automation,
     start_run,
     stop_automation,
-    store_app,
 )
 
 
@@ -191,8 +191,8 @@ class TestControlHandlers(unittest.TestCase):
             [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
         )
 
-    def test_store_and_delete_app(self) -> None:
-        """StoreApp persists a Hub reference and DeleteApp removes it."""
+    def test_add_and_remove_app(self) -> None:
+        """AddApp persists a Hub reference and RemoveApp removes it."""
         with (
             patch(
                 "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
@@ -207,8 +207,8 @@ class TestControlHandlers(unittest.TestCase):
                 },
             ),
         ):
-            response = store_app(
-                StoreAppRequest(
+            response = add_app(
+                AddAppRequest(
                     federation_id=NOOP_FEDERATION_ID,
                     app_id="@flwr/demo",
                 ),
@@ -217,15 +217,15 @@ class TestControlHandlers(unittest.TestCase):
                 None,
             )
 
-        self.assertEqual(response, StoreAppResponse())
+        self.assertEqual(response, AddAppResponse())
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
             [("@flwr/demo", "", TaskType.AGENT_APP)],
         )
 
-        delete_response = delete_app(
-            DeleteAppRequest(
+        remove_response = remove_app(
+            RemoveAppRequest(
                 federation_id=NOOP_FEDERATION_ID,
                 app_id="@flwr/demo",
             ),
@@ -233,7 +233,7 @@ class TestControlHandlers(unittest.TestCase):
             self.state,
         )
 
-        self.assertEqual(delete_response, DeleteAppResponse())
+        self.assertEqual(remove_response, RemoveAppResponse())
         self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
 
     def test_start_automation_normalizes_start_at_to_utc(self) -> None:
