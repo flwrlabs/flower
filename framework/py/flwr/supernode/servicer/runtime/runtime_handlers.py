@@ -18,7 +18,6 @@
 
 from logging import DEBUG, ERROR
 
-from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -55,6 +54,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supernode.nodestate import NodeState
 

@@ -5,8 +5,8 @@ from time import sleep
 
 import numpy as np
 from flwr.app import Context, Message, MessageType, RecordDict
-from flwr.common.logger import log
 from flwr.serverapp import Grid, ServerApp
+from flwr.supercore import log
 from lifelines import KaplanMeierFitter
 
 # Create ServerApp

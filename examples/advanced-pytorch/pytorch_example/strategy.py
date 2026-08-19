@@ -11,10 +11,10 @@ from typing import Callable, Iterable, Optional
 import torch
 import wandb
 from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord
-from flwr.common import log, logger
 from flwr.serverapp import Grid
 from flwr.serverapp.strategy import FedAvg, Result
 from flwr.serverapp.strategy.strategy_utils import log_strategy_start_info
+from flwr.supercore import log
 
 PROJECT_NAME = "FLOWER-advanced-pytorch"
 
@@ -41,11 +41,11 @@ class CustomFedAvg(FedAvg):
         higher."""
         if accuracy > self.best_acc_so_far:
             self.best_acc_so_far = accuracy
-            logger.log(INFO, "💡 New best global model found: %f", accuracy)
+            log(INFO, "💡 New best global model found: %f", accuracy)
             # Save the PyTorch model
             file_name = f"model_state_acc_{accuracy}_round_{current_round}.pth"
             torch.save(arrays.to_torch_state_dict(), self.save_path / file_name)
-            logger.log(INFO, "💾 New best model saved to disk: %s", file_name)
+            log(INFO, "💾 New best model saved to disk: %s", file_name)
 
     def save_metrics_as_json(self, current_round: int, result: Result) -> None:
         """Save the current results to a JSON file."""
@@ -86,7 +86,7 @@ class CustomFedAvg(FedAvg):
         # Perform basic learning rate scheduling
         if server_round == 5:  # half LR at round 5
             config["lr"] = config["lr"] * 0.5
-            logger.log(INFO, "⚙️ Adjusted learning rate to %f", config["lr"])
+            log(INFO, "⚙️ Adjusted learning rate to %f", config["lr"])
         # Continue with standard FedAvg configure_train
         return super().configure_train(server_round, arrays, config, grid)
 

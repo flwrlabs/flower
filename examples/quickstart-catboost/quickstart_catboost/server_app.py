@@ -7,8 +7,8 @@ from time import sleep
 
 from catboost import CatBoostClassifier, sum_models
 from flwr.common import ConfigRecord, Context, Message, MessageType, RecordDict
-from flwr.common.logger import log
 from flwr.server import Grid, ServerApp
+from flwr.supercore import log
 
 from quickstart_catboost.task import convert_to_catboost, convert_to_model_dict
 

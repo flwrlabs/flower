@@ -3,10 +3,10 @@
 from logging import DEBUG, INFO
 
 from flwr.common import parameters_to_ndarrays
-from flwr.common.logger import log
 from flwr.common.typing import Dict, Optional, Parameters, Scalar, Tuple
 from flwr.server.client_manager import ClientManager
 from flwr.server.server import FitResultsAndFailures, Server, fit_clients
+from flwr.supercore import log
 
 from niid_bench.strategy import FedNovaStrategy
 

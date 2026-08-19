@@ -22,14 +22,25 @@ from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from queue import Queue
 
+from flwr.common import configure as common_configure
+from flwr.common import log as common_log
+from flwr.supercore import log as supercore_log
+
 from .logger import (
     FLOWER_LOGGER,
+    configure,
     configure_superlink_log_file,
     console_handler,
     flush_logs,
     mirror_output_to_queue,
     restore_output,
 )
+
+
+def test_common_exports_are_backwards_compatible() -> None:
+    """Verify the legacy package-level logger exports remain compatible."""
+    assert common_log is supercore_log
+    assert common_configure is configure
 
 
 def test_mirror_output_to_queue() -> None:

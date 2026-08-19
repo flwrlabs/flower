@@ -6,9 +6,9 @@ from typing import Iterable, Optional
 import torch
 from datasets import load_dataset
 from flwr.app import ArrayRecord, Context, Message, MetricRecord, UserConfig
-from flwr.common.logger import log
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg
+from flwr.supercore import log
 from torch.utils.data import DataLoader
 from transformers import WhisperProcessor
 

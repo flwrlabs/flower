@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torchvision.transforms as transforms
-from flwr.common.logger import log
+from flwr.supercore import log
 from PIL import Image
 from sklearn import preprocessing
 from torch.utils.data import DataLoader, Dataset, Subset, random_split

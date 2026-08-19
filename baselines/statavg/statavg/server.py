@@ -5,8 +5,8 @@ import pickle
 from logging import INFO
 from pathlib import Path
 
-from flwr.common import log
 from flwr.server import Server
+from flwr.supercore import log
 
 PROJECT_DIR = Path(os.path.abspath(__file__)).parent.parent
 

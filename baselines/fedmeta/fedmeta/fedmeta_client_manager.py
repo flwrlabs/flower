@@ -8,10 +8,10 @@ import random
 from logging import INFO
 from typing import List, Optional
 
-from flwr.common.logger import log
 from flwr.server.client_manager import SimpleClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.criterion import Criterion
+from flwr.supercore import log
 
 
 class FedmetaClientManager(SimpleClientManager):

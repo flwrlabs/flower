@@ -8,9 +8,9 @@ from pathlib import Path
 from secrets import token_hex
 from typing import Dict, Optional, Union
 
-from flwr.common import log
 from flwr.server import Server
 from flwr.server.history import History
+from flwr.supercore import log
 
 PROJECT_DIR = Path(os.path.abspath(__file__)).parent.parent
 
@@ -105,9 +105,7 @@ def save_results_as_pickle(
 def save_results_and_config(history, run_config):
     """Save history and clean scaler dir."""
     results_path = (
-        PROJECT_DIR
-        / run_config["results-save-dir"]
-        / run_config["algorithm-name"]
+        PROJECT_DIR / run_config["results-save-dir"] / run_config["algorithm-name"]
     )
     save_results_as_pickle(
         history=history, file_path=results_path, default_filename="history.pkl"

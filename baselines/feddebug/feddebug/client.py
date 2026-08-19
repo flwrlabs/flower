@@ -7,7 +7,7 @@ to instantiate your client.
 from logging import INFO
 
 import flwr as fl
-from flwr.common.logger import log
+from flwr.supercore import log
 
 from feddebug.models import train_neural_network
 from feddebug.utils import get_parameters, set_parameters

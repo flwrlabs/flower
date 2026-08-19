@@ -11,7 +11,7 @@ from logging import INFO
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from flwr.common.logger import log
+from flwr.supercore import log
 from torchvision import transforms
 
 

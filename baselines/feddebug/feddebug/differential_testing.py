@@ -6,7 +6,7 @@ from logging import DEBUG
 
 import torch
 import torch.nn.functional as F
-from flwr.common.logger import log
+from flwr.supercore import log
 
 from feddebug.neuron_activation import get_neurons_activations
 from feddebug.utils import create_transform

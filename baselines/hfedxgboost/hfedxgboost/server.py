@@ -15,13 +15,13 @@ from typing import Dict, List, Optional, Tuple, Union
 import flwr as fl
 import wandb
 from flwr.common import EvaluateRes, FitRes, Parameters, Scalar, parameters_to_ndarrays
-from flwr.common.logger import log
 from flwr.common.typing import GetParametersIns
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.history import History
 from flwr.server.server import evaluate_clients, fit_clients
 from flwr.server.strategy import Strategy
+from flwr.supercore import log
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 from xgboost import XGBClassifier, XGBRegressor

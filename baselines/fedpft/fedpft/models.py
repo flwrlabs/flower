@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.utils
 import torchvision.transforms as transforms
-from flwr.common.logger import log
+from flwr.supercore import log
 from numpy.typing import NDArray
 from torch import nn
 from torch.utils.data import DataLoader

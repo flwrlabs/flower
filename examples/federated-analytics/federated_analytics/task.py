@@ -6,7 +6,7 @@ from logging import INFO
 import numpy as np
 import pandas as pd
 from flwr.app import Message
-from flwr.common.logger import log
+from flwr.supercore import log
 from sqlalchemy import create_engine
 
 

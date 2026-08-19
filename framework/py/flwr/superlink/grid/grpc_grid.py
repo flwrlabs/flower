@@ -30,7 +30,6 @@ from flwr.common.constant import (
     SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
     ErrorCode,
 )
-from flwr.common.logger import log, warn_deprecated_feature
 from flwr.common.serde import message_to_proto
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -46,6 +45,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 from flwr.serverapp.grid import Grid
+from flwr.supercore import log
 from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
 from flwr.supercore.date import now
 from flwr.supercore.grpc import create_channel, on_channel_state_change
@@ -70,6 +70,7 @@ from flwr.supercore.interceptors import (
     RuntimeTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
+from flwr.supercore.logger import warn_deprecated_feature
 from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.supercore.run import Run
 

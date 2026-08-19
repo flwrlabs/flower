@@ -16,11 +16,11 @@ from flwr.common import (
     ndarrays_to_parameters,
     parameters_to_ndarrays,
 )
-from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy.aggregate import aggregate
 from flwr.server.strategy.fedavg import FedAvg
+from flwr.supercore import log
 
 from .utils import load_all_time_series
 
