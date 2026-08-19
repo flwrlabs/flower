@@ -98,10 +98,10 @@ service Control {
   // List Apps in a Federation
   rpc ListApps(ListAppsRequest) returns (ListAppsResponse) {}
 
-  // Store App in a Federation
+  // Add App to a Federation
   rpc AddApp(AddAppRequest) returns (AddAppResponse) {}
 
-  // Delete App from a Federation
+  // Remove App from a Federation
   rpc RemoveApp(RemoveAppRequest) returns (RemoveAppResponse) {}
 
   // Show Federation
