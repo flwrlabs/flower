@@ -833,8 +833,8 @@ def _positive_int(value: str) -> int:
 
 def _port_int(value: str) -> int:
     parsed = int(value)
-    if parsed < 0 or parsed > 65535:
-        raise argparse.ArgumentTypeError("value must be between 0 and 65535")
+    if parsed < 1 or parsed > 65535:
+        raise argparse.ArgumentTypeError("value must be between 1 and 65535")
     return parsed
 
 
