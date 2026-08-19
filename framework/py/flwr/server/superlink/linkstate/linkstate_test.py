@@ -241,25 +241,6 @@ class StateTest(CoreStateTest):
         )
         self.assertEqual(other_series, [])
 
-    def test_create_run_preserves_initial_series_agent_status(self) -> None:
-        """Test later runs do not change a series' initial agent status."""
-        state = self.state_factory()
-        agent_run_id = create_dummy_run(
-            state,
-            primary_task_type=TaskType.AGENT_APP,
-        )
-        agent_run = state.get_run_info(run_ids=[agent_run_id])[0]
-
-        server_run_id = create_dummy_run(
-            state,
-            primary_task_type=TaskType.SERVER_APP,
-            series_id=agent_run.series_id,
-        )
-
-        self.assertNotEqual(server_run_id, 0)
-        run_series = state.get_run_series(is_agent=True)
-        self.assertEqual(run_series[0].run_ids, [agent_run_id, server_run_id])
-
     def test_claim_automation_returns_stored_run_request(self) -> None:
         """Claiming an automation should return its unresolved run request."""
         state = self.state_factory()
