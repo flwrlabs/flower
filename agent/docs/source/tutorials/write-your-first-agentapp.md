@@ -183,8 +183,9 @@ This example deliberately keeps the agent logic small. From here, you can add
 instructions, make multiple model calls, or give the model a connector that
 lets it search the web.
 
-Continue with [Use connectors](../explanations/use-connectors.md) to build
-your first tool-calling loop. To learn how to configure, observe, and stop a
+Continue with [Build a collaborative research
+agent](build-a-collaborative-agent.md) to add conversation context, connector
+calls, and a bounded tool loop. To learn how to configure, observe, and stop a
 run, see [Run an AgentApp on
 SuperGrid](../how-to-guides/run-on-supergrid.md). For local development, see
 [Run an AgentApp with a local
