@@ -14,26 +14,17 @@ from torch.utils.data import Subset
 from ssfl.data import load_centralized_testloader, load_partition_dataloaders
 from ssfl.partitioner import partition_data_dirichlet
 
+# These tests download torchvision CIFAR-10. Skip them in default CI/unit runs
+# unless the caller opts in with a local cache directory.
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("SSFL_TEST_CIFAR_ROOT", "").strip(),
+    reason="Set SSFL_TEST_CIFAR_ROOT to run torchvision CIFAR download tests",
+)
+
 
 @pytest.fixture(scope="module")
-def cifar_root(tmp_path_factory) -> Path:
-    # Prefer a persistent local-disk cache; NFS temp dirs make torchvision
-    # downloads extremely slow on shared cluster hosts.
-    env_root = os.environ.get("SSFL_TEST_CIFAR_ROOT", "").strip()
-    if env_root:
-        root = Path(env_root)
-    else:
-        local = Path(
-            f"/tmp/{os.environ.get('USER', 'user')}/ssfl-flower/torchvision-cifar"
-        )
-        try:
-            local.mkdir(parents=True, exist_ok=True)
-            probe = local / ".write_probe"
-            probe.write_text("ok", encoding="utf-8")
-            probe.unlink(missing_ok=True)
-            root = local
-        except OSError:
-            root = tmp_path_factory.mktemp("cifar-data")
+def cifar_root() -> Path:
+    root = Path(os.environ["SSFL_TEST_CIFAR_ROOT"])
     root.mkdir(parents=True, exist_ok=True)
     load_centralized_testloader("cifar10", batch_size=8, data_path=str(root))
     return root

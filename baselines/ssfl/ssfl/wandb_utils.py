@@ -1,4 +1,4 @@
-"""Optional Weights & Biases logging (opt-in)."""
+"""Weights & Biases logging (opt-in via wandb-mode)."""
 
 from __future__ import annotations
 
@@ -9,27 +9,28 @@ from flwr.common import log
 
 
 class WandbSession:
-    """No-op unless wandb-mode is online/offline and wandb is installed."""
+    """No-op unless wandb-mode is online or offline."""
 
     def __init__(self) -> None:
         self._run: Any | None = None
         self.enabled = False
 
     def start(self, cfg: dict[str, Any]) -> None:
-        """Start an optional W&B run from the application config."""
+        """Start a W&B run from the application config when logging is enabled."""
         mode = str(cfg.get("wandb-mode", "disabled")).lower()
         if mode in {"", "disabled", "off", "false", "none"}:
             return
         try:
             import wandb  # pylint: disable=import-outside-toplevel
         except ImportError:
-            # Flower's per-run env only installs main deps; don't crash paper runs
-            # if wandb is missing — local summary.json / metrics.jsonl still work.
+            # wandb is a project dependency, but don't crash a paper run if a
+            # hand-built env omitted it. Local summary.json / metrics.jsonl
+            # still work.
             log(
                 WARNING,
-                "wandb-mode=%s but wandb is not installed in this environment; "
-                "continuing with local metrics only. Add wandb to project "
-                "dependencies or `uv pip install wandb` in the app env.",
+                "wandb-mode=%s but wandb is not installed; continuing with "
+                "local metrics only. Reinstall the baseline with "
+                "`python -m pip install -e .`.",
                 mode,
             )
             return

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 import torch
 
 from ssfl.mask import create_mask_from_scores, get_mean_saliency_scores, mask_digest
@@ -36,3 +37,11 @@ def test_mask_digest_stable():
     scores = {"a": torch.tensor([1.0, 0.0, 2.0])}
     masks, _ = create_mask_from_scores(scores, keep_ratio=0.5, device="cpu")
     assert mask_digest(masks) == mask_digest(masks)
+
+
+def test_keep_ratio_must_be_in_unit_interval():
+    scores = {"conv": torch.tensor([4.0, 3.0, 2.0, 1.0])}
+    with pytest.raises(ValueError, match="keep_ratio"):
+        create_mask_from_scores(scores, keep_ratio=1.5, device="cpu")
+    with pytest.raises(ValueError, match="keep_ratio"):
+        create_mask_from_scores(scores, keep_ratio=-0.1, device="cpu")

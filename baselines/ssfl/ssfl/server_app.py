@@ -206,6 +206,12 @@ def _save_checkpoint(
     (directory / f"{stem}_mask_version.txt").write_text(digest + "\n")
 
 
+def _reset_jsonl(path: Path) -> None:
+    """Replace an existing JSONL log so reruns do not mix events."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("", encoding="utf-8")
+
+
 def _append_jsonl(path: Path, record: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
@@ -258,6 +264,7 @@ def main(grid: Grid, context: Context) -> None:
         num_clients,
     )
     if save_metrics:
+        _reset_jsonl(checkpoint_dir / "metrics.jsonl")
         log(INFO, "Metrics will be written under %s", checkpoint_dir)
 
     # Wait for the simulation/deployment cohort.

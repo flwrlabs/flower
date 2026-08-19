@@ -168,12 +168,14 @@ Paper runs write:
 
 - `outputs/<profile>/summary.json`: final accuracy/loss, resolved config, mask
   digest, and communication totals;
-- `outputs/<profile>/metrics.jsonl`: per-evaluation and per-training metrics;
+- `outputs/<profile>/metrics.jsonl`: per-evaluation and per-training metrics
+  for the current run (replaced if the same `checkpoint-dir` is reused);
 - `outputs/<profile>/*.pt`: initial, periodic, and final checkpoints;
-- `wandb/`: offline W&B runs.
+- `wandb/`: offline W&B runs when `wandb-mode` is `offline` or `online`.
 
-The paper profiles use W&B offline mode, so no account is required. To log to
-your own W&B account:
+The paper profiles use W&B offline mode, so no account is required. Local
+`summary.json` and `metrics.jsonl` are always written. To log to your own
+W&B account:
 
 ```bash
 flwr run . --stream \
