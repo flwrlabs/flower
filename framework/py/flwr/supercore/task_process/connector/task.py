@@ -65,7 +65,9 @@ def handle_task(
         message.metadata.__dict__["_run_id"] = run_id
         message.metadata.src_task_id = task_id
         message.metadata.__dict__["_message_id"] = message.object_id
-        client.PushTaskMessage(PushTaskMessageRequest(message=message_to_proto(message)))
+        client.PushTaskMessage(
+            PushTaskMessageRequest(message=message_to_proto(message))
+        )
 
     response = None
     name = cast(str, request_message.payload["name"])
