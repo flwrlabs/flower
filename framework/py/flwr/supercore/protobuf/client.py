@@ -19,12 +19,15 @@ from __future__ import annotations
 import ssl
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Protocol, Self, TypeVar
+from typing import TYPE_CHECKING, Protocol, Self, TypeVar
 
 import httpx
 from google.protobuf.message import DecodeError, Message
 
 from .constants import PROTOBUF_MEDIA_TYPE
+
+if TYPE_CHECKING:
+    from flwr.supercore.retry import RetryInvoker
 
 ResponseT = TypeVar("ResponseT", bound=Message)
 
@@ -67,16 +70,18 @@ def _wrap_interceptor(
 class ProtobufClient:
     """Client providing shared protobuf-over-HTTP request handling."""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         base_url: str,
         *,
         interceptors: Sequence[ProtobufClientInterceptor] = (),
         verify: ssl.SSLContext | bool | str = True,
         timeout: float = 30.0,
+        retry_invoker: RetryInvoker | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._interceptors = tuple(interceptors)
+        self._retry_invoker = retry_invoker
         self._client = httpx.Client(
             verify=verify,
             timeout=timeout,
@@ -84,12 +89,14 @@ class ProtobufClient:
         )
 
     @classmethod
-    def from_server_address(
+    def from_server_address(  # pylint: disable=too-many-arguments
         cls,
         server_address: str,
         insecure: bool,
         root_certificates: bytes | str | None,
         interceptors: Sequence[ProtobufClientInterceptor],
+        *,
+        retry_invoker: RetryInvoker | None = None,
     ) -> Self:
         """Create a protobuf-over-HTTP client from a server address."""
         if insecure and root_certificates is not None:
@@ -111,6 +118,7 @@ class ProtobufClient:
             f"{scheme}://{server_address}",
             interceptors=interceptors,
             verify=verify,
+            retry_invoker=retry_invoker,
         )
 
     def _unary_unary(
@@ -123,23 +131,32 @@ class ProtobufClient:
     ) -> ResponseT:
         """Send a unary request and parse its unary protobuf response."""
         path = path if path.startswith("/") else f"/{path}"
-        http_request = self._client.build_request(
-            method="POST",
-            url=f"{self._base_url}{path}",
-            content=request.SerializeToString(deterministic=True),
-            headers={
-                "content-type": PROTOBUF_MEDIA_TYPE,
-                "accept": PROTOBUF_MEDIA_TYPE,
-            },
+        content = request.SerializeToString(deterministic=True)
+
+        def send() -> httpx.Response:
+            http_request = self._client.build_request(
+                method="POST",
+                url=f"{self._base_url}{path}",
+                content=content,
+                headers={
+                    "content-type": PROTOBUF_MEDIA_TYPE,
+                    "accept": PROTOBUF_MEDIA_TYPE,
+                },
+            )
+            context = ProtobufRequestContext(
+                rpc_method=rpc_method,
+                message=request,
+                request=http_request,
+            )
+            http_response = self._send(context)
+            http_response.raise_for_status()
+            return http_response
+
+        response = (
+            self._retry_invoker.invoke(send)
+            if self._retry_invoker is not None
+            else send()
         )
-        context = ProtobufRequestContext(
-            rpc_method=rpc_method,
-            message=request,
-            request=http_request,
-        )
-        response = self._send(context)
-        if response.is_error:
-            response.raise_for_status()
 
         result = response_type()
         try:
