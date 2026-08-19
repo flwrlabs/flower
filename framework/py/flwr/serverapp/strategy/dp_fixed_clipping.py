@@ -21,6 +21,8 @@ Papers: https://arxiv.org/abs/1712.07557, https://arxiv.org/abs/1710.06963
 from abc import ABC
 from collections.abc import Iterable
 from logging import INFO, WARNING
+from math import isfinite
+from typing import cast
 
 import numpy as np
 
@@ -33,8 +35,16 @@ from flwr.supercore.differential_privacy import (
     compute_clip_model_update,
     compute_stdv,
 )
+from flwr.supercore.privacy_accounting import (
+    GaussianPrivacyEvent,
+    PrivacyAccountant,
+    PrivacySpent,
+    SamplingMethod,
+)
 
+from ..exception import PrivacyBudgetExhausted
 from ..grid import Grid
+from .fedavg import FedAvg
 from .strategy import Strategy
 
 
@@ -55,6 +65,9 @@ class DifferentialPrivacyFixedClippingBase(Strategy, ABC):
         The value of the clipping norm.
     num_sampled_clients : int
         The number of clients that are sampled on each round.
+    accountant : PrivacyAccountant or None
+        Optional accountant used to track cumulative privacy loss. Accounted mode
+        requires no-amplification accounting and uniform FedAvg aggregation.
     """
 
     # pylint: disable=too-many-arguments,too-many-instance-attributes
@@ -64,6 +77,8 @@ class DifferentialPrivacyFixedClippingBase(Strategy, ABC):
         noise_multiplier: float,
         clipping_norm: float,
         num_sampled_clients: int,
+        *,
+        accountant: PrivacyAccountant | None = None,
     ) -> None:
         super().__init__()
 
@@ -80,9 +95,122 @@ class DifferentialPrivacyFixedClippingBase(Strategy, ABC):
                 "The number of sampled clients should be a positive value."
             )
 
+        if accountant is not None:
+            if noise_multiplier <= 0:
+                raise ValueError(
+                    "The noise multiplier must be positive when accounting is enabled."
+                )
+            if accountant.config.sampling_method is not SamplingMethod.NO_AMPLIFICATION:
+                raise ValueError(
+                    "Fixed-clipping accounting currently requires "
+                    "sampling_method='no-amplification'."
+                )
+            if not isinstance(strategy, FedAvg) or (
+                strategy.__class__.aggregate_train is not FedAvg.aggregate_train
+            ):
+                raise ValueError(
+                    "Fixed-clipping accounting currently requires a strategy using "
+                    "FedAvg.aggregate_train."
+                )
+
         self.noise_multiplier = noise_multiplier
         self.clipping_norm = clipping_norm
         self.num_sampled_clients = num_sampled_clients
+        self.accountant = accountant
+        self._pending_events: dict[int, GaussianPrivacyEvent | None] = {}
+
+    def privacy_spent(self) -> PrivacySpent | None:
+        """Return cumulative privacy expenditure, if accounting is enabled."""
+        if self.accountant is None:
+            return None
+        return self.accountant.get_privacy_spent()
+
+    def _prepare_accounting(
+        self, server_round: int, messages: Iterable[Message]
+    ) -> Iterable[Message]:
+        """Create and check the privacy event for a configured round."""
+        if self.accountant is None:
+            return messages
+
+        messages_list = list(messages)
+        if server_round in self._pending_events:
+            raise ValueError(
+                f"Round {server_round} already has a pending privacy event."
+            )
+        if not messages_list:
+            self._pending_events[server_round] = None
+            return messages_list
+        if len(messages_list) != self.num_sampled_clients:
+            raise ValueError(
+                "The configured sample size does not match num_sampled_clients: "
+                f"{len(messages_list)} != {self.num_sampled_clients}."
+            )
+
+        event = GaussianPrivacyEvent(
+            noise_multiplier=self.noise_multiplier,
+            sample_size=len(messages_list),
+            population_size=self.accountant.config.population_size,
+        )
+        if (
+            self.accountant.config.max_epsilon is not None
+            and self.accountant.would_exceed(event)
+        ):
+            spent = self.accountant.get_privacy_spent()
+            raise PrivacyBudgetExhausted(
+                "The next private release would exceed max_epsilon "
+                f"(current epsilon: {spent.epsilon}, delta: {spent.delta})."
+            )
+
+        self._pending_events[server_round] = event
+        return messages_list
+
+    def _pop_pending_event(self, server_round: int) -> GaussianPrivacyEvent | None:
+        """Take the pending event for aggregation of a configured round."""
+        if self.accountant is None:
+            return None
+        if server_round not in self._pending_events:
+            raise ValueError(f"Round {server_round} has no pending privacy event.")
+        return self._pending_events.pop(server_round)
+
+    def _validate_uniform_weights(self, replies: list[Message]) -> None:
+        """Require equal client weights for the account-safe FedAvg path."""
+        if self.accountant is None:
+            return
+        weighting_key = cast(FedAvg, self.strategy).weighted_by_key
+        weights: list[float] = []
+        for reply in replies:
+            if len(reply.content.metric_records) != 1:
+                raise ValueError(
+                    "Accounted aggregation requires exactly one MetricRecord."
+                )
+            metrics = next(iter(reply.content.metric_records.values()))
+            weight = metrics.get(weighting_key)
+            if (
+                isinstance(weight, bool)
+                or not isinstance(weight, (int, float))
+                or not isfinite(weight)
+                or weight <= 0
+            ):
+                raise ValueError(
+                    "Accounted aggregation requires a positive finite client weight."
+                )
+            weights.append(float(weight))
+        if any(weight != weights[0] for weight in weights[1:]):
+            raise ValueError("Accounted aggregation requires equal client weights.")
+
+    def _compose_release(self, event: GaussianPrivacyEvent | None) -> None:
+        """Compose and report a successfully released private aggregate."""
+        if self.accountant is None or event is None:
+            return
+        self.accountant.compose(event)
+        spent = self.accountant.get_privacy_spent()
+        log(
+            INFO,
+            "Privacy spent: epsilon=%.6f at delta=%g after %d releases",
+            spent.epsilon,
+            spent.delta,
+            spent.num_releases,
+        )
 
     def _add_noise_to_aggregated_arrays(
         self, aggregated_arrays: ArrayRecord
@@ -136,6 +264,14 @@ class DifferentialPrivacyFixedClippingBase(Strategy, ABC):
 
     def summary(self) -> None:
         """Log summary configuration of the strategy."""
+        if self.accountant is not None:
+            spent = self.accountant.get_privacy_spent()
+            log(
+                INFO,
+                "\t├──> Privacy spent: epsilon=%.6f at delta=%g",
+                spent.epsilon,
+                spent.delta,
+            )
         self.strategy.summary()
 
 
@@ -153,6 +289,9 @@ class DifferentialPrivacyServerSideFixedClipping(DifferentialPrivacyFixedClippin
         The value of the clipping norm.
     num_sampled_clients : int
         The number of clients that are sampled on each round.
+    accountant : PrivacyAccountant or None
+        Optional accountant used to track cumulative privacy loss. Accounted mode
+        requires no-amplification accounting and uniform FedAvg aggregation.
 
     Examples
     --------
@@ -167,14 +306,22 @@ class DifferentialPrivacyServerSideFixedClipping(DifferentialPrivacyFixedClippin
         )
     """
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         strategy: Strategy,
         noise_multiplier: float,
         clipping_norm: float,
         num_sampled_clients: int,
+        *,
+        accountant: PrivacyAccountant | None = None,
     ) -> None:
-        super().__init__(strategy, noise_multiplier, clipping_norm, num_sampled_clients)
+        super().__init__(
+            strategy,
+            noise_multiplier,
+            clipping_norm,
+            num_sampled_clients,
+            accountant=accountant,
+        )
         self.current_arrays: ArrayRecord = ArrayRecord()
 
     def __repr__(self) -> str:
@@ -193,7 +340,8 @@ class DifferentialPrivacyServerSideFixedClipping(DifferentialPrivacyFixedClippin
     ) -> Iterable[Message]:
         """Configure the next round of training."""
         self.current_arrays = arrays
-        return self.strategy.configure_train(server_round, arrays, config, grid)
+        messages = self.strategy.configure_train(server_round, arrays, config, grid)
+        return self._prepare_accounting(server_round, messages)
 
     def aggregate_train(
         self,
@@ -201,12 +349,19 @@ class DifferentialPrivacyServerSideFixedClipping(DifferentialPrivacyFixedClippin
         replies: Iterable[Message],
     ) -> tuple[ArrayRecord | None, MetricRecord | None]:
         """Aggregate ArrayRecords and MetricRecords in the received Messages."""
-        if not validate_replies(replies, self.num_sampled_clients):
+        replies_list = list(replies)
+        event = self._pop_pending_event(server_round)
+        if not validate_replies(
+            replies_list,
+            self.num_sampled_clients,
+            strict=self.accountant is not None,
+        ):
             return None, None
+        self._validate_uniform_weights(replies_list)
 
         # Clip arrays in replies
         current_ndarrays = self.current_arrays.to_numpy_ndarrays()
-        for reply in replies:
+        for reply in replies_list:
             for arr_name, record in reply.content.array_records.items():
                 # Clip
                 reply_ndarrays = record.to_numpy_ndarrays()
@@ -233,12 +388,13 @@ class DifferentialPrivacyServerSideFixedClipping(DifferentialPrivacyFixedClippin
 
         # Pass the new parameters for aggregation
         aggregated_arrays, aggregated_metrics = self.strategy.aggregate_train(
-            server_round, replies
+            server_round, replies_list
         )
 
         # Add Gaussian noise to the aggregated arrays
         if aggregated_arrays:
             aggregated_arrays = self._add_noise_to_aggregated_arrays(aggregated_arrays)
+            self._compose_release(event)
 
         return aggregated_arrays, aggregated_metrics
 
@@ -264,6 +420,9 @@ class DifferentialPrivacyClientSideFixedClipping(DifferentialPrivacyFixedClippin
         The value of the clipping norm.
     num_sampled_clients : int
         The number of clients that are sampled on each round.
+    accountant : PrivacyAccountant or None
+        Optional accountant used to track cumulative privacy loss. Accounted mode
+        requires no-amplification accounting and uniform FedAvg aggregation.
 
     Examples
     --------
@@ -300,7 +459,8 @@ class DifferentialPrivacyClientSideFixedClipping(DifferentialPrivacyFixedClippin
         # Inject clipping norm in config
         config[KEY_CLIPPING_NORM] = self.clipping_norm
         # Call parent method
-        return self.strategy.configure_train(server_round, arrays, config, grid)
+        messages = self.strategy.configure_train(server_round, arrays, config, grid)
+        return self._prepare_accounting(server_round, messages)
 
     def aggregate_train(
         self,
@@ -308,22 +468,32 @@ class DifferentialPrivacyClientSideFixedClipping(DifferentialPrivacyFixedClippin
         replies: Iterable[Message],
     ) -> tuple[ArrayRecord | None, MetricRecord | None]:
         """Aggregate ArrayRecords and MetricRecords in the received Messages."""
-        if not validate_replies(replies, self.num_sampled_clients):
+        replies_list = list(replies)
+        event = self._pop_pending_event(server_round)
+        if not validate_replies(
+            replies_list,
+            self.num_sampled_clients,
+            strict=self.accountant is not None,
+        ):
             return None, None
+        self._validate_uniform_weights(replies_list)
 
         # Aggregate
         aggregated_arrays, aggregated_metrics = self.strategy.aggregate_train(
-            server_round, replies
+            server_round, replies_list
         )
 
         # Add Gaussian noise to the aggregated arrays
         if aggregated_arrays:
             aggregated_arrays = self._add_noise_to_aggregated_arrays(aggregated_arrays)
+            self._compose_release(event)
 
         return aggregated_arrays, aggregated_metrics
 
 
-def validate_replies(replies: Iterable[Message], num_sampled_clients: int) -> bool:
+def validate_replies(
+    replies: Iterable[Message], num_sampled_clients: int, strict: bool = False
+) -> bool:
     """Validate replies and log errors/warnings.
 
     Arguments
@@ -332,6 +502,8 @@ def validate_replies(replies: Iterable[Message], num_sampled_clients: int) -> bo
         The replies to validate.
     num_sampled_clients : int
         The expected number of sampled clients.
+    strict : bool
+        Whether a reply-count mismatch should abort aggregation.
 
     Returns
     -------
@@ -374,5 +546,7 @@ def validate_replies(replies: Iterable[Message], num_sampled_clients: int) -> bo
             num_replies_with_content,
             num_sampled_clients,
         )
+        if strict:
+            return False
 
     return True
