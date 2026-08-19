@@ -16,6 +16,8 @@ dependencies = [
     "torch==2.10.0",
     "torchvision==0.25.0",
     "numpy>=1.24.0",
+    # Keep wandb as a main dep so `flwr run` installs it into the isolated
+    # runtime env. Logging itself stays opt-in via wandb-mode.
     "wandb>=0.16.0",
 ]
 

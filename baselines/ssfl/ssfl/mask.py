@@ -71,6 +71,8 @@ def create_mask_from_scores(
     """
     if not scores_dict:
         raise ValueError("The saliency score dictionary is empty.")
+    if not 0.0 <= keep_ratio <= 1.0:
+        raise ValueError(f"keep_ratio must be in [0, 1], got {keep_ratio}")
 
     all_scores = torch.cat([v.flatten() for v in scores_dict.values()])
     num_params_to_keep = int(len(all_scores) * keep_ratio)

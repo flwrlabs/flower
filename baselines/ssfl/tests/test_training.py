@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -41,3 +42,33 @@ def test_train_local_runs_and_clips():
     )
     assert loss >= 0.0
     assert abs(lr - 0.1 * (0.998**1)) < 1e-9
+
+
+def test_load_state_dict_honors_strict():
+    model = SparseModel(TinyNet())
+    state = model.state_dict()
+    result = model.load_state_dict(state, strict=True)
+    assert result.missing_keys == []
+    assert result.unexpected_keys == []
+
+    extra = dict(state)
+    extra["not_a_real_key"] = torch.zeros(1)
+    with pytest.raises(RuntimeError, match="Unexpected key"):
+        model.load_state_dict(extra, strict=True)
+    result = model.load_state_dict(extra, strict=False)
+    assert "not_a_real_key" in result.unexpected_keys
+
+    incomplete = {key: value for key, value in state.items() if key != "fc.weight"}
+    with pytest.raises(RuntimeError, match="Missing key"):
+        model.load_state_dict(incomplete, strict=True)
+
+
+def test_load_state_dict_strict_with_applied_masks():
+    model = SparseModel(TinyNet())
+    public_state = model.state_dict()
+    model.apply_masks({"fc.weight": torch.ones_like(public_state["fc.weight"])})
+    state = model.state_dict()
+    assert all(not key.endswith(".weight_mask") for key in state)
+    result = model.load_state_dict(state, strict=True)
+    assert result.missing_keys == []
+    assert result.unexpected_keys == []

@@ -227,17 +227,49 @@ class SparseModel(nn.Module):
         return flat_state_dict
 
     def load_state_dict(self, state_dict, strict=True, assign=False):
-        """Load a flat state dictionary into the wrapped model."""
+        """Load a flat state dictionary into the wrapped model.
+
+        ``strict`` is checked against the public flattened keys. The wrapped
+        model is still loaded with ``strict=False`` because pruning buffers
+        (``weight_orig`` / ``weight_mask``) are not part of that public API.
+        """
+        expected_keys = set(self.state_dict().keys())
+        incoming_keys = set(state_dict.keys())
+        missing_keys = sorted(expected_keys - incoming_keys)
+        unexpected_keys = sorted(incoming_keys - expected_keys)
+
         pruned_load_dict = OrderedDict()
         for key, value in state_dict.items():
+            if key not in expected_keys:
+                continue
             base_name = key.rsplit(".", 1)[0]
             if key.endswith(".weight") and base_name in self.pruned_layers:
                 pruned_load_dict[f"{base_name}.weight_orig"] = value
             else:
                 pruned_load_dict[key] = value
-        return self._wrapped_model().load_state_dict(
+
+        incompatible = self._wrapped_model().load_state_dict(
             pruned_load_dict, strict=False, assign=assign
         )
+        if strict and (missing_keys or unexpected_keys):
+            error_msgs = []
+            if unexpected_keys:
+                error_msgs.append(
+                    "Unexpected key(s) in state_dict: "
+                    + ", ".join(f'"{key}"' for key in unexpected_keys)
+                    + "."
+                )
+            if missing_keys:
+                error_msgs.append(
+                    "Missing key(s) in state_dict: "
+                    + ", ".join(f'"{key}"' for key in missing_keys)
+                    + "."
+                )
+            raise RuntimeError(
+                "Error(s) in loading state_dict for SparseModel:\n\t"
+                + "\n\t".join(error_msgs)
+            )
+        return type(incompatible)(missing_keys, unexpected_keys)
 
     def named_parameters(
         self,
