@@ -218,7 +218,7 @@ class StateTest(CoreStateTest):
         runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
         self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[untyped-decorator]
         [
             (TaskType.AGENT_APP, TaskType.AGENT_APP),
             (TaskType.SERVER_APP, TaskType.SERVER_APP),
