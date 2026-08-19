@@ -110,6 +110,7 @@ request = {
 allowed_tool_names = {
     tool["name"] for tool in tools if isinstance(tool.get("name"), str)
 }
+model_finished = False
 
 for _ in range(3):
     response = agent.responses.create(request)
@@ -122,6 +123,7 @@ for _ in range(3):
         item for item in response_output if item.get("type") == "function_call"
     ]
     if not tool_calls:
+        model_finished = True
         break
     for tool_call in tool_calls:
         if tool_call.get("name") not in allowed_tool_names:
@@ -129,23 +131,25 @@ for _ in range(3):
     outputs = [agent.connectors.call(item) for item in tool_calls]
     request["input"] = [*request["input"], *response_output, *outputs]
 
-agent.responses.create(
-    {
-        "model": request["model"],
-        "input": request["input"],
-        "stream": True,
-    }
-)
+if not model_finished:
+    agent.responses.create(
+        {
+            "model": request["model"],
+            "input": request["input"],
+            "stream": True,
+        }
+    )
 ```
 
 The app checks every function name against the exposed tool schemas before
 calling a connector. It also keeps the complete model output next to the
 connector results, which preserves the context needed by the next model request.
-The final request does not include tools, so the model must produce an answer
-after consuming the available connector outputs. This abbreviated loop omits
-recovery and conversation-state handling. Use the complete [collaborative
-research agent](../tutorials/build-a-collaborative-agent.md) for copy/pasteable
-code.
+When the model stops requesting tools, its response already contains the final
+answer. The extra tool-free request runs only after all three tool turns are
+used, so the last connector outputs are consumed without producing a duplicate
+answer. This abbreviated loop omits recovery and conversation-state handling.
+Use the complete [collaborative research
+agent](../tutorials/build-a-collaborative-agent.md) for copy/pasteable code.
 
 ## Handle failure deliberately
 
