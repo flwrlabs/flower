@@ -112,7 +112,7 @@ class TestHttpGrid(unittest.TestCase):
         msg2 = self._prep_message(Message(RecordDict(), 0, "query.B"))
 
         msgs = [msg1, msg2]
-        # The seconds ObjectIDs doesn't contain the object ID of the emtpy RecordDict
+        # The seconds ObjectIDs doesn't contain the object ID of the empty RecordDict
         # because it is the same as the one in msg1.
         mock_response = Mock(
             message_ids=[msg1.object_id, msg2.object_id],
