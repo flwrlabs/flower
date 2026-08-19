@@ -66,7 +66,7 @@ from flwr.supercore.interceptors import (
 )
 from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.run import Run
-from flwr.superlink.runtime import RuntimeHttpStub
+from flwr.supercore.runtime import RuntimeHttpClient
 
 _DEFAULT_RUNTIME_API_ADDRESS = f"{CLIENT_OCTET}:{UVICORN_DEFAULT_PORT}"
 
@@ -134,7 +134,7 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
         self._cert = root_certificates
         self._token = token
         self._run: Run | None = None
-        self._client: RuntimeHttpStub | None = None
+        self._client: RuntimeHttpClient | None = None
         self.node = Node(node_id=SUPERLINK_NODE_ID)
         self._retry_invoker = make_simple_http_retry_invoker()
         super().__init__()
@@ -152,7 +152,7 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
         if self._is_connected:
             log(WARNING, "Already connected")
             return
-        self._client = RuntimeHttpStub.from_server_address(
+        self._client = RuntimeHttpClient.from_server_address(
             server_address=self._addr,
             insecure=self._insecure,
             root_certificates=self._cert,
@@ -169,7 +169,7 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
         if not self._is_connected:
             log(DEBUG, "Already disconnected")
             return
-        client = cast(RuntimeHttpStub, self._client)
+        client = cast(RuntimeHttpClient, self._client)
         self._client = None
         client.close()
         log(DEBUG, "[flwr-serverapp] Disconnected")
@@ -187,11 +187,11 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
         return Run(**vars(self._run))
 
     @property
-    def _runtime_client(self) -> RuntimeHttpStub:
+    def _runtime_client(self) -> RuntimeHttpClient:
         """Runtime API client."""
         if not self._is_connected:
             self._connect()
-        return cast(RuntimeHttpStub, self._client)
+        return cast(RuntimeHttpClient, self._client)
 
     def _check_message(self, message: Message) -> None:
         # Check if the message is valid

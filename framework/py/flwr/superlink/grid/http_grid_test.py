@@ -264,7 +264,7 @@ class TestHttpGrid(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.grid.set_run(61016)  # type: ignore[arg-type]
 
-    @patch("flwr.superlink.grid.http_grid.RuntimeHttpStub.from_server_address")
+    @patch("flwr.superlink.grid.http_grid.RuntimeHttpClient.from_server_address")
     def test_connect_adds_client_interceptors(
         self,
         from_server_address: Mock,
