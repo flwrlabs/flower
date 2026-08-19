@@ -1,7 +1,7 @@
 # Understand the AgentApp runtime
 
 An `AgentApp` contains the control flow for an agent: what the model should do,
-which tools it can use, and when the task is complete. Flower executes the app
+which tools it can use, and when its work is complete. Flower executes the app
 and provides model and connector access through an `AgentSession`.
 
 ## Where your app meets the runtime
@@ -18,7 +18,7 @@ The `<module>:<attribute>` value tells Flower where to import the `AgentApp`
 object. Flower packages the project as a Flower App Bundle (FAB). A run can
 resolve an app by app spec, local project, or specific FAB hash.
 
-When the task starts, Flower installs the FAB and its declared dependencies,
+When a run starts, Flower installs the FAB and its declared dependencies,
 loads the object, and calls the function registered with `AgentApp.main`:
 
 ```python
@@ -28,20 +28,20 @@ def main(agent: AgentSession, context: Context) -> None:
 ```
 
 The function is synchronous and returns when the app has completed its work. An
-unhandled exception marks the AgentApp task as failed and records the error in
-run details and logs.
+unhandled exception marks the run as failed and records the error in its details
+and logs.
 
 ## AgentSession
 
-Flower creates an `AgentSession` for each AgentApp task and passes it to your
+Flower creates an `AgentSession` for each AgentApp run and passes it to your
 main function. It exposes two capabilities:
 
 - `agent.responses` creates model responses
 - `agent.connectors` returns connector tools and executes function calls
 
-Calling either capability creates a child task. The AgentApp waits for its
-reply, then continues with the returned JSON object. Provider credentials and
-connector implementations remain outside the FAB.
+Calling either capability sends a request through the Flower runtime. The
+AgentApp waits for the response, then continues with the returned JSON object.
+Provider credentials and connector implementations remain outside the FAB.
 
 ### Model responses
 
@@ -64,7 +64,9 @@ model output items to the Flower `Context`.
 
 The default model provider at `api.flower.ai` does not currently support
 continuing with `previous_response_id`. Rebuild `input` from stored messages for
-a follow-up request instead.
+a follow-up request instead. See **Rebuild conversation input** in [Build a
+collaborative research agent](../tutorials/build-a-collaborative-agent.md) for a
+complete example.
 
 ### Connectors
 
@@ -73,9 +75,9 @@ reference normally yields one tool. An account connector such as `slack` can
 yield several related action tools.
 
 When a model returns a `function_call`, pass that item to
-`agent.connectors.call(tool_call)`. Flower resolves the action, starts the
-connector child task, records its activity, and returns a
-`function_call_output` item for the next model request.
+`agent.connectors.call(tool_call)`. Flower resolves the action, runs the
+connector, records its activity, and returns a `function_call_output` item for
+the next model request.
 
 The AgentApp owns the tool loop and must bound it. See [Use
 connectors](use-connectors.md).
@@ -133,13 +135,13 @@ agent change.
 1. The CLI or browser resolves an AgentApp and submits a run to a federation
 1. SuperGrid validates account membership, app configuration, and selected
    account connectors
-1. SuperGrid creates the run, run series when needed, and AgentApp task
+1. SuperGrid creates the run and a run series when needed
 1. An executor starts the isolated AgentApp process and loads its FAB
 1. Flower initializes `AgentSession` and the persisted `Context`
-1. The main function creates model and connector child tasks as needed
+1. The main function sends model requests and calls connectors as needed
 1. Flower streams structured activity while model and connector operations run
 1. During shutdown, Flower pushes the resulting `Context` once and records
-   whether the task completed, failed, or stopped
+   whether the run completed, failed, or stopped
 
 ## AgentApp and other Flower Apps
 
@@ -149,5 +151,5 @@ A FAB currently supports either:
 - a `serverapp` and a `clientapp`
 
 Do not combine an `agentapp` with a `serverapp` or `clientapp` in the same
-bundle. AgentApp runs are agent tasks rather than federated-learning
+bundle. AgentApp runs execute agent logic rather than federated-learning
 simulations.
