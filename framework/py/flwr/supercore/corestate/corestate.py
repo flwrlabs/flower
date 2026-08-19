@@ -398,7 +398,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def store_run_in_series(
+    def store_run_in_series(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         run_id: int,
         federation_id: str,

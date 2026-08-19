@@ -584,7 +584,7 @@ class InMemoryCoreState(
         with self.lock_run_series_context_store:
             self.run_series_context_store[series_id] = context
 
-    def store_run_in_series(
+    def store_run_in_series(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         run_id: int,
         federation_id: str,
