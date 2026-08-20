@@ -100,14 +100,14 @@ fi
 if [ "$3" = "deployment-engine" ]; then
   flower-supernode $client_arg \
       --superlink $server_address $client_auth_1 \
-      --clientappio-api-address localhost:9094 \
+      --host localhost --port 9094 \
       --node-config "partition-id=0 num-partitions=2" --max-retries 0 &
   background_pids+=("$!")
   sleep 2
 
   flower-supernode $client_arg \
       --superlink $server_address $client_auth_2 \
-      --clientappio-api-address localhost:9095 \
+      --host localhost --port 9095 \
       --node-config "partition-id=1 num-partitions=2" --max-retries 0 &
   background_pids+=("$!")
   sleep 2

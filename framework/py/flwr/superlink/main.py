@@ -28,9 +28,10 @@ from fastapi.routing import APIRoute, iter_route_contexts
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from flwr.common import log
+from flwr.supercore import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import http_error_translator
+from flwr.supercore.http_logging import configure_uvicorn_logging
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
 from flwr.supercore.version import package_version
@@ -220,6 +221,7 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
 def __getattr__(name: str) -> FastAPI:
     """Create the module-level FastAPI app lazily."""
     if name == "app":
+        configure_uvicorn_logging()
         fastapi_app = create_app()
         globals()[name] = fastapi_app
         return fastapi_app

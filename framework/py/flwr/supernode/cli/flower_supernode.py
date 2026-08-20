@@ -42,13 +42,13 @@ from flwr.common.constant import (
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
 )
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
     load_superexec_auth_secret,
 )
 from flwr.supercore.constant import UVICORN_DEFAULT_HOST, UVICORN_DEFAULT_PORT
-from flwr.supercore.exit import ExitCode, flwr_exit
+from flwr.supercore.exit import ExitCode, add_exit_handler, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
@@ -178,29 +178,32 @@ def flower_supernode() -> None:
     http_server, http_thread = _start_supernode_http_api(config, state_factory)
     runtime_host = f"[{config.host}]" if ":" in config.host else config.host
 
-    try:
-        start_client_internal(
-            state_factory=state_factory,
-            server_address=config.server_address,
-            transport=config.transport,
-            root_certificates=config.root_certificates,
-            insecure=config.insecure,
-            authentication_keys=config.authentication_keys,
-            max_retries=config.max_retries,
-            max_wait_time=config.max_wait_time,
-            node_config=config.node_config,
-            isolation=config.isolation,
-            runtime_api_address=f"{runtime_host}:{config.port}",
-            runtime_certificates=config.runtime_certificates,
-            runtime_root_certificates_path=config.runtime_root_certificates_path,
-            health_server_address=config.health_server_address,
-            trusted_entities=config.trusted_entities,
-            superexec_auth_secret=config.superexec_auth_secret,
-            runtime_dependency_install=config.runtime_dependency_install,
-        )
-    finally:
+    def stop_http_server() -> None:
+        """Stop the Runtime HTTP API server."""
         http_server.should_exit = True
         http_thread.join()
+
+    add_exit_handler(stop_http_server)
+
+    start_client_internal(
+        state_factory=state_factory,
+        server_address=config.server_address,
+        transport=config.transport,
+        root_certificates=config.root_certificates,
+        insecure=config.insecure,
+        authentication_keys=config.authentication_keys,
+        max_retries=config.max_retries,
+        max_wait_time=config.max_wait_time,
+        node_config=config.node_config,
+        isolation=config.isolation,
+        runtime_api_address=f"{runtime_host}:{config.port}",
+        runtime_certificates=config.runtime_certificates,
+        runtime_root_certificates_path=config.runtime_root_certificates_path,
+        health_server_address=config.health_server_address,
+        trusted_entities=config.trusted_entities,
+        superexec_auth_secret=config.superexec_auth_secret,
+        runtime_dependency_install=config.runtime_dependency_install,
+    )
 
 
 def _start_supernode_http_api(
@@ -262,6 +265,11 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
         "that a separate independent process gets created outside of SuperNode.",
     )
     parser.add_argument(
+        "--clientappio-api-address",
+        type=_unsupported_runtime_api_address,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "--host",
         default=UVICORN_DEFAULT_HOST,
         help=f"Host for the Runtime HTTP API (default: {UVICORN_DEFAULT_HOST}).",
@@ -318,9 +326,16 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
 def _port_int(value: str) -> int:
     """Parse a valid TCP port."""
     parsed = int(value)
-    if parsed < 0 or parsed > 65535:
-        raise argparse.ArgumentTypeError("value must be between 0 and 65535")
+    if parsed < 1 or parsed > 65535:
+        raise argparse.ArgumentTypeError("value must be between 1 and 65535")
     return parsed
+
+
+def _unsupported_runtime_api_address(_value: str) -> str:
+    """Reject the removed combined Runtime API address option."""
+    raise argparse.ArgumentTypeError(
+        "this option is no longer supported; use `--host` and `--port` instead"
+    )
 
 
 def _parse_args_common(parser: argparse.ArgumentParser) -> None:

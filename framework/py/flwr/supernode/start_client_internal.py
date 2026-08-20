@@ -46,8 +46,8 @@ from flwr.common.constant import (
     ExecPluginType,
     SubStatus,
 )
-from flwr.common.logger import log
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.constant import TaskType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers

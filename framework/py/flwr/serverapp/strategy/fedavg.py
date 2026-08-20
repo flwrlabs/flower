@@ -26,7 +26,7 @@ from flwr.app import (
     MetricRecord,
     RecordDict,
 )
-from flwr.common import log
+from flwr.supercore import log
 
 from ..grid import Grid
 from .strategy import Strategy

@@ -24,7 +24,7 @@ from logging import INFO
 from fastapi import FastAPI
 
 from flwr import __version__
-from flwr.common import log
+from flwr.supercore import log
 from flwr.supercore.error import http_error_translator
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health

@@ -46,7 +46,6 @@ from flwr.common.constant import (
     ExecPluginType,
 )
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.common.logger import configure_superlink_log_file, log
 from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
     add_FleetServicer_to_server,
 )
@@ -60,6 +59,7 @@ from flwr.server.superlink.fleet.grpc_rere.node_auth_server_interceptor import (
     NodeAuthServerInterceptor,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore import log
 from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
@@ -73,10 +73,12 @@ from flwr.supercore.constant import (
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
+from flwr.supercore.http_logging import get_uvicorn_log_config
 from flwr.supercore.interceptors import (
     RpcErrorTranslationServerInterceptor,
     create_fleet_runtime_version_server_interceptor,
 )
+from flwr.supercore.logger import configure_superlink_log_file, console_handler
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import (
@@ -528,6 +530,7 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
         port=lifespan_config.port,
         reload=False,
         access_log=True,
+        log_config=get_uvicorn_log_config(console_handler.level),
         ssl_keyfile=lifespan_config.runtime_ssl_keyfile,
         ssl_certfile=lifespan_config.runtime_ssl_certfile,
         workers=1,
@@ -778,6 +781,11 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
 
 def _add_args_http_api(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
+        "--serverappio-api-address",
+        type=_unsupported_runtime_api_address,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "--host",
         default=UVICORN_DEFAULT_HOST,
         help=(
@@ -832,9 +840,16 @@ def _positive_int(value: str) -> int:
 
 def _port_int(value: str) -> int:
     parsed = int(value)
-    if parsed < 0 or parsed > 65535:
-        raise argparse.ArgumentTypeError("value must be between 0 and 65535")
+    if parsed < 1 or parsed > 65535:
+        raise argparse.ArgumentTypeError("value must be between 1 and 65535")
     return parsed
+
+
+def _unsupported_runtime_api_address(_value: str) -> str:
+    """Reject the removed combined Runtime API address option."""
+    raise argparse.ArgumentTypeError(
+        "this option is no longer supported; use `--host` and `--port` instead"
+    )
 
 
 def _add_args_fleet_api(parser: argparse.ArgumentParser) -> None:

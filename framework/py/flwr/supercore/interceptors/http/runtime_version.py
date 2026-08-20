@@ -18,7 +18,7 @@ from logging import WARN
 
 import httpx
 
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.constant import VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.protobuf.client import ProtobufCall, ProtobufRequestContext

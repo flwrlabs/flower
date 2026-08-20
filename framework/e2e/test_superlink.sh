@@ -103,7 +103,7 @@ fi
 
 flower-supernode $client_arg \
   --superlink $server_address $client_auth_1 \
-  --clientappio-api-address "localhost:9094" \
+  --host localhost --port 9094 \
   --max-retries 0 &
 cl1_pid=$!
 background_pids+=("$cl1_pid")
@@ -111,7 +111,7 @@ sleep 3
 
 flower-supernode $client_arg \
   --superlink $server_address $client_auth_2 \
-  --clientappio-api-address "localhost:9096" \
+  --host localhost --port 9096 \
   --max-retries 0 &
 cl2_pid=$!
 background_pids+=("$cl2_pid")

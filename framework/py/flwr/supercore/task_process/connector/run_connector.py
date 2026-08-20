@@ -22,12 +22,12 @@ from logging import DEBUG, ERROR
 import httpx
 
 from flwr.common.constant import SubStatus
-from flwr.common.logger import log
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushTaskOutputRequest,
 )
+from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
@@ -100,7 +100,7 @@ def run_connector(  # pylint: disable=too-many-locals
         event(EventType.FLWR_CONNECTOR_RUN_ENTER)
 
         handle_task(
-            stub=client,
+            client=client,
             task_id=task_input.task_id,
             run_id=task_input.run.run_id,
         )
