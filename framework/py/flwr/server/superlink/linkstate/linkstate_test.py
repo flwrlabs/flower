@@ -218,6 +218,29 @@ class StateTest(CoreStateTest):
         runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
         self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
 
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        [
+            (TaskType.AGENT_APP, True),
+            (TaskType.SERVER_APP, False),
+            (TaskType.SIMULATION, False),
+        ]
+    )
+    def test_create_run_stores_series_agent_status(
+        self, primary_task_type: str, expected_is_agent: bool
+    ) -> None:
+        """Test run series stores whether its first run is an AgentApp."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state, primary_task_type=primary_task_type)
+        run = state.get_run_info(run_ids=[run_id])[0]
+
+        matching_series = state.get_run_series(is_agent=expected_is_agent)
+        other_series = state.get_run_series(is_agent=not expected_is_agent)
+
+        self.assertEqual(
+            [entry.series_id for entry in matching_series], [run.series_id]
+        )
+        self.assertEqual(other_series, [])
+
     def test_claim_automation_returns_stored_run_request(self) -> None:
         """Claiming an automation should return its unresolved run request."""
         state = self.state_factory()
@@ -2573,9 +2596,22 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
     def test_run_series_distinguishes_missing_and_empty_descriptions(self) -> None:
         """Missing and explicitly empty descriptions remain distinct in SQL."""
         state = self.state_factory()
-        self.assertIsNotNone(state.store_run_in_series(1, "@me/fed-a", series_id=None))
         self.assertIsNotNone(
-            state.store_run_in_series(2, "@me/fed-a", series_id=None, description="")
+            state.store_run_in_series(
+                1,
+                "@me/fed-a",
+                is_agent=False,
+                series_id=None,
+            )
+        )
+        self.assertIsNotNone(
+            state.store_run_in_series(
+                2,
+                "@me/fed-a",
+                is_agent=False,
+                series_id=None,
+                description="",
+            )
         )
 
         rows = state.query("SELECT description FROM run_series")
