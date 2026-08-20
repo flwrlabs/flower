@@ -40,8 +40,8 @@ class SimulationIoConnection:
     root_certificates : Optional[bytes] (default: None)
         The PEM-encoded root certificates as a byte string.
         Used only when `insecure` is False. If provided, these certificates are
-        used to verify the server certificate. If None, system root
-        certificates are used.
+        used to verify the server certificate. If None, HTTPX's default trusted CA
+        bundle is used.
     token : str
         Executor token attached to all outgoing RPCs via metadata.
     """
