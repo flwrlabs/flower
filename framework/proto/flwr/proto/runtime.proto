@@ -43,9 +43,6 @@ service Runtime {
   // General Runtime endpoints for App Executor processes
   /////////////////////////////////////////////////////////////////////////////
 
-  // Get run details
-  rpc GetRun(GetRunRequest) returns (GetRunResponse) {}
-
   // Task heartbeat
   rpc SendTaskHeartbeat(SendTaskHeartbeatRequest)
       returns (SendTaskHeartbeatResponse) {}

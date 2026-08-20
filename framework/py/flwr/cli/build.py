@@ -49,6 +49,7 @@ from flwr.supercore.fab_format_version import (
 
 from .config_utils import load_and_validate
 from .utils import (
+    AppPathDepthError,
     build_pathspec,
     collect_files,
     filter_paths_for_publish,
@@ -162,6 +163,8 @@ def build(
     # Build FAB
     try:
         fab_bytes = build_fab_from_disk(app)
+    except AppPathDepthError as err:
+        raise err.to_click_exception() from None
     except ValueError as e:
         raise click.ClickException(str(e)) from None
 

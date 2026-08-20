@@ -122,7 +122,8 @@ AppIo-named certificates for the SuperNode's Runtime API.
         --appio-ssl-certfile certificates/server.pem \
         --appio-ssl-keyfile certificates/server.key \
         --superlink 127.0.0.1:9092 \
-        --clientappio-api-address 127.0.0.1:9094 \
+        --host 127.0.0.1 \
+        --port 9094 \
         --node-config="partition-id=0 num-partitions=2"
 
 .. dropdown:: Understand the command
@@ -147,7 +148,8 @@ to launch the second SuperNode.
         --appio-ssl-certfile certificates/server.pem \
         --appio-ssl-keyfile certificates/server.key \
         --superlink 127.0.0.1:9092 \
-        --clientappio-api-address 127.0.0.1:9095 \
+        --host 127.0.0.1 \
+        --port 9095 \
         --node-config="partition-id=1 num-partitions=2"
 
 At this point, you have successfully launched a SuperLink and two SuperNodes with
