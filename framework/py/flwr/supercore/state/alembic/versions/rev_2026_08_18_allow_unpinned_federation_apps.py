@@ -15,7 +15,7 @@
 """Allow unpinned federation apps.
 
 Revision ID: 0d434553973d
-Revises: a6f4d2c91b7e
+Revises: 03f4cfe3ff15
 Create Date: 2026-08-18 17:16:45.282331
 """
 from collections.abc import Sequence
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "0d434553973d"
-down_revision: str | Sequence[str] | None = "a6f4d2c91b7e"
+down_revision: str | Sequence[str] | None = "03f4cfe3ff15"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
