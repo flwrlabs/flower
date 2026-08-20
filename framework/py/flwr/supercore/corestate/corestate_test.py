@@ -16,7 +16,6 @@
 
 
 # pylint: disable=too-many-lines
-import hashlib
 import unittest
 from contextlib import ExitStack
 from datetime import UTC, datetime, timedelta
@@ -92,17 +91,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Federation apps can be stored, listed, limited, and deleted."""
         state = self.state_factory()
 
-        server_hash = hashlib.sha256(b"server").hexdigest()
-        state.store_app(
-            fab=Fab(server_hash, b"server", {}),
+        server_hash = state.store_app(
+            fab=Fab("", b"server", {}),
             federation_id="@me/fed-a",
             app_id="@me/server",
             app_type=TaskType.SERVER_APP,
             added_by="account-a",
         )
-        agent_hash = hashlib.sha256(b"agent").hexdigest()
-        state.store_app(
-            fab=Fab(agent_hash, b"agent", {}),
+        agent_hash = state.store_app(
+            fab=Fab("", b"agent", {}),
             federation_id="@me/fed-a",
             app_id="@me/z-agent",
             app_type=TaskType.AGENT_APP,
@@ -138,9 +135,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         with self.assertRaises(AssertionError):
             state.list_apps("@me/fed-a", limit=-1)
 
-        updated_hash = hashlib.sha256(b"updated").hexdigest()
-        state.store_app(
-            fab=Fab(updated_hash, b"updated", {}),
+        updated_hash = state.store_app(
+            fab=Fab("", b"updated", {}),
             federation_id="@me/fed-a",
             app_id="@me/server",
             app_type=TaskType.SERVER_APP,

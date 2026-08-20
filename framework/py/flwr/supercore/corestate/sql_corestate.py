@@ -423,7 +423,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         app_id: str,
         app_type: str,
         added_by: str,
-    ) -> None:
+    ) -> str:
         """Atomically store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
             raise ValueError(
@@ -469,6 +469,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             session.execute(fab_stmt)
             session.execute(app_stmt)
+        return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""

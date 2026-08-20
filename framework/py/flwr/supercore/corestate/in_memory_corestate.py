@@ -335,7 +335,7 @@ class InMemoryCoreState(
         app_id: str,
         app_type: str,
         added_by: str,
-    ) -> None:
+    ) -> str:
         """Atomically store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
             raise ValueError(
@@ -364,6 +364,7 @@ class InMemoryCoreState(
                 added_by=existing.added_by if existing else added_by,
                 added_at=existing.added_at if existing else now(),
             )
+        return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""

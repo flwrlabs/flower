@@ -125,7 +125,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         app_id: str,
         app_type: str,
         added_by: str,
-    ) -> None:
+    ) -> str:
         """Atomically store a FAB and associate its app with a federation.
 
         A federation has at most one association for each app ID. Storing the app
@@ -145,6 +145,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         added_by : str
             ID of the account adding the app to the federation.
 
+        Returns
+        -------
+        str
+            Canonical SHA-256 hash of the stored FAB.
         """
 
     @abstractmethod
