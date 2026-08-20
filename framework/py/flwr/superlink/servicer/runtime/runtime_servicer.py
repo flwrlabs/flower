@@ -29,7 +29,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectRequest,
     PushObjectResponse,
 )
-from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorRequest,
     GetConnectorResponse,
@@ -99,12 +98,6 @@ class SuperLinkRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
             self.state(),
             task,
         )
-
-    def GetRun(
-        self, request: GetRunRequest, context: grpc.ServicerContext
-    ) -> GetRunResponse:
-        """Get run information."""
-        return runtime_handlers.get_run(request, self.state())
 
     def GetConnector(
         self, request: GetConnectorRequest, context: grpc.ServicerContext

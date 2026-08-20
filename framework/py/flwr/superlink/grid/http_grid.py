@@ -41,7 +41,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.serverapp.grid import Grid
 from flwr.supercore import log
-from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE, UVICORN_DEFAULT_PORT
+from flwr.supercore.constant import SUPERLINK_UVICORN_DEFAULT_PORT, SYSTEM_MESSAGE_TYPE
 from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
     InflatableObject,
@@ -69,7 +69,7 @@ from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.run import Run
 from flwr.supercore.runtime import RuntimeHttpClient
 
-_DEFAULT_RUNTIME_API_ADDRESS = f"{CLIENT_OCTET}:{UVICORN_DEFAULT_PORT}"
+_DEFAULT_RUNTIME_API_ADDRESS = f"{CLIENT_OCTET}:{SUPERLINK_UVICORN_DEFAULT_PORT}"
 
 ERROR_MESSAGE_PUSH_MESSAGES_PAYLOAD_TOO_LARGE = """
 
@@ -112,8 +112,8 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
     root_certificates : Optional[bytes] (default: None)
         The PEM-encoded root certificates as a byte string.
         Used only when `insecure` is False. If provided, these certificates are
-        used to verify the server certificate. If None, system root
-        certificates are used.
+        used to verify the server certificate. If None, HTTPX's default trusted CA
+        bundle is used.
     token : str
         Executor token used for Runtime API authentication.
     """
@@ -146,10 +146,7 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
         return self._client is not None
 
     def _connect(self) -> None:
-        """Connect to the Runtime API.
-
-        This will not call GetRun.
-        """
+        """Connect to the Runtime API."""
         if self._is_connected:
             log(WARNING, "Already connected")
             return

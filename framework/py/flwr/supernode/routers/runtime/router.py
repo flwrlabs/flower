@@ -34,7 +34,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectRequest,
     PushObjectResponse,
 )
-from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -90,10 +89,6 @@ ClaimTaskAuthDependency = Annotated[
     None,
     Depends(SuperExecAuthDependency("/flwr.proto.Runtime/ClaimTask")),
 ]
-GetRunAuthDependency = Annotated[
-    None,
-    Depends(SuperExecAuthDependency("/flwr.proto.Runtime/GetRun")),
-]
 
 
 @router.post("/pull-pending-tasks")
@@ -114,16 +109,6 @@ def claim_task(
 ) -> ClaimTaskResponse:
     """Claim a pending task."""
     return core_runtime_handlers.claim_task(request, state)
-
-
-@router.post("/get-run")
-def get_run(
-    request: Annotated[GetRunRequest, PROTOBUF_REQUEST_DEPENDENCY],
-    state: NodeStateDependency,
-    _auth: GetRunAuthDependency,
-) -> GetRunResponse:
-    """Get run information."""
-    return runtime_handlers.get_run(request, state)
 
 
 @router.post("/send-task-heartbeat")
