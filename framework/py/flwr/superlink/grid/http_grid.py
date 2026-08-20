@@ -112,8 +112,8 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
     root_certificates : Optional[bytes] (default: None)
         The PEM-encoded root certificates as a byte string.
         Used only when `insecure` is False. If provided, these certificates are
-        used to verify the server certificate. If None, system root
-        certificates are used.
+        used to verify the server certificate. If None, HTTPX's default trusted CA
+        bundle is used.
     token : str
         Executor token used for Runtime API authentication.
     """

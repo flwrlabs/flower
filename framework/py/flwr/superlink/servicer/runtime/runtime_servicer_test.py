@@ -29,13 +29,7 @@ import grpc
 from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
-from flwr.common.constant import (
-    NOOP_FLWR_AID,
-    SUPERLINK_NODE_ID,
-    SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
-    Status,
-    SubStatus,
-)
+from flwr.common.constant import NOOP_FLWR_AID, SUPERLINK_NODE_ID, Status, SubStatus
 from flwr.common.serde import context_to_proto, message_from_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
@@ -111,6 +105,7 @@ from flwr.superlink.servicer.runtime.runtime_servicer import SuperLinkRuntimeSer
 # pylint: disable=broad-except,too-many-lines
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
+_LEGACY_RUNTIME_API_ADDRESS = "0.0.0.0:9091"
 
 
 def test_raise_if_false() -> None:
@@ -454,7 +449,7 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         self.status_to_msg = _STATUS_TO_MSG
 
         self._server: grpc.Server = run_runtime_api_grpc(
-            SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
+            _LEGACY_RUNTIME_API_ADDRESS,
             state_factory,
             objectstore_factory,
             None,
