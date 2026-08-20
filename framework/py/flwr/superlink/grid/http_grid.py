@@ -146,10 +146,7 @@ class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
         return self._client is not None
 
     def _connect(self) -> None:
-        """Connect to the Runtime API.
-
-        This will not call GetRun.
-        """
+        """Connect to the Runtime API."""
         if self._is_connected:
             log(WARNING, "Already connected")
             return

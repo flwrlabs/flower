@@ -20,8 +20,6 @@ from logging import ERROR, WARNING
 from typing import Any
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
-from flwr.common.serde import run_from_proto
-from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     PullPendingTasksRequest,
@@ -41,7 +39,6 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 from flwr.supercore.protobuf.client import ProtobufClientInterceptor
 from flwr.supercore.retry import make_simple_http_retry_invoker
-from flwr.supercore.run import Run
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import validate_and_resolve_root_certificates
@@ -190,17 +187,11 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
         exit_handlers=[client.close],
     )
 
-    def get_run(run_id: int) -> Run:
-        _req = GetRunRequest(run_id=run_id)
-        _res = client.GetRun(_req)
-        return run_from_proto(_res.run)
-
     # Create the SuperExec plugin instance
     plugin = plugin_class(
         runtime_api_address=runtime_api_address,
         insecure=insecure,
         root_certificates_path=root_certificates_path,
-        get_run=get_run,
         runtime_dependency_install=runtime_dependency_install,
         executor=executor,
     )
