@@ -126,48 +126,30 @@ def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
         assert loggers["uvicorn.access"].level == logging.WARNING
         assert isinstance(default_handler.formatter, UTCFormatter)
         assert isinstance(access_handler.formatter, UTCFormatter)
-        assert any(
-            isinstance(log_filter, HealthCheckAccessFilter)
-            for log_filter in access_handler.filters
-        )
-        assert loggers["httpx"].level == logging.WARNING
-        assert loggers["httpcore"].level == logging.WARNING
-    finally:
-        for name, (handlers, level) in original_state.items():
-            loggers[name].handlers = handlers
-            loggers[name].setLevel(level)
-        default_handler.close()
-        access_handler.close()
-
-
-def test_configure_uvicorn_logging_is_idempotent() -> None:
-    """Do not add duplicate health-check filters when configuring twice."""
-    logger_names = ("uvicorn", "uvicorn.error", "uvicorn.access", "httpx", "httpcore")
-    loggers = {name: logging.getLogger(name) for name in logger_names}
-    original_state = {
-        name: (list(logger.handlers), logger.level) for name, logger in loggers.items()
-    }
-    access_handler = logging.StreamHandler(StringIO())
-
-    try:
-        loggers["uvicorn"].handlers = []
-        loggers["uvicorn.error"].handlers = []
-        loggers["uvicorn.access"].handlers = [access_handler]
-        loggers["uvicorn.access"].setLevel(logging.INFO)
-
-        configure_uvicorn_logging()
-        loggers["uvicorn.access"].setLevel(logging.DEBUG)
-        configure_uvicorn_logging()
-
         health_filters = [
             log_filter
             for log_filter in access_handler.filters
             if isinstance(log_filter, HealthCheckAccessFilter)
         ]
         assert len(health_filters) == 1
-        assert health_filters[0].debug_enabled
+        assert not health_filters[0].debug_enabled
+        assert loggers["httpx"].level == logging.WARNING
+        assert loggers["httpcore"].level == logging.WARNING
+
+        loggers["uvicorn.access"].setLevel(logging.DEBUG)
+        configure_uvicorn_logging()
+
+        updated_health_filters = [
+            log_filter
+            for log_filter in access_handler.filters
+            if isinstance(log_filter, HealthCheckAccessFilter)
+        ]
+        assert updated_health_filters == health_filters
+        assert updated_health_filters[0].debug_enabled
+        assert loggers["uvicorn.access"].level == logging.DEBUG
     finally:
         for name, (handlers, level) in original_state.items():
             loggers[name].handlers = handlers
             loggers[name].setLevel(level)
+        default_handler.close()
         access_handler.close()
