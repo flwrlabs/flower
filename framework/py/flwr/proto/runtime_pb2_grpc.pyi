@@ -22,7 +22,6 @@ import collections.abc
 import flwr.proto.control_pb2
 import flwr.proto.log_pb2
 import flwr.proto.message_pb2
-import flwr.proto.run_pb2
 import flwr.proto.runtime_pb2
 import grpc
 import grpc.aio
@@ -54,22 +53,16 @@ class RuntimeStub:
     ]
     """Claim task"""
 
-    GetRun: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.run_pb2.GetRunRequest,
-        flwr.proto.run_pb2.GetRunResponse,
+    SendTaskHeartbeat: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.runtime_pb2.SendTaskHeartbeatRequest,
+        flwr.proto.runtime_pb2.SendTaskHeartbeatResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
     General Runtime endpoints for App Executor processes
     ///////////////////////////////////////////////////////////////////////////
 
-    Get run details
+    Task heartbeat
     """
-
-    SendTaskHeartbeat: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.runtime_pb2.SendTaskHeartbeatRequest,
-        flwr.proto.runtime_pb2.SendTaskHeartbeatResponse,
-    ]
-    """Task heartbeat"""
 
     PullTaskInput: grpc.UnaryUnaryMultiCallable[
         flwr.proto.runtime_pb2.PullTaskInputRequest,
@@ -195,22 +188,16 @@ class RuntimeAsyncStub:
     ]
     """Claim task"""
 
-    GetRun: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.run_pb2.GetRunRequest,
-        flwr.proto.run_pb2.GetRunResponse,
+    SendTaskHeartbeat: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.runtime_pb2.SendTaskHeartbeatRequest,
+        flwr.proto.runtime_pb2.SendTaskHeartbeatResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
     General Runtime endpoints for App Executor processes
     ///////////////////////////////////////////////////////////////////////////
 
-    Get run details
+    Task heartbeat
     """
-
-    SendTaskHeartbeat: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.runtime_pb2.SendTaskHeartbeatRequest,
-        flwr.proto.runtime_pb2.SendTaskHeartbeatResponse,
-    ]
-    """Task heartbeat"""
 
     PullTaskInput: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.runtime_pb2.PullTaskInputRequest,
@@ -341,25 +328,17 @@ class RuntimeServicer(metaclass=abc.ABCMeta):
         """Claim task"""
 
     @abc.abstractmethod
-    def GetRun(
-        self,
-        request: flwr.proto.run_pb2.GetRunRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.run_pb2.GetRunResponse, collections.abc.Awaitable[flwr.proto.run_pb2.GetRunResponse]]:
-        """///////////////////////////////////////////////////////////////////////////
-        General Runtime endpoints for App Executor processes
-        ///////////////////////////////////////////////////////////////////////////
-
-        Get run details
-        """
-
-    @abc.abstractmethod
     def SendTaskHeartbeat(
         self,
         request: flwr.proto.runtime_pb2.SendTaskHeartbeatRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.runtime_pb2.SendTaskHeartbeatResponse, collections.abc.Awaitable[flwr.proto.runtime_pb2.SendTaskHeartbeatResponse]]:
-        """Task heartbeat"""
+        """///////////////////////////////////////////////////////////////////////////
+        General Runtime endpoints for App Executor processes
+        ///////////////////////////////////////////////////////////////////////////
+
+        Task heartbeat
+        """
 
     @abc.abstractmethod
     def PullTaskInput(

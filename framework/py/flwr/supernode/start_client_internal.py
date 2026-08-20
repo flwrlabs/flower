@@ -38,7 +38,6 @@ from flwr.common.config import get_fused_config_from_fab
 from flwr.common.constant import (
     ISOLATION_MODE_SUBPROCESS,
     RUNTIME_DEPENDENCY_INSTALL,
-    SUPERNODE_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
     TRANSPORT_TYPES,
@@ -49,7 +48,7 @@ from flwr.common.constant import (
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.address import parse_address, resolve_bind_address
-from flwr.supercore.constant import TaskType
+from flwr.supercore.constant import SUPERNODE_DEFAULT_SERVER_ADDRESS, TaskType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.fab import Fab
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
@@ -76,7 +75,6 @@ from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import get_client_tls_args
 from flwr.supercore.version import package_version
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
-from flwr.supernode.servicer.runtime import run_runtime_api_grpc
 
 FAB_VERIFICATION_ERROR = Error(ErrorCode.INVALID_FAB, "The FAB could not be verified.")
 
@@ -100,7 +98,7 @@ def start_client_internal(
     max_retries: int | None = None,
     max_wait_time: float | None = None,
     isolation: str = ISOLATION_MODE_SUBPROCESS,
-    runtime_api_address: str = SUPERNODE_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
+    runtime_api_address: str = SUPERNODE_DEFAULT_SERVER_ADDRESS,
     runtime_certificates: tuple[bytes, bytes, bytes] | None = None,
     runtime_root_certificates_path: str | None = None,
     health_server_address: str | None = None,
@@ -147,16 +145,16 @@ def start_client_internal(
     isolation : str (default: ISOLATION_MODE_SUBPROCESS)
         Isolation mode for `ClientApp`. Possible values are `subprocess` and
         `process`. If `subprocess`, the `ClientApp` runs in a subprocess started
-        by the SuperNode and communicates using gRPC at the address
+        by the SuperNode and communicates using HTTP at the address
         `runtime_api_address`. If `process`, the `ClientApp` runs in a separate
-        isolated process and communicates using gRPC at the address
+        isolated process and communicates using HTTP at the address
         `runtime_api_address`.
     runtime_api_address : str
-        (default: `SUPERNODE_RUNTIME_API_DEFAULT_SERVER_ADDRESS`)
-        The SuperNode gRPC server address.
+        (default: `SUPERNODE_DEFAULT_SERVER_ADDRESS`)
+        The SuperNode Runtime HTTP API address.
     runtime_certificates : Optional[Tuple[bytes, bytes, bytes]] (default: None)
         Tuple containing CA certificate, server certificate, and private key used to
-        start a secure Runtime API gRPC server.
+        start a secure Runtime HTTP API server.
     runtime_root_certificates_path : Optional[str] (default: None)
         Path to the CA certificate file passed to subprocess SuperExec instances so
         they can verify the Runtime API server certificate.
@@ -199,16 +197,8 @@ def start_client_internal(
             )
         superexec_auth_secret = None
 
-    # Launch Runtime API server
+    # Runtime API is served over HTTP by the SuperNode process.
     grpc_servers = []
-    runtime_server = run_runtime_api_grpc(
-        address=runtime_api_address,
-        state_factory=state_factory,
-        objectstore_factory=object_store_factory,
-        certificates=runtime_certificates,
-        superexec_auth_secret=superexec_auth_secret,
-    )
-    grpc_servers.append(runtime_server)
 
     # Launch gRPC health server
     if health_server_address is not None:
@@ -228,9 +218,7 @@ def start_client_internal(
 
     # Launch the SuperExec if the isolation mode is `subprocess`
     if isolation == ISOLATION_MODE_SUBPROCESS:
-        # `bound_address` contains the actual address when the port is set to :0
-        # which means let the OS choose a free port.
-        runtime_address = resolve_bind_address(runtime_server.bound_address)
+        runtime_address = resolve_bind_address(runtime_api_address)
         command = ["flower-superexec"]
         command += get_client_tls_args(
             insecure=runtime_certificates is None,
