@@ -104,6 +104,13 @@ Automation activity is scoped to the open federation. If a newly created
 automation does not appear, confirm that you opened the federation where it was
 created, then refresh once.
 
+```{figure} ../_static/screenshots/automation-latest-activity.png
+:alt: The Automations tab under Latest activity for a federation.
+
+The **Automations** tab shows recent schedules for the open federation. Select
+**View all** to open the full list.
+```
+
 ```{figure} ../_static/screenshots/automations-settings.png
 :alt: Flower Automations settings with Active and History tabs and schedule columns.
 
