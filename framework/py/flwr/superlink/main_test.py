@@ -25,7 +25,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from flwr.supercore.error import http_error_translator
-from flwr.supercore.logger import console_handler
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.health.router import health
 from flwr.superlink.routers.control.middlewares import (
@@ -120,7 +119,7 @@ def test_module_app_configures_direct_uvicorn_logging(
     monkeypatch.delitem(vars(main), "app", raising=False)
 
     assert main.__getattr__("app") is fastapi_app
-    configure_logging.assert_called_once_with(console_handler.level)
+    configure_logging.assert_called_once_with()
     monkeypatch.delitem(vars(main), "app", raising=False)
 
 

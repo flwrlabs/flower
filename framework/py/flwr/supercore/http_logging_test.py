@@ -113,11 +113,17 @@ def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
         loggers["uvicorn"].handlers = [default_handler]
         loggers["uvicorn.error"].handlers = []
         loggers["uvicorn.access"].handlers = [access_handler]
+        loggers["uvicorn"].setLevel(logging.ERROR)
+        loggers["uvicorn.error"].setLevel(logging.CRITICAL)
+        loggers["uvicorn.access"].setLevel(logging.WARNING)
 
-        configure_uvicorn_logging(logging.INFO)
+        configure_uvicorn_logging()
 
         assert loggers["uvicorn"].handlers == [default_handler]
         assert loggers["uvicorn.access"].handlers == [access_handler]
+        assert loggers["uvicorn"].level == logging.ERROR
+        assert loggers["uvicorn.error"].level == logging.CRITICAL
+        assert loggers["uvicorn.access"].level == logging.WARNING
         assert isinstance(default_handler.formatter, UTCFormatter)
         assert isinstance(access_handler.formatter, UTCFormatter)
         assert any(
@@ -147,9 +153,11 @@ def test_configure_uvicorn_logging_is_idempotent() -> None:
         loggers["uvicorn"].handlers = []
         loggers["uvicorn.error"].handlers = []
         loggers["uvicorn.access"].handlers = [access_handler]
+        loggers["uvicorn.access"].setLevel(logging.INFO)
 
-        configure_uvicorn_logging(logging.INFO)
-        configure_uvicorn_logging(logging.DEBUG)
+        configure_uvicorn_logging()
+        loggers["uvicorn.access"].setLevel(logging.DEBUG)
+        configure_uvicorn_logging()
 
         health_filters = [
             log_filter

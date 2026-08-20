@@ -130,19 +130,17 @@ def get_uvicorn_log_config(log_level: int) -> dict[str, Any]:
     }
 
 
-def configure_uvicorn_logging(log_level: int) -> None:
+def configure_uvicorn_logging() -> None:
     """Apply HTTP formatting to handlers already created by Uvicorn."""
     formatter = UTCFormatter(LOG_FORMAT)
-    debug_enabled = log_level <= logging.DEBUG
 
     for logger_name in ("uvicorn", "uvicorn.error"):
         logger = logging.getLogger(logger_name)
-        logger.setLevel(log_level)
         for handler in logger.handlers:
             handler.setFormatter(formatter)
 
     access_logger = logging.getLogger("uvicorn.access")
-    access_logger.setLevel(log_level)
+    debug_enabled = access_logger.isEnabledFor(logging.DEBUG)
     for handler in access_logger.handlers:
         handler.setFormatter(formatter)
         for log_filter in handler.filters:
