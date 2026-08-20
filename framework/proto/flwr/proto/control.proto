@@ -98,11 +98,11 @@ service Control {
   // List Apps in a Federation
   rpc ListApps(ListAppsRequest) returns (ListAppsResponse) {}
 
-  // Store App in a Federation
-  rpc StoreApp(StoreAppRequest) returns (StoreAppResponse) {}
+  // Add App to a Federation
+  rpc AddApp(AddAppRequest) returns (AddAppResponse) {}
 
-  // Delete App from a Federation
-  rpc DeleteApp(DeleteAppRequest) returns (DeleteAppResponse) {}
+  // Remove App from a Federation
+  rpc RemoveApp(RemoveAppRequest) returns (RemoveAppResponse) {}
 
   // Show Federation
   rpc ShowFederation(ShowFederationRequest) returns (ShowFederationResponse) {}
@@ -226,6 +226,7 @@ message ListRunSeriesRequest {
   optional string updated_before = 1;
   optional uint32 limit = 2;
   optional string federation_id = 3;
+  optional bool is_agent = 4; // Temporary filter for agent run series.
 }
 message ListRunSeriesResponse { repeated RunSeries entries = 1; }
 
@@ -312,17 +313,17 @@ message ListAppsRequest {
 }
 message ListAppsResponse { repeated AppInfo apps = 1; }
 
-message StoreAppRequest {
-  string federation_id = 1;
-  Fab fab = 2;
-}
-message StoreAppResponse {}
-
-message DeleteAppRequest {
+message AddAppRequest {
   string federation_id = 1;
   string app_id = 2;
 }
-message DeleteAppResponse {}
+message AddAppResponse {}
+
+message RemoveAppRequest {
+  string federation_id = 1;
+  string app_id = 2;
+}
+message RemoveAppResponse {}
 
 message ShowFederationRequest { string federation_name = 1; }
 message ShowFederationResponse {
