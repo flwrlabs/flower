@@ -995,6 +995,22 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         self.assertEqual([entry.series_id for entry in response.entries], [1])
 
+    def test_list_run_series_filters_by_agent_status(self) -> None:
+        """Test ListRunSeries can return only agent or non-agent series."""
+        self._create_dummy_run_series(1)
+        cast(Any, self.state).agent_run_series_ids.add(1)
+        self._create_dummy_run_series(2)
+
+        agent_response = self.servicer.ListRunSeries(
+            ListRunSeriesRequest(is_agent=True), Mock()
+        )
+        non_agent_response = self.servicer.ListRunSeries(
+            ListRunSeriesRequest(is_agent=False), Mock()
+        )
+
+        self.assertEqual([entry.series_id for entry in agent_response.entries], [1])
+        self.assertEqual([entry.series_id for entry in non_agent_response.entries], [2])
+
     def test_get_run_series_returns_context(self) -> None:
         """Test GetRunSeries returns series metadata and shared Context."""
         # Prepare
