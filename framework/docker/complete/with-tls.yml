@@ -3,6 +3,8 @@ services:
     command:
       - --isolation
       - process
+      - --port
+      - "9091"
       - --ssl-ca-certfile=certificates/ca.crt
       - --ssl-certfile=certificates/server.pem
       - --ssl-keyfile=certificates/server.key
@@ -18,8 +20,10 @@ services:
     command:
       - --superlink
       - superlink:9092
-      - --clientappio-api-address
-      - 0.0.0.0:9094
+      - --host
+      - 0.0.0.0
+      - --port
+      - "9094"
       - --isolation
       - process
       - --node-config
@@ -34,8 +38,10 @@ services:
     command:
       - --superlink
       - superlink:9092
-      - --clientappio-api-address
-      - 0.0.0.0:9095
+      - --host
+      - 0.0.0.0
+      - --port
+      - "9095"
       - --isolation
       - process
       - --node-config
@@ -52,8 +58,10 @@ services:
   #   command:
   #     - --superlink
   #     - superlink:9092
-  #     - --clientappio-api-address
-  #     - 0.0.0.0:9096
+  #     - --host
+  #     - 0.0.0.0
+  #     - --port
+  #     - "9096"
   #     - --isolation
   #     - process
   #     - --node-config
