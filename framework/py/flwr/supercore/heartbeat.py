@@ -20,7 +20,6 @@ import signal
 import threading
 from collections.abc import Callable
 
-import grpc
 import httpx
 
 from flwr.common.constant import (
@@ -32,7 +31,6 @@ from flwr.common.constant import (
 
 # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import SendTaskHeartbeatRequest
-from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.retry import RetryInvoker, exponential
 from flwr.supercore.runtime import RuntimeHttpClient
 
@@ -117,45 +115,6 @@ class HeartbeatSender:
         if not self._stop_event.is_set():
             if not self.heartbeat_fn():
                 raise HeartbeatFailure
-
-
-def make_task_heartbeat_fn_grpc(
-    stub: RuntimeStub,
-) -> Callable[[], bool]:
-    """Get the function to send a heartbeat to gRPC endpoint from a task executor.
-
-    Parameters
-    ----------
-    stub : RuntimeStub
-        gRPC stub to send the heartbeat.
-
-    Returns
-    -------
-    Callable[[], bool]
-        Function that sends a heartbeat to the gRPC endpoint.
-    """
-    # Construct the heartbeat request
-    req = SendTaskHeartbeatRequest()
-
-    def fn() -> bool:
-        # Call Runtime API
-        try:
-            res = stub.SendTaskHeartbeat(req)
-        except grpc.RpcError as e:
-            status_code = e.code()  # pylint: disable=E1101
-            if status_code == grpc.StatusCode.UNAVAILABLE:
-                return False
-            if status_code == grpc.StatusCode.DEADLINE_EXCEEDED:
-                return False
-            raise
-
-        # Raise SIGINT to trigger graceful shutdown if heartbeat failed
-        if not res.success:
-            # Never reach here due to token authentication unless race conditions occur
-            signal.raise_signal(signal.SIGINT)
-        return True
-
-    return fn
 
 
 def make_task_heartbeat_fn_http(
