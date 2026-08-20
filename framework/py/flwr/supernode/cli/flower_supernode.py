@@ -265,6 +265,11 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
         "that a separate independent process gets created outside of SuperNode.",
     )
     parser.add_argument(
+        "--clientappio-api-address",
+        type=_unsupported_runtime_api_address,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "--host",
         default=UVICORN_DEFAULT_HOST,
         help=f"Host for the Runtime HTTP API (default: {UVICORN_DEFAULT_HOST}).",
@@ -324,6 +329,13 @@ def _port_int(value: str) -> int:
     if parsed < 1 or parsed > 65535:
         raise argparse.ArgumentTypeError("value must be between 1 and 65535")
     return parsed
+
+
+def _unsupported_runtime_api_address(_value: str) -> str:
+    """Reject the removed combined Runtime API address option."""
+    raise argparse.ArgumentTypeError(
+        "this option is no longer supported; use `--host` and `--port` instead"
+    )
 
 
 def _parse_args_common(parser: argparse.ArgumentParser) -> None:

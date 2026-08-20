@@ -781,6 +781,11 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
 
 def _add_args_http_api(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
+        "--serverappio-api-address",
+        type=_unsupported_runtime_api_address,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "--host",
         default=UVICORN_DEFAULT_HOST,
         help=(
@@ -838,6 +843,13 @@ def _port_int(value: str) -> int:
     if parsed < 1 or parsed > 65535:
         raise argparse.ArgumentTypeError("value must be between 1 and 65535")
     return parsed
+
+
+def _unsupported_runtime_api_address(_value: str) -> str:
+    """Reject the removed combined Runtime API address option."""
+    raise argparse.ArgumentTypeError(
+        "this option is no longer supported; use `--host` and `--port` instead"
+    )
 
 
 def _add_args_fleet_api(parser: argparse.ArgumentParser) -> None:
