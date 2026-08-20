@@ -1,3 +1,9 @@
+---
+tags: [agentapp]
+dataset: []
+framework: []
+---
+
 # Flower Agent
 
 This minimal AgentApp sends the configured `agent.input` to a model and streams

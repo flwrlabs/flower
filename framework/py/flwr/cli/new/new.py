@@ -36,7 +36,8 @@ def new(
     app_spec: Annotated[
         str | None,
         typer.Argument(
-            help="Flower app specifier. Use the format "
+            help="Flower app specifier. Use 'agent' to create a Flower Agent app, "
+            "or use the format "
             "'@account_name/app_name' or '@account_name/app_name==x.y.z'. "
             "Version is optional (defaults to latest)."
         ),

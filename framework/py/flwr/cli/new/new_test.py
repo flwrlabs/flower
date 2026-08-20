@@ -38,7 +38,7 @@ new_module = importlib.import_module("flwr.cli.new.new")
         ("@account/app==1.2.3", "@account/app==1.2.3"),
     ],
 )
-def test_new_uses_remote_download_flow(
+def test_new_maps_agent_alias(
     monkeypatch: pytest.MonkeyPatch,
     app_spec: str,
     expected_app_spec: str,
