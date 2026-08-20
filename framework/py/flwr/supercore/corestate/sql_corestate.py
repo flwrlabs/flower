@@ -429,9 +429,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError(
                 "Federation ID, app ID, app type, and added by are required"
             )
-        fab_hash = (
-            hashlib.sha256(fab.content).hexdigest() if fab is not None else None
-        )
+        fab_hash = hashlib.sha256(fab.content).hexdigest() if fab is not None else None
         if fab is not None and fab.hash_str and fab.hash_str != fab_hash:
             raise ValueError(
                 f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
@@ -488,9 +486,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 verifications=json.loads(row.verifications),
             )
 
-    def get_app_fab(
-        self, federation_id: str, app_id: str, fab_hash: str
-    ) -> Fab | None:
+    def get_app_fab(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
         """Return a FAB only when it matches the federation-app association."""
         if not all((federation_id, app_id, fab_hash)):
             return None
