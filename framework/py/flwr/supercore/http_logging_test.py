@@ -18,6 +18,7 @@ import logging
 from io import StringIO
 
 import pytest
+from uvicorn.logging import AccessFormatter, DefaultFormatter
 
 from .http_logging import (
     LOG_FORMAT,
@@ -108,11 +109,26 @@ def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
     }
     default_handler = logging.StreamHandler(StringIO())
     access_handler = logging.StreamHandler(StringIO())
+    custom_access_handler = logging.StreamHandler(StringIO())
+    custom_formatter = logging.Formatter("custom: %(message)s")
+    default_handler.setFormatter(
+        DefaultFormatter(fmt="%(levelprefix)s %(message)s", use_colors=False)
+    )
+    access_handler.setFormatter(
+        AccessFormatter(
+            fmt='%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
+            use_colors=False,
+        )
+    )
+    custom_access_handler.setFormatter(custom_formatter)
 
     try:
         loggers["uvicorn"].handlers = [default_handler]
         loggers["uvicorn.error"].handlers = []
-        loggers["uvicorn.access"].handlers = [access_handler]
+        loggers["uvicorn.access"].handlers = [
+            access_handler,
+            custom_access_handler,
+        ]
         loggers["uvicorn"].setLevel(logging.ERROR)
         loggers["uvicorn.error"].setLevel(logging.CRITICAL)
         loggers["uvicorn.access"].setLevel(logging.WARNING)
@@ -120,12 +136,17 @@ def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
         configure_uvicorn_logging()
 
         assert loggers["uvicorn"].handlers == [default_handler]
-        assert loggers["uvicorn.access"].handlers == [access_handler]
+        assert loggers["uvicorn.access"].handlers == [
+            access_handler,
+            custom_access_handler,
+        ]
         assert loggers["uvicorn"].level == logging.ERROR
         assert loggers["uvicorn.error"].level == logging.CRITICAL
         assert loggers["uvicorn.access"].level == logging.WARNING
         assert isinstance(default_handler.formatter, UTCFormatter)
         assert isinstance(access_handler.formatter, UTCFormatter)
+        assert custom_access_handler.formatter is custom_formatter
+        assert not custom_access_handler.filters
         health_filters = [
             log_filter
             for log_filter in access_handler.filters
@@ -153,3 +174,4 @@ def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
             loggers[name].setLevel(level)
         default_handler.close()
         access_handler.close()
+        custom_access_handler.close()

@@ -18,9 +18,15 @@ import logging
 import time
 from typing import Any
 
+from uvicorn.logging import AccessFormatter, DefaultFormatter
+
 HEALTH_CHECK_PATH = "/health"
 LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+UVICORN_DEFAULT_LOG_FORMAT = "%(levelprefix)s %(message)s"
+UVICORN_DEFAULT_ACCESS_LOG_FORMAT = (
+    '%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s'
+)
 
 
 class UTCFormatter(logging.Formatter):
@@ -137,12 +143,24 @@ def configure_uvicorn_logging() -> None:
     for logger_name in ("uvicorn", "uvicorn.error"):
         logger = logging.getLogger(logger_name)
         for handler in logger.handlers:
-            handler.setFormatter(formatter)
+            if _is_default_uvicorn_formatter(
+                handler.formatter,
+                DefaultFormatter,
+                UVICORN_DEFAULT_LOG_FORMAT,
+            ):
+                handler.setFormatter(formatter)
 
     access_logger = logging.getLogger("uvicorn.access")
     debug_enabled = access_logger.isEnabledFor(logging.DEBUG)
     for handler in access_logger.handlers:
-        handler.setFormatter(formatter)
+        if _is_default_uvicorn_formatter(
+            handler.formatter,
+            AccessFormatter,
+            UVICORN_DEFAULT_ACCESS_LOG_FORMAT,
+        ):
+            handler.setFormatter(formatter)
+        elif not isinstance(handler.formatter, UTCFormatter):
+            continue
         for log_filter in handler.filters:
             if isinstance(log_filter, HealthCheckAccessFilter):
                 log_filter.debug_enabled = debug_enabled
@@ -152,3 +170,15 @@ def configure_uvicorn_logging() -> None:
 
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+def _is_default_uvicorn_formatter(
+    formatter: logging.Formatter | None,
+    formatter_class: type[logging.Formatter],
+    log_format: str,
+) -> bool:
+    """Return whether a formatter matches one of Uvicorn's defaults."""
+    return (
+        isinstance(formatter, formatter_class)
+        and formatter._fmt == log_format  # pylint: disable=protected-access
+    )
