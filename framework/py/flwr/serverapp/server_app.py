@@ -20,13 +20,13 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
 from flwr.app import Context
-from flwr.common.logger import warn_deprecated_feature_with_example
 from flwr.compat.server.typing import ServerFn
 from flwr.server.client_manager import ClientManager
 from flwr.server.compat import start_grid
 from flwr.server.server import Server
 from flwr.server.server_config import ServerConfig
 from flwr.server.strategy import Strategy
+from flwr.supercore.logger import warn_deprecated_feature_with_example
 
 from .grid import Grid
 from .typing import ServerAppCallable

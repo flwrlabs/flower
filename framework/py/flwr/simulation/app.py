@@ -22,7 +22,7 @@ from dataclasses import replace
 from logging import DEBUG, ERROR, INFO, WARNING
 from queue import Queue
 
-import grpc
+import httpx
 
 from flwr.app.message import Context, RecordDict
 from flwr.cli.config_utils import get_fab_metadata
@@ -34,19 +34,7 @@ from flwr.common.config import (
     get_project_config,
     get_project_dir,
 )
-from flwr.common.constant import (
-    RUNTIME_DEPENDENCY_INSTALL,
-    SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
-    SubStatus,
-)
-from flwr.common.logger import (
-    flush_logs,
-    log,
-    mirror_output_to_queue,
-    restore_output,
-    start_log_uploader,
-    stop_log_uploader,
-)
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -63,10 +51,18 @@ from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
 from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
+from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import NOOP_FEDERATION_ID
+from flwr.supercore.constant import NOOP_FEDERATION_ID, SUPERLINK_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
+from flwr.supercore.logger import (
+    flush_logs,
+    mirror_output_to_queue,
+    restore_output,
+    start_log_uploader,
+    stop_log_uploader,
+)
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
@@ -180,7 +176,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     def on_exit() -> None:
         log(DEBUG, "[flwr-simulation] Will push Simulation task output")
 
-        # Set Grpc max retries to 1 to avoid blocking on exit
+        # Limit Runtime HTTP retries to avoid blocking on exit
         conn._retry_invoker.max_tries = 1
 
         # Upload any remaining logs before pushing final output
@@ -196,7 +192,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
         try:
             conn._stub.PushTaskOutput(out_req)
-        except grpc.RpcError as err:
+        except httpx.HTTPError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
 
         # Stop log uploader for this run and upload final logs
@@ -207,7 +203,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         if heartbeat_sender and heartbeat_sender.is_running:
             heartbeat_sender.stop()
 
-        # Close the gRPC connection
+        # Close the Runtime HTTP connection
         conn._disconnect()
 
         cleanup_app_runtime_environment(runtime_env_dir)
@@ -220,7 +216,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
     try:
         # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(conn._stub))
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_http(conn._stub))
         heartbeat_sender.start()
 
         # Pull SimulationInputs from LinkState
@@ -234,7 +230,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             log_queue=log_queue,
             node_id=context.node_id,
             run_id=run.run_id,
-            stub=conn._stub,
+            client=conn._stub,
         )
 
         # Extract federation configuration
@@ -390,11 +386,11 @@ def _parse_args_run_flwr_simulation() -> argparse.ArgumentParser:
         "--serverappio-api-address",
         "--simulationio-api-address",
         dest="runtime_api_address",
-        default=SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
+        default=SUPERLINK_DEFAULT_CLIENT_ADDRESS,
         type=str,
         help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name). "
         "`--simulationio-api-address` is accepted as a deprecated alias. "
-        f"By default, it is set to {SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS}.",
+        f"By default, it is set to {SUPERLINK_DEFAULT_CLIENT_ADDRESS}.",
     )
     add_args_flwr_app_common(parser=parser)
     return parser

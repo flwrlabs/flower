@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower gRPC Grid."""
+"""Flower HTTP Grid."""
 
 
 import time
@@ -20,17 +20,12 @@ from collections.abc import Iterable
 from logging import DEBUG, ERROR, WARNING
 from typing import cast
 
-import grpc
+import httpx
 
 from flwr.app import Message, Metadata, RecordDict
 from flwr.app.error import Error
 from flwr.app.message import make_message, remove_content_from_message
-from flwr.common.constant import (
-    SUPERLINK_NODE_ID,
-    SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
-    ErrorCode,
-)
-from flwr.common.logger import log, warn_deprecated_feature
+from flwr.common.constant import CLIENT_OCTET, SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import message_to_proto
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -44,11 +39,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushAppMessagesRequest,
     PushAppMessagesResponse,
 )
-from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 from flwr.serverapp.grid import Grid
-from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
+from flwr.supercore import log
+from flwr.supercore.constant import SUPERLINK_UVICORN_DEFAULT_PORT, SYSTEM_MESSAGE_TYPE
 from flwr.supercore.date import now
-from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.inflatable.inflatable_object import (
     InflatableObject,
     get_all_nested_objects,
@@ -67,18 +61,22 @@ from flwr.supercore.inflatable.inflatable_utils import (
     push_objects,
 )
 from flwr.supercore.interceptors import (
-    RuntimeTokenClientInterceptor,
-    RuntimeVersionClientInterceptor,
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
 )
-from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
+from flwr.supercore.logger import warn_deprecated_feature
+from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.run import Run
+from flwr.supercore.runtime import RuntimeHttpClient
 
-ERROR_MESSAGE_PUSH_MESSAGES_RESOURCE_EXHAUSTED = """
+_DEFAULT_RUNTIME_API_ADDRESS = f"{CLIENT_OCTET}:{SUPERLINK_UVICORN_DEFAULT_PORT}"
 
-[Grid.push_messages] gRPC error occurred:
+ERROR_MESSAGE_PUSH_MESSAGES_PAYLOAD_TOO_LARGE = """
 
-The 2GB gRPC limit has been reached. Consider reducing the number of messages pushed
-at once, or push messages individually, for example:
+[Grid.push_messages] HTTP payload too large:
+
+Consider reducing the number of messages pushed at once, or push messages
+individually, for example:
 
 > msgs = [msg1, msg2, msg3]
 > msg_ids = []
@@ -87,12 +85,12 @@ at once, or push messages individually, for example:
 >     msg_ids.extend(msg_id)
 """
 
-ERROR_MESSAGE_PULL_MESSAGES_RESOURCE_EXHAUSTED = """
+ERROR_MESSAGE_PULL_MESSAGES_PAYLOAD_TOO_LARGE = """
 
-[Grid.pull_messages] gRPC error occurred:
+[Grid.pull_messages] HTTP payload too large:
 
-The 2GB gRPC limit has been reached. Consider reducing the number of messages pulled
-at once, or pull messages individually, for example:
+Consider reducing the number of messages pulled at once, or pull messages
+individually, for example:
 
 > msgs_ids = [msg_id1, msg_id2, msg_id3]
 > msgs = []
@@ -102,20 +100,20 @@ at once, or pull messages individually, for example:
 """
 
 
-class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
-    """`GrpcGrid` provides an interface to the Runtime API.
+class HttpGrid(Grid):  # pylint: disable=too-many-instance-attributes
+    """`HttpGrid` provides an interface to the Runtime API.
 
     Parameters
     ----------
-    runtime_api_address : str (default: "[::]:9091")
+    runtime_api_address : str (default: "127.0.0.1:8000")
         The address (URL, IPv6, IPv4) of the SuperLink Runtime API service.
     insecure : bool (default: False)
         If True, use plaintext (TLS disabled). If False, use TLS.
     root_certificates : Optional[bytes] (default: None)
         The PEM-encoded root certificates as a byte string.
         Used only when `insecure` is False. If provided, these certificates are
-        used to verify the server certificate. If None, gRPC default root
-        certificates are used.
+        used to verify the server certificate. If None, HTTPX's default trusted CA
+        bundle is used.
     token : str
         Executor token used for Runtime API authentication.
     """
@@ -124,7 +122,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        runtime_api_address: str = SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
+        runtime_api_address: str = _DEFAULT_RUNTIME_API_ADDRESS,
         insecure: bool = False,
         root_certificates: bytes | None = None,
         *,
@@ -137,37 +135,31 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         self._cert = root_certificates
         self._token = token
         self._run: Run | None = None
-        self._grpc_stub: RuntimeStub | None = None
-        self._channel: grpc.Channel | None = None
+        self._client: RuntimeHttpClient | None = None
         self.node = Node(node_id=SUPERLINK_NODE_ID)
-        self._retry_invoker = make_simple_grpc_retry_invoker()
+        self._retry_invoker = make_simple_http_retry_invoker()
         super().__init__()
 
     @property
     def _is_connected(self) -> bool:
         """Check if connected to the Runtime API server."""
-        return self._channel is not None
+        return self._client is not None
 
     def _connect(self) -> None:
-        """Connect to the Runtime API.
-
-        This will not call GetRun.
-        """
+        """Connect to the Runtime API."""
         if self._is_connected:
             log(WARNING, "Already connected")
             return
-        self._channel = create_channel(
+        self._client = RuntimeHttpClient.from_server_address(
             server_address=self._addr,
             insecure=self._insecure,
             root_certificates=self._cert,
             interceptors=[
-                RuntimeVersionClientInterceptor(component_name="flwr-serverapp"),
-                RuntimeTokenClientInterceptor(token=self._token),
+                RuntimeVersionHttpInterceptor(component_name="flwr-serverapp"),
+                RuntimeTokenHttpInterceptor(token=self._token),
             ],
+            retry_invoker=self._retry_invoker,
         )
-        self._channel.subscribe(on_channel_state_change)
-        self._grpc_stub = RuntimeStub(self._channel)
-        wrap_stub(self._grpc_stub, self._retry_invoker)
         log(DEBUG, "[flwr-serverapp] Connected to %s", self._addr)
 
     def _disconnect(self) -> None:
@@ -175,10 +167,9 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         if not self._is_connected:
             log(DEBUG, "Already disconnected")
             return
-        channel: grpc.Channel = self._channel
-        self._channel = None
-        self._grpc_stub = None
-        channel.close()
+        client = cast(RuntimeHttpClient, self._client)
+        self._client = None
+        client.close()
         log(DEBUG, "[flwr-serverapp] Disconnected")
 
     def set_run(self, run: Run) -> None:
@@ -194,11 +185,11 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         return Run(**vars(self._run))
 
     @property
-    def _stub(self) -> RuntimeStub:
-        """Runtime API stub."""
+    def _runtime_client(self) -> RuntimeHttpClient:
+        """Runtime API client."""
         if not self._is_connected:
             self._connect()
-        return cast(RuntimeStub, self._grpc_stub)
+        return cast(RuntimeHttpClient, self._client)
 
     def _check_message(self, message: Message) -> None:
         # Check if the message is valid
@@ -222,8 +213,8 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         This method constructs a new `Message` with given content and metadata.
         The `run_id` and `src_node_id` will be set automatically.
         """
-        if not GrpcGrid._deprecation_warning_logged:
-            GrpcGrid._deprecation_warning_logged = True
+        if not HttpGrid._deprecation_warning_logged:
+            HttpGrid._deprecation_warning_logged = True
             warn_deprecated_feature(
                 "`Driver.create_message` / `Grid.create_message` is deprecated."
                 "Use `Message` constructor instead."
@@ -232,8 +223,8 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
 
     def get_node_ids(self) -> Iterable[int]:
         """Get node IDs."""
-        # Call RuntimeStub method
-        res: GetNodesResponse = self._stub.GetNodes(GetNodesRequest())
+        # Call the Runtime API client
+        res: GetNodesResponse = self._runtime_client.GetNodes(GetNodesRequest())
         return [node.node_id for node in res.nodes]
 
     def _try_push_messages(self, run_id: int, messages: Iterable[Message]) -> list[str]:
@@ -248,8 +239,8 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
             object_trees.append(get_object_tree(msg))
             del msg
 
-        # Call RuntimeStub method
-        res: PushAppMessagesResponse = self._stub.PushMessages(
+        # Call the Runtime API client
+        res: PushAppMessagesResponse = self._runtime_client.PushMessages(
             PushAppMessagesRequest(
                 messages_list=proto_messages,
                 message_object_trees=object_trees,
@@ -260,7 +251,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         push_objects(
             all_objects,
             push_object_fn=make_push_object_fn_protobuf(
-                push_object_protobuf=self._stub.PushObject,
+                push_object_protobuf=self._runtime_client.PushObject,
                 node=self.node,
                 run_id=run_id,
                 session_id=res.session_id,
@@ -292,9 +283,9 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
                 # Try pushing messages and their objects
                 message_ids = self._try_push_messages(run_id, messages)
 
-        except grpc.RpcError as e:
-            if e.code() == grpc.StatusCode.RESOURCE_EXHAUSTED:  # pylint: disable=E1101
-                log(ERROR, ERROR_MESSAGE_PUSH_MESSAGES_RESOURCE_EXHAUSTED)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == httpx.codes.REQUEST_ENTITY_TOO_LARGE:
+                log(ERROR, ERROR_MESSAGE_PUSH_MESSAGES_PAYLOAD_TOO_LARGE)
                 return []
             raise
 
@@ -318,7 +309,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         run_id = cast(Run, self._run).run_id
         try:
             # Pull Messages
-            res: PullAppMessagesResponse = self._stub.PullMessages(
+            res: PullAppMessagesResponse = self._runtime_client.PullMessages(
                 PullAppMessagesRequest(
                     message_ids=message_ids,
                 )
@@ -335,7 +326,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
                             tree.object_id for tree in iterate_object_tree(msg_tree)
                         ],
                         pull_object_fn=make_pull_object_fn_protobuf(
-                            pull_object_protobuf=self._stub.PullObject,
+                            pull_object_protobuf=self._runtime_client.PullObject,
                             node=self.node,
                             run_id=run_id,
                         ),
@@ -370,7 +361,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
                     continue
 
                 # Confirm that the message has been received
-                self._stub.ConfirmMessageReceived(
+                self._runtime_client.ConfirmMessageReceived(
                     ConfirmMessageReceivedRequest(
                         node=self.node, run_id=run_id, message_object_id=msg_id
                     )
@@ -383,9 +374,9 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
 
             return inflated_msgs
 
-        except grpc.RpcError as e:
-            if e.code() == grpc.StatusCode.RESOURCE_EXHAUSTED:  # pylint: disable=E1101
-                log(ERROR, ERROR_MESSAGE_PULL_MESSAGES_RESOURCE_EXHAUSTED)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == httpx.codes.REQUEST_ENTITY_TOO_LARGE:
+                log(ERROR, ERROR_MESSAGE_PULL_MESSAGES_PAYLOAD_TOO_LARGE)
                 return []
             raise
 

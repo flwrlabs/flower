@@ -29,8 +29,8 @@ from typing import Any, Literal, TypeVar, cast
 import requests
 
 from flwr.common.constant import FLWR_DIR, FLWR_HOME, NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
-from flwr.common.logger import log
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.version import package_version as flwr_version
 
 from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH

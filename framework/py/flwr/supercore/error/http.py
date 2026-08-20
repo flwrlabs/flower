@@ -23,7 +23,7 @@ from fastapi.responses import JSONResponse
 from starlette.datastructures import State
 from starlette.middleware.base import RequestResponseEndpoint
 
-from flwr.common.logger import log
+from flwr.supercore import log
 
 from .base import FlowerError
 from .catalog import API_ERROR_MAP

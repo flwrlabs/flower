@@ -21,7 +21,6 @@ from typing import cast
 from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.client import ClientFnExt
-from flwr.common import log
 from flwr.common.constant import MessageTypeLegacy
 from flwr.compat.client.client import (
     maybe_call_evaluate,
@@ -45,6 +44,7 @@ from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     Reason,
     ServerMessage,
 )
+from flwr.supercore import log
 
 
 class UnexpectedServerMessage(Exception):

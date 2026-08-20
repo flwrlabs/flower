@@ -19,11 +19,11 @@ from logging import INFO, WARNING
 
 import grpc
 
-from flwr.common.logger import log
 from flwr.proto.runtime_pb2_grpc import (  # pylint: disable=E0611
     add_RuntimeServicer_to_server,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore import log
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.interceptors import (
     RpcErrorTranslationServerInterceptor,

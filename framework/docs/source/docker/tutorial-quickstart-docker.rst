@@ -117,7 +117,8 @@ Start two SuperNode containers.
            --insecure \
            --superlink superlink:9092 \
            --node-config "partition-id=0 num-partitions=2" \
-           --clientappio-api-address 0.0.0.0:9094 \
+           --host 0.0.0.0 \
+           --port 9094 \
            --isolation process
 
    .. dropdown:: Understand the command
@@ -138,8 +139,8 @@ Start two SuperNode containers.
          ``superlink:9092``.
        * ``--node-config "partition-id=0 num-partitions=2"``: Set the partition ID to ``0`` and the
          number of partitions to ``2`` for the SuperNode configuration.
-       * ``--clientappio-api-address 0.0.0.0:9094``: Set the address and port number that the
-         SuperNode is listening on to communicate with the ClientApp process. If
+       * ``--host 0.0.0.0``: Make the SuperNode Runtime API accessible outside the container.
+       * ``--port 9094``: Set the port where the SuperNode listens for the ClientApp process. If
          multiple SuperNodes are started on the same machine, use a different port number for each SuperNode.
          (E.g. In the next step, we set the second SuperNode container to listen on port 9095)
        * ``--isolation process``: Tells the SuperNode that the ClientApp is executed by a separate
@@ -159,7 +160,8 @@ Start two SuperNode containers.
            --insecure \
            --superlink superlink:9092 \
            --node-config "partition-id=1 num-partitions=2" \
-           --clientappio-api-address 0.0.0.0:9095 \
+           --host 0.0.0.0 \
+           --port 9095 \
            --isolation process
 
 ***************************************************

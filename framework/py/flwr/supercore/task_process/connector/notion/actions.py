@@ -34,6 +34,7 @@ ACTIONS = (
                 "cursor": _CURSOR,
             },
             "required": ["query"],
+            "additionalProperties": False,
         },
     ),
     ActionDefinition(
@@ -50,6 +51,7 @@ ACTIONS = (
                 "cursor": _CURSOR,
             },
             "required": ["page_id"],
+            "additionalProperties": False,
         },
     ),
 )

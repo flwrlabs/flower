@@ -43,7 +43,7 @@ from flwr.supercore.utils import get_metadata_str
 
 from .runtime_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
 
-_SUPEREXEC_METHOD_NAMES = frozenset({"PullPendingTasks", "ClaimTask", "GetRun"})
+_SUPEREXEC_METHOD_NAMES = frozenset({"PullPendingTasks", "ClaimTask"})
 
 
 def _build_superexec_methods(service_name: str) -> frozenset[str]:

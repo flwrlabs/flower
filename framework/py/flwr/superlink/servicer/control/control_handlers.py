@@ -45,7 +45,6 @@ from flwr.common.constant import (
     TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
 )
-from flwr.common.logger import log
 from flwr.common.serde import (
     context_to_proto,
     run_status_to_proto,
@@ -78,6 +77,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAppsRequest,
+    ListAppsResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
     ListConnectorsRequest,
@@ -126,6 +127,7 @@ from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
+from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
@@ -165,10 +167,11 @@ from flwr.superlink.federation.noop_federation_manager import NoOpFederationMana
 class InvalidConnectorRequestError(FlowerError):
     """Exception raised when a connector request is invalid."""
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, public_details: str | None = None) -> None:
         super().__init__(
             ApiErrorCode.INVALID_CONNECTOR_REQUEST,
             f"Invalid connector request: {reason}.",
+            public_details=public_details,
         )
 
 
@@ -186,9 +189,19 @@ def list_connectors(
     account: AccountInfo,
     state: LinkState,
 ) -> ListConnectorsResponse:
-    """List user-connectable OAuth connectors and account connection status."""
+    """List OAuth connectors available in the requested federation."""
     log(INFO, "ControlServicer.ListConnectors")
-    _ = request
+    if not request.federation:
+        return ListConnectorsResponse()
+
+    flwr_aid = account.flwr_aid
+    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+    _validate_federation_membership_in_request(state, flwr_aid, request.federation)
+    federation = state.federation_manager.get_details(request.federation)
+    # Until connectors are federation-scoped, expose account-scoped connectors only
+    # in the personal agent federation.
+    if federation.can_invite_members or federation.can_add_supernodes:
+        return ListConnectorsResponse()
 
     connectors: list[Connector] = []
     for flow in sorted(
@@ -197,7 +210,7 @@ def list_connectors(
     ):
         connector_ref = flow.connector_ref
         connected = (
-            state.get_connector(flwr_aid=account.flwr_aid, connector_ref=connector_ref)
+            state.get_connector(flwr_aid=flwr_aid, connector_ref=connector_ref)
             is not None
         )
         connectors.append(
@@ -509,6 +522,17 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             f"federation '{federation_id}'.",
         )
 
+    if connector_refs:
+        federation = state.federation_manager.get_details(federation_id)
+        if federation.can_invite_members or federation.can_add_supernodes:
+            raise InvalidConnectorRequestError(
+                "connector refs are not supported for this federation",
+                public_details=(
+                    "Connectors are currently available only in your personal "
+                    "workspace."
+                ),
+            )
+
     try:
         # Validate user config overrides matches keys in run config in FAB
         fab_config = get_fab_config(fab_file)
@@ -519,9 +543,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         # be bundled locally and submitted through the regular `flwr run` path.
         components = fab_config["tool"]["flwr"]["app"].get("components", {})
         is_agentapp_bundle = "agentapp" in components
-        primary_task_type = (
-            TaskType.AGENT_APP if is_agentapp_bundle else TaskType.SERVER_APP
-        )
+        app_type = TaskType.AGENT_APP if is_agentapp_bundle else TaskType.SERVER_APP
+        primary_task_type = app_type
         resolved_federation_config = None
         runtime = RunTime.DEPLOYMENT
         sim_cfg = state.federation_manager.get_simulation_config(federation_id)
@@ -544,13 +567,19 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             fab_file,
             verification_dict,
         )
-        fab_hash = state.store_fab(fab)
+        fab_id, fab_version = get_metadata_from_config(fab_config)
+        fab_hash = state.store_app(
+            fab=fab,
+            federation_id=federation_id,
+            app_id=f"@{fab_id}",
+            app_type=app_type,
+            added_by=flwr_aid,
+        )
 
         if fab_hash != fab.hash_str:
             raise ValueError(
                 f"FAB ({fab.hash_str}) hash from request doesn't match contents"
             )
-        fab_id, fab_version = get_metadata_from_config(fab_config)
         series_id = request.series_id if request.HasField("series_id") else None
         series_description: str | None = None
         if primary_task_type == TaskType.AGENT_APP and series_id is None:
@@ -999,6 +1028,7 @@ def list_run_series(
     )
     limit = request.limit if request.HasField("limit") else None
     federation_id = request.federation_id if request.HasField("federation_id") else None
+    is_agent = request.is_agent if request.HasField("is_agent") else None
 
     if federation_id is not None:
         _validate_federation_membership_in_request(state, flwr_aid, federation_id)
@@ -1008,6 +1038,7 @@ def list_run_series(
         federation_ids = [federation.id for federation in federations]
     entries = state.get_run_series(
         federation_ids=federation_ids,
+        is_agent=is_agent,
         updated_before=updated_before,
         limit=limit,
     )
@@ -1286,6 +1317,16 @@ def list_federations(
             for fed in federations
         ]
     )
+
+
+def list_apps(
+    request: ListAppsRequest, account: AccountInfo, state: LinkState
+) -> ListAppsResponse:
+    """List apps associated with a federation."""
+    federation_id = request.federation_id
+    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    limit = request.limit if request.HasField("limit") else None
+    return ListAppsResponse(apps=state.list_apps(federation_id, limit))
 
 
 def show_federation(
