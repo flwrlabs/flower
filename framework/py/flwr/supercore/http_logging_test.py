@@ -15,7 +15,6 @@
 """HTTP server logging configuration tests."""
 
 import logging
-import sys
 from io import StringIO
 
 import pytest
@@ -101,9 +100,7 @@ def test_get_uvicorn_log_config_enables_debug_health_checks() -> None:
     assert config["filters"]["health_check_access"]["debug_enabled"]
 
 
-def test_configure_uvicorn_logging_updates_existing_handlers(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
     """Configure handlers owned by a direct Uvicorn CLI launch."""
     logger_names = ("uvicorn", "uvicorn.error", "uvicorn.access", "httpx", "httpcore")
     loggers = {name: logging.getLogger(name) for name in logger_names}
@@ -124,7 +121,6 @@ def test_configure_uvicorn_logging_updates_existing_handlers(
     )
 
     try:
-        monkeypatch.delenv("UVICORN_LOG_CONFIG", raising=False)
         loggers["uvicorn"].handlers = [default_handler]
         loggers["uvicorn.error"].handlers = []
         loggers["uvicorn.access"].handlers = [access_handler]
@@ -158,12 +154,6 @@ def test_configure_uvicorn_logging_updates_existing_handlers(
         access_handler.filters.clear()
         loggers["httpx"].setLevel(logging.INFO)
         loggers["httpcore"].setLevel(logging.DEBUG)
-        monkeypatch.setattr(
-            sys,
-            "argv",
-            ["uvicorn", "flwr.superlink.main:app", "--log-config", "custom.json"],
-        )
-
         configure_uvicorn_logging()
 
         assert default_handler.formatter is custom_formatter

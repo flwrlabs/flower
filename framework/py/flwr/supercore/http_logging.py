@@ -15,8 +15,6 @@
 """HTTP server logging configuration."""
 
 import logging
-import os
-import sys
 import time
 from typing import Any
 
@@ -140,9 +138,6 @@ def get_uvicorn_log_config(log_level: int) -> dict[str, Any]:
 
 def configure_uvicorn_logging() -> None:
     """Apply HTTP formatting to handlers already created by Uvicorn."""
-    if _has_explicit_uvicorn_log_config():
-        return
-
     formatter = UTCFormatter(LOG_FORMAT)
 
     for logger_name in ("uvicorn", "uvicorn.error"):
@@ -173,15 +168,10 @@ def configure_uvicorn_logging() -> None:
         else:
             handler.addFilter(HealthCheckAccessFilter(debug_enabled))
 
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-
-
-def _has_explicit_uvicorn_log_config() -> bool:
-    """Return whether Uvicorn was started with an explicit logging config."""
-    return "UVICORN_LOG_CONFIG" in os.environ or any(
-        arg == "--log-config" or arg.startswith("--log-config=") for arg in sys.argv[1:]
-    )
+    for logger_name in ("httpcore", "httpx"):
+        logger = logging.getLogger(logger_name)
+        if logger.level == logging.NOTSET:
+            logger.setLevel(logging.WARNING)
 
 
 def _is_default_uvicorn_formatter(
