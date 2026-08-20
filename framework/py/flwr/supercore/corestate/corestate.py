@@ -156,6 +156,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Return the FAB for the given hash, if present."""
 
     @abstractmethod
+    def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
+
+    @abstractmethod
     def list_apps(
         self, federation_id: str, limit: int | None = None
     ) -> Sequence[AppInfo]:

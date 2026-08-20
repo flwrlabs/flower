@@ -485,6 +485,32 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 verifications=json.loads(row.verifications),
             )
 
+    def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
+        if not all((federation_id, app_id, fab_hash)):
+            return None
+        query = (
+            select(FabModel)
+            .join(
+                FederationAppModel,
+                FederationAppModel.fab_hash == FabModel.fab_hash,
+            )
+            .where(
+                FederationAppModel.federation_id == federation_id,
+                FederationAppModel.app_id == app_id,
+                FederationAppModel.fab_hash == fab_hash,
+            )
+        )
+        with self.session() as session:
+            row = session.scalar(query.execution_options(populate_existing=True))
+            if row is None:
+                return None
+            return Fab(
+                hash_str=row.fab_hash,
+                content=row.content,
+                verifications=json.loads(row.verifications),
+            )
+
     def list_apps(
         self, federation_id: str, limit: int | None = None
     ) -> Sequence[AppInfo]:
