@@ -15,13 +15,16 @@
 """HTTP server logging configuration tests."""
 
 import logging
+from io import StringIO
 
 import pytest
+from uvicorn.logging import AccessFormatter, DefaultFormatter
 
 from .http_logging import (
     LOG_FORMAT,
     HealthCheckAccessFilter,
     UTCFormatter,
+    configure_uvicorn_logging,
     get_uvicorn_log_config,
 )
 
@@ -95,3 +98,72 @@ def test_get_uvicorn_log_config_enables_debug_health_checks() -> None:
     config = get_uvicorn_log_config(logging.DEBUG)
 
     assert config["filters"]["health_check_access"]["debug_enabled"]
+
+
+def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
+    """Configure handlers owned by a direct Uvicorn CLI launch."""
+    logger_names = ("uvicorn", "uvicorn.error", "uvicorn.access", "httpx", "httpcore")
+    loggers = {name: logging.getLogger(name) for name in logger_names}
+    original_state = {
+        name: (list(logger.handlers), logger.level) for name, logger in loggers.items()
+    }
+    default_handler = logging.StreamHandler(StringIO())
+    access_handler = logging.StreamHandler(StringIO())
+    custom_formatter = logging.Formatter("custom: %(message)s")
+    default_handler.setFormatter(
+        DefaultFormatter(fmt="%(levelprefix)s %(message)s", use_colors=False)
+    )
+    access_handler.setFormatter(
+        AccessFormatter(
+            fmt='%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
+            use_colors=False,
+        )
+    )
+
+    try:
+        loggers["uvicorn"].handlers = [default_handler]
+        loggers["uvicorn.error"].handlers = []
+        loggers["uvicorn.access"].handlers = [access_handler]
+        loggers["uvicorn"].setLevel(logging.ERROR)
+        loggers["uvicorn.error"].setLevel(logging.CRITICAL)
+        loggers["uvicorn.access"].setLevel(logging.WARNING)
+        loggers["httpx"].setLevel(logging.NOTSET)
+        loggers["httpcore"].setLevel(logging.NOTSET)
+
+        configure_uvicorn_logging()
+
+        assert loggers["uvicorn"].handlers == [default_handler]
+        assert loggers["uvicorn.access"].handlers == [access_handler]
+        assert loggers["uvicorn"].level == logging.ERROR
+        assert loggers["uvicorn.error"].level == logging.CRITICAL
+        assert loggers["uvicorn.access"].level == logging.WARNING
+        assert isinstance(default_handler.formatter, UTCFormatter)
+        assert isinstance(access_handler.formatter, UTCFormatter)
+        health_filters = [
+            log_filter
+            for log_filter in access_handler.filters
+            if isinstance(log_filter, HealthCheckAccessFilter)
+        ]
+        assert len(health_filters) == 1
+        assert not health_filters[0].debug_enabled
+        assert loggers["httpx"].level == logging.WARNING
+        assert loggers["httpcore"].level == logging.WARNING
+
+        default_handler.setFormatter(custom_formatter)
+        access_handler.setFormatter(custom_formatter)
+        access_handler.filters.clear()
+        loggers["httpx"].setLevel(logging.INFO)
+        loggers["httpcore"].setLevel(logging.DEBUG)
+        configure_uvicorn_logging()
+
+        assert default_handler.formatter is custom_formatter
+        assert access_handler.formatter is custom_formatter
+        assert not access_handler.filters
+        assert loggers["httpx"].level == logging.INFO
+        assert loggers["httpcore"].level == logging.DEBUG
+    finally:
+        for name, (handlers, level) in original_state.items():
+            loggers[name].handlers = handlers
+            loggers[name].setLevel(level)
+        default_handler.close()
+        access_handler.close()
