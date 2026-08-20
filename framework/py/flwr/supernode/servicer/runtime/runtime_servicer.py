@@ -31,7 +31,6 @@ from flwr.proto.message_pb2 import (
     PushObjectRequest,
     PushObjectResponse,
 )
-from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
 from flwr.proto.runtime_pb2 import (
     GetConnectorRequest,
     GetConnectorResponse,
@@ -69,12 +68,6 @@ class SuperNodeRuntimeServicer(RuntimeServicer, runtime_pb2_grpc.RuntimeServicer
     def state(self) -> NodeState:
         """Return the NodeState instance."""
         return self.state_factory.state()
-
-    def GetRun(
-        self, request: GetRunRequest, context: grpc.ServicerContext
-    ) -> GetRunResponse:
-        """Get run information."""
-        return runtime_handlers.get_run(request, self.state_factory.state())
 
     def PullTaskInput(
         self, request: PullTaskInputRequest, context: grpc.ServicerContext

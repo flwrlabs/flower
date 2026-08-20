@@ -18,17 +18,11 @@ from typing import cast
 from unittest.mock import Mock, patch
 
 from flwr.supercore.constant import TaskType
-from flwr.supercore.run import Run
 from flwr.supercore.superexec.executor import ExecutionSpec
 from flwr.supercore.superexec.plugin.base_exec_plugin import BaseExecPlugin
 from flwr.supercore.superexec.plugin.clientapp_exec_plugin import ClientAppExecPlugin
 
 from .serverapp_exec_plugin import ServerAppExecPlugin
-
-
-def _get_run(_: int) -> Run:
-    """Return a minimal dummy run."""
-    return Run.create_empty(run_id=1)
 
 
 def _get_task(*, task_id: int = 1, task_type: str = TaskType.CLIENT_APP) -> Mock:
@@ -51,7 +45,6 @@ def test_clientapp_launch_delegates_default_stdio_spec() -> None:
         runtime_api_address="127.0.0.1:9094",
         insecure=True,
         root_certificates_path=None,
-        get_run=_get_run,
         executor=executor,
     )
 
@@ -69,7 +62,6 @@ def test_clientapp_launch_ignores_unsupported_task_type() -> None:
         runtime_api_address="127.0.0.1:9094",
         insecure=True,
         root_certificates_path=None,
-        get_run=_get_run,
         executor=executor,
     )
 
@@ -87,7 +79,6 @@ def test_serverapp_launch_delegates_suppressed_stdio_spec() -> None:
         runtime_api_address="127.0.0.1:9092",
         insecure=True,
         root_certificates_path=None,
-        get_run=_get_run,
         executor=executor,
     )
 
@@ -107,7 +98,6 @@ def test_serverapp_launch_configures_task_output_visibility() -> None:
         runtime_api_address="127.0.0.1:9092",
         insecure=True,
         root_certificates_path=None,
-        get_run=_get_run,
         executor=executor,
     )
 
@@ -142,7 +132,6 @@ def test_launch_task_forwards_runtime_dependency_install_flag() -> None:
         runtime_api_address="127.0.0.1:9091",
         insecure=True,
         root_certificates_path=None,
-        get_run=Mock(),
         runtime_dependency_install=True,
         executor=executor,
     )
@@ -166,7 +155,6 @@ def test_launch_task_skips_optional_runtime_flags_by_default() -> None:
         runtime_api_address="127.0.0.1:9091",
         insecure=True,
         root_certificates_path=None,
-        get_run=Mock(),
         executor=executor,
     )
 
@@ -182,7 +170,6 @@ def test_clientapp_launch_forwards_root_certificate() -> None:
         runtime_api_address="127.0.0.1:9094",
         insecure=False,
         root_certificates_path="/tmp/root.pem",
-        get_run=_get_run,
         executor=executor,
     )
 
@@ -200,7 +187,6 @@ def test_clientapp_launch_omits_tls_flags_when_using_system_certificates() -> No
         runtime_api_address="127.0.0.1:9094",
         insecure=False,
         root_certificates_path=None,
-        get_run=_get_run,
         executor=executor,
     )
 
