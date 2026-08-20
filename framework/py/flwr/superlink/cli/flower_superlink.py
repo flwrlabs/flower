@@ -73,11 +73,12 @@ from flwr.supercore.constant import (
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
+from flwr.supercore.http_logging import get_uvicorn_log_config
 from flwr.supercore.interceptors import (
     RpcErrorTranslationServerInterceptor,
     create_fleet_runtime_version_server_interceptor,
 )
-from flwr.supercore.logger import configure_superlink_log_file
+from flwr.supercore.logger import configure_superlink_log_file, console_handler
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import (
@@ -590,6 +591,7 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
         port=lifespan_config.port,
         reload=False,
         access_log=True,
+        log_config=get_uvicorn_log_config(console_handler.level),
         ssl_keyfile=None if lifespan_config.insecure else lifespan_config.ssl_keyfile,
         ssl_certfile=None if lifespan_config.insecure else lifespan_config.ssl_certfile,
         workers=1,

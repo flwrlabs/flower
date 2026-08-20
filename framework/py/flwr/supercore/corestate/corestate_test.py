@@ -677,6 +677,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         series_id = state.store_run_in_series(
             run_id=123,
             federation_id="@me/fed-a",
+            is_agent=True,
             series_id=None,
             description="Initial description",
         )
@@ -688,6 +689,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state.store_run_in_series(
                 run_id=456,
                 federation_id="@me/fed-a",
+                is_agent=False,
                 series_id=series_id,
                 description="Replacement description",
             ),
@@ -695,6 +697,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         run_series = state.get_run_series(series_ids=[series_id])
         self.assertEqual(run_series[0].description, "Initial description")
+        self.assertEqual(state.get_run_series(is_agent=True), run_series)
+        self.assertEqual(state.get_run_series(is_agent=False), [])
 
     def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
         """Unknown caller-provided run series IDs return None."""
@@ -704,6 +708,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             series_id = state.store_run_in_series(
                 run_id=123,
                 federation_id="@me/fed-a",
+                is_agent=False,
                 series_id=123,
             )
 
@@ -714,13 +719,17 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Storing the same run ID twice should return None."""
         state = self.state_factory()
         series_id = state.store_run_in_series(
-            run_id=123, federation_id="@me/fed-a", series_id=None
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=False,
+            series_id=None,
         )
         assert series_id is not None
 
         stored = state.store_run_in_series(
             run_id=123,
             federation_id="@me/fed-a",
+            is_agent=False,
             series_id=series_id,
         )
 
@@ -730,13 +739,22 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """RunSeries lookup should filter by series IDs and federation IDs."""
         state = self.state_factory()
         series_id_a = state.store_run_in_series(
-            run_id=123, federation_id="@me/fed-a", series_id=None
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=False,
+            series_id=None,
         )
         series_id_b = state.store_run_in_series(
-            run_id=456, federation_id="@me/fed-b", series_id=None
+            run_id=456,
+            federation_id="@me/fed-b",
+            is_agent=False,
+            series_id=None,
         )
         series_id_c = state.store_run_in_series(
-            run_id=789, federation_id="@me/fed-a", series_id=None
+            run_id=789,
+            federation_id="@me/fed-a",
+            is_agent=False,
+            series_id=None,
         )
         assert series_id_a is not None
         assert series_id_b is not None
