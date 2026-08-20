@@ -44,7 +44,7 @@ from flwr.supercore.utils import (
 
 from ..log import start_stream
 from ..utils import (
-    AppPublishPathDepthError,
+    AppPathDepthError,
     cli_output_handler,
     flwr_cli_grpc_exc_handler,
     init_channel_from_connection,
@@ -184,7 +184,7 @@ def _run_with_control_api(
         if not is_remote_app:
             try:
                 fab_bytes = build_fab_from_disk(app)
-            except AppPublishPathDepthError as err:
+            except AppPathDepthError as err:
                 raise err.to_click_exception() from None
             fab_hash = hashlib.sha256(fab_bytes).hexdigest()
             fab_id, fab_version = get_metadata_from_config(config)

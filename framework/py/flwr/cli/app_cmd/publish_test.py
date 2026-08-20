@@ -65,7 +65,7 @@ def test_collect_files_depth_limit(tmp_path: Path) -> None:
 
     with pytest.raises(click.ClickException) as exc_info:
         _collect_file_paths(tmp_path)
-    assert "does not meet the app publishing requirements" in str(exc_info.value)
+    assert "does not meet the project structure requirements" in str(exc_info.value)
     assert ".gitignore" in str(exc_info.value)
 
 

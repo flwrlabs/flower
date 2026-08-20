@@ -41,7 +41,7 @@ from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 
 from .utils import (
-    AppPublishPathDepthError,
+    AppPathDepthError,
     _format_flower_error,
     build_pathspec,
     cli_output_handler,
@@ -501,7 +501,7 @@ def test_filter_paths_for_publish_max_depth_exceeded(
     )
     # Execute & assert
     with pytest.raises(
-        AppPublishPathDepthError, match="exceeds the maximum directory depth"
+        AppPathDepthError, match="exceeds the maximum directory depth"
     ) as exc_info:
         filter_paths_for_publish(files)
     assert exc_info.value.path == deep

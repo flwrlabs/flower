@@ -521,8 +521,8 @@ def depth_of(relative_path: Path) -> int:
     return max(0, len(relative_path.parts) - 1)
 
 
-class AppPublishPathDepthError(ValueError):
-    """Error raised when an app publishing path exceeds the depth limit."""
+class AppPathDepthError(ValueError):
+    """Error raised when a Flower App path exceeds the depth limit."""
 
     def __init__(self, path: str, max_depth: int) -> None:
         """Initialize the error with the offending path and configured limit."""
@@ -537,11 +537,10 @@ class AppPublishPathDepthError(ValueError):
     def to_click_exception(self) -> click.ClickException:
         """Convert the error to an actionable Click exception."""
         return click.ClickException(
-            "The Flower App does not meet the app publishing requirements:\n"
+            "The Flower App does not meet the project structure requirements:\n"
             f"{self}\n\n"
-            "Flower Apps must satisfy the publishing requirements before they can be "
-            "published, built, or run. If this file is not part of the app source, "
-            "exclude it by adding an appropriate pattern to .gitignore."
+            "If this file is not part of the app source, exclude it by adding an "
+            "appropriate pattern to .gitignore."
         )
 
 
@@ -587,7 +586,7 @@ def filter_paths_for_publish(
 
     Raises
     ------
-    AppPublishPathDepthError
+    AppPathDepthError
         Raised if any path exceeds the maximum directory depth.
     """
     # Load gitignore patterns if exists
@@ -607,7 +606,7 @@ def filter_paths_for_publish(
     ret_files = {}
     for rel_pth in cast(Iterable[str], filtered_paths):
         if depth_of(Path(rel_pth)) > MAX_DIR_DEPTH:
-            raise AppPublishPathDepthError(rel_pth, MAX_DIR_DEPTH)
+            raise AppPathDepthError(rel_pth, MAX_DIR_DEPTH)
         ret_files[rel_pth] = files[rel_pth]
     return ret_files
 
