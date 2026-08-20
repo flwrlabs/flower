@@ -18,7 +18,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-import grpc
+import httpx
 
 from flwr.common.serde import fab_to_proto
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
@@ -30,8 +30,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.supercore.exit import ExitCode
 from flwr.supercore.fab import Fab
 from flwr.supercore.interceptors import (
-    RuntimeTokenClientInterceptor,
-    RuntimeVersionClientInterceptor,
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
 )
 
 from .run_clientapp import pull_task_input, run_clientapp
@@ -56,32 +56,34 @@ class TestRunClientApp(unittest.TestCase):
             pull_task_input(stub)
 
     def test_run_clientapp_adds_client_interceptors(self) -> None:
-        """`run_clientapp` should add client interceptors to gRPC channel creation."""
+        """`run_clientapp` should add interceptors to the Runtime HTTP client."""
         with patch(
-            "flwr.supernode.runtime.run_clientapp.create_channel",
+            "flwr.supernode.runtime.run_clientapp.RuntimeHttpClient.from_server_address",
             side_effect=RuntimeError,
-        ) as mock_create_channel:
+        ) as from_server_address:
             with self.assertRaises(RuntimeError):
                 run_clientapp("127.0.0.1:9094", insecure=True, token="test-token")
 
-        kwargs = mock_create_channel.call_args.kwargs
+        kwargs = from_server_address.call_args.kwargs
         interceptors = kwargs["interceptors"]
         self.assertIsNotNone(interceptors)
         assert interceptors is not None
         self.assertEqual(len(interceptors), 2)
-        self.assertIsInstance(interceptors[0], RuntimeVersionClientInterceptor)
-        self.assertIsInstance(interceptors[1], RuntimeTokenClientInterceptor)
+        self.assertIsInstance(interceptors[0], RuntimeVersionHttpInterceptor)
+        self.assertIsInstance(interceptors[1], RuntimeTokenHttpInterceptor)
         # pylint: disable-next=protected-access
         self.assertEqual(interceptors[0]._metadata.component_name, "flwr-clientapp")
 
-    def test_run_clientapp_exits_nonzero_on_grpc_error(self) -> None:
+    def test_run_clientapp_exits_nonzero_on_http_error(self) -> None:
         """`run_clientapp` should not report success after Runtime API failures."""
         with (
-            patch("flwr.supernode.runtime.run_clientapp.create_channel") as channel,
+            patch(
+                "flwr.supernode.runtime.run_clientapp.RuntimeHttpClient.from_server_address"
+            ),
             patch("flwr.supernode.runtime.run_clientapp.HeartbeatSender"),
             patch(
                 "flwr.supernode.runtime.run_clientapp.pull_task_input",
-                side_effect=grpc.RpcError,
+                side_effect=httpx.ConnectError("Connection failed"),
             ),
             patch("flwr.supernode.runtime.run_clientapp.flwr_exit") as flwr_exit,
         ):
@@ -89,7 +91,6 @@ class TestRunClientApp(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 run_clientapp("127.0.0.1:9094", insecure=True, token="test-token")
 
-        channel.return_value.subscribe.assert_called_once()
         flwr_exit.assert_called_once()
         self.assertEqual(
             flwr_exit.call_args.kwargs["code"], ExitCode.TASK_PROC_EXCEPTION

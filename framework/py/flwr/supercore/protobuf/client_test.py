@@ -270,6 +270,22 @@ def test_from_server_address_uses_plain_http_when_insecure() -> None:
     )
 
 
+def test_from_server_address_uses_default_ca_bundle() -> None:
+    """Use HTTPX's default trusted CA bundle for secure connections by default."""
+    with patch("flwr.supercore.protobuf.client.httpx.Client") as http_client:
+        client = ProtobufClient.from_server_address(
+            server_address="api.example:443",
+            insecure=False,
+            root_certificates=None,
+            interceptors=[],
+        )
+
+    assert client._base_url == "https://api.example:443"  # pylint: disable=W0212
+    http_client.assert_called_once_with(
+        verify=True, timeout=30.0, follow_redirects=True
+    )
+
+
 @pytest.mark.parametrize("root_certificates", [b"certificate", "ca.pem"])
 def test_from_server_address_rejects_certificates_when_insecure(
     root_certificates: bytes | str,

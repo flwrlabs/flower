@@ -19,8 +19,6 @@ import time
 from logging import ERROR, WARNING
 from typing import Any
 
-import grpc
-
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.serde import run_from_proto
 from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
@@ -28,23 +26,23 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     PullPendingTasksRequest,
 )
-from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.supercore.grpc import create_channel, on_channel_state_change
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
-    RuntimeVersionClientInterceptor,
-    SuperExecAuthClientInterceptor,
+    RuntimeVersionHttpInterceptor,
+    SuperExecAuthHttpInterceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
     RUNTIME_SUPEREXEC_METHODS,
 )
-from flwr.supercore.retry import make_simple_grpc_retry_invoker, wrap_stub
+from flwr.supercore.protobuf.client import ProtobufClientInterceptor
+from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.run import Run
+from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
@@ -103,7 +101,7 @@ def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     plugin_class: type[ExecPlugin],
-    stub_class: type[RuntimeStub],
+    client_class: type[RuntimeHttpClient],
     runtime_api_address: str,
     insecure: bool,
     root_certificates_path: str | None = None,
@@ -121,8 +119,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     ----------
     plugin_class : type[ExecPlugin]
         The class of the SuperExec plugin to use.
-    stub_class : type[RuntimeStub]
-        The gRPC stub class for the Runtime API.
+    client_class : type[RuntimeHttpClient]
+        The HTTP client class for the Runtime API.
     runtime_api_address : str
         The address of the Runtime API.
     insecure : bool
@@ -153,12 +151,12 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     except ValueError as err:
         flwr_exit(ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG, str(err))
 
-    interceptors: list[grpc.UnaryUnaryClientInterceptor] = [
-        RuntimeVersionClientInterceptor(component_name="SuperExec")
+    interceptors: list[ProtobufClientInterceptor] = [
+        RuntimeVersionHttpInterceptor(component_name="SuperExec")
     ]
-    auth_interceptor: SuperExecAuthClientInterceptor | None = None
+    auth_interceptor: SuperExecAuthHttpInterceptor | None = None
     if superexec_auth_secret:
-        auth_interceptor = SuperExecAuthClientInterceptor(
+        auth_interceptor = SuperExecAuthHttpInterceptor(
             master_secret=superexec_auth_secret,
             protected_methods=RUNTIME_SUPEREXEC_METHODS,
         )
@@ -174,32 +172,27 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
         health_server = run_health_server_grpc_no_tls(health_server_address)
         grpc_servers.append(health_server)
 
-    # Create the channel to the Runtime API
-    channel = create_channel(
+    client = client_class.from_server_address(
         server_address=runtime_api_address,
         insecure=insecure,
         root_certificates=validate_and_resolve_root_certificates(
             root_certificates_path, insecure
         ),
         interceptors=interceptors,
+        retry_invoker=make_simple_http_retry_invoker(),
     )
-    channel.subscribe(on_channel_state_change)
 
-    # Register exit handlers to close the channel on exit
+    # Register exit handlers to close the Runtime API client on exit
     register_signal_handlers(
         event_type=EventType.RUN_SUPEREXEC_LEAVE,
         exit_message="SuperExec terminated gracefully.",
         grpc_servers=grpc_servers,
-        exit_handlers=[lambda: channel.close()],  # pylint: disable=W0108
+        exit_handlers=[client.close],
     )
-
-    # Create the gRPC stub for the Runtime API
-    stub = stub_class(channel)
-    wrap_stub(stub, make_simple_grpc_retry_invoker())
 
     def get_run(run_id: int) -> Run:
         _req = GetRunRequest(run_id=run_id)
-        _res = stub.GetRun(_req)
+        _res = client.GetRun(_req)
         return run_from_proto(_res.run)
 
     # Create the SuperExec plugin instance
@@ -226,7 +219,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     try:
         while True:
             # Fetch pending tasks
-            tasks_res = stub.PullPendingTasks(request=PullPendingTasksRequest())
+            tasks_res = client.PullPendingTasks(request=PullPendingTasksRequest())
 
             # Select a task to execute using the plugin's selection logic
             task = None
@@ -238,7 +231,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                 executor.wait_for_capacity()
 
                 claim_req = ClaimTaskRequest(task_id=task.task_id)
-                claim_res = stub.ClaimTask(claim_req)
+                claim_res = client.ClaimTask(claim_req)
 
                 # Launch the app if a token was granted; do nothing if not
                 if claim_res.token:
@@ -263,4 +256,4 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             # Sleep for a while before checking again
             time.sleep(1)
     finally:
-        channel.close()
+        client.close()

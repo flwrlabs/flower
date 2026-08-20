@@ -62,11 +62,8 @@ except ImportError:
 class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     """Configuration needed to start the SuperLink lifespan."""
 
-    runtime_address: str
     control_address: str
     health_server_address: str | None
-    enable_http_api: bool
-    disable_grpc_api: bool
     host: str
     port: int
     insecure: bool
@@ -86,6 +83,8 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     database: str
     isolation: str
     runtime_ssl_ca_certfile: str | None
+    runtime_ssl_certfile: str | None
+    runtime_ssl_keyfile: str | None
     runtime_dependency_install: bool
 
 

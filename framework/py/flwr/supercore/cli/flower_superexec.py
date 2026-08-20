@@ -24,7 +24,6 @@ import yaml
 
 from flwr.common.args import add_args_runtime_dependency_install
 from flwr.common.constant import ExecPluginType
-from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore import log
 from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
@@ -33,6 +32,7 @@ from flwr.supercore.auth import (
 from flwr.supercore.constant import EXEC_PLUGIN_SECTION, ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.superexec.executor.config import (
     ExecutorConfig,
     ExecutorConfigError,
@@ -81,7 +81,7 @@ def flower_superexec() -> None:
         getattr(args, "executor_config", None), args.executor
     )
 
-    # Get the plugin class and stub class based on the plugin type
+    # Get the plugin and Runtime HTTP client classes based on the plugin type
     if args.plugin_type == ExecPluginType.SIMULATION:
         log(
             WARN,
@@ -102,7 +102,7 @@ def flower_superexec() -> None:
             ExecPluginType.SERVER_APP,
         )
 
-    plugin_class, stub_class = _get_plugin_and_stub_class(args.plugin_type)
+    plugin_class, client_class = _get_plugin_and_client_class(args.plugin_type)
     superexec_auth_secret = None
     if args.superexec_auth_secret_file is not None:
         try:
@@ -126,7 +126,7 @@ def flower_superexec() -> None:
 
     run_superexec(
         plugin_class=plugin_class,
-        stub_class=stub_class,  # type: ignore
+        client_class=client_class,
         runtime_api_address=args.runtime_api_address,
         insecure=args.insecure,
         root_certificates_path=args.root_certificates,
@@ -219,16 +219,16 @@ def _load_executor_config(
         flwr_exit(ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG, str(err))
 
 
-def _get_plugin_and_stub_class(
+def _get_plugin_and_client_class(
     plugin_type: str,
-) -> tuple[type[ExecPlugin], type[object]]:
-    """Get the plugin class and stub class based on the plugin type."""
-    mapping: dict[str, tuple[type[ExecPlugin], type[object]]] = {
-        ExecPluginType.CLIENT_APP: (ClientAppExecPlugin, RuntimeStub),
-        ExecPluginType.SERVER_APP: (ServerAppExecPlugin, RuntimeStub),
+) -> tuple[type[ExecPlugin], type[RuntimeHttpClient]]:
+    """Get the plugin and Runtime HTTP client classes for a plugin type."""
+    mapping: dict[str, tuple[type[ExecPlugin], type[RuntimeHttpClient]]] = {
+        ExecPluginType.CLIENT_APP: (ClientAppExecPlugin, RuntimeHttpClient),
+        ExecPluginType.SERVER_APP: (ServerAppExecPlugin, RuntimeHttpClient),
         ExecPluginType.SERVER_APP_EPHEMERAL: (
             ServerAppEphemeralExecPlugin,
-            RuntimeStub,
+            RuntimeHttpClient,
         ),
     }
     if plugin_type in mapping:
