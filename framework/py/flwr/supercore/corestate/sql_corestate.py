@@ -434,6 +434,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError(
                 f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
             )
+        # Keep launch behavior: last write wins for metadata under the same
+        # content hash.
+        fab_stmt = self.dialect_insert(FabModel).values(
+            fab_hash=fab_hash,
+            content=fab.content,
+            verifications=json.dumps(fab.verifications),
+        )
+        fab_stmt = fab_stmt.on_conflict_do_update(
+            index_elements=[FabModel.fab_hash],
+            set_={
+                "content": fab_stmt.excluded.content,
+                "verifications": fab_stmt.excluded.verifications,
+            },
+        )
         app_stmt = self.dialect_insert(FederationAppModel).values(
             federation_id=federation_id,
             app_id=app_id,
@@ -450,20 +464,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             set_={
                 "fab_hash": app_stmt.excluded.fab_hash,
                 "app_type": app_stmt.excluded.app_type,
-            },
-        )
-        # Keep launch behavior: last write wins for metadata under the same
-        # content hash.
-        fab_stmt = self.dialect_insert(FabModel).values(
-            fab_hash=fab_hash,
-            content=fab.content,
-            verifications=json.dumps(fab.verifications),
-        )
-        fab_stmt = fab_stmt.on_conflict_do_update(
-            index_elements=[FabModel.fab_hash],
-            set_={
-                "content": fab_stmt.excluded.content,
-                "verifications": fab_stmt.excluded.verifications,
             },
         )
         with self.session() as session:
