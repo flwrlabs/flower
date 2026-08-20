@@ -15,6 +15,7 @@
 """Tests for SuperLink FastAPI application construction."""
 
 from typing import cast
+from unittest.mock import Mock
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
@@ -24,6 +25,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from flwr.supercore.error import http_error_translator
+from flwr.supercore.logger import console_handler
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.health.router import health
 from flwr.superlink.routers.control.middlewares import (
@@ -105,6 +107,21 @@ def test_get_ee_linkstate_db_uses_explicit_database(monkeypatch: MonkeyPatch) ->
     monkeypatch.setenv("FLWR_DATABASE", "sqlite:///state.db")
 
     assert main.get_ee_linkstate_db() == "sqlite:///state.db"
+
+
+def test_module_app_configures_direct_uvicorn_logging(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Configure Uvicorn before creating the lazily loaded module app."""
+    fastapi_app = FastAPI()
+    configure_logging = Mock()
+    monkeypatch.setattr(main, "configure_uvicorn_logging", configure_logging)
+    monkeypatch.setattr(main, "create_app", lambda: fastapi_app)
+    monkeypatch.delitem(vars(main), "app", raising=False)
+
+    assert main.__getattr__("app") is fastapi_app
+    configure_logging.assert_called_once_with(console_handler.level)
+    monkeypatch.delitem(vars(main), "app", raising=False)
 
 
 def test_create_app_constructs_control_middleware_in_execution_order(

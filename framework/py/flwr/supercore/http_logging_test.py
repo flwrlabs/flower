@@ -15,6 +15,7 @@
 """HTTP server logging configuration tests."""
 
 import logging
+from io import StringIO
 
 import pytest
 
@@ -22,6 +23,7 @@ from .http_logging import (
     LOG_FORMAT,
     HealthCheckAccessFilter,
     UTCFormatter,
+    configure_uvicorn_logging,
     get_uvicorn_log_config,
 )
 
@@ -95,3 +97,69 @@ def test_get_uvicorn_log_config_enables_debug_health_checks() -> None:
     config = get_uvicorn_log_config(logging.DEBUG)
 
     assert config["filters"]["health_check_access"]["debug_enabled"]
+
+
+def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
+    """Configure handlers owned by a direct Uvicorn CLI launch."""
+    logger_names = ("uvicorn", "uvicorn.error", "uvicorn.access", "httpx", "httpcore")
+    loggers = {name: logging.getLogger(name) for name in logger_names}
+    original_state = {
+        name: (list(logger.handlers), logger.level) for name, logger in loggers.items()
+    }
+    default_handler = logging.StreamHandler(StringIO())
+    access_handler = logging.StreamHandler(StringIO())
+
+    try:
+        loggers["uvicorn"].handlers = [default_handler]
+        loggers["uvicorn.error"].handlers = []
+        loggers["uvicorn.access"].handlers = [access_handler]
+
+        configure_uvicorn_logging(logging.INFO)
+
+        assert loggers["uvicorn"].handlers == [default_handler]
+        assert loggers["uvicorn.access"].handlers == [access_handler]
+        assert isinstance(default_handler.formatter, UTCFormatter)
+        assert isinstance(access_handler.formatter, UTCFormatter)
+        assert any(
+            isinstance(log_filter, HealthCheckAccessFilter)
+            for log_filter in access_handler.filters
+        )
+        assert loggers["httpx"].level == logging.WARNING
+        assert loggers["httpcore"].level == logging.WARNING
+    finally:
+        for name, (handlers, level) in original_state.items():
+            loggers[name].handlers = handlers
+            loggers[name].setLevel(level)
+        default_handler.close()
+        access_handler.close()
+
+
+def test_configure_uvicorn_logging_is_idempotent() -> None:
+    """Do not add duplicate health-check filters when configuring twice."""
+    logger_names = ("uvicorn", "uvicorn.error", "uvicorn.access", "httpx", "httpcore")
+    loggers = {name: logging.getLogger(name) for name in logger_names}
+    original_state = {
+        name: (list(logger.handlers), logger.level) for name, logger in loggers.items()
+    }
+    access_handler = logging.StreamHandler(StringIO())
+
+    try:
+        loggers["uvicorn"].handlers = []
+        loggers["uvicorn.error"].handlers = []
+        loggers["uvicorn.access"].handlers = [access_handler]
+
+        configure_uvicorn_logging(logging.INFO)
+        configure_uvicorn_logging(logging.DEBUG)
+
+        health_filters = [
+            log_filter
+            for log_filter in access_handler.filters
+            if isinstance(log_filter, HealthCheckAccessFilter)
+        ]
+        assert len(health_filters) == 1
+        assert health_filters[0].debug_enabled
+    finally:
+        for name, (handlers, level) in original_state.items():
+            loggers[name].handlers = handlers
+            loggers[name].setLevel(level)
+        access_handler.close()
