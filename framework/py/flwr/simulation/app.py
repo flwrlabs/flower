@@ -53,10 +53,7 @@ from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import (
-    NOOP_FEDERATION_ID,
-    SUPERLINK_DEFAULT_CLIENT_ADDRESS,
-)
+from flwr.supercore.constant import NOOP_FEDERATION_ID, SUPERLINK_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
 from flwr.supercore.logger import (
