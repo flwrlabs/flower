@@ -1363,9 +1363,7 @@ def add_app(
             ApiErrorCode.INVALID_APP_SPEC,
             "Failed to store app: app ID is required.",
         )
-    fab_file, verification_dict, _ = _get_remote_fab(
-        fleet_api_type, request.app_id
-    )
+    fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
     try:
         app_type = _get_app_type(get_fab_config(fab_file))
     except ValueError as e:
