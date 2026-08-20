@@ -521,6 +521,30 @@ def depth_of(relative_path: Path) -> int:
     return max(0, len(relative_path.parts) - 1)
 
 
+class AppPublishPathDepthError(ValueError):
+    """Error raised when an app publishing path exceeds the depth limit."""
+
+    def __init__(self, path: str, max_depth: int) -> None:
+        """Initialize the error with the offending path and configured limit."""
+        self.path = path
+        self.max_depth = max_depth
+        super().__init__(
+            f"'{path}' in the project exceeds the maximum directory depth "
+            f"of {max_depth}. Consider refactoring your project structure to "
+            "reduce nesting."
+        )
+
+    def to_click_exception(self) -> click.ClickException:
+        """Convert the error to an actionable Click exception."""
+        return click.ClickException(
+            "The Flower App does not meet the app publishing requirements:\n"
+            f"{self}\n\n"
+            "Flower Apps must satisfy the publishing requirements before they can be "
+            "published, built, or run. If this file is not part of the app source, "
+            "exclude it by adding an appropriate pattern to .gitignore."
+        )
+
+
 def collect_files(root: Path) -> dict[str, Path]:
     """Collect all files under the root directory and return a mapping of relative POSIX
     paths to absolute Paths.
@@ -563,7 +587,7 @@ def filter_paths_for_publish(
 
     Raises
     ------
-    ValueError
+    AppPublishPathDepthError
         Raised if any path exceeds the maximum directory depth.
     """
     # Load gitignore patterns if exists
@@ -583,11 +607,7 @@ def filter_paths_for_publish(
     ret_files = {}
     for rel_pth in cast(Iterable[str], filtered_paths):
         if depth_of(Path(rel_pth)) > MAX_DIR_DEPTH:
-            raise ValueError(
-                f"'{rel_pth}' in the project exceeds the maximum directory depth "
-                f"of {MAX_DIR_DEPTH}. Consider refactoring your project structure to "
-                "reduce nesting."
-            )
+            raise AppPublishPathDepthError(rel_pth, MAX_DIR_DEPTH)
         ret_files[rel_pth] = files[rel_pth]
     return ret_files
 

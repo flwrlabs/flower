@@ -41,6 +41,7 @@ from flwr.supercore.version import package_version as flwr_version
 from ..auth_plugin.oidc_cli_plugin import OidcCliPlugin
 from ..config_utils import load as load_toml
 from ..utils import (
+    AppPublishPathDepthError,
     collect_files,
     filter_paths_for_publish,
     load_cli_auth_plugin_from_connection,
@@ -194,6 +195,8 @@ def _collect_file_paths(root: Path) -> list[Path]:
             typer.secho(f"Skip: {path}", fg=typer.colors.YELLOW)
         # Build list of absolute file paths (sorted by relative path for stability)
         file_paths = [files[key].expanduser().resolve() for key in sorted(files.keys())]
+    except AppPublishPathDepthError as err:
+        raise err.to_click_exception() from None
     except ValueError as err:
         raise click.ClickException(str(err)) from err
 
