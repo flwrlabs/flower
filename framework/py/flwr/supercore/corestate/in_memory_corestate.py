@@ -379,6 +379,21 @@ class InMemoryCoreState(
                 verifications=dict(fab.verifications),
             )
 
+    def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
+        if not all((federation_id, app_id, fab_hash)):
+            return None
+        with self.lock_fab_store, self.lock_federation_app_store:
+            app = self.federation_app_store.get((federation_id, app_id))
+            fab = self.fab_store.get(fab_hash)
+            if app is None or app.fab_hash != fab_hash or fab is None:
+                return None
+            return Fab(
+                hash_str=fab.hash_str,
+                content=fab.content,
+                verifications=dict(fab.verifications),
+            )
+
     def list_apps(
         self, federation_id: str, limit: int | None = None
     ) -> Sequence[AppInfo]:
