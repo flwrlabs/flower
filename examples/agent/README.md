@@ -6,8 +6,8 @@ framework: []
 
 # Flower Agent
 
-This minimal AgentApp sends the configured `agent.input` to a model and streams
-the response. Use it as a starting point for a custom Flower Agent.
+This minimal AgentApp sends the configured `agent.input` to a model and prints
+the final response text. Use it as a starting point for a custom Flower Agent.
 
 ## Build
 
@@ -35,3 +35,8 @@ uv run flwr run . supergrid \
   --run-config 'agent.input="Explain federated learning in one paragraph."' \
   --stream
 ```
+
+## Learn more
+
+See the [Flower Agent documentation](https://flower.ai/docs/agent/) for more
+tutorials and guides.
