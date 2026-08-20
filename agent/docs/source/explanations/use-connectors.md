@@ -11,7 +11,6 @@ Built-in connectors need no external account:
 | ------------------ | --------------------------------- | -------------------------------------------- |
 | `web_search`       | Search the public web             | Results depend on runtime availability       |
 | `web_fetch`        | Fetch eligible public web content | Private and unsafe targets are blocked       |
-| `browser_use`      | Run a browser task                | Availability depends on the deployment       |
 | `start_automation` | Schedule AgentApp input           | Explicit future or recurring intent required |
 
 Account connectors use access granted by a signed-in user:
