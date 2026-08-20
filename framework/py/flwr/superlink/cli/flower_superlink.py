@@ -67,8 +67,8 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
+    SUPERLINK_UVICORN_DEFAULT_PORT,
     UVICORN_DEFAULT_HOST,
-    UVICORN_DEFAULT_PORT,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
@@ -796,10 +796,10 @@ def _add_args_http_api(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--port",
         type=_port_int,
-        default=UVICORN_DEFAULT_PORT,
+        default=SUPERLINK_UVICORN_DEFAULT_PORT,
         help=(
             "Port for the Runtime HTTP API. "
-            f"By default, it is set to {UVICORN_DEFAULT_PORT}."
+            f"By default, it is set to {SUPERLINK_UVICORN_DEFAULT_PORT}."
         ),
     )
 

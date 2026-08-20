@@ -49,8 +49,8 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.constant import (
     HTTP_SERVER_SHUTDOWN_TIMEOUT,
+    SUPERNODE_UVICORN_DEFAULT_PORT,
     UVICORN_DEFAULT_HOST,
-    UVICORN_DEFAULT_PORT,
 )
 from flwr.supercore.exit import ExitCode, add_exit_handler, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
@@ -288,8 +288,11 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     parser.add_argument(
         "--port",
         type=_port_int,
-        default=UVICORN_DEFAULT_PORT,
-        help=f"Port for the Runtime HTTP API (default: {UVICORN_DEFAULT_PORT}).",
+        default=SUPERNODE_UVICORN_DEFAULT_PORT,
+        help=(
+            "Port for the Runtime HTTP API "
+            f"(default: {SUPERNODE_UVICORN_DEFAULT_PORT})."
+        ),
     )
     parser.add_argument(
         "--appio-ssl-certfile",
