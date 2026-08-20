@@ -26,8 +26,20 @@ Starting at 09:00 Europe/London tomorrow, summarize new public Flower releases
 every 24 hours, for three runs total.
 ```
 
+```{figure} ../_static/screenshots/automation-request.png
+:alt: A one-off automation request in the Flower Agent chat composer.
+
+Describe the work, time, timezone, and recurrence before sending the request.
+```
+
 Review the agent's confirmation. It should identify the next execution time and
 whether the schedule repeats.
+
+```{figure} ../_static/screenshots/automation-confirmation.png
+:alt: Flower Agent confirming the execution time for a one-off automation.
+
+The confirmation restates when the automation will run and whether it repeats.
+```
 
 ## Expose automation from a custom AgentApp
 
@@ -111,18 +123,17 @@ The **Automations** tab shows recent schedules for the open federation. Select
 **View all** to open the full list.
 ```
 
-```{figure} ../_static/screenshots/automations-settings.png
-:alt: Flower Automations settings with Active and History tabs and schedule columns.
-
-The **Active** tab shows upcoming schedules. Use **History** for completed,
-stopped, or failed automations.
-```
-
 ## Stop an automation
 
 From the federation's **Latest activity**, open **Automations**, select **View
 all**, then select **Stop** on the relevant row under **Active**. Wait for its
 status to update before leaving the page.
+
+```{figure} ../_static/screenshots/automation-stop-action.png
+:alt: The Active status and Stop action for an automation.
+
+The **Stop** action is available while an automation is active.
+```
 
 Stopping prevents future scheduled runs. It does not stop a run that has
 already started. Stop that run separately from its run details or with
