@@ -67,7 +67,6 @@ def test_new_command() -> None:
     assert result.exit_code == 0
     assert "Usage:" in result.output
     assert "new" in result.output
-    assert "Use 'agent'" in result.output
 
 
 def test_run_command() -> None:

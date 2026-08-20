@@ -31,30 +31,6 @@ new_module = importlib.import_module("flwr.cli.new.new")
 
 
 @pytest.mark.parametrize(
-    ("app_spec", "expected_app_spec"),
-    [
-        ("agent", "@flwrlabs/agent"),
-        ("@flwrlabs/agent", "@flwrlabs/agent"),
-        ("@account/app==1.2.3", "@account/app==1.2.3"),
-    ],
-)
-def test_new_maps_agent_alias(
-    monkeypatch: pytest.MonkeyPatch,
-    app_spec: str,
-    expected_app_spec: str,
-) -> None:
-    """Map the agent alias without changing other remote app specs."""
-    downloaded_app_specs: list[str] = []
-    monkeypatch.setattr(
-        new_module, "download_remote_app_via_api", downloaded_app_specs.append
-    )
-
-    new_module.new(app_spec)
-
-    assert downloaded_app_specs == [expected_app_spec]
-
-
-@pytest.mark.parametrize(
     "value",
     [
         "user/app==1.2.3",  # missing '@'

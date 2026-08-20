@@ -36,8 +36,7 @@ def new(
     app_spec: Annotated[
         str | None,
         typer.Argument(
-            help="Flower app specifier. Use 'agent' to create a Flower Agent app, "
-            "or use the format "
+            help="Flower app specifier. Use the format "
             "'@account_name/app_name' or '@account_name/app_name==x.y.z'. "
             "Version is optional (defaults to latest)."
         ),
@@ -87,9 +86,6 @@ def new(
                 "the number from the list below:",
                 app_ids,
             )
-
-    if app_spec == "agent":
-        app_spec = "@flwrlabs/agent"
 
     # Download remote app
     download_remote_app_via_api(app_spec)
