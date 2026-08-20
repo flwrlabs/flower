@@ -34,11 +34,7 @@ from flwr.common.config import (
     get_project_config,
     get_project_dir,
 )
-from flwr.common.constant import (
-    RUNTIME_DEPENDENCY_INSTALL,
-    SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
-    SubStatus,
-)
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -57,7 +53,7 @@ from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import NOOP_FEDERATION_ID
+from flwr.supercore.constant import NOOP_FEDERATION_ID, SUPERLINK_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
 from flwr.supercore.logger import (
@@ -390,11 +386,11 @@ def _parse_args_run_flwr_simulation() -> argparse.ArgumentParser:
         "--serverappio-api-address",
         "--simulationio-api-address",
         dest="runtime_api_address",
-        default=SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
+        default=SUPERLINK_DEFAULT_CLIENT_ADDRESS,
         type=str,
         help="Address of SuperLink's Runtime API (IPv4, IPv6, or a domain name). "
         "`--simulationio-api-address` is accepted as a deprecated alias. "
-        f"By default, it is set to {SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS}.",
+        f"By default, it is set to {SUPERLINK_DEFAULT_CLIENT_ADDRESS}.",
     )
     add_args_flwr_app_common(parser=parser)
     return parser

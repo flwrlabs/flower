@@ -70,7 +70,7 @@ def test_parse_superlink_lifespan_config_returns_final_defaults(
     assert config.runtime_certificates is None
     assert config.superexec_auth_secret is None
     assert config.host == app_module.UVICORN_DEFAULT_HOST
-    assert config.port == app_module.UVICORN_DEFAULT_PORT
+    assert config.port == app_module.SUPERLINK_UVICORN_DEFAULT_PORT
     assert config.insecure is True
     assert config.enable_supernode_auth is False
     assert config.simulation is False
