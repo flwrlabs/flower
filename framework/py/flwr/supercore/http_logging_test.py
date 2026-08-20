@@ -15,6 +15,7 @@
 """HTTP server logging configuration tests."""
 
 import logging
+import sys
 from io import StringIO
 
 import pytest
@@ -100,7 +101,9 @@ def test_get_uvicorn_log_config_enables_debug_health_checks() -> None:
     assert config["filters"]["health_check_access"]["debug_enabled"]
 
 
-def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
+def test_configure_uvicorn_logging_updates_existing_handlers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Configure handlers owned by a direct Uvicorn CLI launch."""
     logger_names = ("uvicorn", "uvicorn.error", "uvicorn.access", "httpx", "httpcore")
     loggers = {name: logging.getLogger(name) for name in logger_names}
@@ -109,7 +112,6 @@ def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
     }
     default_handler = logging.StreamHandler(StringIO())
     access_handler = logging.StreamHandler(StringIO())
-    custom_access_handler = logging.StreamHandler(StringIO())
     custom_formatter = logging.Formatter("custom: %(message)s")
     default_handler.setFormatter(
         DefaultFormatter(fmt="%(levelprefix)s %(message)s", use_colors=False)
@@ -120,33 +122,27 @@ def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
             use_colors=False,
         )
     )
-    custom_access_handler.setFormatter(custom_formatter)
 
     try:
+        monkeypatch.delenv("UVICORN_LOG_CONFIG", raising=False)
         loggers["uvicorn"].handlers = [default_handler]
         loggers["uvicorn.error"].handlers = []
-        loggers["uvicorn.access"].handlers = [
-            access_handler,
-            custom_access_handler,
-        ]
+        loggers["uvicorn.access"].handlers = [access_handler]
         loggers["uvicorn"].setLevel(logging.ERROR)
         loggers["uvicorn.error"].setLevel(logging.CRITICAL)
         loggers["uvicorn.access"].setLevel(logging.WARNING)
+        loggers["httpx"].setLevel(logging.NOTSET)
+        loggers["httpcore"].setLevel(logging.NOTSET)
 
         configure_uvicorn_logging()
 
         assert loggers["uvicorn"].handlers == [default_handler]
-        assert loggers["uvicorn.access"].handlers == [
-            access_handler,
-            custom_access_handler,
-        ]
+        assert loggers["uvicorn.access"].handlers == [access_handler]
         assert loggers["uvicorn"].level == logging.ERROR
         assert loggers["uvicorn.error"].level == logging.CRITICAL
         assert loggers["uvicorn.access"].level == logging.WARNING
         assert isinstance(default_handler.formatter, UTCFormatter)
         assert isinstance(access_handler.formatter, UTCFormatter)
-        assert custom_access_handler.formatter is custom_formatter
-        assert not custom_access_handler.filters
         health_filters = [
             log_filter
             for log_filter in access_handler.filters
@@ -157,21 +153,27 @@ def test_configure_uvicorn_logging_updates_existing_handlers() -> None:
         assert loggers["httpx"].level == logging.WARNING
         assert loggers["httpcore"].level == logging.WARNING
 
-        loggers["uvicorn.access"].setLevel(logging.DEBUG)
+        default_handler.setFormatter(custom_formatter)
+        access_handler.setFormatter(custom_formatter)
+        access_handler.filters.clear()
+        loggers["httpx"].setLevel(logging.INFO)
+        loggers["httpcore"].setLevel(logging.DEBUG)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["uvicorn", "flwr.superlink.main:app", "--log-config", "custom.json"],
+        )
+
         configure_uvicorn_logging()
 
-        updated_health_filters = [
-            log_filter
-            for log_filter in access_handler.filters
-            if isinstance(log_filter, HealthCheckAccessFilter)
-        ]
-        assert updated_health_filters == health_filters
-        assert updated_health_filters[0].debug_enabled
-        assert loggers["uvicorn.access"].level == logging.DEBUG
+        assert default_handler.formatter is custom_formatter
+        assert access_handler.formatter is custom_formatter
+        assert not access_handler.filters
+        assert loggers["httpx"].level == logging.INFO
+        assert loggers["httpcore"].level == logging.DEBUG
     finally:
         for name, (handlers, level) in original_state.items():
             loggers[name].handlers = handlers
             loggers[name].setLevel(level)
         default_handler.close()
         access_handler.close()
-        custom_access_handler.close()
