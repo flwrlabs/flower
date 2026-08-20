@@ -18,8 +18,8 @@
 from logging import DEBUG, WARNING
 from typing import cast
 
-from flwr.common.constant import SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore import log
+from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.interceptors import (
     RuntimeTokenHttpInterceptor,
     RuntimeVersionHttpInterceptor,
@@ -48,7 +48,7 @@ class SimulationIoConnection:
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        runtime_api_address: str = SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
+        runtime_api_address: str = SUPERLINK_DEFAULT_CLIENT_ADDRESS,
         insecure: bool = False,
         root_certificates: bytes | None = None,
         *,

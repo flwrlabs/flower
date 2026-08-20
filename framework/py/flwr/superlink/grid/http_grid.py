@@ -41,7 +41,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.serverapp.grid import Grid
 from flwr.supercore import log
-from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE, UVICORN_DEFAULT_PORT
+from flwr.supercore.constant import SUPERLINK_UVICORN_DEFAULT_PORT, SYSTEM_MESSAGE_TYPE
 from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
     InflatableObject,
@@ -69,7 +69,7 @@ from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.run import Run
 from flwr.supercore.runtime import RuntimeHttpClient
 
-_DEFAULT_RUNTIME_API_ADDRESS = f"{CLIENT_OCTET}:{UVICORN_DEFAULT_PORT}"
+_DEFAULT_RUNTIME_API_ADDRESS = f"{CLIENT_OCTET}:{SUPERLINK_UVICORN_DEFAULT_PORT}"
 
 ERROR_MESSAGE_PUSH_MESSAGES_PAYLOAD_TOO_LARGE = """
 
