@@ -37,7 +37,7 @@ Request the runtime tool schema and include it in a model request:
 tools = agent.connectors.tools(["start_automation"])
 ```
 
-When the model returns its `function_call`, pass it to:
+Store the returned `function_call` item in `tool_call`, then pass it to:
 
 ```python
 output = agent.connectors.call(tool_call)
@@ -52,12 +52,13 @@ The model-facing arguments are:
 | `fixed_interval` | No       | Seconds between recurring runs, omitted for one execution        |
 | `max_runs`       | No       | Maximum executions, valid only with `fixed_interval`             |
 
-A one-off function call can look like:
+A one-off function call can look like this. Replace `YYYY-MM-DD` with the
+intended future date:
 
 ```json
 {
   "input": "Summarize new public Flower releases.",
-  "start_at": "2026-08-26T09:00:00+01:00"
+  "start_at": "YYYY-MM-DDT09:00:00+01:00"
 }
 ```
 
@@ -66,13 +67,13 @@ A bounded recurring call can look like:
 ```json
 {
   "input": "Summarize new public Flower releases.",
-  "start_at": "2026-08-26T09:00:00+01:00",
+  "start_at": "YYYY-MM-DDT09:00:00+01:00",
   "fixed_interval": 86400,
   "max_runs": 3
 }
 ```
 
-Do not use a timezone-free value such as `2026-08-26T09:00:00` because the
+Do not use a timezone-free value such as `YYYY-MM-DDT09:00:00` because the
 runtime rejects it. Avoid an unbounded recurrence unless the user clearly
 requested one and understands how to stop it.
 
