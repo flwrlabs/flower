@@ -415,15 +415,11 @@ def _run_until_connection_start(
     runtime_certificates: tuple[bytes, bytes, bytes] | None = None,
     runtime_root_certificates_path: str | None = None,
     runtime_api_address: str = "127.0.0.1:9094",
-    bound_address: str = "127.0.0.1:9094",
-) -> tuple[Mock, Mock]:
-    """Run startup only far enough to inspect Runtime API and SuperExec wiring."""
+) -> Mock:
+    """Run startup only far enough to inspect SuperExec HTTP wiring."""
     objectstore_factory = Mock()
     state_factory = Mock(objectstore_factory=objectstore_factory)
     with (
-        patch(
-            "flwr.supernode.start_client_internal.run_runtime_api_grpc"
-        ) as run_runtime,
         patch("flwr.supernode.start_client_internal.register_signal_handlers"),
         patch("flwr.supernode.start_client_internal.subprocess.Popen") as popen,
         patch(
@@ -431,7 +427,6 @@ def _run_until_connection_start(
             side_effect=_StopAfterSuperExecLaunch,
         ),
     ):
-        run_runtime.return_value.bound_address = bound_address
         # `_init_connection` starts the long-running SuperNode/SuperLink connection.
         # Raising there keeps this test focused on the setup performed before it.
         with pytest.raises(_StopAfterSuperExecLaunch):
@@ -447,20 +442,17 @@ def _run_until_connection_start(
                 runtime_root_certificates_path=runtime_root_certificates_path,
             )
 
-    assert run_runtime.call_args.kwargs["state_factory"] is state_factory
-    assert run_runtime.call_args.kwargs["objectstore_factory"] is objectstore_factory
-    return run_runtime, popen
+    return popen
 
 
 def test_start_client_internal_launches_insecure_superexec_by_default() -> None:
     """Subprocess SuperExec should use insecure Runtime API when TLS is off."""
     # This verifies the default subprocess-isolation path: when SuperNode starts
     # Runtime API without server TLS means the spawned SuperExec uses plaintext too.
-    run_runtime, popen = _run_until_connection_start()
+    popen = _run_until_connection_start()
 
     # No Runtime API server certificates means the local server is plaintext,
     # so the child SuperExec must connect with `--insecure`.
-    assert run_runtime.call_args.kwargs["certificates"] is None
     command = popen.call_args.args[0]
     assert command[:2] == ["flower-superexec", "--insecure"]
     assert "--root-certificates" not in command
@@ -475,25 +467,21 @@ def test_start_client_internal_launches_secure_superexec_with_root_certificates(
     # Runtime API with server TLS means the spawned SuperExec receives trust roots.
     certificates = (b"ca", b"cert", b"key")
 
-    run_runtime, popen = _run_until_connection_start(
+    popen = _run_until_connection_start(
         runtime_certificates=certificates,
         runtime_root_certificates_path="/tmp/ca.pem",
     )
 
     # When the Runtime API starts with TLS, SuperExec should verify that server
     # certificate with the same CA file instead of falling back to plaintext.
-    assert run_runtime.call_args.kwargs["certificates"] == certificates
     command = popen.call_args.args[0]
     assert "--insecure" not in command
     assert command[:3] == ["flower-superexec", "--root-certificates", "/tmp/ca.pem"]
 
 
-def test_start_client_internal_launches_superexec_with_bound_runtime_address() -> None:
-    """Subprocess SuperExec should use the selected Runtime API port."""
-    _, popen = _run_until_connection_start(
-        runtime_api_address="localhost:0",
-        bound_address="localhost:54321",
-    )
+def test_start_client_internal_launches_superexec_with_runtime_http_address() -> None:
+    """Subprocess SuperExec should use the Runtime HTTP API address."""
+    popen = _run_until_connection_start(runtime_api_address="localhost:54321")
 
     command = popen.call_args.args[0]
     assert command[command.index("--appio-api-address") + 1] == "localhost:54321"

@@ -24,7 +24,6 @@ from flwr.supercore.runtime import RuntimeHttpClient
 _UNARY_UNARY_PATHS = (
     "pull-pending-tasks",
     "claim-task",
-    "get-run",
     "send-task-heartbeat",
     "pull-task-input",
     "push-task-output",

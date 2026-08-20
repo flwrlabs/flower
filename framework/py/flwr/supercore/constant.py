@@ -97,6 +97,7 @@ APP_PUBLISH_INCLUDE_PATTERNS = (
 )
 APP_PUBLISH_EXCLUDE_PATTERNS = (
     f"{FLWR_DIR}/**",  # Exclude the .flwr directory
+    ".venv/**",
     "**/__pycache__/**",
 )
 MAX_TOTAL_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -132,6 +133,7 @@ DEFAULT_FEDERATION_SIMULATION = "workspace"
 
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
+HTTP_SERVER_SHUTDOWN_TIMEOUT = 3
 TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
 
 # Constants for message processing timing

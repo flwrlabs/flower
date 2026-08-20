@@ -73,7 +73,6 @@ class TestHttpGrid(unittest.TestCase):
         self.assertEqual(self.grid.run.fab_version, "v1.0.0")
         self.assertEqual(self.grid.run.fab_hash, "9f86d08")
         self.assertEqual(self.grid._addr, "127.0.0.1:8000")  # pylint: disable=W0212
-        self.mock_client.GetRun.assert_not_called()
 
     def test_get_nodes(self) -> None:
         """Test retrieval of nodes."""
@@ -87,7 +86,6 @@ class TestHttpGrid(unittest.TestCase):
         args, kwargs = self.mock_client.GetNodes.call_args
 
         # Assert
-        self.mock_client.GetRun.assert_not_called()
         self.assertEqual(len(args), 1)
         self.assertEqual(len(kwargs), 0)
         self.assertIsInstance(args[0], GetNodesRequest)
@@ -127,7 +125,6 @@ class TestHttpGrid(unittest.TestCase):
         args, kwargs = self.mock_client.PushMessages.call_args
 
         # Assert
-        self.mock_client.GetRun.assert_not_called()
         self.assertEqual(len(args), 1)
         self.assertEqual(len(kwargs), 0)
         self.assertIsInstance(args[0], PushAppMessagesRequest)
@@ -175,7 +172,6 @@ class TestHttpGrid(unittest.TestCase):
         args, kwargs = self.mock_client.PullMessages.call_args
 
         # Assert
-        self.mock_client.GetRun.assert_not_called()
         self.assertEqual(len(args), 1)
         self.assertEqual(len(kwargs), 0)
         self.assertIsInstance(args[0], PullAppMessagesRequest)

@@ -391,7 +391,6 @@ class TestMethodPolicyMaps(TestCase):
     NO_AUTH_BOOTSTRAP_METHODS = {
         "PullPendingTasks",
         "ClaimTask",
-        "GetRun",
     }
 
     @staticmethod
