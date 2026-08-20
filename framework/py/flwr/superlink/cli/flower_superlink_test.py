@@ -63,18 +63,12 @@ def test_parse_superlink_lifespan_config_returns_final_defaults(
 
     config = _parse_superlink_lifespan_config()
 
-    assert (
-        config.runtime_address
-        == app_module.SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS
-    )
     assert config.control_address == app_module.CONTROL_API_DEFAULT_SERVER_ADDRESS
     assert config.fleet_api_address == app_module.FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
     assert config.health_server_address is None
     assert config.certificates is None
     assert config.runtime_certificates is None
     assert config.superexec_auth_secret is None
-    assert config.enable_http_api is False
-    assert config.disable_grpc_api is False
     assert config.host == app_module.UVICORN_DEFAULT_HOST
     assert config.port == app_module.UVICORN_DEFAULT_PORT
     assert config.insecure is True
@@ -242,46 +236,21 @@ def test_flower_superlink_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> 
     assert captured == ["update", "flower-superlink"]
 
 
-def test_flower_superlink_legacy_factory_error_exits_invalid_args(
+def test_flower_superlink_runs_runtime_http_api(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Legacy mode factory creation errors should use the CLI invalid-args exit."""
-
-    class _SentinelError(Exception):
-        pass
-
-    config = SimpleNamespace(
-        enable_http_api=False,
-        simulation=False,
-        database="dummysql://localhost/flwr",
-    )
-    captured: dict[str, object] = {}
-
-    def _raise_value_error(*_args: object, **_kwargs: object) -> object:
-        raise ValueError("Unsupported value for `--database`.")
-
-    def _capture_exit(code: int, message: str) -> None:
-        captured["code"] = code
-        captured["message"] = message
-        raise _SentinelError()
+    """SuperLink should run the Runtime HTTP API unconditionally."""
+    config = SimpleNamespace()
+    run_http = Mock()
 
     monkeypatch.setattr(app_module, "warn_if_flwr_update_available", lambda **_: None)
     monkeypatch.setattr(app_module, "event", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(app_module, "_parse_superlink_lifespan_config", lambda: config)
-    monkeypatch.setattr(
-        app_module,
-        "get_objectstore_linkstate_factories",
-        _raise_value_error,
-    )
-    monkeypatch.setattr(app_module, "flwr_exit", _capture_exit)
+    monkeypatch.setattr(app_module, "_run_superlink_http_api", run_http)
 
-    with pytest.raises(_SentinelError):
-        app_module.flower_superlink()
+    app_module.flower_superlink()
 
-    assert captured == {
-        "code": app_module.ExitCode.SUPERLINK_INVALID_ARGS,
-        "message": "Unsupported value for `--database`.",
-    }
+    run_http.assert_called_once_with(lifespan_config=config)
 
 
 def test_obtain_superlink_certificates_keeps_runtime_separate(

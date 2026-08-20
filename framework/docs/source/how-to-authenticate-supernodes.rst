@@ -207,7 +207,8 @@ the TLS certificate.
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
         --superlink 127.0.0.1:9092 \
-        --clientappio-api-address 127.0.0.1:9094 \
+        --host 127.0.0.1 \
+        --port 9094 \
         --node-config="partition-id=0 num-partitions=2" \
         --auth-supernode-private-key keys/supernode_credentials_1
 
@@ -224,7 +225,8 @@ private key:
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
         --superlink 127.0.0.1:9092 \
-        --clientappio-api-address 127.0.0.1:9095 \
+        --host 127.0.0.1 \
+        --port 9095 \
         --node-config="partition-id=1 num-partitions=2" \
         --auth-supernode-private-key keys/supernode_credentials_2
 
