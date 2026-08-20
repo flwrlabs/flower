@@ -30,7 +30,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectRequest,
     PushObjectResponse,
 )
-from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -87,15 +86,6 @@ class RuntimeHttpClient(ProtobufClient):
             rpc_method="/flwr.proto.Runtime/ClaimTask",
             request=request,
             response_type=ClaimTaskResponse,
-        )
-
-    def GetRun(self, request: GetRunRequest) -> GetRunResponse:
-        """Get the run associated with a task."""
-        return self._unary_unary(
-            path="/v1/runtime/get-run",
-            rpc_method="/flwr.proto.Runtime/GetRun",
-            request=request,
-            response_type=GetRunResponse,
         )
 
     def SendTaskHeartbeat(

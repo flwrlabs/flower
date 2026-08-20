@@ -6,7 +6,6 @@ import warnings
 from flwr.proto import control_pb2 as flwr_dot_proto_dot_control__pb2
 from flwr.proto import log_pb2 as flwr_dot_proto_dot_log__pb2
 from flwr.proto import message_pb2 as flwr_dot_proto_dot_message__pb2
-from flwr.proto import run_pb2 as flwr_dot_proto_dot_run__pb2
 from flwr.proto import runtime_pb2 as flwr_dot_proto_dot_runtime__pb2
 
 GRPC_GENERATED_VERSION = '1.70.0'
@@ -47,11 +46,6 @@ class RuntimeStub(object):
                 '/flwr.proto.Runtime/ClaimTask',
                 request_serializer=flwr_dot_proto_dot_runtime__pb2.ClaimTaskRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_runtime__pb2.ClaimTaskResponse.FromString,
-                _registered_method=True)
-        self.GetRun = channel.unary_unary(
-                '/flwr.proto.Runtime/GetRun',
-                request_serializer=flwr_dot_proto_dot_run__pb2.GetRunRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_run__pb2.GetRunResponse.FromString,
                 _registered_method=True)
         self.SendTaskHeartbeat = channel.unary_unary(
                 '/flwr.proto.Runtime/SendTaskHeartbeat',
@@ -161,19 +155,12 @@ class RuntimeServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetRun(self, request, context):
+    def SendTaskHeartbeat(self, request, context):
         """///////////////////////////////////////////////////////////////////////////
         General Runtime endpoints for App Executor processes
         ///////////////////////////////////////////////////////////////////////////
 
-        Get run details
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SendTaskHeartbeat(self, request, context):
-        """Task heartbeat
+        Task heartbeat
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -311,11 +298,6 @@ def add_RuntimeServicer_to_server(servicer, server):
                     servicer.ClaimTask,
                     request_deserializer=flwr_dot_proto_dot_runtime__pb2.ClaimTaskRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_runtime__pb2.ClaimTaskResponse.SerializeToString,
-            ),
-            'GetRun': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetRun,
-                    request_deserializer=flwr_dot_proto_dot_run__pb2.GetRunRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_run__pb2.GetRunResponse.SerializeToString,
             ),
             'SendTaskHeartbeat': grpc.unary_unary_rpc_method_handler(
                     servicer.SendTaskHeartbeat,
@@ -457,33 +439,6 @@ class Runtime(object):
             '/flwr.proto.Runtime/ClaimTask',
             flwr_dot_proto_dot_runtime__pb2.ClaimTaskRequest.SerializeToString,
             flwr_dot_proto_dot_runtime__pb2.ClaimTaskResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def GetRun(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.Runtime/GetRun',
-            flwr_dot_proto_dot_run__pb2.GetRunRequest.SerializeToString,
-            flwr_dot_proto_dot_run__pb2.GetRunResponse.FromString,
             options,
             channel_credentials,
             insecure,

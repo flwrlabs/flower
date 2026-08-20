@@ -48,7 +48,6 @@ from .router import router
 _SUPEREXEC_PATHS = {
     "/v1/runtime/pull-pending-tasks",
     "/v1/runtime/claim-task",
-    "/v1/runtime/get-run",
 }
 
 
@@ -96,7 +95,7 @@ def test_all_runtime_routes_have_protobuf_request_types() -> None:
         if route_key[1].startswith("/v1/runtime/")
     }
 
-    assert len(route_keys) == 20
+    assert len(route_keys) == 19
     assert route_keys == runtime_request_types
 
 
