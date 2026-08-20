@@ -423,7 +423,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         app_id: str,
         app_type: str,
         added_by: str,
-    ) -> str | None:
+    ) -> None:
         """Associate an app with a federation and optionally store its FAB."""
         if not all((federation_id, app_id, app_type, added_by)):
             raise ValueError(
@@ -470,7 +470,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 session.execute(fab_stmt)
             session.execute(app_stmt)
-        return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
@@ -486,7 +485,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 verifications=json.loads(row.verifications),
             )
 
-    def get_app_fab(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
+    def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
         """Return a FAB only when it matches the federation-app association."""
         if not all((federation_id, app_id, fab_hash)):
             return None

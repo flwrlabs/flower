@@ -16,6 +16,7 @@
 
 
 # pylint: disable=too-many-lines
+import hashlib
 import unittest
 from contextlib import ExitStack
 from datetime import UTC, datetime, timedelta
@@ -95,15 +96,17 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Federation apps can be stored, listed, limited, and deleted."""
         state = self.state_factory()
 
-        server_hash = state.store_app(
-            fab=Fab("", b"server", {}),
+        server_hash = hashlib.sha256(b"server").hexdigest()
+        state.store_app(
+            fab=Fab(server_hash, b"server", {}),
             federation_id="@me/fed-a",
             app_id="@me/server",
             app_type=TaskType.SERVER_APP,
             added_by="account-a",
         )
-        agent_hash = state.store_app(
-            fab=Fab("", b"agent", {}),
+        agent_hash = hashlib.sha256(b"agent").hexdigest()
+        state.store_app(
+            fab=Fab(agent_hash, b"agent", {}),
             federation_id="@me/fed-a",
             app_id="@me/z-agent",
             app_type=TaskType.AGENT_APP,
@@ -126,11 +129,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             ],
         )
         self.assertEqual(
-            state.get_app_fab("@me/fed-a", "@me/server", server_hash),
+            state.get_app("@me/fed-a", "@me/server", server_hash),
             Fab(server_hash, b"server", {}),
         )
-        self.assertIsNone(state.get_app_fab("@me/fed-b", "@me/server", server_hash))
-        self.assertIsNone(state.get_app_fab("@me/fed-a", "@me/z-agent", server_hash))
+        self.assertIsNone(state.get_app("@me/fed-b", "@me/server", server_hash))
+        self.assertIsNone(state.get_app("@me/fed-a", "@me/z-agent", server_hash))
         self.assertEqual(
             [app.app_id for app in state.list_apps("@me/fed-a", limit=1)],
             ["@me/z-agent"],
@@ -139,8 +142,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         with self.assertRaises(AssertionError):
             state.list_apps("@me/fed-a", limit=-1)
 
-        updated_hash = state.store_app(
-            fab=Fab("", b"updated", {}),
+        updated_hash = hashlib.sha256(b"updated").hexdigest()
+        state.store_app(
+            fab=Fab(updated_hash, b"updated", {}),
             federation_id="@me/fed-a",
             app_id="@me/server",
             app_type=TaskType.SERVER_APP,
@@ -149,8 +153,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         updated = state.list_apps("@me/fed-a")
         self.assertEqual(len(updated), 2)
         self.assertEqual(updated[1].fab_hash, updated_hash)
-        self.assertIsNone(state.get_app_fab("@me/fed-a", "@me/server", server_hash))
-        self.assertIsNotNone(state.get_app_fab("@me/fed-a", "@me/server", updated_hash))
+        self.assertIsNone(state.get_app("@me/fed-a", "@me/server", server_hash))
+        self.assertIsNotNone(state.get_app("@me/fed-a", "@me/server", updated_hash))
 
         self.assertTrue(state.delete_app("@me/fed-a", "@me/server"))
         self.assertFalse(state.delete_app("@me/fed-a", "@me/server"))
@@ -187,10 +191,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
                 )
             ],
         )
-        self.assertIsNone(state.get_app_fab("@me/fed", "@flwr/demo", "missing-hash"))
+        self.assertIsNone(state.get_app("@me/fed", "@flwr/demo", "missing-hash"))
 
-        fab_hash = state.store_app(
-            fab=Fab("", b"uploaded", {}),
+        fab_hash = hashlib.sha256(b"uploaded").hexdigest()
+        state.store_app(
+            fab=Fab(fab_hash, b"uploaded", {}),
             federation_id="@me/fed",
             app_id="@flwr/demo",
             app_type=TaskType.SERVER_APP,
