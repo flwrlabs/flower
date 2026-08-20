@@ -47,7 +47,11 @@ from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
     load_superexec_auth_secret,
 )
-from flwr.supercore.constant import UVICORN_DEFAULT_HOST, UVICORN_DEFAULT_PORT
+from flwr.supercore.constant import (
+    HTTP_SERVER_SHUTDOWN_TIMEOUT,
+    UVICORN_DEFAULT_HOST,
+    UVICORN_DEFAULT_PORT,
+)
 from flwr.supercore.exit import ExitCode, add_exit_handler, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -181,7 +185,14 @@ def flower_supernode() -> None:
     def stop_http_server() -> None:
         """Stop the Runtime HTTP API server."""
         http_server.should_exit = True
-        http_thread.join()
+        http_thread.join(timeout=HTTP_SERVER_SHUTDOWN_TIMEOUT)
+        if http_thread.is_alive():
+            log(
+                WARN,
+                "Runtime HTTP API server did not stop within %.1f seconds.",
+                HTTP_SERVER_SHUTDOWN_TIMEOUT,
+            )
+            http_server.force_exit = True
 
     add_exit_handler(stop_http_server)
 

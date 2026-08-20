@@ -201,6 +201,7 @@ def test_flower_supernode_injects_state_factory(
     monkeypatch.setattr(flower_supernode_module, "add_exit_handler", add_exit_handler)
     http_server = Mock()
     http_thread = Mock()
+    http_thread.is_alive.return_value = True
     monkeypatch.setattr(
         flower_supernode_module,
         "_start_supernode_http_api",
@@ -215,4 +216,7 @@ def test_flower_supernode_injects_state_factory(
     exit_handler = add_exit_handler.call_args.args[0]
     exit_handler()
     assert http_server.should_exit is True
-    http_thread.join.assert_called_once_with()
+    http_thread.join.assert_called_once_with(
+        timeout=flower_supernode_module.HTTP_SERVER_SHUTDOWN_TIMEOUT
+    )
+    assert http_server.force_exit is True

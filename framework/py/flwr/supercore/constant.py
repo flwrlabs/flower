@@ -132,6 +132,7 @@ DEFAULT_FEDERATION_SIMULATION = "workspace"
 
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
+HTTP_SERVER_SHUTDOWN_TIMEOUT = 5.0
 TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
 
 # Constants for message processing timing
