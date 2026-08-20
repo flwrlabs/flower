@@ -68,7 +68,7 @@ unsupported connector, or the run rejects selected connector references.
 
 First distinguish the connector types:
 
-- built-ins (`web_search`, `web_fetch`, `browser_use`, `start_automation`) are
+- built-ins (`web_search`, `web_fetch`, `start_automation`) are
   requested in AgentApp code;
 - account connectors (Slack, Notion, GitHub, Attio) must be connected and
   selected for a browser run.

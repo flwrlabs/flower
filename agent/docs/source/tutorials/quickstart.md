@@ -124,3 +124,5 @@ private source content in a support report.
   terminal](get-started-with-flower-agent.md) introduces `flwr chat`.
 - [Write your first AgentApp](write-your-first-agentapp.md).
 - [Build a collaborative research agent](build-a-collaborative-agent.md).
+- [Connect accounts](../how-to-guides/connect-accounts.md) only if your project
+  needs account data.
