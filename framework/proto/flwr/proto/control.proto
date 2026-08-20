@@ -226,6 +226,7 @@ message ListRunSeriesRequest {
   optional string updated_before = 1;
   optional uint32 limit = 2;
   optional string federation_id = 3;
+  optional bool is_agent = 4; // Temporary filter for agent run series.
 }
 message ListRunSeriesResponse { repeated RunSeries entries = 1; }
 

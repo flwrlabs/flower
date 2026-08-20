@@ -136,9 +136,8 @@ class TestControlHandlers(unittest.TestCase):
 
     def test_list_apps(self) -> None:
         """List apps associated with the requested federation."""
-        fab_hash = hashlib.sha256(b"fab").hexdigest()
-        self.state.store_app(
-            fab=Fab(fab_hash, b"fab", {}),
+        fab_hash = self.state.store_app(
+            fab=Fab("", b"fab", {}),
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
             app_type=TaskType.SERVER_APP,

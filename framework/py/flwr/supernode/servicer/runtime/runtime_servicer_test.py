@@ -172,7 +172,7 @@ class TestSuperNodeRuntimeServicer(unittest.TestCase):
         # Execute
         push_message(self.mock_stub, message, context)
         push_task_output(
-            stub=self.mock_stub,
+            client=self.mock_stub,
             context=context,
             sub_status=sub_status,
             details=details,

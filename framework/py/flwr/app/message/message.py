@@ -24,7 +24,6 @@ from flwr.app.constants import DEFAULT_TTL
 from flwr.app.error import Error
 from flwr.app.metadata import Metadata
 from flwr.common.constant import MESSAGE_TTL_TOLERANCE
-from flwr.common.logger import log, warn_deprecated_feature
 from flwr.common.serde_utils import (
     error_from_proto,
     error_to_proto,
@@ -34,6 +33,7 @@ from flwr.common.serde_utils import (
 from flwr.proto.message_pb2 import Message as ProtoMessage  # pylint: disable=E0611
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectIDs  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
     InflatableObject,
@@ -42,6 +42,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_body,
     get_object_children_ids_from_object_content,
 )
+from flwr.supercore.logger import warn_deprecated_feature
 
 from .recorddict import RecordDict
 

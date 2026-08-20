@@ -17,14 +17,6 @@
 from math import isfinite
 from typing import Any, cast
 
-try:
-    from dp_accounting import dp_event, privacy_accountant
-    from dp_accounting import rdp as rdp_module
-except ImportError as exc:
-    raise ImportError(
-        'RDP accounting requires the optional dependency: pip install "flwr[dp]".'
-    ) from exc
-
 from .privacy_accounting import (
     GaussianPrivacyEvent,
     NeighboringRelation,
@@ -52,6 +44,11 @@ class RdpAccountant:
         self._config = config
         if orders is not None:
             orders = _validate_orders(orders)
+        (
+            self._dp_event,
+            self._privacy_accountant,
+            self._rdp_module,
+        ) = _load_dp_accounting()
         self._backend = self._new_backend(orders)
         self._orders = tuple(float(order) for order in self._backend.orders)
         self._compositions: list[tuple[GaussianPrivacyEvent, int]] = []
@@ -196,10 +193,10 @@ class RdpAccountant:
 
     def _new_backend(self, orders: tuple[float, ...] | None) -> Any:
         relation = getattr(
-            privacy_accountant.NeighboringRelation,
+            self._privacy_accountant.NeighboringRelation,
             self._config.neighboring_relation.name,
         )
-        return rdp_module.RdpAccountant(
+        return self._rdp_module.RdpAccountant(
             orders=orders,
             neighboring_relation=relation,
         )
@@ -209,14 +206,14 @@ class RdpAccountant:
             backend.compose(self._to_backend_event(event), count)
 
     def _to_backend_event(self, event: GaussianPrivacyEvent) -> Any:
-        gaussian_event = dp_event.GaussianDpEvent(event.noise_multiplier)
+        gaussian_event = self._dp_event.GaussianDpEvent(event.noise_multiplier)
         if self._config.sampling_method is SamplingMethod.POISSON:
-            return dp_event.PoissonSampledDpEvent(
+            return self._dp_event.PoissonSampledDpEvent(
                 event.sample_size / event.population_size,
                 gaussian_event,
             )
         if self._config.sampling_method is SamplingMethod.WITHOUT_REPLACEMENT:
-            return dp_event.SampledWithoutReplacementDpEvent(
+            return self._dp_event.SampledWithoutReplacementDpEvent(
                 event.population_size,
                 event.sample_size,
                 gaussian_event,
@@ -233,6 +230,20 @@ class RdpAccountant:
                 "Privacy event population_size does not match PrivacyConfig: "
                 f"{event.population_size} != {self._config.population_size}."
             )
+
+
+def _load_dp_accounting() -> tuple[Any, Any, Any]:
+    """Load the optional privacy-accounting backend."""
+    # pylint: disable=import-outside-toplevel
+    try:
+        from dp_accounting import dp_event, privacy_accountant
+        from dp_accounting import rdp as rdp_module
+    except ImportError as exc:
+        raise ImportError(
+            'RDP accounting requires the optional dependency: pip install "flwr[dp]".'
+        ) from exc
+    # pylint: enable=import-outside-toplevel
+    return dp_event, privacy_accountant, rdp_module
 
 
 def _parse_config(value: object) -> PrivacyConfig:

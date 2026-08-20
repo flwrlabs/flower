@@ -21,6 +21,7 @@ from unittest.mock import MagicMock, patch
 
 from flwr.cli.constant import (
     LOCAL_CONTROL_API_ADDRESS,
+    LOCAL_RUNTIME_API_PORT,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
 )
@@ -147,8 +148,11 @@ def test_start_local_superlink_uses_builtin_log_rotation(tmp_path: Path) -> None
     cmd = popen.call_args.args[0]
     assert "--log-file" in cmd
     assert str(log_file) in cmd
-    assert "--serverappio-api-address" in cmd
-    assert "127.0.0.1:0" in cmd
+    assert "--host" in cmd
+    assert cmd[cmd.index("--host") + 1] == "127.0.0.1"
+    assert "--port" in cmd
+    assert cmd[cmd.index("--port") + 1] == LOCAL_RUNTIME_API_PORT
+    assert "--serverappio-api-address" not in cmd
     assert "--database" in cmd
     assert str(database) in cmd
     assert "--log-rotation-interval-hours" in cmd

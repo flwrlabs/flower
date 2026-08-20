@@ -23,8 +23,8 @@ import pytest
 
 from flwr.supercore.constant import ExecutorType
 from flwr.supercore.interceptors import (
-    RuntimeVersionClientInterceptor,
-    SuperExecAuthClientInterceptor,
+    RuntimeVersionHttpInterceptor,
+    SuperExecAuthHttpInterceptor,
 )
 from flwr.supercore.superexec.executor import LaunchResult, LaunchResultStatus
 
@@ -35,22 +35,19 @@ def _run_superexec_one_launch(
     monkeypatch: pytest.MonkeyPatch, launch_result: LaunchResult | None
 ) -> tuple[Mock, Mock, Mock]:
     """Run one SuperExec launch loop and stop at the loop sleep."""
-    channel = Mock()
     task = Mock()
     task.task_id = 123
-    stub = Mock()
-    stub.PullPendingTasks.return_value = Mock(tasks=[task])
-    stub.ClaimTask.return_value = Mock(token="token-123")
+    client = Mock()
+    client.PullPendingTasks.return_value = Mock(tasks=[task])
+    client.ClaimTask.return_value = Mock(token="token-123")
+    client_class = Mock()
+    client_class.from_server_address.return_value = client
     plugin = Mock()
     plugin.select_task.return_value = task
     plugin.launch_task.return_value = launch_result
     log = Mock()
 
-    monkeypatch.setattr(
-        run_superexec_module, "create_channel", Mock(return_value=channel)
-    )
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
-    monkeypatch.setattr(run_superexec_module, "wrap_stub", Mock())
     monkeypatch.setattr(run_superexec_module, "get_executor", Mock())
     monkeypatch.setattr(run_superexec_module, "log", log)
     monkeypatch.setattr(
@@ -61,21 +58,21 @@ def _run_superexec_one_launch(
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
             plugin_class=Mock(return_value=plugin),
-            stub_class=Mock(return_value=stub),
+            client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
         )
 
-    return log, plugin, stub
+    return log, plugin, client
 
 
 @pytest.mark.parametrize(
     ("superexec_auth_secret", "expected_interceptor_types"),
     [
-        (None, (RuntimeVersionClientInterceptor,)),
+        (None, (RuntimeVersionHttpInterceptor,)),
         (
             b"superexec-secret",
-            (RuntimeVersionClientInterceptor, SuperExecAuthClientInterceptor),
+            (RuntimeVersionHttpInterceptor, SuperExecAuthHttpInterceptor),
         ),
     ],
 )
@@ -85,23 +82,22 @@ def test_run_superexec_adds_runtime_version_interceptor(
     expected_interceptor_types: tuple[type[object], ...],
 ) -> None:
     """SuperExec should attach runtime version metadata to Runtime API calls."""
-    channel = Mock()
-    stub = Mock()
-    stub.PullPendingTasks.side_effect = KeyboardInterrupt()
+    client = Mock()
+    client.PullPendingTasks.side_effect = KeyboardInterrupt()
+    client_class = Mock()
     captured: dict[str, Any] = {}
 
-    def _create_channel(**kwargs: Any) -> Mock:
+    def _from_server_address(**kwargs: Any) -> Mock:
         captured.update(kwargs)
-        return channel
+        return client
 
-    monkeypatch.setattr(run_superexec_module, "create_channel", _create_channel)
+    client_class.from_server_address.side_effect = _from_server_address
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
-    monkeypatch.setattr(run_superexec_module, "wrap_stub", Mock())
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
             plugin_class=Mock(),
-            stub_class=Mock(return_value=stub),
+            client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
             superexec_auth_secret=superexec_auth_secret,
@@ -116,26 +112,23 @@ def test_run_superexec_passes_executor_config_to_factory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """SuperExec should pass selected executor config to the factory."""
-    channel = Mock()
-    stub = Mock()
-    stub.PullPendingTasks.side_effect = KeyboardInterrupt()
+    client = Mock()
+    client.PullPendingTasks.side_effect = KeyboardInterrupt()
+    client_class = Mock()
+    client_class.from_server_address.return_value = client
     executor_config: dict[str, object] = {
         "namespace": "flower-system",
         "image": "taskexecutor:dev",
     }
     get_executor = Mock(return_value=Mock())
 
-    monkeypatch.setattr(
-        run_superexec_module, "create_channel", Mock(return_value=channel)
-    )
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
-    monkeypatch.setattr(run_superexec_module, "wrap_stub", Mock())
     monkeypatch.setattr(run_superexec_module, "get_executor", get_executor)
 
     with pytest.raises(KeyboardInterrupt):
         run_superexec_module.run_superexec(
             plugin_class=Mock(),
-            stub_class=Mock(return_value=stub),
+            client_class=client_class,
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
             executor_type=ExecutorType.KUBERNETES,

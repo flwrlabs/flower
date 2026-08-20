@@ -25,11 +25,11 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskMessageRequest,
     PushTaskMessageRequest,
 )
-from flwr.proto.runtime_pb2_grpc import RuntimeStub
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
+from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_loads
@@ -43,12 +43,12 @@ from .registry import (
 
 
 def handle_task(
-    stub: RuntimeStub,
+    client: RuntimeHttpClient,
     task_id: int,
     run_id: int,
 ) -> None:
     """Run one connector task request."""
-    request_message = _pull_connector_request(stub)
+    request_message = _pull_connector_request(client)
     if request_message.metadata.src_task_id is None:
         raise RuntimeError("Connector request source task is not set.")
 
@@ -65,7 +65,9 @@ def handle_task(
         message.metadata.__dict__["_run_id"] = run_id
         message.metadata.src_task_id = task_id
         message.metadata.__dict__["_message_id"] = message.object_id
-        stub.PushTaskMessage(PushTaskMessageRequest(message=message_to_proto(message)))
+        client.PushTaskMessage(
+            PushTaskMessageRequest(message=message_to_proto(message))
+        )
 
     response = None
     name = cast(str, request_message.payload["name"])
@@ -76,7 +78,7 @@ def handle_task(
         credentials: JSONObject | None = None
         config: JSONObject | None = None
         if uses_credentials:
-            connector = stub.GetConnector(GetConnectorRequest())
+            connector = client.GetConnector(GetConnectorRequest())
             if connector.connector_ref != connector_ref:
                 raise RuntimeError("Connector credentials could not be loaded.")
             credentials = _parse_connector_json(connector.credentials_json)
@@ -85,7 +87,7 @@ def handle_task(
             "output": invoke_connector(
                 name=name,
                 arguments=cast(JSONObject, request_message.payload["arguments"]),
-                usage_recorder=TaskUsageRecorder(stub),
+                usage_recorder=TaskUsageRecorder(client),
                 credentials=credentials,
                 config=config,
             ),
@@ -114,12 +116,12 @@ def handle_task(
         raise RuntimeError(credential_failure_message)
 
 
-def _pull_connector_request(stub: RuntimeStub) -> ConnectorRequest:
+def _pull_connector_request(client: RuntimeHttpClient) -> ConnectorRequest:
     """Pull one connector request, waiting until it becomes available."""
     # Keep polling until flwr-agentapp produces a request. If it exits, cleanup
     # forces flwr-connector to stop, with auth handling revoked tokens.
     while True:
-        pull_response = stub.PullTaskMessage(PullTaskMessageRequest(limit=1))
+        pull_response = client.PullTaskMessage(PullTaskMessageRequest(limit=1))
         messages = [message_from_proto(message) for message in pull_response.messages]
         if messages:
             return ConnectorRequest.from_message(messages[0])

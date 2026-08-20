@@ -54,7 +54,6 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.logger import log
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -74,6 +73,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
+from flwr.supercore import log
 from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
@@ -423,7 +423,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         app_id: str,
         app_type: str,
         added_by: str,
-    ) -> None:
+    ) -> str:
         """Atomically store a FAB and associate its app with a federation."""
         if not all((federation_id, app_id, app_type, added_by)):
             raise ValueError(
@@ -469,6 +469,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             session.execute(fab_stmt)
             session.execute(app_stmt)
+        return fab_hash
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
@@ -727,11 +728,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return updated_oauth_session_id is not None
 
-    def get_run_series(  # pylint: disable=R0914
+    def get_run_series(  # pylint: disable=R0913,R0914
         self,
         *,
         series_ids: Sequence[int] | None = None,
         federation_ids: Sequence[str] | None = None,
+        is_agent: bool | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -756,6 +758,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             page_query = page_query.where(
                 RunSeriesModel.federation_id.in_(federation_ids)
             )
+        if is_agent is not None:
+            page_query = page_query.where(RunSeriesModel.is_agent.is_(is_agent))
         if updated_before is not None:
             page_query = page_query.where(
                 RunSeriesModel.updated_at < datetime.fromisoformat(updated_before)
@@ -820,10 +824,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             session.execute(stmt)
 
-    def store_run_in_series(
+    def store_run_in_series(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         run_id: int,
         federation_id: str,
+        is_agent: bool,
         series_id: int | None,
         description: str | None = None,
     ) -> int | None:
@@ -839,6 +844,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         .values(
                             series_id=uint64_to_int64(candidate),
                             federation_id=federation_id,
+                            is_agent=is_agent,
                             description=description,
                             created_at=timestamp,
                             updated_at=timestamp,

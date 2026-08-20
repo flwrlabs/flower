@@ -37,7 +37,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskEventsRequest,
     PushTaskMessageRequest,
 )
-from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
@@ -45,6 +44,7 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorResponse,
 )
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
+from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
@@ -117,7 +117,7 @@ class RuntimeAgentResponses(AgentResponses):
     def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
-        stub: RuntimeStub,
+        stub: RuntimeHttpClient,
         run_id: int,
         task_id: int,
         context: Context,

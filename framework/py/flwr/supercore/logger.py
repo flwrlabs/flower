@@ -27,16 +27,18 @@ from logging import ERROR, WARN, LogRecord
 from logging.handlers import HTTPHandler, TimedRotatingFileHandler
 from pathlib import Path
 from queue import Empty, Queue
-from typing import TYPE_CHECKING, Any, TextIO
+from typing import TYPE_CHECKING, Any, Protocol, TextIO
 
-import grpc
+import httpx
 import typer
 from rich.console import Console
 
 from flwr.common.constant import LOG_UPLOAD_INTERVAL
-from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
+from flwr.proto.log_pb2 import (  # pylint: disable=E0611
+    PushLogsRequest,
+    PushLogsResponse,
+)
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 
 __all__ = [
     "ConsoleHandler",
@@ -402,8 +404,17 @@ def redirect_output(output_buffer: StringIO) -> None:
     console_handler.stream = sys.stdout
 
 
+class _RuntimeLogClient(Protocol):
+    """Runtime client supporting log upload."""
+
+    def PushLogs(  # pylint: disable=invalid-name
+        self, request: PushLogsRequest
+    ) -> PushLogsResponse:
+        """Push logs to the Runtime API."""
+
+
 def _log_uploader(
-    log_queue: Queue[str | None], node_id: int, run_id: int, stub: RuntimeStub
+    log_queue: Queue[str | None], node_id: int, run_id: int, client: _RuntimeLogClient
 ) -> None:
     """Upload logs to the SuperLink."""
     exit_flag = False
@@ -431,13 +442,11 @@ def _log_uploader(
                 logs=msgs,
             )
             try:
-                stub.PushLogs(req)
+                client.PushLogs(req)
                 msgs.clear()
-            except grpc.RpcError as e:
-                # Ignore minor network errors
-                # pylint: disable-next=no-member
-                if e.code() != grpc.StatusCode.UNAVAILABLE:
-                    raise e
+            except httpx.TransportError:
+                # Ignore transient network errors during shutdown.
+                pass
 
         if exit_flag:
             break
@@ -449,11 +458,11 @@ def start_log_uploader(
     log_queue: Queue[str | None],
     node_id: int,
     run_id: int,
-    stub: RuntimeStub,
+    client: _RuntimeLogClient,
 ) -> threading.Thread:
     """Start the log uploader thread and return it."""
     thread = threading.Thread(
-        target=_log_uploader, args=(log_queue, node_id, run_id, stub), daemon=True
+        target=_log_uploader, args=(log_queue, node_id, run_id, client), daemon=True
     )
     thread.start()
     return thread

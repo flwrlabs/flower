@@ -59,7 +59,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectRequest,
     PushObjectRequest,
 )
-from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     CreateTaskRequest,
@@ -124,7 +123,6 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ): ConfigureSimulationFederationRequest,
     ("POST", "/v1/runtime/pull-pending-tasks"): PullPendingTasksRequest,
     ("POST", "/v1/runtime/claim-task"): ClaimTaskRequest,
-    ("POST", "/v1/runtime/get-run"): GetRunRequest,
     ("POST", "/v1/runtime/send-task-heartbeat"): SendTaskHeartbeatRequest,
     ("POST", "/v1/runtime/pull-task-input"): PullTaskInputRequest,
     ("POST", "/v1/runtime/push-task-output"): PushTaskOutputRequest,

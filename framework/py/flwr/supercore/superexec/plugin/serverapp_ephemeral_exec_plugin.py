@@ -18,8 +18,8 @@
 from logging import ERROR
 from typing import ClassVar
 
-from flwr.common.logger import log
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore import log
 from flwr.supercore.constant import TaskType
 
 from .base_ephemeral_exec_plugin import BaseEphemeralExecPlugin

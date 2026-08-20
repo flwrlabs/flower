@@ -552,7 +552,7 @@ answer had to handle.
 - Keep a finite tool-turn limit even when you change models
 - Validate every required run-config value before making a model call
 - Never put credentials in prompts or connector arguments
-- Connect and authorize an account before adding its connector, and remember
-  that those runs are personal-workspace-only
+- Use [Connect accounts](../how-to-guides/connect-accounts.md) before adding an
+  account connector, and remember that those runs are personal-workspace-only
 - Expose `start_automation` only when the app must honor explicit future or
   recurring requests

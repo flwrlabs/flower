@@ -163,13 +163,13 @@ class ControlStub:
         flwr.proto.control_pb2.AddAppRequest,
         flwr.proto.control_pb2.AddAppResponse,
     ]
-    """Store App in a Federation"""
+    """Add App to a Federation"""
 
     RemoveApp: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.RemoveAppRequest,
         flwr.proto.control_pb2.RemoveAppResponse,
     ]
-    """Delete App from a Federation"""
+    """Remove App from a Federation"""
 
     ShowFederation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
@@ -385,13 +385,13 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.AddAppRequest,
         flwr.proto.control_pb2.AddAppResponse,
     ]
-    """Store App in a Federation"""
+    """Add App to a Federation"""
 
     RemoveApp: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.RemoveAppRequest,
         flwr.proto.control_pb2.RemoveAppResponse,
     ]
-    """Delete App from a Federation"""
+    """Remove App from a Federation"""
 
     ShowFederation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
@@ -651,7 +651,7 @@ class ControlServicer(metaclass=abc.ABCMeta):
         request: flwr.proto.control_pb2.AddAppRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.AddAppResponse, collections.abc.Awaitable[flwr.proto.control_pb2.AddAppResponse]]:
-        """Store App in a Federation"""
+        """Add App to a Federation"""
 
     @abc.abstractmethod
     def RemoveApp(
@@ -659,7 +659,7 @@ class ControlServicer(metaclass=abc.ABCMeta):
         request: flwr.proto.control_pb2.RemoveAppRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.RemoveAppResponse, collections.abc.Awaitable[flwr.proto.control_pb2.RemoveAppResponse]]:
-        """Delete App from a Federation"""
+        """Remove App from a Federation"""
 
     @abc.abstractmethod
     def ShowFederation(

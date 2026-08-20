@@ -367,14 +367,14 @@ class ControlServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def AddApp(self, request, context):
-        """Store App in a Federation
+        """Add App to a Federation
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def RemoveApp(self, request, context):
-        """Delete App from a Federation
+        """Remove App from a Federation
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')

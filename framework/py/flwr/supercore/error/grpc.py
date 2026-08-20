@@ -22,7 +22,7 @@ from logging import ERROR
 import grpc
 from grpc import StatusCode
 
-from flwr.common.logger import log
+from flwr.supercore import log
 
 from .base import FlowerError
 from .catalog import API_ERROR_MAP

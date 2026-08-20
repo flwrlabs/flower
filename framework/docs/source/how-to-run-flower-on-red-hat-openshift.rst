@@ -326,8 +326,10 @@ Finally, spin up two SuperNode pods with the following YAML definitions:
                   - "--insecure"
                   - "--superlink"
                   - "superlink-service:9092"
-                  - "--clientappio-api-address"
-                  - "0.0.0.0:9094"
+                  - "--host"
+                  - "0.0.0.0"
+                  - "--port"
+                  - "9094"
                 ports:
                 - containerPort: 9094
                 volumeMounts:
@@ -383,8 +385,10 @@ Finally, spin up two SuperNode pods with the following YAML definitions:
                   - "--insecure"
                   - "--superlink"
                   - "superlink-service:9092"
-                  - "--clientappio-api-address"
-                  - "0.0.0.0:9094"
+                  - "--host"
+                  - "0.0.0.0"
+                  - "--port"
+                  - "9094"
                 ports:
                 - containerPort: 9094
                 volumeMounts:
