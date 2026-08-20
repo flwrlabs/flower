@@ -27,7 +27,7 @@ from typing import cast
 import numpy as np
 
 from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord
-from flwr.common import log
+from flwr.supercore import log
 from flwr.supercore.differential_privacy import (
     CLIENTS_DISCREPANCY_WARNING,
     KEY_CLIPPING_NORM,

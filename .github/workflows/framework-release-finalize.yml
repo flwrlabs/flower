@@ -63,19 +63,20 @@ jobs:
             local ref="$1"
             local existing_sha
 
-            existing_sha="$(
+            if existing_sha="$(
               gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref#refs/}" \
-                --jq '.object.sha' 2>/dev/null || true
-            )"
-            if [[ -z "${existing_sha}" ]]; then
+                --jq '.object.sha' 2>/dev/null
+            )"; then
+              if [[ "${existing_sha}" != "${RELEASE_SOURCE_SHA}" ]]; then
+                echo "${ref} points to ${existing_sha}, expected ${RELEASE_SOURCE_SHA}." >&2
+                exit 1
+              fi
+
+              echo "${ref} already points to ${RELEASE_SOURCE_SHA}; continuing."
+            else
               gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
                 -f ref="${ref}" \
                 -f sha="${RELEASE_SOURCE_SHA}"
-            elif [[ "${existing_sha}" != "${RELEASE_SOURCE_SHA}" ]]; then
-              echo "${ref} points to ${existing_sha}, expected ${RELEASE_SOURCE_SHA}." >&2
-              exit 1
-            else
-              echo "${ref} already points to ${RELEASE_SOURCE_SHA}; continuing."
             fi
           }
 

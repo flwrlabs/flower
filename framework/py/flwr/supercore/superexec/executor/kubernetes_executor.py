@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Protocol, cast
 from uuid import uuid4
 
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
     TASK_TYPE_TO_COMMAND,
