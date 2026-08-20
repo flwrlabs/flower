@@ -63,19 +63,20 @@ jobs:
             local ref="$1"
             local existing_sha
 
-            existing_sha="$(
+            if existing_sha="$(
               gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref#refs/}" \
-                --jq '.object.sha' 2>/dev/null || true
-            )"
-            if [[ -z "${existing_sha}" ]]; then
+                --jq '.object.sha' 2>/dev/null
+            )"; then
+              if [[ "${existing_sha}" != "${RELEASE_SOURCE_SHA}" ]]; then
+                echo "${ref} points to ${existing_sha}, expected ${RELEASE_SOURCE_SHA}." >&2
+                exit 1
+              fi
+
+              echo "${ref} already points to ${RELEASE_SOURCE_SHA}; continuing."
+            else
               gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
                 -f ref="${ref}" \
                 -f sha="${RELEASE_SOURCE_SHA}"
-            elif [[ "${existing_sha}" != "${RELEASE_SOURCE_SHA}" ]]; then
-              echo "${ref} points to ${existing_sha}, expected ${RELEASE_SOURCE_SHA}." >&2
-              exit 1
-            else
-              echo "${ref} already points to ${RELEASE_SOURCE_SHA}; continuing."
             fi
           }
 
@@ -139,13 +140,30 @@ jobs:
           # Process each built image recorded in the digest manifest.
           while IFS= read -r image; do
             repository="$(jq -r '.repository' <<< "${image}")"
+            repository_name="${repository##*/}"
             index_digest="$(jq -r '.index_digest' <<< "${image}")"
             tag_args=()
 
-            # Derive stable version tags from every unstable tag variant.
+            # Derive variant-specific stable tags from unstable variant tags.
             while IFS= read -r unstable_tag; do
+              if [[ "${unstable_tag}" != "${repository}:unstable-"* ]]; then
+                continue
+              fi
               tag_suffix="${unstable_tag#"${repository}:unstable"}"
               tag_args+=(-t "${repository}:${VERSION}${tag_suffix}")
+
+              # Add stable aliases explicitly for the current release variants.
+              case "${repository_name}:${tag_suffix}" in
+                "superlink:-py3.13-alpine3.22"|"supernode:-py3.13-alpine3.22")
+                  tag_args+=(-t "${repository}:${VERSION}")
+                  ;;
+                "superlink:-py3.13-ubuntu24.04"|"supernode:-py3.13-ubuntu24.04")
+                  tag_args+=(-t "${repository}:latest")
+                  ;;
+                "superexec:-py3.13-ubuntu24.04")
+                  tag_args+=(-t "${repository}:${VERSION}" -t "${repository}:latest")
+                  ;;
+              esac
             done < <(jq -r '.tags[]' <<< "${image}")
 
             # Promote the immutable multi-platform image without rebuilding it.

@@ -45,7 +45,6 @@ from flwr.common.constant import (
     TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
 )
-from flwr.common.logger import log
 from flwr.common.serde import (
     context_to_proto,
     run_status_to_proto,
@@ -128,6 +127,7 @@ from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
+from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
@@ -1028,6 +1028,7 @@ def list_run_series(
     )
     limit = request.limit if request.HasField("limit") else None
     federation_id = request.federation_id if request.HasField("federation_id") else None
+    is_agent = request.is_agent if request.HasField("is_agent") else None
 
     if federation_id is not None:
         _validate_federation_membership_in_request(state, flwr_aid, federation_id)
@@ -1037,6 +1038,7 @@ def list_run_series(
         federation_ids = [federation.id for federation in federations]
     entries = state.get_run_series(
         federation_ids=federation_ids,
+        is_agent=is_agent,
         updated_before=updated_before,
         limit=limit,
     )

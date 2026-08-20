@@ -36,7 +36,6 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.logger import log
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
     Automation,
@@ -50,6 +49,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
+from flwr.supercore import log
 from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
@@ -134,6 +134,7 @@ class InMemoryCoreState(
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
         self.run_series_store: dict[int, RunSeries] = {}
+        self.agent_run_series_ids: set[int] = set()
         self.lock_run_series_store = Lock()
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
@@ -535,11 +536,12 @@ class InMemoryCoreState(
             )
         return True
 
-    def get_run_series(
+    def get_run_series(  # pylint: disable=too-many-arguments
         self,
         *,
         series_ids: Sequence[int] | None = None,
         federation_ids: Sequence[str] | None = None,
+        is_agent: bool | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -566,6 +568,11 @@ class InMemoryCoreState(
                     and record.federation not in federation_id_set
                 ):
                     continue
+                if (
+                    is_agent is not None
+                    and (record.series_id in self.agent_run_series_ids) != is_agent
+                ):
+                    continue
                 if updated_before is not None and record.updated_at >= updated_before:
                     continue
                 run_series.append(record)
@@ -584,10 +591,11 @@ class InMemoryCoreState(
         with self.lock_run_series_context_store:
             self.run_series_context_store[series_id] = context
 
-    def store_run_in_series(
+    def store_run_in_series(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         run_id: int,
         federation_id: str,
+        is_agent: bool,
         series_id: int | None,
         description: str | None = None,
     ) -> int | None:
@@ -626,6 +634,8 @@ class InMemoryCoreState(
                     updated_at=timestamp,
                 )
                 self.run_series_store[new_series_id] = run_series
+                if is_agent:
+                    self.agent_run_series_ids.add(new_series_id)
                 resolved_series_id = new_series_id
 
             # Store the membership last so callers only receive linked series IDs.
