@@ -92,15 +92,17 @@ workspace.
 
 In SuperGrid:
 
-1. Open **Settings** > **Automations**
-1. Use **Active** for upcoming schedules
+1. Open the federation where the automation was created
+1. Under **Latest activity**, select **Automations**
 1. Check the run series, next run time, remaining runs, fixed interval, and
    status
-1. Use **History** for completed, stopped, or failed schedules
+1. Select **View all** to open the full automation list
+1. Use **Active** for upcoming schedules and **History** for completed, stopped,
+   or failed schedules
 
-The settings page uses the Agent execution federation. If a newly created
-automation does not appear, first confirm that the chat and settings page show
-the same federation, then refresh once.
+Automation activity is scoped to the open federation. If a newly created
+automation does not appear, confirm that you opened the federation where it was
+created, then refresh once.
 
 ```{figure} ../_static/screenshots/automations-settings.png
 :alt: Flower Automations settings with Active and History tabs and schedule columns.
@@ -111,15 +113,16 @@ stopped, or failed automations.
 
 ## Stop an automation
 
-On **Settings** > **Automations** > **Active**, select **Stop** on the relevant
-row. Wait for its status to update before leaving the page.
+From the federation's **Latest activity**, open **Automations**, select **View
+all**, then select **Stop** on the relevant row under **Active**. Wait for its
+status to update before leaving the page.
 
 Stopping prevents future scheduled runs. It does not stop a run that has
 already started. Stop that run separately from its run details or with
 `flwr stop <run-id> supergrid`.
 
 There is no public CLI command for listing or stopping automations in Flower
-1.34.0. Use the SuperGrid settings page.
+1.34.0. Use the automation list in SuperGrid.
 
 ## Recover from a failed schedule
 
