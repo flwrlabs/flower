@@ -87,6 +87,9 @@ def new(
                 app_ids,
             )
 
+    if app_spec == "agent":
+        app_spec = "@flwrlabs/agent"
+
     # Download remote app
     download_remote_app_via_api(app_spec)
 
