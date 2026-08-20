@@ -120,23 +120,22 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab | None,
+        fab: Fab,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
-    ) -> str | None:
-        """Associate an app with a federation and optionally store its FAB.
+    ) -> None:
+        """Atomically store a FAB and associate its app with a federation.
 
         A federation has at most one association for each app ID. Storing the app
         again updates its FAB hash and type while preserving when and by whom it was
-        first added. If no FAB is provided, the association remains unpinned.
+        first added.
 
         Parameters
         ----------
-        fab : Optional[Fab]
-            FAB content and verification metadata to store, or None for an
-            unpinned Hub app.
+        fab : Fab
+            FAB content and verification metadata to store.
         federation_id : str
             ID of the federation to associate with the app.
         app_id : str
@@ -146,10 +145,6 @@ class CoreState(ABC):  # pylint: disable=R0904
         added_by : str
             ID of the account adding the app to the federation.
 
-        Returns
-        -------
-        Optional[str]
-            Canonical SHA-256 hash of the stored FAB, or None if unpinned.
         """
 
     @abstractmethod
@@ -157,9 +152,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Return the FAB for the given hash, if present."""
 
     @abstractmethod
-    def get_app_fab(
-        self, federation_id: str, app_id: str, fab_hash: str
-    ) -> Fab | None:
+    def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
         """Return a FAB only when it matches the federation-app association."""
 
     @abstractmethod

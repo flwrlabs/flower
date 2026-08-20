@@ -499,7 +499,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
     stored_fab = None
     if is_stored_app:
-        stored_fab = state.get_app_fab(
+        stored_fab = state.get_app(
             federation_id,
             request.app_spec,
             request.fab.hash_str,
@@ -512,14 +512,14 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
         if builtin_agent_fab is not None:
             fab_file, verification_dict = builtin_agent_fab
-        elif request.app_spec:
-            fab_file, verification_dict, note = _get_remote_fab(
-                fleet_api_type, request.app_spec
-            )
         elif is_stored_app:
             raise FlowerError(
                 ApiErrorCode.FAB_DOWNLOAD_FAILURE,
                 "App or FAB not found in the requested federation.",
+            )
+        elif request.app_spec:
+            fab_file, verification_dict, note = _get_remote_fab(
+                fleet_api_type, request.app_spec
             )
         else:
             fab_file = request.fab.content
@@ -588,16 +588,14 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         elif is_hub_app:
             fab_hash = state.store_fab(fab)
         else:
-            stored_hash = state.store_app(
+            state.store_app(
                 fab=fab,
                 federation_id=federation_id,
                 app_id=app_id,
                 app_type=app_type,
                 added_by=flwr_aid,
             )
-            if stored_hash is None:
-                raise ValueError("Failed to store uploaded FAB")
-            fab_hash = stored_hash
+            fab_hash = fab.hash_str
 
         if fab_hash != fab.hash_str:
             raise ValueError(
@@ -1364,7 +1362,9 @@ def add_app(
             ApiErrorCode.INVALID_APP_SPEC,
             "Failed to store app: app ID is required.",
         )
-    fab_file, _, _ = _get_remote_fab(fleet_api_type, request.app_id)
+    fab_file, verification_dict, _ = _get_remote_fab(
+        fleet_api_type, request.app_id
+    )
     try:
         app_type = _get_app_type(get_fab_config(fab_file))
     except ValueError as e:
@@ -1374,7 +1374,11 @@ def add_app(
         ) from e
 
     state.store_app(
-        fab=None,
+        fab=Fab(
+            hash_str=hashlib.sha256(fab_file).hexdigest(),
+            content=fab_file,
+            verifications=verification_dict,
+        ),
         federation_id=federation_id,
         app_id=request.app_id,
         app_type=app_type,

@@ -23,7 +23,6 @@ from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
-    AppInfo,
     ListAppsRequest,
     ListAutomationsRequest,
     RemoveAppRequest,
@@ -118,63 +117,28 @@ class TestControlHandlers(unittest.TestCase):
 
         self.assertEqual(error.exception.code, ApiErrorCode.FAB_DOWNLOAD_FAILURE)
 
-    def test_start_run_falls_back_to_hub_without_pinning_app(self) -> None:
-        """StartRun fetches the latest Hub FAB when the requested hash misses."""
-        fab_content = b"hub FAB"
-        fab_hash = hashlib.sha256(fab_content).hexdigest()
-        self.state.store_app(
-            fab=None,
-            federation_id=NOOP_FEDERATION_ID,
-            app_id="@flwr/demo",
-            app_type=TaskType.AGENT_APP,
-            added_by=self.account.flwr_aid,
+    def test_start_run_does_not_fetch_unknown_stored_app_from_hub(self) -> None:
+        """StartRun rejects an unknown stored app without fetching from Hub."""
+        request = StartRunRequest(
+            app_spec="@flwr/demo",
+            federation=NOOP_FEDERATION_ID,
         )
+        request.fab.hash_str = "stale-hash"
 
-        with (
-            patch(
-                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
-                return_value=(fab_content, {}, None),
-            ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
-                return_value={"tool": {"flwr": {"app": {}}}},
-            ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers"
-                ".get_metadata_from_config",
-                return_value=("flwr/demo", "1.0.0"),
-            ),
-            patch.object(
-                self.state, "store_fab", wraps=self.state.store_fab
-            ) as mock_store_fab,
-            patch.object(self.state, "store_app") as mock_store_app,
-        ):
-            request = StartRunRequest(
-                app_spec="@flwr/demo",
-                federation=NOOP_FEDERATION_ID,
-            )
-            request.fab.hash_str = "stale-hash"
-            response = start_run(request, self.account, self.state, None)
+        with patch(
+            "flwr.superlink.servicer.control.control_handlers._get_remote_fab"
+        ) as mock_get_remote_fab:
+            with self.assertRaises(FlowerError) as error:
+                start_run(request, self.account, self.state, None)
 
-        self.assertGreater(response.run_id, 0)
-        mock_store_fab.assert_called_once()
-        mock_store_app.assert_not_called()
-        self.assertIsNotNone(self.state.get_fab(fab_hash))
-        self.assertEqual(
-            list(self.state.list_apps(NOOP_FEDERATION_ID)),
-            [
-                AppInfo(
-                    app_id="@flwr/demo",
-                    fab_hash="",
-                    app_type=TaskType.AGENT_APP,
-                )
-            ],
-        )
+        self.assertEqual(error.exception.code, ApiErrorCode.FAB_DOWNLOAD_FAILURE)
+        mock_get_remote_fab.assert_not_called()
 
     def test_list_apps(self) -> None:
         """List apps associated with the requested federation."""
-        fab_hash = self.state.store_app(
-            fab=Fab("", b"fab", {}),
+        fab_hash = hashlib.sha256(b"fab").hexdigest()
+        self.state.store_app(
+            fab=Fab(fab_hash, b"fab", {}),
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
             app_type=TaskType.SERVER_APP,
@@ -193,12 +157,14 @@ class TestControlHandlers(unittest.TestCase):
         )
 
     def test_add_and_remove_app(self) -> None:
-        """AddApp persists a Hub reference and RemoveApp removes it."""
+        """AddApp stores the latest Hub FAB and RemoveApp removes the app."""
+        fab_content = b"hub FAB"
+        verification_dict = {"publisher-key": "verified"}
         with (
             patch(
                 "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
-                return_value=(b"hub FAB", {}, None),
-            ),
+                return_value=(fab_content, verification_dict, None),
+            ) as mock_get_remote_fab,
             patch(
                 "flwr.superlink.servicer.control.control_handlers.get_fab_config",
                 return_value={
@@ -219,10 +185,16 @@ class TestControlHandlers(unittest.TestCase):
             )
 
         self.assertEqual(response, AddAppResponse())
+        mock_get_remote_fab.assert_called_once_with(None, "@flwr/demo")
+        fab_hash = hashlib.sha256(fab_content).hexdigest()
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
-            [("@flwr/demo", "", TaskType.AGENT_APP)],
+            [("@flwr/demo", fab_hash, TaskType.AGENT_APP)],
+        )
+        self.assertEqual(
+            self.state.get_app(NOOP_FEDERATION_ID, "@flwr/demo", fab_hash),
+            Fab(fab_hash, fab_content, verification_dict),
         )
 
         remove_response = remove_app(

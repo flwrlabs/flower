@@ -138,7 +138,7 @@ class FederationApp(FlwrBase):
 
     federation_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     app_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
-    fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    fab_hash: Mapped[str] = mapped_column(String, nullable=False)
     app_type: Mapped[str] = mapped_column(String, nullable=False)
     added_by: Mapped[str] = mapped_column(String, nullable=False)
     added_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)

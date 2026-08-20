@@ -16,6 +16,7 @@
 
 
 # pylint: disable=too-many-lines
+import hashlib
 import unittest
 from contextlib import ExitStack
 from datetime import UTC, datetime, timedelta
@@ -32,11 +33,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    AppInfo,
-    Automation,
-    StartRunRequest,
-)
+from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskEvent,
@@ -95,15 +92,17 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Federation apps can be stored, listed, limited, and deleted."""
         state = self.state_factory()
 
-        server_hash = state.store_app(
-            fab=Fab("", b"server", {}),
+        server_hash = hashlib.sha256(b"server").hexdigest()
+        state.store_app(
+            fab=Fab(server_hash, b"server", {}),
             federation_id="@me/fed-a",
             app_id="@me/server",
             app_type=TaskType.SERVER_APP,
             added_by="account-a",
         )
-        agent_hash = state.store_app(
-            fab=Fab("", b"agent", {}),
+        agent_hash = hashlib.sha256(b"agent").hexdigest()
+        state.store_app(
+            fab=Fab(agent_hash, b"agent", {}),
             federation_id="@me/fed-a",
             app_id="@me/z-agent",
             app_type=TaskType.AGENT_APP,
@@ -126,14 +125,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             ],
         )
         self.assertEqual(
-            state.get_app_fab("@me/fed-a", "@me/server", server_hash),
+            state.get_app("@me/fed-a", "@me/server", server_hash),
             Fab(server_hash, b"server", {}),
         )
         self.assertIsNone(
-            state.get_app_fab("@me/fed-b", "@me/server", server_hash)
+            state.get_app("@me/fed-b", "@me/server", server_hash)
         )
         self.assertIsNone(
-            state.get_app_fab("@me/fed-a", "@me/z-agent", server_hash)
+            state.get_app("@me/fed-a", "@me/z-agent", server_hash)
         )
         self.assertEqual(
             [app.app_id for app in state.list_apps("@me/fed-a", limit=1)],
@@ -143,8 +142,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         with self.assertRaises(AssertionError):
             state.list_apps("@me/fed-a", limit=-1)
 
-        updated_hash = state.store_app(
-            fab=Fab("", b"updated", {}),
+        updated_hash = hashlib.sha256(b"updated").hexdigest()
+        state.store_app(
+            fab=Fab(updated_hash, b"updated", {}),
             federation_id="@me/fed-a",
             app_id="@me/server",
             app_type=TaskType.SERVER_APP,
@@ -154,10 +154,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(updated), 2)
         self.assertEqual(updated[1].fab_hash, updated_hash)
         self.assertIsNone(
-            state.get_app_fab("@me/fed-a", "@me/server", server_hash)
+            state.get_app("@me/fed-a", "@me/server", server_hash)
         )
         self.assertIsNotNone(
-            state.get_app_fab("@me/fed-a", "@me/server", updated_hash)
+            state.get_app("@me/fed-a", "@me/server", updated_hash)
         )
 
         self.assertTrue(state.delete_app("@me/fed-a", "@me/server"))
@@ -171,71 +171,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             ["@me/server"],
         )
         self.assertIsNotNone(state.get_fab(updated_hash))
-
-    def test_store_unpinned_hub_app(self) -> None:
-        """A Hub-app association does not require a locally stored FAB."""
-        state = self.state_factory()
-
-        self.assertIsNone(
-            state.store_app(
-                fab=None,
-                federation_id="@me/fed",
-                app_id="@flwr/demo",
-                app_type=TaskType.AGENT_APP,
-                added_by="account-a",
-            )
-        )
-        self.assertEqual(
-            list(state.list_apps("@me/fed")),
-            [
-                AppInfo(
-                    app_id="@flwr/demo",
-                    fab_hash="",
-                    app_type=TaskType.AGENT_APP,
-                )
-            ],
-        )
-        self.assertIsNone(
-            state.get_app_fab("@me/fed", "@flwr/demo", "missing-hash")
-        )
-
-        fab_hash = state.store_app(
-            fab=Fab("", b"uploaded", {}),
-            federation_id="@me/fed",
-            app_id="@flwr/demo",
-            app_type=TaskType.SERVER_APP,
-            added_by="account-a",
-        )
-        self.assertEqual(
-            list(state.list_apps("@me/fed")),
-            [
-                AppInfo(
-                    app_id="@flwr/demo",
-                    fab_hash=fab_hash,
-                    app_type=TaskType.SERVER_APP,
-                )
-            ],
-        )
-
-        self.assertIsNone(
-            state.store_app(
-                fab=None,
-                federation_id="@me/fed",
-                app_id="@flwr/demo",
-                app_type=TaskType.AGENT_APP,
-                added_by="account-a",
-            )
-        )
-        self.assertEqual(
-            list(state.list_apps("@me/fed")),
-            [
-                AppInfo(
-                    app_id="@flwr/demo",
-                    fab_hash="",
-                    app_type=TaskType.AGENT_APP,
-                )
-            ],
-        )
 
     def test_connector_upsert_get_and_delete(self) -> None:
         """A connector can be created, updated, retrieved, and deleted."""
