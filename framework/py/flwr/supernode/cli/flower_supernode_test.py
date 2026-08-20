@@ -177,6 +177,7 @@ def test_flower_supernode_injects_state_factory(
     objectstore_factory = Mock()
     state_factory = Mock()
     start_client_internal = Mock()
+    add_exit_handler = Mock()
 
     monkeypatch.setattr(
         flower_supernode_module, "warn_if_flwr_update_available", Mock()
@@ -197,6 +198,7 @@ def test_flower_supernode_injects_state_factory(
     monkeypatch.setattr(
         flower_supernode_module, "start_client_internal", start_client_internal
     )
+    monkeypatch.setattr(flower_supernode_module, "add_exit_handler", add_exit_handler)
     http_server = Mock()
     http_thread = Mock()
     monkeypatch.setattr(
@@ -209,5 +211,8 @@ def test_flower_supernode_injects_state_factory(
 
     node_state_factory.assert_called_once_with(objectstore_factory=objectstore_factory)
     assert start_client_internal.call_args.kwargs["state_factory"] is state_factory
+    add_exit_handler.assert_called_once()
+    exit_handler = add_exit_handler.call_args.args[0]
+    exit_handler()
     assert http_server.should_exit is True
     http_thread.join.assert_called_once_with()

@@ -48,7 +48,7 @@ from flwr.supercore.auth import (
     load_superexec_auth_secret,
 )
 from flwr.supercore.constant import UVICORN_DEFAULT_HOST, UVICORN_DEFAULT_PORT
-from flwr.supercore.exit import ExitCode, flwr_exit
+from flwr.supercore.exit import ExitCode, add_exit_handler, flwr_exit
 from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
@@ -178,29 +178,32 @@ def flower_supernode() -> None:
     http_server, http_thread = _start_supernode_http_api(config, state_factory)
     runtime_host = f"[{config.host}]" if ":" in config.host else config.host
 
-    try:
-        start_client_internal(
-            state_factory=state_factory,
-            server_address=config.server_address,
-            transport=config.transport,
-            root_certificates=config.root_certificates,
-            insecure=config.insecure,
-            authentication_keys=config.authentication_keys,
-            max_retries=config.max_retries,
-            max_wait_time=config.max_wait_time,
-            node_config=config.node_config,
-            isolation=config.isolation,
-            runtime_api_address=f"{runtime_host}:{config.port}",
-            runtime_certificates=config.runtime_certificates,
-            runtime_root_certificates_path=config.runtime_root_certificates_path,
-            health_server_address=config.health_server_address,
-            trusted_entities=config.trusted_entities,
-            superexec_auth_secret=config.superexec_auth_secret,
-            runtime_dependency_install=config.runtime_dependency_install,
-        )
-    finally:
+    def stop_http_server() -> None:
+        """Stop the Runtime HTTP API server."""
         http_server.should_exit = True
         http_thread.join()
+
+    add_exit_handler(stop_http_server)
+
+    start_client_internal(
+        state_factory=state_factory,
+        server_address=config.server_address,
+        transport=config.transport,
+        root_certificates=config.root_certificates,
+        insecure=config.insecure,
+        authentication_keys=config.authentication_keys,
+        max_retries=config.max_retries,
+        max_wait_time=config.max_wait_time,
+        node_config=config.node_config,
+        isolation=config.isolation,
+        runtime_api_address=f"{runtime_host}:{config.port}",
+        runtime_certificates=config.runtime_certificates,
+        runtime_root_certificates_path=config.runtime_root_certificates_path,
+        health_server_address=config.health_server_address,
+        trusted_entities=config.trusted_entities,
+        superexec_auth_secret=config.superexec_auth_secret,
+        runtime_dependency_install=config.runtime_dependency_install,
+    )
 
 
 def _start_supernode_http_api(
