@@ -93,6 +93,8 @@ class TestRunClientApp(unittest.TestCase):
         self.assertEqual(len(pulled_message.content.config_records), 1)
         self.assertEqual(context.node_id, 123)
         self.assertEqual(run.run_id, 61016)
+        self.assertEqual(run.fab_id, "mock/mock")
+        self.assertEqual(run.fab_version, "v1.0.0")
         self.assertEqual(pulled_fab, fab)
 
     def test_push_task_output(self) -> None:
