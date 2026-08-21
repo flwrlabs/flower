@@ -32,7 +32,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
-from flwr.supercore.error import http_error_translator
+from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import (
     PROTOBUF_REQUEST_TYPES,
@@ -154,4 +154,7 @@ def test_superexec_route_rejects_unsigned_request_when_auth_is_enabled() -> None
     response = _post(client, "/v1/runtime/claim-task", ClaimTaskRequest(task_id=123))
 
     assert response.status_code == 401
-    assert response.json() == {"detail": "Authentication failed."}
+    assert response.json() == {
+        "detail": "Authentication failed.",
+        "code": ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED.value,
+    }

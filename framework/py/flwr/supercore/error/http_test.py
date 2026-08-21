@@ -51,41 +51,61 @@ def _assert_json_response(
 
 
 def test_http_error_translator_mapped_flower_error() -> None:
-    """Translate a mapped FlowerError into its configured HTTP contract."""
-    response = _run_translator(
-        FlowerError(
-            ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
-            "internal diagnostic message",
-        )
-    )
+    """Include the public message and numeric code for a mapped FlowerError."""
+    error_code = ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT
+    response = _run_translator(FlowerError(error_code, "internal diagnostic message"))
 
-    spec = API_ERROR_MAP[ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT]
+    spec = API_ERROR_MAP[error_code]
     _assert_json_response(
         response,
         spec.http_status_code,
-        {"detail": spec.public_message},
+        {"detail": spec.public_message, "code": error_code.value},
     )
     assert b"internal diagnostic message" not in response.body
 
 
-def test_http_error_translator_prefers_public_details() -> None:
-    """Prefer specific public details over the catalog's generic message."""
+def test_http_error_translator_includes_public_details() -> None:
+    """Expose public details separately from the catalog message."""
+    error_code = ApiErrorCode.INVALID_FEDERATION_NAME
     public_details = "The requested federation name is invalid."
     response = _run_translator(
         FlowerError(
-            ApiErrorCode.INVALID_FEDERATION_NAME,
+            error_code,
             "internal diagnostic message",
             public_details=public_details,
         )
     )
 
-    spec = API_ERROR_MAP[ApiErrorCode.INVALID_FEDERATION_NAME]
+    spec = API_ERROR_MAP[error_code]
     _assert_json_response(
         response,
         spec.http_status_code,
-        {"detail": public_details},
+        {
+            "detail": spec.public_message,
+            "code": error_code.value,
+            "extra": public_details,
+        },
     )
     assert b"internal diagnostic message" not in response.body
+
+
+def test_http_error_translator_includes_empty_public_details() -> None:
+    """Include an empty public-details string in a FlowerError response."""
+    error_code = ApiErrorCode.INVALID_FEDERATION_NAME
+    response = _run_translator(
+        FlowerError(
+            error_code,
+            "internal diagnostic message",
+            public_details="",
+        )
+    )
+
+    spec = API_ERROR_MAP[error_code]
+    _assert_json_response(
+        response,
+        spec.http_status_code,
+        {"detail": spec.public_message, "code": error_code.value, "extra": ""},
+    )
 
 
 def test_http_error_translator_adds_bearer_authentication_challenge() -> None:
@@ -101,7 +121,10 @@ def test_http_error_translator_adds_bearer_authentication_challenge() -> None:
     _assert_json_response(
         response,
         spec.http_status_code,
-        {"detail": spec.public_message},
+        {
+            "detail": spec.public_message,
+            "code": ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED.value,
+        },
     )
     assert response.headers["www-authenticate"] == "Bearer"
     assert b"internal authentication failure" not in response.body
@@ -119,8 +142,8 @@ def test_http_error_translator_unmapped_flower_error() -> None:
     assert b"internal diagnostic message" not in response.body
 
 
-def test_http_error_translator_entitlement_error_preserves_error_message() -> None:
-    """Keep entitlement details in the translated payload."""
+def test_http_error_translator_entitlement_error() -> None:
+    """Expose entitlement details without its entitlement code."""
     error_message = "Entitlement check failed: plan does not allow this action."
     entitlement_code = 101
 
@@ -136,7 +159,11 @@ def test_http_error_translator_entitlement_error_preserves_error_message() -> No
     _assert_json_response(
         response,
         spec.http_status_code,
-        {"detail": error_message},
+        {
+            "detail": spec.public_message,
+            "code": ApiErrorCode.ENTITLEMENT_ERROR.value,
+            "extra": error_message,
+        },
     )
     assert b"internal diagnostic message" not in response.body
 

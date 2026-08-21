@@ -32,6 +32,19 @@ INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error."
 NOT_AUTHENTICATED_DETAIL = "Not authenticated"
 
 
+def _flower_error_content(
+    err: FlowerError, public_message: str
+) -> dict[str, str | int]:
+    """Build the client-visible HTTP payload for a mapped FlowerError."""
+    content: dict[str, str | int] = {
+        "detail": public_message,
+        "code": int(err.code),
+    }
+    if err.public_details is not None:
+        content["extra"] = err.public_details
+    return content
+
+
 class BearerAuthenticationError(HTTPException):
     """Represent failed HTTP Bearer authentication."""
 
@@ -49,10 +62,11 @@ async def http_error_translator(
     """Translate exceptions from downstream HTTP handling into safe responses.
 
     Let successful responses pass through unchanged. Convert ``FlowerError``
-    instances into their catalog-defined public JSON contract, preserve
-    FastAPI's response contract for ``HTTPException``, and translate every
-    unexpected exception into a generic JSON 500 response. Internal exception
-    details are logged for diagnostics but are never exposed to the client.
+    instances into their catalog-defined public JSON contract, including the
+    numeric error code and optional public details. Preserve FastAPI's response
+    contract for ``HTTPException``, and translate every unexpected exception
+    into a generic JSON 500 response. Internal exception details are logged for
+    diagnostics but are never exposed to the client.
     """
     try:
         return await call_next(request)
@@ -60,15 +74,11 @@ async def http_error_translator(
         try:
             error_spec = API_ERROR_MAP[err.code]
             http_status = error_spec.http_status_code
-            public_detail = (
-                err.public_details
-                if err.public_details is not None
-                else error_spec.public_message
-            )
+            content = _flower_error_content(err, error_spec.public_message)
             http_headers = error_spec.http_headers
         except (ValueError, KeyError):
             http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
-            public_detail = INTERNAL_SERVER_ERROR_MESSAGE
+            content = {"detail": INTERNAL_SERVER_ERROR_MESSAGE}
             http_headers = None
 
         # Log error as is
@@ -77,7 +87,7 @@ async def http_error_translator(
         # Return sanitized error to client
         return JSONResponse(
             status_code=http_status,
-            content={"detail": public_detail},
+            content=content,
             headers=http_headers,
         )
     except HTTPException as err:

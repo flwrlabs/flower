@@ -29,7 +29,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.error import http_error_translator
+from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import (
     PROTOBUF_REQUEST_TYPES,
@@ -95,7 +95,10 @@ def test_protobuf_request_without_handler_response_returns_internal_error() -> N
 
     assert response.status_code == 500
     assert response.headers["content-type"] == "application/json"
-    assert response.json() == {"detail": "Invalid protobuf response."}
+    assert response.json() == {
+        "detail": "Invalid protobuf response.",
+        "code": ApiErrorCode.INVALID_PROTOBUF_RESPONSE.value,
+    }
 
 
 def test_protobuf_route_passes_through_http_exception() -> None:
@@ -173,7 +176,10 @@ def test_protobuf_route_rejects_non_json_error_response() -> None:
 
     assert response.status_code == 500
     assert response.headers["content-type"] == "application/json"
-    assert response.json() == {"detail": "Invalid protobuf response."}
+    assert response.json() == {
+        "detail": "Invalid protobuf response.",
+        "code": ApiErrorCode.INVALID_PROTOBUF_RESPONSE.value,
+    }
     assert b"Conflict" not in response.content
 
 
@@ -193,7 +199,10 @@ def test_non_protobuf_request_in_state_returns_internal_error() -> None:
 
     assert response.status_code == 500
     assert response.headers["content-type"] == "application/json"
-    assert response.json() == {"detail": "Invalid protobuf request."}
+    assert response.json() == {
+        "detail": "Invalid protobuf request.",
+        "code": ApiErrorCode.INVALID_PROTOBUF_REQUEST.value,
+    }
 
 
 def test_list_runs_returns_runs_from_linkstate() -> None:
@@ -217,6 +226,7 @@ def test_list_runs_returns_runs_from_linkstate() -> None:
     proto_response = ListRunsResponse.FromString(response.content)
 
     assert response.status_code == 200
+    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
     assert set(proto_response.run_dict) == {7}
     assert proto_response.run_dict[7].account_name == _ACCOUNT.account_name
     assert datetime.fromisoformat(proto_response.now)
@@ -269,7 +279,10 @@ def test_list_runs_rejects_non_protobuf_payload() -> None:
 
     assert response.status_code == 415
     assert response.headers["content-type"] == "application/json"
-    assert response.json() == {"detail": "Unsupported Content-Type."}
+    assert response.json() == {
+        "detail": "Unsupported Content-Type.",
+        "code": ApiErrorCode.UNSUPPORTED_CONTENT_TYPE.value,
+    }
 
 
 def test_list_runs_rejects_invalid_protobuf_bytes() -> None:
@@ -282,6 +295,7 @@ def test_list_runs_rejects_invalid_protobuf_bytes() -> None:
         "/v1/control/list-runs",
         content=b"\x80",
         headers={
+            "accept": PROTOBUF_MEDIA_TYPE,
             "authorization": "Bearer access-token",
             "content-type": PROTOBUF_MEDIA_TYPE,
         },
@@ -289,4 +303,7 @@ def test_list_runs_rejects_invalid_protobuf_bytes() -> None:
 
     assert response.status_code == 400
     assert response.headers["content-type"] == "application/json"
-    assert response.json() == {"detail": "Invalid protobuf payload."}
+    assert response.json() == {
+        "detail": "Invalid protobuf payload.",
+        "code": ApiErrorCode.INVALID_PROTOBUF_PAYLOAD.value,
+    }

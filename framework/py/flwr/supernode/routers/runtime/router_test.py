@@ -154,4 +154,7 @@ def test_superexec_route_rejects_unsigned_request_when_auth_is_enabled() -> None
     response = _post(client, "/v1/runtime/claim-task", ClaimTaskRequest(task_id=123))
 
     assert response.status_code == 401
-    assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+    assert response.json() == {
+        "detail": "Authentication failed.",
+        "code": ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED.value,
+    }

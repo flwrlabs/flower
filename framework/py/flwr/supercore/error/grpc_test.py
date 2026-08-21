@@ -67,6 +67,24 @@ def test_flower_error_from_json() -> None:
     assert parsed.public_details == "public details"
 
 
+def test_flower_error_from_http_json() -> None:
+    """Deserialize the public HTTP FlowerError payload on the client side."""
+    parsed = FlowerError.from_json(
+        json.dumps(
+            {
+                "detail": "public message",
+                "code": ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE.value,
+                "extra": "public details",
+            }
+        )
+    )
+
+    assert parsed is not None
+    assert parsed.code == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
+    assert parsed.message == "public message"
+    assert parsed.public_details == "public details"
+
+
 def test_flower_error_from_json_returns_base_error_for_subclass_call() -> None:
     """Deserialize public payloads into a base FlowerError."""
     err = EntitlementError(
@@ -95,6 +113,11 @@ def test_flower_error_from_json_returns_base_error_for_subclass_call() -> None:
         '{"code": "1", "public_message": "wrong code type"}',
         '{"code": true, "public_message": "wrong code type"}',
         '{"code": 1, "public_message": "ok", "public_details": 1}',
+        '{"detail": "missing code"}',
+        '{"code": "1", "detail": "wrong code type"}',
+        '{"code": true, "detail": "wrong code type"}',
+        '{"code": 1, "detail": 1}',
+        '{"code": 1, "detail": "ok", "extra": 1}',
     ],
 )
 def test_flower_error_from_json_returns_none_for_invalid_payloads(
