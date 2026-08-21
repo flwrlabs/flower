@@ -28,7 +28,7 @@ from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.model_message import ModelResponse
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
-from .responses import _Exchange, _stream_response, router
+from .responses import _Exchange, _stream_response, _wait_for_response, router
 
 
 def _client(state: Mock) -> TestClient:
@@ -188,20 +188,31 @@ def test_responses_waits_for_terminal_events_after_reply() -> None:
     assert state.get_task_events.call_count == 2
 
 
-def test_responses_stops_and_drains_after_timeout() -> None:
-    """Stop the child task and drain its reply when a request times out."""
+def test_responses_stops_and_drains_when_response_wait_is_cancelled() -> None:
+    """Stop the child task and drain its reply when response waiting is cancelled."""
     state = _state()
     state.get_task_message.return_value = []
     state.get_tasks.return_value = [Task(task_id=456)]
 
-    with patch("flwr.superlink.routers.runtime.responses._REPLY_TIMEOUT", new=0):
-        response = _client(state).post(
-            "/v1/runtime/responses",
-            json={"model": "model", "input": "hello"},
-            headers={"Authorization": "Bearer task-token"},
-        )
+    async def wait_until_polled() -> None:
+        while not state.get_tasks.called:
+            await asyncio.sleep(0)
 
-    assert response.status_code == 504
+    async def cancel_response_wait() -> None:
+        exchange = _Exchange(
+            agent_task_id=123,
+            model_task_id=456,
+            run_id=789,
+        )
+        with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
+            response_wait = asyncio.create_task(_wait_for_response(state, exchange))
+            await asyncio.wait_for(wait_until_polled(), timeout=1)
+            response_wait.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await response_wait
+
+    asyncio.run(cancel_response_wait())
+
     state.finish_task.assert_called_once_with(
         456, SubStatus.STOPPED, "Responses request ended early."
     )

@@ -72,6 +72,7 @@ _AGENT_INPUT_KEY = "agent.input"
 _RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
 _RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
 _SSL_CERT_FILE_ENV = "SSL_CERT_FILE"
+_SSL_CERT_DIR_ENV = "SSL_CERT_DIR"
 
 
 def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
@@ -301,17 +302,42 @@ def _set_runtime_environment(
         return None
 
     # OpenAI/httpx reads custom CAs from SSL_CERT_FILE, which requires a path.
-    # Extend its public CA bundle with the Runtime CA for this AgentApp process.
+    # Extend the public and inherited roots with the Runtime CA for this process.
     with NamedTemporaryFile(
         mode="wb", prefix="flwr-runtime-ca-", suffix=".pem", delete=False
     ) as certificate_file:
         public_ca_context = httpx.create_ssl_context(trust_env=False)
-        for public_certificate in public_ca_context.get_ca_certs(binary_form=True):
+        trusted_certificates = [
+            *public_ca_context.get_ca_certs(binary_form=True),
+            *_load_inherited_ca_certificates(),
+        ]
+        for trusted_certificate in dict.fromkeys(trusted_certificates):
             certificate_file.write(
-                ssl.DER_cert_to_PEM_cert(public_certificate).encode("ascii")
+                ssl.DER_cert_to_PEM_cert(trusted_certificate).encode("ascii")
             )
         certificate_file.write(b"\n")
         certificate_file.write(certificates)
     certificate_path = Path(certificate_file.name)
     os.environ[_SSL_CERT_FILE_ENV] = str(certificate_path)
     return certificate_path
+
+
+def _load_inherited_ca_certificates() -> list[bytes]:
+    """Load roots configured through the standard OpenSSL environment."""
+    ca_file = os.environ.get(_SSL_CERT_FILE_ENV)
+    ca_dir = os.environ.get(_SSL_CERT_DIR_ENV)
+    if not ca_file and not ca_dir:
+        return []
+
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    if ca_file:
+        context.load_verify_locations(cafile=ca_file)
+    if ca_dir:
+        for ca_path in sorted(Path(ca_dir).iterdir()):
+            if not ca_path.is_file():
+                continue
+            try:
+                context.load_verify_locations(cafile=ca_path)
+            except OSError:
+                continue
+    return context.get_ca_certs(binary_form=True)

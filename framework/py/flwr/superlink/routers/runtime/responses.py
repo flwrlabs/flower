@@ -61,7 +61,6 @@ _SUPPORTED_FIELDS = frozenset(
 _TERMINAL_EVENTS = frozenset(
     {"error", "response.completed", "response.failed", "response.incomplete"}
 )
-_REPLY_TIMEOUT = 300.0
 _POLL_INTERVAL = 0.25
 _TERMINAL_EVENT_GRACE = 1.0
 
@@ -222,7 +221,6 @@ def _start_exchange(
 
 async def _wait_for_response(state: LinkState, exchange: _Exchange) -> JSONObject:
     """Wait for and return one correlated model response."""
-    deadline = time.monotonic() + _REPLY_TIMEOUT
     complete = False
     try:
         while True:
@@ -233,10 +231,6 @@ async def _wait_for_response(state: LinkState, exchange: _Exchange) -> JSONObjec
                 return response
 
             await run_in_threadpool(_raise_if_model_task_ended, state, exchange)
-            if time.monotonic() >= deadline:
-                raise _ResponsesError(
-                    504, "Timed out waiting for model response.", "model_timeout"
-                )
             await asyncio.sleep(_POLL_INTERVAL)
     finally:
         if not complete:
@@ -249,7 +243,6 @@ async def _stream_response(
     state: LinkState, exchange: _Exchange
 ) -> AsyncGenerator[str, None]:
     """Relay correlated child-task events as Server-Sent Events."""
-    deadline = time.monotonic() + _REPLY_TIMEOUT
     cursor: int | None = None
     complete = False
     response: JSONObject | None = None
@@ -266,7 +259,7 @@ async def _stream_response(
                 cursor = event.id
                 if event.event in _TERMINAL_EVENTS:
                     if response is None:
-                        await _wait_for_terminal_reply(state, exchange, deadline)
+                        await _wait_for_terminal_reply(state, exchange)
                     complete = True
                     yield _sse_frame(event)
                     return
@@ -277,9 +270,7 @@ async def _stream_response(
                 if response is not None:
                     # The reply can become visible between event polls, before the
                     # next poll observes its terminal event.
-                    terminal_event_deadline = min(
-                        deadline, time.monotonic() + _TERMINAL_EVENT_GRACE
-                    )
+                    terminal_event_deadline = time.monotonic() + _TERMINAL_EVENT_GRACE
 
             if (
                 response is not None
@@ -299,10 +290,6 @@ async def _stream_response(
 
             if response is None:
                 await run_in_threadpool(_raise_if_model_task_ended, state, exchange)
-            if time.monotonic() >= deadline:
-                raise _ResponsesError(
-                    504, "Timed out waiting for model response.", "model_timeout"
-                )
             await asyncio.sleep(_POLL_INTERVAL)
     except _ResponsesError as err:
         yield _stream_error(err.message, err.code)
@@ -316,7 +303,6 @@ async def _stream_response(
 async def _wait_for_terminal_reply(
     state: LinkState,
     exchange: _Exchange,
-    deadline: float,
 ) -> JSONObject:
     """Consume the final reply before exposing a terminal stream event."""
     while True:
@@ -324,10 +310,6 @@ async def _wait_for_terminal_reply(
         if response is not None:
             return response
         await run_in_threadpool(_raise_if_model_task_ended, state, exchange)
-        if time.monotonic() >= deadline:
-            raise _ResponsesError(
-                504, "Timed out waiting for final model response.", "model_timeout"
-            )
         await asyncio.sleep(_POLL_INTERVAL)
 
 
