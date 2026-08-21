@@ -783,11 +783,24 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ) as mock_get_metadata_from_config,
         ):
             mock_get_fab_config.return_value = {"tool": {"flwr": {"app": {}}}}
-            mock_get_metadata_from_config.return_value = ("flwr/demo", "0.1.0")
+            mock_get_metadata_from_config.return_value = (
+                "anne-dev/simple-legacy-127",
+                "0.1.0",
+            )
             response = self.servicer.StartRun(request, Mock())
 
         assert response.HasField("note")
         assert response.note
+        apps = self.state.list_apps(NOOP_FEDERATION_ID)
+        self.assertEqual(
+            [(app.app_id, app.fab_hash) for app in apps],
+            [
+                (
+                    "@anne-dev/simple-legacy-127",
+                    hashlib.sha256(b"test FAB content 123456").hexdigest(),
+                )
+            ],
+        )
 
     def test_start_run_accepts_valid_nested_override_keys(self) -> None:
         """Test StartRun accepts valid dotted override keys from nested FAB config."""

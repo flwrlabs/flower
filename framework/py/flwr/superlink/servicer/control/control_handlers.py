@@ -494,16 +494,35 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
     verification_dict: dict[str, str] = {}
     note: str | None = None
+    app_id = None
+    if request.app_spec:
+        try:
+            app_id, _ = parse_app_spec(request.app_spec)
+        except ValueError as e:
+            raise FlowerError(
+                ApiErrorCode.INVALID_APP_SPEC,
+                f"Invalid app specification: {request.app_spec}",
+            ) from e
     is_stored_app = bool(request.fab.hash_str and not request.fab.content)
-    is_hub_app = bool(request.app_spec and not request.fab.content)
 
     stored_fab = None
+    builtin_agent_fab = None
     if is_stored_app:
+        if app_id is None:
+            raise FlowerError(
+                ApiErrorCode.FAB_DOWNLOAD_FAILURE,
+                "App or FAB not found in the requested federation.",
+            )
         stored_fab = state.get_app(
             federation_id,
-            request.app_spec,
+            app_id,
             request.fab.hash_str,
         )
+        if stored_fab is None:
+            raise FlowerError(
+                ApiErrorCode.FAB_DOWNLOAD_FAILURE,
+                "App or FAB not found in the requested federation.",
+            )
 
     if stored_fab is not None:
         fab_file = stored_fab.content
@@ -512,11 +531,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
         if builtin_agent_fab is not None:
             fab_file, verification_dict = builtin_agent_fab
-        elif is_stored_app:
-            raise FlowerError(
-                ApiErrorCode.FAB_DOWNLOAD_FAILURE,
-                "App or FAB not found in the requested federation.",
-            )
         elif request.app_spec:
             fab_file, verification_dict, note = _get_remote_fab(
                 fleet_api_type, request.app_spec
@@ -580,13 +594,14 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             verification_dict,
         )
         fab_id, fab_version = get_metadata_from_config(fab_config)
-        app_id = f"@{fab_id}"
+        fab_app_id = f"@{fab_id}"
+        if app_id is None or builtin_agent_fab is not None:
+            app_id = fab_app_id
+        elif app_id != fab_app_id:
+            raise ValueError("Stored app ID does not match the request")
+
         if stored_fab is not None:
-            if app_id != request.app_spec or fab.hash_str != request.fab.hash_str:
-                raise ValueError("Stored app metadata does not match the request")
             fab_hash = fab.hash_str
-        elif is_hub_app:
-            fab_hash = state.store_fab(fab)
         else:
             fab_hash = state.store_app(
                 fab=fab,

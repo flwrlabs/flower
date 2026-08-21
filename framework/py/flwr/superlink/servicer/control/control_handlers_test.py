@@ -94,7 +94,7 @@ class TestControlHandlers(unittest.TestCase):
             patch.object(self.state, "store_app") as mock_store_app,
         ):
             request = StartRunRequest(federation=NOOP_FEDERATION_ID)
-            request.app_spec = "@flwr/demo"
+            request.app_spec = "@flwr/demo==0.0.1"
             request.fab.hash_str = fab_hash
             response = start_run(request, self.account, self.state, None)
 
