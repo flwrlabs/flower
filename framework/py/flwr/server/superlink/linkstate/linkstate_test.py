@@ -456,10 +456,15 @@ class StateTest(CoreStateTest):
         msg_res_0.metadata._message_id = str(uuid4())  # type: ignore
 
         _ = state.store_message_res(message=msg_res_0)
+        state.record_instruction_enqueued(msg_ins_list[0].object_id, 1000.0)
+        state.record_clientapp_delivered(
+            run_id, msg_ins_list[0].object_id, 1100.0
+        )
         retrieved_msg_res_0 = state.get_message_res(
             message_ids={msg_res_0.metadata.reply_to_message_id}
         )[0]
         assert retrieved_msg_res_0.error.code == 0
+        assert not retrieved_msg_res_0.has_content()
 
         # Insert one reply Message, but don't retrieve it
         msg_res_1 = Message(RecordDict(), reply_to=msg_ins_list[1])

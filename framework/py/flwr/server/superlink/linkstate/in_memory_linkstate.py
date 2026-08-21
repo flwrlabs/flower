@@ -344,7 +344,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 ins_enqueued_at_ms = timings.get("ins_enqueued_at_ms")
                 clientapp_delivered_at_ms = timings.get("clientapp_delivered_at_ms")
                 if (
-                    ins_enqueued_at_ms is not None
+                    not message_res.has_error()
+                    and ins_enqueued_at_ms is not None
                     and clientapp_delivered_at_ms is not None
                 ):
                     downstream_ms = max(

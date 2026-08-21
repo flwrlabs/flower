@@ -581,7 +581,8 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
                 ins_enqueued_at_ms = timings.get("ins_enqueued_at_ms")
                 clientapp_delivered_at_ms = timings.get("clientapp_delivered_at_ms")
                 if (
-                    ins_enqueued_at_ms is not None
+                    not message_res.has_error()
+                    and ins_enqueued_at_ms is not None
                     and clientapp_delivered_at_ms is not None
                 ):
                     downstream_ms = max(
