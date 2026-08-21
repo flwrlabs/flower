@@ -24,7 +24,7 @@ from flwr.common.constant import SubStatus
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.constant import TaskType
-from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
+from flwr.supercore.json_message.model_message import ModelResponse
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
 from .responses import _Exchange, _stream_response, router
@@ -71,18 +71,6 @@ def _event(event_id: int, event: str, data: str | None = None) -> TaskEvent:
     )
 
 
-def _capture_requests(state: Mock) -> list[ModelRequest]:
-    """Capture task messages stored by the endpoint."""
-    requests: list[ModelRequest] = []
-
-    def store(request: ModelRequest) -> bool:
-        requests.append(request)
-        return True
-
-    state.store_task_message.side_effect = store
-    return requests
-
-
 @pytest.mark.parametrize("authorization", [None, "Basic task-token"])
 def test_responses_requires_bearer_authentication(
     authorization: str | None,
@@ -103,9 +91,8 @@ def test_responses_requires_bearer_authentication(
 def test_responses_returns_correlated_model_response() -> None:
     """Create a child model task and claim only its direct reply."""
     state = _state()
-    stored_requests = _capture_requests(state)
     state.get_task_message.side_effect = lambda **_: [
-        _reply(stored_requests[0].metadata.message_id)
+        _reply(state.store_task_message.call_args.args[0].metadata.message_id)
     ]
 
     response = _client(state).post(
@@ -116,7 +103,7 @@ def test_responses_returns_correlated_model_response() -> None:
 
     assert response.status_code == 200
     assert response.json()["id"] == "resp_1"
-    request = stored_requests[0]
+    request = state.store_task_message.call_args.args[0]
     assert request.metadata.src_task_id == 123
     assert request.metadata.dst_task_id == 456
     state.get_task_message.assert_called_once_with(
@@ -145,13 +132,12 @@ def test_responses_rejects_unsupported_fields() -> None:
 def test_responses_streams_only_child_task_events() -> None:
     """Relay ordered events and consume the final correlated reply."""
     state = _state()
-    stored_requests = _capture_requests(state)
     state.get_task_events.return_value = [
         _event(1, "response.created"),
         _event(2, "response.completed"),
     ]
     state.get_task_message.side_effect = lambda **_: [
-        _reply(stored_requests[0].metadata.message_id)
+        _reply(state.store_task_message.call_args.args[0].metadata.message_id)
     ]
 
     response = _client(state).post(
@@ -174,7 +160,6 @@ def test_responses_streams_only_child_task_events() -> None:
 def test_responses_waits_for_terminal_events_after_reply() -> None:
     """Do not truncate a final event batch that becomes visible after its reply."""
     state = _state()
-    stored_requests = _capture_requests(state)
     state.get_task_events.side_effect = [
         [
             _event(
@@ -186,7 +171,7 @@ def test_responses_waits_for_terminal_events_after_reply() -> None:
         [_event(2, "response.completed")],
     ]
     state.get_task_message.side_effect = lambda **_: [
-        _reply(stored_requests[0].metadata.message_id)
+        _reply(state.store_task_message.call_args.args[0].metadata.message_id)
     ]
 
     with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=0):

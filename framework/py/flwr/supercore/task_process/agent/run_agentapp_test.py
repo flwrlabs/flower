@@ -28,9 +28,35 @@ def test_set_runtime_environment(
     """Expose the Runtime Responses base URL and AgentApp task token."""
     monkeypatch.delenv("FLWR_RUNTIME_BASE_URL", raising=False)
     monkeypatch.delenv("FLWR_RUNTIME_API_KEY", raising=False)
-    _set_runtime_environment("runtime.example:9092", "task-token", insecure=insecure)
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+    certificate_path = _set_runtime_environment(
+        "runtime.example:9092", "task-token", insecure=insecure
+    )
 
     assert os.environ["FLWR_RUNTIME_BASE_URL"] == (
         f"{scheme}://runtime.example:9092/v1/runtime"
     )
     assert os.environ["FLWR_RUNTIME_API_KEY"] == "task-token"
+    assert certificate_path is None
+    assert "SSL_CERT_FILE" not in os.environ
+
+
+def test_set_runtime_environment_exposes_root_certificates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Expose custom Runtime root certificates to SDK HTTP clients."""
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+
+    certificate_path = _set_runtime_environment(
+        "runtime.example:9092",
+        "task-token",
+        insecure=False,
+        certificates=b"root-certificates",
+    )
+
+    assert certificate_path is not None
+    try:
+        assert os.environ["SSL_CERT_FILE"] == str(certificate_path)
+        assert certificate_path.read_bytes() == b"root-certificates"
+    finally:
+        certificate_path.unlink(missing_ok=True)

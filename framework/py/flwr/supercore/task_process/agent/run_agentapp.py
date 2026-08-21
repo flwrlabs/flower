@@ -19,6 +19,7 @@ import os
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
+from tempfile import NamedTemporaryFile
 
 import httpx
 
@@ -69,6 +70,7 @@ from .session import RuntimeAgentConnectors, RuntimeAgentResponses, RuntimeAgent
 _AGENT_INPUT_KEY = "agent.input"
 _RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
 _RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
+_SSL_CERT_FILE_ENV = "SSL_CERT_FILE"
 
 
 def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
@@ -100,6 +102,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     heartbeat_sender = None
     context: Context | None = None
     runtime_env_dir: Path | None = None
+    runtime_root_certificates_path: Path | None = None
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
@@ -129,6 +132,8 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         grid.close()
 
         cleanup_app_runtime_environment(runtime_env_dir)
+        if runtime_root_certificates_path is not None:
+            runtime_root_certificates_path.unlink(missing_ok=True)
 
     register_signal_handlers(
         event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
@@ -239,7 +244,9 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         connectors = RuntimeAgentConnectors(responses)
         agent = RuntimeAgentSession(responses=responses, connectors=connectors)
 
-        _set_runtime_environment(runtime_api_address, token, insecure)
+        runtime_root_certificates_path = _set_runtime_environment(
+            runtime_api_address, token, insecure, certificates
+        )
 
         # Load and run the AgentApp
         agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)
@@ -278,10 +285,24 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
 
 
 def _set_runtime_environment(
-    runtime_api_address: str, token: str, insecure: bool
-) -> None:
+    runtime_api_address: str,
+    token: str,
+    insecure: bool,
+    certificates: bytes | None = None,
+) -> Path | None:
     """Expose the Open Responses-compatible Runtime endpoint to the AgentApp."""
     scheme = "http" if insecure else "https"
     address = runtime_api_address.rstrip("/")
     os.environ[_RUNTIME_BASE_URL_ENV] = f"{scheme}://{address}/v1/runtime"
     os.environ[_RUNTIME_API_KEY_ENV] = token
+
+    if certificates is None:
+        return None
+
+    with NamedTemporaryFile(
+        mode="wb", prefix="flwr-runtime-ca-", suffix=".pem", delete=False
+    ) as certificate_file:
+        certificate_file.write(certificates)
+    certificate_path = Path(certificate_file.name)
+    os.environ[_SSL_CERT_FILE_ENV] = str(certificate_path)
+    return certificate_path

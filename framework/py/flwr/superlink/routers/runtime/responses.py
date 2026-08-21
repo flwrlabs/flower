@@ -276,6 +276,8 @@ def _stream_response(
             if response is None:
                 response = _claim_response(state, exchange)
                 if response is not None:
+                    # The reply can become visible between event polls, before the
+                    # next poll observes its terminal event.
                     terminal_event_deadline = min(
                         deadline, time.monotonic() + _TERMINAL_EVENT_GRACE
                     )
