@@ -106,7 +106,7 @@ async def create_runtime_response(
         )
 
     try:
-        response = await _wait_for_response(state, exchange)
+        response = await _wait_for_response(request, state, exchange)
     except _ResponsesError as err:
         return _error_response(err)
     return JSONResponse(content=response)
@@ -219,11 +219,18 @@ def _start_exchange(
     )
 
 
-async def _wait_for_response(state: LinkState, exchange: _Exchange) -> JSONObject:
+async def _wait_for_response(
+    request: Request, state: LinkState, exchange: _Exchange
+) -> JSONObject:
     """Wait for and return one correlated model response."""
     complete = False
     try:
         while True:
+            if await request.is_disconnected():
+                raise _ResponsesError(
+                    499, "Client disconnected.", "client_disconnected"
+                )
+
             response = await run_in_threadpool(_claim_response, state, exchange)
             if response is not None:
                 complete = True

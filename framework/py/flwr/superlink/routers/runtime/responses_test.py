@@ -15,10 +15,10 @@
 """Tests for the Runtime Responses endpoint."""
 
 import asyncio
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from flwr.common.constant import SubStatus
@@ -28,7 +28,13 @@ from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.model_message import ModelResponse
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
-from .responses import _Exchange, _stream_response, _wait_for_response, router
+from .responses import (
+    _Exchange,
+    _ResponsesError,
+    _stream_response,
+    _wait_for_response,
+    router,
+)
 
 
 def _client(state: Mock) -> TestClient:
@@ -199,13 +205,17 @@ def test_responses_stops_and_drains_when_response_wait_is_cancelled() -> None:
             await asyncio.sleep(0)
 
     async def cancel_response_wait() -> None:
+        request = Mock(spec=Request)
+        request.is_disconnected = AsyncMock(return_value=False)
         exchange = _Exchange(
             agent_task_id=123,
             model_task_id=456,
             run_id=789,
         )
         with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
-            response_wait = asyncio.create_task(_wait_for_response(state, exchange))
+            response_wait = asyncio.create_task(
+                _wait_for_response(request, state, exchange)
+            )
             await asyncio.wait_for(wait_until_polled(), timeout=1)
             response_wait.cancel()
             with pytest.raises(asyncio.CancelledError):
@@ -217,6 +227,36 @@ def test_responses_stops_and_drains_when_response_wait_is_cancelled() -> None:
         456, SubStatus.STOPPED, "Responses request ended early."
     )
     assert state.get_task_message.call_count == 2
+
+
+def test_responses_stops_and_drains_when_client_disconnects() -> None:
+    """Stop the child task and drain its reply when the client disconnects."""
+    state = _state()
+    state.get_task_message.return_value = []
+    request = Mock(spec=Request)
+    request.is_disconnected = AsyncMock(return_value=True)
+
+    async def wait_for_response() -> None:
+        exchange = _Exchange(
+            agent_task_id=123,
+            model_task_id=456,
+            run_id=789,
+        )
+        with pytest.raises(_ResponsesError) as exc_info:
+            await _wait_for_response(request, state, exchange)
+        assert exc_info.value.code == "client_disconnected"
+
+    asyncio.run(wait_for_response())
+
+    state.finish_task.assert_called_once_with(
+        456, SubStatus.STOPPED, "Responses request ended early."
+    )
+    state.get_task_message.assert_called_once_with(
+        dst_task_ids=[123],
+        src_task_ids=[456],
+        limit=1,
+        order_by="created_at",
+    )
 
 
 def test_responses_stops_and_drains_when_stream_is_cancelled() -> None:
