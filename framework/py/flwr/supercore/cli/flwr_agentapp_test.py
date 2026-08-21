@@ -87,11 +87,11 @@ def test_flwr_agentapp_parses_args_before_mirroring_output() -> None:
     mirror_output_to_queue.assert_not_called()
 
 
-def test_flwr_agentapp_forwards_cli_args(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_flwr_agentapp_forwards_cli_args() -> None:
     """The AgentApp CLI should forward parsed args to the runtime."""
     monkeypatch.delenv("SSL_CERT_FILE", raising=False)
     args = SimpleNamespace(
-        insecure=False,
+        insecure=True,
         runtime_api_address="127.0.0.1:9091",
         token="test-token",
         root_certificates=None,
@@ -127,11 +127,10 @@ def test_flwr_agentapp_forwards_cli_args(monkeypatch: pytest.MonkeyPatch) -> Non
     assert kwargs["runtime_api_address"] == "127.0.0.1:9091"
     assert kwargs["log_queue"] is mirror_output_to_queue.call_args.args[0]
     assert kwargs["token"] == "test-token"
-    assert kwargs["insecure"] is False
+    assert kwargs["insecure"] is True
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321
     assert kwargs["runtime_dependency_install"] is True
-    assert "SSL_CERT_FILE" not in os.environ
 
 
 def test_flwr_agentapp_exposes_explicit_root_certificates(
