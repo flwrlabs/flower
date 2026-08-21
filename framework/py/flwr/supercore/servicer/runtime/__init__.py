@@ -12,11 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared Runtime API servicer implementation."""
-
-
-from .runtime_servicer import RuntimeServicer
-
-__all__ = [
-    "RuntimeServicer",
-]
+"""Shared Runtime API handlers."""

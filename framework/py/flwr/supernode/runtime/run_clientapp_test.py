@@ -20,25 +20,117 @@ from unittest.mock import Mock, patch
 
 import httpx
 
-from flwr.common.serde import fab_to_proto
+from flwr.app import Context
+from flwr.app.message import make_message
+from flwr.common.constant import SubStatus
+from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
+from flwr.common.serde_test import RecordMaker
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
 from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesResponse,
     PullTaskInputResponse,
+    PushAppMessagesResponse,
+    PushTaskOutputResponse,
 )
 from flwr.supercore.exit import ExitCode
 from flwr.supercore.fab import Fab
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_tree,
+    iterate_object_tree,
+)
 from flwr.supercore.interceptors import (
     RuntimeTokenHttpInterceptor,
     RuntimeVersionHttpInterceptor,
 )
 
-from .run_clientapp import pull_task_input, run_clientapp
+from .run_clientapp import (
+    pull_task_input,
+    push_message,
+    push_task_output,
+    run_clientapp,
+)
 
 
 class TestRunClientApp(unittest.TestCase):
     """Tests for `run_clientapp`."""
+
+    def setUp(self) -> None:
+        """Initialize record fixtures."""
+        self.maker = RecordMaker()
+
+    def test_pull_task_input(self) -> None:
+        """Test pulling messages from SuperNode."""
+        stub = Mock()
+        message = make_message(
+            metadata=self.maker.metadata(),
+            content=self.maker.recorddict(3, 2, 1),
+        )
+        fab = Fab("abc123#$%", b"\xf3\xf5\xf8\x98", {"ab12#$%": "abc123#$%"})
+        stub.PullTaskInput.return_value = PullTaskInputResponse(
+            context=ProtoContext(node_id=123),
+            run=ProtoRun(run_id=61016, fab_id="mock/mock", fab_version="v1.0.0"),
+            fab=fab_to_proto(fab),
+        )
+        stub.PullMessages.return_value = PullAppMessagesResponse(
+            messages_list=[message_to_proto(message)],
+            message_object_trees=[get_object_tree(message)],
+        )
+        all_objects = get_all_nested_objects(message)
+        all_objects[message.object_id] = message
+        stub.PullObject.side_effect = lambda request: Mock(
+            object_found=True,
+            object_available=True,
+            object_content=all_objects[request.object_id].deflate(),
+        )
+
+        pulled_message, context, run, pulled_fab = pull_task_input(stub)
+
+        stub.PullTaskInput.assert_called_once()
+        self.assertEqual(len(pulled_message.content.array_records), 3)
+        self.assertEqual(len(pulled_message.content.metric_records), 2)
+        self.assertEqual(len(pulled_message.content.config_records), 1)
+        self.assertEqual(context.node_id, 123)
+        self.assertEqual(run.run_id, 61016)
+        self.assertEqual(run.fab_id, "mock/mock")
+        self.assertEqual(run.fab_version, "v1.0.0")
+        self.assertEqual(pulled_fab, fab)
+
+    def test_push_task_output(self) -> None:
+        """Test pushing messages and task output to SuperNode."""
+        stub = Mock()
+        message = make_message(
+            metadata=self.maker.metadata(),
+            content=self.maker.recorddict(2, 2, 1),
+        )
+        context = Context(
+            run_id=1,
+            node_id=1,
+            node_config={"nodeconfig1": 4.2},
+            state=self.maker.recorddict(2, 2, 1),
+            run_config={"runconfig1": 6.1},
+        )
+        object_tree = get_object_tree(message)
+        object_ids = [tree.object_id for tree in iterate_object_tree(object_tree)]
+        stub.PushMessages.return_value = PushAppMessagesResponse(
+            message_ids=[message.object_id], objects_to_push=object_ids
+        )
+        stub.PushTaskOutput.return_value = PushTaskOutputResponse()
+
+        push_message(stub, message, context)
+        push_task_output(stub, context, SubStatus.COMPLETED, "completed")
+
+        stub.PushTaskOutput.assert_called_once()
+        stub.PushMessages.assert_called_once()
+        self.assertCountEqual(
+            [call.args[0].object_id for call in stub.PushObject.call_args_list],
+            object_ids,
+        )
+        request = stub.PushTaskOutput.call_args.args[0]
+        self.assertEqual(request.context, context_to_proto(context))
+        self.assertEqual(request.sub_status, SubStatus.COMPLETED)
+        self.assertEqual(request.details, "completed")
 
     def test_pull_task_input_raises_when_no_message_received(self) -> None:
         """`pull_task_input` should reject an empty PullMessages response."""
