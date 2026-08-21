@@ -554,5 +554,5 @@ answer had to handle.
 - Never put credentials in prompts or connector arguments
 - Use [Connect accounts](../how-to-guides/connect-accounts.md) before adding an
   account connector, and remember that those runs are personal-workspace-only
-- Expose `start_automation` only when the app must honor explicit future or
-  recurring requests
+- Follow [Create automations](../how-to-guides/create-automations.md) before
+  exposing `start_automation` for explicit future or recurring requests
