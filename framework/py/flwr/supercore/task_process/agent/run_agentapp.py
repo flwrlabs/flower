@@ -16,6 +16,7 @@
 
 
 import os
+import ssl
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
@@ -300,10 +301,16 @@ def _set_runtime_environment(
         return None
 
     # OpenAI/httpx reads custom CAs from SSL_CERT_FILE, which requires a path.
-    # Materialize the Runtime CA for the lifetime of this isolated AgentApp process.
+    # Extend its public CA bundle with the Runtime CA for this AgentApp process.
     with NamedTemporaryFile(
         mode="wb", prefix="flwr-runtime-ca-", suffix=".pem", delete=False
     ) as certificate_file:
+        public_ca_context = httpx.create_ssl_context(trust_env=False)
+        for public_certificate in public_ca_context.get_ca_certs(binary_form=True):
+            certificate_file.write(
+                ssl.DER_cert_to_PEM_cert(public_certificate).encode("ascii")
+            )
+        certificate_file.write(b"\n")
         certificate_file.write(certificates)
     certificate_path = Path(certificate_file.name)
     os.environ[_SSL_CERT_FILE_ENV] = str(certificate_path)

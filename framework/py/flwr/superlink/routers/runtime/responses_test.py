@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for the Runtime Responses endpoint."""
 
+import asyncio
 from unittest.mock import Mock, patch
 
 import pytest
@@ -207,33 +208,40 @@ def test_responses_stops_and_drains_after_timeout() -> None:
     assert state.get_task_message.call_count == 2
 
 
-def test_responses_stops_and_drains_when_stream_closes() -> None:
-    """Stop the child task and drain its reply when the client closes the stream."""
+def test_responses_stops_and_drains_when_stream_is_cancelled() -> None:
+    """Stop the child task and drain its reply when the stream is cancelled."""
     state = _state()
-    state.get_task_events.return_value = [
-        _event(
-            1,
-            "response.output_text.delta",
-            '{"type":"response.output_text.delta","delta":"x"}',
-        )
-    ]
+    state.get_task_events.return_value = []
     state.get_task_message.return_value = []
-    stream = _stream_response(
-        state,
-        _Exchange(
-            agent_task_id=123,
-            model_task_id=456,
-            run_id=789,
-        ),
-    )
+    state.get_tasks.return_value = [Task(task_id=456)]
 
-    assert next(stream).startswith("event: response.output_text.delta")
-    stream.close()
+    async def wait_until_polled() -> None:
+        while not state.get_tasks.called:
+            await asyncio.sleep(0)
+
+    async def cancel_stream() -> None:
+        stream = _stream_response(
+            state,
+            _Exchange(
+                agent_task_id=123,
+                model_task_id=456,
+                run_id=789,
+            ),
+        )
+        with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
+            next_event = asyncio.create_task(anext(stream))
+            await asyncio.wait_for(wait_until_polled(), timeout=1)
+            next_event.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await next_event
+
+    asyncio.run(cancel_stream())
 
     state.finish_task.assert_called_once_with(
         456, SubStatus.STOPPED, "Responses stream ended early."
     )
-    state.get_task_message.assert_called_once_with(
+    assert state.get_task_message.call_count == 2
+    state.get_task_message.assert_called_with(
         dst_task_ids=[123],
         src_task_ids=[456],
         limit=1,

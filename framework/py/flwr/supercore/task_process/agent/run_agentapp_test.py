@@ -44,7 +44,7 @@ def test_set_runtime_environment(
 def test_set_runtime_environment_exposes_root_certificates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Expose custom Runtime root certificates to SDK HTTP clients."""
+    """Add custom Runtime root certificates to the public trust bundle."""
     monkeypatch.delenv("SSL_CERT_FILE", raising=False)
 
     certificate_path = _set_runtime_environment(
@@ -57,6 +57,8 @@ def test_set_runtime_environment_exposes_root_certificates(
     assert certificate_path is not None
     try:
         assert os.environ["SSL_CERT_FILE"] == str(certificate_path)
-        assert certificate_path.read_bytes() == b"root-certificates"
+        certificate_bundle = certificate_path.read_bytes()
+        assert certificate_bundle.startswith(b"-----BEGIN CERTIFICATE-----")
+        assert certificate_bundle.endswith(b"\nroot-certificates")
     finally:
         certificate_path.unlink(missing_ok=True)
