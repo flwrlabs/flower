@@ -38,6 +38,7 @@ def render_markdown(block: MarkdownBlock, width: int) -> StyleAndTextTuples:
         markup=False,
     )
     fragments: StyleAndTextTuples = []
+    links: dict[str, str] = {}
     for segment in console.render(Markdown(block.body), console.options):
         # Ignore Rich control sequences and segments without visible content.
         if segment.control or not segment.text:
@@ -45,8 +46,7 @@ def render_markdown(block: MarkdownBlock, width: int) -> StyleAndTextTuples:
 
         # Translate Rich text attributes to prompt_toolkit style syntax.
         style = segment.style
-        if isinstance(style, str):
-            style = console.get_style(style)
+        link = style.link if style is not None else None
         attributes: list[str] = []
         if style is not None:
             for enabled, name in (
@@ -63,12 +63,19 @@ def render_markdown(block: MarkdownBlock, width: int) -> StyleAndTextTuples:
                 if color is None:
                     continue
                 triplet = color.get_truecolor()
-                if triplet is not None:
-                    attributes.append(
-                        f"{prefix}#{triplet.red:02x}{triplet.green:02x}"
-                        f"{triplet.blue:02x}"
-                    )
+                attributes.append(
+                    f"{prefix}#{triplet.red:02x}{triplet.green:02x}"
+                    f"{triplet.blue:02x}"
+                )
         fragments.append((" ".join(attributes), segment.text))
+        if link is not None:
+            links[link] = f"{links.get(link, '')}{segment.text}"
+
+    # Keep destinations visible and copyable because prompt_toolkit fragments
+    # cannot represent Rich's hyperlink metadata. Avoid repeating bare URLs.
+    for link, text in links.items():
+        if text.strip() != link:
+            fragments.append(("", f"{link}\n"))
 
     # Rich terminates each rendered message with one newline. Retain the blank
     # row that separates messages in the transcript.

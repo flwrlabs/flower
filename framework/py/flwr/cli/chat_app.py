@@ -462,7 +462,12 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 if event_type == CHAT_TEXT_DELTA_EVENT:
                     delta = payload.get("delta")
                     if isinstance(delta, str):
-                        if markdown_block is None:
+                        # Start a new block after tool output so transcript entries
+                        # remain in the same order as their streamed events.
+                        if (
+                            markdown_block is None
+                            or self.transcript[-1] is not markdown_block
+                        ):
                             self.status = ""
                             markdown_block = MarkdownBlock()
                             self.transcript.append(markdown_block)
