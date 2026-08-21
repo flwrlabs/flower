@@ -18,14 +18,11 @@ import json
 
 import pytest
 
-from .privacy_accounting import (
-    GaussianPrivacyEvent,
-    NeighboringRelation,
-    PrivacyConfig,
-    SamplingMethod,
-)
+from . import GaussianPrivacyEvent, NeighboringRelation, PrivacyConfig, SamplingMethod
 
-RdpAccountant = pytest.importorskip("flwr.supercore.rdp_accountant").RdpAccountant
+RdpAccountant = pytest.importorskip(
+    "flwr.supercore.privacy_accounting.rdp_accountant"
+).RdpAccountant
 
 TARGET_DELTA = 1e-6
 
