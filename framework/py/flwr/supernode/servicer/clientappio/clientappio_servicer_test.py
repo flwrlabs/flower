@@ -32,6 +32,7 @@ from flwr.common.serde_test import RecordMaker
 from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
     PullAppInputsResponse,
     PullAppMessagesResponse,
+    PushAppMessagesRequest,
     PushAppMessagesResponse,
     PushAppOutputsResponse,
 )
@@ -167,6 +168,31 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PushClientAppOutputs.assert_called_once()
         self.mock_stub.PushMessage.assert_called_once()
         self.assertSetEqual(pushed_obj_ids, set(all_obj_ids))
+
+    def test_push_message_records_end_before_publishing_reply(self) -> None:
+        """The sender loop must not see a reply before its end timestamp."""
+        message = make_message(
+            metadata=self.maker.metadata(),
+            content=self.maker.recorddict(1, 1, 1),
+        )
+        request = PushAppMessagesRequest(
+            token="token",
+            messages_list=[message_to_proto(message)],
+            message_object_trees=[],
+        )
+        events: list[str] = []
+        self.mock_state.get_run_id_by_token.return_value = 1
+        self.mock_state.verify_token.return_value = True
+        self.mock_state.record_message_processing_end.side_effect = (
+            lambda **_kwargs: events.append("end")
+        )
+        self.mock_state.store_message.side_effect = (
+            lambda _message: events.append("store")
+        )
+
+        self.servicer.PushMessage(request, Mock())
+
+        self.assertEqual(events, ["end", "store"])
 
     @parameterized.expand([(True,), (False,)])  # type: ignore
     def test_send_app_heartbeat(self, success: bool) -> None:
