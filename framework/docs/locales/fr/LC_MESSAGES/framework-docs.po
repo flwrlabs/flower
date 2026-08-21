@@ -18303,7 +18303,6 @@ msgstr ""
 "``src/py/flwr/superlink/grid/__init__.py``:"
 
 #: ../../source/contributor-explanation-public-and-private-apis.rst:133
-#, fuzzy
 msgid ""
 "The interesting part is that both ``HttpGrid`` and ``InMemoryGrid`` are "
 "never used by Flower framework users, only by other parts of the Flower "
@@ -18314,7 +18313,7 @@ msgid ""
 "(``inmemory_grid.py`` is the module containing the actual "
 "``InMemoryGrid`` class definition)."
 msgstr ""
-"La partie intéressante est que les deux ``GrpcGrid`` et ``InMemoryGrid`` "
+"La partie intéressante est que les deux ``HttpGrid`` et ``InMemoryGrid`` "
 "sont jamais utilisés par les utilisateurs du cadre Flower, mais "
 "uniquement par d'autres parties du codebase du cadre Flower. Ces autres "
 "parties du codebase importent, par exemple, ``InMemoryGrid`` à l'aide de "
@@ -22520,19 +22519,17 @@ msgid ""
 msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:143
-#, fuzzy
 msgid ""
 "``--port 9094``: Set the port where the SuperNode listens for the "
 "ClientApp process. If multiple SuperNodes are started on the same "
 "machine, use a different port number for each SuperNode. (E.g. In the "
 "next step, we set the second SuperNode container to listen on port 9095)"
 msgstr ""
-"``--clientappio-api-address 0.0.0.0:9094``: Définissez l'adresse et le "
-"numéro de port que SuperNode écoute pour communiquer avec le processus "
-"ClientApp. Si plusieurs SuperNodes sont démarrés sur la même machine, "
-"utilisez un numéro de port différent pour chaque SuperNode. (Par exemple,"
-" dans l'étape suivante, nous définissons le deuxième conteneur SuperNode "
-"pour écouter sur le port 9095)"
+"``--port 9094``: Définissez le port sur lequel le SuperNode écoute pour "
+"communiquer avec le processus ClientApp. Si plusieurs SuperNodes sont "
+"démarrés sur la même machine, utilisez un numéro de port différent pour "
+"chaque SuperNode. (Par exemple, à l'étape suivante, nous configurons le "
+"deuxième conteneur SuperNode pour écouter sur le port 9095)"
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:146
 msgid ""
@@ -36571,14 +36568,12 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:155
-#, fuzzy
 msgid ""
 "``--port 9094``: Set the Runtime API port used to communicate with the "
 "``ClientApp``."
 msgstr ""
-"``--clientappio-api-address 127.0.0.1:9094``: Définissez l'adresse et le "
-"numéro de port où le SuperNode écoute pour communiquer avec le "
-"``ClientApp``."
+"``--port 9094``: Définissez le port de l'API Runtime utilisé pour "
+"communiquer avec le ``ClientApp``."
 
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:156
 msgid ""
@@ -36601,18 +36596,16 @@ msgstr ""
 "environnement :"
 
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:171
-#, fuzzy
 msgid ""
 "``--port 9095``: Note that a different port is being used. This is only "
 "needed because you are running two SuperNodes on the same machine. "
 "Typically you would run one node per machine and could omit ``--port`` to"
 " use its default value."
 msgstr ""
-"``--clientappio-api-address 127.0.0.1:9095``: Notez que un autre port est"
-" utilisé. Il n'est nécessaire que parce que vous exécutez deux SuperNodes"
-" sur la même machine. Généralement, vous exécutez une seule node par "
-"machine et donc, le ``--clientappio-api-address`` pourrait être omis tout"
-" à fait et laisser son valeur par défaut."
+"``--port 9095``: Notez qu'un port différent est utilisé. Cela n'est "
+"nécessaire que parce que vous exécutez deux SuperNodes sur la même "
+"machine. En général, vous exécutez un seul nœud par machine et pouvez "
+"omettre ``--port`` pour utiliser sa valeur par défaut."
 
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:172
 msgid ""
@@ -65605,4 +65598,3 @@ msgstr ""
 #~ " server certificate. If None, gRPC "
 #~ "default root certificates are used."
 #~ msgstr ""
-
