@@ -47,11 +47,18 @@ Request the runtime tool schema and include it in a model request:
 
 ```python
 tools = agent.connectors.tools(["start_automation"])
+allowed_tool_names = {
+    tool["name"] for tool in tools if isinstance(tool.get("name"), str)
+}
 ```
 
-Store the returned `function_call` item in `tool_call`, then pass it to:
+Store the returned `function_call` item in `tool_call`. Before calling the
+connector, verify that its name was included in `tools`:
 
 ```python
+if tool_call.get("name") not in allowed_tool_names:
+    raise RuntimeError(f"Tool {tool_call.get('name')!r} was not exposed")
+
 output = agent.connectors.call(tool_call)
 ```
 
