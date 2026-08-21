@@ -31,10 +31,15 @@ from .grid import Grid
 from .server_app import ServerApp as ServerApp
 
 if TYPE_CHECKING:
-    from flwr.supercore.rdp_accountant import RdpAccountant as RdpAccountant
+    from flwr.supercore.privacy_accounting.rdp_accountant import (
+        RdpAccountant as RdpAccountant,
+    )
 
 _LAZY_EXPORTS = {
-    "RdpAccountant": ("flwr.supercore.rdp_accountant", "RdpAccountant"),
+    "RdpAccountant": (
+        "flwr.supercore.privacy_accounting.rdp_accountant",
+        "RdpAccountant",
+    ),
 }
 
 __all__ = [
