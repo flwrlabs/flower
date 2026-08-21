@@ -128,6 +128,7 @@ class TestRunClientApp(unittest.TestCase):
         request = stub.PushTaskOutput.call_args.args[0]
         self.assertEqual(request.context, context_to_proto(context))
         self.assertEqual(request.sub_status, SubStatus.COMPLETED)
+        self.assertEqual(request.details, "completed")
 
     def test_pull_task_input_raises_when_no_message_received(self) -> None:
         """`pull_task_input` should reject an empty PullMessages response."""
