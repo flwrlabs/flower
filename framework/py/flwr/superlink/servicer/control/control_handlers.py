@@ -28,7 +28,6 @@ from typing import Any, cast
 
 import requests
 
-from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
 from flwr.app.user_config import UserConfig
 from flwr.cli.utils import validate_federation_name
 from flwr.common.config import (
@@ -506,7 +505,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     is_stored_app = bool(request.fab.hash_str and not request.fab.content)
 
     stored_fab = None
-    builtin_agent_fab = None
     if is_stored_app:
         if app_id is None:
             raise FlowerError(
@@ -527,16 +525,12 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     if stored_fab is not None:
         fab_file = stored_fab.content
         verification_dict = stored_fab.verifications
+    elif request.app_spec:
+        fab_file, verification_dict, note = _get_remote_fab(
+            fleet_api_type, request.app_spec
+        )
     else:
-        builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
-        if builtin_agent_fab is not None:
-            fab_file, verification_dict = builtin_agent_fab
-        elif request.app_spec:
-            fab_file, verification_dict, note = _get_remote_fab(
-                fleet_api_type, request.app_spec
-            )
-        else:
-            fab_file = request.fab.content
+        fab_file = request.fab.content
 
     if len(fab_file) > FAB_MAX_SIZE:
         log(
@@ -595,7 +589,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         )
         fab_id, fab_version = get_metadata_from_config(fab_config)
         fab_app_id = f"@{fab_id}"
-        if app_id is None or builtin_agent_fab is not None:
+        if app_id is None:
             app_id = fab_app_id
         elif app_id != fab_app_id:
             raise ValueError("Stored app ID does not match the request")
@@ -1373,11 +1367,6 @@ def add_app(
     """Add a Hub app to a federation."""
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
-    if not request.app_id:
-        raise FlowerError(
-            ApiErrorCode.INVALID_APP_SPEC,
-            "Failed to store app: app ID is required.",
-        )
     fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
     try:
         app_type = _get_app_type(get_fab_config(fab_file))
