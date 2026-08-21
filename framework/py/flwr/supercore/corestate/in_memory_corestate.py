@@ -52,6 +52,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
@@ -671,9 +672,28 @@ class InMemoryCoreState(
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
+        max_active: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
         with self.lock_automation_store:
+            if (
+                max_active is not None
+                and sum(
+                    record.automation.federation == federation_id
+                    and record.automation.status == AutomationStatus.ACTIVE
+                    for record in self.automation_store.values()
+                )
+                >= max_active
+            ):
+                raise FlowerError(
+                    ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+                    f"Federation {federation_id} has reached the active automation "
+                    f"limit of {max_active}.",
+                    public_details=(
+                        f"A federation can have at most {max_active} active "
+                        "automations."
+                    ),
+                )
             current = now()
             automation_id = self._next_automation_id
             self._next_automation_id += 1

@@ -452,6 +452,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
+        max_active: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata.
 
@@ -475,11 +476,18 @@ class CoreState(ABC):  # pylint: disable=R0904
         max_runs : int | None (default: None)
             Maximum number of runs, if finite. The value initializes the
             persisted `remaining_runs` counter.
+        max_active : int | None (default: None)
+            Maximum number of active automations allowed in the federation.
 
         Returns
         -------
         Automation
             Stored automation metadata.
+
+        Raises
+        ------
+        FlowerError
+            If the federation is already at `max_active`.
         """
 
     @abstractmethod

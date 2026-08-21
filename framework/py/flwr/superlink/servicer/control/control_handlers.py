@@ -130,6 +130,9 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
+    AUTOMATION_MIN_FIXED_INTERVAL,
+    AUTOMATION_MIN_START_DELAY,
     DEFAULT_FEDERATION_SIMULATION,
     FLWR_SUPERGRID_API_URL,
     NOOP_FEDERATION_ID,
@@ -771,8 +774,28 @@ def start_automation(  # pylint: disable=too-many-locals
                     "timestamp with a timezone."
                 ),
             ) from e
+        earliest_start_at = now() + timedelta(seconds=AUTOMATION_MIN_START_DELAY)
+        if start_at < earliest_start_at:
+            raise FlowerError(
+                ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+                "Automation start_at must be at least "
+                f"{AUTOMATION_MIN_START_DELAY} seconds in the future: "
+                f"{request.start_at}",
+                public_details=(
+                    "The automation start_at value must be at least "
+                    f"{AUTOMATION_MIN_START_DELAY // 60} minutes in the future."
+                ),
+            )
     else:
-        next_run_at = now().isoformat()
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "Automation start_at is required and must be at least "
+            f"{AUTOMATION_MIN_START_DELAY} seconds in the future.",
+            public_details=(
+                "The automation start_at value must be at least "
+                f"{AUTOMATION_MIN_START_DELAY // 60} minutes in the future."
+            ),
+        )
 
     # Resolve recurrence settings and the default one-shot behavior.
     fixed_interval = (
@@ -789,11 +812,15 @@ def start_automation(  # pylint: disable=too-many-locals
             "`max_runs` must be greater than zero.",
             public_details="`max_runs` must be greater than zero.",
         )
-    if fixed_interval is not None and fixed_interval < 1:
+    if fixed_interval is not None and fixed_interval < AUTOMATION_MIN_FIXED_INTERVAL:
         raise FlowerError(
             ApiErrorCode.INVALID_AUTOMATION_REQUEST,
-            "`fixed_interval` must be greater than zero.",
-            public_details="`fixed_interval` must be greater than zero.",
+            "`fixed_interval` must be at least "
+            f"{AUTOMATION_MIN_FIXED_INTERVAL} seconds.",
+            public_details=(
+                "`fixed_interval` must be at least "
+                f"{AUTOMATION_MIN_FIXED_INTERVAL} seconds."
+            ),
         )
     if fixed_interval is not None and fixed_interval >= 2**63:
         raise FlowerError(
@@ -816,6 +843,7 @@ def start_automation(  # pylint: disable=too-many-locals
     federation_id = _resolve_federation_id(
         state, account.account_name, start_run_request.federation
     )
+    _validate_federation_membership_in_request(state, flwr_aid, federation_id)
     stored_start_run_request = StartRunRequest()
     stored_start_run_request.CopyFrom(start_run_request)
     stored_start_run_request.federation = federation_id
@@ -830,6 +858,7 @@ def start_automation(  # pylint: disable=too-many-locals
             next_run_at=next_run_at,
             fixed_interval=fixed_interval,
             max_runs=max_runs,
+            max_active=AUTOMATION_MAX_ACTIVE_PER_FEDERATION,
         )
     except ValueError as e:
         raise FlowerError(

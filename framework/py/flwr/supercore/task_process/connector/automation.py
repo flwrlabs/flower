@@ -14,6 +14,7 @@
 # ==============================================================================
 """Built-in automation tool."""
 
+from flwr.supercore.constant import AUTOMATION_MIN_FIXED_INTERVAL
 from flwr.supercore.typing import JSONObject
 
 START_AUTOMATION_TOOL_NAME = "start_automation"
@@ -38,12 +39,13 @@ def make_start_automation_tool() -> JSONObject:
                 "start_at": {
                     "type": "string",
                     "description": (
-                        "When to start, for example 2026-07-28T12:00:00+00:00."
+                        "When to start, at least 15 minutes in the future, for "
+                        "example 2026-07-28T12:00:00+00:00."
                     ),
                 },
                 "fixed_interval": {
                     "type": "integer",
-                    "minimum": 1,
+                    "minimum": AUTOMATION_MIN_FIXED_INTERVAL,
                     "description": "Seconds between runs. Omit for one execution.",
                 },
                 "max_runs": {

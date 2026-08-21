@@ -17,6 +17,7 @@
 
 import hashlib
 import unittest
+from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock, patch
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
@@ -30,6 +31,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    AUTOMATION_MIN_FIXED_INTERVAL,
+    AUTOMATION_MIN_START_DELAY,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     AutomationStatus,
@@ -134,7 +137,7 @@ class TestControlHandlers(unittest.TestCase):
         # Prepare
         request = StartAutomationRequest(
             start_at="2026-07-10T04:00:00-05:00",
-            fixed_interval=60,
+            fixed_interval=AUTOMATION_MIN_FIXED_INTERVAL,
             max_runs=3,
             start_run_request=StartRunRequest(
                 federation=NOOP_FEDERATION_ID,
@@ -143,7 +146,11 @@ class TestControlHandlers(unittest.TestCase):
         )
 
         # Execute
-        response = start_automation(request, self.account, self.state)
+        with patch(
+            "flwr.superlink.servicer.control.control_handlers.now",
+            return_value=datetime(2026, 7, 10, 8, 45, tzinfo=UTC),
+        ):
+            response = start_automation(request, self.account, self.state)
 
         # Assert
         automation = self.state.list_automations(
@@ -157,28 +164,92 @@ class TestControlHandlers(unittest.TestCase):
                 automation.fixed_interval,
                 automation.remaining_runs,
             ),
-            (response.series_id, "2026-07-10T09:00:00+00:00", 60, 3),
+            (
+                response.series_id,
+                "2026-07-10T09:00:00+00:00",
+                AUTOMATION_MIN_FIXED_INTERVAL,
+                3,
+            ),
         )
 
-    def test_start_automation_rejects_start_at_without_timezone(self) -> None:
-        """Reject a start time without timezone information."""
-        # Prepare
-        request = StartAutomationRequest(
-            start_at="2026-07-10T09:00:00",
-            start_run_request=StartRunRequest(series_id=1),
-        )
+    def test_start_automation_rejects_invalid_schedule(self) -> None:
+        """Reject missing, invalid, or below-minimum schedule values."""
+        current_time = datetime(2026, 7, 10, 9, tzinfo=UTC)
+        valid_start_at = current_time + timedelta(seconds=AUTOMATION_MIN_START_DELAY)
+        requests = {
+            "missing start": StartAutomationRequest(
+                start_run_request=StartRunRequest(series_id=1)
+            ),
+            "missing timezone": StartAutomationRequest(
+                start_at="2026-07-10T09:15:00",
+                start_run_request=StartRunRequest(series_id=1),
+            ),
+            "early start": StartAutomationRequest(
+                start_at=(valid_start_at - timedelta(seconds=1)).isoformat(),
+                start_run_request=StartRunRequest(series_id=1),
+            ),
+            "short interval": StartAutomationRequest(
+                start_at=valid_start_at.isoformat(),
+                fixed_interval=AUTOMATION_MIN_FIXED_INTERVAL - 1,
+                start_run_request=StartRunRequest(series_id=1),
+            ),
+        }
 
-        # Execute
-        with self.assertRaises(FlowerError) as error:
-            start_automation(request, self.account, self.state)
+        with patch(
+            "flwr.superlink.servicer.control.control_handlers.now",
+            return_value=current_time,
+        ):
+            for name, request in requests.items():
+                with self.subTest(name=name), self.assertRaises(FlowerError) as error:
+                    start_automation(request, self.account, self.state)
 
-        # Assert
+                self.assertEqual(
+                    error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST
+                )
+
+    def test_start_automation_rejects_federation_active_automation_limit(self) -> None:
+        """Reject creation after a federation reaches its automation limit."""
+        with (
+            patch.object(
+                self.state,
+                "store_automation",
+                side_effect=FlowerError(
+                    ApiErrorCode.INVALID_AUTOMATION_REQUEST, "Limit reached."
+                ),
+            ),
+            self.assertRaises(FlowerError) as error,
+        ):
+            start_automation(
+                StartAutomationRequest(
+                    start_at="2099-01-01T00:00:00+00:00",
+                    start_run_request=StartRunRequest(series_id=1),
+                ),
+                self.account,
+                self.state,
+            )
+
         self.assertEqual(error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
-        self.assertEqual(
-            error.exception.public_details,
-            "The automation start_at value must be a valid ISO 8601 "
-            "timestamp with a timezone.",
-        )
+
+    def test_start_automation_rejects_non_member(self) -> None:
+        """Reject creation when the account is not a federation member."""
+        with (
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=False
+            ),
+            patch.object(self.state, "store_automation") as store_automation,
+            self.assertRaises(FlowerError) as error,
+        ):
+            start_automation(
+                StartAutomationRequest(
+                    start_at="2099-01-01T00:00:00+00:00",
+                    start_run_request=StartRunRequest(series_id=1),
+                ),
+                self.account,
+                self.state,
+            )
+
+        self.assertEqual(error.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND)
+        store_automation.assert_not_called()
 
     def test_list_automations(self) -> None:
         """List automations for a federation."""

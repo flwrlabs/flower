@@ -76,6 +76,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_models import Automation as AutomationModel
@@ -902,29 +903,54 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
+        max_active: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
         current = now()
-        stmt = (
-            insert(AutomationModel)
-            .values(
-                federation_id=federation_id,
-                status=AutomationStatus.ACTIVE,
-                series_id=uint64_to_int64(series_id),
-                flwr_aid=flwr_aid,
-                start_run_request=start_run_request.SerializeToString(),
-                created_at=current,
-                updated_at=current,
-                next_run_at=datetime.fromisoformat(next_run_at),
-                fixed_interval=fixed_interval,
-                remaining_runs=max_runs,
-                stopped_at=None,
+        values = {
+            "federation_id": federation_id,
+            "status": AutomationStatus.ACTIVE,
+            "series_id": uint64_to_int64(series_id),
+            "flwr_aid": flwr_aid,
+            "start_run_request": start_run_request.SerializeToString(),
+            "created_at": current,
+            "updated_at": current,
+            "next_run_at": datetime.fromisoformat(next_run_at),
+            "fixed_interval": fixed_interval,
+            "remaining_runs": max_runs,
+            "stopped_at": None,
+        }
+        stmt = insert(AutomationModel).values(**values)
+        if max_active is not None:
+            active_count = (
+                select(func.count())  # pylint: disable=not-callable
+                .select_from(AutomationModel)
+                .where(
+                    AutomationModel.federation_id == federation_id,
+                    AutomationModel.status == AutomationStatus.ACTIVE,
+                )
+                .scalar_subquery()
             )
-            .returning(AutomationModel)
-        )
+            stmt = insert(AutomationModel).from_select(
+                list(values),
+                select(*(literal(value) for value in values.values())).where(
+                    active_count < max_active
+                ),
+            )
+        stmt = stmt.returning(AutomationModel)
         try:
             with self.session() as session:
-                automation = session.scalars(stmt).one()
+                automation = session.scalars(stmt).one_or_none()
+                if automation is None:
+                    raise FlowerError(
+                        ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+                        f"Federation {federation_id} has reached the active automation "
+                        f"limit of {max_active}.",
+                        public_details=(
+                            f"A federation can have at most {max_active} active "
+                            "automations."
+                        ),
+                    )
                 return _automation_from_model(automation)
         except IntegrityError as exc:
             raise ValueError(f"Could not store automation: {exc}") from exc
