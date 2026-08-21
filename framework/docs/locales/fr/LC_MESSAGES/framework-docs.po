@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-08-20 00:05+0000\n"
+"POT-Creation-Date: 2026-08-21 00:06+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -18055,7 +18055,7 @@ msgstr ""
 "collaborative."
 
 #: ../../source/contribute.rst:58
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:365
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:367
 #: ../../source/index.rst:106 ../../source/index.rst:108
 #: ../../source/reference.rst:7
 msgid "References"
@@ -18303,8 +18303,9 @@ msgstr ""
 "``src/py/flwr/superlink/grid/__init__.py``:"
 
 #: ../../source/contributor-explanation-public-and-private-apis.rst:133
+#, fuzzy
 msgid ""
-"The interesting part is that both ``GrpcGrid`` and ``InMemoryGrid`` are "
+"The interesting part is that both ``HttpGrid`` and ``InMemoryGrid`` are "
 "never used by Flower framework users, only by other parts of the Flower "
 "framework codebase. Those other parts of the codebase import, for "
 "example, ``InMemoryGrid`` using ``from flwr.superlink.grid import "
@@ -20962,9 +20963,9 @@ msgstr "Comprendre la commande"
 #: ../../source/docker/enable-tls.rst:213
 #: ../../source/docker/enable-tls.rst:238
 #: ../../source/docker/tutorial-quickstart-docker.rst:83
-#: ../../source/docker/tutorial-quickstart-docker.rst:125
-#: ../../source/docker/tutorial-quickstart-docker.rst:241
-#: ../../source/docker/tutorial-quickstart-docker.rst:279
+#: ../../source/docker/tutorial-quickstart-docker.rst:126
+#: ../../source/docker/tutorial-quickstart-docker.rst:243
+#: ../../source/docker/tutorial-quickstart-docker.rst:281
 msgid "``docker run``: This tells Docker to run a container from an image."
 msgstr ""
 "``docker run``: Cela dit à Docker de lancer un conteneur à partir d'une "
@@ -20976,9 +20977,9 @@ msgstr ""
 #: ../../source/docker/enable-tls.rst:214
 #: ../../source/docker/enable-tls.rst:239
 #: ../../source/docker/tutorial-quickstart-docker.rst:84
-#: ../../source/docker/tutorial-quickstart-docker.rst:126
-#: ../../source/docker/tutorial-quickstart-docker.rst:242
-#: ../../source/docker/tutorial-quickstart-docker.rst:280
+#: ../../source/docker/tutorial-quickstart-docker.rst:127
+#: ../../source/docker/tutorial-quickstart-docker.rst:244
+#: ../../source/docker/tutorial-quickstart-docker.rst:282
 msgid "``--rm``: Remove the container once it is stopped or the command exits."
 msgstr ""
 "``--rm``: Supprimez le conteneur une fois qu'il est arrêté ou que la "
@@ -21340,14 +21341,14 @@ msgstr ""
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:167
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:110
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:250
-#: ../../source/docker/tutorial-quickstart-docker.rst:326
+#: ../../source/docker/tutorial-quickstart-docker.rst:328
 #: ../../source/how-to-authenticate-accounts.rst:71
 #: ../../source/how-to-authenticate-supernodes.rst:127
-#: ../../source/how-to-enable-tls-connections.rst:220
+#: ../../source/how-to-enable-tls-connections.rst:222
 #: ../../source/how-to-run-flower-on-azure.rst:230
-#: ../../source/how-to-run-flower-on-gcp.rst:624
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:678
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:212
+#: ../../source/how-to-run-flower-on-gcp.rst:628
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:682
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:214
 #: ../../source/how-to-upgrade-to-flower-1.28.rst:80
 #: ../../source/how-to-upgrade-to-flower-1.28.rst:99
 msgid "config.toml"
@@ -22404,9 +22405,9 @@ msgstr ""
 "``http://localhost:9093``: "
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:89
-#: ../../source/docker/tutorial-quickstart-docker.rst:130
-#: ../../source/docker/tutorial-quickstart-docker.rst:243
-#: ../../source/docker/tutorial-quickstart-docker.rst:281
+#: ../../source/docker/tutorial-quickstart-docker.rst:131
+#: ../../source/docker/tutorial-quickstart-docker.rst:245
+#: ../../source/docker/tutorial-quickstart-docker.rst:283
 msgid ""
 "``--network flwr-network``: Make the container join the network named "
 "``flwr-network``."
@@ -22419,9 +22420,9 @@ msgid "``--name superlink``: Assign the name ``superlink`` to the container."
 msgstr "``--name superlink``: Attribuez au conteneur le nom ``superlink``: "
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:91
-#: ../../source/docker/tutorial-quickstart-docker.rst:132
-#: ../../source/docker/tutorial-quickstart-docker.rst:245
-#: ../../source/docker/tutorial-quickstart-docker.rst:283
+#: ../../source/docker/tutorial-quickstart-docker.rst:133
+#: ../../source/docker/tutorial-quickstart-docker.rst:247
+#: ../../source/docker/tutorial-quickstart-docker.rst:285
 msgid ""
 "``--detach``: Run the container in the background, freeing up the "
 "terminal."
@@ -22440,7 +22441,7 @@ msgstr ""
 "<pin-version>` de l'image."
 
 #: ../../source/docker/tutorial-quickstart-docker.rst:94
-#: ../../source/docker/tutorial-quickstart-docker.rst:135
+#: ../../source/docker/tutorial-quickstart-docker.rst:136
 msgid ""
 "``--insecure``: This flag tells the container to operate in an insecure "
 "mode, allowing unencrypted communication."
@@ -22472,7 +22473,7 @@ msgstr "Démarrer deux conteneurs SuperNode."
 msgid "Start the first container:"
 msgstr "Démarrer le premier conteneur :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:127
+#: ../../source/docker/tutorial-quickstart-docker.rst:128
 msgid ""
 "``-p 9094:9094``: Map port ``9094`` of the container to the same port of "
 "the host machine, allowing other services to access the SuperNode API on "
@@ -22482,11 +22483,11 @@ msgstr ""
 "même port de la machine hôte, permettant à d'autres services d'accéder au"
 " SuperNode API sur ``http://localhost:9094``: "
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:131
+#: ../../source/docker/tutorial-quickstart-docker.rst:132
 msgid "``--name supernode-1``: Assign the name ``supernode-1`` to the container."
 msgstr "``--name supernode-1``: Attribuez au conteneur le nom ``supernode-1``: "
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:133
+#: ../../source/docker/tutorial-quickstart-docker.rst:134
 msgid ""
 ":substitution-code:`flwr/supernode:|stable_flwr_version|`: This is the "
 "name of the image to be run and the specific tag of the image."
@@ -22494,7 +22495,7 @@ msgstr ""
 ":substitution-code:`flwr/supernode:|stable_flwr_version|` : nom de "
 "l'image à exécuter et tag spécifique de l'image."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:137
+#: ../../source/docker/tutorial-quickstart-docker.rst:138
 msgid ""
 "``--superlink superlink:9092``: Connect to the SuperLink's Fleet API at "
 "the address ``superlink:9092``."
@@ -22502,7 +22503,7 @@ msgstr ""
 "``--superlink superlink:9092``: Connectez-vous à l'API Fleet de SuperLink"
 " à l'adresse ``superlink:9092``."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:139
+#: ../../source/docker/tutorial-quickstart-docker.rst:140
 msgid ""
 "``--node-config \"partition-id=0 num-partitions=2\"``: Set the partition "
 "ID to ``0`` and the number of partitions to ``2`` for the SuperNode "
@@ -22512,10 +22513,16 @@ msgstr ""
 "partition à ``0`` et le nombre de partitions à ``2`` pour la "
 "configuration du SuperNode."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:141
+#: ../../source/docker/tutorial-quickstart-docker.rst:142
 msgid ""
-"``--clientappio-api-address 0.0.0.0:9094``: Set the address and port "
-"number that the SuperNode is listening on to communicate with the "
+"``--host 0.0.0.0``: Make the SuperNode Runtime API accessible outside the"
+" container."
+msgstr ""
+
+#: ../../source/docker/tutorial-quickstart-docker.rst:143
+#, fuzzy
+msgid ""
+"``--port 9094``: Set the port where the SuperNode listens for the "
 "ClientApp process. If multiple SuperNodes are started on the same "
 "machine, use a different port number for each SuperNode. (E.g. In the "
 "next step, we set the second SuperNode container to listen on port 9095)"
@@ -22527,7 +22534,7 @@ msgstr ""
 " dans l'étape suivante, nous définissons le deuxième conteneur SuperNode "
 "pour écouter sur le port 9095)"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:145
+#: ../../source/docker/tutorial-quickstart-docker.rst:146
 msgid ""
 "``--isolation process``: Tells the SuperNode that the ClientApp is "
 "executed by a separate independent process. The SuperNode does not "
@@ -22536,15 +22543,15 @@ msgstr ""
 "``--isolation process``: Indique à SuperNode que ClientApp est exécuté "
 "par un processus indépendant. Le SuperNode ne tente pas d'exécuter cela."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:148
+#: ../../source/docker/tutorial-quickstart-docker.rst:149
 msgid "Start the second container:"
 msgstr "Démarrer le deuxième conteneur :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:167
+#: ../../source/docker/tutorial-quickstart-docker.rst:169
 msgid "Step 4: Start the SuperExec to execute ServerApps"
 msgstr "Étape 4 : Démarrer SuperExec pour exécuter les ServerApps"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:169
+#: ../../source/docker/tutorial-quickstart-docker.rst:171
 msgid ""
 "The **SuperExec** Docker image comes with a pre-installed version of "
 "Flower and serves as a base for building your own image. Use a **single**"
@@ -22558,7 +22565,7 @@ msgstr ""
 "ClientApps) au moment de l'exécution via le drapeau ``--plugin-type``. "
 "SuperExec démarre les processus correspondants à la demande."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:174
+#: ../../source/docker/tutorial-quickstart-docker.rst:176
 #, fuzzy
 msgid ""
 "When using SuperExec with the *serverapp* plugin, pass ``--appio-api-"
@@ -22567,7 +22574,7 @@ msgstr ""
 "Lorsque vous utilisez SuperExec avec le plugin *serverapp*, passez "
 "``--appio-api-address`` pointant vers l'API **ServerAppIO** de SuperLink."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:177
+#: ../../source/docker/tutorial-quickstart-docker.rst:179
 msgid ""
 "Create a Dockerfile called ``superexec.Dockerfile`` and paste the "
 "following:"
@@ -22575,7 +22582,7 @@ msgstr ""
 "Créez un fichier Docker appelé ``superexec.Dockerfile`` et collez-y le "
 "suivant : "
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:179
+#: ../../source/docker/tutorial-quickstart-docker.rst:181
 #: ../../source/how-to-run-flower-on-gcp.rst
 msgid "superexec.Dockerfile"
 msgstr ""
@@ -22584,7 +22591,7 @@ msgstr ""
 msgid "Understand the Dockerfile"
 msgstr "Comprenez le fichier Dockerfile"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:195
+#: ../../source/docker/tutorial-quickstart-docker.rst:197
 msgid ""
 ":substitution-code:`FROM flwr/superexec:|stable_flwr_version|`: This line"
 " specifies that the Docker image to be built from is the "
@@ -22595,7 +22602,7 @@ msgstr ""
 "ligne indique que l'image Docker utilisée comme base est l'image "
 "``flwr/superexec``, version :substitution-code:`|stable_flwr_version|`."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:197
+#: ../../source/docker/tutorial-quickstart-docker.rst:199
 msgid ""
 "``WORKDIR /app``: Set the working directory for the container to "
 "``/app``. Any subsequent commands that reference a directory will be "
@@ -22605,7 +22612,7 @@ msgstr ""
 "sur ``/app``. Toute commande ultérieure qui référence un répertoire sera "
 "relative à ce répertoire."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:199
+#: ../../source/docker/tutorial-quickstart-docker.rst:201
 msgid ""
 "``COPY pyproject.toml .``: Copy the ``pyproject.toml`` file. from the "
 "current working directory into the container's ``/app`` directory."
@@ -22613,7 +22620,7 @@ msgstr ""
 "``COPY pyproject.toml .``: Copiez le fichier ``pyproject.toml``. from le "
 "répertoire courant dans le répertoire ``/app`` du conteneur."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:201
+#: ../../source/docker/tutorial-quickstart-docker.rst:203
 msgid ""
 "``RUN sed -i 's/.*flwr\\[simulation\\].*//' pyproject.toml``: Remove the "
 "``flwr`` dependency from the ``pyproject.toml``."
@@ -22621,7 +22628,7 @@ msgstr ""
 "``RUN sed -i 's/.*flwr\\[simulation\\].*//' pyproject.toml``: Supprimez "
 "la dépendance ``flwr`` du ``pyproject.toml``."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:203
+#: ../../source/docker/tutorial-quickstart-docker.rst:205
 msgid ""
 "``python -m pip install -U --no-cache-dir .``: Run the ``pip`` install "
 "command to install the dependencies defined in the ``pyproject.toml`` "
@@ -22631,7 +22638,7 @@ msgstr ""
 "d'installation ``pip`` pour installer les dépendances définies dans le "
 "fichier ``pyproject.toml``."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:206
+#: ../../source/docker/tutorial-quickstart-docker.rst:208
 msgid ""
 "The ``-U`` flag indicates that any existing packages should be upgraded, "
 "and ``--no-cache-dir`` prevents pip from using the cache to speed up the "
@@ -22641,7 +22648,7 @@ msgstr ""
 "et ``--no-cache-dir`` empêche pip d'utiliser la cache pour accélérer "
 "l'installation."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:208
+#: ../../source/docker/tutorial-quickstart-docker.rst:210
 msgid ""
 "``ENTRYPOINT [\"flower-superexec\"]``: Set the command ``flower-"
 "superexec`` to be the default command run when the container is started."
@@ -22650,7 +22657,7 @@ msgstr ""
 "superexec`` comme commande par défaut à exécuter lorsqu'on démarrage le "
 "conteneur."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:213
+#: ../../source/docker/tutorial-quickstart-docker.rst:215
 msgid ""
 "Note that `flwr <https://pypi.org/project/flwr/>`__ is already installed "
 "in the ``flwr/superexec`` base image, so only other package dependencies "
@@ -22665,7 +22672,7 @@ msgstr ""
 " est supprimée de l'image ``pyproject.toml`` après qu'elle a été copiée "
 "dans l'image Docker (voir ligne 5)."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:219
+#: ../../source/docker/tutorial-quickstart-docker.rst:221
 msgid ""
 "Afterward, in the directory that holds the Dockerfile, execute this "
 "Docker command to build the SuperExec image:"
@@ -22673,16 +22680,16 @@ msgstr ""
 "Après cela, dans le répertoire qui contient le fichier Dockerfile, "
 "exécutez cette commande Docker pour construire l'image SuperExec :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:226
+#: ../../source/docker/tutorial-quickstart-docker.rst:228
 msgid "Start the **SuperExec for ServerApps** container:"
 msgstr "Démarrer le **SuperExec pour les ServerApps** conteneur :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:244
+#: ../../source/docker/tutorial-quickstart-docker.rst:246
 msgid "``--name superexec-serverapp``: Give the container a descriptive name."
 msgstr "``--name superexec-serverapp``: Attribuez au conteneur un nom descriptif."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:246
-#: ../../source/docker/tutorial-quickstart-docker.rst:284
+#: ../../source/docker/tutorial-quickstart-docker.rst:248
+#: ../../source/docker/tutorial-quickstart-docker.rst:286
 msgid ""
 "``flwr_superexec:0.0.1``: This is the name of the image to be run and the"
 " specific tag of the image."
@@ -22690,8 +22697,8 @@ msgstr ""
 "``flwr_superexec:0.0.1``: C'est le nom de l'image à exécuter et la balise"
 " spécifique de l'image."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:248
-#: ../../source/docker/tutorial-quickstart-docker.rst:286
+#: ../../source/docker/tutorial-quickstart-docker.rst:250
+#: ../../source/docker/tutorial-quickstart-docker.rst:288
 msgid ""
 "``--insecure``: This flag tells the container to operate in an insecure "
 "mode, allowing unencrypted communication. Secure connections will be "
@@ -22701,7 +22708,7 @@ msgstr ""
 "mode non sécurisé, permettant la communication non chiffrée. Les "
 "connexions sécurisées seront ajoutées dans les futures versions."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:250
+#: ../../source/docker/tutorial-quickstart-docker.rst:252
 msgid ""
 "``--plugin-type serverapp``: Load the *serverapp* plugin. SuperExec will "
 "spawn ServerApp processes as needed."
@@ -22709,7 +22716,7 @@ msgstr ""
 "``--plugin-type serverapp``: Chargez le plugin *serverapp*. SuperExec "
 "lancera ServerApp processus à mesure que nécessaire."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:252
+#: ../../source/docker/tutorial-quickstart-docker.rst:254
 #, fuzzy
 msgid ""
 "``--appio-api-address superlink:9091``: Connect to the SuperLink's "
@@ -22718,11 +22725,11 @@ msgstr ""
 "``--appio-api-address superlink:9091``: Connectez-vous à l'API "
 "ServerAppIO de SuperLink à l'adresse ``superlink:9091``."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:257
+#: ../../source/docker/tutorial-quickstart-docker.rst:259
 msgid "Step 5: Start the SuperExec to execute ClientApps"
 msgstr "Étape 5 : Démarrer SuperExec pour exécuter les ClientApps"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:259
+#: ../../source/docker/tutorial-quickstart-docker.rst:261
 #, fuzzy
 msgid ""
 "For ClientApps, reuse the **same** image and change the plugin and API "
@@ -22733,21 +22740,21 @@ msgstr ""
 " l'adresse API. Lorsque vous utilisez le plugin *clientapp*, passez "
 "``--appio-api-address`` pointant vers l'API **ClientAppIO** de SuperNode."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:263
+#: ../../source/docker/tutorial-quickstart-docker.rst:265
 msgid "(No new Dockerfile is needed; reuse ``flwr_superexec:0.0.1``.)"
 msgstr ""
 "(Aucun nouveau fichier Dockerfile n'est nécessaire ; réutilisez "
 "``flwr_superexec:0.0.1``)"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:264
+#: ../../source/docker/tutorial-quickstart-docker.rst:266
 msgid "Start the first **SuperExec for ClientApps** container:"
 msgstr "Démarrer le premier **SuperExec pour les ClientApps** conteneur :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:282
+#: ../../source/docker/tutorial-quickstart-docker.rst:284
 msgid "``--name superexec-clientapp-1``: Give the container a descriptive name."
 msgstr "``--name superexec-clientapp-1``: Donnez au conteneur un nom descriptif."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:288
+#: ../../source/docker/tutorial-quickstart-docker.rst:290
 msgid ""
 "``--plugin-type clientapp``: Load the *clientapp* plugin. SuperExec will "
 "spawn ClientApp processes as needed."
@@ -22755,7 +22762,7 @@ msgstr ""
 "``--plugin-type clientapp``: Chargez le plugin *clientapp*. SuperExec "
 "lancera ClientApp processus à mesure que nécessaire."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:290
+#: ../../source/docker/tutorial-quickstart-docker.rst:292
 #, fuzzy
 msgid ""
 "``--appio-api-address supernode-1:9094``: Connect to the SuperNode's "
@@ -22764,17 +22771,17 @@ msgstr ""
 "``--appio-api-address supernode-1:9094``: Connectez-vous à l'API "
 "ClientAppIO de SuperNode à l'adresse ``supernode-1:9094``."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:293
+#: ../../source/docker/tutorial-quickstart-docker.rst:295
 msgid "Start the second **SuperExec for ClientApps** container:"
 msgstr "Démarrer le deuxième **SuperExec pour les ClientApps** conteneur :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:308
+#: ../../source/docker/tutorial-quickstart-docker.rst:310
 msgid "Step 6: Run the Quickstart Project"
 msgstr "Étape 6 : Exécuter le Projet Quickstart"
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:94
-#: ../../source/docker/tutorial-quickstart-docker.rst:310
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:196
+#: ../../source/docker/tutorial-quickstart-docker.rst:312
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:198
 msgid ""
 "Find the Flower Configuration TOML file in your machine. This file is "
 "automatically create for your when you first use a Flower CLI command. "
@@ -22787,7 +22794,7 @@ msgstr ""
 "voir les connexions SuperLink disponibles ainsi que le chemin du fichier "
 "de configuration."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:324
+#: ../../source/docker/tutorial-quickstart-docker.rst:326
 msgid ""
 "Add the following lines to the ``config.toml`` to add a new SuperLink "
 "connection:"
@@ -22795,7 +22802,7 @@ msgstr ""
 "Ajoutez les lignes suivantes au ``config.toml`` pour ajouter une nouvelle"
 " connexion SuperLink: "
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:333
+#: ../../source/docker/tutorial-quickstart-docker.rst:335
 msgid ""
 "Run the ``quickstart-pytorch`` project and follow the ServerApp logs to "
 "track the execution of the run:"
@@ -22803,11 +22810,11 @@ msgstr ""
 "Exécutez le projet ``quickstart-pytorch`` et suivez les journaux "
 "ServerApp pour suivre l'exécution de l’exécution:"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:342
+#: ../../source/docker/tutorial-quickstart-docker.rst:344
 msgid "Step 7: Update the Application"
 msgstr "Étape 7 : Mettre à jour l'Application"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:344
+#: ../../source/docker/tutorial-quickstart-docker.rst:346
 msgid ""
 "Change the application code. For example, change the ``seed`` in "
 "``pytorchexample/task.py`` to ``43`` and save it:"
@@ -22815,16 +22822,16 @@ msgstr ""
 "Modifiez le code de l'application. Par exemple, changez la valeur "
 "``seed`` dans ``pytorchexample/task.py`` en ``43`` et sauvegardez-le:"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:347
+#: ../../source/docker/tutorial-quickstart-docker.rst:349
 msgid "pytorchexample/task.py"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:354
+#: ../../source/docker/tutorial-quickstart-docker.rst:356
 msgid "Stop the running containers:"
 msgstr "Arrêter les conteneurs en cours :"
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:148
-#: ../../source/docker/tutorial-quickstart-docker.rst:358
+#: ../../source/docker/tutorial-quickstart-docker.rst:360
 msgid ""
 "If you have modified the dependencies listed in your ``pyproject.toml`` "
 "file, it is essential to rebuild images."
@@ -22832,17 +22839,17 @@ msgstr ""
 "Si vous avez modifié les dépendances listées dans votre fichier "
 "``pyproject.toml``, il est essentiel de reconstruire les images."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:361
+#: ../../source/docker/tutorial-quickstart-docker.rst:363
 msgid "If you haven't made any changes, you can skip steps 2 through 4."
 msgstr ""
 "Si vous n'avez pas apporté de modifications, vous pouvez sauter les "
 "étapes 2 à 4."
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:367
+#: ../../source/docker/tutorial-quickstart-docker.rst:369
 msgid "Rebuild the SuperExec image:"
 msgstr "Reconstruire l'image SuperExec :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:373
+#: ../../source/docker/tutorial-quickstart-docker.rst:375
 msgid ""
 "Launch **one SuperExec container** for the new ServerApp and **two "
 "SuperExec containers** for the new ClientApps:"
@@ -22850,32 +22857,32 @@ msgstr ""
 "Lancer **un conteneur SuperExec** pour la nouvelle ServerApp et **deux "
 "conteneurs SuperExec** pour les nouvelles ClientApps :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:403
+#: ../../source/docker/tutorial-quickstart-docker.rst:405
 msgid "Run the updated project:"
 msgstr "Lancer le projet mis à jour :"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:411
+#: ../../source/docker/tutorial-quickstart-docker.rst:413
 msgid "Step 8: Clean Up"
 msgstr "Étape 8 : Nettoyage"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:413
+#: ../../source/docker/tutorial-quickstart-docker.rst:415
 msgid "Remove the containers and the bridge network:"
 msgstr "Supprimer les conteneurs et le réseau de pont :"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:432
-#: ../../source/docker/tutorial-quickstart-docker.rst:425
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:436
+#: ../../source/docker/tutorial-quickstart-docker.rst:427
 msgid "Where to Go Next"
 msgstr "Où aller ensuite ?"
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:427
+#: ../../source/docker/tutorial-quickstart-docker.rst:429
 msgid ":doc:`enable-tls`"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:428
+#: ../../source/docker/tutorial-quickstart-docker.rst:430
 msgid ":doc:`persist-superlink-state`"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker.rst:429
+#: ../../source/docker/tutorial-quickstart-docker.rst:431
 msgid ":doc:`tutorial-quickstart-docker-compose`"
 msgstr ""
 
@@ -23133,7 +23140,7 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:208
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:263
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:398
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:402
 msgid "Rerun the ``quickstart-pytorch`` project:"
 msgstr "Reexécutez le projet ``quickstart-pytorch``: "
 
@@ -23200,7 +23207,7 @@ msgstr ""
 msgid "compose.yml"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:330
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:332
 msgid ""
 "If you also want to enable TLS for the new SuperNode, uncomment the "
 "definition in the ``with-tls.yml`` file:"
@@ -23208,19 +23215,19 @@ msgstr ""
 "Si vous voulez également activer le TLS pour le nouveau SuperNode, "
 "décommentez la définition dans le fichier ``with-tls.yml`` :"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:333
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:335
 msgid "with-tls.yml"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:354
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:358
 msgid "Restart the services with:"
 msgstr "Redémarrez les services avec :"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:364
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:368
 msgid "Step 8: Persisting the SuperLink State and Enabling TLS"
 msgstr "Étape 8 : Persister l'état de SuperLink et activer TLS"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:366
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:370
 msgid ""
 "To run Flower with persisted SuperLink state and enabled TLS, a slight "
 "change in the ``with-state.yml`` file is required:"
@@ -23229,23 +23236,23 @@ msgstr ""
 "activé, une légère modification est requise dans le fichier ``with-"
 "state.yml`` :"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:369
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:373
 msgid "Comment out the lines 2-6 and uncomment the lines 7-13:"
 msgstr "Commentez les lignes 2-6 et décommentez les lignes 7-13 :"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:371
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:375
 msgid "with-state.yml"
 msgstr ""
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:392
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:396
 msgid "Restart the services:"
 msgstr "Redémarrez les services :"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:406
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:410
 msgid "Step 9: Merge Multiple Compose Files"
 msgstr "Étape 9 : Fusionner plusieurs fichiers Compose"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:408
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:412
 msgid ""
 "You can merge multiple Compose files into a single file. For instance, if"
 " you wish to combine the basic configuration with the TLS configuration, "
@@ -23255,7 +23262,7 @@ msgstr ""
 "exemple, si vous souhaitez combiner la configuration de base avec la "
 "configuration TLS, exécutez la commande suivante :"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:417
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:421
 msgid ""
 "This will merge the contents of ``compose.yml`` and ``with-tls.yml`` into"
 " a new file called ``my_compose.yml``."
@@ -23263,15 +23270,15 @@ msgstr ""
 "Cela fusionnera les contenus de ``compose.yml`` et ``with-tls.yml`` dans "
 "un nouveau fichier appelé ``my_compose.yml``."
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:422
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:426
 msgid "Step 10: Clean Up"
 msgstr "Étape 10 : Nettoyage"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:424
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:428
 msgid "Remove all services and volumes:"
 msgstr "Supprimez tous les services et volumes :"
 
-#: ../../source/docker/tutorial-quickstart-docker-compose.rst:434
+#: ../../source/docker/tutorial-quickstart-docker-compose.rst:438
 msgid ":doc:`run-quickstart-examples-docker-compose`"
 msgstr ""
 
@@ -25810,6 +25817,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.workflow.SecAggPlusWorkflow.rst
 #: ../../source/ref-api/flwr.server.workflow.SecAggWorkflow.rst
 #: ../../source/ref-api/flwr.serverapp.Grid.rst
+#: ../../source/ref-api/flwr.serverapp.PrivacyConfig.rst
 #: ../../source/ref-api/flwr.serverapp.strategy.Bulyan.rst
 #: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst
 #: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.rst
@@ -29629,8 +29637,8 @@ msgstr ""
 "exécutant une commande ``flwr ls`` : "
 
 #: ../../source/how-to-authenticate-supernodes.rst:150
-#: ../../source/how-to-enable-tls-connections.rst:237
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:240
+#: ../../source/how-to-enable-tls-connections.rst:239
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:242
 msgid ""
 "You can setup your ``local-deployment`` profile as the default so you "
 "don't have to specify it in every Flower CLI command that needs to "
@@ -29704,11 +29712,11 @@ msgstr ""
 "consulter :ref:`Launching the SuperNodes with TLS <connecting-the-"
 "supernodes-with-tls>`."
 
-#: ../../source/how-to-authenticate-supernodes.rst:216
+#: ../../source/how-to-authenticate-supernodes.rst:217
 msgid "``--auth-supernode-private-key``: the private key of this SuperNode."
 msgstr "``--auth-supernode-private-key``: La clé privée de ce SuperNode."
 
-#: ../../source/how-to-authenticate-supernodes.rst:218
+#: ../../source/how-to-authenticate-supernodes.rst:219
 msgid ""
 "Follow the same procedure to launch the second SuperNode by passing its "
 "corresponding private key:"
@@ -29716,7 +29724,7 @@ msgstr ""
 "Suivez la même procédure pour lancer le deuxième SuperNode en passant sa "
 "clé privée correspondante :"
 
-#: ../../source/how-to-authenticate-supernodes.rst:231
+#: ../../source/how-to-authenticate-supernodes.rst:233
 msgid ""
 "After connecting both SuperNodes, you can check the status of the "
 "SuperNodes again. You will notice their status is now ``online``:"
@@ -29725,11 +29733,11 @@ msgstr ""
 "des Supernodes à nouveau. Vous remarquerez que leur statut est maintenant"
 " ``online`` :"
 
-#: ../../source/how-to-authenticate-supernodes.rst:248
+#: ../../source/how-to-authenticate-supernodes.rst:250
 msgid "Unregister SuperNodes"
 msgstr "Désinscrire des SuperNodes"
 
-#: ../../source/how-to-authenticate-supernodes.rst:252
+#: ../../source/how-to-authenticate-supernodes.rst:254
 msgid ""
 "This is a destructive operation. Unregistering a SuperNode is permanent "
 "and cannot be undone. If you wish to connect a SuperNode again, a new key"
@@ -29739,7 +29747,7 @@ msgstr ""
 "permanente et ne peut pas être annulée. Si vous souhaitez reconnecter un "
 "SuperNode, un nouveau paquet de clés est nécessaire."
 
-#: ../../source/how-to-authenticate-supernodes.rst:255
+#: ../../source/how-to-authenticate-supernodes.rst:257
 msgid ""
 "At anypoint you can unregister a SuperNode from the SuperLink (even if it"
 " has never connected). This will prevent the SuperNode from making future"
@@ -29755,7 +29763,7 @@ msgstr ""
 " La désinscription d'un SuperNode peut être effectuée via le "
 "|flower_cli_supernode_link|_ comme suit :"
 
-#: ../../source/how-to-authenticate-supernodes.rst:266
+#: ../../source/how-to-authenticate-supernodes.rst:268
 msgid ""
 "The above command unregisters the first SuperNode. You can verify this by"
 " listing the SuperNodes again:"
@@ -29763,7 +29771,7 @@ msgstr ""
 "Le commande ci-dessus désinscrit le premier SuperNode. Vous pouvez "
 "vérifier cela en listant les SuperNodes à nouveau :"
 
-#: ../../source/how-to-authenticate-supernodes.rst:280
+#: ../../source/how-to-authenticate-supernodes.rst:282
 msgid ""
 "If you pass the ``--verbose`` flag to the previous command you'll see "
 "that the status of the unregistered SuperNode has changed to "
@@ -29778,11 +29786,11 @@ msgstr ""
 "vous souhaitez reconnecter un deuxième SuperNode, un nouveau paquet de "
 "clés EC est nécessaire.**"
 
-#: ../../source/how-to-authenticate-supernodes.rst:300
+#: ../../source/how-to-authenticate-supernodes.rst:302
 msgid "Security notice"
 msgstr "Avertissement de sécurité"
 
-#: ../../source/how-to-authenticate-supernodes.rst:302
+#: ../../source/how-to-authenticate-supernodes.rst:304
 msgid ""
 "The system's security relies on the credentials of the SuperLink and each"
 " SuperNode. Therefore, it is imperative to safeguard and safely store the"
@@ -29801,14 +29809,14 @@ msgstr ""
 "communications sont effectuées dans un cadre sécurisé en utilisant des "
 "méthodes de communication fiables."
 
-#: ../../source/how-to-authenticate-supernodes.rst:310
-#: ../../source/how-to-enable-tls-connections.rst:244
+#: ../../source/how-to-authenticate-supernodes.rst:312
+#: ../../source/how-to-enable-tls-connections.rst:246
 #: ../../source/how-to-use-built-in-mods.rst:175
 #: ../../source/tutorial-series-what-is-federated-learning.rst:291
 msgid "Conclusion"
 msgstr "Conclusion"
 
-#: ../../source/how-to-authenticate-supernodes.rst:312
+#: ../../source/how-to-authenticate-supernodes.rst:314
 msgid ""
 "You should now have learned how to start a long-running Flower SuperLink "
 "and SuperNode with node authentication enabled. You should also know the "
@@ -29819,8 +29827,8 @@ msgstr ""
 "Vous devriez également connaître l'importance de la clé privée et la "
 "stocker en toute sécurité pour minimiser les risques."
 
-#: ../../source/how-to-authenticate-supernodes.rst:318
-#: ../../source/how-to-enable-tls-connections.rst:254
+#: ../../source/how-to-authenticate-supernodes.rst:320
+#: ../../source/how-to-enable-tls-connections.rst:256
 msgid ""
 "Refer to the :doc:`docker/index` documentation to learn how to setup a "
 "federation where each component runs in its own Docker container. You can"
@@ -32014,7 +32022,7 @@ msgstr ""
 " ``--insecure`` par ``--root-certificates``. Le même commande peut "
 "également fournir des certificats AppIo pour l'API ClientAppIo interne."
 
-#: ../../source/how-to-enable-tls-connections.rst:130
+#: ../../source/how-to-enable-tls-connections.rst:131
 msgid ""
 "``--root-certificates``: This specifies the location of the CA "
 "certificate file. The ``ca.crt`` file is used to verify the identity of "
@@ -32035,7 +32043,7 @@ msgstr ""
 "certificat CA utilisé par SuperExec pour vérifier le certificat serveur "
 "API ClientAppIo du SuperNode."
 
-#: ../../source/how-to-enable-tls-connections.rst:138
+#: ../../source/how-to-enable-tls-connections.rst:139
 msgid ""
 "Follow the same procedure, i.e. replacing ``--insecure`` with ``--root-"
 "certificates``, to launch the second SuperNode."
@@ -32043,7 +32051,7 @@ msgstr ""
 "Suivez la même procédure, c'est-à-dire en remplaçant ``--insecure`` par "
 "``--root-certificates``, pour lancer le deuxième SuperNode."
 
-#: ../../source/how-to-enable-tls-connections.rst:153
+#: ../../source/how-to-enable-tls-connections.rst:155
 msgid ""
 "At this point, you have successfully launched a SuperLink and two "
 "SuperNodes with TLS-enabled connections."
@@ -32051,7 +32059,7 @@ msgstr ""
 "À ce stade, vous avez réussi à lancer un SuperLink et deux SuperNodes "
 "avec des connexions TLS activées."
 
-#: ../../source/how-to-enable-tls-connections.rst:158
+#: ../../source/how-to-enable-tls-connections.rst:160
 #, fuzzy
 msgid ""
 "The ``--appio-ssl-*`` Runtime API TLS options configure server-"
@@ -32069,12 +32077,12 @@ msgstr ""
 "connexions internes AppIo restent non chiffrées et devraient rester à "
 "l'intérieur d'un réseau de confiance."
 
-#: ../../source/how-to-enable-tls-connections.rst:166
+#: ../../source/how-to-enable-tls-connections.rst:168
 #, fuzzy
 msgid "TLS for Runtime API Connections in \"Process\" Isolation Mode"
 msgstr "TLS pour les Connexions AppIo dans « Process » Isolation Mode"
 
-#: ../../source/how-to-enable-tls-connections.rst:168
+#: ../../source/how-to-enable-tls-connections.rst:170
 msgid ""
 "For details about SuperExec, \"process\" isolation mode, and "
 "\"subprocess\" isolation mode, see :doc:`ref-flower-network-"
@@ -32084,7 +32092,7 @@ msgstr ""
 "le mode d'isolement « subprocess », voir :doc:`ref-flower-network-"
 "communication`."
 
-#: ../../source/how-to-enable-tls-connections.rst:171
+#: ../../source/how-to-enable-tls-connections.rst:173
 #, fuzzy
 msgid ""
 "So far, we've been showing you how to enable TLS for Runtime API "
@@ -32102,7 +32110,7 @@ msgstr ""
 "process », vous devez faire quelques choses différemment pour activer TLS"
 " pour les connexions AppIo."
 
-#: ../../source/how-to-enable-tls-connections.rst:177
+#: ../../source/how-to-enable-tls-connections.rst:179
 #, fuzzy
 msgid ""
 "First, we need to launch the SuperLink and SuperNode with "
@@ -32123,7 +32131,7 @@ msgstr ""
 "SuperExecs. Voici un exemple de commande pour lancer une SuperExec qui "
 "peut établir des connexions TLS avec le ServerAppIo API du SuperLink:"
 
-#: ../../source/how-to-enable-tls-connections.rst:195
+#: ../../source/how-to-enable-tls-connections.rst:197
 #, fuzzy
 msgid ""
 "``--root-certificates``: Specify the location of the CA certificate file."
@@ -32154,7 +32162,7 @@ msgstr ""
 "SuperExec doit lancer. Utilisez ``serverapp`` pour un ``ServerApp`` "
 "SuperExec."
 
-#: ../../source/how-to-enable-tls-connections.rst:199
+#: ../../source/how-to-enable-tls-connections.rst:201
 #, fuzzy
 msgid ""
 "Next, use the same procedure for a ``ClientApp`` SuperExec, but pass the "
@@ -32165,7 +32173,7 @@ msgstr ""
 " passez l'adresse API ClientAppIo du SuperNode, par exemple "
 "``127.0.0.1:9094``, et définissez ``--plugin-type clientapp``."
 
-#: ../../source/how-to-enable-tls-connections.rst:202
+#: ../../source/how-to-enable-tls-connections.rst:204
 #, fuzzy
 msgid ""
 "Now your SuperLink-side SuperExec and SuperNode-side SuperExec can "
@@ -32186,11 +32194,11 @@ msgstr ""
 "commandes ou la configuration utilisées par votre système "
 "d'orchestration."
 
-#: ../../source/how-to-enable-tls-connections.rst:211
+#: ../../source/how-to-enable-tls-connections.rst:213
 msgid "TLS-enabled Flower CLI"
 msgstr "Flower CLI avec TLS activé"
 
-#: ../../source/how-to-enable-tls-connections.rst:213
+#: ../../source/how-to-enable-tls-connections.rst:215
 msgid ""
 "The `Flower CLI <ref-api-cli.html>`_ (e.g. ``flwr run`` command) is the "
 "way a user (e.g. a data scientist) can interact with a deployed "
@@ -32210,7 +32218,7 @@ msgstr ""
 "faire, remplacez le champ ``insecure = true`` dans votre fichier de "
 "configuration TOML Flower avec un nouveau champ qui lit le certificat:"
 
-#: ../../source/how-to-enable-tls-connections.rst:228
+#: ../../source/how-to-enable-tls-connections.rst:230
 msgid ""
 "Note that the path to the ``root-certificates`` is relative to the root "
 "of the project. Now, you can run the example by executing ``flwr run``:"
@@ -32219,7 +32227,7 @@ msgstr ""
 " du projet. Vous pouvez maintenant exécuter l'exemple en exécutant ``flwr"
 " run``:"
 
-#: ../../source/how-to-enable-tls-connections.rst:246
+#: ../../source/how-to-enable-tls-connections.rst:248
 #, fuzzy
 msgid ""
 "You should now have learned how to generate self-signed certificates "
@@ -32237,11 +32245,11 @@ msgstr ""
 "connexions internes AppIo. Toutes les autres commandes dans le `Flower "
 "CLI <ref-api-cli.html>`_ seront également TLS-activées."
 
-#: ../../source/how-to-enable-tls-connections.rst:261
+#: ../../source/how-to-enable-tls-connections.rst:263
 msgid "Additional resources"
 msgstr "Ressources supplémentaires"
 
-#: ../../source/how-to-enable-tls-connections.rst:263
+#: ../../source/how-to-enable-tls-connections.rst:265
 msgid ""
 "These additional sources might be relevant if you would like to dive "
 "deeper into the topic of certificates:"
@@ -32249,11 +32257,11 @@ msgstr ""
 "Ces sources supplémentaires peuvent être pertinentes si tu souhaites "
 "approfondir le sujet des certificats :"
 
-#: ../../source/how-to-enable-tls-connections.rst:266
+#: ../../source/how-to-enable-tls-connections.rst:268
 msgid "`Let's Encrypt <https://letsencrypt.org/docs/>`_"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:267
+#: ../../source/how-to-enable-tls-connections.rst:269
 msgid "`certbot <https://certbot.eff.org/>`_"
 msgstr ""
 
@@ -34086,7 +34094,7 @@ msgstr ""
 "|enable_tls_connections|_"
 
 #: ../../source/how-to-run-flower-on-azure.rst:199
-#: ../../source/how-to-run-flower-on-gcp.rst:591
+#: ../../source/how-to-run-flower-on-gcp.rst:595
 msgid "Run Flower App"
 msgstr "Exécutez l'application Flower"
 
@@ -34109,8 +34117,8 @@ msgstr ""
 "fichier de configuration Flower :"
 
 #: ../../source/how-to-run-flower-on-azure.rst:214
-#: ../../source/how-to-run-flower-on-gcp.rst:608
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:662
+#: ../../source/how-to-run-flower-on-gcp.rst:612
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:666
 msgid ""
 "Run ``flwr config list`` to locate the Flower configuration file on your "
 "machine and view available SuperLink connections."
@@ -34120,8 +34128,8 @@ msgstr ""
 "disponibles."
 
 #: ../../source/how-to-run-flower-on-azure.rst:227
-#: ../../source/how-to-run-flower-on-gcp.rst:621
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:675
+#: ../../source/how-to-run-flower-on-gcp.rst:625
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:679
 msgid ""
 "Open the Flower Configuration file (``config.toml``) and add a new "
 "SuperLink connection at the end:"
@@ -34650,7 +34658,7 @@ msgstr ""
 msgid "superexec-clientapp-2-deployment.yaml"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:544
+#: ../../source/how-to-run-flower-on-gcp.rst:548
 msgid ""
 "Once you have created the required files, you can use the following "
 "``k8s-deploy.sh`` helper script to deploy all the ``Pods``."
@@ -34658,7 +34666,7 @@ msgstr ""
 "Une fois que vous avez créé les fichiers requis, vous pouvez utiliser l' "
 "aide script suivant ``k8s-deploy.sh`` pour déployer tous les ``Pods``."
 
-#: ../../source/how-to-run-flower-on-gcp.rst:549
+#: ../../source/how-to-run-flower-on-gcp.rst:553
 msgid ""
 "Make sure the Flower version you use to deploy the ``Pods`` matches the "
 "version of your Flower app."
@@ -34670,7 +34678,7 @@ msgstr ""
 msgid "k8s-deploy.sh"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-gcp.rst:579
+#: ../../source/how-to-run-flower-on-gcp.rst:583
 msgid ""
 "To see that your ``Pods`` are deployed, please go to the ``Navigation "
 "Menu`` on the Google Console, select ``Kubernetes Engine`` and then the "
@@ -34682,7 +34690,7 @@ msgstr ""
 "Engine`` et puis la page ``Workloads``. La nouvelle fenêtre qui apparaît "
 "montrera l'état des ``Pods`` en cours de déploiement."
 
-#: ../../source/how-to-run-flower-on-gcp.rst:585
+#: ../../source/how-to-run-flower-on-gcp.rst:589
 msgid ""
 "Please wait for a couple of minutes (3' to 5' minutes should be enough) "
 "before the ``Pods`` are up and running. While ``Pods`` resources are "
@@ -34693,7 +34701,7 @@ msgstr ""
 "mise en place des ressources ``Pods``, certaines avertissements sont "
 "attendus."
 
-#: ../../source/how-to-run-flower-on-gcp.rst:593
+#: ../../source/how-to-run-flower-on-gcp.rst:597
 msgid ""
 "Once all ``Pods`` are up and running, we need to get the ``EXTERNAL_IP`` "
 "of the ``superlink-service`` and point our Flower app to use the "
@@ -34704,7 +34712,7 @@ msgstr ""
 "pointer notre application Flower pour utiliser le cluster Kubernetes pour"
 " soumettre et exécuter la tâche."
 
-#: ../../source/how-to-run-flower-on-gcp.rst:597
+#: ../../source/how-to-run-flower-on-gcp.rst:601
 msgid ""
 "To get the ``EXTERNAL-IP`` of the ``superlink-service`` we run the "
 "following command, which will show the ``NAME``, ``TYPE``, ``CLUSTER-"
@@ -34714,7 +34722,7 @@ msgstr ""
 "suivante, qui montrera les ``TYPE``, ``CLUSTER-IP``, ``EXTERNAL-IP``, "
 "``PORTS`` et __PH7__ de la service :"
 
-#: ../../source/how-to-run-flower-on-gcp.rst:605
+#: ../../source/how-to-run-flower-on-gcp.rst:609
 msgid ""
 "After we get the ``EXTERNAL-IP`` we need to create a new SuperLink "
 "connection in the Flower Configuration file:"
@@ -34722,11 +34730,11 @@ msgstr ""
 "Après avoir récupéré le ``EXTERNAL-IP``, nous avons besoin de créer un "
 "nouveau lien de connexion dans le fichier de configuration SuperLink :"
 
-#: ../../source/how-to-run-flower-on-gcp.rst:631
+#: ../../source/how-to-run-flower-on-gcp.rst:635
 msgid "Then we can execute the example on the GCP cluster by running:"
 msgstr "Nous pouvons ensuite exécuter l'exemple sur le cluster GCP en exécutant :"
 
-#: ../../source/how-to-run-flower-on-gcp.rst:639
+#: ../../source/how-to-run-flower-on-gcp.rst:643
 msgid ""
 "Please note that in the current deployment, communication is not "
 "encrypted. To enable TLS for secure connections, check the following "
@@ -34739,7 +34747,7 @@ msgstr ""
 "mettrons également à jour ce guide bientôt avec plus de détails sur la "
 "configuration de TLS."
 
-#: ../../source/how-to-run-flower-on-gcp.rst:644
+#: ../../source/how-to-run-flower-on-gcp.rst:648
 msgid ""
 "If the job is successfully submitted, and executed, then in your console "
 "you should see the logs from the run. The output should look like the one"
@@ -34753,7 +34761,7 @@ msgstr ""
 msgid "Expected Output"
 msgstr "Sortie attendue"
 
-#: ../../source/how-to-run-flower-on-gcp.rst:720
+#: ../../source/how-to-run-flower-on-gcp.rst:724
 msgid ""
 "Please note that if you terminate or shut down the cluster, and create a "
 "new one, the value of the ``EXTERNAL_IP`` changes. In that case, you will"
@@ -34763,11 +34771,11 @@ msgstr ""
 "nouveau, la valeur du ``EXTERNAL_IP`` change. Dans ce cas, vous devrez "
 "mettre à jour le fichier de configuration Flower."
 
-#: ../../source/how-to-run-flower-on-gcp.rst:726
+#: ../../source/how-to-run-flower-on-gcp.rst:730
 msgid "Shutdown Flower Infrastructure"
 msgstr "Arrêter l'infrastructure Flower"
 
-#: ../../source/how-to-run-flower-on-gcp.rst:728
+#: ../../source/how-to-run-flower-on-gcp.rst:732
 msgid ""
 "If you would like to shutdown all the running pods deployed during this "
 "guide, you can use the ``kubectl delete`` command and pass the the "
@@ -35222,7 +35230,7 @@ msgstr ""
 msgid "Copy and paste the following YAML definition for the SuperNode pod."
 msgstr "Copiez et collez la définition YAML suivante pour le pod SuperNode."
 
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:351
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:353
 msgid ""
 "Now, when you check the logs of the SuperLink pod in the first OpenShift "
 "cluster, you should see that the SuperNode has successfully connected to "
@@ -35232,7 +35240,7 @@ msgstr ""
 "premier cluster OpenShift, vous devriez voir que SuperNode a réussi à se "
 "connecter à partir du cluster distant."
 
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:354
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:356
 msgid ""
 "Congratulations! You have successfully deployed and run SuperLink and "
 "SuperNode in different OpenShift clusters. You can further extend your "
@@ -35244,7 +35252,7 @@ msgstr ""
 "encore votre fédération en déployant des SuperNodes supplémentaires dans "
 "d'autres clusters en répétant les étapes ci-dessus."
 
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:358
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:360
 msgid ""
 "This deployment pattern allows you to scale your Flower deployment across"
 " multiple clusters where secure deployment platforms like OpenShift are "
@@ -35257,7 +35265,7 @@ msgstr ""
 "des charges de travail critiques dans des environnements de recherche, "
 "des datacenters et des serveurs en local."
 
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:367
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:369
 msgid ""
 "To learn more about Red Hat Service Interconnect and Skupper concepts, "
 "please refer to the following resources:"
@@ -35265,7 +35273,7 @@ msgstr ""
 "Pour en savoir plus sur Red Hat Service Interconnect et les concepts "
 "Skupper, veuillez vous référer aux ressources suivantes :"
 
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:370
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:372
 msgid ""
 "`Red Hat Service Interconnect webpage "
 "<https://www.redhat.com/en/technologies/cloud-computing/service-"
@@ -35275,11 +35283,11 @@ msgstr ""
 "<https://www.redhat.com/en/technologies/cloud-computing/service-"
 "interconnect>`_"
 
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:372
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:374
 msgid "`Skupper concepts <https://skupperproject.github.io/refdog/concepts/>`_"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:374
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:376
 msgid ""
 "For further reading about deploying Flower with Red Hat, Docker, and "
 "Kubernetes, check out our guides below:"
@@ -35287,7 +35295,7 @@ msgstr ""
 "Pour une lecture plus approfondie sur le déploiement de Flower avec Red "
 "Hat, Docker et Kubernetes, consultez nos guides ci-dessous :"
 
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:377
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:379
 msgid ""
 ":doc:`How to run Flower on Red Hat OpenShift <how-to-run-flower-on-red-"
 "hat-openshift>`"
@@ -35295,18 +35303,18 @@ msgstr ""
 ":doc:`Exécuter Flower sur Red Hat OpenShift <how-to-run-flower-on-red-"
 "hat-openshift>`"
 
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:378
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:710
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:380
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:714
 msgid ":doc:`How to run Flower with Docker <docker/index>`"
 msgstr ":doc:`Exécuter Flower avec Docker <docker/index>`"
 
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:379
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:711
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:381
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:715
 msgid ":doc:`How to run Flower with Helm <helm/index>`"
 msgstr ":doc:`Exécuter Flower avec Helm <helm/index>`"
 
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:381
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:713
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:383
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:717
 msgid ""
 "To learn about running Flower on other cloud platforms, check out our "
 "guides below:"
@@ -35314,13 +35322,13 @@ msgstr ""
 "Pour en savoir plus sur l'exécution de Flower sur d'autres plateformes "
 "cloud, consultez nos guides ci-dessous :"
 
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:383
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:715
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:385
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:719
 msgid ":doc:`How to run Flower on Microsoft Azure <how-to-run-flower-on-azure>`"
 msgstr ":doc:`Exécuter Flower sur Microsoft Azure <how-to-run-flower-on-azure>`"
 
-#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:384
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:716
+#: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:386
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:720
 msgid ""
 ":doc:`How to run Flower on Google Cloud Platform <how-to-run-flower-on-"
 "gcp>`"
@@ -35801,7 +35809,7 @@ msgstr ""
 "Finalement, lancez deux pods SuperNode avec les définitions YAML "
 "suivantes :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:413
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:417
 msgid ""
 "To view the status of pods that were just deployed, click on the "
 "``Workloads`` link in the left panel. You should be able to see three "
@@ -35812,15 +35820,15 @@ msgstr ""
 "trois pods Flower en état « Exécutant » comme montré dans la capture "
 "d'écran ci-dessous :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:417
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:421
 msgid "Flower SuperLink and SuperNode pods in Red Hat OpenShift"
 msgstr "Pods Flower SuperLink et SuperNode dans Red Hat OpenShift"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:422
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:426
 msgid "Flower SuperLink and SuperNode pods in Red Hat OpenShift."
 msgstr "Pods Flower SuperLink et SuperNode dans Red Hat OpenShift."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:424
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:428
 msgid ""
 "Click on the SuperLink pod to view the pod details and click on the "
 "``Logs`` tab. You should be able to view the SuperLink logs showing two "
@@ -35830,7 +35838,7 @@ msgstr ""
 "sur l'onglet ``Logs``. Vous devriez pouvoir afficher les journaux "
 "SuperLink montrant deux SuperNodes connectés."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:429
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:433
 msgid ""
 "To shut down the pods, navigate to ``Workloads`` > ``Deployments``, "
 "select the deployed pods, and click on ``Edit Pod Count`` to set the "
@@ -35843,11 +35851,11 @@ msgstr ""
 "pods en sélectionnant-les et en cliquant sur le bouton ``Delete "
 "Deployment``."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:436
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:440
 msgid "Deploy Red Hat OpenShift AI"
 msgstr "Déployer l'intelligence artificielle collaborative Red Hat OpenShift"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:438
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:442
 msgid ""
 "To interface with the deployed SuperLink and SuperNode in the OpenShift "
 "cluster, we want to make use of OpenShift AI workbench. So, we need to "
@@ -35858,7 +35866,7 @@ msgstr ""
 "Par conséquent, nous devons activer cet Opérateur dans le cluster "
 "OpenShift."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:442
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:446
 msgid ""
 "First, ensure that the Red Hat OpenShift AI is enabled via the Red Hat "
 "OpenShift console. You may enable a free trial if you do not have a "
@@ -35890,23 +35898,23 @@ msgstr ""
 "l'Opérateur ``Red Hat OpenShift AI`` dans le panneau ``Installed "
 "Operators`` :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:453
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:457
 msgid "Red Hat OpenShift AI Operator in OpenShift"
 msgstr ""
 "Opérateur d'intelligence artificielle collaborative Red Hat OpenShift "
 "dans OpenShift"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:458
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:462
 msgid "Red Hat OpenShift AI Operator in OpenShift."
 msgstr ""
 "Opérateur d'intelligence artificielle collaborative Red Hat OpenShift "
 "dans OpenShift."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:461
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:465
 msgid "Install Data Science Cluster"
 msgstr "Installer un cluster de science des données"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:463
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:467
 msgid ""
 "After installing the Operator, we need to install the "
 "``DataScienceCluster`` using the web console. Follow the official steps "
@@ -35946,7 +35954,7 @@ msgstr ""
 msgid "rhosai-datasciencecluster.yaml"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:518
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:522
 msgid ""
 "Click on ``Create`` to create the Data Science Cluster. If successful, "
 "you should see a ``default-dsc`` instance in the ``Data Science "
@@ -35956,19 +35964,19 @@ msgstr ""
 "vous devriez voir une instance ``default-dsc`` dans l'onglet ``Data "
 "Science Clusters`` avec un signe de vérification vert :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:521
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:525
 msgid "View of a successfully created Red Hat OpenShift AI Data Science Cluster"
 msgstr ""
 "Vue d'un cluster de science des données Red Hat OpenShift AI créé avec "
 "succès"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:526
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:530
 msgid "View of a successfully created Red Hat OpenShift AI Data Science Cluster."
 msgstr ""
 "Vue d'un cluster de science des données Red Hat OpenShift AI créé avec "
 "succès."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:528
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:532
 msgid ""
 "Once the above is complete, you will be able to launch OpenShift AI by "
 "clicking on the grid icon on the top right of the OpenShift console and "
@@ -35979,19 +35987,19 @@ msgstr ""
 "grilleau à droite supérieur de la console OpenShift et en cliquant sur le"
 " lien ``Red Hat OpenShift AI`` :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:532
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:536
 msgid "Launch Red Hat OpenShift AI from OpenShift console"
 msgstr ""
 "Lancer l'intelligence artificielle collaborative Red Hat OpenShift à "
 "partir de la console OpenShift"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:537
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:541
 msgid "Launch Red Hat OpenShift AI from OpenShift console."
 msgstr ""
 "Lancer l'intelligence artificielle collaborative Red Hat OpenShift à "
 "partir de la console OpenShift."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:539
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:543
 msgid ""
 "Follow the instructions when prompted to ``Log in with OpenShift``. After"
 " logging in, you will be taken to the OpenShift AI dashboard."
@@ -36000,11 +36008,11 @@ msgstr ""
 "OpenShift``. Après avoir connecté, vous serez redirigé vers le tableau de"
 " bord d'intelligence artificielle OpenShift."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:543
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:547
 msgid "Create a Custom OpenShift AI Image with Flower"
 msgstr "Créer une image d'OpenShift AI personnalisée avec Flower"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:545
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:549
 msgid ""
 "In OpenShift AI, you will be building and running your Flower app in a "
 "workbench, which is a Jupyter notebook environment. However, the default "
@@ -36029,7 +36037,7 @@ msgstr ""
 "/creating-custom-workbench-images#creating-a-custom-image-from-default-"
 "image_custom-images>`_."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:553
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:557
 msgid ""
 "**Pre-requisites**: Given that Red Hat OpenShift AI needs to be able to "
 "pull from a container registry, you will need to create an account on "
@@ -36047,7 +36055,7 @@ msgstr ""
 "<https://docs.docker.com/get-docker/>`_ sur votre système. Ensuite, "
 "connectez-vous à votre compte ``quay.io`` en utilisant la commande :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:564
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:568
 msgid ""
 "Now, we select a base image for our custom OpenShift AI image. In the Red"
 " Hat OpenShift console, go to ``Builds`` > ``ImageStreams``. You can find"
@@ -36065,7 +36073,7 @@ msgstr ""
 "l'identifiant ``sha256``. Dans ce guide, nous utilisons la balise "
 "``2025.1``."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:570
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:574
 msgid "Next, in your machine, create a Dockerfile with the following contents:"
 msgstr ""
 "Créez ensuite dans votre machine un fichier Dockerfile avec le contenu "
@@ -36075,7 +36083,7 @@ msgstr ""
 msgid "Dockerfile"
 msgstr ""
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:583
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:587
 msgid ""
 "Build and push the container image to your public repository on "
 "``quay.io``:"
@@ -36083,7 +36091,7 @@ msgstr ""
 "Construirez et envoyez l'image de conteneur vers votre dépôt public sur "
 "``quay.io``: "
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:589
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:593
 msgid ""
 "Once the image is pushed, we will configure OpenShift AI to load this "
 "custom workbench image. In the OpenShift AI dashboard, go to ``Settings``"
@@ -36106,19 +36114,19 @@ msgstr ""
 " pour importer l'image. Si c'est réussi, vous devriez voir votre image "
 "personnalisée dans la liste des images de travail :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:597
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:601
 msgid "Custom OpenShift AI workbench image with Flower"
 msgstr "Image de travail OpenShift AI personnalisée avec Flower"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:602
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:606
 msgid "Custom OpenShift AI workbench image with Flower."
 msgstr "Image de travail OpenShift AI personnalisée avec Flower."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:605
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:609
 msgid "Create a Data Science Project"
 msgstr "Créer un projet de science des données"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:607
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:611
 msgid ""
 "Now we are ready to create a Data Science project in OpenShift AI and "
 "create a workbench using the custom image we just created from the "
@@ -36129,7 +36137,7 @@ msgstr ""
 "l'image personnalisée que nous avons créée précédemment dans la section "
 "précédente."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:610
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:614
 msgid ""
 "On the left sidebar, click on ``Home``, navigate to the ``Data Science "
 "Projects`` section, and click on the ``Create project`` button. Give your"
@@ -36143,15 +36151,15 @@ msgstr ""
 "demo``, et - si vous le souhaitez, une description. Ensuite, cliquez sur "
 "``Create``. Cliquez sur votre projet créé pour l'ouvrir."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:615
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:619
 msgid "Data Science project in Red Hat OpenShift AI"
 msgstr "Projet de science des données dans Red Hat OpenShift AI"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:620
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:624
 msgid "Data Science project in Red Hat OpenShift AI."
 msgstr "Projet de science des données dans Red Hat OpenShift AI."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:622
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:626
 msgid ""
 "Navigate to the ``Workbenches`` tab and click on ``Create workbench`` to "
 "create a new workbench. Under \"Name and description\", provide a name "
@@ -36172,25 +36180,25 @@ msgstr ""
 "``Create Workbench``. L'état de votre interface de travail devrait passer"
 " à ``Running`` après quelques minutes :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:630
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:634
 msgid "Running workbench in Red Hat OpenShift AI"
 msgstr "Interface de travail en cours d'exécution dans Red Hat OpenShift AI"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:635
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:639
 msgid "Running workbench in Red Hat OpenShift AI."
 msgstr "Interface de travail en cours d'exécution dans Red Hat OpenShift AI."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:637
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:641
 msgid "Now, click on your workbench and launch the JupyterLab environment."
 msgstr ""
 "Cliquez maintenant sur votre interface de travail et lancez "
 "l'environnement JupyterLab."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:641
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:645
 msgid "Run the Flower App in OpenShift AI"
 msgstr "Exécuter l'application Flower dans OpenShift AI"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:643
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:647
 msgid ""
 "With a running workbench and deployed SuperLink and SuperNode pods in "
 "your OpenShift cluster, you are now ready to run a Flower app! In the "
@@ -36205,19 +36213,19 @@ msgstr ""
 "correctement et fonctionne comme attendu : ouvrez un nouveau terminal et "
 "exécutez ``flwr --version`` pour vérifier la version de Flower :"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:648
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:652
 msgid "Verify Flower installation in OpenShift AI workbench"
 msgstr ""
 "Vérification de l'installation de Flower dans l'interface de travail "
 "OpenShift AI"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:653
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:657
 msgid "Verify Flower installation in OpenShift AI workbench."
 msgstr ""
 "Vérification de l'installation de Flower dans l'interface de travail "
 "OpenShift AI."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:655
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:659
 msgid ""
 "With Flower running correctly, you can now follow the usual steps of "
 "using ``flwr new`` to create a new Flower app from a template, and ``flwr"
@@ -36237,21 +36245,21 @@ msgstr ""
 "une nouvelle connexion SuperLink dans le fichier de configuration Flower:"
 " "
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:685
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:689
 msgid "And finally, run your Flower app as usual with ``flwr run``:"
 msgstr ""
 "Et enfin, exécutez votre application Flower comme d'habitude avec ``flwr "
 "run``: "
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:687
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:691
 msgid "Running Flower app in OpenShift AI workbench"
 msgstr "Exécuter l'application Flower dans l'interface de travail OpenShift AI"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:692
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:696
 msgid "Running Flower app in OpenShift AI workbench."
 msgstr "Exécuter l'application Flower dans l'interface de travail OpenShift AI."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:694
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:698
 msgid ""
 "You can also view the logs of the SuperLink pod in the OpenShift console."
 " Navigate to ``Workloads`` > ``Pods``, click on the SuperLink pod, and "
@@ -36261,19 +36269,19 @@ msgstr ""
 "console OpenShift. Naviguez vers ``Workloads`` > ``Pods``, cliquez sur le"
 " pod SuperLink, puis cliquez sur l'icône ``Logs``: "
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:697
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:701
 msgid "SuperLink logs showing connected SuperNodes and running Flower app"
 msgstr ""
 "Journal des logs SuperLink montrant les SuperNodes connectés et "
 "l'application Flower en cours d'exécution"
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:702
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:706
 msgid "SuperLink logs showing connected SuperNodes and running Flower app."
 msgstr ""
 "Journal des logs SuperLink montrant les SuperNodes connectés et "
 "l'application Flower en cours d'exécution."
 
-#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:704
+#: ../../source/how-to-run-flower-on-red-hat-openshift.rst:708
 msgid ""
 "Congratulations! You have successfully created, deployed, and run a "
 "Flower app on Red Hat OpenShift using the Red Hat OpenShift Service on "
@@ -36528,11 +36536,11 @@ msgstr ""
 "**Terminal 1** Lancez le premier SuperNode après avoir activé votre "
 "environnement :"
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:148
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:149
 msgid "``flower-supernode``: Name of the SuperNode installed CLI executable."
 msgstr "``flower-supernode``: Nom de l'exécutable SuperNode installé CLI."
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:149
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:150
 msgid ""
 "``--insecure``: This flag tells the SuperNode to operate in an insecure "
 "mode, allowing unencrypted communication. Refer to the :doc:`how-to-"
@@ -36544,7 +36552,7 @@ msgstr ""
 " à la guide :doc:`how-to-enable-tls-connections` pour apprendre à "
 "exécuter votre SuperNode avec TLS."
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:151
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:152
 msgid ""
 "``--superlink 127.0.0.1:9092``: Connect to the SuperLink's Fleet API at "
 "the address ``127.0.0.1:9092``. If you had launched the SuperLink in a "
@@ -36556,17 +36564,23 @@ msgstr ""
 "une autre machine, vous remplaceriez ``127.0.0.1`` par l'IP publique de "
 "cette machine."
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:153
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:154
 msgid ""
-"``--clientappio-api-address 127.0.0.1:9094``: Set the address and port "
-"number where the SuperNode is listening to communicate with the "
+"``--host 127.0.0.1``: Set the host where the SuperNode listens for "
+"Runtime API requests."
+msgstr ""
+
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:155
+#, fuzzy
+msgid ""
+"``--port 9094``: Set the Runtime API port used to communicate with the "
 "``ClientApp``."
 msgstr ""
 "``--clientappio-api-address 127.0.0.1:9094``: Définissez l'adresse et le "
 "numéro de port où le SuperNode écoute pour communiquer avec le "
 "``ClientApp``."
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:155
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:156
 msgid ""
 "``--node-config \"partition-id=0 num-partitions=2\"``: The ``ClientApp`` "
 "code generated via ``flwr new`` expects those two key-value pairs to be "
@@ -36578,7 +36592,7 @@ msgstr ""
 "temps réel. Définissez l'ID de partition à ``0`` et le nombre de "
 "partitions à ``2`` pour la configuration du SuperNode."
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:157
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:158
 msgid ""
 "**Terminal 2** Start the second SuperNode after activating your "
 "environment:"
@@ -36586,13 +36600,13 @@ msgstr ""
 "**Terminal 2** Lancez le second SuperNode après avoir activé votre "
 "environnement :"
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:169
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:171
+#, fuzzy
 msgid ""
-"``--clientappio-api-address 127.0.0.1:9095``: Note that a different port "
-"is being used. This is only needed because you are running two SuperNodes"
-" on the same machine. Typically you would run one node per machine and "
-"therefore, the ``--clientappio-api-address`` could be omitted all "
-"together and left with its default value."
+"``--port 9095``: Note that a different port is being used. This is only "
+"needed because you are running two SuperNodes on the same machine. "
+"Typically you would run one node per machine and could omit ``--port`` to"
+" use its default value."
 msgstr ""
 "``--clientappio-api-address 127.0.0.1:9095``: Notez que un autre port est"
 " utilisé. Il n'est nécessaire que parce que vous exécutez deux SuperNodes"
@@ -36600,7 +36614,7 @@ msgstr ""
 "machine et donc, le ``--clientappio-api-address`` pourrait être omis tout"
 " à fait et laisser son valeur par défaut."
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:170
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:172
 msgid ""
 "``--node-config \"partition-id=1 num-partitions=2\"``: Note here we "
 "indicate a different `partition-id`. In this way, a ``ClientApp`` will "
@@ -36611,7 +36625,7 @@ msgstr ""
 " utilisera une partition de données différente en fonction du SuperNode "
 "qui s'exécute."
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:174
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:176
 #, fuzzy
 msgid ""
 "To enable TLS also for the SuperNode Runtime API, please refer to "
@@ -36622,11 +36636,11 @@ msgstr ""
 "consulter :ref:`Connecting the SuperNodes with TLS <connecting-the-"
 "supernodes-with-tls>`."
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:179
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:181
 msgid "Step 3: Run a Flower App on the Federation"
 msgstr "Étape 3 : Exécutez une application Flower sur la fédération"
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:183
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:185
 msgid ""
 "The Flower Configuration file is automatically created for you when you "
 "first use a Flower CLI command. Use ``flwr config list`` to see available"
@@ -36639,7 +36653,7 @@ msgstr ""
 "disponibles ainsi que le chemin du fichier de configuration. En savoir "
 "plus à ce sujet dans le guide :doc:`ref-flower-configuration`."
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:188
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:190
 msgid ""
 "At this point, you have launched two SuperNodes that are connected to the"
 " same SuperLink. The system is idling waiting for a ``Run`` to be "
@@ -36661,7 +36675,7 @@ msgstr ""
 "(seulement lors des tests locaux, les déploiements réels nécessitent "
 "TLS)."
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:210
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:212
 msgid ""
 "Open the ``config.toml`` file and at the end add a new SuperLink "
 "connection:"
@@ -36669,7 +36683,7 @@ msgstr ""
 "Ouvrez le fichier ``config.toml`` et ajoutez une nouvelle connexion "
 "SuperLink à la fin :"
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:221
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:223
 msgid ""
 "You can customize the string that follows ``[superlink.]`` to fit your "
 "needs. However, please note that the string cannot contain a dot (``.``)."
@@ -36678,7 +36692,7 @@ msgstr ""
 "convenir. Cependant, notez que la chaîne ne peut pas contenir un point "
 "(``.``)."
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:224
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:226
 msgid ""
 "In this example, ``local-deployment`` has been used. Just remember to "
 "replace ``local-deployment`` with your chosen name in both the "
@@ -36689,7 +36703,7 @@ msgstr ""
 "les deux chaînes ``[superlink.]`` et le commande correspondant ``flwr run"
 " .``."
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:228
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:230
 msgid ""
 "In another terminal and with your Python environment activated, run the "
 "Flower App and follow the ``ServerApp`` logs to track the execution of "
@@ -36699,7 +36713,7 @@ msgstr ""
 "exécutez l'application Flower et suivez les journaux ``ServerApp`` pour "
 "suivre l'exécution de l’exécution :"
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:235
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:237
 msgid ""
 "If you want to rerun the project or test an updated version by making "
 "changes to the code, simply re-run the command above."
@@ -36708,11 +36722,11 @@ msgstr ""
 "faisant des modifications au code, simplement ré-exécutez la commande ci-"
 "dessus."
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:247
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:249
 msgid "Step 4: Clean Up"
 msgstr "Étape 4 : Nettoyage"
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:249
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:251
 msgid ""
 "Use the ``Ctrl+C`` command in each terminal to stop the respective "
 "processes."
@@ -40964,7 +40978,7 @@ msgstr "Package principal Flower."
 #: ../../source/ref-api/flwr.client.rst:43
 #: ../../source/ref-api/flwr.clientapp.rst:33 ../../source/ref-api/flwr.rst:25
 #: ../../source/ref-api/flwr.server.rst:49
-#: ../../source/ref-api/flwr.serverapp.rst:34
+#: ../../source/ref-api/flwr.serverapp.rst:41
 msgid "Modules"
 msgstr ""
 
@@ -41143,7 +41157,11 @@ msgstr ""
 #: flwr.server.workflow.secure_aggregation.secaggplus_workflow.SecAggPlusWorkflow:1
 #: flwr.serverapp.server_app.ServerApp:1
 #: flwr.serverapp.strategy.result.Result:1
-#: flwr.simulation.simulationio_connection.SimulationIoConnection:1 of
+#: flwr.simulation.simulationio_connection.SimulationIoConnection:1
+#: flwr.supercore.privacy_accounting.GaussianPrivacyEvent:1
+#: flwr.supercore.privacy_accounting.PrivacyConfig:1
+#: flwr.supercore.privacy_accounting.PrivacySpent:1
+#: flwr.supercore.rdp_accountant.RdpAccountant:1 of
 msgid "Bases: :py:class:`object`"
 msgstr "Bases : :py:class:`object`"
 
@@ -41170,8 +41188,8 @@ msgstr "Bases : :py:class:`object`"
 #: flwr.serverapp.server_app.ServerApp.lifespan:7
 #: flwr.serverapp.server_app.ServerApp.main:4
 #: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:31
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:21
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:14
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:25
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:18
 #: of
 msgid "Examples"
 msgstr "Exemples"
@@ -41267,7 +41285,14 @@ msgstr "Définir un agent avec une seule fonction principale::"
 #: ../../source/ref-api/flwr.server.workflow.DefaultWorkflow.rst:15
 #: ../../source/ref-api/flwr.server.workflow.SecAggPlusWorkflow.rst:15
 #: ../../source/ref-api/flwr.server.workflow.SecAggWorkflow.rst:15
+#: ../../source/ref-api/flwr.serverapp.GaussianPrivacyEvent.rst:15
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:15
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:15
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:15
+#: ../../source/ref-api/flwr.serverapp.PrivacyConfig.rst:15
+#: ../../source/ref-api/flwr.serverapp.PrivacySpent.rst:15
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:15
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:15
 #: ../../source/ref-api/flwr.serverapp.ServerApp.rst:15
 #: ../../source/ref-api/flwr.serverapp.strategy.Bulyan.rst:15
 #: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst:15
@@ -41519,7 +41544,14 @@ msgstr ""
 #: ../../source/ref-api/flwr.server.LegacyContext.rst:25
 #: ../../source/ref-api/flwr.server.ServerAppComponents.rst:25
 #: ../../source/ref-api/flwr.server.ServerConfig.rst:25
+#: ../../source/ref-api/flwr.serverapp.GaussianPrivacyEvent.rst:25
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:43
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:166
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:46
+#: ../../source/ref-api/flwr.serverapp.PrivacyConfig.rst:25
+#: ../../source/ref-api/flwr.serverapp.PrivacySpent.rst:25
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:46
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:166
 #: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst:43
 #: ../../source/ref-api/flwr.serverapp.strategy.Result.rst:25
 msgid "Attributes"
@@ -45669,6 +45701,8 @@ msgstr ":py:obj:`metric_records <flwr.app.RecordDict.metric_records>`\\"
 msgid "EventType"
 msgstr "type"
 
+#: flwr.supercore.privacy_accounting.NeighboringRelation:1
+#: flwr.supercore.privacy_accounting.SamplingMethod:1
 #: flwr.supercore.telemetry.EventType:1 of
 msgid "Bases: :py:class:`str`, :py:class:`~enum.Enum`"
 msgstr ""
@@ -45683,7 +45717,10 @@ msgstr ""
 "mods\\]\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.encode:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.encode:1 flwr.serverapp.NeighboringRelation.encode:1
+#: flwr.serverapp.SamplingMethod.encode:1 of
 msgid "Encode the string using the codec registered for encoding."
 msgstr ""
 
@@ -45695,7 +45732,10 @@ msgid ""
 msgstr ":py:obj:`Error <flwr.app.Error>`\\ \\(code\\[\\, reason\\]\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.replace:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.replace:1 flwr.serverapp.NeighboringRelation.replace:1
+#: flwr.serverapp.SamplingMethod.replace:1 of
 msgid "Return a copy with all occurrences of substring old replaced by new."
 msgstr ""
 
@@ -45709,7 +45749,13 @@ msgstr ""
 "mods\\]\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.rsplit:1 flwr.common.EventType.split:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.rsplit:1 flwr.common.EventType.split:1
+#: flwr.serverapp.NeighboringRelation.rsplit:1
+#: flwr.serverapp.NeighboringRelation.split:1
+#: flwr.serverapp.SamplingMethod.rsplit:1 flwr.serverapp.SamplingMethod.split:1
+#: of
 msgid ""
 "Return a list of the substrings in the string, using sep as the separator"
 " string."
@@ -45729,7 +45775,10 @@ msgid ":py:obj:`join <flwr.common.EventType.join>`\\ \\(iterable\\, \\/\\)"
 msgstr ""
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.join:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.join:1 flwr.serverapp.NeighboringRelation.join:1
+#: flwr.serverapp.SamplingMethod.join:1 of
 msgid "Concatenate any number of strings."
 msgstr ""
 
@@ -45739,7 +45788,11 @@ msgid ":py:obj:`capitalize <flwr.common.EventType.capitalize>`\\ \\(\\)"
 msgstr ":py:obj:`popitem <flwr.app.ArrayRecord.popitem>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.capitalize:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.capitalize:1
+#: flwr.serverapp.NeighboringRelation.capitalize:1
+#: flwr.serverapp.SamplingMethod.capitalize:1 of
 msgid "Return a capitalized version of the string."
 msgstr ""
 
@@ -45749,7 +45802,11 @@ msgid ":py:obj:`casefold <flwr.common.EventType.casefold>`\\ \\(\\)"
 msgstr ":py:obj:`has_error <flwr.app.Message.has_error>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.casefold:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.casefold:1
+#: flwr.serverapp.NeighboringRelation.casefold:1
+#: flwr.serverapp.SamplingMethod.casefold:1 of
 msgid "Return a version of the string suitable for caseless comparisons."
 msgstr ""
 
@@ -45759,7 +45816,10 @@ msgid ":py:obj:`title <flwr.common.EventType.title>`\\ \\(\\)"
 msgstr ":py:obj:`items <flwr.app.ConfigRecord.items>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.title:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.title:1 flwr.serverapp.NeighboringRelation.title:1
+#: flwr.serverapp.SamplingMethod.title:1 of
 msgid "Return a version of the string where each word is titlecased."
 msgstr ""
 
@@ -45773,7 +45833,10 @@ msgstr ""
 "mods\\]\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.center:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.center:1 flwr.serverapp.NeighboringRelation.center:1
+#: flwr.serverapp.SamplingMethod.center:1 of
 msgid "Return a centered string of length width."
 msgstr ""
 
@@ -45784,6 +45847,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
 msgid ""
 "Return the number of non-overlapping occurrences of substring sub in "
 "string S[start:end]."
@@ -45796,7 +45861,11 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.expandtabs:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.expandtabs:1
+#: flwr.serverapp.NeighboringRelation.expandtabs:1
+#: flwr.serverapp.SamplingMethod.expandtabs:1 of
 msgid "Return a copy where all tab characters are expanded using spaces."
 msgstr ""
 
@@ -45807,6 +45876,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
 msgid ""
 "Return the lowest index in S where substring sub is found, such that sub "
 "is contained within S[start:end]."
@@ -45817,7 +45888,13 @@ msgid ":py:obj:`partition <flwr.common.EventType.partition>`\\ \\(sep\\, \\/\\)"
 msgstr ""
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.partition:1 flwr.common.EventType.rpartition:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.partition:1 flwr.common.EventType.rpartition:1
+#: flwr.serverapp.NeighboringRelation.partition:1
+#: flwr.serverapp.NeighboringRelation.rpartition:1
+#: flwr.serverapp.SamplingMethod.partition:1
+#: flwr.serverapp.SamplingMethod.rpartition:1 of
 msgid "Partition the string into three parts using the given separator."
 msgstr ""
 
@@ -45834,7 +45911,10 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.ljust:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.ljust:1 flwr.serverapp.NeighboringRelation.ljust:1
+#: flwr.serverapp.SamplingMethod.ljust:1 of
 msgid "Return a left-justified string of length width."
 msgstr ""
 
@@ -45844,7 +45924,10 @@ msgid ":py:obj:`lower <flwr.common.EventType.lower>`\\ \\(\\)"
 msgstr ":py:obj:`clear <flwr.app.RecordDict.clear>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.lower:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.lower:1 flwr.serverapp.NeighboringRelation.lower:1
+#: flwr.serverapp.SamplingMethod.lower:1 of
 msgid "Return a copy of the string converted to lowercase."
 msgstr ""
 
@@ -45856,7 +45939,10 @@ msgstr ""
 "mods\\]\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.lstrip:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.lstrip:1 flwr.serverapp.NeighboringRelation.lstrip:1
+#: flwr.serverapp.SamplingMethod.lstrip:1 of
 msgid "Return a copy of the string with leading whitespace removed."
 msgstr ""
 
@@ -45867,6 +45953,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
 msgid ""
 "Return the highest index in S where substring sub is found, such that sub"
 " is contained within S[start:end]."
@@ -45885,7 +45973,10 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.rjust:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.rjust:1 flwr.serverapp.NeighboringRelation.rjust:1
+#: flwr.serverapp.SamplingMethod.rjust:1 of
 msgid "Return a right-justified string of length width."
 msgstr ""
 
@@ -45897,7 +45988,10 @@ msgstr ""
 "mods\\]\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.rstrip:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.rstrip:1 flwr.serverapp.NeighboringRelation.rstrip:1
+#: flwr.serverapp.SamplingMethod.rstrip:1 of
 msgid "Return a copy of the string with trailing whitespace removed."
 msgstr ""
 
@@ -45915,7 +46009,11 @@ msgstr ""
 "mods\\]\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.splitlines:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.splitlines:1
+#: flwr.serverapp.NeighboringRelation.splitlines:1
+#: flwr.serverapp.SamplingMethod.splitlines:1 of
 msgid "Return a list of the lines in the string, breaking at line boundaries."
 msgstr ""
 
@@ -45925,7 +46023,10 @@ msgid ":py:obj:`strip <flwr.common.EventType.strip>`\\ \\(\\[chars\\]\\)"
 msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.strip:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.strip:1 flwr.serverapp.NeighboringRelation.strip:1
+#: flwr.serverapp.SamplingMethod.strip:1 of
 msgid "Return a copy of the string with leading and trailing whitespace removed."
 msgstr ""
 
@@ -45935,7 +46036,11 @@ msgid ":py:obj:`swapcase <flwr.common.EventType.swapcase>`\\ \\(\\)"
 msgstr ":py:obj:`MessageType <flwr.app.MessageType>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.swapcase:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.swapcase:1
+#: flwr.serverapp.NeighboringRelation.swapcase:1
+#: flwr.serverapp.SamplingMethod.swapcase:1 of
 msgid ""
 "Convert uppercase characters to lowercase and lowercase characters to "
 "uppercase."
@@ -45947,7 +46052,11 @@ msgid ":py:obj:`translate <flwr.common.EventType.translate>`\\ \\(table\\, \\/\\
 msgstr ":py:obj:`Strategy <flwr.serverapp.strategy.Strategy>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.translate:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.translate:1
+#: flwr.serverapp.NeighboringRelation.translate:1
+#: flwr.serverapp.SamplingMethod.translate:1 of
 msgid "Replace each character in the string using the given translation table."
 msgstr ""
 
@@ -45957,7 +46066,10 @@ msgid ":py:obj:`upper <flwr.common.EventType.upper>`\\ \\(\\)"
 msgstr ":py:obj:`QUERY <flwr.app.MessageType.QUERY>`\\"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.upper:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.upper:1 flwr.serverapp.NeighboringRelation.upper:1
+#: flwr.serverapp.SamplingMethod.upper:1 of
 msgid "Return a copy of the string converted to uppercase."
 msgstr ""
 
@@ -45968,6 +46080,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
 msgid "Return True if S starts with the specified prefix, False otherwise."
 msgstr ""
 
@@ -45978,6 +46092,8 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
 msgid "Return True if S ends with the specified suffix, False otherwise."
 msgstr ""
 
@@ -45988,7 +46104,11 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.removeprefix:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.removeprefix:1
+#: flwr.serverapp.NeighboringRelation.removeprefix:1
+#: flwr.serverapp.SamplingMethod.removeprefix:1 of
 msgid "Return a str with the given prefix string removed if present."
 msgstr ""
 
@@ -45999,7 +46119,11 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.removesuffix:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.removesuffix:1
+#: flwr.serverapp.NeighboringRelation.removesuffix:1
+#: flwr.serverapp.SamplingMethod.removesuffix:1 of
 msgid "Return a str with the given suffix string removed if present."
 msgstr ""
 
@@ -46009,7 +46133,10 @@ msgid ":py:obj:`isascii <flwr.common.EventType.isascii>`\\ \\(\\)"
 msgstr ":py:obj:`MessageType <flwr.app.MessageType>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.isascii:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.isascii:1 flwr.serverapp.NeighboringRelation.isascii:1
+#: flwr.serverapp.SamplingMethod.isascii:1 of
 msgid "Return True if all characters in the string are ASCII, False otherwise."
 msgstr ""
 
@@ -46019,7 +46146,10 @@ msgid ":py:obj:`islower <flwr.common.EventType.islower>`\\ \\(\\)"
 msgstr ":py:obj:`clear <flwr.app.RecordDict.clear>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.islower:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.islower:1 flwr.serverapp.NeighboringRelation.islower:1
+#: flwr.serverapp.SamplingMethod.islower:1 of
 msgid "Return True if the string is a lowercase string, False otherwise."
 msgstr ""
 
@@ -46029,7 +46159,10 @@ msgid ":py:obj:`isupper <flwr.common.EventType.isupper>`\\ \\(\\)"
 msgstr ":py:obj:`QUERY <flwr.app.MessageType.QUERY>`\\"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.isupper:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.isupper:1 flwr.serverapp.NeighboringRelation.isupper:1
+#: flwr.serverapp.SamplingMethod.isupper:1 of
 msgid "Return True if the string is an uppercase string, False otherwise."
 msgstr ""
 
@@ -46039,7 +46172,10 @@ msgid ":py:obj:`istitle <flwr.common.EventType.istitle>`\\ \\(\\)"
 msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.istitle:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.istitle:1 flwr.serverapp.NeighboringRelation.istitle:1
+#: flwr.serverapp.SamplingMethod.istitle:1 of
 msgid "Return True if the string is a title-cased string, False otherwise."
 msgstr ""
 
@@ -46049,7 +46185,10 @@ msgid ":py:obj:`isspace <flwr.common.EventType.isspace>`\\ \\(\\)"
 msgstr ":py:obj:`Message <flwr.app.Message>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.isspace:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.isspace:1 flwr.serverapp.NeighboringRelation.isspace:1
+#: flwr.serverapp.SamplingMethod.isspace:1 of
 msgid "Return True if the string is a whitespace string, False otherwise."
 msgstr ""
 
@@ -46059,7 +46198,11 @@ msgid ":py:obj:`isdecimal <flwr.common.EventType.isdecimal>`\\ \\(\\)"
 msgstr ":py:obj:`items <flwr.app.ConfigRecord.items>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.isdecimal:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.isdecimal:1
+#: flwr.serverapp.NeighboringRelation.isdecimal:1
+#: flwr.serverapp.SamplingMethod.isdecimal:1 of
 msgid "Return True if the string is a decimal string, False otherwise."
 msgstr ""
 
@@ -46069,7 +46212,10 @@ msgid ":py:obj:`isdigit <flwr.common.EventType.isdigit>`\\ \\(\\)"
 msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.isdigit:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.isdigit:1 flwr.serverapp.NeighboringRelation.isdigit:1
+#: flwr.serverapp.SamplingMethod.isdigit:1 of
 msgid "Return True if the string is a digit string, False otherwise."
 msgstr ""
 
@@ -46079,7 +46225,11 @@ msgid ":py:obj:`isnumeric <flwr.common.EventType.isnumeric>`\\ \\(\\)"
 msgstr ":py:obj:`QUERY <flwr.app.MessageType.QUERY>`\\"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.isnumeric:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.isnumeric:1
+#: flwr.serverapp.NeighboringRelation.isnumeric:1
+#: flwr.serverapp.SamplingMethod.isnumeric:1 of
 msgid "Return True if the string is a numeric string, False otherwise."
 msgstr ""
 
@@ -46089,7 +46239,10 @@ msgid ":py:obj:`isalpha <flwr.common.EventType.isalpha>`\\ \\(\\)"
 msgstr ":py:obj:`MessageType <flwr.app.MessageType>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.isalpha:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.isalpha:1 flwr.serverapp.NeighboringRelation.isalpha:1
+#: flwr.serverapp.SamplingMethod.isalpha:1 of
 msgid "Return True if the string is an alphabetic string, False otherwise."
 msgstr ""
 
@@ -46099,7 +46252,10 @@ msgid ":py:obj:`isalnum <flwr.common.EventType.isalnum>`\\ \\(\\)"
 msgstr ":py:obj:`values <flwr.app.ArrayRecord.values>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.isalnum:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.isalnum:1 flwr.serverapp.NeighboringRelation.isalnum:1
+#: flwr.serverapp.SamplingMethod.isalnum:1 of
 msgid "Return True if the string is an alpha-numeric string, False otherwise."
 msgstr ""
 
@@ -46109,7 +46265,11 @@ msgid ":py:obj:`isidentifier <flwr.common.EventType.isidentifier>`\\ \\(\\)"
 msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.isidentifier:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.isidentifier:1
+#: flwr.serverapp.NeighboringRelation.isidentifier:1
+#: flwr.serverapp.SamplingMethod.isidentifier:1 of
 msgid "Return True if the string is a valid Python identifier, False otherwise."
 msgstr ""
 
@@ -46119,7 +46279,11 @@ msgid ":py:obj:`isprintable <flwr.common.EventType.isprintable>`\\ \\(\\)"
 msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.isprintable:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.isprintable:1
+#: flwr.serverapp.NeighboringRelation.isprintable:1
+#: flwr.serverapp.SamplingMethod.isprintable:1 of
 msgid "Return True if the string is printable, False otherwise."
 msgstr ""
 
@@ -46129,7 +46293,10 @@ msgid ":py:obj:`zfill <flwr.common.EventType.zfill>`\\ \\(width\\, \\/\\)"
 msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.zfill:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.zfill:1 flwr.serverapp.NeighboringRelation.zfill:1
+#: flwr.serverapp.SamplingMethod.zfill:1 of
 msgid ""
 "Pad a numeric string with zeros on the left, to fill a field of the given"
 " width."
@@ -46143,6 +46310,8 @@ msgid ""
 msgstr ":py:obj:`update <flwr.app.ConfigRecord.update>`\\ \\(\\[E\\, \\]\\*\\*F\\)"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
 msgid "Return a formatted version of S, using substitutions from args and kwargs."
 msgstr ""
 
@@ -46151,6 +46320,8 @@ msgid ":py:obj:`format_map <flwr.common.EventType.format_map>`\\ \\(mapping\\)"
 msgstr ""
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
 msgid "Return a formatted version of S, using substitutions from mapping."
 msgstr ""
 
@@ -46160,7 +46331,11 @@ msgid ":py:obj:`maketrans <flwr.common.EventType.maketrans>`\\"
 msgstr ":py:obj:`TRAIN <flwr.app.MessageType.TRAIN>`\\"
 
 #: ../../source/ref-api/flwr.common.EventType.rst:164:<autosummary>:1
-#: flwr.common.EventType.maketrans:1 of
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#: flwr.common.EventType.maketrans:1
+#: flwr.serverapp.NeighboringRelation.maketrans:1
+#: flwr.serverapp.SamplingMethod.maketrans:1 of
 msgid "Return a translation table usable for str.translate()."
 msgstr ""
 
@@ -46325,38 +46500,49 @@ msgid ""
 "<flwr.common.EventType.RUN_SUPEREXEC_LEAVE>`\\"
 msgstr ""
 
-#: flwr.common.EventType.capitalize:3 of
+#: flwr.common.EventType.capitalize:3
+#: flwr.serverapp.NeighboringRelation.capitalize:3
+#: flwr.serverapp.SamplingMethod.capitalize:3 of
 msgid ""
 "More specifically, make the first character have upper case and the rest "
 "lower case."
 msgstr ""
 
 #: flwr.common.EventType.center:3 flwr.common.EventType.ljust:3
-#: flwr.common.EventType.rjust:3 of
+#: flwr.common.EventType.rjust:3 flwr.serverapp.NeighboringRelation.center:3
+#: flwr.serverapp.NeighboringRelation.ljust:3
+#: flwr.serverapp.NeighboringRelation.rjust:3
+#: flwr.serverapp.SamplingMethod.center:3 flwr.serverapp.SamplingMethod.ljust:3
+#: flwr.serverapp.SamplingMethod.rjust:3 of
 msgid "Padding is done using the specified fill character (default is a space)."
 msgstr ""
 
-#: flwr.common.EventType.count:1 of
+#: flwr.common.EventType.count:1 flwr.serverapp.NeighboringRelation.count:1
+#: flwr.serverapp.SamplingMethod.count:1 of
 msgid ""
 "Return the number of non-overlapping occurrences of substring sub in "
 "string S[start:end].  Optional arguments start and end are interpreted as"
 " in slice notation."
 msgstr ""
 
-#: flwr.common.EventType.encode:3 of
+#: flwr.common.EventType.encode:3 flwr.serverapp.NeighboringRelation.encode:3
+#: flwr.serverapp.SamplingMethod.encode:3 of
 msgid "encoding"
 msgstr ""
 
-#: flwr.common.EventType.encode:4 of
+#: flwr.common.EventType.encode:4 flwr.serverapp.NeighboringRelation.encode:4
+#: flwr.serverapp.SamplingMethod.encode:4 of
 msgid "The encoding in which to encode the string."
 msgstr ""
 
-#: flwr.common.EventType.encode:5 of
+#: flwr.common.EventType.encode:5 flwr.serverapp.NeighboringRelation.encode:5
+#: flwr.serverapp.SamplingMethod.encode:5 of
 #, fuzzy
 msgid "errors"
 msgstr "Error"
 
-#: flwr.common.EventType.encode:6 of
+#: flwr.common.EventType.encode:6 flwr.serverapp.NeighboringRelation.encode:6
+#: flwr.serverapp.SamplingMethod.encode:6 of
 msgid ""
 "The error handling scheme to use for encoding errors. The default is "
 "'strict' meaning that encoding errors raise a UnicodeEncodeError.  Other "
@@ -46365,7 +46551,9 @@ msgid ""
 "UnicodeEncodeErrors."
 msgstr ""
 
-#: flwr.common.EventType.endswith:1 of
+#: flwr.common.EventType.endswith:1
+#: flwr.serverapp.NeighboringRelation.endswith:1
+#: flwr.serverapp.SamplingMethod.endswith:1 of
 msgid ""
 "Return True if S ends with the specified suffix, False otherwise. With "
 "optional start, test S beginning at that position. With optional end, "
@@ -46373,128 +46561,170 @@ msgid ""
 "to try."
 msgstr ""
 
-#: flwr.common.EventType.expandtabs:3 of
+#: flwr.common.EventType.expandtabs:3
+#: flwr.serverapp.NeighboringRelation.expandtabs:3
+#: flwr.serverapp.SamplingMethod.expandtabs:3 of
 msgid "If tabsize is not given, a tab size of 8 characters is assumed."
 msgstr ""
 
-#: flwr.common.EventType.find:1 flwr.common.EventType.index:1 of
+#: flwr.common.EventType.find:1 flwr.common.EventType.index:1
+#: flwr.serverapp.NeighboringRelation.find:1
+#: flwr.serverapp.NeighboringRelation.index:1
+#: flwr.serverapp.SamplingMethod.find:1 flwr.serverapp.SamplingMethod.index:1
+#: of
 msgid ""
 "Return the lowest index in S where substring sub is found, such that sub "
 "is contained within S[start:end].  Optional arguments start and end are "
 "interpreted as in slice notation."
 msgstr ""
 
-#: flwr.common.EventType.find:5 flwr.common.EventType.rfind:5 of
+#: flwr.common.EventType.find:5 flwr.common.EventType.rfind:5
+#: flwr.serverapp.NeighboringRelation.find:5
+#: flwr.serverapp.NeighboringRelation.rfind:5
+#: flwr.serverapp.SamplingMethod.find:5 flwr.serverapp.SamplingMethod.rfind:5
+#: of
 #, fuzzy
 msgid "Return -1 on failure."
 msgstr "Exécutez Flower sur Azure"
 
-#: flwr.common.EventType.format:1 of
+#: flwr.common.EventType.format:1 flwr.serverapp.NeighboringRelation.format:1
+#: flwr.serverapp.SamplingMethod.format:1 of
 #, python-brace-format
 msgid ""
 "Return a formatted version of S, using substitutions from args and "
 "kwargs. The substitutions are identified by braces ('{' and '}')."
 msgstr ""
 
-#: flwr.common.EventType.format_map:1 of
+#: flwr.common.EventType.format_map:1
+#: flwr.serverapp.NeighboringRelation.format_map:1
+#: flwr.serverapp.SamplingMethod.format_map:1 of
 #, python-brace-format
 msgid ""
 "Return a formatted version of S, using substitutions from mapping. The "
 "substitutions are identified by braces ('{' and '}')."
 msgstr ""
 
-#: flwr.common.EventType.index:5 flwr.common.EventType.rindex:5 of
+#: flwr.common.EventType.index:5 flwr.common.EventType.rindex:5
+#: flwr.serverapp.NeighboringRelation.index:5
+#: flwr.serverapp.NeighboringRelation.rindex:5
+#: flwr.serverapp.SamplingMethod.index:5 flwr.serverapp.SamplingMethod.rindex:5
+#: of
 msgid "Raises ValueError when the substring is not found."
 msgstr ""
 
-#: flwr.common.EventType.isalnum:3 of
+#: flwr.common.EventType.isalnum:3 flwr.serverapp.NeighboringRelation.isalnum:3
+#: flwr.serverapp.SamplingMethod.isalnum:3 of
 msgid ""
 "A string is alpha-numeric if all characters in the string are alpha-"
 "numeric and there is at least one character in the string."
 msgstr ""
 
-#: flwr.common.EventType.isalpha:3 of
+#: flwr.common.EventType.isalpha:3 flwr.serverapp.NeighboringRelation.isalpha:3
+#: flwr.serverapp.SamplingMethod.isalpha:3 of
 msgid ""
 "A string is alphabetic if all characters in the string are alphabetic and"
 " there is at least one character in the string."
 msgstr ""
 
-#: flwr.common.EventType.isascii:3 of
+#: flwr.common.EventType.isascii:3 flwr.serverapp.NeighboringRelation.isascii:3
+#: flwr.serverapp.SamplingMethod.isascii:3 of
 msgid ""
 "ASCII characters have code points in the range U+0000-U+007F. Empty "
 "string is ASCII too."
 msgstr ""
 
-#: flwr.common.EventType.isdecimal:3 of
+#: flwr.common.EventType.isdecimal:3
+#: flwr.serverapp.NeighboringRelation.isdecimal:3
+#: flwr.serverapp.SamplingMethod.isdecimal:3 of
 msgid ""
 "A string is a decimal string if all characters in the string are decimal "
 "and there is at least one character in the string."
 msgstr ""
 
-#: flwr.common.EventType.isdigit:3 of
+#: flwr.common.EventType.isdigit:3 flwr.serverapp.NeighboringRelation.isdigit:3
+#: flwr.serverapp.SamplingMethod.isdigit:3 of
 msgid ""
 "A string is a digit string if all characters in the string are digits and"
 " there is at least one character in the string."
 msgstr ""
 
-#: flwr.common.EventType.isidentifier:3 of
+#: flwr.common.EventType.isidentifier:3
+#: flwr.serverapp.NeighboringRelation.isidentifier:3
+#: flwr.serverapp.SamplingMethod.isidentifier:3 of
 msgid ""
 "Call keyword.iskeyword(s) to test whether string s is a reserved "
 "identifier, such as \"def\" or \"class\"."
 msgstr ""
 
-#: flwr.common.EventType.islower:3 of
+#: flwr.common.EventType.islower:3 flwr.serverapp.NeighboringRelation.islower:3
+#: flwr.serverapp.SamplingMethod.islower:3 of
 msgid ""
 "A string is lowercase if all cased characters in the string are lowercase"
 " and there is at least one cased character in the string."
 msgstr ""
 
-#: flwr.common.EventType.isnumeric:3 of
+#: flwr.common.EventType.isnumeric:3
+#: flwr.serverapp.NeighboringRelation.isnumeric:3
+#: flwr.serverapp.SamplingMethod.isnumeric:3 of
 msgid ""
 "A string is numeric if all characters in the string are numeric and there"
 " is at least one character in the string."
 msgstr ""
 
-#: flwr.common.EventType.isprintable:3 of
+#: flwr.common.EventType.isprintable:3
+#: flwr.serverapp.NeighboringRelation.isprintable:3
+#: flwr.serverapp.SamplingMethod.isprintable:3 of
 msgid ""
 "A string is printable if all of its characters are considered printable "
 "in repr() or if it is empty."
 msgstr ""
 
-#: flwr.common.EventType.isspace:3 of
+#: flwr.common.EventType.isspace:3 flwr.serverapp.NeighboringRelation.isspace:3
+#: flwr.serverapp.SamplingMethod.isspace:3 of
 msgid ""
 "A string is whitespace if all characters in the string are whitespace and"
 " there is at least one character in the string."
 msgstr ""
 
-#: flwr.common.EventType.istitle:3 of
+#: flwr.common.EventType.istitle:3 flwr.serverapp.NeighboringRelation.istitle:3
+#: flwr.serverapp.SamplingMethod.istitle:3 of
 msgid ""
 "In a title-cased string, upper- and title-case characters may only follow"
 " uncased characters and lowercase characters only cased ones."
 msgstr ""
 
-#: flwr.common.EventType.isupper:3 of
+#: flwr.common.EventType.isupper:3 flwr.serverapp.NeighboringRelation.isupper:3
+#: flwr.serverapp.SamplingMethod.isupper:3 of
 msgid ""
 "A string is uppercase if all cased characters in the string are uppercase"
 " and there is at least one cased character in the string."
 msgstr ""
 
-#: flwr.common.EventType.join:3 of
+#: flwr.common.EventType.join:3 flwr.serverapp.NeighboringRelation.join:3
+#: flwr.serverapp.SamplingMethod.join:3 of
 msgid ""
 "The string whose method is called is inserted in between each given "
 "string. The result is returned as a new string."
 msgstr ""
 
-#: flwr.common.EventType.join:6 of
+#: flwr.common.EventType.join:6 flwr.serverapp.NeighboringRelation.join:6
+#: flwr.serverapp.SamplingMethod.join:6 of
 msgid "Example: '.'.join(['ab', 'pq', 'rs']) -> 'ab.pq.rs'"
 msgstr ""
 
 #: flwr.common.EventType.lstrip:3 flwr.common.EventType.rstrip:3
-#: flwr.common.EventType.strip:3 of
+#: flwr.common.EventType.strip:3 flwr.serverapp.NeighboringRelation.lstrip:3
+#: flwr.serverapp.NeighboringRelation.rstrip:3
+#: flwr.serverapp.NeighboringRelation.strip:3
+#: flwr.serverapp.SamplingMethod.lstrip:3
+#: flwr.serverapp.SamplingMethod.rstrip:3 flwr.serverapp.SamplingMethod.strip:3
+#: of
 msgid "If chars is given and not None, remove characters in chars instead."
 msgstr ""
 
-#: flwr.common.EventType.maketrans:3 of
+#: flwr.common.EventType.maketrans:3
+#: flwr.serverapp.NeighboringRelation.maketrans:3
+#: flwr.serverapp.SamplingMethod.maketrans:3 of
 msgid ""
 "If there is only one argument, it must be a dictionary mapping Unicode "
 "ordinals (integers) or characters to Unicode ordinals, strings or None. "
@@ -46505,114 +46735,160 @@ msgid ""
 "whose characters will be mapped to None in the result."
 msgstr ""
 
-#: flwr.common.EventType.partition:3 of
+#: flwr.common.EventType.partition:3
+#: flwr.serverapp.NeighboringRelation.partition:3
+#: flwr.serverapp.SamplingMethod.partition:3 of
 msgid ""
 "This will search for the separator in the string.  If the separator is "
 "found, returns a 3-tuple containing the part before the separator, the "
 "separator itself, and the part after it."
 msgstr ""
 
-#: flwr.common.EventType.partition:7 of
+#: flwr.common.EventType.partition:7
+#: flwr.serverapp.NeighboringRelation.partition:7
+#: flwr.serverapp.SamplingMethod.partition:7 of
 msgid ""
 "If the separator is not found, returns a 3-tuple containing the original "
 "string and two empty strings."
 msgstr ""
 
-#: flwr.common.EventType.removeprefix:3 of
+#: flwr.common.EventType.removeprefix:3
+#: flwr.serverapp.NeighboringRelation.removeprefix:3
+#: flwr.serverapp.SamplingMethod.removeprefix:3 of
 msgid ""
 "If the string starts with the prefix string, return string[len(prefix):]."
 " Otherwise, return a copy of the original string."
 msgstr ""
 
-#: flwr.common.EventType.removesuffix:3 of
+#: flwr.common.EventType.removesuffix:3
+#: flwr.serverapp.NeighboringRelation.removesuffix:3
+#: flwr.serverapp.SamplingMethod.removesuffix:3 of
 msgid ""
 "If the string ends with the suffix string and that suffix is not empty, "
 "return string[:-len(suffix)]. Otherwise, return a copy of the original "
 "string."
 msgstr ""
 
-#: flwr.common.EventType.replace:3 of
+#: flwr.common.EventType.replace:3 flwr.serverapp.NeighboringRelation.replace:3
+#: flwr.serverapp.SamplingMethod.replace:3 of
 #, fuzzy
 msgid "count"
 msgstr "Context"
 
-#: flwr.common.EventType.replace:4 of
+#: flwr.common.EventType.replace:4 flwr.serverapp.NeighboringRelation.replace:4
+#: flwr.serverapp.SamplingMethod.replace:4 of
 msgid ""
 "Maximum number of occurrences to replace. -1 (the default value) means "
 "replace all occurrences."
 msgstr ""
 
-#: flwr.common.EventType.replace:7 of
+#: flwr.common.EventType.replace:7 flwr.serverapp.NeighboringRelation.replace:7
+#: flwr.serverapp.SamplingMethod.replace:7 of
 msgid ""
 "If the optional argument count is given, only the first count occurrences"
 " are replaced."
 msgstr ""
 
-#: flwr.common.EventType.rfind:1 flwr.common.EventType.rindex:1 of
+#: flwr.common.EventType.rfind:1 flwr.common.EventType.rindex:1
+#: flwr.serverapp.NeighboringRelation.rfind:1
+#: flwr.serverapp.NeighboringRelation.rindex:1
+#: flwr.serverapp.SamplingMethod.rfind:1 flwr.serverapp.SamplingMethod.rindex:1
+#: of
 msgid ""
 "Return the highest index in S where substring sub is found, such that sub"
 " is contained within S[start:end].  Optional arguments start and end are "
 "interpreted as in slice notation."
 msgstr ""
 
-#: flwr.common.EventType.rpartition:3 of
+#: flwr.common.EventType.rpartition:3
+#: flwr.serverapp.NeighboringRelation.rpartition:3
+#: flwr.serverapp.SamplingMethod.rpartition:3 of
 msgid ""
 "This will search for the separator in the string, starting at the end. If"
 " the separator is found, returns a 3-tuple containing the part before the"
 " separator, the separator itself, and the part after it."
 msgstr ""
 
-#: flwr.common.EventType.rpartition:7 of
+#: flwr.common.EventType.rpartition:7
+#: flwr.serverapp.NeighboringRelation.rpartition:7
+#: flwr.serverapp.SamplingMethod.rpartition:7 of
 msgid ""
 "If the separator is not found, returns a 3-tuple containing two empty "
 "strings and the original string."
 msgstr ""
 
-#: flwr.common.EventType.rsplit:3 flwr.common.EventType.split:3 of
+#: flwr.common.EventType.rsplit:3 flwr.common.EventType.split:3
+#: flwr.serverapp.NeighboringRelation.rsplit:3
+#: flwr.serverapp.NeighboringRelation.split:3
+#: flwr.serverapp.SamplingMethod.rsplit:3 flwr.serverapp.SamplingMethod.split:3
+#: of
 msgid "sep"
 msgstr ""
 
-#: flwr.common.EventType.rsplit:4 flwr.common.EventType.split:4 of
+#: flwr.common.EventType.rsplit:4 flwr.common.EventType.split:4
+#: flwr.serverapp.NeighboringRelation.rsplit:4
+#: flwr.serverapp.NeighboringRelation.split:4
+#: flwr.serverapp.SamplingMethod.rsplit:4 flwr.serverapp.SamplingMethod.split:4
+#: of
 msgid "The separator used to split the string."
 msgstr ""
 
-#: flwr.common.EventType.rsplit:6 flwr.common.EventType.split:6 of
+#: flwr.common.EventType.rsplit:6 flwr.common.EventType.split:6
+#: flwr.serverapp.NeighboringRelation.rsplit:6
+#: flwr.serverapp.NeighboringRelation.split:6
+#: flwr.serverapp.SamplingMethod.rsplit:6 flwr.serverapp.SamplingMethod.split:6
+#: of
 msgid ""
 "When set to None (the default value), will split on any whitespace "
 "character (including \\n \\r \\t \\f and spaces) and will discard empty "
 "strings from the result."
 msgstr ""
 
-#: flwr.common.EventType.rsplit:9 flwr.common.EventType.split:9 of
+#: flwr.common.EventType.rsplit:9 flwr.common.EventType.split:9
+#: flwr.serverapp.NeighboringRelation.rsplit:9
+#: flwr.serverapp.NeighboringRelation.split:9
+#: flwr.serverapp.SamplingMethod.rsplit:9 flwr.serverapp.SamplingMethod.split:9
+#: of
 msgid "maxsplit"
 msgstr ""
 
-#: flwr.common.EventType.rsplit:10 flwr.common.EventType.split:10 of
+#: flwr.common.EventType.rsplit:10 flwr.common.EventType.split:10
+#: flwr.serverapp.NeighboringRelation.rsplit:10
+#: flwr.serverapp.NeighboringRelation.split:10
+#: flwr.serverapp.SamplingMethod.rsplit:10
+#: flwr.serverapp.SamplingMethod.split:10 of
 msgid "Maximum number of splits. -1 (the default value) means no limit."
 msgstr ""
 
-#: flwr.common.EventType.rsplit:13 of
+#: flwr.common.EventType.rsplit:13 flwr.serverapp.NeighboringRelation.rsplit:13
+#: flwr.serverapp.SamplingMethod.rsplit:13 of
 msgid "Splitting starts at the end of the string and works to the front."
 msgstr ""
 
-#: flwr.common.EventType.split:13 of
+#: flwr.common.EventType.split:13 flwr.serverapp.NeighboringRelation.split:13
+#: flwr.serverapp.SamplingMethod.split:13 of
 msgid "Splitting starts at the front of the string and works to the end."
 msgstr ""
 
-#: flwr.common.EventType.split:15 of
+#: flwr.common.EventType.split:15 flwr.serverapp.NeighboringRelation.split:15
+#: flwr.serverapp.SamplingMethod.split:15 of
 msgid ""
 "Note, str.split() is mainly useful for data that has been intentionally "
 "delimited.  With natural text that includes punctuation, consider using "
 "the regular expression module."
 msgstr ""
 
-#: flwr.common.EventType.splitlines:3 of
+#: flwr.common.EventType.splitlines:3
+#: flwr.serverapp.NeighboringRelation.splitlines:3
+#: flwr.serverapp.SamplingMethod.splitlines:3 of
 msgid ""
 "Line breaks are not included in the resulting list unless keepends is "
 "given and true."
 msgstr ""
 
-#: flwr.common.EventType.startswith:1 of
+#: flwr.common.EventType.startswith:1
+#: flwr.serverapp.NeighboringRelation.startswith:1
+#: flwr.serverapp.SamplingMethod.startswith:1 of
 msgid ""
 "Return True if S starts with the specified prefix, False otherwise. With "
 "optional start, test S beginning at that position. With optional end, "
@@ -46620,31 +46896,39 @@ msgid ""
 "to try."
 msgstr ""
 
-#: flwr.common.EventType.title:3 of
+#: flwr.common.EventType.title:3 flwr.serverapp.NeighboringRelation.title:3
+#: flwr.serverapp.SamplingMethod.title:3 of
 msgid ""
 "More specifically, words start with uppercased characters and all "
 "remaining cased characters have lower case."
 msgstr ""
 
-#: flwr.common.EventType.translate:3 of
+#: flwr.common.EventType.translate:3
+#: flwr.serverapp.NeighboringRelation.translate:3
+#: flwr.serverapp.SamplingMethod.translate:3 of
 #, fuzzy
 msgid "table"
 msgstr "Value"
 
-#: flwr.common.EventType.translate:4 of
+#: flwr.common.EventType.translate:4
+#: flwr.serverapp.NeighboringRelation.translate:4
+#: flwr.serverapp.SamplingMethod.translate:4 of
 msgid ""
 "Translation table, which must be a mapping of Unicode ordinals to Unicode"
 " ordinals, strings, or None."
 msgstr ""
 
-#: flwr.common.EventType.translate:7 of
+#: flwr.common.EventType.translate:7
+#: flwr.serverapp.NeighboringRelation.translate:7
+#: flwr.serverapp.SamplingMethod.translate:7 of
 msgid ""
 "The table must implement lookup/indexing via __getitem__, for instance a "
 "dictionary or list.  If this operation raises LookupError, the character "
 "is left untouched.  Characters mapped to None are deleted."
 msgstr ""
 
-#: flwr.common.EventType.zfill:3 of
+#: flwr.common.EventType.zfill:3 flwr.serverapp.NeighboringRelation.zfill:3
+#: flwr.serverapp.SamplingMethod.zfill:3 of
 msgid "The string is never truncated."
 msgstr ""
 
@@ -47637,7 +47921,7 @@ msgid ":py:obj:`Grid <flwr.server.Grid>`\\ \\(\\)"
 msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.server.rst:38:<autosummary>:1
-#: ../../source/ref-api/flwr.serverapp.rst:23:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
 #: flwr.serverapp.grid.grid.Grid:1 of
 msgid "Abstract base class Grid to send/receive messages."
 msgstr "Classe abstraite de grille pour envoyer/recevoir des messages."
@@ -47686,7 +47970,7 @@ msgstr ""
 "config\\, strategy\\, ...\\]\\)"
 
 #: ../../source/ref-api/flwr.server.rst:38:<autosummary>:1
-#: ../../source/ref-api/flwr.serverapp.rst:23:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
 #: flwr.serverapp.server_app.ServerApp:1 of
 msgid "Flower ServerApp."
 msgstr "Application Flower ServerApp."
@@ -49833,8 +50117,8 @@ msgstr ""
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:22
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:15
 #: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:32
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:22
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:15
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:26
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:19
 #: of
 msgid "Create a strategy::"
 msgstr "Créez une stratégie::"
@@ -49978,7 +50262,7 @@ msgstr ""
 "forte confidentialité."
 
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:26
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:26
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:30
 #: of
 msgid ""
 "Wrap the strategy with the `DifferentialPrivacyClientSideFixedClipping` "
@@ -49988,7 +50272,7 @@ msgstr ""
 "`DifferentialPrivacyClientSideFixedClipping`::"
 
 #: flwr.server.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:32
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:32
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:36
 #: of
 msgid "On the client, add the `fixedclipping_mod` to the client-side mods::"
 msgstr "Sur le client, ajoutez le `fixedclipping_mod` aux mods côté-client::"
@@ -52535,11 +52819,110 @@ msgstr ""
 msgid "serverapp"
 msgstr ""
 
-#: ../../source/ref-api/flwr.serverapp.rst:23:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`GaussianPrivacyEvent <flwr.serverapp.GaussianPrivacyEvent>`\\ "
+"\\(noise\\_multiplier\\, ...\\)"
+msgstr ""
+":py:obj:`Result <flwr.serverapp.strategy.Result>`\\ \\(arrays\\, "
+"train\\_metrics\\_clientapp\\, ...\\)"
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#: flwr.supercore.privacy_accounting.GaussianPrivacyEvent:1 of
+msgid "Describe one or more identical sampled Gaussian releases."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
 msgid ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.serverapp.rst:23:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`NeighboringRelation <flwr.serverapp.NeighboringRelation>`\\ "
+"\\(value\\[\\, names\\, module\\, ...\\]\\)"
+msgstr ""
+":py:obj:`Context <flwr.app.Context>`\\ \\(run\\_id\\, node\\_id\\, "
+"node\\_config\\, state\\, ...\\)"
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#: flwr.supercore.privacy_accounting.NeighboringRelation:1 of
+msgid "Define which client-level datasets are considered neighbors."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`PrivacyAccountant <flwr.serverapp.PrivacyAccountant>`\\ "
+"\\(\\*args\\, \\*\\*kwargs\\)"
+msgstr ""
+":py:obj:`FedXgbBagging <flwr.serverapp.strategy.FedXgbBagging>`\\ "
+"\\(\\[fraction\\_train\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#: flwr.supercore.privacy_accounting.PrivacyAccountant:1 of
+msgid "Protocol implemented by privacy-accounting backends."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`PrivacyConfig <flwr.serverapp.PrivacyConfig>`\\ "
+"\\(target\\_delta\\, population\\_size\\, ...\\)"
+msgstr ""
+"Flower 1.0 : ``start_server(..., "
+"config=flwr.server.ServerConfig(num_rounds=3, round_timeout=600.0), "
+"...)``"
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#: flwr.supercore.privacy_accounting.PrivacyConfig:1 of
+msgid "Configure cumulative client-level privacy accounting."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`PrivacySpent <flwr.serverapp.PrivacySpent>`\\ \\(epsilon\\, "
+"delta\\, num\\_releases\\, ...\\)"
+msgstr ""
+":py:obj:`start <flwr.serverapp.strategy.FedXgbCyclic.start>`\\ \\(grid\\,"
+" initial\\_arrays\\[\\, num\\_rounds\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#: flwr.supercore.privacy_accounting.PrivacySpent:1 of
+msgid "Represent cumulative privacy expenditure."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`RdpAccountant <flwr.serverapp.RdpAccountant>`\\ \\(config\\[\\, "
+"orders\\]\\)"
+msgstr ""
+":py:obj:`ServerApp <flwr.serverapp.ServerApp>`\\ \\(\\[server\\, "
+"config\\, strategy\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#: flwr.supercore.rdp_accountant.RdpAccountant:1 of
+msgid "Track cumulative privacy loss using Renyi differential privacy."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`SamplingMethod <flwr.serverapp.SamplingMethod>`\\ \\(value\\[\\,"
+" names\\, module\\, ...\\]\\)"
+msgstr ""
+":py:obj:`Context <flwr.app.Context>`\\ \\(run\\_id\\, node\\_id\\, "
+"node\\_config\\, state\\, ...\\)"
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
+#: flwr.supercore.privacy_accounting.SamplingMethod:1 of
+msgid "Define how clients are sampled for a private release."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
 msgid ""
 ":py:obj:`ServerApp <flwr.serverapp.ServerApp>`\\ \\(\\[server\\, "
 "config\\, strategy\\, ...\\]\\)"
@@ -52547,14 +52930,44 @@ msgstr ""
 ":py:obj:`ServerApp <flwr.serverapp.ServerApp>`\\ \\(\\[server\\, "
 "config\\, strategy\\, ...\\]\\)"
 
-#: ../../source/ref-api/flwr.serverapp.rst:42:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.rst:49:<autosummary>:1
 msgid ":py:obj:`strategy <flwr.serverapp.strategy>`\\"
 msgstr ""
 
-#: ../../source/ref-api/flwr.serverapp.rst:42:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.rst:49:<autosummary>:1
 #: flwr.serverapp.strategy:1 of
 msgid "ServerApp strategies."
 msgstr "Stratégies d'application serveur."
+
+#: ../../source/ref-api/flwr.serverapp.GaussianPrivacyEvent.rst:2
+msgid "GaussianPrivacyEvent"
+msgstr ""
+
+#: flwr.supercore.privacy_accounting.GaussianPrivacyEvent:3 of
+msgid ""
+"For Poisson sampling, ``sample_size / population_size`` is the expected "
+"sampling probability. For sampling without replacement, ``sample_size`` "
+"is the exact sample size. With no amplification, the sampling metadata is"
+" retained for reporting but does not reduce the accounted privacy cost."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.GaussianPrivacyEvent.rst:30:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`noise_multiplier "
+"<flwr.serverapp.GaussianPrivacyEvent.noise_multiplier>`\\"
+msgstr ":py:obj:`node_id <flwr.app.Context.node_id>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.GaussianPrivacyEvent.rst:30:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`sample_size <flwr.serverapp.GaussianPrivacyEvent.sample_size>`\\"
+msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.GaussianPrivacyEvent.rst:30:<autosummary>:1
+msgid ""
+":py:obj:`population_size "
+"<flwr.serverapp.GaussianPrivacyEvent.population_size>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
 msgid ""
@@ -52599,6 +53012,1010 @@ msgstr ""
 #: flwr.serverapp.grid.grid.Grid.create_message:1:<autosummary>:1 of
 msgid ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
 msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:2
+#, fuzzy
+msgid "NeighboringRelation"
+msgstr "Génération des Migrations"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`encode <flwr.serverapp.NeighboringRelation.encode>`\\ "
+"\\(\\[encoding\\, errors\\]\\)"
+msgstr ""
+":py:obj:`query <flwr.clientapp.ClientApp.query>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`replace <flwr.serverapp.NeighboringRelation.replace>`\\ "
+"\\(old\\, new\\[\\, count\\]\\)"
+msgstr ":py:obj:`Error <flwr.app.Error>`\\ \\(code\\[\\, reason\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`split <flwr.serverapp.NeighboringRelation.split>`\\ \\(\\[sep\\,"
+" maxsplit\\]\\)"
+msgstr ""
+":py:obj:`ClientApp <flwr.clientapp.ClientApp>`\\ \\(\\[client\\_fn\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`rsplit <flwr.serverapp.NeighboringRelation.rsplit>`\\ "
+"\\(\\[sep\\, maxsplit\\]\\)"
+msgstr ""
+":py:obj:`ClientApp <flwr.clientapp.ClientApp>`\\ \\(\\[client\\_fn\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`join <flwr.serverapp.NeighboringRelation.join>`\\ \\(iterable\\,"
+" \\/\\)"
+msgstr ":py:obj:`main <flwr.serverapp.ServerApp.main>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`capitalize <flwr.serverapp.NeighboringRelation.capitalize>`\\ "
+"\\(\\)"
+msgstr ":py:obj:`popitem <flwr.app.ArrayRecord.popitem>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`casefold <flwr.serverapp.NeighboringRelation.casefold>`\\ \\(\\)"
+msgstr ":py:obj:`has_error <flwr.app.Message.has_error>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`title <flwr.serverapp.NeighboringRelation.title>`\\ \\(\\)"
+msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`center <flwr.serverapp.NeighboringRelation.center>`\\ "
+"\\(width\\[\\, fillchar\\]\\)"
+msgstr ""
+":py:obj:`query <flwr.clientapp.ClientApp.query>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`count <flwr.serverapp.NeighboringRelation.count>`\\ \\(sub\\[\\,"
+" start\\[\\, end\\]\\]\\)"
+msgstr ""
+":py:obj:`FedYogi <flwr.serverapp.strategy.FedYogi>`\\ \\(\\*\\[\\, "
+"fraction\\_train\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`expandtabs <flwr.serverapp.NeighboringRelation.expandtabs>`\\ "
+"\\(\\[tabsize\\]\\)"
+msgstr ":py:obj:`lifespan <flwr.serverapp.ServerApp.lifespan>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`find <flwr.serverapp.NeighboringRelation.find>`\\ \\(sub\\[\\, "
+"start\\[\\, end\\]\\]\\)"
+msgstr ""
+":py:obj:`FedYogi <flwr.serverapp.strategy.FedYogi>`\\ \\(\\*\\[\\, "
+"fraction\\_train\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`partition <flwr.serverapp.NeighboringRelation.partition>`\\ "
+"\\(sep\\, \\/\\)"
+msgstr ":py:obj:`main <flwr.serverapp.ServerApp.main>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`index <flwr.serverapp.NeighboringRelation.index>`\\ \\(sub\\[\\,"
+" start\\[\\, end\\]\\]\\)"
+msgstr ""
+":py:obj:`inflate <flwr.app.MetricRecord.inflate>`\\ "
+"\\(object\\_content\\[\\, children\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`ljust <flwr.serverapp.NeighboringRelation.ljust>`\\ "
+"\\(width\\[\\, fillchar\\]\\)"
+msgstr ""
+":py:obj:`query <flwr.clientapp.ClientApp.query>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`lower <flwr.serverapp.NeighboringRelation.lower>`\\ \\(\\)"
+msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`lstrip <flwr.serverapp.NeighboringRelation.lstrip>`\\ "
+"\\(\\[chars\\]\\)"
+msgstr ""
+":py:obj:`train <flwr.clientapp.ClientApp.train>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`rfind <flwr.serverapp.NeighboringRelation.rfind>`\\ \\(sub\\[\\,"
+" start\\[\\, end\\]\\]\\)"
+msgstr ""
+":py:obj:`FedYogi <flwr.serverapp.strategy.FedYogi>`\\ \\(\\*\\[\\, "
+"fraction\\_train\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+msgid ""
+":py:obj:`rindex <flwr.serverapp.NeighboringRelation.rindex>`\\ "
+"\\(sub\\[\\, start\\[\\, end\\]\\]\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`rjust <flwr.serverapp.NeighboringRelation.rjust>`\\ "
+"\\(width\\[\\, fillchar\\]\\)"
+msgstr ""
+":py:obj:`query <flwr.clientapp.ClientApp.query>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`rstrip <flwr.serverapp.NeighboringRelation.rstrip>`\\ "
+"\\(\\[chars\\]\\)"
+msgstr ""
+":py:obj:`train <flwr.clientapp.ClientApp.train>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`rpartition <flwr.serverapp.NeighboringRelation.rpartition>`\\ "
+"\\(sep\\, \\/\\)"
+msgstr ":py:obj:`main <flwr.serverapp.ServerApp.main>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`splitlines <flwr.serverapp.NeighboringRelation.splitlines>`\\ "
+"\\(\\[keepends\\]\\)"
+msgstr ""
+":py:obj:`train <flwr.clientapp.ClientApp.train>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`strip <flwr.serverapp.NeighboringRelation.strip>`\\ "
+"\\(\\[chars\\]\\)"
+msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`swapcase <flwr.serverapp.NeighboringRelation.swapcase>`\\ \\(\\)"
+msgstr ":py:obj:`MessageType <flwr.app.MessageType>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`translate <flwr.serverapp.NeighboringRelation.translate>`\\ "
+"\\(table\\, \\/\\)"
+msgstr ":py:obj:`Strategy <flwr.serverapp.strategy.Strategy>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`upper <flwr.serverapp.NeighboringRelation.upper>`\\ \\(\\)"
+msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+msgid ""
+":py:obj:`startswith <flwr.serverapp.NeighboringRelation.startswith>`\\ "
+"\\(prefix\\[\\, start\\[\\, end\\]\\]\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`endswith <flwr.serverapp.NeighboringRelation.endswith>`\\ "
+"\\(suffix\\[\\, start\\[\\, end\\]\\]\\)"
+msgstr ""
+":py:obj:`FedYogi <flwr.serverapp.strategy.FedYogi>`\\ \\(\\*\\[\\, "
+"fraction\\_train\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`removeprefix "
+"<flwr.serverapp.NeighboringRelation.removeprefix>`\\ \\(prefix\\, \\/\\)"
+msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+msgid ""
+":py:obj:`removesuffix "
+"<flwr.serverapp.NeighboringRelation.removesuffix>`\\ \\(suffix\\, \\/\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isascii <flwr.serverapp.NeighboringRelation.isascii>`\\ \\(\\)"
+msgstr ":py:obj:`MessageType <flwr.app.MessageType>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`islower <flwr.serverapp.NeighboringRelation.islower>`\\ \\(\\)"
+msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isupper <flwr.serverapp.NeighboringRelation.isupper>`\\ \\(\\)"
+msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`istitle <flwr.serverapp.NeighboringRelation.istitle>`\\ \\(\\)"
+msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isspace <flwr.serverapp.NeighboringRelation.isspace>`\\ \\(\\)"
+msgstr ":py:obj:`lifespan <flwr.serverapp.ServerApp.lifespan>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`isdecimal <flwr.serverapp.NeighboringRelation.isdecimal>`\\ "
+"\\(\\)"
+msgstr ":py:obj:`items <flwr.app.ConfigRecord.items>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isdigit <flwr.serverapp.NeighboringRelation.isdigit>`\\ \\(\\)"
+msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`isnumeric <flwr.serverapp.NeighboringRelation.isnumeric>`\\ "
+"\\(\\)"
+msgstr ":py:obj:`QUERY <flwr.app.MessageType.QUERY>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isalpha <flwr.serverapp.NeighboringRelation.isalpha>`\\ \\(\\)"
+msgstr ":py:obj:`MessageType <flwr.app.MessageType>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isalnum <flwr.serverapp.NeighboringRelation.isalnum>`\\ \\(\\)"
+msgstr ":py:obj:`values <flwr.app.ArrayRecord.values>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`isidentifier "
+"<flwr.serverapp.NeighboringRelation.isidentifier>`\\ \\(\\)"
+msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`isprintable <flwr.serverapp.NeighboringRelation.isprintable>`\\ "
+"\\(\\)"
+msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`zfill <flwr.serverapp.NeighboringRelation.zfill>`\\ \\(width\\, "
+"\\/\\)"
+msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`format <flwr.serverapp.NeighboringRelation.format>`\\ "
+"\\(\\*args\\, \\*\\*kwargs\\)"
+msgstr ":py:obj:`update <flwr.app.ConfigRecord.update>`\\ \\(\\[E\\, \\]\\*\\*F\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`format_map <flwr.serverapp.NeighboringRelation.format_map>`\\ "
+"\\(mapping\\)"
+msgstr ""
+":py:obj:`push_messages <flwr.serverapp.Grid.push_messages>`\\ "
+"\\(messages\\)"
+
+#: ../../source/ref-api/flwr.serverapp.NeighboringRelation.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`maketrans <flwr.serverapp.NeighboringRelation.maketrans>`\\"
+msgstr ":py:obj:`TRAIN <flwr.app.MessageType.TRAIN>`\\"
+
+#: flwr.serverapp.NeighboringRelation.capitalize:1:<autosummary>:1 of
+msgid ""
+":py:obj:`ADD_OR_REMOVE_ONE "
+"<flwr.serverapp.NeighboringRelation.ADD_OR_REMOVE_ONE>`\\"
+msgstr ""
+
+#: flwr.serverapp.NeighboringRelation.capitalize:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`REPLACE_ONE <flwr.serverapp.NeighboringRelation.REPLACE_ONE>`\\"
+msgstr ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:2
+msgid "PrivacyAccountant"
+msgstr ""
+
+#: flwr.supercore.privacy_accounting.PrivacyAccountant:1 of
+#, fuzzy
+msgid "Bases: :py:class:`~typing.Protocol`"
+msgstr "Bases : :py:class:`object`"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`compose <flwr.serverapp.PrivacyAccountant.compose>`\\ "
+"\\(event\\[\\, count\\]\\)"
+msgstr ""
+":py:obj:`ServerApp <flwr.serverapp.ServerApp>`\\ \\(\\[server\\, "
+"config\\, strategy\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1 of
+msgid "Compose one or more identical privacy events."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`get_delta <flwr.serverapp.PrivacyAccountant.get_delta>`\\ "
+"\\(epsilon\\)"
+msgstr ":py:obj:`get_node_ids <flwr.serverapp.Grid.get_node_ids>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#: flwr.supercore.privacy_accounting.PrivacyAccountant.get_delta:1
+#: flwr.supercore.rdp_accountant.RdpAccountant.get_delta:1 of
+msgid "Return cumulative delta at the supplied epsilon."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`get_epsilon <flwr.serverapp.PrivacyAccountant.get_epsilon>`\\ "
+"\\(delta\\)"
+msgstr ":py:obj:`set_run <flwr.serverapp.Grid.set_run>`\\ \\(run\\)"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#: flwr.supercore.privacy_accounting.PrivacyAccountant.get_epsilon:1
+#: flwr.supercore.rdp_accountant.RdpAccountant.get_epsilon:1 of
+msgid "Return cumulative epsilon at the supplied delta."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`get_privacy_spent "
+"<flwr.serverapp.PrivacyAccountant.get_privacy_spent>`\\ \\(\\[delta\\]\\)"
+msgstr ":py:obj:`set_run <flwr.serverapp.Grid.set_run>`\\ \\(run\\)"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#: flwr.supercore.privacy_accounting.PrivacyAccountant.get_privacy_spent:1 of
+msgid "Return cumulative privacy expenditure."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`load_state_dict "
+"<flwr.serverapp.PrivacyAccountant.load_state_dict>`\\ \\(state\\)"
+msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#: flwr.supercore.privacy_accounting.PrivacyAccountant.load_state_dict:1 of
+msgid "Restore serializable accountant state."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`state_dict <flwr.serverapp.PrivacyAccountant.state_dict>`\\ "
+"\\(\\)"
+msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#: flwr.supercore.privacy_accounting.PrivacyAccountant.state_dict:1 of
+msgid "Return serializable accountant state."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`would_exceed <flwr.serverapp.PrivacyAccountant.would_exceed>`\\ "
+"\\(event\\[\\, max\\_epsilon\\, count\\]\\)"
+msgstr ""
+":py:obj:`send_and_receive <flwr.serverapp.Grid.send_and_receive>`\\ "
+"\\(messages\\, \\*\\[\\, timeout\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#: flwr.supercore.privacy_accounting.PrivacyAccountant.would_exceed:1
+#: flwr.supercore.rdp_accountant.RdpAccountant.would_exceed:1 of
+msgid "Return whether composing an event would exceed an epsilon limit."
+msgstr ""
+
+#: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1
+#: of
+#, fuzzy
+msgid ":py:obj:`config <flwr.serverapp.PrivacyAccountant.config>`\\"
+msgstr ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
+
+#: flwr.serverapp.PrivacyAccountant.config:1
+#: flwr.serverapp.RdpAccountant.config:1
+#: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1
+#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#, fuzzy
+msgid "Return the privacy configuration."
+msgstr "Configurer les fédérations."
+
+#: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1
+#: of
+#, fuzzy
+msgid ":py:obj:`num_releases <flwr.serverapp.PrivacyAccountant.num_releases>`\\"
+msgstr ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
+
+#: flwr.serverapp.PrivacyAccountant.num_releases:1
+#: flwr.serverapp.RdpAccountant.num_releases:1
+#: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1
+#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+msgid "Return the number of composed private releases."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyConfig.rst:2
+msgid "PrivacyConfig"
+msgstr ""
+
+#: flwr.supercore.privacy_accounting.PrivacyConfig:3 of
+msgid "Default delta used when reporting the cumulative epsilon."
+msgstr ""
+
+#: flwr.supercore.privacy_accounting.PrivacyConfig:5 of
+msgid "Size of the stable population from which clients are sampled."
+msgstr ""
+
+#: flwr.supercore.privacy_accounting.PrivacyConfig:7 of
+msgid "Relation used to define neighboring client populations."
+msgstr ""
+
+#: flwr.supercore.privacy_accounting.PrivacyConfig:9 of
+msgid "Sampling model used by every composed privacy event."
+msgstr ""
+
+#: flwr.supercore.privacy_accounting.PrivacyConfig:11 of
+msgid "Optional privacy-budget limit used for prospective checks."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyConfig.rst:32:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`max_epsilon <flwr.serverapp.PrivacyConfig.max_epsilon>`\\"
+msgstr ":py:obj:`main <flwr.serverapp.ServerApp.main>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyConfig.rst:32:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`target_delta <flwr.serverapp.PrivacyConfig.target_delta>`\\"
+msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyConfig.rst:32:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`population_size <flwr.serverapp.PrivacyConfig.population_size>`\\"
+msgstr ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyConfig.rst:32:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`neighboring_relation "
+"<flwr.serverapp.PrivacyConfig.neighboring_relation>`\\"
+msgstr ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacyConfig.rst:32:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`sampling_method <flwr.serverapp.PrivacyConfig.sampling_method>`\\"
+msgstr ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacySpent.rst:2
+msgid "PrivacySpent"
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.PrivacySpent.rst:32:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`optimal_order <flwr.serverapp.PrivacySpent.optimal_order>`\\"
+msgstr ":py:obj:`serverapp <flwr.serverapp>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacySpent.rst:32:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`epsilon <flwr.serverapp.PrivacySpent.epsilon>`\\"
+msgstr ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacySpent.rst:32:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`delta <flwr.serverapp.PrivacySpent.delta>`\\"
+msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacySpent.rst:32:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`num_releases <flwr.serverapp.PrivacySpent.num_releases>`\\"
+msgstr ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.PrivacySpent.rst:32:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`accounting_method "
+"<flwr.serverapp.PrivacySpent.accounting_method>`\\"
+msgstr ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:2
+msgid "RdpAccountant"
+msgstr ""
+
+#: flwr.supercore.rdp_accountant.RdpAccountant:3 of
+msgid ""
+"This class wraps Google's ``dp-accounting`` package while exposing only "
+"Flower-owned configuration, event, result, and serialization types."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`compose <flwr.serverapp.RdpAccountant.compose>`\\ \\(event\\[\\,"
+" count\\]\\)"
+msgstr ""
+":py:obj:`ServerApp <flwr.serverapp.ServerApp>`\\ \\(\\[server\\, "
+"config\\, strategy\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1 of
+msgid "Compose one or more identical sampled Gaussian releases."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`get_delta <flwr.serverapp.RdpAccountant.get_delta>`\\ "
+"\\(epsilon\\)"
+msgstr ":py:obj:`get_node_ids <flwr.serverapp.Grid.get_node_ids>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`get_epsilon <flwr.serverapp.RdpAccountant.get_epsilon>`\\ "
+"\\(delta\\)"
+msgstr ":py:obj:`get_node_ids <flwr.serverapp.Grid.get_node_ids>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`get_privacy_spent "
+"<flwr.serverapp.RdpAccountant.get_privacy_spent>`\\ \\(\\[delta\\]\\)"
+msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#: flwr.supercore.rdp_accountant.RdpAccountant.get_privacy_spent:1 of
+msgid "Return cumulative privacy expenditure at delta."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`load_state_dict "
+"<flwr.serverapp.RdpAccountant.load_state_dict>`\\ \\(state\\)"
+msgstr ":py:obj:`Strategy <flwr.serverapp.strategy.Strategy>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#: flwr.supercore.rdp_accountant.RdpAccountant.load_state_dict:1 of
+msgid "Restore state produced by :meth:`state_dict`."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`state_dict <flwr.serverapp.RdpAccountant.state_dict>`\\ \\(\\)"
+msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#: flwr.supercore.rdp_accountant.RdpAccountant.state_dict:1 of
+msgid "Return JSON-serializable accountant state."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`would_exceed <flwr.serverapp.RdpAccountant.would_exceed>`\\ "
+"\\(event\\[\\, max\\_epsilon\\, count\\]\\)"
+msgstr ""
+":py:obj:`send_and_receive <flwr.serverapp.Grid.send_and_receive>`\\ "
+"\\(messages\\, \\*\\[\\, timeout\\]\\)"
+
+#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`config <flwr.serverapp.RdpAccountant.config>`\\"
+msgstr ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
+
+#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`num_releases <flwr.serverapp.RdpAccountant.num_releases>`\\"
+msgstr ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
+
+#: flwr.supercore.rdp_accountant.RdpAccountant.load_state_dict:3 of
+msgid ""
+"The restored state must use the same privacy configuration as this "
+"accountant. Backend numeric state is rebuilt from Flower's event ledger."
+msgstr ""
+
+#: flwr.supercore.rdp_accountant.RdpAccountant.would_exceed:3 of
+msgid "This method does not mutate committed accountant state."
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:2
+msgid "SamplingMethod"
+msgstr ""
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`encode <flwr.serverapp.SamplingMethod.encode>`\\ "
+"\\(\\[encoding\\, errors\\]\\)"
+msgstr ""
+":py:obj:`query <flwr.clientapp.ClientApp.query>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`replace <flwr.serverapp.SamplingMethod.replace>`\\ \\(old\\, "
+"new\\[\\, count\\]\\)"
+msgstr ":py:obj:`Error <flwr.app.Error>`\\ \\(code\\[\\, reason\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`split <flwr.serverapp.SamplingMethod.split>`\\ \\(\\[sep\\, "
+"maxsplit\\]\\)"
+msgstr ""
+":py:obj:`ClientApp <flwr.clientapp.ClientApp>`\\ \\(\\[client\\_fn\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`rsplit <flwr.serverapp.SamplingMethod.rsplit>`\\ \\(\\[sep\\, "
+"maxsplit\\]\\)"
+msgstr ""
+":py:obj:`ClientApp <flwr.clientapp.ClientApp>`\\ \\(\\[client\\_fn\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`join <flwr.serverapp.SamplingMethod.join>`\\ \\(iterable\\, "
+"\\/\\)"
+msgstr ":py:obj:`main <flwr.serverapp.ServerApp.main>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`capitalize <flwr.serverapp.SamplingMethod.capitalize>`\\ \\(\\)"
+msgstr ":py:obj:`popitem <flwr.app.ArrayRecord.popitem>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`casefold <flwr.serverapp.SamplingMethod.casefold>`\\ \\(\\)"
+msgstr ":py:obj:`has_error <flwr.app.Message.has_error>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`title <flwr.serverapp.SamplingMethod.title>`\\ \\(\\)"
+msgstr ":py:obj:`items <flwr.app.ConfigRecord.items>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`center <flwr.serverapp.SamplingMethod.center>`\\ \\(width\\[\\, "
+"fillchar\\]\\)"
+msgstr ""
+":py:obj:`query <flwr.clientapp.ClientApp.query>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`count <flwr.serverapp.SamplingMethod.count>`\\ \\(sub\\[\\, "
+"start\\[\\, end\\]\\]\\)"
+msgstr ""
+":py:obj:`FedMedian <flwr.serverapp.strategy.FedMedian>`\\ "
+"\\(\\[fraction\\_train\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`expandtabs <flwr.serverapp.SamplingMethod.expandtabs>`\\ "
+"\\(\\[tabsize\\]\\)"
+msgstr ":py:obj:`lifespan <flwr.serverapp.ServerApp.lifespan>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`find <flwr.serverapp.SamplingMethod.find>`\\ \\(sub\\[\\, "
+"start\\[\\, end\\]\\]\\)"
+msgstr ""
+":py:obj:`FedYogi <flwr.serverapp.strategy.FedYogi>`\\ \\(\\*\\[\\, "
+"fraction\\_train\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`partition <flwr.serverapp.SamplingMethod.partition>`\\ \\(sep\\,"
+" \\/\\)"
+msgstr ":py:obj:`main <flwr.serverapp.ServerApp.main>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`index <flwr.serverapp.SamplingMethod.index>`\\ \\(sub\\[\\, "
+"start\\[\\, end\\]\\]\\)"
+msgstr ""
+":py:obj:`FedMedian <flwr.serverapp.strategy.FedMedian>`\\ "
+"\\(\\[fraction\\_train\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`ljust <flwr.serverapp.SamplingMethod.ljust>`\\ \\(width\\[\\, "
+"fillchar\\]\\)"
+msgstr ""
+":py:obj:`query <flwr.clientapp.ClientApp.query>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`lower <flwr.serverapp.SamplingMethod.lower>`\\ \\(\\)"
+msgstr ":py:obj:`clear <flwr.app.RecordDict.clear>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`lstrip <flwr.serverapp.SamplingMethod.lstrip>`\\ "
+"\\(\\[chars\\]\\)"
+msgstr ""
+":py:obj:`train <flwr.clientapp.ClientApp.train>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`rfind <flwr.serverapp.SamplingMethod.rfind>`\\ \\(sub\\[\\, "
+"start\\[\\, end\\]\\]\\)"
+msgstr ""
+":py:obj:`FedMedian <flwr.serverapp.strategy.FedMedian>`\\ "
+"\\(\\[fraction\\_train\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`rindex <flwr.serverapp.SamplingMethod.rindex>`\\ \\(sub\\[\\, "
+"start\\[\\, end\\]\\]\\)"
+msgstr ""
+":py:obj:`FedMedian <flwr.serverapp.strategy.FedMedian>`\\ "
+"\\(\\[fraction\\_train\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`rjust <flwr.serverapp.SamplingMethod.rjust>`\\ \\(width\\[\\, "
+"fillchar\\]\\)"
+msgstr ""
+":py:obj:`query <flwr.clientapp.ClientApp.query>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`rstrip <flwr.serverapp.SamplingMethod.rstrip>`\\ "
+"\\(\\[chars\\]\\)"
+msgstr ""
+":py:obj:`train <flwr.clientapp.ClientApp.train>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`rpartition <flwr.serverapp.SamplingMethod.rpartition>`\\ "
+"\\(sep\\, \\/\\)"
+msgstr ":py:obj:`main <flwr.serverapp.ServerApp.main>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`splitlines <flwr.serverapp.SamplingMethod.splitlines>`\\ "
+"\\(\\[keepends\\]\\)"
+msgstr ""
+":py:obj:`train <flwr.clientapp.ClientApp.train>`\\ \\(\\[action\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`strip <flwr.serverapp.SamplingMethod.strip>`\\ \\(\\[chars\\]\\)"
+msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`swapcase <flwr.serverapp.SamplingMethod.swapcase>`\\ \\(\\)"
+msgstr ":py:obj:`MessageType <flwr.app.MessageType>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`translate <flwr.serverapp.SamplingMethod.translate>`\\ "
+"\\(table\\, \\/\\)"
+msgstr ":py:obj:`Strategy <flwr.serverapp.strategy.Strategy>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`upper <flwr.serverapp.SamplingMethod.upper>`\\ \\(\\)"
+msgstr ":py:obj:`QUERY <flwr.app.MessageType.QUERY>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`startswith <flwr.serverapp.SamplingMethod.startswith>`\\ "
+"\\(prefix\\[\\, start\\[\\, end\\]\\]\\)"
+msgstr ""
+":py:obj:`start <flwr.serverapp.strategy.FedMedian.start>`\\ \\(grid\\, "
+"initial\\_arrays\\[\\, num\\_rounds\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`endswith <flwr.serverapp.SamplingMethod.endswith>`\\ "
+"\\(suffix\\[\\, start\\[\\, end\\]\\]\\)"
+msgstr ""
+":py:obj:`FedMedian <flwr.serverapp.strategy.FedMedian>`\\ "
+"\\(\\[fraction\\_train\\, ...\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`removeprefix <flwr.serverapp.SamplingMethod.removeprefix>`\\ "
+"\\(prefix\\, \\/\\)"
+msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`removesuffix <flwr.serverapp.SamplingMethod.removesuffix>`\\ "
+"\\(suffix\\, \\/\\)"
+msgstr ""
+":py:obj:`ClientApp <flwr.clientapp.ClientApp>`\\ \\(\\[client\\_fn\\, "
+"mods\\]\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isascii <flwr.serverapp.SamplingMethod.isascii>`\\ \\(\\)"
+msgstr ":py:obj:`MessageType <flwr.app.MessageType>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`islower <flwr.serverapp.SamplingMethod.islower>`\\ \\(\\)"
+msgstr ":py:obj:`clear <flwr.app.RecordDict.clear>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isupper <flwr.serverapp.SamplingMethod.isupper>`\\ \\(\\)"
+msgstr ":py:obj:`QUERY <flwr.app.MessageType.QUERY>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`istitle <flwr.serverapp.SamplingMethod.istitle>`\\ \\(\\)"
+msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isspace <flwr.serverapp.SamplingMethod.isspace>`\\ \\(\\)"
+msgstr ":py:obj:`Message <flwr.app.Message>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isdecimal <flwr.serverapp.SamplingMethod.isdecimal>`\\ \\(\\)"
+msgstr ":py:obj:`items <flwr.app.ConfigRecord.items>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isdigit <flwr.serverapp.SamplingMethod.isdigit>`\\ \\(\\)"
+msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isnumeric <flwr.serverapp.SamplingMethod.isnumeric>`\\ \\(\\)"
+msgstr ":py:obj:`QUERY <flwr.app.MessageType.QUERY>`\\"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isalpha <flwr.serverapp.SamplingMethod.isalpha>`\\ \\(\\)"
+msgstr ":py:obj:`MessageType <flwr.app.MessageType>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isalnum <flwr.serverapp.SamplingMethod.isalnum>`\\ \\(\\)"
+msgstr ":py:obj:`values <flwr.app.ArrayRecord.values>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`isidentifier <flwr.serverapp.SamplingMethod.isidentifier>`\\ "
+"\\(\\)"
+msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`isprintable <flwr.serverapp.SamplingMethod.isprintable>`\\ \\(\\)"
+msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`zfill <flwr.serverapp.SamplingMethod.zfill>`\\ \\(width\\, \\/\\)"
+msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`format <flwr.serverapp.SamplingMethod.format>`\\ \\(\\*args\\, "
+"\\*\\*kwargs\\)"
+msgstr ":py:obj:`update <flwr.app.ConfigRecord.update>`\\ \\(\\[E\\, \\]\\*\\*F\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ""
+":py:obj:`format_map <flwr.serverapp.SamplingMethod.format_map>`\\ "
+"\\(mapping\\)"
+msgstr ""
+":py:obj:`push_messages <flwr.serverapp.Grid.push_messages>`\\ "
+"\\(messages\\)"
+
+#: ../../source/ref-api/flwr.serverapp.SamplingMethod.rst:164:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`maketrans <flwr.serverapp.SamplingMethod.maketrans>`\\"
+msgstr ":py:obj:`TRAIN <flwr.app.MessageType.TRAIN>`\\"
+
+#: flwr.serverapp.SamplingMethod.capitalize:1:<autosummary>:1 of
+#, fuzzy
+msgid ":py:obj:`POISSON <flwr.serverapp.SamplingMethod.POISSON>`\\"
+msgstr ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
+
+#: flwr.serverapp.SamplingMethod.capitalize:1:<autosummary>:1 of
+msgid ""
+":py:obj:`WITHOUT_REPLACEMENT "
+"<flwr.serverapp.SamplingMethod.WITHOUT_REPLACEMENT>`\\"
+msgstr ""
+
+#: flwr.serverapp.SamplingMethod.capitalize:1:<autosummary>:1 of
+#, fuzzy
+msgid ""
+":py:obj:`NO_AMPLIFICATION "
+"<flwr.serverapp.SamplingMethod.NO_AMPLIFICATION>`\\"
+msgstr ":py:obj:`node_config <flwr.app.Context.node_config>`\\"
 
 #: flwr.serverapp.server_app.ServerApp.lifespan:1:<autosummary>:1 of
 msgid ":py:obj:`lifespan <flwr.serverapp.ServerApp.lifespan>`\\ \\(\\)"
@@ -53349,6 +54766,15 @@ msgstr ""
 "Bases : "
 ":py:class:`~flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase`"
 
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:19
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:12
+#: of
+msgid ""
+"Optional accountant used to track cumulative privacy loss for model "
+"updates. Training and evaluation metrics are not included. Accounted mode"
+" requires no-amplification accounting and uniform FedAvg aggregation."
+msgstr ""
+
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
 #: of
 msgid ""
@@ -53392,6 +54818,24 @@ msgstr ""
 ":py:obj:`configure_train "
 "<flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.configure_train>`\\"
 " \\(server\\_round\\, arrays\\, ...\\)"
+
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
+#, fuzzy
+msgid ""
+":py:obj:`privacy_spent "
+"<flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.privacy_spent>`\\"
+" \\(\\)"
+msgstr ""
+":py:obj:`summary "
+"<flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.summary>`\\"
+" \\(\\)"
+
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.privacy_spent:1
+#: of
+msgid "Return cumulative privacy expenditure, if accounting is enabled."
+msgstr ""
 
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
 #: of
@@ -53481,7 +54925,7 @@ msgstr ""
 "<flwr.serverapp.strategy.DifferentialPrivacyServerSideAdaptiveClipping.summary>`\\"
 " \\(\\)"
 
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:19
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:23
 #: of
 msgid ""
 "Wrap the strategy with the `DifferentialPrivacyServerSideFixedClipping` "
@@ -53533,6 +54977,18 @@ msgstr ""
 ":py:obj:`configure_train "
 "<flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.configure_train>`\\"
 " \\(server\\_round\\, arrays\\, ...\\)"
+
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
+#: of
+#, fuzzy
+msgid ""
+":py:obj:`privacy_spent "
+"<flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.privacy_spent>`\\"
+" \\(\\)"
+msgstr ""
+":py:obj:`summary "
+"<flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.summary>`\\"
+" \\(\\)"
 
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyFixedClippingBase.aggregate_evaluate:1:<autosummary>:1
 #: of
@@ -54791,7 +56247,8 @@ msgstr ""
 msgid ""
 "The PEM-encoded root certificates as a byte string. Used only when "
 "`insecure` is False. If provided, these certificates are used to verify "
-"the server certificate. If None, gRPC default root certificates are used."
+"the server certificate. If None, HTTPX's default trusted CA bundle is "
+"used."
 msgstr ""
 
 #: flwr.simulation.simulationio_connection.SimulationIoConnection:12 of
@@ -64139,3 +65596,13 @@ msgstr ""
 #~ " D. Kwon`, `reducedradius` <!---"
 #~ "TOKEN_v1.31.0-->"
 #~ msgstr ""
+
+#~ msgid ""
+#~ "The PEM-encoded root certificates as "
+#~ "a byte string. Used only when "
+#~ "`insecure` is False. If provided, these"
+#~ " certificates are used to verify the"
+#~ " server certificate. If None, gRPC "
+#~ "default root certificates are used."
+#~ msgstr ""
+
