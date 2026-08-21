@@ -121,7 +121,10 @@ class TestRunClientApp(unittest.TestCase):
 
         stub.PushTaskOutput.assert_called_once()
         stub.PushMessages.assert_called_once()
-        self.assertEqual(stub.PushObject.call_count, len(object_ids))
+        self.assertCountEqual(
+            [call.args[0].object_id for call in stub.PushObject.call_args_list],
+            object_ids,
+        )
         request = stub.PushTaskOutput.call_args.args[0]
         self.assertEqual(request.context, context_to_proto(context))
         self.assertEqual(request.sub_status, SubStatus.COMPLETED)

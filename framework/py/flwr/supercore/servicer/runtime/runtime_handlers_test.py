@@ -122,17 +122,20 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
 
     def test_send_task_heartbeat_acknowledges_authenticated_task(self) -> None:
         """SendTaskHeartbeat should use the authenticated task ID."""
-        # Prepare
-        self.state.acknowledge_task_heartbeat.return_value = True
+        for success in (True, False):
+            with self.subTest(success=success):
+                # Prepare
+                self.state.reset_mock()
+                self.state.acknowledge_task_heartbeat.return_value = success
 
-        # Execute
-        response = runtime_handlers.send_task_heartbeat(
-            SendTaskHeartbeatRequest(), self.state, Mock(task_id=123)
-        )
+                # Execute
+                response = runtime_handlers.send_task_heartbeat(
+                    SendTaskHeartbeatRequest(), self.state, Mock(task_id=123)
+                )
 
-        # Assert
-        self.state.acknowledge_task_heartbeat.assert_called_once_with(123)
-        self.assertTrue(response.success)
+                # Assert
+                self.state.acknowledge_task_heartbeat.assert_called_once_with(123)
+                self.assertEqual(response.success, success)
 
     def test_create_task_returns_task_id(self) -> None:
         """CreateTask should create a task for the authenticated run."""
