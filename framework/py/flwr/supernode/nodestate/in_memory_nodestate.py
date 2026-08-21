@@ -221,6 +221,7 @@ class InMemoryNodeState(
                         self.object_store.put(obj_id, obj.deflate())
 
                 # Store the error reply message
+                self.record_message_processing_end(msg.metadata.message_id)
                 self.store_message(error_reply)
 
     def record_message_processing_start(self, message_id: str) -> None:
