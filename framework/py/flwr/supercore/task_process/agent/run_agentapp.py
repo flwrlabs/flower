@@ -299,6 +299,8 @@ def _set_runtime_environment(
     if certificates is None:
         return None
 
+    # OpenAI/httpx reads custom CAs from SSL_CERT_FILE, which requires a path.
+    # Materialize the Runtime CA for the lifetime of this isolated AgentApp process.
     with NamedTemporaryFile(
         mode="wb", prefix="flwr-runtime-ca-", suffix=".pem", delete=False
     ) as certificate_file:
