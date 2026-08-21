@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""RuntimeServicer tests."""
+"""Runtime API handler tests."""
 
 
 import unittest
 from logging import ERROR
 from unittest.mock import Mock, patch
-
-import grpc
 
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.serde import message_to_proto
@@ -50,42 +48,27 @@ from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.task_process.connector import registry as connector_registry
 
-from .runtime_servicer import RuntimeServicer
+from . import runtime_handlers
 
 
-class _TestRuntimeServicer(RuntimeServicer):
-    """Concrete RuntimeServicer for tests."""
-
-    def __init__(self, state: Mock) -> None:
-        self._state = state
-
-    def state(self) -> Mock:
-        """Return mocked CoreState."""
-        return self._state
-
-
-class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
-    """Tests for shared RuntimeServicer task RPCs."""
+class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
+    """Tests for shared Runtime API handlers."""
 
     def setUp(self) -> None:
         """Set up test fixture."""
         self.state = Mock()
         self.state.get_tasks.return_value = []
-        self.servicer = _TestRuntimeServicer(self.state)
 
     def _create_connector_task(self, connector_ref: str) -> CreateTaskResponse:
         """Create a connector task as an authenticated AgentApp task."""
-        with patch(
-            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-            return_value=Mock(task_id=789, run_id=123, type=TaskType.AGENT_APP),
-        ):
-            return self.servicer.CreateTask(
-                CreateTaskRequest(
-                    type=TaskType.CONNECTOR,
-                    connector_ref=connector_ref,
-                ),
-                Mock(),
-            )
+        return runtime_handlers.create_task(
+            CreateTaskRequest(
+                type=TaskType.CONNECTOR,
+                connector_ref=connector_ref,
+            ),
+            self.state,
+            Mock(task_id=789, run_id=123, type=TaskType.AGENT_APP),
+        )
 
     def test_pull_pending_tasks_returns_pending_tasks(self) -> None:
         """PullPendingTasks should return pending tasks from state."""
@@ -98,7 +81,9 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         self.state.get_tasks.return_value = [task]
 
         # Execute
-        response = self.servicer.PullPendingTasks(PullPendingTasksRequest(), Mock())
+        response = runtime_handlers.pull_pending_tasks(
+            PullPendingTasksRequest(), self.state
+        )
 
         # Assert
         self.state.get_tasks.assert_called_once_with(
@@ -113,7 +98,9 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         self.state.claim_task.return_value = "task-token"
 
         # Execute
-        response = self.servicer.ClaimTask(ClaimTaskRequest(task_id=123), Mock())
+        response = runtime_handlers.claim_task(
+            ClaimTaskRequest(task_id=123), self.state
+        )
 
         # Assert
         self.state.claim_task.assert_called_once_with(123)
@@ -125,7 +112,9 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         self.state.claim_task.return_value = None
 
         # Execute
-        response = self.servicer.ClaimTask(ClaimTaskRequest(task_id=123), Mock())
+        response = runtime_handlers.claim_task(
+            ClaimTaskRequest(task_id=123), self.state
+        )
 
         # Assert
         self.state.claim_task.assert_called_once_with(123)
@@ -133,21 +122,20 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
 
     def test_send_task_heartbeat_acknowledges_authenticated_task(self) -> None:
         """SendTaskHeartbeat should use the authenticated task ID."""
-        # Prepare
-        self.state.acknowledge_task_heartbeat.return_value = True
+        for success in (True, False):
+            with self.subTest(success=success):
+                # Prepare
+                self.state.reset_mock()
+                self.state.acknowledge_task_heartbeat.return_value = success
 
-        # Execute
-        with patch(
-            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-            return_value=Mock(task_id=123),
-        ):
-            response = self.servicer.SendTaskHeartbeat(
-                SendTaskHeartbeatRequest(), Mock()
-            )
+                # Execute
+                response = runtime_handlers.send_task_heartbeat(
+                    SendTaskHeartbeatRequest(), self.state, Mock(task_id=123)
+                )
 
-        # Assert
-        self.state.acknowledge_task_heartbeat.assert_called_once_with(123)
-        self.assertTrue(response.success)
+                # Assert
+                self.state.acknowledge_task_heartbeat.assert_called_once_with(123)
+                self.assertEqual(response.success, success)
 
     def test_create_task_returns_task_id(self) -> None:
         """CreateTask should create a task for the authenticated run."""
@@ -159,11 +147,11 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         )
 
         # Execute
-        with patch(
-            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-            return_value=Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
-        ):
-            response = self.servicer.CreateTask(request, Mock())
+        response = runtime_handlers.create_task(
+            request,
+            self.state,
+            Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
+        )
 
         # Assert
         self.state.create_task.assert_called_once_with(
@@ -187,13 +175,11 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
 
             with self.subTest(requesting_task_type=requesting_task_type):
                 # Execute
-                with patch(
-                    "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-                    return_value=Mock(
-                        task_id=789, run_id=123, type=requesting_task_type
-                    ),
-                ):
-                    response = self.servicer.CreateTask(request, Mock())
+                response = runtime_handlers.create_task(
+                    request,
+                    self.state,
+                    Mock(task_id=789, run_id=123, type=requesting_task_type),
+                )
 
                 # Assert
                 self.state.create_task.assert_called_once_with(
@@ -270,16 +256,11 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         )
 
         # Execute
-        with (
-            patch(
-                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-                return_value=Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
-            ),
-            self.assertRaises(RuntimeError) as err,
-        ):
-            self.servicer.CreateTask(
+        with self.assertRaises(RuntimeError) as err:
+            runtime_handlers.create_task(
                 CreateTaskRequest(type=TaskType.MODEL, model_ref="model"),
-                Mock(),
+                self.state,
+                Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
             )
 
         # Assert
@@ -316,16 +297,12 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
 
         for request, detail in test_cases:
             with self.subTest(task_type=request.type):
-                with (
-                    patch(
-                        "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-                        return_value=Mock(
-                            task_id=789, run_id=123, type=TaskType.SERVER_APP
-                        ),
-                    ),
-                    self.assertRaises(FlowerError) as error,
-                ):
-                    self.servicer.CreateTask(request, Mock())
+                with self.assertRaises(FlowerError) as error:
+                    runtime_handlers.create_task(
+                        request,
+                        self.state,
+                        Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
+                    )
 
                 self.assertEqual(
                     error.exception.code,
@@ -344,14 +321,12 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         )
 
         # Execute
-        with (
-            patch(
-                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-                return_value=Mock(run_id=123, type=TaskType.SERVER_APP),
-            ),
-            self.assertRaises(FlowerError) as error,
-        ):
-            self.servicer.CreateTask(request, Mock())
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.create_task(
+                request,
+                self.state,
+                Mock(run_id=123, type=TaskType.SERVER_APP),
+            )
 
         # Assert
         self.assertEqual(
@@ -371,11 +346,9 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         request = PushTaskMessageRequest(message=message_to_proto(message))
 
         # Execute
-        with patch(
-            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-            return_value=Task(task_id=123, run_id=789),
-        ):
-            response = self.servicer.PushTaskMessage(request, Mock())
+        response = runtime_handlers.push_task_message(
+            request, self.state, Task(task_id=123, run_id=789)
+        )
 
         # Assert
         self.state.store_task_message.assert_called_once()
@@ -392,14 +365,10 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         message = create_task_message(run_id=789, src_task_id=321, dst_task_id=456)
         request = PushTaskMessageRequest(message=message_to_proto(message))
 
-        with (
-            patch(
-                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-                return_value=Task(task_id=123, run_id=789),
-            ),
-            self.assertRaises(FlowerError) as error,
-        ):
-            self.servicer.PushTaskMessage(request, Mock())
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.push_task_message(
+                request, self.state, Task(task_id=123, run_id=789)
+            )
 
         self.assertEqual(
             error.exception.code,
@@ -414,14 +383,10 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         message = create_task_message(run_id=789, src_task_id=123, dst_task_id=456)
         request = PushTaskMessageRequest(message=message_to_proto(message))
         # Execute
-        with (
-            patch(
-                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-                return_value=Task(task_id=123, run_id=789),
-            ),
-            self.assertRaises(FlowerError) as error,
-        ):
-            self.servicer.PushTaskMessage(request, Mock())
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.push_task_message(
+                request, self.state, Task(task_id=123, run_id=789)
+            )
 
         # Assert
         self.assertEqual(
@@ -447,11 +412,9 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         )
 
         # Execute
-        with patch(
-            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-            return_value=Task(task_id=123, run_id=789),
-        ):
-            response = self.servicer.PushTaskEvents(request, Mock())
+        response = runtime_handlers.push_task_events(
+            request, self.state, Task(task_id=123, run_id=789)
+        )
 
         # Assert
         self.state.store_task_events.assert_called_once()
@@ -475,21 +438,14 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
                 TaskEvent(event="response.created", data="{"),
             ]
         )
-        context = Mock(spec=grpc.ServicerContext)
-
         # Execute
-        with (
-            patch(
-                "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-                return_value=Task(task_id=123, run_id=789),
-            ),
-            patch("flwr.supercore.servicer.runtime.runtime_handlers.log") as log_mock,
-        ):
-            response = self.servicer.PushTaskEvents(request, context)
+        with patch("flwr.supercore.servicer.runtime.runtime_handlers.log") as log_mock:
+            response = runtime_handlers.push_task_events(
+                request, self.state, Task(task_id=123, run_id=789)
+            )
 
         # Assert
         self.assertIsInstance(response, PushTaskEventsResponse)
-        context.abort.assert_not_called()
         log_mock.assert_any_call(
             ERROR,
             "Task events could not be stored for task %d of run %d.",
@@ -510,11 +466,11 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         )
         request = RecordTaskUsageRequest(task_usage=usage)
 
-        with patch(
-            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-            return_value=Task(task_id=123, run_id=789, type=TaskType.MODEL),
-        ):
-            response = self.servicer.RecordTaskUsage(request, Mock())
+        response = runtime_handlers.record_task_usage(
+            request,
+            self.state,
+            Task(task_id=123, run_id=789, type=TaskType.MODEL),
+        )
 
         self.state.add_task_usage.assert_called_once_with(123, usage)
         self.assertIsNotNone(response)
@@ -531,14 +487,11 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
         self.state.get_task_message.return_value = [message]
 
         # Execute
-        with patch(
-            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-            return_value=Task(task_id=321, run_id=789),
-        ):
-            response = self.servicer.PullTaskMessage(
-                PullTaskMessageRequest(limit=5, src_task_id=123),
-                Mock(),
-            )
+        response = runtime_handlers.pull_task_message(
+            PullTaskMessageRequest(limit=5, src_task_id=123),
+            self.state,
+            Task(task_id=321, run_id=789),
+        )
 
         # Assert
         self.state.get_task_message.assert_called_once_with(
@@ -565,16 +518,11 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
 
             with self.subTest(requesting_task_type=requesting_task_type):
                 # Execute
-                with (
-                    patch(
-                        "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-                        return_value=Mock(run_id=123, type=requesting_task_type),
-                    ),
-                    self.assertRaises(FlowerError) as error,
-                ):
-                    self.servicer.CreateTask(
+                with self.assertRaises(FlowerError) as error:
+                    runtime_handlers.create_task(
                         CreateTaskRequest(type=TaskType.MODEL, model_ref="model"),
-                        Mock(),
+                        self.state,
+                        Mock(run_id=123, type=requesting_task_type),
                     )
 
                 # Assert
@@ -587,14 +535,11 @@ class TestRuntimeServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_push_logs_merges_logs_and_stores_them(self) -> None:
         """PushLogs should concatenate fragments and store them via state."""
         # Execute
-        with patch(
-            "flwr.supercore.servicer.runtime.runtime_servicer.get_authenticated_task",
-            return_value=Mock(task_id=123),
-        ):
-            response = self.servicer.PushLogs(
-                PushLogsRequest(run_id=123, logs=["hello", " ", "world"]),
-                Mock(),
-            )
+        response = runtime_handlers.push_logs(
+            PushLogsRequest(run_id=123, logs=["hello", " ", "world"]),
+            self.state,
+            Mock(task_id=123),
+        )
 
         # Assert
         self.state.add_task_log.assert_called_once_with(123, "hello world")
