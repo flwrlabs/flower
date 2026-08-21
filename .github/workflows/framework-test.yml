@@ -138,7 +138,7 @@ jobs:
             --ignore=py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
             --ignore=py/flwr/server/superlink/fleet/grpc_rere \
             --ignore=py/flwr/superlink/servicer/runtime \
-            --ignore=py/flwr/supercore/servicer/runtime/runtime_servicer_test.py \
+            --ignore=py/flwr/supercore/servicer/runtime/runtime_handlers_test.py \
             -n 4 \
             --dist=loadscope \
             --durations=50
@@ -154,7 +154,7 @@ jobs:
             py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
             py/flwr/server/superlink/fleet/grpc_rere \
             py/flwr/superlink/servicer/runtime \
-            py/flwr/supercore/servicer/runtime/runtime_servicer_test.py
+            py/flwr/supercore/servicer/runtime/runtime_handlers_test.py
       - name: Prepare coverage artifact
         if: ${{ (matrix.task == 'pytest' || matrix.task == 'pytest_serial') && needs.changes.outputs.framework == 'true' }}
         run: |
