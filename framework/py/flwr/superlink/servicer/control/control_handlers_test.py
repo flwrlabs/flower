@@ -35,6 +35,7 @@ from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
+    FLOWER_AGENT_APP_ID,
     NOOP_FEDERATION_ID,
     AutomationStatus,
     TaskType,
@@ -152,8 +153,42 @@ class TestControlHandlers(unittest.TestCase):
 
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in response.apps],
-            [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
+            [
+                ("@flwr/demo", fab_hash, TaskType.SERVER_APP),
+                (FLOWER_AGENT_APP_ID, "", TaskType.AGENT_APP),
+            ],
         )
+
+    def test_list_apps_does_not_duplicate_stored_flower_agent(self) -> None:
+        """List apps uses the stored Flower Agent entry when available."""
+        fab_hash = self.state.store_app(
+            fab=Fab("", b"fab", {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id=FLOWER_AGENT_APP_ID,
+            app_type=TaskType.AGENT_APP,
+            added_by=self.account.flwr_aid,
+        )
+
+        response = list_apps(
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
+            self.account,
+            self.state,
+        )
+
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type) for app in response.apps],
+            [(FLOWER_AGENT_APP_ID, fab_hash, TaskType.AGENT_APP)],
+        )
+
+    def test_list_apps_with_zero_limit_is_empty(self) -> None:
+        """List apps does not add Flower Agent when the limit is zero."""
+        response = list_apps(
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID, limit=0),
+            self.account,
+            self.state,
+        )
+
+        self.assertEqual(response.apps, [])
 
     def test_add_and_remove_app(self) -> None:
         """AddApp stores the latest Hub FAB and RemoveApp removes the app."""

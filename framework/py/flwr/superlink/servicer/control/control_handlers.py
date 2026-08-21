@@ -59,6 +59,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
     ArchiveFederationResponse,
+    AppInfo,
     BeginConnectorOAuthRequest,
     BeginConnectorOAuthResponse,
     CompleteConnectorOAuthRequest,
@@ -134,6 +135,7 @@ from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
+    FLOWER_AGENT_APP_ID,
     FLWR_SUPERGRID_API_URL,
     NOOP_FEDERATION_ID,
     OAUTH_SESSION_TTL,
@@ -1352,7 +1354,15 @@ def list_apps(
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
     limit = request.limit if request.HasField("limit") else None
-    return ListAppsResponse(apps=state.list_apps(federation_id, limit))
+    apps = list(state.list_apps(federation_id, limit))
+    if limit != 0 and not any(app.app_id == FLOWER_AGENT_APP_ID for app in apps):
+        apps.append(
+            AppInfo(
+                app_id=FLOWER_AGENT_APP_ID,
+                app_type=TaskType.AGENT_APP,
+            )
+        )
+    return ListAppsResponse(apps=apps)
 
 
 def add_app(
