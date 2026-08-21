@@ -4,14 +4,14 @@ dataset: []
 framework: []
 ---
 
-# Flower Agent
+# Flower AgentApp
 
-This minimal AgentApp sends the configured `agent.input` to a model and prints
+This minimal `AgentApp` sends the configured `agent.input` to a model and prints
 the final response text. Use it as a starting point for a custom Flower Agent.
 
 ## Build
 
-Install the project and build its Flower App Bundle:
+Install the project and build its Flower App Bundle (FAB):
 
 ```shell
 uv sync
@@ -32,7 +32,7 @@ Override the default input for a run with:
 
 ```shell
 uv run flwr run . supergrid \
-  --run-config 'agent.input="Explain federated learning in one paragraph."' \
+  --run-config 'agent.input="Explain agent harness in one paragraph."' \
   --stream
 ```
 
