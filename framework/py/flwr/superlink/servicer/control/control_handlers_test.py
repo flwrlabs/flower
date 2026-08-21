@@ -34,8 +34,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
-    FLWR_IN_MEMORY_DB_NAME,
     FLOWER_AGENT_APP_ID,
+    FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     AutomationStatus,
     TaskType,
@@ -146,7 +146,7 @@ class TestControlHandlers(unittest.TestCase):
         )
 
         response = list_apps(
-            ListAppsRequest(federation_id=NOOP_FEDERATION_ID, limit=1),
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
             self.account,
             self.state,
         )
@@ -157,6 +157,27 @@ class TestControlHandlers(unittest.TestCase):
                 ("@flwr/demo", fab_hash, TaskType.SERVER_APP),
                 (FLOWER_AGENT_APP_ID, "", TaskType.AGENT_APP),
             ],
+        )
+
+    def test_list_apps_limit_includes_flower_agent(self) -> None:
+        """List apps counts Flower Agent toward the requested limit."""
+        self.state.store_app(
+            fab=Fab("", b"fab", {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id="@flwr/demo",
+            app_type=TaskType.SERVER_APP,
+            added_by=self.account.flwr_aid,
+        )
+
+        response = list_apps(
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID, limit=1),
+            self.account,
+            self.state,
+        )
+
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type) for app in response.apps],
+            [(FLOWER_AGENT_APP_ID, "", TaskType.AGENT_APP)],
         )
 
     def test_list_apps_does_not_duplicate_stored_flower_agent(self) -> None:
