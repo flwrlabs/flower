@@ -29,7 +29,6 @@ from unittest.mock import MagicMock, Mock, patch
 import grpc
 from parameterized import parameterized
 
-from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
 from flwr.app import ConfigRecord, Context, RecordDict
 from flwr.common.constant import NOOP_ACCOUNT_NAME, SUPERLINK_NODE_ID, Status, SubStatus
 from flwr.common.serde import user_config_to_proto
@@ -702,35 +701,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             [("@flwr/agent", runs[0].fab_hash, TaskType.AGENT_APP)],
         )
 
-    def test_start_run_creates_builtin_agentapp_run_from_app_spec(self) -> None:
-        """Test StartRun creates an AgentApp run for the built-in flwr agent."""
-        request = StartRunRequest(
-            app_spec="@flwragent/flwr-agent",
-            federation=NOOP_FEDERATION_ID,
-        )
-        for key, value in user_config_to_proto({"agent.input": "Hello"}).items():
-            request.override_config[key].CopyFrom(value)
-        builtin_agent_fab = try_resolve_builtin_agent_fab("@flwragent/flwr-agent")
-        assert builtin_agent_fab is not None
-        fab_file, _ = builtin_agent_fab
-        expected_fab_hash = hashlib.sha256(fab_file).hexdigest()
-
-        response = self.servicer.StartRun(request, Mock())
-
-        runs = self.state.get_run_info(run_ids=[response.run_id])
-        tasks = self.state.get_tasks()
-
-        self.assertEqual(len(runs), 1)
-        self.assertEqual(runs[0].fab_id, "flwrlabs/flwr-agent")
-        self.assertEqual(runs[0].fab_version, "0.1.0")
-        self.assertEqual(runs[0].fab_hash, expected_fab_hash)
-        self.assertEqual(runs[0].primary_task_type, TaskType.AGENT_APP)
-        self.assertEqual(runs[0].override_config["agent.input"], "Hello")
-        self.assertEqual(len(tasks), 1)
-        self.assertEqual(tasks[0].run_id, response.run_id)
-        self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
-        self.assertEqual(tasks[0].fab_hash, runs[0].fab_hash)
-
     def test_start_run_raises_if_create_run_fails(self) -> None:
         """Test StartRun raises if the initial task cannot be created."""
         fab_content = b"test FAB content task failure"
@@ -783,11 +753,24 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ) as mock_get_metadata_from_config,
         ):
             mock_get_fab_config.return_value = {"tool": {"flwr": {"app": {}}}}
-            mock_get_metadata_from_config.return_value = ("flwr/demo", "0.1.0")
+            mock_get_metadata_from_config.return_value = (
+                "anne-dev/simple-legacy-127",
+                "0.1.0",
+            )
             response = self.servicer.StartRun(request, Mock())
 
         assert response.HasField("note")
         assert response.note
+        apps = self.state.list_apps(NOOP_FEDERATION_ID)
+        self.assertEqual(
+            [(app.app_id, app.fab_hash) for app in apps],
+            [
+                (
+                    "@anne-dev/simple-legacy-127",
+                    hashlib.sha256(b"test FAB content 123456").hexdigest(),
+                )
+            ],
+        )
 
     def test_start_run_accepts_valid_nested_override_keys(self) -> None:
         """Test StartRun accepts valid dotted override keys from nested FAB config."""
