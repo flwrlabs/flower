@@ -504,7 +504,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
             ) from e
     is_stored_app = bool(request.fab.hash_str and not request.fab.content)
 
-    stored_fab = None
+    # Start a run using a stored app
     if is_stored_app:
         if app_id is None:
             raise FlowerError(
@@ -521,14 +521,14 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 ApiErrorCode.FAB_DOWNLOAD_FAILURE,
                 "App or FAB not found in the requested federation.",
             )
-
-    if stored_fab is not None:
         fab_file = stored_fab.content
         verification_dict = stored_fab.verifications
+    # Start a run using a remote app
     elif request.app_spec:
         fab_file, verification_dict, note = _get_remote_fab(
             fleet_api_type, request.app_spec
         )
+    # Start a run using the provided app
     else:
         fab_file = request.fab.content
 
@@ -592,12 +592,13 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         if app_id is None:
             app_id = fab_app_id
         elif app_id != fab_app_id:
-            raise ValueError("Stored app ID does not match the request")
+            raise FlowerError(
+                ApiErrorCode.INVALID_APP_SPEC,
+                "Stored app ID does not match the request",
+            )
 
-        if stored_fab is not None:
-            fab_hash = fab.hash_str
-        else:
-            fab_hash = state.store_app(
+        if not is_stored_app:
+            state.store_app(
                 fab=fab,
                 federation_id=federation_id,
                 app_id=app_id,
@@ -605,10 +606,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 added_by=flwr_aid,
             )
 
-        if fab_hash != fab.hash_str:
-            raise ValueError(
-                f"FAB ({fab.hash_str}) hash from request doesn't match contents"
-            )
         series_id = request.series_id if request.HasField("series_id") else None
         series_description: str | None = None
         if primary_task_type == TaskType.AGENT_APP and series_id is None:
@@ -619,7 +616,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         run_id = state.create_run(
             fab_id,
             fab_version,
-            fab_hash,
+            fab.hash_str,
             override_config,
             federation_id,
             resolved_federation_config,
@@ -636,7 +633,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 "Failed to create or initialize run for "
                 f"flwr_aid={flwr_aid}, federation_id={federation_id}, "
                 f"fab_id={fab_id}, fab_version={fab_version}, "
-                f"fab_hash={fab_hash}, primary_task_type={primary_task_type}.",
+                f"fab_hash={fab.hash_str}, primary_task_type={primary_task_type}.",
             )
 
         run = state.get_run_info(run_ids=[run_id])[0]
