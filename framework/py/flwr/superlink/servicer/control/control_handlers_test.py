@@ -208,8 +208,10 @@ class TestControlHandlers(unittest.TestCase):
         self.assertEqual(remove_response, RemoveAppResponse())
         self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
 
-    def test_start_automation_normalizes_start_at_to_utc(self) -> None:
-        """Normalize the automation start time to UTC."""
+    def test_start_automation_preserves_recurrence_and_normalizes_start_at(
+        self,
+    ) -> None:
+        """Normalize the start time and preserve a recurring interval."""
         # Prepare
         request = StartAutomationRequest(
             start_at="2026-07-10T04:00:00-05:00",
@@ -238,6 +240,34 @@ class TestControlHandlers(unittest.TestCase):
             ),
             (response.series_id, "2026-07-10T09:00:00+00:00", 60, 3),
         )
+
+    def test_start_automation_omits_interval_for_one_run(self) -> None:
+        """Store and list one-run automations without a recurrence interval."""
+        # Prepare
+        request = StartAutomationRequest(
+            fixed_interval=60,
+            max_runs=1,
+            start_run_request=StartRunRequest(
+                federation=NOOP_FEDERATION_ID,
+                series_id=1,
+            ),
+        )
+
+        # Execute
+        response = start_automation(request, self.account, self.state)
+        stored_automation = self.state.list_automations(
+            automation_ids=[response.automation_id],
+            order_by="updated_at",
+        )[0]
+        listed_automation = list_automations(
+            ListAutomationsRequest(federation=NOOP_FEDERATION_ID),
+            self.account,
+            self.state,
+        ).automations[0]
+
+        # Assert
+        self.assertFalse(stored_automation.HasField("fixed_interval"))
+        self.assertFalse(listed_automation.HasField("fixed_interval"))
 
     def test_start_automation_rejects_start_at_without_timezone(self) -> None:
         """Reject a start time without timezone information."""
