@@ -82,32 +82,40 @@ class RuntimeVersionMetadata:
         )
 
     @classmethod
-    def from_grpc_metadata(
+    def from_metadata(
         cls,
-        grpc_metadata: Sequence[tuple[str, str | bytes]] | None,
+        metadata: Sequence[tuple[str, str | bytes]] | None,
     ) -> tuple[RuntimeVersionMetadata | None, str | None]:
-        """Parse runtime version metadata from a gRPC metadata sequence."""
+        """Parse runtime version metadata from a transport metadata sequence."""
         # TEMPORARY: allow continuation when all runtime metadata keys are missing
         # to avoid hard-failing older clients without metadata
-        if _metadata_is_missing(grpc_metadata):
+        if _metadata_is_missing(metadata):
             return None, None
 
         try:
             ret = RuntimeVersionMetadata(
                 package_name=get_metadata_str_checked(
-                    grpc_metadata, FLWR_PACKAGE_NAME_METADATA_KEY
+                    metadata, FLWR_PACKAGE_NAME_METADATA_KEY
                 ),
                 package_version=get_metadata_str_checked(
-                    grpc_metadata, FLWR_PACKAGE_VERSION_METADATA_KEY
+                    metadata, FLWR_PACKAGE_VERSION_METADATA_KEY
                 ),
                 component_name=get_metadata_str_checked(
-                    grpc_metadata, FLWR_COMPONENT_NAME_METADATA_KEY
+                    metadata, FLWR_COMPONENT_NAME_METADATA_KEY
                 ),
             )
             return ret, None
 
         except MetadataLookupError as e:
             return None, f"Invalid Flower runtime metadata: {str(e)}"
+
+    @classmethod
+    def from_grpc_metadata(
+        cls,
+        grpc_metadata: Sequence[tuple[str, str | bytes]] | None,
+    ) -> tuple[RuntimeVersionMetadata | None, str | None]:
+        """Parse runtime version metadata from a gRPC metadata sequence."""
+        return cls.from_metadata(grpc_metadata)
 
     def append_to_grpc_metadata(
         self,
