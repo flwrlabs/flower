@@ -17,8 +17,29 @@
 from dataclasses import dataclass
 
 from prompt_toolkit.formatted_text import StyleAndTextTuples
+from rich.color import Color, ColorType
 from rich.console import Console
 from rich.markdown import Markdown
+
+
+_ANSI_COLOR_NAMES = (
+    "ansiblack",
+    "ansired",
+    "ansigreen",
+    "ansiyellow",
+    "ansiblue",
+    "ansimagenta",
+    "ansicyan",
+    "ansiwhite",
+    "ansibrightblack",
+    "ansibrightred",
+    "ansibrightgreen",
+    "ansibrightyellow",
+    "ansibrightblue",
+    "ansibrightmagenta",
+    "ansibrightcyan",
+    "ansibrightwhite",
+)
 
 
 @dataclass
@@ -58,15 +79,12 @@ def render_markdown(block: MarkdownBlock, width: int) -> StyleAndTextTuples:
                 if enabled:
                     attributes.append(name)
 
-            # Preserve Rich's foreground and background colors as truecolor values.
+            # Keep ANSI colors theme-aware and convert extended colors to RGB.
             for color, prefix in ((style.color, "fg:"), (style.bgcolor, "bg:")):
                 if color is None:
                     continue
-                triplet = color.get_truecolor()
-                attributes.append(
-                    f"{prefix}#{triplet.red:02x}{triplet.green:02x}"
-                    f"{triplet.blue:02x}"
-                )
+                if color_value := _to_prompt_toolkit_color(color):
+                    attributes.append(f"{prefix}{color_value}")
         fragments.append((" ".join(attributes), segment.text))
         if link is not None:
             links[link] = f"{links.get(link, '')}{segment.text}"
@@ -81,3 +99,14 @@ def render_markdown(block: MarkdownBlock, width: int) -> StyleAndTextTuples:
     # row that separates messages in the transcript.
     fragments.append(("", "\n"))
     return fragments
+
+
+def _to_prompt_toolkit_color(color: Color) -> str | None:
+    """Translate a Rich color to prompt_toolkit style syntax."""
+    if color.type == ColorType.DEFAULT:
+        return None
+    if color.type == ColorType.STANDARD:
+        assert color.number is not None
+        return _ANSI_COLOR_NAMES[color.number]
+    triplet = color.get_truecolor()
+    return f"#{triplet.red:02x}{triplet.green:02x}{triplet.blue:02x}"
