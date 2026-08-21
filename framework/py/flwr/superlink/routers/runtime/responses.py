@@ -18,8 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import Annotated, cast
 
@@ -62,7 +61,6 @@ _TERMINAL_EVENTS = frozenset(
     {"error", "response.completed", "response.failed", "response.incomplete"}
 )
 _POLL_INTERVAL = 0.25
-_TERMINAL_EVENT_GRACE = 1.0
 
 
 @dataclass(frozen=True)
@@ -161,20 +159,7 @@ async def _read_request_payload(request: Request) -> JSONObject:
 def _model_request_from_payload(payload: JSONObject) -> ModelRequest:
     """Build and validate the task-routed model request."""
     try:
-        return ModelRequest(
-            dst_task_id=0,
-            input_=cast(str | Sequence[JSONObject], payload.get("input")),
-            model=cast(str, payload.get("model")),
-            stream=cast(bool, payload.get("stream", False)),
-            tools=cast(Sequence[JSONObject] | None, payload.get("tools")),
-            tool_choice=payload.get("tool_choice"),
-            reasoning=cast(JSONObject | None, payload.get("reasoning")),
-            previous_response_id=cast(str | None, payload.get("previous_response_id")),
-            instructions=cast(str | None, payload.get("instructions")),
-            max_output_tokens=cast(int | None, payload.get("max_output_tokens")),
-            metadata=cast(JSONObject | None, payload.get("metadata")),
-            text=cast(JSONObject | None, payload.get("text")),
-        )
+        return ModelRequest.from_payload(dst_task_id=0, payload=payload)
     except (TypeError, ValueError) as err:
         raise _ResponsesError(400, str(err), "invalid_request") from err
 
@@ -253,7 +238,6 @@ async def _stream_response(
     cursor: int | None = None
     complete = False
     response: JSONObject | None = None
-    terminal_event_deadline: float | None = None
     try:
         while True:
             events = await run_in_threadpool(
@@ -272,18 +256,7 @@ async def _stream_response(
                     return
                 yield _sse_frame(event)
 
-            if response is None:
-                response = await run_in_threadpool(_claim_response, state, exchange)
-                if response is not None:
-                    # The reply can become visible between event polls, before the
-                    # next poll observes its terminal event.
-                    terminal_event_deadline = time.monotonic() + _TERMINAL_EVENT_GRACE
-
-            if (
-                response is not None
-                and terminal_event_deadline is not None
-                and time.monotonic() >= terminal_event_deadline
-            ):
+            if response is not None:
                 complete = True
                 yield _stream_error(
                     (
@@ -295,9 +268,10 @@ async def _stream_response(
                 )
                 return
 
+            response = await run_in_threadpool(_claim_response, state, exchange)
             if response is None:
                 await run_in_threadpool(_raise_if_model_task_ended, state, exchange)
-            await asyncio.sleep(_POLL_INTERVAL)
+                await asyncio.sleep(_POLL_INTERVAL)
     except _ResponsesError as err:
         yield _stream_error(err.message, err.code)
     finally:

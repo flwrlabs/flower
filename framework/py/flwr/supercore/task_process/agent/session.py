@@ -153,19 +153,9 @@ class RuntimeAgentResponses(AgentResponses):
             raise RuntimeError("Model task could not be created.")
 
         model_task_id = create_res.task_id
-        message = ModelRequest(
+        message = ModelRequest.from_payload(
             dst_task_id=model_task_id,
-            input_=cast(str | Sequence[JSONObject], request.get("input")),
-            model=model,
-            stream=cast(bool, request.get("stream", False)),
-            tools=cast(Sequence[JSONObject] | None, request.get("tools")),
-            tool_choice=request.get("tool_choice"),
-            reasoning=cast(JSONObject | None, request.get("reasoning")),
-            previous_response_id=cast(str | None, request.get("previous_response_id")),
-            instructions=cast(str | None, request.get("instructions")),
-            max_output_tokens=cast(int | None, request.get("max_output_tokens")),
-            metadata=cast(JSONObject | None, request.get("metadata")),
-            text=cast(JSONObject | None, request.get("text")),
+            payload=request,
         )
         response_message = self._send_and_receive(message)
         response = ModelResponse.from_message(response_message)

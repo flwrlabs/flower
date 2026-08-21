@@ -165,7 +165,7 @@ def test_responses_streams_only_child_task_events() -> None:
 
 
 def test_responses_waits_for_terminal_events_after_reply() -> None:
-    """Do not truncate a final event batch that becomes visible after its reply."""
+    """Poll once more for the terminal event after observing the final reply."""
     state = _state()
     state.get_task_events.side_effect = [
         [
@@ -181,16 +181,34 @@ def test_responses_waits_for_terminal_events_after_reply() -> None:
         _reply(state.store_task_message.call_args.args[0].metadata.message_id)
     ]
 
-    with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=0):
-        response = _client(state).post(
-            "/v1/runtime/responses",
-            json={"model": "model", "input": "hello", "stream": True},
-            headers={"Authorization": "Bearer task-token"},
-        )
+    response = _client(state).post(
+        "/v1/runtime/responses",
+        json={"model": "model", "input": "hello", "stream": True},
+        headers={"Authorization": "Bearer task-token"},
+    )
 
     assert "event: response.output_text.delta" in response.text
     assert "event: response.completed" in response.text
     assert "event: error" not in response.text
+    assert state.get_task_events.call_count == 2
+
+
+def test_responses_reports_missing_terminal_event_after_reply() -> None:
+    """Fail when the flushed event stream has no terminal event."""
+    state = _state()
+    state.get_task_events.return_value = []
+    state.get_task_message.side_effect = lambda **_: [
+        _reply(state.store_task_message.call_args.args[0].metadata.message_id)
+    ]
+
+    response = _client(state).post(
+        "/v1/runtime/responses",
+        json={"model": "model", "input": "hello", "stream": True},
+        headers={"Authorization": "Bearer task-token"},
+    )
+
+    assert "event: error" in response.text
+    assert "Model stream ended before a terminal event." in response.text
     assert state.get_task_events.call_count == 2
 
 

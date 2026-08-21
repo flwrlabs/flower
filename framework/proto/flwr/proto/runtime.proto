@@ -154,6 +154,7 @@ message PushTaskEventsResponse {}
 // PullTaskMessage messages
 message PullTaskMessageRequest {
   optional uint64 limit = 1;
+  // Filter concurrent exchanges by sender task ID.
   optional uint64 src_task_id = 2;
 }
 message PullTaskMessageResponse { repeated Message messages = 1; }
