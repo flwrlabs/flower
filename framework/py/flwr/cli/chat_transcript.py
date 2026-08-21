@@ -32,7 +32,7 @@ def render_markdown(block: MarkdownBlock, width: int) -> StyleAndTextTuples:
     """Render Markdown as prompt_toolkit formatted-text fragments."""
     # Render Markdown with Rich using the transcript's current terminal width.
     console = Console(
-        width=max(1, width),
+        width=width,
         color_system="truecolor",
         force_terminal=True,
         markup=False,
