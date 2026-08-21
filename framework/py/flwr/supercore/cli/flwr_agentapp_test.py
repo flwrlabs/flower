@@ -89,7 +89,6 @@ def test_flwr_agentapp_parses_args_before_mirroring_output() -> None:
 
 def test_flwr_agentapp_forwards_cli_args() -> None:
     """The AgentApp CLI should forward parsed args to the runtime."""
-    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
     args = SimpleNamespace(
         insecure=True,
         runtime_api_address="127.0.0.1:9091",
