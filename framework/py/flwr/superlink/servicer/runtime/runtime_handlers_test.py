@@ -708,7 +708,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             # expected a single object id (that of the error message)
             assert list(object_ids_in_response) == [msg_res.object_id]
 
-    def test_push_object_succesful(self) -> None:
+    def test_push_object_successful(self) -> None:
         """Test `PushObject`."""
         # Prepare
         run_id = self._auth_run_id
