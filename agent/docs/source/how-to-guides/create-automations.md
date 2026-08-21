@@ -65,12 +65,13 @@ The model-facing arguments are:
 | `max_runs`       | No       | Maximum executions, valid only with `fixed_interval`             |
 
 The `arguments` payload for a one-off function call can look like this. Replace
-`YYYY-MM-DD` with the intended future date:
+`YYYY-MM-DD` with the intended future date and `±HH:MM` with the UTC offset for
+that date in the requested timezone:
 
 ```json
 {
   "input": "Summarize new public Flower releases.",
-  "start_at": "YYYY-MM-DDT09:00:00+01:00"
+  "start_at": "YYYY-MM-DDT09:00:00±HH:MM"
 }
 ```
 
@@ -79,7 +80,7 @@ A bounded recurring `arguments` payload can look like:
 ```json
 {
   "input": "Summarize new public Flower releases.",
-  "start_at": "YYYY-MM-DDT09:00:00+01:00",
+  "start_at": "YYYY-MM-DDT09:00:00±HH:MM",
   "fixed_interval": 86400,
   "max_runs": 3
 }
