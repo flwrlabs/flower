@@ -14,19 +14,20 @@
 # ==============================================================================
 """Tests for the Runtime Responses endpoint."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from flwr.common.constant import SubStatus
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
-from .responses import router
+from .responses import _Exchange, _stream_response, router
 
 
 def _client(state: Mock) -> TestClient:
@@ -56,6 +57,17 @@ def _reply(request_message_id: str) -> ModelResponse:
             "output": [],
         },
         reply_to_message_id=request_message_id,
+    )
+
+
+def _event(event_id: int, event: str, data: str | None = None) -> TaskEvent:
+    """Create one child model task event."""
+    return TaskEvent(
+        id=event_id,
+        run_id=789,
+        task_id=456,
+        event=event,
+        data=data or f'{{"type":"{event}"}}',
     )
 
 
@@ -135,20 +147,8 @@ def test_responses_streams_only_child_task_events() -> None:
     state = _state()
     stored_requests = _capture_requests(state)
     state.get_task_events.return_value = [
-        TaskEvent(
-            id=1,
-            run_id=789,
-            task_id=456,
-            event="response.created",
-            data='{"type":"response.created"}',
-        ),
-        TaskEvent(
-            id=2,
-            run_id=789,
-            task_id=456,
-            event="response.completed",
-            data='{"type":"response.completed"}',
-        ),
+        _event(1, "response.created"),
+        _event(2, "response.completed"),
     ]
     state.get_task_message.side_effect = lambda **_: [
         _reply(stored_requests[0].metadata.message_id)
@@ -168,4 +168,90 @@ def test_responses_streams_only_child_task_events() -> None:
     )
     state.get_task_events.assert_called_once_with(
         run_id=789, task_ids=[456], after_task_event_id=None
+    )
+
+
+def test_responses_waits_for_terminal_events_after_reply() -> None:
+    """Do not truncate a final event batch that becomes visible after its reply."""
+    state = _state()
+    stored_requests = _capture_requests(state)
+    state.get_task_events.side_effect = [
+        [
+            _event(
+                1,
+                "response.output_text.delta",
+                '{"type":"response.output_text.delta","delta":"x"}',
+            )
+        ],
+        [_event(2, "response.completed")],
+    ]
+    state.get_task_message.side_effect = lambda **_: [
+        _reply(stored_requests[0].metadata.message_id)
+    ]
+
+    with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=0):
+        response = _client(state).post(
+            "/v1/runtime/responses",
+            json={"model": "model", "input": "hello", "stream": True},
+            headers={"Authorization": "Bearer task-token"},
+        )
+
+    assert "event: response.output_text.delta" in response.text
+    assert "event: response.completed" in response.text
+    assert "event: error" not in response.text
+    assert state.get_task_events.call_count == 2
+
+
+def test_responses_stops_and_drains_after_timeout() -> None:
+    """Stop the child task and drain its reply when a request times out."""
+    state = _state()
+    state.get_task_message.return_value = []
+    state.get_tasks.return_value = [Task(task_id=456)]
+
+    with patch("flwr.superlink.routers.runtime.responses._REPLY_TIMEOUT", new=0):
+        response = _client(state).post(
+            "/v1/runtime/responses",
+            json={"model": "model", "input": "hello"},
+            headers={"Authorization": "Bearer task-token"},
+        )
+
+    assert response.status_code == 504
+    state.finish_task.assert_called_once_with(
+        456, SubStatus.STOPPED, "Responses request ended early."
+    )
+    assert state.get_task_message.call_count == 2
+
+
+def test_responses_stops_and_drains_when_stream_closes() -> None:
+    """Stop the child task and drain its reply when the client closes the stream."""
+    state = _state()
+    state.get_task_events.return_value = [
+        _event(
+            1,
+            "response.output_text.delta",
+            '{"type":"response.output_text.delta","delta":"x"}',
+        )
+    ]
+    state.get_task_message.return_value = []
+    stream = _stream_response(
+        state,
+        _Exchange(
+            agent_task_id=123,
+            model_task_id=456,
+            request_message_id="request-1",
+            run_id=789,
+        ),
+    )
+
+    assert next(stream).startswith("event: response.output_text.delta")
+    stream.close()
+
+    state.finish_task.assert_called_once_with(
+        456, SubStatus.STOPPED, "Responses stream ended early."
+    )
+    state.get_task_message.assert_called_once_with(
+        dst_task_ids=[123],
+        reply_to_message_ids=["request-1"],
+        limit=1,
+        order_by="created_at",
     )

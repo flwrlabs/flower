@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Sequence
 from dataclasses import dataclass
 from typing import Annotated, cast
 
@@ -63,6 +63,7 @@ _TERMINAL_EVENTS = frozenset(
 )
 _REPLY_TIMEOUT = 300.0
 _POLL_INTERVAL = 0.25
+_TERMINAL_EVENT_GRACE = 1.0
 
 
 @dataclass(frozen=True)
@@ -246,11 +247,15 @@ async def _wait_for_response(state: LinkState, exchange: _Exchange) -> JSONObjec
             )
 
 
-def _stream_response(state: LinkState, exchange: _Exchange) -> Iterator[str]:
+def _stream_response(
+    state: LinkState, exchange: _Exchange
+) -> Generator[str, None, None]:
     """Relay correlated child-task events as Server-Sent Events."""
     deadline = time.monotonic() + _REPLY_TIMEOUT
     cursor: int | None = None
     complete = False
+    response: JSONObject | None = None
+    terminal_event_deadline: float | None = None
     try:
         while True:
             events = state.get_task_events(
@@ -261,14 +266,25 @@ def _stream_response(state: LinkState, exchange: _Exchange) -> Iterator[str]:
             for event in events:
                 cursor = event.id
                 if event.event in _TERMINAL_EVENTS:
-                    _wait_for_terminal_reply(state, exchange, deadline)
+                    if response is None:
+                        _wait_for_terminal_reply(state, exchange, deadline)
                     complete = True
                     yield _sse_frame(event)
                     return
                 yield _sse_frame(event)
 
-            response = _claim_response(state, exchange)
-            if response is not None:
+            if response is None:
+                response = _claim_response(state, exchange)
+                if response is not None:
+                    terminal_event_deadline = min(
+                        deadline, time.monotonic() + _TERMINAL_EVENT_GRACE
+                    )
+
+            if (
+                response is not None
+                and terminal_event_deadline is not None
+                and time.monotonic() >= terminal_event_deadline
+            ):
                 complete = True
                 yield _stream_error(
                     (
@@ -280,7 +296,8 @@ def _stream_response(state: LinkState, exchange: _Exchange) -> Iterator[str]:
                 )
                 return
 
-            _raise_if_model_task_ended(state, exchange)
+            if response is None:
+                _raise_if_model_task_ended(state, exchange)
             if time.monotonic() >= deadline:
                 raise _ResponsesError(
                     504, "Timed out waiting for model response.", "model_timeout"
@@ -358,8 +375,13 @@ def _response_error_message(response: JSONObject) -> str:
 
 
 def _stop_model_task(state: LinkState, exchange: _Exchange, details: str) -> None:
-    """Stop an unfinished model task after cancellation or timeout."""
+    """Stop an unfinished model task and drain an already-arrived reply."""
     state.finish_task(exchange.model_task_id, SubStatus.STOPPED, details)
+    try:
+        _claim_response(state, exchange)
+    except _ResponsesError:
+        # Cleanup is best-effort; the original request has already ended.
+        pass
 
 
 def _sse_frame(event: TaskEvent) -> str:
