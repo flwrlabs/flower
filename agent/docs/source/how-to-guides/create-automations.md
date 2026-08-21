@@ -64,8 +64,8 @@ The model-facing arguments are:
 | `fixed_interval` | No       | Seconds between recurring runs, omitted for one execution        |
 | `max_runs`       | No       | Maximum executions, valid only with `fixed_interval`             |
 
-A one-off function call can look like this. Replace `YYYY-MM-DD` with the
-intended future date:
+The `arguments` payload for a one-off function call can look like this. Replace
+`YYYY-MM-DD` with the intended future date:
 
 ```json
 {
@@ -74,7 +74,7 @@ intended future date:
 }
 ```
 
-A bounded recurring call can look like:
+A bounded recurring `arguments` payload can look like:
 
 ```json
 {
@@ -95,10 +95,10 @@ The 1.34.0 runtime builds scheduled runs from the current run request. It keeps
 the automation's runs in the current run series and federation and replaces
 `agent.input` with the scheduled `input`.
 
-Production acceptance of federation and account-connector scoping is still
-required for each deployment. Confirm the displayed federation and run series
-before relying on a schedule. Account connectors remain limited to the personal
-workspace.
+Before relying on an automation, confirm that it appears under the expected
+federation and run series. If it uses an account connector, verify that the
+connector works in that deployment. Account connectors remain limited to the
+personal workspace.
 
 ## Inspect an automation
 
@@ -111,6 +111,9 @@ In SuperGrid:
 1. Select **View all** to open the full automation list
 1. Use **Active** for upcoming schedules and **History** for completed, stopped,
    or failed schedules
+
+To see all of your automations in one place, open **Settings** >
+**Automations**.
 
 Automation activity is scoped to the open federation. If a newly created
 automation does not appear, confirm that you opened the federation where it was
