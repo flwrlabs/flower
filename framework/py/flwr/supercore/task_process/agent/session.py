@@ -359,9 +359,11 @@ class RuntimeAgentResponses(AgentResponses):
             PushTaskMessageRequest(message=message_to_proto(message))
         )
 
-    def _pull_task_messages(self) -> list[Message]:
-        """Pull pending task messages."""
-        res = self._stub.PullTaskMessage(PullTaskMessageRequest(limit=1))
+    def _pull_task_messages(self, src_task_id: int) -> list[Message]:
+        """Pull pending task messages from one child task."""
+        res = self._stub.PullTaskMessage(
+            PullTaskMessageRequest(limit=1, src_task_id=src_task_id)
+        )
         return [message_from_proto(msg) for msg in res.messages]
 
     def _send_and_receive(self, message: Message) -> Message:
@@ -370,6 +372,10 @@ class RuntimeAgentResponses(AgentResponses):
         For now, `flwr-agentapp` expects a strict one-request-one-reply exchange with
         child tasks, so any non-matching pulled message is treated as an error.
         """
+        child_task_id = message.metadata.dst_task_id
+        if child_task_id is None:
+            raise ValueError("Task message requires a destination task ID.")
+
         # Push the message to the child task
         self._push_task_message(message)
         message_id = message.metadata.message_id
@@ -377,7 +383,7 @@ class RuntimeAgentResponses(AgentResponses):
         # Pull until a message arrives that replies to the pushed message, or timeout
         deadline = time.monotonic() + _DEFAULT_MODEL_REPLY_TIMEOUT
         while True:
-            for pulled_msg in self._pull_task_messages():
+            for pulled_msg in self._pull_task_messages(child_task_id):
                 if pulled_msg.metadata.reply_to_message_id != message_id:
                     raise RuntimeError(
                         "Received a message that does not reply to the request."

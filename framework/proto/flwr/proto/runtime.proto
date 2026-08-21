@@ -152,7 +152,10 @@ message PushTaskEventsRequest { repeated TaskEvent events = 1; }
 message PushTaskEventsResponse {}
 
 // PullTaskMessage messages
-message PullTaskMessageRequest { optional uint64 limit = 1; }
+message PullTaskMessageRequest {
+  optional uint64 limit = 1;
+  optional uint64 src_task_id = 2;
+}
 message PullTaskMessageResponse { repeated Message messages = 1; }
 
 // RecordTaskUsage messages
