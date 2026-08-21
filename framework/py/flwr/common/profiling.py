@@ -25,6 +25,9 @@ from typing import Any
 
 from .message import Message
 
+PROFILE_CONFIG_RECORD_NAME = "_flwr_profile"
+PROFILE_CLIENT_NAME_KEY = "client_name"
+
 
 @dataclass(frozen=True)
 class ProfileEvent:
@@ -46,6 +49,20 @@ def _single_or_mixed(values: set[Any]) -> Any:
     if len(values) > 1:
         return "mixed"
     return None
+
+
+def client_name_from_message(message: Message) -> str | None:
+    """Return the optional human-readable client name carried by a message."""
+    if not message.has_content():
+        return None
+    profile_config = message.content.get(PROFILE_CONFIG_RECORD_NAME)
+    if profile_config is None:
+        return None
+    client_name = profile_config.get(PROFILE_CLIENT_NAME_KEY)
+    if client_name is None:
+        return None
+    client_name = str(client_name).strip()
+    return client_name or None
 
 
 class ProfileRecorder:
@@ -134,6 +151,9 @@ class ProfileRecorder:
                     "network_count": 0,
                     "sender_node_ids": set(),
                     "receiver_node_ids": set(),
+                    "node_names": set(),
+                    "sender_node_names": set(),
+                    "receiver_node_names": set(),
                 }
                 stats[key] = stat
             stat["count"] += 1
@@ -239,6 +259,14 @@ class ProfileRecorder:
                 stat["sender_node_ids"].add(event.metadata["sender_node_id"])
             if "receiver_node_id" in event.metadata:
                 stat["receiver_node_ids"].add(event.metadata["receiver_node_id"])
+            if event.metadata.get("node_name"):
+                stat["node_names"].add(event.metadata["node_name"])
+            if event.metadata.get("sender_node_name"):
+                stat["sender_node_names"].add(event.metadata["sender_node_name"])
+            if event.metadata.get("receiver_node_name"):
+                stat["receiver_node_names"].add(
+                    event.metadata["receiver_node_name"]
+                )
 
         entries: list[dict[str, Any]] = []
         for stat in stats.values():
@@ -272,6 +300,9 @@ class ProfileRecorder:
             receiver_node_ids = stat["receiver_node_ids"]
             sender_node_id = _single_or_mixed(sender_node_ids)
             receiver_node_id = _single_or_mixed(receiver_node_ids)
+            node_name = _single_or_mixed(stat["node_names"])
+            sender_node_name = _single_or_mixed(stat["sender_node_names"])
+            receiver_node_name = _single_or_mixed(stat["receiver_node_names"])
             network_count = stat["network_count"]
             total_network_mb = (
                 stat["sum_network_bytes"] / (1024**2) if network_count else None
@@ -311,6 +342,9 @@ class ProfileRecorder:
                     "max_network_mb": max_network_mb,
                     "sender_node_id": sender_node_id,
                     "receiver_node_id": receiver_node_id,
+                    "node_name": node_name,
+                    "sender_node_name": sender_node_name,
+                    "receiver_node_name": receiver_node_name,
                     "node_id": stat["node_id"],
                 }
             )
@@ -400,6 +434,7 @@ class ProfileRecorder:
                     "task": event.task,
                     "round": event.round,
                     "node_id": event.node_id,
+                    "node_name": metadata.get("node_name"),
                     "duration_ms": event.duration_ms,
                     "memory_start_mb": metadata.get("memory_start_mb"),
                     "memory_end_mb": metadata.get("memory_end_mb"),
@@ -411,6 +446,8 @@ class ProfileRecorder:
                     "network_mb": network_mb,
                     "sender_node_id": metadata.get("sender_node_id"),
                     "receiver_node_id": metadata.get("receiver_node_id"),
+                    "sender_node_name": metadata.get("sender_node_name"),
+                    "receiver_node_name": metadata.get("receiver_node_name"),
                 }
             )
 
@@ -489,6 +526,7 @@ def record_profile_metrics_from_messages(messages: Iterable[Message]) -> None:
         if msg.has_error() or msg.content is None:
             continue
         try:
+            client_name = client_name_from_message(msg)
             for metric_record in msg.content.metric_records.values():
                 durations: dict[str, float] = {}
                 mems: dict[str, float] = {}
@@ -558,6 +596,8 @@ def record_profile_metrics_from_messages(messages: Iterable[Message]) -> None:
                         metadata["disk_write_mb"] = disk_writes[task]
                     if task in disk_sources:
                         metadata["disk_source"] = disk_sources[task]
+                    if client_name:
+                        metadata["node_name"] = client_name
                     profiler.record(
                         scope="client",
                         task=task,
@@ -585,6 +625,7 @@ def record_network_delivery_metrics_from_messages(
             if msg.has_error():
                 continue
             client_node_id = msg.metadata.src_node_id
+            client_name = client_name_from_message(msg)
             # Upstream: SuperNode reply enqueue at SuperLink -> ServerApp delivery.
             created_at_ms = float(msg.metadata.created_at) * 1000.0
             message_delivered_at_ms = msg.metadata.__dict__.get(
@@ -600,7 +641,11 @@ def record_network_delivery_metrics_from_messages(
             upstream_metadata: dict[str, Any] = {
                 "sender_node_id": client_node_id,
                 "receiver_node_id": "server",
+                "sender_node_name": client_name,
+                "receiver_node_name": "server",
             }
+            if client_name:
+                upstream_metadata["node_name"] = client_name
             if isinstance(upstream_bytes, (int, float)):
                 upstream_metadata["network_bytes"] = int(upstream_bytes)
             profiler.record(
@@ -632,7 +677,11 @@ def record_network_delivery_metrics_from_messages(
                 downstream_metadata: dict[str, Any] = {
                     "sender_node_id": "server",
                     "receiver_node_id": client_node_id,
+                    "sender_node_name": "server",
+                    "receiver_node_name": client_name,
                 }
+                if client_name:
+                    downstream_metadata["node_name"] = client_name
                 if isinstance(downstream_bytes, (int, float)):
                     downstream_metadata["network_bytes"] = int(downstream_bytes)
                 profiler.record(
@@ -647,6 +696,8 @@ def record_network_delivery_metrics_from_messages(
                     "sender_node_id": None,
                     "receiver_node_id": None,
                 }
+                if client_name:
+                    combined_metadata["node_name"] = client_name
                 combined_bytes = 0
                 has_combined_bytes = False
                 if isinstance(downstream_bytes, (int, float)):

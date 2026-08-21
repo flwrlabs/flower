@@ -6,10 +6,15 @@ import os
 import pickle
 import warnings
 from time import perf_counter
+from typing import Any
 
 import torch
 from flwr.app import ArrayRecord, ConfigRecord, Context, Message, MetricRecord, RecordDict
 from flwr.clientapp import ClientApp
+from flwr.common.profiling import (
+    PROFILE_CLIENT_NAME_KEY,
+    PROFILE_CONFIG_RECORD_NAME,
+)
 from flwr.common.config import unflatten_dict
 from omegaconf import DictConfig
 
@@ -56,6 +61,18 @@ app = ClientApp()
 
 _DOWNLOAD_LAYER_CACHE: dict[tuple[int, int, str], CachedLayer] = {}
 _COMMS_LAYER_CACHE: dict[tuple[int, int, str], CachedLayer] = {}
+
+
+def _profiled_content(context: Context, records: dict[str, Any]) -> RecordDict:
+    """Attach the optional human-readable client name to a reply."""
+    configured_name = context.node_config.get(
+        "client.name", context.run_config.get("client.name", "")
+    )
+    client_name = str(configured_name).strip() or str(context.node_id)
+    records[PROFILE_CONFIG_RECORD_NAME] = ConfigRecord(
+        {PROFILE_CLIENT_NAME_KEY: client_name}
+    )
+    return RecordDict(records)
 
 
 def _layer_file_path(context: Context, layer_name: str) -> str:
@@ -193,7 +210,10 @@ def train_download(msg: Message, context: Context):
     """Receive layer chunks from the server and persist to disk."""
     t0 = perf_counter()
     if msg.content is None or "arrays" not in msg.content or "config" not in msg.content:
-        return Message(content=RecordDict({"metrics": MetricRecord()}), reply_to=msg)
+        return Message(
+            content=_profiled_content(context, {"metrics": MetricRecord()}),
+            reply_to=msg,
+        )
 
     config = msg.content["config"]
     arrays = msg.content["arrays"]
@@ -239,7 +259,10 @@ def train_download(msg: Message, context: Context):
                 )
 
     if not entries:
-        return Message(content=RecordDict({"metrics": MetricRecord()}), reply_to=msg)
+        return Message(
+            content=_profiled_content(context, {"metrics": MetricRecord()}),
+            reply_to=msg,
+        )
 
     layer_base_dir = layer_dir(context)
     touched_layers: list[tuple[int | None, str, str]] = []
@@ -327,7 +350,10 @@ def train_download(msg: Message, context: Context):
 
     t1 = perf_counter()
     metrics = MetricRecord({"profile.client.train_download.ms": (t1 - t0) * 1000.0})
-    return Message(content=RecordDict({"metrics": metrics}), reply_to=msg)
+    return Message(
+        content=_profiled_content(context, {"metrics": metrics}),
+        reply_to=msg,
+    )
 
 
 @app.train()
@@ -383,7 +409,9 @@ def train(msg: Message, context: Context):
             }
         )
         return Message(
-            content=RecordDict({"arrays": ArrayRecord(), "metrics": metrics}),
+            content=_profiled_content(
+                context, {"arrays": ArrayRecord(), "metrics": metrics}
+            ),
             reply_to=msg,
         )
 
@@ -447,7 +475,9 @@ def train(msg: Message, context: Context):
                 metrics_dict["debug.noise_delta"] = after - before
             metrics = MetricRecord(metrics_dict)
             return Message(
-                content=RecordDict({"arrays": arrays_out, "metrics": metrics}),
+                content=_profiled_content(
+                    context, {"arrays": arrays_out, "metrics": metrics}
+                ),
                 reply_to=msg,
             )
 
@@ -478,7 +508,9 @@ def train(msg: Message, context: Context):
             }
         )
         return Message(
-            content=RecordDict({"arrays": ArrayRecord(), "metrics": metrics}),
+            content=_profiled_content(
+                context, {"arrays": ArrayRecord(), "metrics": metrics}
+            ),
             reply_to=msg,
         )
 
@@ -526,7 +558,9 @@ def train(msg: Message, context: Context):
         )
         metrics = MetricRecord(metrics_dict)
         return Message(
-            content=RecordDict({"arrays": ArrayRecord(), "metrics": metrics}),
+            content=_profiled_content(
+                context, {"arrays": ArrayRecord(), "metrics": metrics}
+            ),
             reply_to=msg,
         )
 
@@ -574,7 +608,9 @@ def train(msg: Message, context: Context):
     }
 
     metric_record = MetricRecord(metrics)
-    content = RecordDict({"arrays": ArrayRecord(), "metrics": metric_record})
+    content = _profiled_content(
+        context, {"arrays": ArrayRecord(), "metrics": metric_record}
+    )
 
     if aggregation_mode == "all_at_once":
         content["arrays"] = ArrayRecord(state_dict)
@@ -717,11 +753,13 @@ def train_comms(msg: Message, context: Context):
 
     t1 = perf_counter()
     config_record = ConfigRecord({"send_complete": send_complete})
-    content = RecordDict({
-        "arrays": ArrayRecord(arrays),
-        "metrics": metric_record,
-        "config": config_record,
-    })
+    content = RecordDict(
+        {
+            "arrays": ArrayRecord(arrays),
+            "metrics": metric_record,
+            "config": config_record,
+        }
+    )
     metric_record["profile.client.train_comms.ms"] = (t1 - t0) * 1000.0
     if send_complete:
         _cleanup_layer_files_for_context(context, layer_paths)

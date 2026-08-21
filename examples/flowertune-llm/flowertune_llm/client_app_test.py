@@ -191,3 +191,4 @@ def test_layerwise_torchtitan_dcp_does_not_load_hf_model(tmp_path, monkeypatch) 
     assert calls["layer_paths"] == list(context.state[STATE_LAYER_PATHS]["paths"])
     assert isinstance(reply.content["arrays"], ArrayRecord)
     assert len(reply.content["arrays"]) == 0
+    assert reply.content["_flwr_profile"]["client_name"] == "800"

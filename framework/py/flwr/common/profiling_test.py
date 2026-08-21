@@ -21,9 +21,10 @@ from .profiling import (
     ProfileRecorder,
     clear_active_profiler,
     record_network_delivery_metrics_from_messages,
+    record_profile_metrics_from_messages,
     set_active_profiler,
 )
-from .record import MetricRecord, RecordDict
+from .record import ConfigRecord, MetricRecord, RecordDict
 
 
 class TestProfileRecorder(unittest.TestCase):
@@ -195,3 +196,40 @@ class TestProfileRecorder(unittest.TestCase):
             if entry["scope"] == "network" and entry["task"] == "upstream"
         )
         self.assertAlmostEqual(entry["avg_ms"], 500.0)
+
+    def test_client_name_is_carried_into_profile_entries(self) -> None:
+        """Profile entries should expose a name without losing the node ID."""
+        instruction = Message(RecordDict(), dst_node_id=7, message_type="train")
+        reply = Message(
+            RecordDict(
+                {
+                    "metrics": MetricRecord({"profile.client.train.ms": 12.0}),
+                    "_flwr_profile": ConfigRecord({"client_name": "client-a"}),
+                }
+            ),
+            reply_to=instruction,
+        )
+        reply.metadata.created_at = 10.0
+        reply.metadata.__dict__["_network_delivered_at_ms"] = 10_500.0
+
+        recorder = ProfileRecorder(run_id=1)
+        set_active_profiler(recorder)
+        try:
+            record_profile_metrics_from_messages([reply])
+            record_network_delivery_metrics_from_messages(
+                [reply], delivered_at_ms=50_000.0
+            )
+        finally:
+            clear_active_profiler()
+
+        entries = recorder.summarize()["entries"]
+        client_entry = next(entry for entry in entries if entry["scope"] == "client")
+        upstream_entry = next(
+            entry
+            for entry in entries
+            if entry["scope"] == "network" and entry["task"] == "upstream"
+        )
+        self.assertEqual(client_entry["node_id"], 7)
+        self.assertEqual(client_entry["node_name"], "client-a")
+        self.assertEqual(upstream_entry["sender_node_id"], 7)
+        self.assertEqual(upstream_entry["sender_node_name"], "client-a")

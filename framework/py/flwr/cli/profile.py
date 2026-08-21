@@ -242,6 +242,7 @@ def _render_table(
         node_val = entry.get("node_id")
         if node_val is None and entry.get("scope") == "server":
             node_val = "server"
+        node_display = entry.get("node_name") or node_val
         avg_mem = entry.get("avg_mem_mb")
         max_mem = entry.get("max_mem_mb")
         avg_mem_delta = entry.get("avg_mem_delta_mb")
@@ -250,19 +251,21 @@ def _render_table(
         disk_source = entry.get("disk_source")
         sender_node = entry.get("sender_node_id")
         receiver_node = entry.get("receiver_node_id")
+        sender_display = entry.get("sender_node_name") or sender_node
+        receiver_display = entry.get("receiver_node_name") or receiver_node
         avg_network = entry.get("avg_network_mb")
         total_network = entry.get("total_network_mb")
         table.add_row(
             str(entry.get("task", "")),
             str(entry.get("scope", "")),
             str(entry.get("round", "N/A")),
-            str(node_val if node_val is not None else "N/A"),
+            str(node_display if node_display is not None else "N/A"),
             f"{entry.get('avg_ms', 0.0):.2f}",
             f"{entry.get('max_ms', 0.0):.2f}",
             *(
                 [
-                    str(sender_node) if sender_node is not None else "-",
-                    str(receiver_node) if receiver_node is not None else "-",
+                    str(sender_display) if sender_display is not None else "-",
+                    str(receiver_display) if receiver_display is not None else "-",
                     (
                         f"{avg_network:.2f}"
                         if isinstance(avg_network, (int, float))

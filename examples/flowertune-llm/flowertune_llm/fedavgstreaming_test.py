@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import torch
 
-from flwr.common import MetricRecord, RecordDict
+from flwr.common import ConfigRecord, MetricRecord, RecordDict
 from flwr.common.message import Message
 from flwr.common.profiling import (
     ProfileRecorder,
@@ -80,6 +80,7 @@ def test_record_network_profile_preserves_endpoint_and_bytes() -> None:
             sender_node_id=7,
             receiver_node_id="server",
             network_bytes=3 * 1024 * 1024,
+            client_name="client-a",
         )
     finally:
         clear_active_profiler()
@@ -91,13 +92,21 @@ def test_record_network_profile_preserves_endpoint_and_bytes() -> None:
     assert entries[0]["total_network_mb"] == 3.0
     assert entries[0]["sender_node_id"] == 7
     assert entries[0]["receiver_node_id"] == "server"
+    assert entries[0]["node_name"] == "client-a"
+    assert entries[0]["sender_node_name"] == "client-a"
+    assert entries[0]["receiver_node_name"] == "server"
 
 
 def test_layerwise_download_uses_standard_network_definitions() -> None:
     """Layerwise replies must report downstream, upstream, and their sum."""
     instruction = Message(RecordDict(), dst_node_id=7, message_type="train")
     reply = Message(
-        RecordDict({"metrics": MetricRecord({"profile.client.train.ms": 1.0})}),
+        RecordDict(
+            {
+                "metrics": MetricRecord({"profile.client.train.ms": 1.0}),
+                "_flwr_profile": ConfigRecord({"client_name": "client-a"}),
+            }
+        ),
         reply_to=instruction,
     )
     reply.metadata.created_at = 10.0
@@ -161,6 +170,7 @@ def test_streamed_upload_accepts_downstream_profile_bytes() -> None:
         chunk_count_by_layer={},
         layer_names=[],
         downstream_bytes_by_id={},
+        client_names_by_node_id={},
     )
 
 

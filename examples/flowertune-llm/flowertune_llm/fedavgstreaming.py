@@ -50,6 +50,7 @@ from flwr.common.inflatable import (
 from flwr.common.inflatable_protobuf_utils import make_pull_object_fn_protobuf
 from flwr.common.inflatable_utils import pull_objects
 from flwr.common.profiling import (
+    client_name_from_message,
     get_active_profiler,
     get_current_round,
     publish_profile_summary,
@@ -145,6 +146,7 @@ class _StreamedReply:
     downstream_ms: float | None
     array_refs: dict[str, str]
     metrics: MetricRecord
+    client_name: str | None = None
     network_bytes: int = 0
 
 
@@ -357,22 +359,34 @@ def _record_network_profile(
     sender_node_id: int | str | None,
     receiver_node_id: int | str | None,
     network_bytes: int,
+    client_name: str | None = None,
 ) -> None:
     """Record a per-peer network event for custom layerwise transfers."""
     profiler = get_active_profiler()
     if profiler is None:
         return
+    metadata: dict[str, Any] = {
+        "sender_node_id": sender_node_id,
+        "receiver_node_id": receiver_node_id,
+        "network_bytes": network_bytes,
+    }
+    if client_name:
+        metadata["node_name"] = client_name
+        if sender_node_id == node_id:
+            metadata["sender_node_name"] = client_name
+        if receiver_node_id == node_id:
+            metadata["receiver_node_name"] = client_name
+    if sender_node_id == "server":
+        metadata["sender_node_name"] = "server"
+    if receiver_node_id == "server":
+        metadata["receiver_node_name"] = "server"
     profiler.record(
         scope="network",
         task=task,
         round=get_current_round(),
         node_id=node_id,
         duration_ms=duration_ms,
-        metadata={
-            "sender_node_id": sender_node_id,
-            "receiver_node_id": receiver_node_id,
-            "network_bytes": network_bytes,
-        },
+        metadata=metadata,
     )
 
 
@@ -780,6 +794,7 @@ class FedAvgStreaming(FedAvg):
         chunk_count_by_layer: dict[str, int],
         layer_names: list[str],
         downstream_bytes_by_id: dict[str, int],
+        client_names_by_node_id: dict[int, str],
     ) -> None:
         """Pull reply objects one array at a time and aggregate incrementally."""
         if not msg_ids:
@@ -837,8 +852,7 @@ class FedAvgStreaming(FedAvg):
                     str(tree.object_id) for tree in iterate_object_tree(msg_tree)
                 }
                 array_refs, metrics, downstream_ms = object_reader.array_refs(
-                    msg_tree.object_id,
-                    owner_key=owner_key,
+                    msg_tree.object_id, owner_key=owner_key
                 )
                 # Streamed replies are pulled from the raw ServerAppIo response, so
                 # the delivery sidecar is inline in ``msg_proto`` rather than part of
@@ -863,6 +877,9 @@ class FedAvgStreaming(FedAvg):
                         downstream_ms=downstream_ms,
                         array_refs=array_refs,
                         metrics=metrics,
+                        client_name=client_names_by_node_id.get(
+                            int(light_msg.metadata.src_node_id)
+                        ),
                     )
                 )
 
@@ -965,6 +982,7 @@ class FedAvgStreaming(FedAvg):
                 sender_node_id=reply.node_id,
                 receiver_node_id="server",
                 network_bytes=reply.network_bytes,
+                client_name=reply.client_name,
             )
             if reply.downstream_ms is not None:
                 _record_network_profile(
@@ -974,6 +992,7 @@ class FedAvgStreaming(FedAvg):
                     sender_node_id="server",
                     receiver_node_id=reply.node_id,
                     network_bytes=downstream_bytes,
+                    client_name=reply.client_name,
                 )
                 _record_network_profile(
                     "combined",
@@ -982,6 +1001,7 @@ class FedAvgStreaming(FedAvg):
                     sender_node_id=None,
                     receiver_node_id=None,
                     network_bytes=reply.network_bytes + downstream_bytes,
+                    client_name=reply.client_name,
                 )
 
         _record_server_profile(
@@ -1220,6 +1240,11 @@ class FedAvgStreaming(FedAvg):
             node_ids = [
                 msg.metadata.src_node_id for msg in train_replies if not msg.has_error()
             ]
+            client_names_by_node_id: dict[int, str] = {}
+            for msg in train_replies:
+                client_name = client_name_from_message(msg)
+                if client_name:
+                    client_names_by_node_id[int(msg.metadata.src_node_id)] = client_name
             if not node_ids:
                 log(WARNING, "No valid training replies, skipping round %s", current_round)
                 continue
@@ -1394,6 +1419,7 @@ class FedAvgStreaming(FedAvg):
                         chunk_count_by_layer=chunk_count_by_layer,
                         layer_names=layer_names,
                         downstream_bytes_by_id=downstream_bytes_by_id,
+                        client_names_by_node_id=client_names_by_node_id,
                     )
                     log_upload_progress(batch_idx)
 
