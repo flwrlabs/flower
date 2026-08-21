@@ -74,21 +74,28 @@ def test_set_runtime_environment_preserves_inherited_root_certificates(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ca_env: str
 ) -> None:
     """Keep inherited custom roots when adding the Runtime root certificate."""
-    inherited_certificate = httpx.create_ssl_context(trust_env=False).get_ca_certs(
+    inherited_certificates = httpx.create_ssl_context(trust_env=False).get_ca_certs(
         binary_form=True
-    )[0]
-    inherited_certificate_pem = ssl.DER_cert_to_PEM_cert(inherited_certificate).encode(
-        "ascii"
-    )
+    )[:2]
+    inherited_certificates_pem = [
+        ssl.DER_cert_to_PEM_cert(certificate).encode("ascii")
+        for certificate in inherited_certificates
+    ]
     if ca_env == "SSL_CERT_FILE":
         inherited_ca_path = tmp_path / "inherited-ca.pem"
-        inherited_ca_file = inherited_ca_path
+        inherited_ca_path.write_bytes(inherited_certificates_pem[0])
+        ca_env_value = str(inherited_ca_path)
+        expected_certificates = inherited_certificates_pem[:1]
     else:
-        inherited_ca_path = tmp_path / "inherited-cas"
-        inherited_ca_path.mkdir()
-        inherited_ca_file = inherited_ca_path / "inherited-ca.pem"
-    inherited_ca_file.write_bytes(inherited_certificate_pem)
-    monkeypatch.setenv(ca_env, str(inherited_ca_path))
+        inherited_ca_directories = []
+        for index, certificate in enumerate(inherited_certificates_pem):
+            inherited_ca_directory = tmp_path / f"inherited-cas-{index}"
+            inherited_ca_directory.mkdir()
+            (inherited_ca_directory / "inherited-ca.pem").write_bytes(certificate)
+            inherited_ca_directories.append(str(inherited_ca_directory))
+        ca_env_value = os.pathsep.join(inherited_ca_directories)
+        expected_certificates = inherited_certificates_pem
+    monkeypatch.setenv(ca_env, ca_env_value)
     monkeypatch.delenv(
         "SSL_CERT_DIR" if ca_env == "SSL_CERT_FILE" else "SSL_CERT_FILE",
         raising=False,
@@ -107,7 +114,8 @@ def test_set_runtime_environment_preserves_inherited_root_certificates(
     assert certificate_path is not None
     try:
         certificate_bundle = certificate_path.read_bytes()
-        assert certificate_bundle.startswith(inherited_certificate_pem)
+        for certificate in expected_certificates:
+            assert certificate in certificate_bundle
         assert certificate_bundle.endswith(b"\nruntime-root-certificate")
     finally:
         certificate_path.unlink(missing_ok=True)

@@ -21,8 +21,8 @@ import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-from flwr.common.constant import SubStatus
-from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
+from flwr.common.constant import Status, SubStatus
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.model_message import ModelResponse
@@ -274,6 +274,41 @@ def test_responses_stops_and_drains_when_client_disconnects() -> None:
         src_task_ids=[456],
         limit=1,
         order_by="created_at",
+    )
+
+
+def test_responses_times_out_if_model_task_is_not_launched() -> None:
+    """Stop waiting when no executor launches the child model task."""
+    state = _state()
+    state.get_task_message.return_value = []
+    state.get_tasks.return_value = [
+        Task(
+            task_id=456,
+            status=TaskStatus(status=Status.PENDING),
+        )
+    ]
+    request = Mock(spec=Request)
+    request.is_disconnected = AsyncMock(return_value=False)
+
+    async def wait_for_response() -> None:
+        exchange = _Exchange(
+            agent_task_id=123,
+            model_task_id=456,
+            run_id=789,
+        )
+        with patch(
+            "flwr.superlink.routers.runtime.responses._model_task_launch_timeout",
+            return_value=0.0,
+        ):
+            with pytest.raises(_ResponsesError) as exc_info:
+                await _wait_for_response(request, state, exchange)
+        assert exc_info.value.status_code == 504
+        assert exc_info.value.code == "model_task_launch_timeout"
+
+    asyncio.run(wait_for_response())
+
+    state.finish_task.assert_called_once_with(
+        456, SubStatus.STOPPED, "Responses request ended early."
     )
 
 

@@ -303,14 +303,14 @@ def _set_runtime_environment(
 
     # OpenAI/httpx reads custom CAs from SSL_CERT_FILE, which requires a path.
     # Extend the public and inherited roots with the Runtime CA for this process.
+    public_ca_context = httpx.create_ssl_context(trust_env=False)
+    trusted_certificates = [
+        *public_ca_context.get_ca_certs(binary_form=True),
+        *_load_inherited_ca_certificates(),
+    ]
     with NamedTemporaryFile(
         mode="wb", prefix="flwr-runtime-ca-", suffix=".pem", delete=False
     ) as certificate_file:
-        public_ca_context = httpx.create_ssl_context(trust_env=False)
-        trusted_certificates = [
-            *public_ca_context.get_ca_certs(binary_form=True),
-            *_load_inherited_ca_certificates(),
-        ]
         for trusted_certificate in dict.fromkeys(trusted_certificates):
             certificate_file.write(
                 ssl.DER_cert_to_PEM_cert(trusted_certificate).encode("ascii")
@@ -333,11 +333,18 @@ def _load_inherited_ca_certificates() -> list[bytes]:
     if ca_file:
         context.load_verify_locations(cafile=ca_file)
     if ca_dir:
-        for ca_path in sorted(Path(ca_dir).iterdir()):
-            if not ca_path.is_file():
+        for directory in ca_dir.split(os.pathsep):
+            if not directory:
                 continue
             try:
-                context.load_verify_locations(cafile=ca_path)
+                ca_paths = sorted(Path(directory).iterdir())
             except OSError:
                 continue
+            for ca_path in ca_paths:
+                if not ca_path.is_file():
+                    continue
+                try:
+                    context.load_verify_locations(cafile=ca_path)
+                except OSError:
+                    continue
     return context.get_ca_certs(binary_form=True)
