@@ -836,6 +836,10 @@ def start_automation(  # pylint: disable=too-many-locals
             ),
         )
 
+    # One-run automations do not recur, so an interval is not meaningful.
+    if max_runs == 1:
+        fixed_interval = None
+
     # Resolve the account-scoped federation and run configuration.
     flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
