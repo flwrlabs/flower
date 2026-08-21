@@ -221,15 +221,17 @@ async def _wait_for_response(
                     499, "Client disconnected.", "client_disconnected"
                 )
 
-            response = await run_in_threadpool(_claim_response, state, exchange)
+            response = await run_in_threadpool(
+                _claim_response_or_raise_for_model_task_state,
+                state,
+                exchange,
+                launch_deadline,
+            )
             if response is not None:
                 complete = True
                 _raise_for_failed_response(response)
                 return response
 
-            await run_in_threadpool(
-                _raise_for_model_task_state, state, exchange, launch_deadline
-            )
             await asyncio.sleep(_POLL_INTERVAL)
     finally:
         if not complete:
@@ -276,11 +278,13 @@ async def _stream_response(
                 )
                 return
 
-            response = await run_in_threadpool(_claim_response, state, exchange)
+            response = await run_in_threadpool(
+                _claim_response_or_raise_for_model_task_state,
+                state,
+                exchange,
+                launch_deadline,
+            )
             if response is None:
-                await run_in_threadpool(
-                    _raise_for_model_task_state, state, exchange, launch_deadline
-                )
                 await asyncio.sleep(_POLL_INTERVAL)
     except _ResponsesError as err:
         yield _stream_error(err.message, err.code)
@@ -297,10 +301,11 @@ async def _wait_for_terminal_reply(
 ) -> JSONObject:
     """Consume the final reply before exposing a terminal stream event."""
     while True:
-        response = await run_in_threadpool(_claim_response, state, exchange)
+        response = await run_in_threadpool(
+            _claim_response_or_raise_for_model_task_state, state, exchange
+        )
         if response is not None:
             return response
-        await run_in_threadpool(_raise_for_model_task_state, state, exchange)
         await asyncio.sleep(_POLL_INTERVAL)
 
 
@@ -322,13 +327,22 @@ def _claim_response(state: LinkState, exchange: _Exchange) -> JSONObject | None:
         ) from err
 
 
-def _raise_for_model_task_state(
+def _claim_response_or_raise_for_model_task_state(
     state: LinkState,
     exchange: _Exchange,
     launch_deadline: float | None = None,
-) -> None:
-    """Fail when the child task ended or was not launched in time."""
+) -> JSONObject | None:
+    """Claim a reply, or fail when its task cannot produce one."""
+    response = _claim_response(state, exchange)
+    if response is not None:
+        return response
+
     tasks = state.get_tasks(task_ids=[exchange.model_task_id])
+    if tasks and tasks[0].status.status == Status.FINISHED:
+        # The reply is stored immediately before the task is marked finished.
+        response = _claim_response(state, exchange)
+        if response is not None:
+            return response
     if not tasks or tasks[0].status.status == Status.FINISHED:
         details = tasks[0].status.details if tasks else ""
         raise _ResponsesError(
@@ -346,6 +360,7 @@ def _raise_for_model_task_state(
             "Model task was not launched before the configured timeout.",
             "model_task_launch_timeout",
         )
+    return None
 
 
 def _model_task_launch_timeout() -> float:

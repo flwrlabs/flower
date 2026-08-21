@@ -96,10 +96,14 @@ def test_responses_requires_bearer_authentication(
 
 
 def test_responses_returns_correlated_model_response() -> None:
-    """Create a child model task and claim only its direct reply."""
+    """Recheck and claim the direct reply after its child task finishes."""
     state = _state()
-    state.get_task_message.side_effect = lambda **_: [
-        _reply(state.store_task_message.call_args.args[0].metadata.message_id)
+    state.get_task_message.side_effect = [
+        [],
+        [_reply("request-message-id")],
+    ]
+    state.get_tasks.return_value = [
+        Task(task_id=456, status=TaskStatus(status=Status.FINISHED))
     ]
 
     response = _client(state).post(
@@ -113,7 +117,8 @@ def test_responses_returns_correlated_model_response() -> None:
     request = state.store_task_message.call_args.args[0]
     assert request.metadata.src_task_id == 123
     assert request.metadata.dst_task_id == 456
-    state.get_task_message.assert_called_once_with(
+    assert state.get_task_message.call_count == 2
+    state.get_task_message.assert_called_with(
         dst_task_ids=[123],
         src_task_ids=[456],
         limit=1,
