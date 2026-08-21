@@ -341,7 +341,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             federation_id=NOOP_FEDERATION_ID,
             flwr_aid=NOOP_FLWR_AID,
             start_run_request=StartRunRequest(
-                app_spec="@flwragent/flwr-agent",
+                app_spec="@flwr/demo",
                 federation=NOOP_FEDERATION_ID,
                 series_id=series_id,
             ),
@@ -350,9 +350,24 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             max_runs=1,
         )
 
-        response = runtime_handlers.pull_pending_tasks(
-            PullPendingTasksRequest(), self.state
-        )
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
+                return_value=(b"fab", {}, None),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/demo", "0.1.0"),
+            ),
+        ):
+            response = runtime_handlers.pull_pending_tasks(
+                PullPendingTasksRequest(), self.state
+            )
 
         self.assertEqual(len(response.tasks), 1)
         run = self.state.get_run_info(run_ids=[response.tasks[0].run_id])[0]

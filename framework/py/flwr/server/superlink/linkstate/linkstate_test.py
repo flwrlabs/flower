@@ -249,7 +249,7 @@ class StateTest(CoreStateTest):
         previous_next_run_at = (now() - timedelta(seconds=30)).isoformat()
         next_run_at = (now() + timedelta(seconds=30)).isoformat()
         start_run_request = StartRunRequest(
-            app_spec="@flwragent/flwr-agent",
+            app_spec="@flwr/demo",
             federation="@me/health",
             series_id=series_id,
         )
