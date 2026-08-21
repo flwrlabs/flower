@@ -307,19 +307,20 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: AddAppRequest, context: grpc.ServicerContext
     ) -> AddAppResponse:
         """Add an app to a federation."""
-        _ = request
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details("AddApp is not implemented.")
-        raise NotImplementedError("AddApp is not implemented.")
+        return control_handlers.add_app(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            self.fleet_api_type,
+        )
 
     def RemoveApp(
         self, request: RemoveAppRequest, context: grpc.ServicerContext
     ) -> RemoveAppResponse:
         """Remove an app from a federation."""
-        _ = request
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details("RemoveApp is not implemented.")
-        raise NotImplementedError("RemoveApp is not implemented.")
+        return control_handlers.remove_app(
+            request, _get_account(), self.linkstate_factory.state()
+        )
 
     def ShowFederation(
         self, request: ShowFederationRequest, context: grpc.ServicerContext
