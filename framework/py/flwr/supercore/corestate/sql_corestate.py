@@ -1536,7 +1536,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
-        reply_to_message_ids: Sequence[str] | None = None,
+        src_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
         order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
@@ -1549,14 +1549,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return []
         if dst_task_ids is not None and not dst_task_ids:
             return []
-        if reply_to_message_ids is not None and not reply_to_message_ids:
+        if src_task_ids is not None and not src_task_ids:
             return []
 
         with self.session():
             self._cleanup_expired_task_tokens()
             self._cleanup_invalid_task_messages()
             rows = self._claim_task_message_models(
-                dst_task_ids, reply_to_message_ids, order_by, limit
+                dst_task_ids, src_task_ids, order_by, limit
             )
             snapshots = [_task_message_snapshot_from_model(row) for row in rows]
         return [_task_message_from_snapshot(row) for row in snapshots]
@@ -1621,7 +1621,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def _claim_task_message_models(
         self,
         dst_task_ids: Sequence[int] | None,
-        reply_to_message_ids: Sequence[str] | None,
+        src_task_ids: Sequence[int] | None,
         order_by: Literal["created_at"] | None,
         limit: int | None,
     ) -> list[TaskMessageModel]:
@@ -1632,10 +1632,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if dst_task_ids is not None:
             sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
             query = query.where(TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids))
-        if reply_to_message_ids is not None:
-            query = query.where(
-                TaskMessageModel.reply_to_message_id.in_(reply_to_message_ids)
-            )
+        if src_task_ids is not None:
+            sint64_src_task_ids = [uint64_to_int64(t) for t in src_task_ids]
+            query = query.where(TaskMessageModel.src_task_id.in_(sint64_src_task_ids))
         if order_by is not None:
             query = query.order_by(TaskMessageModel.created_at.asc())
         if limit is not None:
@@ -1662,9 +1661,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 delete_query = delete_query.where(
                     TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids)
                 )
-            if reply_to_message_ids is not None:
+            if src_task_ids is not None:
+                sint64_src_task_ids = [uint64_to_int64(t) for t in src_task_ids]
                 delete_query = delete_query.where(
-                    TaskMessageModel.reply_to_message_id.in_(reply_to_message_ids)
+                    TaskMessageModel.src_task_id.in_(sint64_src_task_ids)
                 )
 
         returning_query = delete_query.returning(TaskMessageModel)

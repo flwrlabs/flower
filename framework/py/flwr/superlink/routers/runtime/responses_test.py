@@ -108,7 +108,7 @@ def test_responses_returns_correlated_model_response() -> None:
     assert request.metadata.dst_task_id == 456
     state.get_task_message.assert_called_once_with(
         dst_task_ids=[123],
-        reply_to_message_ids=[request.metadata.message_id],
+        src_task_ids=[456],
         limit=1,
         order_by="created_at",
     )
@@ -223,7 +223,6 @@ def test_responses_stops_and_drains_when_stream_closes() -> None:
         _Exchange(
             agent_task_id=123,
             model_task_id=456,
-            request_message_id="request-1",
             run_id=789,
         ),
     )
@@ -236,7 +235,7 @@ def test_responses_stops_and_drains_when_stream_closes() -> None:
     )
     state.get_task_message.assert_called_once_with(
         dst_task_ids=[123],
-        reply_to_message_ids=["request-1"],
+        src_task_ids=[456],
         limit=1,
         order_by="created_at",
     )

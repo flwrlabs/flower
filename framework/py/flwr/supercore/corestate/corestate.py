@@ -879,7 +879,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
-        reply_to_message_ids: Sequence[str] | None = None,
+        src_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
         order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
@@ -892,8 +892,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         dst_task_ids : Optional[Sequence[int]] (default: None)
             Sequence of destination task IDs to filter by.
-        reply_to_message_ids : Optional[Sequence[str]] (default: None)
-            Sequence of request message IDs that returned messages must reply to.
+        src_task_ids : Optional[Sequence[int]] (default: None)
+            Sequence of source task IDs to filter by.
         limit : Optional[int] (default: None)
             Maximum number of messages to return. If `None`, no limit is applied.
         order_by : Optional[Literal["created_at"]] (default: None)

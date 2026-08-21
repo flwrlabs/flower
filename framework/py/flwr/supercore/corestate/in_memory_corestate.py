@@ -1194,7 +1194,7 @@ class InMemoryCoreState(
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
-        reply_to_message_ids: Sequence[str] | None = None,
+        src_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
         order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
@@ -1207,7 +1207,7 @@ class InMemoryCoreState(
             return []
         if dst_task_ids is not None and not dst_task_ids:
             return []
-        if reply_to_message_ids is not None and not reply_to_message_ids:
+        if src_task_ids is not None and not src_task_ids:
             return []
 
         with self.lock_task_store, self.lock_task_message_store:
@@ -1215,11 +1215,9 @@ class InMemoryCoreState(
             current = now().timestamp()
             self._cleanup_invalid_task_messages_locked(current)
 
-            # Filter by dst_task_id
+            # Filter by task IDs
             dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
-            reply_to_message_id_set = (
-                set(reply_to_message_ids) if reply_to_message_ids is not None else None
-            )
+            src_task_id_set = set(src_task_ids) if src_task_ids is not None else None
             selected_messages = [
                 msg
                 for msg in self.task_message_store.values()
@@ -1228,8 +1226,8 @@ class InMemoryCoreState(
                     or msg.metadata.dst_task_id in dst_task_id_set
                 )
                 and (
-                    reply_to_message_id_set is None
-                    or msg.metadata.reply_to_message_id in reply_to_message_id_set
+                    src_task_id_set is None
+                    or msg.metadata.src_task_id in src_task_id_set
                 )
             ]
 

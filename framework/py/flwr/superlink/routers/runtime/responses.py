@@ -72,7 +72,6 @@ class _Exchange:
 
     agent_task_id: int
     model_task_id: int
-    request_message_id: str
     run_id: int
 
 
@@ -217,7 +216,6 @@ def _start_exchange(
     return _Exchange(
         agent_task_id=task.task_id,
         model_task_id=model_task_id,
-        request_message_id=request.metadata.message_id,
         run_id=task.run_id,
     )
 
@@ -334,7 +332,7 @@ def _claim_response(state: LinkState, exchange: _Exchange) -> JSONObject | None:
     """Atomically claim the reply belonging to this exchange."""
     messages = state.get_task_message(
         dst_task_ids=[exchange.agent_task_id],
-        reply_to_message_ids=[exchange.request_message_id],
+        src_task_ids=[exchange.model_task_id],
         limit=1,
         order_by="created_at",
     )

@@ -1720,33 +1720,34 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(pulled[0].metadata.message_id, msg_1.metadata.message_id)
         self.assertEqual(pulled_next[0].metadata.message_id, msg_2.metadata.message_id)
 
-    def test_get_task_message_filters_by_reply(self) -> None:
-        """A reply-specific claim should not consume another request's reply."""
+    def test_get_task_message_filters_by_source_task(self) -> None:
+        """A source-specific claim should not consume another task's message."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        src_task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        src_task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
         dst_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        assert src_task_id is not None and dst_task_id is not None
-        reply_1 = create_task_message(
-            src_task_id,
-            dst_task_id,
-            run_id,
-            reply_to_message_id="request-1",
+        assert (
+            src_task_id_1 is not None
+            and src_task_id_2 is not None
+            and dst_task_id is not None
         )
-        reply_2 = create_task_message(
-            src_task_id,
-            dst_task_id,
-            run_id,
-            reply_to_message_id="request-2",
-        )
+        reply_1 = create_task_message(src_task_id_1, dst_task_id, run_id)
+        reply_2 = create_task_message(src_task_id_2, dst_task_id, run_id)
         self.assertTrue(state.store_task_message(reply_1))
         self.assertTrue(state.store_task_message(reply_2))
 
         pulled_2 = state.get_task_message(
-            dst_task_ids=[dst_task_id], reply_to_message_ids=["request-2"]
+            dst_task_ids=[dst_task_id],
+            src_task_ids=[src_task_id_2],
+            limit=1,
+            order_by="created_at",
         )
         pulled_1 = state.get_task_message(
-            dst_task_ids=[dst_task_id], reply_to_message_ids=["request-1"]
+            dst_task_ids=[dst_task_id],
+            src_task_ids=[src_task_id_1],
+            limit=1,
+            order_by="created_at",
         )
 
         self.assertEqual(pulled_2[0].metadata.message_id, reply_2.metadata.message_id)
