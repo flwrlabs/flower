@@ -32,19 +32,6 @@ INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error."
 NOT_AUTHENTICATED_DETAIL = "Not authenticated"
 
 
-def _flower_error_content(
-    err: FlowerError, public_message: str
-) -> dict[str, str | int]:
-    """Build the client-visible HTTP payload for a mapped FlowerError."""
-    content: dict[str, str | int] = {
-        "detail": public_message,
-        "code": int(err.code),
-    }
-    if err.public_details is not None:
-        content["extra"] = err.public_details
-    return content
-
-
 class BearerAuthenticationError(HTTPException):
     """Represent failed HTTP Bearer authentication."""
 
@@ -73,23 +60,22 @@ async def http_error_translator(
     except FlowerError as err:
         try:
             error_spec = API_ERROR_MAP[err.code]
-            http_status = error_spec.http_status_code
-            content = _flower_error_content(err, error_spec.public_message)
-            http_headers = error_spec.http_headers
+            response = JSONResponse(
+                content=err.to_json(error_spec.public_message),
+                status_code=error_spec.http_status_code,
+                headers=error_spec.http_headers,
+            )
         except (ValueError, KeyError):
-            http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
-            content = {"detail": INTERNAL_SERVER_ERROR_MESSAGE}
-            http_headers = None
+            response = JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"detail": INTERNAL_SERVER_ERROR_MESSAGE},
+            )
 
         # Log error as is
         msg = f"[{request.url.path}][ApiError:{err.code}] {err.message}"
         log(ERROR, msg)
         # Return sanitized error to client
-        return JSONResponse(
-            status_code=http_status,
-            content=content,
-            headers=http_headers,
-        )
+        return response
     except HTTPException as err:
         return await http_exception_handler(request, err)
     except Exception as err:  # pylint: disable=broad-exception-caught
