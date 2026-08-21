@@ -21,7 +21,6 @@ from rich.color import Color, ColorType
 from rich.console import Console
 from rich.markdown import Markdown
 
-
 _ANSI_COLOR_NAMES = (
     "ansiblack",
     "ansired",
