@@ -17,7 +17,7 @@
 from math import isfinite
 from typing import Any, cast
 
-from .privacy_accounting import (
+from . import (
     GaussianPrivacyEvent,
     NeighboringRelation,
     PrivacyConfig,
