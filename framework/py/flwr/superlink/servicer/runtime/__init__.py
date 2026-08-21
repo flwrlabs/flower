@@ -12,11 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SuperLink implementation of the Runtime API."""
-
-
-from .runtime_grpc import run_runtime_api_grpc
-
-__all__ = [
-    "run_runtime_api_grpc",
-]
+"""SuperLink Runtime API handlers."""
