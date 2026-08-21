@@ -26,6 +26,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
+    AddAppRequest,
     AddNodeToFederationRequest,
     ArchiveFederationRequest,
     ConfigureSimulationFederationRequest,
@@ -42,6 +43,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RegisterNodeRequest,
     RejectInvitationRequest,
     RemoveAccountFromFederationRequest,
+    RemoveAppRequest,
     RemoveNodeFromFederationRequest,
     RevokeInvitationRequest,
     ShowFederationRequest,
@@ -95,6 +97,8 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/unregister-node"): UnregisterNodeRequest,
     ("POST", "/v1/control/list-nodes"): ListNodesRequest,
     ("POST", "/v1/control/list-apps"): ListAppsRequest,
+    ("POST", "/v1/control/add-app"): AddAppRequest,
+    ("POST", "/v1/control/remove-app"): RemoveAppRequest,
     ("POST", "/v1/control/list-federations"): ListFederationsRequest,
     ("POST", "/v1/control/show-federation"): ShowFederationRequest,
     ("POST", "/v1/control/create-federation"): CreateFederationRequest,

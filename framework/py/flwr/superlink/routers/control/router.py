@@ -21,6 +21,8 @@ from fastapi import APIRouter, Depends
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
+    AddAppRequest,
+    AddAppResponse,
     AddNodeToFederationRequest,
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
@@ -53,6 +55,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RejectInvitationResponse,
     RemoveAccountFromFederationRequest,
     RemoveAccountFromFederationResponse,
+    RemoveAppRequest,
+    RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
@@ -213,6 +217,27 @@ def list_apps(
 ) -> ListAppsResponse:
     """List apps associated with a federation."""
     return control_handlers.list_apps(request, account, linkstate)
+
+
+@router.post("/add-app")
+def add_app(
+    request: Annotated[AddAppRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> AddAppResponse:
+    """Add an app to a federation."""
+    # Temporary: pass an empty Fleet API type
+    return control_handlers.add_app(request, account, linkstate, "")
+
+
+@router.post("/remove-app")
+def remove_app(
+    request: Annotated[RemoveAppRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> RemoveAppResponse:
+    """Remove an app from a federation."""
+    return control_handlers.remove_app(request, account, linkstate)
 
 
 @router.post("/show-federation")
