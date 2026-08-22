@@ -63,6 +63,7 @@ from flwr.cli.constant import (
     CHAT_AGENTS_API_PATH,
     CHAT_APP_STYLE,
     CHAT_COMMANDS,
+    CHAT_DEFAULT_FEDERATION_NAME,
     CHAT_EXIT_COMMAND,
     CHAT_EXIT_HINT,
     CHAT_EXPERIMENTAL_WARNING,
@@ -101,11 +102,7 @@ from flwr.supercore.typing import JSONObject
 
 from ..auth_plugin import CliAuthPlugin, OidcCliPlugin
 from ..utils import flwr_cli_grpc_exc_handler
-from .chat_federation import (
-    complete_federations,
-    resolve_default_federation,
-    select_federation,
-)
+from .chat_federation import complete_federations, select_federation
 from .chat_transcript import MarkdownBlock, render_markdown
 
 
@@ -236,7 +233,11 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         auth_plugin: CliAuthPlugin,
     ) -> None:
         self.stub = stub
-        self.federation = resolve_default_federation(federations)
+        self.federation = next(
+            federation.name
+            for federation in federations
+            if federation.name.endswith(f"/{CHAT_DEFAULT_FEDERATION_NAME}")
+        )
         self.federations = federations
         self.series_id: int | None = None
         self.run_id: int | None = None
@@ -467,6 +468,9 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
 
         self.federation = federation_name
         self.completer.set_federation(federation_name)
+        self.agent_app_spec = FLOWER_AGENT_APP_ID
+        self.agent_fab_hash = None
+        self.agent_name = CHAT_AGENT_NAME
         self.series_id = None
         self.transcript.clear()
         self.follow_transcript = True

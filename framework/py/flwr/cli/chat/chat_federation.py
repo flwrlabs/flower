@@ -19,9 +19,8 @@ from collections.abc import Iterable
 import click
 from prompt_toolkit.completion import Completion
 
-from flwr.cli.constant import CHAT_DEFAULT_FEDERATION_NAME, CHAT_FEDERATION_COMMAND
+from flwr.cli.constant import CHAT_FEDERATION_COMMAND
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
-from flwr.supercore.constant import DEFAULT_FEDERATION_SIMULATION
 
 
 def complete_federations(
@@ -47,18 +46,3 @@ def select_federation(prompt: str, federations: list[Federation]) -> str:
     if federation_name not in {federation.name for federation in federations}:
         raise click.ClickException(f"Unknown federation: {federation_name}")
     return federation_name
-
-
-def resolve_default_federation(federations: list[Federation]) -> str:
-    """Resolve the account-scoped default federation used by Flower Chat."""
-    execution_suffix = f"/{CHAT_DEFAULT_FEDERATION_NAME}"
-    for federation in federations:
-        if federation.name.endswith(execution_suffix):
-            return federation.name
-
-    workspace_suffix = f"/{DEFAULT_FEDERATION_SIMULATION}"
-    for federation in federations:
-        if federation.name.endswith(workspace_suffix):
-            account_name = federation.name[: -len(workspace_suffix)]
-            return f"{account_name}{execution_suffix}"
-    raise click.ClickException("No Flower Chat federation is available.")
