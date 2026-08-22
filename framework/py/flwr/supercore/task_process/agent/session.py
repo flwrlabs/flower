@@ -24,7 +24,7 @@ from typing import Literal, cast
 
 from google.protobuf.json_format import ParseDict
 
-from flwr.agentapp import AgentConnectors, AgentResponses, AgentSession
+from flwr.agentapp import AgentConnectors, AgentEvents, AgentResponses, AgentSession
 from flwr.app import Context, Message
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -64,9 +64,15 @@ _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
 class RuntimeAgentSession(AgentSession):
     """AgentSession bound to one AgentApp task."""
 
-    def __init__(self, responses: AgentResponses, connectors: AgentConnectors) -> None:
+    def __init__(
+        self,
+        responses: AgentResponses,
+        connectors: AgentConnectors,
+        events: AgentEvents,
+    ) -> None:
         self._responses = responses
         self._connectors = connectors
+        self._events = events
 
     @property
     def responses(self) -> AgentResponses:
@@ -77,6 +83,29 @@ class RuntimeAgentSession(AgentSession):
     def connectors(self) -> AgentConnectors:
         """Connector tool schema and execution API."""
         return self._connectors
+
+    @property
+    def events(self) -> AgentEvents:
+        """Structured run event API."""
+        return self._events
+
+
+class RuntimeAgentEvents(AgentEvents):
+    """AgentEvents implementation backed by Runtime task events."""
+
+    def __init__(self, stub: RuntimeHttpClient) -> None:
+        self._stub = stub
+
+    def emit(self, event: JSONObject) -> None:
+        """Emit one structured run event."""
+        event_type = event.get("type")
+        if not isinstance(event_type, str) or not event_type:
+            raise ValueError("Run event requires a non-empty string 'type' field.")
+        task_event = TaskEvent(
+            event=event_type,
+            data=strict_json_dumps(event, compact=True),
+        )
+        self._stub.PushTaskEvents(PushTaskEventsRequest(events=[task_event]))
 
 
 class RuntimeAgentConnectors(AgentConnectors):
