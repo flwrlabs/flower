@@ -24,7 +24,7 @@ from typing import Literal, cast
 
 from google.protobuf.json_format import ParseDict
 
-from flwr.agentapp import AgentConnectors, AgentResponses, AgentSession
+from flwr.agentapp import AgentConnectors, AgentEvents, AgentResponses, AgentSession
 from flwr.app import Context, Message
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -64,9 +64,15 @@ _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
 class RuntimeAgentSession(AgentSession):
     """AgentSession bound to one AgentApp task."""
 
-    def __init__(self, responses: AgentResponses, connectors: AgentConnectors) -> None:
+    def __init__(
+        self,
+        responses: AgentResponses,
+        connectors: AgentConnectors,
+        events: AgentEvents,
+    ) -> None:
         self._responses = responses
         self._connectors = connectors
+        self._events = events
 
     @property
     def responses(self) -> AgentResponses:
@@ -77,6 +83,22 @@ class RuntimeAgentSession(AgentSession):
     def connectors(self) -> AgentConnectors:
         """Connector tool schema and execution API."""
         return self._connectors
+
+    @property
+    def events(self) -> AgentEvents:
+        """Structured run event API."""
+        return self._events
+
+
+class RuntimeAgentEvents(AgentEvents):
+    """AgentEvents implementation backed by Runtime task events."""
+
+    def __init__(self, stub: RuntimeHttpClient) -> None:
+        self._stub = stub
+
+    def emit(self, event: JSONObject) -> None:
+        """Emit one structured run event."""
+        _push_run_events(self._stub, [event])
 
 
 class RuntimeAgentConnectors(AgentConnectors):
@@ -328,16 +350,7 @@ class RuntimeAgentResponses(AgentResponses):
 
     def push_run_events(self, events: Sequence[JSONObject]) -> None:
         """Push structured run events for `StreamRunEvents` clients."""
-        if not events:
-            return
-        task_events = [
-            TaskEvent(
-                event=cast(str, event["type"]),
-                data=strict_json_dumps(event, compact=True),
-            )
-            for event in events
-        ]
-        self._stub.PushTaskEvents(PushTaskEventsRequest(events=task_events))
+        _push_run_events(self._stub, events)
 
     def append_and_push_run_events(self, events: list[JSONObject]) -> None:
         """Append run events to context and push them to `StreamRunEvents` clients."""
@@ -401,3 +414,24 @@ class RuntimeAgentResponses(AgentResponses):
 def _is_json_object_list(obj: JSONValue) -> bool:
     """Check if the given object is a list of JSON objects."""
     return isinstance(obj, list) and all(isinstance(item, dict) for item in obj)
+
+
+def _push_run_events(
+    stub: RuntimeHttpClient, events: Sequence[JSONObject]
+) -> None:
+    """Push structured run events through the Runtime API."""
+    if not events:
+        return
+
+    task_events = []
+    for event in events:
+        event_type = event.get("type")
+        if not isinstance(event_type, str) or not event_type:
+            raise ValueError("Run event requires a non-empty string 'type' field.")
+        task_events.append(
+            TaskEvent(
+                event=event_type,
+                data=strict_json_dumps(event, compact=True),
+            )
+        )
+    stub.PushTaskEvents(PushTaskEventsRequest(events=task_events))

@@ -63,7 +63,12 @@ from flwr.supercore.typing import JSONObject
 from flwr.superlink.grid import HttpGrid
 
 from .context_items import append_items
-from .session import RuntimeAgentConnectors, RuntimeAgentResponses, RuntimeAgentSession
+from .session import (
+    RuntimeAgentConnectors,
+    RuntimeAgentEvents,
+    RuntimeAgentResponses,
+    RuntimeAgentSession,
+)
 
 _AGENT_INPUT_KEY = "agent.input"
 
@@ -234,7 +239,10 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             ),
         )
         connectors = RuntimeAgentConnectors(responses)
-        agent = RuntimeAgentSession(responses=responses, connectors=connectors)
+        events = RuntimeAgentEvents(grid._runtime_client)
+        agent = RuntimeAgentSession(
+            responses=responses, connectors=connectors, events=events
+        )
 
         # Load and run the AgentApp
         agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)
