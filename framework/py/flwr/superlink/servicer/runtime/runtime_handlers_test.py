@@ -483,6 +483,8 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         """PushTaskOutput should persist context in the authenticated run series."""
         # Prepare
         run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        current_context = self.state.get_run_series_context(run.series_id)
+        assert current_context is not None
         request_context = Context(
             run_id=123,
             node_id=SUPERLINK_NODE_ID,
@@ -490,6 +492,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             state=RecordDict(),
             run_config={"test": "test"},
             series_id=456,
+            version=current_context.version,
         )
         request = PushTaskOutputRequest(
             sub_status="completed",
@@ -506,7 +509,33 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         assert isinstance(response, PushTaskOutputResponse)
         stored_context = self.state.get_run_series_context(run.series_id)
         assert stored_context is not None
-        assert stored_context == request_context
+        assert stored_context.run_id == request_context.run_id
+        assert stored_context.node_config == request_context.node_config
+        assert stored_context.run_config == request_context.run_config
+        assert stored_context.version == request_context.version + 1
+
+    def test_push_task_output_rejects_stale_run_series_context(self) -> None:
+        """PushTaskOutput should reject a stale concurrent context update."""
+        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        stale_context = self.state.get_run_series_context(run.series_id)
+        assert stale_context is not None
+        latest_context = self.state.get_run_series_context(run.series_id)
+        assert latest_context is not None
+        assert self.state.set_run_series_context(run.series_id, latest_context)
+        request = PushTaskOutputRequest(
+            sub_status=SubStatus.COMPLETED,
+            context=context_to_proto(stale_context),
+        )
+
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.push_task_output(request, self.state, self._auth_task)
+
+        assert error.exception.code == ApiErrorCode.RUNTIME_RUN_SERIES_CONTEXT_CONFLICT
+        task = self.state.get_tasks(task_ids=[self._auth_task.task_id])[0]
+        assert task.status.sub_status == SubStatus.FAILED
+        stored_context = self.state.get_run_series_context(run.series_id)
+        assert stored_context is not None
+        assert stored_context.version == latest_context.version
 
     def test_get_node(self) -> None:
         """Test `GetNode` success."""
@@ -901,6 +930,8 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
         # Set run series context as if it was persisted by an earlier run.
         run = self.state.get_run_info(run_ids=[run_id])[0]
+        current_context = self.state.get_run_series_context(run.series_id)
+        assert current_context is not None
         context = Context(
             123,
             SUPERLINK_NODE_ID,
@@ -908,8 +939,9 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             RecordDict(),
             {},
             series_id=run.series_id,
+            version=current_context.version,
         )
-        self.state.set_run_series_context(run.series_id, context)
+        assert self.state.set_run_series_context(run.series_id, context)
 
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.STARTING

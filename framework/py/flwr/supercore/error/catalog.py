@@ -419,4 +419,9 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_403_FORBIDDEN,
         public_message="Message run ID does not match the authenticated task.",
     ),
+    ApiErrorCode.RUNTIME_RUN_SERIES_CONTEXT_CONFLICT: ApiErrorSpec(
+        status_code=StatusCode.ABORTED,
+        http_status_code=status.HTTP_409_CONFLICT,
+        public_message="Run series context was updated concurrently.",
+    ),
 }

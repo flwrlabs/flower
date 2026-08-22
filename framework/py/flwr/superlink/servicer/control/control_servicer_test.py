@@ -554,6 +554,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         fab_content = b"test FAB content with series ID"
         initial_run_id = self._create_dummy_run(self.aid)
         series_id = self.state.get_run_info(run_ids=[initial_run_id])[0].series_id
+        current_context = self.state.get_run_series_context(series_id)
+        assert current_context is not None
         shared_state = RecordDict({"shared": ConfigRecord({"value": "kept"})})
         initial_context = Context(
             run_id=initial_run_id,
@@ -562,8 +564,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             state=shared_state,
             run_config={"existing": "context"},
             series_id=series_id,
+            version=current_context.version,
         )
-        self.state.set_run_series_context(series_id, initial_context)
+        assert self.state.set_run_series_context(series_id, initial_context)
         request = StartRunRequest(series_id=series_id, federation=NOOP_FEDERATION_ID)
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.fab.content = fab_content
@@ -590,7 +593,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(run_context.run_id, response.run_id)
         self.assertEqual(run_context.node_id, SUPERLINK_NODE_ID)
         self.assertEqual(run_context.node_config, {})
-        self.assertIs(run_context.state, shared_state)
+        self.assertEqual(run_context.state, shared_state)
         self.assertEqual(run_context.run_config, {})
         self.assertEqual(run_context.series_id, series_id)
         self.assertEqual(initial_context.run_id, initial_run_id)

@@ -83,6 +83,7 @@ class SeriesContext(FlwrBase):
 
     series_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
     context: Mapped[bytes | None] = mapped_column(LargeBinary)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
 
 class SeriesRuns(FlwrBase):

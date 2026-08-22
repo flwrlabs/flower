@@ -182,6 +182,7 @@ erDiagram
   series_context {
     BIGINT series_id PK
     BLOB context "nullable"
+    INTEGER version
   }
 
   series_runs {

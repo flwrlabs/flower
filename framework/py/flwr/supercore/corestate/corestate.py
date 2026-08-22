@@ -393,8 +393,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def set_run_series_context(self, series_id: int, context: Context) -> None:
-        """Set the shared Context for the specified RunSeries.
+    def set_run_series_context(self, series_id: int, context: Context) -> bool:
+        """Set the shared Context for the specified RunSeries if its version matches.
 
         Parameters
         ----------
@@ -402,6 +402,12 @@ class CoreState(ABC):  # pylint: disable=R0904
             The ID of the RunSeries for which to persist shared context.
         context : Context
             The shared context to store.
+
+        Returns
+        -------
+        bool
+            ``True`` if the context was stored, or ``False`` if a newer version
+            is already stored.
         """
 
     @abstractmethod

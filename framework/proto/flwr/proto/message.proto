@@ -35,6 +35,7 @@ message Context {
   RecordDict state = 4;
   map<string, Scalar> run_config = 5;
   uint64 series_id = 6;
+  uint64 version = 7;
 }
 
 message Metadata {

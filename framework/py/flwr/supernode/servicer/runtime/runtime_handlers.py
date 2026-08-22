@@ -18,6 +18,7 @@
 
 from logging import DEBUG, ERROR
 
+from flwr.common.constant import SubStatus
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -123,6 +124,25 @@ def push_task_output(
 
     run_id = task.run_id
 
+    # Save the context before finishing the task. Context versions prevent a
+    # stale concurrent execution from overwriting a newer result.
+    if request.HasField("context"):
+        run = state.get_run(run_id)
+        if run is not None and not state.set_run_series_context(
+            run.series_id,
+            context_from_proto(request.context),
+        ):
+            details = "Run series context was updated concurrently."
+            state.finish_task(
+                task_id=task.task_id,
+                sub_status=SubStatus.FAILED,
+                details=details,
+            )
+            raise FlowerError(
+                ApiErrorCode.RUNTIME_RUN_SERIES_CONTEXT_CONFLICT,
+                details,
+            )
+
     # Flag task as finished
     if state.finish_task(
         task_id=task.task_id,
@@ -130,14 +150,6 @@ def push_task_output(
         details=request.details,
     ):
         log(DEBUG, "Finished task %d of run %s", task.task_id, run_id)
-        # Save the context to the state
-        if request.HasField("context"):
-            run = state.get_run(run_id)
-            if run is not None:
-                state.set_run_series_context(
-                    run.series_id,
-                    context_from_proto(request.context),
-                )
     else:
         log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
 

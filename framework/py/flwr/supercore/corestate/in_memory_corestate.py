@@ -58,6 +58,8 @@ from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import (
+    context_from_bytes,
+    context_to_bytes,
     generate_rand_int_from_bytes,
     validate_task_event_data,
     validate_task_message,
@@ -599,12 +601,26 @@ class InMemoryCoreState(
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
         with self.lock_run_series_context_store:
-            return self.run_series_context_store.get(series_id)
+            context = self.run_series_context_store.get(series_id)
+            if context is None:
+                return None
+            return context_from_bytes(context_to_bytes(context))
 
-    def set_run_series_context(self, series_id: int, context: Context) -> None:
-        """Set the shared Context for the specified RunSeries."""
+    def set_run_series_context(self, series_id: int, context: Context) -> bool:
+        """Set the shared Context if its version matches the stored version."""
         with self.lock_run_series_context_store:
-            self.run_series_context_store[series_id] = context
+            stored = self.run_series_context_store.get(series_id)
+            if stored is None:
+                if context.version != 0:
+                    return False
+            elif stored.version != context.version:
+                return False
+
+            context.version += 1
+            self.run_series_context_store[series_id] = context_from_bytes(
+                context_to_bytes(context)
+            )
+            return True
 
     def store_run_in_series(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,

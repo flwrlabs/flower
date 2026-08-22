@@ -19,6 +19,7 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
@@ -807,22 +808,35 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             if row is None or row.context is None:
                 return None
-            return context_from_bytes(row.context)
+            context = context_from_bytes(row.context)
+            context.version = row.version
+            return context
 
-    def set_run_series_context(self, series_id: int, context: Context) -> None:
-        """Set the shared Context for the specified RunSeries."""
+    def set_run_series_context(self, series_id: int, context: Context) -> bool:
+        """Set the shared Context if its version matches the stored version."""
         sint_series_id = uint64_to_int64(series_id)
-        context_bytes = context_to_bytes(context)
+        next_version = context.version + 1
+        next_context = replace(context, version=next_version)
+        context_bytes = context_to_bytes(next_context)
         stmt = self.dialect_insert(SeriesContextModel).values(
             series_id=sint_series_id,
             context=context_bytes,
+            version=next_version,
         )
         stmt = stmt.on_conflict_do_update(
             index_elements=[SeriesContextModel.series_id],
-            set_={"context": stmt.excluded.context},
+            set_={
+                "context": stmt.excluded.context,
+                "version": stmt.excluded.version,
+            },
+            where=SeriesContextModel.version == context.version,
         )
         with self.session() as session:
-            session.execute(stmt)
+            stored_version = session.scalar(stmt.returning(SeriesContextModel.version))
+        if stored_version is None:
+            return False
+        context.version = stored_version
+        return True
 
     def store_run_in_series(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,

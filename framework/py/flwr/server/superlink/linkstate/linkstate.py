@@ -458,4 +458,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         )
         if existing_context := self.get_run_series_context(series_id):
             context.state = existing_context.state
-        self.set_run_series_context(series_id=series_id, context=context)
+            context.version = existing_context.version
+        if not self.set_run_series_context(series_id=series_id, context=context):
+            raise RuntimeError("Run series context changed while refreshing it.")

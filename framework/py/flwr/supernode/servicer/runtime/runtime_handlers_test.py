@@ -19,7 +19,7 @@ from unittest.mock import Mock
 
 from parameterized import parameterized
 
-from flwr.app import Context
+from flwr.app import Context, RecordDict
 from flwr.app.message import make_message
 from flwr.common.constant import SubStatus
 from flwr.common.serde import context_to_proto, message_to_proto
@@ -167,6 +167,33 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
             task_id=task.task_id,
             sub_status=request.sub_status,
             details=request.details,
+        )
+
+    def test_push_task_output_rejects_stale_context(self) -> None:
+        """PushTaskOutput should fail a task instead of overwriting context."""
+        run = Run.create_empty(run_id=61016)
+        run.series_id = 777
+        task = Task(task_id=123, run_id=run.run_id)
+        request = PushTaskOutputRequest(
+            context=context_to_proto(
+                Context(run.run_id, 1, {}, RecordDict(), {}, series_id=run.series_id)
+            ),
+            sub_status=SubStatus.COMPLETED,
+        )
+        self.state.get_run.return_value = run
+        self.state.set_run_series_context.return_value = False
+
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.push_task_output(request, self.state, task)
+
+        self.assertEqual(
+            error.exception.code,
+            ApiErrorCode.RUNTIME_RUN_SERIES_CONTEXT_CONFLICT,
+        )
+        self.state.finish_task.assert_called_once_with(
+            task_id=task.task_id,
+            sub_status=SubStatus.FAILED,
+            details="Run series context was updated concurrently.",
         )
 
     def test_pull_messages_returns_empty_response(self) -> None:

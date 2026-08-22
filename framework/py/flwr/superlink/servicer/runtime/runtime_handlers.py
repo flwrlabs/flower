@@ -20,7 +20,7 @@ from itertools import chain
 from logging import DEBUG, ERROR, INFO
 
 from flwr.app import Message
-from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.common.constant import SUPERLINK_NODE_ID, Status, SubStatus
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -283,18 +283,31 @@ def push_task_output(
     if request.HasField("clientapp_runtime"):
         state.add_clientapp_runtime(run_id, request.clientapp_runtime)
 
+    # Only a run's primary task persists its context. Store it before finishing
+    # the task so a stale concurrent execution can be failed explicitly.
+    if request.HasField("context"):
+        runs = state.get_run_info(run_ids=[run_id])
+        run = runs[0] if runs else None
+        if run and run.series_id and run.primary_task_id == task.task_id:
+            if not state.set_run_series_context(
+                run.series_id,
+                context_from_proto(request.context),
+            ):
+                details = "Run series context was updated concurrently."
+                state.finish_task(
+                    task.task_id,
+                    sub_status=SubStatus.FAILED,
+                    details=details,
+                )
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_RUN_SERIES_CONTEXT_CONFLICT,
+                    details,
+                )
+
     if state.finish_task(
         task.task_id, sub_status=request.sub_status, details=request.details
     ):
         log(INFO, "Finished task %d of run %d", task.task_id, run_id)
-        if request.HasField("context"):
-            runs = state.get_run_info(run_ids=[run_id])
-            run = runs[0] if runs else None
-            if run and run.series_id and run.primary_task_id == task.task_id:
-                state.set_run_series_context(
-                    run.series_id,
-                    context_from_proto(request.context),
-                )
     else:
         log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
     return PushTaskOutputResponse()

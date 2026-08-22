@@ -393,9 +393,12 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             )
             if existing_context := state.get_run_series_context(run_info.series_id):
                 context.state = existing_context.state
+                context.version = existing_context.version
 
             # Store in the state
-            state.set_run_series_context(run_info.series_id, context)
+            if not state.set_run_series_context(run_info.series_id, context):
+                log(ERROR, "Run series context changed while initializing the run.")
+                return None
             state.store_run(run_info)
             state.store_fab(fab)
 
