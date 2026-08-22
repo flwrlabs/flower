@@ -131,6 +131,13 @@ clientapp = "fldsme.client_app:app"
 
 # Custom config values accessible via `context.run_config`
 [tool.flwr.app.config]
+seed = 0
+results-path = ""
+dsme-enabled = true
+selection-policy = "eligible"
+harvest-mj-per-round = 0.0
+energy-margin = 1.0
+exploration-eps = 0.1
 num-server-rounds = 20
 fraction-train = 0.5
 local-epochs = 1
