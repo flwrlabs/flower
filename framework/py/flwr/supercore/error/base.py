@@ -45,8 +45,8 @@ class FlowerError(Exception):
         self.message = message  # Sensitive message
         self.public_details = public_details
 
-    def to_json(self, public_message: str) -> str:
-        """Serialize the client-visible error payload as JSON.
+    def to_json(self, public_message: str) -> dict[str, int | str]:
+        """Return the client-visible HTTP error payload as a JSON dictionary.
 
         Parameters
         ----------
@@ -56,24 +56,25 @@ class FlowerError(Exception):
 
         Returns
         -------
-        str
-            A JSON string containing the error code, the client-visible message,
-            and any client-safe details attached to the error.
+        dict[str, int | str]
+            A JSON dictionary containing the error code and client-visible detail,
+            plus any client-safe extra information attached to the error.
         """
-        return json.dumps(
-            {
-                "code": self.code,
-                "public_message": public_message,
-                "public_details": self.public_details,
-            }
-        )
+        payload: dict[str, int | str] = {
+            "code": self.code,
+            "detail": public_message,
+        }
+        if self.public_details is not None:
+            payload["extra"] = self.public_details
+        return payload
 
     @staticmethod
     def from_json(value: str | None) -> FlowerError | None:
-        """Deserialize a client-visible error payload.
+        """Deserialize a client-visible gRPC or HTTP error payload.
 
         The internal diagnostic message is not transmitted over the wire. The returned
-        error therefore uses the public message as its ``message`` value.
+        error therefore uses the public message (``public_message`` for gRPC or
+        ``detail`` for HTTP) as its ``message`` value.
         """
         if value is None:
             return None
@@ -87,8 +88,12 @@ class FlowerError(Exception):
             return None
 
         code = payload.get("code")
-        public_message = payload.get("public_message")
-        public_details = payload.get("public_details")
+        if "public_message" in payload:
+            public_message = payload.get("public_message")
+            public_details = payload.get("public_details")
+        else:
+            public_message = payload.get("detail")
+            public_details = payload.get("extra")
 
         if (
             not isinstance(code, int)

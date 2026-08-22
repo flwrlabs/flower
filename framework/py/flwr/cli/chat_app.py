@@ -98,6 +98,7 @@ from flwr.supercore.constant import (
 from flwr.supercore.typing import JSONObject
 
 from .auth_plugin import CliAuthPlugin, OidcCliPlugin
+from .chat_transcript import MarkdownBlock, render_markdown
 from .utils import flwr_cli_grpc_exc_handler
 
 
@@ -203,7 +204,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.run_id: int | None = None
         self.busy = False
         self.cancel_requested = False
-        self.transcript: list[tuple[str, str] | _DetailsBlock] = []
+        self.transcript: list[tuple[str, str] | _DetailsBlock | MarkdownBlock] = []
         self.wrapped_transcript: StyleAndTextTuples = []
         self.wrapped_transcript_key: tuple[int, int] | None = None
         self.transcript_revision = 0
@@ -431,6 +432,13 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         except click.ClickException as exc:
             self._append_transcript("class:error", f"Error: {exc.format_message()}\n\n")
         finally:
+            finalized_markdown = False
+            for entry in self.transcript:
+                if isinstance(entry, MarkdownBlock) and not entry.finalized:
+                    entry.finalized = True
+                    finalized_markdown = True
+            if finalized_markdown:
+                self.transcript_revision += 1
             self.run_id = None
             self.busy = False
             self.cancel_requested = False
@@ -451,10 +459,10 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self._stop_run(self.run_id)
             return
 
-        response_started = False
         terminal_event_seen = False
         response_start = len(self.transcript)
         reasoning_block: _DetailsBlock | None = None
+        markdown_block: MarkdownBlock | None = None
         web_search_blocks: dict[str, _DetailsBlock] = {}
         req_events = StreamRunEventsRequest(run_id=self.run_id)
         # Append streamed response content until the run reaches a terminal event.
@@ -464,10 +472,18 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 if event_type == CHAT_TEXT_DELTA_EVENT:
                     delta = payload.get("delta")
                     if isinstance(delta, str):
-                        if not response_started:
-                            response_started = True
+                        # Start a new block after tool output so transcript entries
+                        # remain in the same order as their streamed events.
+                        if (
+                            markdown_block is None
+                            or self.transcript[-1] is not markdown_block
+                        ):
                             self.status = ""
-                        self._append_transcript("", delta)
+                            markdown_block = MarkdownBlock()
+                            self.transcript.append(markdown_block)
+                        markdown_block.body += delta
+                        self.transcript_revision += 1
+                        self.application.invalidate()
                 elif event_type in {
                     CHAT_REASONING_DELTA_EVENT,
                     CHAT_TOOL_CALL_STARTED_EVENT,
@@ -480,13 +496,17 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                         reasoning_block,
                         web_search_blocks,
                     )
+                    if (
+                        markdown_block is not None
+                        and self.transcript[-1] is not markdown_block
+                    ):
+                        markdown_block.finalized = True
+                        markdown_block = None
                 elif event_type in CHAT_FAILURE_EVENTS:
                     raise click.ClickException(format_failure_event(payload))
                 elif event_type in CHAT_TERMINAL_EVENTS:
                     terminal_event_seen = True
 
-        if response_started:
-            self._append_transcript("", "\n\n")
         if not terminal_event_seen and not self.cancel_requested:
             raise click.ClickException(
                 "Chat run ended before the agent response completed."
@@ -619,6 +639,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             for entry in self.transcript:
                 if isinstance(entry, _DetailsBlock):
                     fragments.extend(self._render_details_block(entry, width))
+                elif isinstance(entry, MarkdownBlock):
+                    fragments.extend(render_markdown(entry, width))
                 else:
                     fragments.append(entry)
             self.wrapped_transcript = _wrap_transcript_fragments(fragments, width)
