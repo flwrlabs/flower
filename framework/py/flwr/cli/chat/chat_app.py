@@ -64,6 +64,7 @@ from flwr.cli.constant import (
     CHAT_AGENTS_API_PATH,
     CHAT_APP_STYLE,
     CHAT_COMMANDS,
+    CHAT_DEFAULT_FEDERATION_NAME,
     CHAT_EXIT_COMMAND,
     CHAT_EXIT_HINT,
     CHAT_EXPERIMENTAL_WARNING,
@@ -103,11 +104,7 @@ from flwr.supercore.typing import JSONObject
 from ..auth_plugin import CliAuthPlugin, OidcCliPlugin
 from ..utils import flwr_cli_grpc_exc_handler
 from .chat_commands import HistoryBlock, load_conversation, load_history, render_history
-from .chat_federation import (
-    complete_federations,
-    resolve_default_federation,
-    select_federation,
-)
+from .chat_federation import complete_federations, select_federation
 from .chat_transcript import MarkdownBlock, render_markdown
 
 
@@ -130,18 +127,26 @@ class _Agent:
     fab_hash: str | None
 
 
+def _finalize_markdown_block(block: MarkdownBlock) -> bool:
+    """Finalize a Markdown block and report whether it changed."""
+    if block.finalized:
+        return False
+    block.finalized = True
+    return True
+
+
 class _ChatCompleter(Completer):
     """Complete slash commands and agents in the prompt."""
 
     def __init__(
         self,
         auth_plugin: CliAuthPlugin,
-        federation: str | None,
-        federations: list[Federation] | None = None,
+        federation: str,
+        federations: list[Federation],
     ) -> None:
         self.auth_plugin = auth_plugin
         self.federation = federation
-        self.federations = federations or []
+        self.federations = federations
         self.agents: list[_Agent] | None = None
         self._agents_lock = Lock()
 
@@ -230,7 +235,11 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         auth_plugin: CliAuthPlugin,
     ) -> None:
         self.stub = stub
-        self.federation = resolve_default_federation(federations)
+        self.federation = next(
+            federation.name
+            for federation in federations
+            if federation.name.endswith(f"/{CHAT_DEFAULT_FEDERATION_NAME}")
+        )
         self.federations = federations
         self.series_id: int | None = None
         self.run_id: int | None = None
@@ -482,19 +491,20 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self._append_transcript("class:error", f"{exc.format_message()}\n\n")
             return True
 
+        if federation_name == self.federation:
+            return True
+
         self.federation = federation_name
         self.completer.set_federation(federation_name)
+        self.agent_app_spec = FLOWER_AGENT_APP_ID
+        self.agent_fab_hash = None
+        self.agent_name = CHAT_AGENT_NAME
         self.series_id = None
         self._clear_transcript()
         return True
 
     def _show_history(self) -> None:
         """Show conversation history for the active federation."""
-        if self.federation is None:
-            self._append_transcript(
-                "class:error", "The active federation is unavailable.\n\n"
-            )
-            return
         try:
             block = load_history(self.stub, self.federation)
         except click.ClickException as exc:
@@ -584,8 +594,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         finally:
             finalized_markdown = False
             for entry in self.transcript:
-                if isinstance(entry, MarkdownBlock) and not entry.finalized:
-                    entry.finalized = True
+                if isinstance(entry, MarkdownBlock) and _finalize_markdown_block(entry):
                     finalized_markdown = True
             if finalized_markdown:
                 self.transcript_revision += 1

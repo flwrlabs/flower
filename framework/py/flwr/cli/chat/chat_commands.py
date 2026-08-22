@@ -54,7 +54,7 @@ def load_history(stub: ControlStub, federation: str) -> HistoryBlock | None:
 
 
 def load_conversation(
-    stub: ControlStub, entry: RunSeries, federation: str | None
+    stub: ControlStub, entry: RunSeries, federation: str
 ) -> list[tuple[str, str]]:
     """Load displayable messages for one conversation."""
     with flwr_cli_grpc_exc_handler():

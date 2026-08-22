@@ -20,7 +20,9 @@ from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 
 from flwr.cli.chat.chat_app import ChatApplication, _ChatCompleter
+from flwr.cli.constant import CHAT_AGENT_NAME
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
+from flwr.supercore.constant import FLOWER_AGENT_APP_ID
 
 
 def test_chat_selects_federation_from_dropdown() -> None:
@@ -29,7 +31,7 @@ def test_chat_selects_federation_from_dropdown() -> None:
         Federation(name="@flower/flower-agent-execution", description="Default"),
         Federation(name="@flower/other", description="Other"),
     ]
-    completer = _ChatCompleter(Mock(), None, federations)
+    completer = _ChatCompleter(Mock(), federations[0].name, federations)
     completions = list(
         completer.get_completions(Document("/federation @flower/o"), CompleteEvent())
     )
@@ -49,10 +51,27 @@ def test_chat_selects_federation_from_dropdown() -> None:
 
     chat.transcript = [("", "Previous conversation\n\n")]
     chat.series_id = 123
+    chat.agent_app_spec = "@flower/custom-agent"
+    chat.agent_fab_hash = "fab-hash"
+    chat.agent_name = "Custom Agent"
     assert chat._handle_command(  # pylint: disable=protected-access
         event, "/federation @flower/other"
     )
     assert chat.federation == "@flower/other"
     assert chat.completer.federation == "@flower/other"
+    assert chat.agent_app_spec == FLOWER_AGENT_APP_ID
+    assert chat.agent_fab_hash is None
+    assert chat.agent_name == CHAT_AGENT_NAME
     assert chat.series_id is None
     assert not chat.transcript
+
+    transcript = [("", "Active conversation\n\n")]
+    chat.transcript = transcript
+    chat.series_id = 456
+    application.reset_mock()
+    assert chat._handle_command(  # pylint: disable=protected-access
+        event, "/federation @flower/other"
+    )
+    assert chat.series_id == 456
+    assert chat.transcript == transcript
+    application.invalidate.assert_not_called()

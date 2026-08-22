@@ -26,6 +26,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     CreateTaskResponse,
+    PullTaskMessageRequest,
+    PullTaskMessageResponse,
 )
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
@@ -37,6 +39,24 @@ from flwr.supercore.task_process.connector.registry import get_builtin_connector
 from flwr.supercore.typing import JSONObject
 
 from .session import RuntimeAgentConnectors, RuntimeAgentResponses
+
+
+def test_pull_task_messages_filters_by_child_task() -> None:
+    """Claim only messages sent by the expected child task."""
+    stub = Mock()
+    stub.PullTaskMessage.return_value = PullTaskMessageResponse()
+    responses = RuntimeAgentResponses(
+        stub=stub,
+        run_id=123,
+        task_id=789,
+        context=Mock(),
+        start_run_request=StartRunRequest(),
+    )
+
+    assert responses._pull_task_messages(456) == []  # pylint: disable=W0212
+    stub.PullTaskMessage.assert_called_once_with(
+        PullTaskMessageRequest(limit=1, src_task_id=456)
+    )
 
 
 def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
