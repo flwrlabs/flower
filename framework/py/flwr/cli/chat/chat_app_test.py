@@ -29,7 +29,7 @@ def test_chat_selects_federation_from_dropdown() -> None:
         Federation(name="@flower/flower-agent-execution", description="Default"),
         Federation(name="@flower/other", description="Other"),
     ]
-    completer = _ChatCompleter(Mock(), None, federations)
+    completer = _ChatCompleter(Mock(), federations[0].name, federations)
     completions = list(
         completer.get_completions(Document("/federation @flower/o"), CompleteEvent())
     )

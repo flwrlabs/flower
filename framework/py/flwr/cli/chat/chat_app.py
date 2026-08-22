@@ -128,18 +128,26 @@ class _Agent:
     fab_hash: str | None
 
 
+def _finalize_markdown_block(block: MarkdownBlock) -> bool:
+    """Finalize a Markdown block and report whether it changed."""
+    if block.finalized:
+        return False
+    block.finalized = True
+    return True
+
+
 class _ChatCompleter(Completer):
     """Complete slash commands and agents in the prompt."""
 
     def __init__(
         self,
         auth_plugin: CliAuthPlugin,
-        federation: str | None,
-        federations: list[Federation] | None = None,
+        federation: str,
+        federations: list[Federation],
     ) -> None:
         self.auth_plugin = auth_plugin
         self.federation = federation
-        self.federations = federations or []
+        self.federations = federations
         self.agents: list[_Agent] | None = None
         self._agents_lock = Lock()
 
@@ -495,10 +503,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         finally:
             finalized_markdown = False
             for entry in self.transcript:
-                if not isinstance(entry, MarkdownBlock):
-                    continue
-                if not entry.finalized:
-                    entry.finalized = True
+                if isinstance(entry, MarkdownBlock) and _finalize_markdown_block(entry):
                     finalized_markdown = True
             if finalized_markdown:
                 self.transcript_revision += 1

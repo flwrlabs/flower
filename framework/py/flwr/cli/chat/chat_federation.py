@@ -49,7 +49,7 @@ def select_federation(prompt: str, federations: list[Federation]) -> str:
     return federation_name
 
 
-def resolve_default_federation(federations: list[Federation]) -> str | None:
+def resolve_default_federation(federations: list[Federation]) -> str:
     """Resolve the account-scoped default federation used by Flower Chat."""
     execution_suffix = f"/{CHAT_DEFAULT_FEDERATION_NAME}"
     for federation in federations:
@@ -61,4 +61,4 @@ def resolve_default_federation(federations: list[Federation]) -> str | None:
         if federation.name.endswith(workspace_suffix):
             account_name = federation.name[: -len(workspace_suffix)]
             return f"{account_name}{execution_suffix}"
-    return None
+    raise click.ClickException("No Flower Chat federation is available.")
