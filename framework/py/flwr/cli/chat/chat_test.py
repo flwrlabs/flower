@@ -24,7 +24,7 @@ import pytest
 from flwr.cli.constant import CHAT_SUPERGRID_CONNECTION_NAME
 from flwr.cli.typing import SuperLinkConnection
 
-chat_module = importlib.import_module("flwr.cli.chat")
+chat_module = importlib.import_module("flwr.cli.chat.chat")
 
 
 def test_chat_requires_login_before_interactive_application() -> None:

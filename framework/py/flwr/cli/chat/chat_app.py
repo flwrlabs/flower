@@ -97,9 +97,9 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.typing import JSONObject
 
-from .auth_plugin import CliAuthPlugin, OidcCliPlugin
+from ..auth_plugin import CliAuthPlugin, OidcCliPlugin
 from .chat_transcript import MarkdownBlock, render_markdown
-from .utils import flwr_cli_grpc_exc_handler
+from ..utils import flwr_cli_grpc_exc_handler
 
 
 @dataclass
