@@ -52,16 +52,11 @@ def test_emit_event_pushes_task_event() -> None:
 
     events.emit({"type": "response.output_text.delta", "delta": "Hello"})
 
-    stub.PushTaskEvents.assert_called_once_with(
-        PushTaskEventsRequest(
-            events=[
-                TaskEvent(
-                    event="response.output_text.delta",
-                    data=('{"type":"response.output_text.delta","delta":"Hello"}'),
-                )
-            ]
-        )
+    event = TaskEvent(
+        event="response.output_text.delta",
+        data=('{"type":"response.output_text.delta","delta":"Hello"}'),
     )
+    stub.PushTaskEvents.assert_called_once_with(PushTaskEventsRequest(events=[event]))
 
 
 def test_emit_event_requires_type() -> None:
