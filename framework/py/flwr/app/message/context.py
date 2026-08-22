@@ -18,23 +18,11 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from threading import RLock
-from typing import TypedDict
+from threading import Lock
 
 from flwr.app.user_config import UserConfig
 
 from .recorddict import RecordDict
-
-
-class _ContextState(TypedDict):
-    """Pickle state for Context."""
-
-    run_id: int
-    node_id: int
-    node_config: UserConfig
-    state: RecordDict
-    run_config: UserConfig
-    series_id: int
 
 
 @dataclass
@@ -87,7 +75,7 @@ class Context:
         self.state = state
         self.run_config = run_config
         self.series_id = series_id
-        self._lock = RLock()
+        self._lock = Lock()
 
     @contextmanager
     def locked(self) -> Iterator[None]:
@@ -95,23 +83,13 @@ class Context:
         with self._lock:
             yield
 
-    def __getstate__(self) -> _ContextState:
-        """Return pickle state without the process-local lock."""
-        return {
-            "run_id": self.run_id,
-            "node_id": self.node_id,
-            "node_config": self.node_config,
-            "state": self.state,
-            "run_config": self.run_config,
-            "series_id": self.series_id,
-        }
+    def __getstate__(self) -> dict[str, object]:
+        """Return the state without the unpicklable lock."""
+        state = self.__dict__.copy()
+        del state["_lock"]
+        return state
 
-    def __setstate__(self, state: _ContextState) -> None:
-        """Restore pickle state and create a new process-local lock."""
-        self.run_id = state["run_id"]
-        self.node_id = state["node_id"]
-        self.node_config = state["node_config"]
-        self.state = state["state"]
-        self.run_config = state["run_config"]
-        self.series_id = state["series_id"]
-        self._lock = RLock()
+    def __setstate__(self, state: dict[str, object]) -> None:
+        """Restore the state and create a new lock."""
+        self.__dict__.update(state)
+        self.__dict__["_lock"] = Lock()
