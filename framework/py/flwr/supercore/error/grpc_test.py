@@ -51,30 +51,36 @@ def test_rpc_error_translator_mapped_flower_error() -> None:
     }
 
 
-def test_flower_error_from_json() -> None:
-    """Deserialize the public FlowerError payload on the client side."""
+def test_flower_error_to_json_and_from_json() -> None:
+    """Serialize and deserialize the canonical HTTP FlowerError payload."""
     err = FlowerError(
         ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
         "internal diagnostic message",
         public_details="public details",
     )
 
-    parsed = FlowerError.from_json(err.to_json("public message"))
+    payload = err.to_json("public message")
+    parsed = FlowerError.from_json(json.dumps(payload))
 
+    assert payload == {
+        "code": ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
+        "detail": "public message",
+        "extra": "public details",
+    }
     assert parsed is not None
     assert parsed.code == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
     assert parsed.message == "public message"
     assert parsed.public_details == "public details"
 
 
-def test_flower_error_from_http_json() -> None:
-    """Deserialize the public HTTP FlowerError payload on the client side."""
+def test_flower_error_from_grpc_json() -> None:
+    """Continue to deserialize the legacy gRPC FlowerError payload."""
     parsed = FlowerError.from_json(
         json.dumps(
             {
-                "detail": "public message",
+                "public_message": "public message",
                 "code": ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE.value,
-                "extra": "public details",
+                "public_details": "public details",
             }
         )
     )
@@ -86,15 +92,22 @@ def test_flower_error_from_http_json() -> None:
 
 
 def test_flower_error_from_json_returns_base_error_for_subclass_call() -> None:
-    """Deserialize public payloads into a base FlowerError."""
+    """Use the base HTTP representation and deserialize into a base FlowerError."""
     err = EntitlementError(
         "internal diagnostic message",
         public_details="public details",
         entitlement_code=123,
     )
 
-    parsed = EntitlementError.from_json(err.to_json("public message"))
+    payload = err.to_json("public message")
+    parsed = EntitlementError.from_json(json.dumps(payload))
 
+    assert payload == {
+        "code": ApiErrorCode.ENTITLEMENT_ERROR,
+        "detail": "public message",
+        "extra": "public details",
+        "entitlement_code": 123,
+    }
     assert isinstance(parsed, FlowerError)
     assert not isinstance(parsed, EntitlementError)
     assert parsed.code == ApiErrorCode.ENTITLEMENT_ERROR

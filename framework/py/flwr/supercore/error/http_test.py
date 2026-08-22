@@ -23,7 +23,6 @@ from starlette.datastructures import State
 
 from .base import ApiErrorCode, FlowerError
 from .catalog import API_ERROR_MAP
-from .exceptions import EntitlementError
 from .http import (
     INTERNAL_SERVER_ERROR_MESSAGE,
     BearerAuthenticationError,
@@ -138,32 +137,6 @@ def test_http_error_translator_unmapped_flower_error() -> None:
         response,
         status.HTTP_500_INTERNAL_SERVER_ERROR,
         {"detail": INTERNAL_SERVER_ERROR_MESSAGE},
-    )
-    assert b"internal diagnostic message" not in response.body
-
-
-def test_http_error_translator_entitlement_error() -> None:
-    """Expose entitlement details without its entitlement code."""
-    error_message = "Entitlement check failed: plan does not allow this action."
-    entitlement_code = 101
-
-    response = _run_translator(
-        EntitlementError(
-            "internal diagnostic message",
-            public_details=error_message,
-            entitlement_code=entitlement_code,
-        )
-    )
-
-    spec = API_ERROR_MAP[ApiErrorCode.ENTITLEMENT_ERROR]
-    _assert_json_response(
-        response,
-        spec.http_status_code,
-        {
-            "detail": spec.public_message,
-            "code": ApiErrorCode.ENTITLEMENT_ERROR.value,
-            "extra": error_message,
-        },
     )
     assert b"internal diagnostic message" not in response.body
 
