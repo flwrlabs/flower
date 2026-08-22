@@ -496,6 +496,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         self.state.get_task_message.assert_called_once_with(
             dst_task_ids=[321],
+            src_task_ids=None,
             limit=5,
             order_by="created_at",
         )
@@ -504,6 +505,25 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(response.messages[0].metadata.dst_task_id, 321)
         self.assertEqual(response.messages[0].metadata.src_node_id, SUPERLINK_NODE_ID)
         self.assertEqual(response.messages[0].metadata.dst_node_id, SUPERLINK_NODE_ID)
+
+    def test_pull_task_message_filters_source_task(self) -> None:
+        """PullTaskMessage should optionally query messages from one source task."""
+        self.state.get_task_message.return_value = []
+
+        # Execute
+        runtime_handlers.pull_task_message(
+            PullTaskMessageRequest(limit=5, src_task_id=123),
+            self.state,
+            Task(task_id=321, run_id=789),
+        )
+
+        # Assert
+        self.state.get_task_message.assert_called_once_with(
+            dst_task_ids=[321],
+            src_task_ids=[123],
+            limit=5,
+            order_by="created_at",
+        )
 
     def test_create_task_rejects_disallowed_requesting_task_type(self) -> None:
         """CreateTask should reject task creation requests from non-app task types."""
