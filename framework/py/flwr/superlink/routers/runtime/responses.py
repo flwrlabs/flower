@@ -21,6 +21,7 @@ import json
 import os
 import time
 from dataclasses import dataclass
+from logging import ERROR
 from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -31,6 +32,7 @@ from flwr.common.constant import Status, SubStatus
 from flwr.proto.runtime_pb2 import CreateTaskRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
+from flwr.supercore import log
 from flwr.supercore.constant import TaskType
 from flwr.supercore.error import FlowerError
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
@@ -58,6 +60,7 @@ _SUPPORTED_FIELDS = frozenset(
     }
 )
 _POLL_INTERVAL = 0.25
+_DEFAULT_MODEL_RESPONSE_TIMEOUT = 300.0
 _DEFAULT_MODEL_TASK_LAUNCH_TIMEOUT = 300.0
 _MODEL_TASK_LAUNCH_TIMEOUT_ENV = "FLWR_MODEL_TASK_LAUNCH_TIMEOUT"
 
@@ -91,13 +94,14 @@ async def create_runtime_response(
         payload = await _read_request_payload(request)
         model_request = _model_request_from_payload(payload)
         exchange = await run_in_threadpool(_start_exchange, state, task, model_request)
-    except _ResponsesError as err:
-        return _error_response(err)
-
-    try:
         response = await _wait_for_response(request, state, exchange)
     except _ResponsesError as err:
         return _error_response(err)
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        log(ERROR, "Runtime Responses request failed unexpectedly", exc_info=err)
+        return _error_response(
+            _ResponsesError(500, "Internal server error.", "internal_error")
+        )
     return JSONResponse(content=response)
 
 
@@ -204,7 +208,9 @@ async def _wait_for_response(
     request: Request, state: LinkState, exchange: _Exchange
 ) -> JSONObject:
     """Wait for and return one correlated model response."""
-    launch_deadline = time.monotonic() + _model_task_launch_timeout()
+    started_at = time.monotonic()
+    launch_deadline = started_at + _model_task_launch_timeout()
+    response_deadline = started_at + _DEFAULT_MODEL_RESPONSE_TIMEOUT
     complete = False
     try:
         while True:
@@ -218,6 +224,7 @@ async def _wait_for_response(
                 state,
                 exchange,
                 launch_deadline,
+                response_deadline,
             )
             if response is not None:
                 complete = True
@@ -254,6 +261,7 @@ def _claim_response_or_raise_for_model_task_state(
     state: LinkState,
     exchange: _Exchange,
     launch_deadline: float | None = None,
+    response_deadline: float | None = None,
 ) -> JSONObject | None:
     """Claim a reply, or fail when its task cannot produce one."""
     response = _claim_response(state, exchange)
@@ -282,6 +290,12 @@ def _claim_response_or_raise_for_model_task_state(
             504,
             "Model task was not launched before the configured timeout.",
             "model_task_launch_timeout",
+        )
+    if response_deadline is not None and time.monotonic() >= response_deadline:
+        raise _ResponsesError(
+            504,
+            "Model response was not received before the configured timeout.",
+            "model_response_timeout",
         )
     return None
 

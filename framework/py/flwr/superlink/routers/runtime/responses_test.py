@@ -144,6 +144,27 @@ def test_responses_rejects_streaming() -> None:
     state.create_task.assert_not_called()
 
 
+def test_responses_maps_unexpected_errors() -> None:
+    """Return an OpenAI-style error envelope for unexpected failures."""
+    with patch(
+        "flwr.superlink.routers.runtime.responses._authenticate",
+        side_effect=RuntimeError("unexpected"),
+    ):
+        response = _client(_state()).post(
+            "/v1/runtime/responses",
+            json={"model": "model", "input": "hello"},
+            headers={"Authorization": "Bearer task-token"},
+        )
+
+    assert response.status_code == 500
+    assert response.json()["error"] == {
+        "message": "Internal server error.",
+        "type": "server_error",
+        "param": None,
+        "code": "internal_error",
+    }
+
+
 def test_responses_stops_and_drains_when_response_wait_is_cancelled() -> None:
     """Stop the child task and drain its reply when response waiting is cancelled."""
     state = _state()
@@ -233,6 +254,40 @@ def test_responses_times_out_if_model_task_is_not_launched() -> None:
                 await _wait_for_response(request, state, exchange)
         assert exc_info.value.status_code == 504
         assert exc_info.value.code == "model_task_launch_timeout"
+
+    asyncio.run(wait_for_response())
+
+    state.finish_task.assert_called_once_with(
+        456, SubStatus.STOPPED, "Responses request ended early."
+    )
+
+
+def test_responses_times_out_if_running_model_task_does_not_respond() -> None:
+    """Stop waiting when a running model task does not produce a response."""
+    state = _state()
+    state.get_task_message.return_value = []
+    state.get_tasks.return_value = [
+        Task(
+            task_id=456,
+            status=TaskStatus(status=Status.RUNNING),
+        )
+    ]
+    request = Mock(spec=Request)
+    request.is_disconnected = AsyncMock(return_value=False)
+
+    async def wait_for_response() -> None:
+        exchange = _Exchange(
+            agent_task_id=123,
+            model_task_id=456,
+        )
+        with patch(
+            "flwr.superlink.routers.runtime.responses._DEFAULT_MODEL_RESPONSE_TIMEOUT",
+            new=0.0,
+        ):
+            with pytest.raises(_ResponsesError) as exc_info:
+                await _wait_for_response(request, state, exchange)
+        assert exc_info.value.status_code == 504
+        assert exc_info.value.code == "model_response_timeout"
 
     asyncio.run(wait_for_response())
 
