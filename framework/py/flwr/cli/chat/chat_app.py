@@ -454,6 +454,9 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             self._append_transcript("class:error", f"{exc.format_message()}\n\n")
             return True
 
+        if federation_name == self.federation:
+            return True
+
         self.federation = federation_name
         self.completer.set_federation(federation_name)
         self.series_id = None
@@ -492,7 +495,9 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         finally:
             finalized_markdown = False
             for entry in self.transcript:
-                if isinstance(entry, MarkdownBlock) and not entry.finalized:
+                if not isinstance(entry, MarkdownBlock):
+                    continue
+                if not entry.finalized:
                     entry.finalized = True
                     finalized_markdown = True
             if finalized_markdown:

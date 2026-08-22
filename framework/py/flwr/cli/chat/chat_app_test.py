@@ -56,3 +56,14 @@ def test_chat_selects_federation_from_dropdown() -> None:
     assert chat.completer.federation == "@flower/other"
     assert chat.series_id is None
     assert not chat.transcript
+
+    transcript = [("", "Active conversation\n\n")]
+    chat.transcript = transcript
+    chat.series_id = 456
+    application.reset_mock()
+    assert chat._handle_command(  # pylint: disable=protected-access
+        event, "/federation @flower/other"
+    )
+    assert chat.series_id == 456
+    assert chat.transcript == transcript
+    application.invalidate.assert_not_called()
