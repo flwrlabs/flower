@@ -488,7 +488,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         # Execute
         response = runtime_handlers.pull_task_message(
-            PullTaskMessageRequest(limit=5),
+            PullTaskMessageRequest(limit=5, src_task_id=123),
             self.state,
             Task(task_id=321, run_id=789),
         )
@@ -496,6 +496,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         self.state.get_task_message.assert_called_once_with(
             dst_task_ids=[321],
+            src_task_ids=[123],
             limit=5,
             order_by="created_at",
         )
