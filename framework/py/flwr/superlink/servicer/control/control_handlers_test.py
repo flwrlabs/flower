@@ -34,6 +34,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    FLOWER_AGENT_APP_ID,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     AutomationStatus,
@@ -145,14 +146,38 @@ class TestControlHandlers(unittest.TestCase):
         )
 
         response = list_apps(
-            ListAppsRequest(federation_id=NOOP_FEDERATION_ID, limit=1),
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
             self.account,
             self.state,
         )
 
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in response.apps],
-            [("@flwr/demo", fab_hash, TaskType.SERVER_APP)],
+            [
+                ("@flwr/demo", fab_hash, TaskType.SERVER_APP),
+                (FLOWER_AGENT_APP_ID, "", TaskType.AGENT_APP),
+            ],
+        )
+
+    def test_list_apps_does_not_duplicate_stored_flower_agent(self) -> None:
+        """List apps uses the stored Flower Agent entry when available."""
+        fab_hash = self.state.store_app(
+            fab=Fab("", b"fab", {}),
+            federation_id=NOOP_FEDERATION_ID,
+            app_id=FLOWER_AGENT_APP_ID,
+            app_type=TaskType.AGENT_APP,
+            added_by=self.account.flwr_aid,
+        )
+
+        response = list_apps(
+            ListAppsRequest(federation_id=NOOP_FEDERATION_ID),
+            self.account,
+            self.state,
+        )
+
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type) for app in response.apps],
+            [(FLOWER_AGENT_APP_ID, fab_hash, TaskType.AGENT_APP)],
         )
 
     def test_add_and_remove_app(self) -> None:
@@ -208,8 +233,10 @@ class TestControlHandlers(unittest.TestCase):
         self.assertEqual(remove_response, RemoveAppResponse())
         self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
 
-    def test_start_automation_normalizes_start_at_to_utc(self) -> None:
-        """Normalize the automation start time to UTC."""
+    def test_start_automation_preserves_recurrence_and_normalizes_start_at(
+        self,
+    ) -> None:
+        """Normalize the start time and preserve a recurring interval."""
         # Prepare
         request = StartAutomationRequest(
             start_at="2026-07-10T04:00:00-05:00",
@@ -238,6 +265,34 @@ class TestControlHandlers(unittest.TestCase):
             ),
             (response.series_id, "2026-07-10T09:00:00+00:00", 60, 3),
         )
+
+    def test_start_automation_omits_interval_for_one_run(self) -> None:
+        """Store and list one-run automations without a recurrence interval."""
+        # Prepare
+        request = StartAutomationRequest(
+            fixed_interval=60,
+            max_runs=1,
+            start_run_request=StartRunRequest(
+                federation=NOOP_FEDERATION_ID,
+                series_id=1,
+            ),
+        )
+
+        # Execute
+        response = start_automation(request, self.account, self.state)
+        stored_automation = self.state.list_automations(
+            automation_ids=[response.automation_id],
+            order_by="updated_at",
+        )[0]
+        listed_automation = list_automations(
+            ListAutomationsRequest(federation=NOOP_FEDERATION_ID),
+            self.account,
+            self.state,
+        ).automations[0]
+
+        # Assert
+        self.assertFalse(stored_automation.HasField("fixed_interval"))
+        self.assertFalse(listed_automation.HasField("fixed_interval"))
 
     def test_start_automation_rejects_start_at_without_timezone(self) -> None:
         """Reject a start time without timezone information."""

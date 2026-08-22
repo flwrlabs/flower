@@ -47,7 +47,6 @@ FEDERATION_CONFIG_HELP_MESSAGE = CONFIG_HELP_MESSAGE.format(
 )
 
 # Constants for `flwr chat`
-CHAT_FLOWER_AGENT_APP_SPEC = "@flwrlabs/flwr-agent"
 CHAT_SUPERGRID_CONNECTION_NAME = "supergrid"
 CHAT_AGENT_INPUT_KEY = "agent.input"
 CHAT_AGENTS_API_PATH = "/user/agents"
