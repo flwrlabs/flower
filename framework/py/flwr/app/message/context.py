@@ -92,4 +92,4 @@ class Context:
     def __setstate__(self, state: dict[str, object]) -> None:
         """Restore the state and create a new lock."""
         self.__dict__.update(state)
-        self.__dict__["_lock"] = Lock()
+        self.__dict__["_lock"] = RLock()
