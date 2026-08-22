@@ -606,15 +606,14 @@ def message_from_proto(message_proto: ProtoMessage) -> Message:
 
 def context_to_proto(context: Context) -> ProtoContext:
     """Serialize `Context` to ProtoBuf."""
-    with context.locked():
-        return ProtoContext(
-            run_id=context.run_id,
-            node_id=context.node_id,
-            node_config=user_config_to_proto(context.node_config),
-            state=recorddict_to_proto(context.state),
-            run_config=user_config_to_proto(context.run_config),
-            series_id=context.series_id,
-        )
+    return ProtoContext(
+        run_id=context.run_id,
+        node_id=context.node_id,
+        node_config=user_config_to_proto(context.node_config),
+        state=recorddict_to_proto(context.state),
+        run_config=user_config_to_proto(context.run_config),
+        series_id=context.series_id,
+    )
 
 
 def context_from_proto(context_proto: ProtoContext) -> Context:
