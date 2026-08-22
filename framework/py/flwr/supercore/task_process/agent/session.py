@@ -367,7 +367,7 @@ class RuntimeAgentResponses(AgentResponses):
         return [message_from_proto(msg) for msg in res.messages]
 
     def _send_and_receive(self, message: Message) -> Message:
-        """Send one message and wait for its direct reply.
+        """Send one message and wait for its destination child task's direct reply.
 
         For now, `flwr-agentapp` expects a strict one-request-one-reply exchange with
         child tasks, so any non-matching pulled message is treated as an error.
@@ -383,7 +383,8 @@ class RuntimeAgentResponses(AgentResponses):
         # Pull until a message arrives that replies to the pushed message, or timeout
         deadline = time.monotonic() + _DEFAULT_MODEL_REPLY_TIMEOUT
         while True:
-            for pulled_msg in self._pull_task_messages(child_task_id):
+            # The request destination becomes the source of its reply.
+            for pulled_msg in self._pull_task_messages(src_task_id=child_task_id):
                 if pulled_msg.metadata.reply_to_message_id != message_id:
                     raise RuntimeError(
                         "Received a message that does not reply to the request."
