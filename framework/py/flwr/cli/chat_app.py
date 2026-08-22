@@ -344,8 +344,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
             return
 
         prompt = self.input_buffer.text
-        self.input_buffer.reset()
         stripped_prompt = prompt.strip()
+        self.input_buffer.reset(append_to_history=bool(stripped_prompt))
         if not stripped_prompt:
             return
         if self._handle_command(event, stripped_prompt):
