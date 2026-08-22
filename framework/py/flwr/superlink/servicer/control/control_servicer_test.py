@@ -67,6 +67,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ShowFederationRequest,
     ShowFederationResponse,
     StartRunRequest,
+    StartRunResponse,
     StopRunRequest,
     StreamLogsRequest,
     StreamLogsResponse,
@@ -411,6 +412,21 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         assert run_context is not None
         self.assertEqual(run_context.run_id, response.run_id)
         self.assertEqual(run_context.series_id, response.series_id)
+
+    def test_start_run_forwards_explicit_web_ui_source(self) -> None:
+        """Forward an explicit Web UI origin received through gRPC metadata."""
+        context = Mock()
+        context.invocation_metadata.return_value = (("x-flwr-run-source", "web_ui"),)
+        expected = StartRunResponse(run_id=42)
+
+        with patch(
+            "flwr.superlink.servicer.control.control_servicer.control_handlers.start_run",
+            return_value=expected,
+        ) as start_run:
+            response = self.servicer.StartRun(StartRunRequest(), context)
+
+        self.assertIs(response, expected)
+        self.assertEqual(start_run.call_args.kwargs["source"], "web_ui")
 
     def test_start_run_validates_and_binds_oauth_connectors(self) -> None:
         """StartRun should bind canonical connected OAuth connector refs."""
