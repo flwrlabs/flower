@@ -70,7 +70,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.supercore.protobuf.client import ProtobufClient
 from flwr.supercore.typing import JSONObject
 
-
 _TERMINAL_RESPONSE_EVENTS = frozenset(
     {"response.completed", "response.failed", "response.incomplete"}
 )
