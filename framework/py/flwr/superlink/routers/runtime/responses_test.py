@@ -28,12 +28,7 @@ from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.model_message import ModelResponse
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
-from .responses import (
-    _Exchange,
-    _ResponsesError,
-    _wait_for_response,
-    router,
-)
+from .responses import _Exchange, _ResponsesError, _wait_for_response, router
 
 
 def _client(state: Mock) -> TestClient:
