@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-21 00:06+0000\n"
+"POT-Creation-Date: 2026-08-22 00:05+0000\n"
 "PO-Revision-Date: 2026-06-11 04:01+0000\n"
 "Last-Translator: reducedradius <feixiang512@outlook.com>\n"
 "Language: zh_Hans\n"
@@ -16485,174 +16485,129 @@ msgstr "发布 Flower"
 
 #: ../../source/contributor-how-to-release-flower.rst:5
 msgid ""
-"This document describes the current release process. It may or may not "
-"change in the future."
-msgstr "本文件描述了当前的发布流程。今后可能会有变化，也可能不会有变化。"
+"Framework minor releases are mostly automated. The manual release process"
+" has two steps:"
+msgstr ""
+
+#: ../../source/contributor-how-to-release-flower.rst:7
+msgid "Trigger the release preparation workflow to create a release pull request."
+msgstr ""
+
+#: ../../source/contributor-how-to-release-flower.rst:8
+msgid "Review the generated changelog, then approve and merge the pull request."
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:10
-msgid "During the release"
-msgstr "在发布期间"
-
-#: ../../source/contributor-how-to-release-flower.rst:12
-#, fuzzy
 msgid ""
-"The version number of a release is stated in "
-"``./framework/pyproject.toml``. To release a new version of Flower, the "
-"following things need to happen (in that order):"
-msgstr "版本号在 ``pyproject.toml`` 中说明。要发布 Flower 的新版本，需要完成以下工作（按顺序排列）："
+"After the release pull request is merged, the remaining release steps are"
+" performed automatically by GitHub Actions."
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:15
-msgid ""
-"Run ``python3 ./framework/dev/update_changelog.py <YOUR_GH_TOKEN>`` to "
-"add all new changes to the changelog. You can make manual edits to the "
-"changelog afterward to improve its formatting or wording. This script "
-"will also replace the ``## Unreleased`` header with the new version "
-"number and current date, and add a thank-you message for contributors. "
-"Open a pull request with these changes."
-msgstr ""
-
-#: ../../source/contributor-how-to-release-flower.rst:20
 #, fuzzy
-msgid ""
-"Once the pull request is merged, tag the release commit with the version "
-"number: ``git tag v<NEW_VERSION>`` (notice the ``v`` added before the "
-"version number), then ``git push --tags``. This will create a draft "
-"release on GitHub containing the correct artifacts and the relevant part "
-"of the changelog."
-msgstr ""
-"在 PR 合并后立即用版本号标记发布提交：``git tag v0.12.3``，然后``git push --tags``。这将在 GitHub"
-" 上创建一个包含正确工件和更新日志相关部分的发布草案。"
-
-#: ../../source/contributor-how-to-release-flower.rst:24
-msgid "Check the draft release on GitHub, and if everything is good, publish it."
-msgstr "检查 GitHub 上的发布稿，如果一切正常，就发布它。"
-
-#: ../../source/contributor-how-to-release-flower.rst:28
-msgid "After the release"
+msgid "Prepare the release PR"
 msgstr "发布后"
 
-#: ../../source/contributor-how-to-release-flower.rst:30
-msgid "Create a pull request which contains the following changes:"
-msgstr "创建包含以下更改的拉取请求："
+#: ../../source/contributor-how-to-release-flower.rst:17
+msgid "Trigger the release preparation workflow using the GitHub CLI:"
+msgstr ""
 
-#: ../../source/contributor-how-to-release-flower.rst:32
+#: ../../source/contributor-how-to-release-flower.rst:25
 msgid ""
-"Increase the minor version in ``pyproject.toml`` by one and update all "
-"files which contain the current version number (if necessary) by running "
-"``./framework/dev/update_version.py``."
+"Alternatively, trigger the `Framework Prepare Minor Release workflow "
+"<https://github.com/flwrlabs/flower/actions/workflows/framework-release-"
+"prepare.yml>`_ from the GitHub web UI."
+msgstr ""
+
+#: ../../source/contributor-how-to-release-flower.rst:29
+msgid "The version must use the ``X.Y.0`` format, for example ``1.34.0``."
+msgstr ""
+
+#: ../../source/contributor-how-to-release-flower.rst:31
+msgid ""
+"The workflow pins the current ``main`` commit as the release source and "
+"creates a draft release PR. It generates and polishes the changelog and "
+"updates the version bookkeeping needed for the release and the next "
+"development cycle."
 msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:35
 msgid ""
-"Add a new ``## Unreleased`` section at the top of "
-"``./framework/docs/source/ref-changelog.md`` to prepare for future "
-"changes."
+"If more changes land on ``main`` before the release PR is merged, trigger"
+" the workflow again with the same version. The existing release PR is "
+"refreshed instead of creating a new one, and the release source is re-"
+"pinned to the current ``main`` HEAD."
 msgstr ""
 
-#: ../../source/contributor-how-to-release-flower.rst:38
+#: ../../source/contributor-how-to-release-flower.rst:39
 msgid ""
-"Merge the pull request on the same day (i.e., before a new nightly "
-"release gets published to PyPI)."
-msgstr "在同一天合并拉取请求（即在新版本发布到 PyPI 之前）。"
+"The release PR is also checked automatically. These checks validate the "
+"generated version state and changelog and verify that the prebuilt "
+"release artifacts for the pinned source commit are available."
+msgstr ""
 
-#: ../../source/contributor-how-to-release-flower.rst:43
-msgid "Publishing a pre-release"
-msgstr "发布预发布版本"
+#: ../../source/contributor-how-to-release-flower.rst:45
+#, fuzzy
+msgid "Review and merge the PR"
+msgstr "**审查 PR**"
 
-#: ../../source/contributor-how-to-release-flower.rst:46
-msgid "Pre-release naming"
-msgstr "释放前命名"
-
-#: ../../source/contributor-how-to-release-flower.rst:48
+#: ../../source/contributor-how-to-release-flower.rst:47
 msgid ""
-"PyPI supports pre-releases (alpha, beta, release candidate). Pre-releases"
-" MUST use one of the following naming patterns:"
-msgstr "PyPI 支持预发布版本（alpha、beta、release candidate）。预发布版本必须使用以下命名模式之一："
+"Review the generated changelog in "
+"``framework/docs/source/changelog/vX.Y.0.md`` and make any edits needed "
+"before the release. When the PR is ready, mark it ready for review if it "
+"is still a draft, approve it, and merge it into ``main``."
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:51
-msgid "Alpha: ``MAJOR.MINOR.PATCHaN``"
-msgstr "阿尔法 ``MAJOR.MINOR.PATCHaN``"
+msgid ""
+"That is the end of the manual release process. Do not manually create "
+"release tags or publish Python packages, Docker images, or a GitHub "
+"Release."
+msgstr ""
 
-#: ../../source/contributor-how-to-release-flower.rst:52
-msgid "Beta: ``MAJOR.MINOR.PATCHbN``"
-msgstr "贝塔： ``MAJOR.MINOR.PATCHbN``"
-
-#: ../../source/contributor-how-to-release-flower.rst:53
-msgid "Release candidate (RC): ``MAJOR.MINOR.PATCHrcN``"
-msgstr "版本代号 (RC)： ``MAJOR.MINOR.PATCHrcN``"
-
-#: ../../source/contributor-how-to-release-flower.rst:55
-msgid "Examples include:"
-msgstr "例子包括："
-
-#: ../../source/contributor-how-to-release-flower.rst:57
-msgid "``1.0.0a0``"
-msgstr "``1.0.0a0``"
+#: ../../source/contributor-how-to-release-flower.rst:56
+msgid "What happens after the merge"
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:58
-msgid "``1.0.0b0``"
-msgstr "``1.0.0b0``"
-
-#: ../../source/contributor-how-to-release-flower.rst:59
-msgid "``1.0.0rc0``"
-msgstr "``1.0.0rc0``"
-
-#: ../../source/contributor-how-to-release-flower.rst:60
-msgid "``1.0.0rc1``"
-msgstr "``1.0.0rc1``"
+msgid ""
+"Merging the release PR automatically triggers ``framework-release-"
+"finalize.yml``. The workflow uses the release source commit recorded by "
+"the latest release preparation run and:"
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:62
 msgid ""
-"This is in line with PEP-440 and the recommendations from the Python "
-"Packaging Authority (PyPA):"
-msgstr "这符合 PEP-440 和 Python 包装管理局 (PyPA) 的建议："
+"creates the ``framework-X.Y.0`` tag and the ``release/framework-X.Y`` "
+"maintenance branch;"
+msgstr ""
+
+#: ../../source/contributor-how-to-release-flower.rst:64
+msgid "publishes the Python wheel and source distribution;"
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:65
-msgid "`PEP-440 <https://peps.python.org/pep-0440/>`_"
-msgstr "`PEP-440 <https://peps.python.org/pep-0440/>`_"
+msgid "promotes the prebuilt Docker images to their stable release tags;"
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:66
-msgid ""
-"`PyPA Choosing a versioning scheme "
-"<https://packaging.python.org/en/latest/guides/distributing-packages-"
-"using-setuptools/#choosing-a-versioning-scheme>`_"
+msgid "dispatches the Framework documentation build from the release branch; and"
 msgstr ""
-"`PyPA 选择版本控制方案 <https://packaging.python.org/en/latest/guides"
-"/distributing-packages-using-setuptools/#choosing-a-versioning-scheme>`_"
+
+#: ../../source/contributor-how-to-release-flower.rst:67
+msgid ""
+"publishes the GitHub Release using the release changelog as the release "
+"notes."
+msgstr ""
 
 #: ../../source/contributor-how-to-release-flower.rst:69
 msgid ""
-"Note that the approach defined by PyPA is not compatible with SemVer "
-"2.0.0 spec, for details consult the `Semantic Versioning Specification "
-"<https://semver.org/spec/v2.0.0.html#spec-item-11>`_ (specifically item "
-"11 on precedence)."
+"The release artifacts are built ahead of time for commits on ``main`` by "
+"``framework-commit-artifacts.yml``. The finalization workflow promotes "
+"the artifacts for the exact pinned release source instead of rebuilding "
+"them during the release."
 msgstr ""
-"请注意，PyPA 所定义的方法与 SemVer 2.0.0 "
-"规范不兼容，详情请查阅《语义版本规范》<https://semver.org/spec/v2.0.0.html#spec-"
-"item-11>`_（特别是关于优先级的第 11 项）。"
-
-#: ../../source/contributor-how-to-release-flower.rst:75
-msgid "Pre-release classification"
-msgstr "发布前分类"
-
-#: ../../source/contributor-how-to-release-flower.rst:77
-msgid "Should the next pre-release be called alpha, beta, or release candidate?"
-msgstr "下一个预发布版应该叫阿尔法版、贝塔版还是候选发布版？"
-
-#: ../../source/contributor-how-to-release-flower.rst:79
-msgid ""
-"RC: feature complete, no known issues (apart from issues that are "
-"classified as \"won't fix\" for the next stable release) - if no issues "
-"surface this will become the next stable release"
-msgstr "RC：功能完整，无已知问题（除了下一个稳定版中被列为 \"不会修复 \"的问题）--如果没有问题出现，这将成为下一个稳定版"
-
-#: ../../source/contributor-how-to-release-flower.rst:82
-msgid "Beta: feature complete, allowed to have known issues"
-msgstr "贝塔版：功能完整，允许存在已知问题"
-
-#: ../../source/contributor-how-to-release-flower.rst:83
-msgid "Alpha: not feature complete, allowed to have known issues"
-msgstr "阿尔法版：功能不完整，允许存在已知问题"
 
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:3
 msgid "Set up a virtual env"
@@ -34619,7 +34574,7 @@ msgstr "客户端"
 #: flwr.supercore.privacy_accounting.GaussianPrivacyEvent:1
 #: flwr.supercore.privacy_accounting.PrivacyConfig:1
 #: flwr.supercore.privacy_accounting.PrivacySpent:1
-#: flwr.supercore.rdp_accountant.RdpAccountant:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant:1 of
 #, fuzzy
 msgid "Bases: :py:class:`object`"
 msgstr "Bases: :py:class:`object`"
@@ -46187,7 +46142,7 @@ msgid ""
 msgstr "server.strategy.Strategy"
 
 #: ../../source/ref-api/flwr.serverapp.rst:30:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant:1 of
 msgid "Track cumulative privacy loss using Renyi differential privacy."
 msgstr ""
 
@@ -46662,7 +46617,8 @@ msgstr ":py:obj:`get_node_ids <flwr.server.Driver.get_node_ids>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.get_delta:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.get_delta:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.get_delta:1
+#: of
 msgid "Return cumulative delta at the supplied epsilon."
 msgstr ""
 
@@ -46676,7 +46632,8 @@ msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.get_epsilon:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.get_epsilon:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.get_epsilon:1
+#: of
 msgid "Return cumulative epsilon at the supplied delta."
 msgstr ""
 
@@ -46729,7 +46686,8 @@ msgstr ""
 #: ../../source/ref-api/flwr.serverapp.PrivacyAccountant.rst:44:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.would_exceed:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.would_exceed:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.would_exceed:1
+#: of
 msgid "Return whether composing an event would exceed an epsilon limit."
 msgstr ""
 
@@ -46742,7 +46700,8 @@ msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
 #: flwr.serverapp.PrivacyAccountant.config:1
 #: flwr.serverapp.RdpAccountant.config:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid "Return the privacy configuration."
 msgstr "配置值"
@@ -46756,7 +46715,8 @@ msgstr ":py:obj:`run_driver_api <flwr.server.run_driver_api>`\\ \\(\\)"
 #: flwr.serverapp.PrivacyAccountant.num_releases:1
 #: flwr.serverapp.RdpAccountant.num_releases:1
 #: flwr.supercore.privacy_accounting.PrivacyAccountant.compose:1:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1
+#: of
 msgid "Return the number of composed private releases."
 msgstr ""
 
@@ -46846,7 +46806,7 @@ msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
 msgid "RdpAccountant"
 msgstr ""
 
-#: flwr.supercore.rdp_accountant.RdpAccountant:3 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant:3 of
 msgid ""
 "This class wraps Google's ``dp-accounting`` package while exposing only "
 "Flower-owned configuration, event, result, and serialization types."
@@ -46860,7 +46820,7 @@ msgid ""
 msgstr ":py:obj:`pop <flwr.common.MetricsRecord.pop>`\\ \\(k\\[\\,d\\]\\)"
 
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1 of
 msgid "Compose one or more identical sampled Gaussian releases."
 msgstr ""
 
@@ -46886,7 +46846,8 @@ msgid ""
 msgstr ":py:obj:`run_driver_api <flwr.server.run_driver_api>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.get_privacy_spent:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.get_privacy_spent:1
+#: of
 msgid "Return cumulative privacy expenditure at delta."
 msgstr ""
 
@@ -46898,7 +46859,8 @@ msgid ""
 msgstr "server.strategy.Strategy"
 
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.load_state_dict:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.load_state_dict:1
+#: of
 msgid "Restore state produced by :meth:`state_dict`."
 msgstr ""
 
@@ -46908,7 +46870,8 @@ msgid ":py:obj:`state_dict <flwr.serverapp.RdpAccountant.state_dict>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
 
 #: ../../source/ref-api/flwr.serverapp.RdpAccountant.rst:44:<autosummary>:1
-#: flwr.supercore.rdp_accountant.RdpAccountant.state_dict:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.state_dict:1
+#: of
 msgid "Return JSON-serializable accountant state."
 msgstr ""
 
@@ -46922,23 +46885,27 @@ msgstr ""
 "config=flwr.server.ServerConfig(num_rounds=3, round_timeout=600.0), "
 "...)``"
 
-#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`config <flwr.serverapp.RdpAccountant.config>`\\"
 msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
 
-#: flwr.supercore.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.compose:1:<autosummary>:1
+#: of
 #, fuzzy
 msgid ":py:obj:`num_releases <flwr.serverapp.RdpAccountant.num_releases>`\\"
 msgstr ":py:obj:`run_driver_api <flwr.server.run_driver_api>`\\ \\(\\)"
 
-#: flwr.supercore.rdp_accountant.RdpAccountant.load_state_dict:3 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.load_state_dict:3
+#: of
 msgid ""
 "The restored state must use the same privacy configuration as this "
 "accountant. Backend numeric state is rebuilt from Flower's event ledger."
 msgstr ""
 
-#: flwr.supercore.rdp_accountant.RdpAccountant.would_exceed:3 of
+#: flwr.supercore.privacy_accounting.rdp_accountant.RdpAccountant.would_exceed:3
+#: of
 msgid "This method does not mutate committed accountant state."
 msgstr ""
 
@@ -87273,4 +87240,173 @@ msgstr ""
 #~ " server certificate. If None, gRPC "
 #~ "default root certificates are used."
 #~ msgstr ""
+
+#~ msgid ""
+#~ "This document describes the current "
+#~ "release process. It may or may not"
+#~ " change in the future."
+#~ msgstr "本文件描述了当前的发布流程。今后可能会有变化，也可能不会有变化。"
+
+#~ msgid "During the release"
+#~ msgstr "在发布期间"
+
+#~ msgid ""
+#~ "The version number of a release is"
+#~ " stated in ``./framework/pyproject.toml``. To "
+#~ "release a new version of Flower, "
+#~ "the following things need to happen "
+#~ "(in that order):"
+#~ msgstr "版本号在 ``pyproject.toml`` 中说明。要发布 Flower 的新版本，需要完成以下工作（按顺序排列）："
+
+#~ msgid ""
+#~ "Run ``python3 ./framework/dev/update_changelog.py "
+#~ "<YOUR_GH_TOKEN>`` to add all new changes"
+#~ " to the changelog. You can make "
+#~ "manual edits to the changelog afterward"
+#~ " to improve its formatting or "
+#~ "wording. This script will also replace"
+#~ " the ``## Unreleased`` header with "
+#~ "the new version number and current "
+#~ "date, and add a thank-you message"
+#~ " for contributors. Open a pull "
+#~ "request with these changes."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Once the pull request is merged, "
+#~ "tag the release commit with the "
+#~ "version number: ``git tag v<NEW_VERSION>`` "
+#~ "(notice the ``v`` added before the "
+#~ "version number), then ``git push "
+#~ "--tags``. This will create a draft "
+#~ "release on GitHub containing the correct"
+#~ " artifacts and the relevant part of"
+#~ " the changelog."
+#~ msgstr ""
+#~ "在 PR 合并后立即用版本号标记发布提交：``git tag "
+#~ "v0.12.3``，然后``git push --tags``。这将在 GitHub "
+#~ "上创建一个包含正确工件和更新日志相关部分的发布草案。"
+
+#~ msgid ""
+#~ "Check the draft release on GitHub, "
+#~ "and if everything is good, publish "
+#~ "it."
+#~ msgstr "检查 GitHub 上的发布稿，如果一切正常，就发布它。"
+
+#~ msgid "Create a pull request which contains the following changes:"
+#~ msgstr "创建包含以下更改的拉取请求："
+
+#~ msgid ""
+#~ "Increase the minor version in "
+#~ "``pyproject.toml`` by one and update all"
+#~ " files which contain the current "
+#~ "version number (if necessary) by running"
+#~ " ``./framework/dev/update_version.py``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Add a new ``## Unreleased`` section "
+#~ "at the top of ``./framework/docs/source"
+#~ "/ref-changelog.md`` to prepare for future"
+#~ " changes."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Merge the pull request on the same"
+#~ " day (i.e., before a new nightly "
+#~ "release gets published to PyPI)."
+#~ msgstr "在同一天合并拉取请求（即在新版本发布到 PyPI 之前）。"
+
+#~ msgid "Publishing a pre-release"
+#~ msgstr "发布预发布版本"
+
+#~ msgid "Pre-release naming"
+#~ msgstr "释放前命名"
+
+#~ msgid ""
+#~ "PyPI supports pre-releases (alpha, beta,"
+#~ " release candidate). Pre-releases MUST "
+#~ "use one of the following naming "
+#~ "patterns:"
+#~ msgstr "PyPI 支持预发布版本（alpha、beta、release candidate）。预发布版本必须使用以下命名模式之一："
+
+#~ msgid "Alpha: ``MAJOR.MINOR.PATCHaN``"
+#~ msgstr "阿尔法 ``MAJOR.MINOR.PATCHaN``"
+
+#~ msgid "Beta: ``MAJOR.MINOR.PATCHbN``"
+#~ msgstr "贝塔： ``MAJOR.MINOR.PATCHbN``"
+
+#~ msgid "Release candidate (RC): ``MAJOR.MINOR.PATCHrcN``"
+#~ msgstr "版本代号 (RC)： ``MAJOR.MINOR.PATCHrcN``"
+
+#~ msgid "Examples include:"
+#~ msgstr "例子包括："
+
+#~ msgid "``1.0.0a0``"
+#~ msgstr "``1.0.0a0``"
+
+#~ msgid "``1.0.0b0``"
+#~ msgstr "``1.0.0b0``"
+
+#~ msgid "``1.0.0rc0``"
+#~ msgstr "``1.0.0rc0``"
+
+#~ msgid "``1.0.0rc1``"
+#~ msgstr "``1.0.0rc1``"
+
+#~ msgid ""
+#~ "This is in line with PEP-440 and"
+#~ " the recommendations from the Python "
+#~ "Packaging Authority (PyPA):"
+#~ msgstr "这符合 PEP-440 和 Python 包装管理局 (PyPA) 的建议："
+
+#~ msgid "`PEP-440 <https://peps.python.org/pep-0440/>`_"
+#~ msgstr "`PEP-440 <https://peps.python.org/pep-0440/>`_"
+
+#~ msgid ""
+#~ "`PyPA Choosing a versioning scheme "
+#~ "<https://packaging.python.org/en/latest/guides/distributing-"
+#~ "packages-using-setuptools/#choosing-a-versioning-"
+#~ "scheme>`_"
+#~ msgstr ""
+#~ "`PyPA 选择版本控制方案 "
+#~ "<https://packaging.python.org/en/latest/guides/distributing-"
+#~ "packages-using-setuptools/#choosing-a-versioning-"
+#~ "scheme>`_"
+
+#~ msgid ""
+#~ "Note that the approach defined by "
+#~ "PyPA is not compatible with SemVer "
+#~ "2.0.0 spec, for details consult the "
+#~ "`Semantic Versioning Specification "
+#~ "<https://semver.org/spec/v2.0.0.html#spec-item-11>`_ "
+#~ "(specifically item 11 on precedence)."
+#~ msgstr ""
+#~ "请注意，PyPA 所定义的方法与 SemVer 2.0.0 "
+#~ "规范不兼容，详情请查阅《语义版本规范》<https://semver.org/spec/v2.0.0.html#spec-"
+#~ "item-11>`_（特别是关于优先级的第 11 项）。"
+
+#~ msgid "Pre-release classification"
+#~ msgstr "发布前分类"
+
+#~ msgid ""
+#~ "Should the next pre-release be "
+#~ "called alpha, beta, or release "
+#~ "candidate?"
+#~ msgstr "下一个预发布版应该叫阿尔法版、贝塔版还是候选发布版？"
+
+#~ msgid ""
+#~ "RC: feature complete, no known issues"
+#~ " (apart from issues that are "
+#~ "classified as \"won't fix\" for the "
+#~ "next stable release) - if no "
+#~ "issues surface this will become the "
+#~ "next stable release"
+#~ msgstr "RC：功能完整，无已知问题（除了下一个稳定版中被列为 \"不会修复 \"的问题）--如果没有问题出现，这将成为下一个稳定版"
+
+#~ msgid "Beta: feature complete, allowed to have known issues"
+#~ msgstr "贝塔版：功能完整，允许存在已知问题"
+
+#~ msgid "Alpha: not feature complete, allowed to have known issues"
+#~ msgstr "阿尔法版：功能不完整，允许存在已知问题"
 
