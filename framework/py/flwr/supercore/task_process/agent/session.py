@@ -43,7 +43,6 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
     ConnectorResponse,
 )
-from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
@@ -112,18 +111,20 @@ class RuntimeAgentConnectors(AgentConnectors):
 
 
 class RuntimeAgentResponses(AgentResponses):
-    """AgentResponses implementation backed by Runtime task messages."""
+    """AgentResponses implementation backed by the Runtime API."""
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
         stub: RuntimeHttpClient,
+        token: str,
         run_id: int,
         task_id: int,
         context: Context,
         start_run_request: StartRunRequest,
     ) -> None:
         self._stub = stub
+        self._token = token
         self._context = context
         self._run_id = run_id
         self._task_id = task_id
@@ -140,26 +141,11 @@ class RuntimeAgentResponses(AgentResponses):
 
     def _create_model_response(self, request: JSONObject) -> JSONObject:
         """Create one model response through a child model task."""
-        model = request.get("model")
-        if not isinstance(model, str) or not model:
-            raise ValueError(
-                "AgentResponses request requires a non-empty string 'model' field."
-            )
-
-        create_res = self._stub.CreateTask(
-            CreateTaskRequest(type=TaskType.MODEL, model_ref=model)
+        return self._stub.create_response(
+            request,
+            token=self._token,
+            timeout=_DEFAULT_MODEL_REPLY_TIMEOUT,
         )
-        if not create_res.HasField("task_id"):
-            raise RuntimeError("Model task could not be created.")
-
-        model_task_id = create_res.task_id
-        message = ModelRequest.from_payload(
-            dst_task_id=model_task_id,
-            payload=request,
-        )
-        response_message = self._send_and_receive(message)
-        response = ModelResponse.from_message(response_message)
-        return response.payload
 
     def create_connector_response(
         self, *, name: str, call_id: str, arguments: JSONObject

@@ -47,6 +47,7 @@ def test_pull_task_messages_filters_by_child_task() -> None:
     stub.PullTaskMessage.return_value = PullTaskMessageResponse()
     responses = RuntimeAgentResponses(
         stub=stub,
+        token="task-token",
         run_id=123,
         task_id=789,
         context=Mock(),
@@ -92,6 +93,38 @@ def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
     get_connector_tools.assert_called_once_with("example")
 
 
+def test_create_response_delegates_to_runtime_endpoint() -> None:
+    """Delegate model exchange handling and retain response context output."""
+    stub = Mock()
+    response: JSONObject = {
+        "object": "response",
+        "status": "completed",
+        "output": [{"type": "message", "role": "assistant"}],
+    }
+    stub.create_response.return_value = response
+    context = Mock()
+    responses = RuntimeAgentResponses(
+        stub=stub,
+        token="task-token",
+        run_id=123,
+        task_id=789,
+        context=context,
+        start_run_request=StartRunRequest(),
+    )
+    request: JSONObject = {"model": "model", "input": "hello", "stream": True}
+
+    with patch(
+        "flwr.supercore.task_process.agent.session.append_items"
+    ) as append_items:
+        result = responses.create(request)
+
+    assert result == response
+    stub.create_response.assert_called_once_with(
+        request, token="task-token", timeout=300.0
+    )
+    append_items.assert_called_once_with(context, response["output"])
+
+
 def test_call_automation_embeds_input_in_control_request() -> None:
     """Embed model input in the Control request sent to the Runtime API."""
     # Prepare
@@ -105,6 +138,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     )
     responses = RuntimeAgentResponses(
         stub=stub,
+        token="task-token",
         run_id=123,
         task_id=789,
         context=Mock(),
@@ -147,6 +181,7 @@ def test_create_connector_response_resolves_canonical_name() -> None:
     stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
     responses = RuntimeAgentResponses(
         stub=stub,
+        token="task-token",
         run_id=123,
         task_id=789,
         context=Mock(),
