@@ -5,3 +5,5 @@ __pycache__/
 .venv/
 results_*.txt
 .ruff_cache/
+results/
+*.bak
