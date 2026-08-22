@@ -40,6 +40,7 @@ class DSMEMACModel:
         num_clusters: int = 4,
         energy_budget: float = 60.0,
         bandwidth_frac: float = 0.8,
+        seed: int = 0,
     ):
         self.bo = bo
         self.mo = mo
@@ -48,6 +49,7 @@ class DSMEMACModel:
         self.num_clusters = num_clusters
         self.energy_budget = energy_budget
         self.bandwidth_frac = bandwidth_frac
+        self.seed = int(seed)
         self._cluster_map = {i: i % num_clusters for i in range(num_clients)}
 
     @property
@@ -104,7 +106,12 @@ class DSMEMACModel:
         if cap_mode == "NCR":
             base = min(1.0, base * 1.15)
 
-        rng_client = np.random.default_rng(client_id * 1000 + fl_round)
+        # Mix the run seed in, otherwise every "seed" in a multi-seed sweep
+        # draws an identical bandwidth sequence and the error bars are fiction.
+        # seed=0 reproduces the original draws exactly.
+        rng_client = np.random.default_rng(
+            self.seed * 1_000_003 + client_id * 1000 + fl_round
+        )
         variation = rng_client.uniform(-0.1, 0.05)
         return float(np.clip(base + variation, 0.3, 1.0))
 
