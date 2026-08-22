@@ -20,12 +20,12 @@ from flwr.cli.flower_config import read_superlink_connection
 from flwr.proto.control_pb2 import ListFederationsRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 
-from .chat_app import ChatApplication
 from ..utils import (
     flwr_cli_grpc_exc_handler,
     init_channel_from_connection,
     load_cli_auth_plugin_from_connection,
 )
+from .chat_app import ChatApplication
 
 
 def chat() -> None:
