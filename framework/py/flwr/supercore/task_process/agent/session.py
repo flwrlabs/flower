@@ -98,7 +98,14 @@ class RuntimeAgentEvents(AgentEvents):
 
     def emit(self, event: JSONObject) -> None:
         """Emit one structured run event."""
-        _push_run_events(self._stub, [event])
+        event_type = event.get("type")
+        if not isinstance(event_type, str) or not event_type:
+            raise ValueError("Run event requires a non-empty string 'type' field.")
+        task_event = TaskEvent(
+            event=event_type,
+            data=strict_json_dumps(event, compact=True),
+        )
+        self._stub.PushTaskEvents(PushTaskEventsRequest(events=[task_event]))
 
 
 class RuntimeAgentConnectors(AgentConnectors):
@@ -350,7 +357,16 @@ class RuntimeAgentResponses(AgentResponses):
 
     def push_run_events(self, events: Sequence[JSONObject]) -> None:
         """Push structured run events for `StreamRunEvents` clients."""
-        _push_run_events(self._stub, events)
+        if not events:
+            return
+        task_events = [
+            TaskEvent(
+                event=cast(str, event["type"]),
+                data=strict_json_dumps(event, compact=True),
+            )
+            for event in events
+        ]
+        self._stub.PushTaskEvents(PushTaskEventsRequest(events=task_events))
 
     def append_and_push_run_events(self, events: list[JSONObject]) -> None:
         """Append run events to context and push them to `StreamRunEvents` clients."""
@@ -414,24 +430,3 @@ class RuntimeAgentResponses(AgentResponses):
 def _is_json_object_list(obj: JSONValue) -> bool:
     """Check if the given object is a list of JSON objects."""
     return isinstance(obj, list) and all(isinstance(item, dict) for item in obj)
-
-
-def _push_run_events(
-    stub: RuntimeHttpClient, events: Sequence[JSONObject]
-) -> None:
-    """Push structured run events through the Runtime API."""
-    if not events:
-        return
-
-    task_events = []
-    for event in events:
-        event_type = event.get("type")
-        if not isinstance(event_type, str) or not event_type:
-            raise ValueError("Run event requires a non-empty string 'type' field.")
-        task_events.append(
-            TaskEvent(
-                event=event_type,
-                data=strict_json_dumps(event, compact=True),
-            )
-        )
-    stub.PushTaskEvents(PushTaskEventsRequest(events=task_events))
