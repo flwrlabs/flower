@@ -429,6 +429,13 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         except click.ClickException as exc:
             self._append_transcript("class:error", f"Error: {exc.format_message()}\n\n")
         finally:
+            finalized_markdown = False
+            for entry in self.transcript:
+                if isinstance(entry, MarkdownBlock) and not entry.finalized:
+                    entry.finalized = True
+                    finalized_markdown = True
+            if finalized_markdown:
+                self.transcript_revision += 1
             self.run_id = None
             self.busy = False
             self.cancel_requested = False
@@ -486,6 +493,12 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                         reasoning_block,
                         web_search_blocks,
                     )
+                    if (
+                        markdown_block is not None
+                        and self.transcript[-1] is not markdown_block
+                    ):
+                        markdown_block.finalized = True
+                        markdown_block = None
                 elif event_type in CHAT_FAILURE_EVENTS:
                     raise click.ClickException(format_failure_event(payload))
                 elif event_type in CHAT_TERMINAL_EVENTS:

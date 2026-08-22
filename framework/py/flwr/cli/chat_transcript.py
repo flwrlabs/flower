@@ -14,7 +14,7 @@
 # ==============================================================================
 """Transcript blocks and rendering for Flower Chat."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from prompt_toolkit.formatted_text import StyleAndTextTuples
 from rich.color import Color, ColorType
@@ -46,10 +46,34 @@ class MarkdownBlock:
     """Markdown-formatted assistant message shown in the transcript."""
 
     body: str = ""
+    finalized: bool = False
+    _rendered_width: int | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
+    _rendered_fragments: StyleAndTextTuples = field(
+        default_factory=list, init=False, repr=False, compare=False
+    )
+
+    def cached_fragments(self, width: int) -> StyleAndTextTuples | None:
+        """Return streaming or cached fragments when rendering is unnecessary."""
+        if not self.finalized:
+            return [("", self.body)]
+        if self._rendered_width == width:
+            return self._rendered_fragments
+        return None
+
+    def cache_fragments(self, width: int, fragments: StyleAndTextTuples) -> None:
+        """Cache completed Markdown fragments for the current width."""
+        self._rendered_width = width
+        self._rendered_fragments = fragments
 
 
 def render_markdown(block: MarkdownBlock, width: int) -> StyleAndTextTuples:
     """Render Markdown as prompt_toolkit formatted-text fragments."""
+    # Avoid repeatedly parsing a growing Markdown document while it streams.
+    if (fragments := block.cached_fragments(width)) is not None:
+        return fragments
+
     # Render Markdown with Rich using the transcript's current terminal width.
     console = Console(
         width=width,
@@ -57,7 +81,7 @@ def render_markdown(block: MarkdownBlock, width: int) -> StyleAndTextTuples:
         force_terminal=True,
         markup=False,
     )
-    fragments: StyleAndTextTuples = []
+    fragments = []
     links: dict[str, str] = {}
     for segment in console.render(Markdown(block.body), console.options):
         # Ignore Rich control sequences and segments without visible content.
@@ -97,6 +121,7 @@ def render_markdown(block: MarkdownBlock, width: int) -> StyleAndTextTuples:
     # Rich terminates each rendered message with one newline. Retain the blank
     # row that separates messages in the transcript.
     fragments.append(("", "\n"))
+    block.cache_fragments(width, fragments)
     return fragments
 
 
