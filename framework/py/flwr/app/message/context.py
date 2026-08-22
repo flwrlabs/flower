@@ -19,10 +19,22 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from threading import RLock
+from typing import TypedDict
 
 from flwr.app.user_config import UserConfig
 
 from .recorddict import RecordDict
+
+
+class _ContextState(TypedDict):
+    """Pickle state for Context."""
+
+    run_id: int
+    node_id: int
+    node_config: UserConfig
+    state: RecordDict
+    run_config: UserConfig
+    series_id: int
 
 
 @dataclass
@@ -82,3 +94,24 @@ class Context:
         """Lock this context for an atomic in-process operation."""
         with self._lock:
             yield
+
+    def __getstate__(self) -> _ContextState:
+        """Return pickle state without the process-local lock."""
+        return {
+            "run_id": self.run_id,
+            "node_id": self.node_id,
+            "node_config": self.node_config,
+            "state": self.state,
+            "run_config": self.run_config,
+            "series_id": self.series_id,
+        }
+
+    def __setstate__(self, state: _ContextState) -> None:
+        """Restore pickle state and create a new process-local lock."""
+        self.run_id = state["run_id"]
+        self.node_id = state["node_id"]
+        self.node_config = state["node_config"]
+        self.state = state["state"]
+        self.run_config = state["run_config"]
+        self.series_id = state["series_id"]
+        self._lock = RLock()

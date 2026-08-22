@@ -14,6 +14,7 @@
 # ==============================================================================
 """Context tests."""
 
+import pickle
 from concurrent.futures import ThreadPoolExecutor
 from time import sleep
 
@@ -46,3 +47,28 @@ def test_locked_is_reentrant() -> None:
         context.state["config"] = ConfigRecord({"value": 1})
 
     assert context.state["config"]["value"] == 1
+
+
+def test_context_is_picklable() -> None:
+    """Context should recreate its lock after deserialization."""
+    context = Context(
+        1,
+        2,
+        {"partition-id": 3},
+        RecordDict({"config": ConfigRecord({"value": 4})}),
+        {"rounds": 5},
+        6,
+    )
+
+    restored = pickle.loads(pickle.dumps(context))
+
+    assert isinstance(restored, Context)
+    assert restored.run_id == 1
+    assert restored.node_id == 2
+    assert restored.node_config == {"partition-id": 3}
+    assert restored.state.config_records["config"]["value"] == 4
+    assert restored.run_config == {"rounds": 5}
+    assert restored.series_id == 6
+    with restored.locked():
+        restored.state.config_records["config"]["value"] = 7
+    assert restored.state.config_records["config"]["value"] == 7
