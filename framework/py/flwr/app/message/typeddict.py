@@ -14,7 +14,6 @@
 # ==============================================================================
 """Typed dict base class for *Records."""
 
-
 from collections.abc import (
     Callable,
     ItemsView,
@@ -23,6 +22,7 @@ from collections.abc import (
     MutableMapping,
     ValuesView,
 )
+from threading import Lock
 from typing import Generic, Self, TypeVar, cast
 
 K = TypeVar("K")  # Key type
@@ -38,6 +38,7 @@ class TypedDict(MutableMapping[K, V], Generic[K, V]):
         self.__dict__["_check_key_fn"] = check_key_fn
         self.__dict__["_check_value_fn"] = check_value_fn
         self.__dict__["_data"] = {}
+        self.__dict__["_lock"] = Lock()
 
     def __setitem__(self, key: K, value: V) -> None:
         """Set the given key to the given value after type checking."""
@@ -46,11 +47,13 @@ class TypedDict(MutableMapping[K, V], Generic[K, V]):
         cast(Callable[[V], None], self.__dict__["_check_value_fn"])(value)
 
         # Set key-value pair
-        cast(dict[K, V], self.__dict__["_data"])[key] = value
+        with self.__dict__["_lock"]:
+            cast(dict[K, V], self.__dict__["_data"])[key] = value
 
     def __delitem__(self, key: K) -> None:
         """Remove the item with the specified key."""
-        del cast(dict[K, V], self.__dict__["_data"])[key]
+        with self.__dict__["_lock"]:
+            del cast(dict[K, V], self.__dict__["_data"])[key]
 
     def __getitem__(self, item: K) -> V:
         """Return the value for the specified key."""
@@ -102,4 +105,16 @@ class TypedDict(MutableMapping[K, V], Generic[K, V]):
         new.__dict__["_check_key_fn"] = self.__dict__["_check_key_fn"]
         new.__dict__["_check_value_fn"] = self.__dict__["_check_value_fn"]
         new.__dict__["_data"] = cast(dict[K, V], self.__dict__["_data"]).copy()
+        new.__dict__["_lock"] = Lock()
         return new
+
+    def __getstate__(self) -> dict[str, object]:
+        """Return the state without the unpicklable lock."""
+        state = self.__dict__.copy()
+        del state["_lock"]
+        return state
+
+    def __setstate__(self, state: dict[str, object]) -> None:
+        """Restore the state and create a new lock."""
+        self.__dict__.update(state)
+        self.__dict__["_lock"] = Lock()
