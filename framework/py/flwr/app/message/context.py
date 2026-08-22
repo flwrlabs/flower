@@ -18,7 +18,7 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from threading import Lock
+from threading import RLock
 
 from flwr.app.user_config import UserConfig
 
@@ -75,7 +75,7 @@ class Context:
         self.state = state
         self.run_config = run_config
         self.series_id = series_id
-        self._lock = Lock()
+        self._lock = RLock()
 
     @contextmanager
     def locked(self) -> Iterator[None]:
