@@ -33,37 +33,32 @@ from pathlib import Path
 # Keys must match the ones declared in pyproject.toml under
 # [tool.flwr.app.config]. Add any missing keys there first.
 ARMS: dict[str, dict[str, object]] = {
-    # Control: no MAC-layer gating at all. This is the curve the PR is
-    # currently missing and the one reviewers will ask for.
+    # Control: no MAC-layer gating at all. This is the curve that lets the cost
+    # of the DSME constraints be measured rather than assumed.
     "fedavg_no_dsme": {
         "dsme-enabled": False,
-        "selection-policy": "random",
     },
-    # Current PR behaviour: MAC gate active, uniform random sampling.
+    # MAC gate and GTS bandwidth limit active.
     "dsme_random": {
         "dsme-enabled": True,
-        "selection-policy": "random",
-    },
-    # Energy-aware selection, no harvesting.
-    "dsme_eligible": {
-        "dsme-enabled": True,
-        "selection-policy": "eligible",
-    },
-    "dsme_greedy": {
-        "dsme-enabled": True,
-        "selection-policy": "greedy",
-    },
-    "dsme_proportional": {
-        "dsme-enabled": True,
-        "selection-policy": "proportional",
-    },
-    # Energy harvesting turns depletion cyclic instead of terminal.
-    "dsme_eligible_harvest": {
-        "dsme-enabled": True,
-        "selection-policy": "eligible",
-        "harvest-mj-per-round": 8.0,
     },
 }
+
+# NOTE ON REMOVED ARMS
+# Earlier revisions of this file declared arms differing only by a
+# `selection-policy` key (eligible / greedy / proportional) plus a harvesting
+# variant. Those settings are not read anywhere: DSMEFedAvg inherits FedAvg's
+# uniform `configure_train` sampling, so every one of those arms ran the
+# identical code path as `dsme_random` and could not have measured the policy
+# it named. They have been removed rather than left as dead configuration.
+#
+# Running them anyway was not wasted: five seeds of `dsme_eligible` against five
+# of `dsme_random` is the same code under a different RNG stream, which gives a
+# 0.7-point accuracy spread. That is the run-to-run noise floor quoted in the
+# README, and the bar any real selection policy has to clear.
+#
+# When energy-aware selection is implemented, it belongs in `strategy.py` as an
+# override of `configure_train`, with the arm re-added here at that point.
 
 
 def as_run_config(overrides: dict[str, object]) -> str:
@@ -145,9 +140,9 @@ def main() -> int:
     parser.add_argument(
         "--arms",
         nargs="+",
-        default=["fedavg_no_dsme", "dsme_random", "dsme_eligible"],
+        default=sorted(ARMS),
         choices=sorted(ARMS),
-        help="Subset of arms to run. Default is the minimum set for the PR.",
+        help="Subset of arms to run. Defaults to all.",
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
