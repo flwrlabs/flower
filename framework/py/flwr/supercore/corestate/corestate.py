@@ -402,6 +402,7 @@ class CoreState(ABC):  # pylint: disable=R0904
             The ID of the RunSeries for which to persist shared context.
         context : Context
             The shared context to store.
+
         """
 
     @abstractmethod
@@ -699,6 +700,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
+        claimable: bool = False,
     ) -> Sequence[Task]:
         """Retrieve information about tasks based on the specified filters.
 
@@ -720,6 +722,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Whether sorting should be in ascending order.
         limit : Optional[int] (default: None)
             Maximum number of tasks to return. If `None`, no limit is applied.
+        claimable : bool (default: False)
+            If `True`, exclude AgentApp tasks whose run series is already active.
 
         Returns
         -------

@@ -89,7 +89,10 @@ def pull_pending_tasks(
     log(DEBUG, "Runtime.PullPendingTasks")
     process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
     tasks = state.get_tasks(
-        statuses=[Status.PENDING], order_by="pending_at", ascending=True
+        statuses=[Status.PENDING],
+        order_by="pending_at",
+        ascending=True,
+        claimable=True,
     )
     return PullPendingTasksResponse(tasks=tasks)
 
@@ -256,6 +259,8 @@ def pull_task_input(
     if run and run.series_id:
         series_context = state.get_run_series_context(run.series_id)
     if run and fab and series_context and state.activate_task(task.task_id):
+        series_context.run_id = run_id
+        series_context.series_id = run.series_id
         log(INFO, "Started task %d of run %d", task.task_id, run_id)
         return PullTaskInputResponse(
             context=context_to_proto(series_context),
@@ -283,18 +288,31 @@ def push_task_output(
     if request.HasField("clientapp_runtime"):
         state.add_clientapp_runtime(run_id, request.clientapp_runtime)
 
+    series_id = None
+    output_context = None
+    if request.HasField("context"):
+        runs = state.get_run_info(run_ids=[run_id])
+        run = runs[0] if runs else None
+        if run and run.series_id and run.primary_task_id == task.task_id:
+            series_id = run.series_id
+            output_context = context_from_proto(request.context)
+
+    # Finishing releases an AgentApp's run-series reservation, so persist its
+    # context first. Other task types retain the existing finish-then-store order.
+    if series_id is not None and output_context is not None:
+        if task.type == TaskType.AGENT_APP:
+            state.set_run_series_context(series_id, output_context)
+
     if state.finish_task(
         task.task_id, sub_status=request.sub_status, details=request.details
     ):
         log(INFO, "Finished task %d of run %d", task.task_id, run_id)
-        if request.HasField("context"):
-            runs = state.get_run_info(run_ids=[run_id])
-            run = runs[0] if runs else None
-            if run and run.series_id and run.primary_task_id == task.task_id:
-                state.set_run_series_context(
-                    run.series_id,
-                    context_from_proto(request.context),
-                )
+        if (
+            series_id is not None
+            and output_context is not None
+            and task.type != TaskType.AGENT_APP
+        ):
+            state.set_run_series_context(series_id, output_context)
     else:
         log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
     return PushTaskOutputResponse()

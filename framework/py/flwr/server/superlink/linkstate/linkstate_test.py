@@ -218,6 +218,65 @@ class StateTest(CoreStateTest):
         runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
         self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
 
+    def test_claim_task_serializes_agentapp_runs_in_series(self) -> None:
+        """Only one AgentApp task in a run series should be claimable at a time."""
+        state = self.state_factory()
+        run_id_1 = create_dummy_run(state, primary_task_type=TaskType.AGENT_APP)
+        run_1 = state.get_run_info(run_ids=[run_id_1])[0]
+        run_id_2 = create_dummy_run(
+            state,
+            primary_task_type=TaskType.AGENT_APP,
+            series_id=run_1.series_id,
+        )
+        task_id_1 = get_primary_task_id(state, run_id_1)
+        task_id_2 = get_primary_task_id(state, run_id_2)
+
+        assert state.claim_task(task_id_1) is not None
+        assert state.claim_task(task_id_2) is None
+        assert task_id_2 in {
+            task.task_id for task in state.get_tasks(statuses=[Status.PENDING])
+        }
+        assert task_id_2 not in {
+            task.task_id
+            for task in state.get_tasks(statuses=[Status.PENDING], claimable=True)
+        }
+
+        assert state.finish_task(task_id_1, SubStatus.FAILED, "done")
+        assert state.claim_task(task_id_2) is not None
+
+    def test_claim_task_allows_parallel_non_agent_runs_in_series(self) -> None:
+        """Series serialization should not affect non-AgentApp tasks."""
+        state = self.state_factory()
+        run_id_1 = create_dummy_run(state, primary_task_type=TaskType.SERVER_APP)
+        run_1 = state.get_run_info(run_ids=[run_id_1])[0]
+        run_id_2 = create_dummy_run(
+            state,
+            primary_task_type=TaskType.SERVER_APP,
+            series_id=run_1.series_id,
+        )
+
+        assert state.claim_task(get_primary_task_id(state, run_id_1)) is not None
+        assert state.claim_task(get_primary_task_id(state, run_id_2)) is not None
+
+    def test_expired_agentapp_claim_releases_run_series(self) -> None:
+        """An expired AgentApp claim should let the next series run start."""
+        state = self.state_factory()
+        run_id_1 = create_dummy_run(state, primary_task_type=TaskType.AGENT_APP)
+        run_1 = state.get_run_info(run_ids=[run_id_1])[0]
+        run_id_2 = create_dummy_run(
+            state,
+            primary_task_type=TaskType.AGENT_APP,
+            series_id=run_1.series_id,
+        )
+        task_id_1 = get_primary_task_id(state, run_id_1)
+        task_id_2 = get_primary_task_id(state, run_id_2)
+        assert state.claim_task(task_id_1) is not None
+
+        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = patched_dt
+            assert state.claim_task(task_id_2) is not None
+
     @parameterized.expand(  # type: ignore[untyped-decorator]
         [
             (TaskType.AGENT_APP, True),

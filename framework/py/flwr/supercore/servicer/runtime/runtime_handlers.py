@@ -63,7 +63,10 @@ def pull_pending_tasks(
     log(DEBUG, "Runtime.PullPendingTasks")
 
     tasks = state.get_tasks(
-        statuses=[Status.PENDING], order_by="pending_at", ascending=True
+        statuses=[Status.PENDING],
+        order_by="pending_at",
+        ascending=True,
+        claimable=True,
     )
     return PullPendingTasksResponse(tasks=tasks)
 

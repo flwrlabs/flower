@@ -40,6 +40,7 @@ from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from flwr.app import Context, Message
 from flwr.app.message import make_message
@@ -74,7 +75,11 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskUsage,
 )
 from flwr.supercore import log
-from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
+from flwr.supercore.constant import (
+    OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AutomationStatus,
+    TaskType,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
@@ -133,6 +138,10 @@ STATUS_CONDITIONS = {
     Status.RUNNING: "(running_at IS NOT NULL AND finished_at IS NULL)",
     Status.FINISHED: "(finished_at IS NOT NULL)",
 }
+
+
+class _AgentRunSeriesBusyError(Exception):
+    """Signal that an AgentApp run series is already reserved."""
 
 
 class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
@@ -1231,6 +1240,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
+        claimable: bool = False,
     ) -> Sequence[Task]:
         """Retrieve information about tasks based on the specified filters."""
         if order_by not in (None, "pending_at"):
@@ -1266,6 +1276,22 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if not status_conditions:
                 return []
             query = query.where(or_(*status_conditions))
+
+        if claimable:
+            active_series_exists = exists(
+                select(SeriesRunsModel.id)
+                .join(
+                    RunSeriesModel,
+                    RunSeriesModel.series_id == SeriesRunsModel.series_id,
+                )
+                .where(
+                    SeriesRunsModel.run_id == TaskModel.run_id,
+                    RunSeriesModel.active_agent_task_id.is_not(None),
+                )
+            )
+            query = query.where(
+                or_(TaskModel.type != TaskType.AGENT_APP, ~active_series_exists)
+            )
 
         if order_by is not None:
             order_column = (
@@ -1347,11 +1373,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         claimed_at = now()
         active_until = claimed_at + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
         sint64_task_id = uint64_to_int64(task_id)
+        self._cleanup_expired_task_tokens()
         try:
             # The conditional UPDATE is the atomic claim: exactly one caller can
             # move a pending, unclaimed task to STARTING and attach a token.
             with self.session() as session:
-                claimed_task_id = session.scalar(
+                claimed_task = session.execute(
                     update(TaskModel)
                     .where(
                         TaskModel.task_id == sint64_task_id,
@@ -1363,14 +1390,33 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         active_until=active_until,
                         starting_at=claimed_at,
                     )
-                    .returning(TaskModel.task_id)
-                )
-            if claimed_task_id is None:
-                return None
+                    .returning(TaskModel.task_id, TaskModel.type, TaskModel.run_id)
+                ).one_or_none()
+                if claimed_task is None:
+                    return None
+
+                if claimed_task.type == TaskType.AGENT_APP:
+                    series_id = session.scalar(
+                        select(SeriesRunsModel.series_id).where(
+                            SeriesRunsModel.run_id == claimed_task.run_id
+                        )
+                    )
+                    if series_id is not None:
+                        reserved_series_id = session.scalar(
+                            update(RunSeriesModel)
+                            .where(
+                                RunSeriesModel.series_id == series_id,
+                                RunSeriesModel.active_agent_task_id.is_(None),
+                            )
+                            .values(active_agent_task_id=sint64_task_id)
+                            .returning(RunSeriesModel.series_id)
+                        )
+                        if reserved_series_id is None:
+                            raise _AgentRunSeriesBusyError
 
             return token
-        except IntegrityError:
-            # Rare failure: generated token already exists (duplicate)
+        except (IntegrityError, _AgentRunSeriesBusyError):
+            # The token collided or another AgentApp owns the run series.
             return None
 
     def activate_task(self, task_id: int) -> bool:
@@ -1414,16 +1460,24 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if sub_status == SubStatus.COMPLETED:
                 query = query.where(TaskModel.running_at.is_not(None))
 
-            finished_task_id = session.scalar(
+            finished_task = session.execute(
                 query.values(
                     finished_at=now(),
                     sub_status=sub_status,
                     details=details,
                     active_until=None,
                     token=None,
-                ).returning(TaskModel.task_id)
-            )
-            return finished_task_id is not None
+                ).returning(TaskModel.task_id, TaskModel.type, TaskModel.run_id)
+            ).one_or_none()
+            if finished_task is None:
+                return False
+            if finished_task.type == TaskType.AGENT_APP:
+                self._release_agent_run_series(
+                    session,
+                    task_id=finished_task.task_id,
+                    run_id=finished_task.run_id,
+                )
+            return True
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
         """Extend heartbeat state for the claimed task."""
@@ -1682,21 +1736,25 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         expired_at = now()
         with self.session() as session:
             # Claims that never reached RUNNING are retryable launch failures.
-            session.execute(
-                update(TaskModel)
-                .where(
-                    TaskModel.token.is_not(None),
-                    TaskModel.active_until < expired_at,
-                    _task_status_filter(Status.STARTING),
-                )
-                .values(
-                    token=None,
-                    active_until=None,
-                    starting_at=None,
-                    sub_status="",
-                    details="",
-                )
-            )
+            expired_starting_tasks = [
+                task_from_model(row)
+                for row in session.scalars(
+                    update(TaskModel)
+                    .where(
+                        TaskModel.token.is_not(None),
+                        TaskModel.active_until < expired_at,
+                        _task_status_filter(Status.STARTING),
+                    )
+                    .values(
+                        token=None,
+                        active_until=None,
+                        starting_at=None,
+                        sub_status="",
+                        details="",
+                    )
+                    .returning(TaskModel)
+                ).all()
+            ]
 
             # Expired running task claims are terminal failures and lose their token.
             expired_tasks = [
@@ -1718,8 +1776,35 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     .returning(TaskModel)
                 ).all()
             ]
+            for task in [*expired_starting_tasks, *expired_tasks]:
+                if task.type == TaskType.AGENT_APP:
+                    self._release_agent_run_series(
+                        session,
+                        task_id=uint64_to_int64(task.task_id),
+                        run_id=uint64_to_int64(task.run_id),
+                    )
         if expired_tasks:
             self._on_task_tokens_expired(expired_tasks)
+
+    @staticmethod
+    def _release_agent_run_series(
+        session: Session,
+        *,
+        task_id: int,
+        run_id: int,
+    ) -> None:
+        """Release an AgentApp run-series reservation in this transaction."""
+        series_id = select(SeriesRunsModel.series_id).where(
+            SeriesRunsModel.run_id == run_id
+        )
+        session.execute(
+            update(RunSeriesModel)
+            .where(
+                RunSeriesModel.series_id == series_id.scalar_subquery(),
+                RunSeriesModel.active_agent_task_id == task_id,
+            )
+            .values(active_agent_task_id=None)
+        )
 
     def _cleanup_invalid_task_messages(self) -> None:
         """Remove expired task Messages."""

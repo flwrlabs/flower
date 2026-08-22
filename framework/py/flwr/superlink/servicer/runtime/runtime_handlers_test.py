@@ -921,7 +921,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
         # Assert: Response is successful and run status is now RUNNING
         assert isinstance(response, PullTaskInputResponse)
-        assert response.context.run_id == 123
+        assert response.context.run_id == run_id
         assert response.context.series_id == run.series_id
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.RUNNING
