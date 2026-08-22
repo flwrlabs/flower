@@ -12,13 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SuperNode implementation of the Runtime API."""
-
-
-from .runtime_grpc import run_runtime_api_grpc
-from .runtime_servicer import SuperNodeRuntimeServicer
-
-__all__ = [
-    "SuperNodeRuntimeServicer",
-    "run_runtime_api_grpc",
-]
+"""SuperNode Runtime API handlers."""
