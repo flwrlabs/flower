@@ -5,6 +5,21 @@ import torch.nn.functional as F
 from torch import nn
 
 
+def get_device() -> torch.device:
+    """Pick the best available device.
+
+    CUDA where present, MPS on Apple Silicon, CPU otherwise. Without the MPS
+    branch an M1/M2 Mac silently falls back to CPU, which is roughly 3-5x
+    slower for this CNN.
+    """
+    if torch.cuda.is_available():
+        return torch.device("cuda:0")
+    mps = getattr(torch.backends, "mps", None)
+    if mps is not None and mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
 class Net(nn.Module):
     """Model (simple CNN adapted from 'PyTorch: A 60 Minute Blitz')."""
 
