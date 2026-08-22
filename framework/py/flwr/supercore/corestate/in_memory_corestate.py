@@ -50,7 +50,11 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskUsage,
 )
 from flwr.supercore import log
-from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
+from flwr.supercore.constant import (
+    OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AutomationStatus,
+    TaskType,
+)
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
@@ -58,8 +62,6 @@ from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import (
-    context_from_bytes,
-    context_to_bytes,
     generate_rand_int_from_bytes,
     validate_task_event_data,
     validate_task_message,
@@ -137,6 +139,8 @@ class InMemoryCoreState(
         self.lock_nonce_store = Lock()
         self.run_series_store: dict[int, RunSeries] = {}
         self.agent_run_series_ids: set[int] = set()
+        self.run_id_to_series_id: dict[int, int] = {}
+        self.active_agent_tasks: dict[int, int] = {}
         self.lock_run_series_store = Lock()
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
@@ -601,26 +605,12 @@ class InMemoryCoreState(
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
         with self.lock_run_series_context_store:
-            context = self.run_series_context_store.get(series_id)
-            if context is None:
-                return None
-            return context_from_bytes(context_to_bytes(context))
+            return self.run_series_context_store.get(series_id)
 
-    def set_run_series_context(self, series_id: int, context: Context) -> bool:
-        """Set the shared Context if its version matches the stored version."""
+    def set_run_series_context(self, series_id: int, context: Context) -> None:
+        """Set the shared Context for the specified RunSeries."""
         with self.lock_run_series_context_store:
-            stored = self.run_series_context_store.get(series_id)
-            if stored is None:
-                if context.version != 0:
-                    return False
-            elif stored.version != context.version:
-                return False
-
-            context.version += 1
-            self.run_series_context_store[series_id] = context_from_bytes(
-                context_to_bytes(context)
-            )
-            return True
+            self.run_series_context_store[series_id] = context
 
     def store_run_in_series(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
@@ -673,6 +663,7 @@ class InMemoryCoreState(
             if run_id in run_series.run_ids:
                 return None
             run_series.run_ids.append(run_id)
+            self.run_id_to_series_id[run_id] = resolved_series_id
             if series_id is not None:
                 run_series.updated_at = now().isoformat()
             return resolved_series_id
@@ -954,6 +945,7 @@ class InMemoryCoreState(
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
+        claimable: bool = False,
     ) -> Sequence[Task]:
         """Retrieve information about tasks based on the specified filters."""
         if order_by not in (None, "pending_at"):
@@ -996,6 +988,13 @@ class InMemoryCoreState(
                     if self.task_store[task_id].status.status in status_set
                 }
 
+            if claimable:
+                matched_task_ids &= {
+                    task_id
+                    for task_id in matched_task_ids
+                    if self._is_task_claimable_locked(self.task_store[task_id])
+                }
+
             tasks = [self.task_store[task_id] for task_id in matched_task_ids]
 
             if order_by is not None:
@@ -1014,6 +1013,13 @@ class InMemoryCoreState(
                 task_copy.CopyFrom(task)
                 result.append(task_copy)
             return result
+
+    def _is_task_claimable_locked(self, task: Task) -> bool:
+        """Return whether a task can acquire its run series under the task lock."""
+        if task.type != TaskType.AGENT_APP:
+            return True
+        series_id = self.run_id_to_series_id.get(task.run_id)
+        return series_id is None or series_id not in self.active_agent_tasks
 
     def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
         """Record usage for the specified task."""
@@ -1061,10 +1067,13 @@ class InMemoryCoreState(
         """Atomically claim a pending task."""
         token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         with self.lock_task_store:
+            self._cleanup_expired_task_tokens_locked()
             task = self.task_store.get(task_id)
             if task is None or task_id in self.task_token_store:
                 return None
             if task.status.status != Status.PENDING:
+                return None
+            if not self._reserve_agent_run_series_locked(task):
                 return None
 
             # Claiming moves the task into STARTING and records the heartbeat state.
@@ -1134,6 +1143,7 @@ class InMemoryCoreState(
             # Revoke any existing task token now that the task is finished.
             if (record := self.task_token_store.pop(task_id, None)) is not None:
                 self.task_token_to_task_id.pop(record.token, None)
+            self._release_agent_run_series_locked(task)
             return True
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
@@ -1327,6 +1337,7 @@ class InMemoryCoreState(
                     task.status.CopyFrom(
                         TaskStatus(status=Status.PENDING, sub_status="", details="")
                     )
+                    self._release_agent_run_series_locked(task)
                 elif task and task.status.status == Status.RUNNING:
                     task.finished_at = record.active_until.isoformat()
                     task.status.CopyFrom(
@@ -1339,11 +1350,35 @@ class InMemoryCoreState(
                     expired_task = Task()
                     expired_task.CopyFrom(task)
                     expired_tasks.append(expired_task)
+                    self._release_agent_run_series_locked(task)
                 del self.task_token_store[task_id]
                 self.task_token_to_task_id.pop(record.token, None)
 
         if expired_tasks:
             self._on_task_tokens_expired(expired_tasks)
+
+    def _reserve_agent_run_series_locked(self, task: Task) -> bool:
+        """Reserve an AgentApp run series for a task while holding the task lock."""
+        if task.type != TaskType.AGENT_APP:
+            return True
+        series_id = self.run_id_to_series_id.get(task.run_id)
+        if series_id is None:
+            return True
+        if series_id in self.active_agent_tasks:
+            return False
+        self.active_agent_tasks[series_id] = task.task_id
+        return True
+
+    def _release_agent_run_series_locked(self, task: Task) -> None:
+        """Release an AgentApp run series while holding the task lock."""
+        if task.type != TaskType.AGENT_APP:
+            return
+        series_id = self.run_id_to_series_id.get(task.run_id)
+        if (
+            series_id is not None
+            and self.active_agent_tasks.get(series_id) == task.task_id
+        ):
+            del self.active_agent_tasks[series_id]
 
     def _cleanup_invalid_task_messages_locked(self, current: float) -> None:
         """Remove expired Messages and Messages for invalid destination tasks."""

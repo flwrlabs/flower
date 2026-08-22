@@ -51,9 +51,6 @@ class Context:
         (e.g. across multiple rounds)
     series_id : int (default: 0)
         The ID that identifies the run series, if this run belongs to one.
-    version : int (default: 0)
-        The persisted version of this context. The runtime uses this value to
-        prevent concurrent executions from overwriting newer context state.
     """
 
     run_id: int
@@ -62,7 +59,6 @@ class Context:
     state: RecordDict
     run_config: UserConfig
     series_id: int
-    version: int
 
     def __init__(  # pylint: disable=too-many-arguments, too-many-positional-arguments
         self,
@@ -72,7 +68,6 @@ class Context:
         state: RecordDict,
         run_config: UserConfig,
         series_id: int = 0,
-        version: int = 0,
     ) -> None:
         self.run_id = run_id
         self.node_id = node_id
@@ -80,7 +75,6 @@ class Context:
         self.state = state
         self.run_config = run_config
         self.series_id = series_id
-        self.version = version
         self._lock = RLock()
 
     @contextmanager

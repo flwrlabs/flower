@@ -393,8 +393,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def set_run_series_context(self, series_id: int, context: Context) -> bool:
-        """Set the shared Context for the specified RunSeries if its version matches.
+    def set_run_series_context(self, series_id: int, context: Context) -> None:
+        """Set the shared Context for the specified RunSeries.
 
         Parameters
         ----------
@@ -403,11 +403,6 @@ class CoreState(ABC):  # pylint: disable=R0904
         context : Context
             The shared context to store.
 
-        Returns
-        -------
-        bool
-            ``True`` if the context was stored, or ``False`` if a newer version
-            is already stored.
         """
 
     @abstractmethod
@@ -705,6 +700,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
+        claimable: bool = False,
     ) -> Sequence[Task]:
         """Retrieve information about tasks based on the specified filters.
 
@@ -726,6 +722,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Whether sorting should be in ascending order.
         limit : Optional[int] (default: None)
             Maximum number of tasks to return. If `None`, no limit is applied.
+        claimable : bool (default: False)
+            If `True`, exclude AgentApp tasks whose run series is already active.
 
         Returns
         -------

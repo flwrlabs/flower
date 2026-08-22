@@ -614,7 +614,6 @@ def context_to_proto(context: Context) -> ProtoContext:
             state=recorddict_to_proto(context.state),
             run_config=user_config_to_proto(context.run_config),
             series_id=context.series_id,
-            version=context.version,
         )
 
 
@@ -627,7 +626,6 @@ def context_from_proto(context_proto: ProtoContext) -> Context:
         state=recorddict_from_proto(context_proto.state),
         run_config=user_config_from_proto(context_proto.run_config),
         series_id=context_proto.series_id,
-        version=context_proto.version,
     )
     return context
 

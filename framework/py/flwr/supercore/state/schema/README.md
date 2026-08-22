@@ -172,6 +172,7 @@ erDiagram
 
   run_series {
     BIGINT series_id PK
+    BIGINT active_agent_task_id "nullable"
     TIMESTAMP created_at
     VARCHAR description "nullable"
     VARCHAR federation_id
@@ -182,7 +183,6 @@ erDiagram
   series_context {
     BIGINT series_id PK
     BLOB context "nullable"
-    INTEGER version
   }
 
   series_runs {

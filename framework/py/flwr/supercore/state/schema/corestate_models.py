@@ -74,6 +74,7 @@ class RunSeries(FlwrBase):
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    active_agent_task_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
 
 class SeriesContext(FlwrBase):
@@ -83,7 +84,6 @@ class SeriesContext(FlwrBase):
 
     series_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
     context: Mapped[bytes | None] = mapped_column(LargeBinary)
-    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
 
 class SeriesRuns(FlwrBase):

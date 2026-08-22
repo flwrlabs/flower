@@ -237,7 +237,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             run_config={"run": "value"},
             series_id=42,
         )
-        self.assertTrue(state.set_run_series_context(series_id=42, context=context))
+        state.set_run_series_context(series_id=42, context=context)
 
         retrieved = state.get_run_series_context(series_id=42)
 
@@ -247,7 +247,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(retrieved.node_config, context.node_config)
         self.assertEqual(retrieved.run_config, context.run_config)
         self.assertEqual(retrieved.series_id, context.series_id)
-        self.assertEqual(retrieved.version, 1)
 
         updated_context = Context(
             run_id=456,
@@ -256,11 +255,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state=RecordDict(),
             run_config={"run": "updated"},
             series_id=42,
-            version=retrieved.version,
         )
-        self.assertTrue(
-            state.set_run_series_context(series_id=42, context=updated_context)
-        )
+        state.set_run_series_context(series_id=42, context=updated_context)
 
         updated = state.get_run_series_context(series_id=42)
 
@@ -268,21 +264,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(updated.run_id, updated_context.run_id)
         self.assertEqual(updated.node_config, updated_context.node_config)
         self.assertEqual(updated.run_config, updated_context.run_config)
-        self.assertEqual(updated.version, 2)
-
-        stale_context = Context(
-            run_id=789,
-            node_id=SUPERLINK_NODE_ID,
-            node_config={},
-            state=RecordDict(),
-            run_config={},
-            series_id=42,
-            version=retrieved.version,
-        )
-        self.assertFalse(
-            state.set_run_series_context(series_id=42, context=stale_context)
-        )
-        self.assertEqual(state.get_run_series_context(42), updated)
 
     def test_connector_oauth_session_lifecycle(self) -> None:
         """An OAuth session can be created, retrieved, and completed once."""

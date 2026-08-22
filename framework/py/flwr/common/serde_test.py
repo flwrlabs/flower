@@ -459,7 +459,6 @@ def test_context_serialization_deserialization() -> None:
         state=maker.recorddict(1, 1, 1),
         run_config=maker.user_config(),
         series_id=123,
-        version=4,
     )
 
     # Execute
