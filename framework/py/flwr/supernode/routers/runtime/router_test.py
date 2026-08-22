@@ -31,6 +31,11 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.constant import (
+    FLWR_COMPONENT_NAME_METADATA_KEY,
+    FLWR_PACKAGE_NAME_METADATA_KEY,
+    FLWR_PACKAGE_VERSION_METADATA_KEY,
+)
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import (
@@ -48,7 +53,6 @@ from .router import router
 _SUPEREXEC_PATHS = {
     "/v1/runtime/pull-pending-tasks",
     "/v1/runtime/claim-task",
-    "/v1/runtime/get-run",
 }
 
 
@@ -82,6 +86,25 @@ def _post(client: TestClient, path: str, request: Message) -> Response:
     )
 
 
+def test_runtime_route_rejects_incompatible_version() -> None:
+    """Runtime routes should reject peers from a different Flower release."""
+    client = TestClient(_create_app(Mock(spec=NodeState)))
+
+    response = client.post(
+        "/v1/runtime/claim-task",
+        content=ClaimTaskRequest(task_id=123).SerializeToString(),
+        headers={
+            "content-type": PROTOBUF_MEDIA_TYPE,
+            FLWR_PACKAGE_NAME_METADATA_KEY: "flwr",
+            FLWR_PACKAGE_VERSION_METADATA_KEY: "0.0.1",
+            FLWR_COMPONENT_NAME_METADATA_KEY: "SuperExec",
+        },
+    )
+
+    assert response.status_code == 412
+    assert response.json()["code"] == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
+
+
 def test_all_runtime_routes_have_protobuf_request_types() -> None:
     """Every Runtime route has exactly one protobuf request type mapping."""
     route_keys = {
@@ -96,7 +119,7 @@ def test_all_runtime_routes_have_protobuf_request_types() -> None:
         if route_key[1].startswith("/v1/runtime/")
     }
 
-    assert len(route_keys) == 20
+    assert len(route_keys) == 19
     assert route_keys == runtime_request_types
 
 

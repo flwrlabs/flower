@@ -57,6 +57,8 @@ tutorials/build-a-collaborative-agent
 :maxdepth: 1
 
 how-to-guides/use-agents-and-federations
+how-to-guides/connect-accounts
+how-to-guides/create-automations
 how-to-guides/run-on-supergrid
 how-to-guides/troubleshoot-agent-runs
 how-to-guides/run-with-local-superlink

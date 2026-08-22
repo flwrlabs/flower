@@ -10,10 +10,10 @@ import time
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
-    SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS,
     Status,
     SubStatus,
 )
+from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 use_sim = sys.argv[1] == "simulation" if len(sys.argv) > 1 else False
 superlink_connection = "e2e-sim" if use_sim else "e2e"
@@ -40,7 +40,7 @@ def run_superlink(database_path: str, secret_path: str) -> subprocess.Popen:
 def run_superexec(secret_path: str) -> subprocess.Popen:
     """Run the SuperExec."""
     cmd = ["flower-superexec", "--insecure"]
-    cmd += ["--appio-api-address", SUPERLINK_RUNTIME_API_DEFAULT_CLIENT_ADDRESS]
+    cmd += ["--appio-api-address", SUPERLINK_DEFAULT_CLIENT_ADDRESS]
     cmd += ["--plugin-type", plugin_type_arg]
     cmd += ["--superexec-auth-secret-file", secret_path]
     return subprocess.Popen(cmd)

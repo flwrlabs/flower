@@ -31,6 +31,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from flwr.supercore import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import http_error_translator
+from flwr.supercore.http_logging import configure_uvicorn_logging
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
 from flwr.supercore.version import package_version
@@ -49,6 +50,7 @@ from flwr.superlink.routers.control.middlewares import (
     ControlEventLogMiddleware,
     ControlLicenseMiddleware,
 )
+from flwr.superlink.routers.runtime import router as runtime_router
 
 try:
     from flwr.ee import get_ee_linkstate_db as get_ee_linkstate_db
@@ -127,12 +129,12 @@ def create_app(
     # Force initialization before exposing LinkState through FastAPI dependencies
     linkstate_factory.state()
 
-    # Instantiate SuperLink lifespan for legacy gRPC server if required
+    # Instantiate the lifespan which owns the Control and Fleet gRPC servers.
     superlink_lifespan = None
-    if config and not config.disable_grpc_api:
+    if config:
         if superlink_lifespan_class is None:
             raise RuntimeError(
-                "A SuperLink lifespan class is required when legacy gRPC is enabled."
+                "A SuperLink lifespan class is required when configuration is provided."
             )
         superlink_lifespan = superlink_lifespan_class(config, linkstate_factory)
 
@@ -181,7 +183,7 @@ def create_app(
 
     # SuperLink APIs
     fastapi_app.include_router(control_router)
-    # fastapi_app.include_router(runtime.router)
+    fastapi_app.include_router(runtime_router)
 
     # Extension hooks
     extensions.configure_app(fastapi_app)
@@ -217,6 +219,7 @@ def validate_unique_route_operation_ids(fastapi_app: FastAPI) -> None:
 def __getattr__(name: str) -> FastAPI:
     """Create the module-level FastAPI app lazily."""
     if name == "app":
+        configure_uvicorn_logging()
         fastapi_app = create_app()
         globals()[name] = fastapi_app
         return fastapi_app

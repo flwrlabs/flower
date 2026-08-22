@@ -67,7 +67,6 @@ from flwr.cli.constant import (
     CHAT_EXIT_HINT,
     CHAT_EXPERIMENTAL_WARNING,
     CHAT_FAILURE_EVENTS,
-    CHAT_FLOWER_AGENT_APP_SPEC,
     CHAT_FLOWER_LOGO,
     CHAT_HELP_COMMAND,
     CHAT_NEW_COMMAND,
@@ -91,7 +90,11 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.fab_pb2 import Fab  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
-from flwr.supercore.constant import APP_ID_PATTERN, FLWR_SUPERGRID_API_URL
+from flwr.supercore.constant import (
+    APP_ID_PATTERN,
+    FLOWER_AGENT_APP_ID,
+    FLWR_SUPERGRID_API_URL,
+)
 from flwr.supercore.typing import JSONObject
 
 from .auth_plugin import CliAuthPlugin, OidcCliPlugin
@@ -206,7 +209,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.transcript_revision = 0
         self.follow_transcript = True
         self.status = ""
-        self.agent_app_spec = CHAT_FLOWER_AGENT_APP_SPEC
+        self.agent_app_spec = FLOWER_AGENT_APP_ID
         self.agent_fab_hash: str | None = None
         self.agent_name = CHAT_AGENT_NAME
         self.completer = _ChatCompleter(auth_plugin, federation)
@@ -759,12 +762,12 @@ def start_chat_run(  # pylint: disable=too-many-arguments,too-many-positional-ar
     prompt: str,
     federation: str | None,
     series_id: int | None,
-    app_spec: str = CHAT_FLOWER_AGENT_APP_SPEC,
+    app_spec: str = FLOWER_AGENT_APP_ID,
     fab_hash: str | None = None,
 ) -> tuple[int, int | None]:
     """Start one Flower AgentApp run."""
     req = StartRunRequest(
-        app_spec=app_spec if fab_hash is None else "",
+        app_spec=app_spec,
         override_config=user_config_to_proto({CHAT_AGENT_INPUT_KEY: prompt}),
         federation=federation or "",
     )

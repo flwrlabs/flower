@@ -134,6 +134,7 @@ class InMemoryCoreState(
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
         self.run_series_store: dict[int, RunSeries] = {}
+        self.agent_run_series_ids: set[int] = set()
         self.lock_run_series_store = Lock()
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
@@ -378,6 +379,21 @@ class InMemoryCoreState(
                 verifications=dict(fab.verifications),
             )
 
+    def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
+        if not all((federation_id, app_id, fab_hash)):
+            return None
+        with self.lock_fab_store, self.lock_federation_app_store:
+            app = self.federation_app_store.get((federation_id, app_id))
+            fab = self.fab_store.get(fab_hash)
+            if app is None or app.fab_hash != fab_hash or fab is None:
+                return None
+            return Fab(
+                hash_str=fab.hash_str,
+                content=fab.content,
+                verifications=dict(fab.verifications),
+            )
+
     def list_apps(
         self, federation_id: str, limit: int | None = None
     ) -> Sequence[AppInfo]:
@@ -535,11 +551,12 @@ class InMemoryCoreState(
             )
         return True
 
-    def get_run_series(
+    def get_run_series(  # pylint: disable=too-many-arguments
         self,
         *,
         series_ids: Sequence[int] | None = None,
         federation_ids: Sequence[str] | None = None,
+        is_agent: bool | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -566,6 +583,11 @@ class InMemoryCoreState(
                     and record.federation not in federation_id_set
                 ):
                     continue
+                if (
+                    is_agent is not None
+                    and (record.series_id in self.agent_run_series_ids) != is_agent
+                ):
+                    continue
                 if updated_before is not None and record.updated_at >= updated_before:
                     continue
                 run_series.append(record)
@@ -584,10 +606,11 @@ class InMemoryCoreState(
         with self.lock_run_series_context_store:
             self.run_series_context_store[series_id] = context
 
-    def store_run_in_series(
+    def store_run_in_series(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         run_id: int,
         federation_id: str,
+        is_agent: bool,
         series_id: int | None,
         description: str | None = None,
     ) -> int | None:
@@ -626,6 +649,8 @@ class InMemoryCoreState(
                     updated_at=timestamp,
                 )
                 self.run_series_store[new_series_id] = run_series
+                if is_agent:
+                    self.agent_run_series_ids.add(new_series_id)
                 resolved_series_id = new_series_id
 
             # Store the membership last so callers only receive linked series IDs.

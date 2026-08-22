@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SuperLinkRuntimeServicer tests."""
+"""SuperLink Runtime API handler tests."""
 
 # pylint: disable=too-many-lines
 
@@ -25,17 +25,10 @@ import unittest
 from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock, patch
 
-import grpc
 from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
-from flwr.common.constant import (
-    NOOP_FLWR_AID,
-    SUPERLINK_NODE_ID,
-    SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
-    Status,
-    SubStatus,
-)
+from flwr.common.constant import NOOP_FLWR_AID, SUPERLINK_NODE_ID, Status, SubStatus
 from flwr.common.serde import context_to_proto, message_from_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
@@ -47,16 +40,12 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedResponse,
     ObjectTree,
     PullObjectRequest,
-    PullObjectResponse,
     PushObjectRequest,
-    PushObjectResponse,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
-    ClaimTaskResponse,
     CreateTaskRequest,
-    CreateTaskResponse,
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
@@ -64,21 +53,17 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullPendingTasksRequest,
-    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
-    SendTaskHeartbeatRequest,
-    SendTaskHeartbeatResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
-from flwr.server.superlink.utils import _STATUS_TO_MSG
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
@@ -94,23 +79,12 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     iterate_object_tree,
 )
-from flwr.supercore.interceptors import (
-    TASK_TOKEN_HEADER,
-    RuntimeTokenClientInterceptor,
-    SuperExecAuthClientInterceptor,
-)
-from flwr.supercore.interceptors.superexec_auth_interceptor import (
-    RUNTIME_SUPEREXEC_METHODS,
-)
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.superlink.federation import NoOpFederationManager
-from flwr.superlink.servicer.runtime.runtime_grpc import run_runtime_api_grpc
-from flwr.superlink.servicer.runtime.runtime_handlers import _raise_if
-from flwr.superlink.servicer.runtime.runtime_servicer import SuperLinkRuntimeServicer
+from flwr.superlink.servicer.runtime import runtime_handlers
 
 # pylint: disable=broad-except,too-many-lines
-
-_SUPEREXEC_SECRET = b"test-superexec-secret"
 
 
 def test_raise_if_false() -> None:
@@ -121,7 +95,7 @@ def test_raise_if_false() -> None:
 
     try:
         # Execute
-        _raise_if(
+        runtime_handlers._raise_if(  # pylint: disable=protected-access
             validation_error=validation_error,
             request_name="DummyRequest",
             detail=detail,
@@ -143,7 +117,7 @@ def test_raise_if_true() -> None:
 
     try:
         # Execute
-        _raise_if(
+        runtime_handlers._raise_if(  # pylint: disable=protected-access
             validation_error=validation_error,
             request_name="DummyRequest",
             detail=detail,
@@ -157,34 +131,9 @@ def test_raise_if_true() -> None:
         raise AssertionError() from err
 
 
-def _start_runtime_with_port_retry(
-    state_factory: LinkStateFactory,
-    objectstore_factory: ObjectStoreFactory,
-    start_port: int,
-) -> grpc.Server:
-    for offset in range(40):
-        address = f"127.0.0.1:{start_port + offset}"
-        try:
-            return run_runtime_api_grpc(
-                address,
-                state_factory,
-                objectstore_factory,
-                None,
-                superexec_auth_secret=_SUPEREXEC_SECRET,
-            )
-        except RuntimeError as err:
-            if "Failed to bind to address" in str(err):
-                continue
-            raise
-
-    raise AssertionError(
-        f"Could not bind Runtime gRPC server starting at port {start_port}."
-    )
-
-
 def _create_shared_runtime(
     tmpdir: str,
-) -> tuple[int, int, LinkState, grpc.Server, grpc.Server]:
+) -> tuple[int, int, LinkState, LinkState]:
     database_path = os.path.join(tmpdir, "shared.db")
 
     objectstore_factory_0 = ObjectStoreFactory()
@@ -225,76 +174,31 @@ def _create_shared_runtime(
     )
     assert run.primary_task_id is not None
     task_id = run.primary_task_id
-    server_0 = _start_runtime_with_port_retry(
-        state_factory_0,
-        objectstore_factory_0,
-        start_port=19091,
-    )
-    server_1 = _start_runtime_with_port_retry(
-        state_factory_1,
-        objectstore_factory_1,
-        start_port=19141,
-    )
-    return run_id, task_id, state_0, server_0, server_1
+    return run_id, task_id, state_0, state_factory_1.state()
 
 
-def _claim_task(channel: grpc.Channel, task_id: int) -> str:
-    superexec_channel = grpc.intercept_channel(
-        channel,
-        SuperExecAuthClientInterceptor(
-            master_secret=_SUPEREXEC_SECRET,
-            protected_methods=RUNTIME_SUPEREXEC_METHODS,
-        ),
-    )
-    request_token = superexec_channel.unary_unary(
-        "/flwr.proto.Runtime/ClaimTask",
-        request_serializer=ClaimTaskRequest.SerializeToString,
-        response_deserializer=ClaimTaskResponse.FromString,
-    )
-    token_response, token_call = request_token.with_call(
-        ClaimTaskRequest(task_id=task_id)
-    )
-    assert grpc.StatusCode.OK == token_call.code()
-    token = str(token_response.token)
-    assert token
-    return token
-
-
-def _claim_in_parallel(
-    channel_0: grpc.Channel, channel_1: grpc.Channel, token: str
-) -> list[grpc.StatusCode | None]:
-    pull_task_input_0 = channel_0.unary_unary(
-        "/flwr.proto.Runtime/PullTaskInput",
-        request_serializer=PullTaskInputRequest.SerializeToString,
-        response_deserializer=PullTaskInputResponse.FromString,
-    )
-    pull_task_input_1 = channel_1.unary_unary(
-        "/flwr.proto.Runtime/PullTaskInput",
-        request_serializer=PullTaskInputRequest.SerializeToString,
-        response_deserializer=PullTaskInputResponse.FromString,
-    )
+def _activate_in_parallel(
+    state_0: LinkState, state_1: LinkState, task: Task
+) -> list[bool | None]:
     timeout = 5.0
     barrier = threading.Barrier(3)
-    results: list[grpc.StatusCode | None] = [None, None]
+    results: list[bool | None] = [None, None]
     exceptions: list[Exception] = []
 
-    def claim_inputs(idx: int, pull_fn: grpc.UnaryUnaryMultiCallable) -> None:
+    def activate_task(idx: int, state: LinkState) -> None:
         try:
             barrier.wait(timeout=timeout)
-            response, call = pull_fn.with_call(
-                PullTaskInputRequest(),
-                metadata=((TASK_TOKEN_HEADER, token),),
-            )
-            del response
-            results[idx] = call.code()
-        except grpc.RpcError as err:
-            results[idx] = err.code()
+            runtime_handlers.pull_task_input(PullTaskInputRequest(), state, task)
+            results[idx] = True
+        except FlowerError as err:
+            assert err.code == ApiErrorCode.RUNTIME_TASK_START_FAILED
+            results[idx] = False
         except Exception as ex:  # pylint: disable=broad-exception-caught
             exceptions.append(ex)
 
     threads = [
-        threading.Thread(target=claim_inputs, args=(0, pull_task_input_0)),
-        threading.Thread(target=claim_inputs, args=(1, pull_task_input_1)),
+        threading.Thread(target=activate_task, args=(0, state_0)),
+        threading.Thread(target=activate_task, args=(1, state_1)),
     ]
     for thread in threads:
         thread.start()
@@ -320,14 +224,8 @@ class TestGetConnector(unittest.TestCase):
     """Test connector credential authorization with mocked state."""
 
     def setUp(self) -> None:
-        """Create a servicer backed by mocked state."""
+        """Create mocked state."""
         self.state = Mock(spec=LinkState)
-        self.state_factory = Mock(spec=LinkStateFactory)
-        self.state_factory.state.return_value = self.state
-        self.servicer = SuperLinkRuntimeServicer(
-            self.state_factory,
-            Mock(spec=ObjectStoreFactory),
-        )
 
     def test_returns_authenticated_task_credentials(self) -> None:
         """GetConnector should return the run owner's matching credentials."""
@@ -339,15 +237,9 @@ class TestGetConnector(unittest.TestCase):
             config_json='{"workspace":"primary"}',
         )
 
-        with patch(
-            "flwr.superlink.servicer.runtime.runtime_servicer."
-            "get_authenticated_task",
-            return_value=task,
-        ):
-            response = self.servicer.GetConnector(
-                GetConnectorRequest(),
-                Mock(),
-            )
+        response = runtime_handlers.get_connector(
+            GetConnectorRequest(), self.state, task
+        )
 
         self.assertEqual(
             response,
@@ -362,20 +254,6 @@ class TestGetConnector(unittest.TestCase):
             connector_ref="notion",
         )
 
-    def test_authenticates_before_accessing_state(self) -> None:
-        """GetConnector should authenticate before accessing state."""
-        with (
-            patch(
-                "flwr.superlink.servicer.runtime.runtime_servicer."
-                "get_authenticated_task",
-                side_effect=RuntimeError("No authenticated task"),
-            ),
-            self.assertRaisesRegex(RuntimeError, "No authenticated task"),
-        ):
-            self.servicer.GetConnector(GetConnectorRequest(), Mock())
-
-        self.state_factory.state.assert_not_called()
-
     @parameterized.expand(  # type: ignore
         [
             ("wrong_task_type", TaskType.AGENT_APP, "notion"),
@@ -389,19 +267,9 @@ class TestGetConnector(unittest.TestCase):
         connector_ref: str,
     ) -> None:
         """GetConnector should reject tasks without a connector identity."""
-        with (
-            patch(
-                "flwr.superlink.servicer.runtime.runtime_servicer."
-                "get_authenticated_task",
-                return_value=Mock(
-                    type=task_type,
-                    connector_ref=connector_ref,
-                    run_id=123,
-                ),
-            ),
-            self.assertRaises(FlowerError) as error,
-        ):
-            self.servicer.GetConnector(GetConnectorRequest(), Mock())
+        task = Mock(type=task_type, connector_ref=connector_ref, run_id=123)
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.get_connector(GetConnectorRequest(), self.state, task)
 
         self.assertEqual(
             error.exception.code,
@@ -415,15 +283,8 @@ class TestGetConnector(unittest.TestCase):
         self.state.get_run_info.return_value = [Mock(flwr_aid="account-b")]
         self.state.get_connector.return_value = None
 
-        with (
-            patch(
-                "flwr.superlink.servicer.runtime.runtime_servicer."
-                "get_authenticated_task",
-                return_value=task,
-            ),
-            self.assertRaises(FlowerError) as error,
-        ):
-            self.servicer.GetConnector(GetConnectorRequest(), Mock())
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.get_connector(GetConnectorRequest(), self.state, task)
 
         self.state.get_connector.assert_called_once_with(
             flwr_aid="account-b",
@@ -432,11 +293,11 @@ class TestGetConnector(unittest.TestCase):
         self.assertEqual(error.exception.code, ApiErrorCode.CONNECTOR_NOT_FOUND)
 
 
-class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
-    """SuperLinkRuntimeServicer tests for allowed RunStatuses."""
+class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902, R0904
+    """SuperLink Runtime API handler tests."""
 
     def setUp(self) -> None:
-        """Initialize mock stub and server interceptor."""
+        """Initialize state shared by handler tests."""
         objectstore_factory = ObjectStoreFactory()
         state_factory = LinkStateFactory(
             FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
@@ -451,94 +312,13 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         )
         self.state.acknowledge_node_heartbeat(self.node_id, 1e3)
 
-        self.status_to_msg = _STATUS_TO_MSG
-
-        self._server: grpc.Server = run_runtime_api_grpc(
-            SUPERLINK_RUNTIME_API_DEFAULT_SERVER_ADDRESS,
-            state_factory,
-            objectstore_factory,
-            None,
-            superexec_auth_secret=_SUPEREXEC_SECRET,
-        )
-
-        # Provide a valid claimed-task token on the default test channel so existing
-        # servicer behavior tests continue to exercise business logic paths.
         self._auth_run_id = self.state.create_run(
             "", "", "", {}, NOOP_FEDERATION_ID, None, "", TaskType.SERVER_APP
         )
         auth_task_id = self._primary_task_id(self._auth_run_id)
-        auth_token = self.state.claim_task(auth_task_id)
-        assert auth_token is not None
+        assert self.state.claim_task(auth_task_id) is not None
         assert self.state.activate_task(auth_task_id)
-        self._auth_token = auth_token
-        self._runtime_auth_interceptor = RuntimeTokenClientInterceptor(auth_token)
-        self._channel = grpc.intercept_channel(
-            grpc.insecure_channel("localhost:9091"),
-            self._runtime_auth_interceptor,
-            SuperExecAuthClientInterceptor(
-                master_secret=_SUPEREXEC_SECRET,
-                protected_methods=RUNTIME_SUPEREXEC_METHODS,
-            ),
-        )
-        self._get_nodes = self._channel.unary_unary(
-            "/flwr.proto.Runtime/GetNodes",
-            request_serializer=GetNodesRequest.SerializeToString,
-            response_deserializer=GetNodesResponse.FromString,
-        )
-        self._push_messages = self._channel.unary_unary(
-            "/flwr.proto.Runtime/PushMessages",
-            request_serializer=PushAppMessagesRequest.SerializeToString,
-            response_deserializer=PushAppMessagesResponse.FromString,
-        )
-        self._pull_messages = self._channel.unary_unary(
-            "/flwr.proto.Runtime/PullMessages",
-            request_serializer=PullAppMessagesRequest.SerializeToString,
-            response_deserializer=PullAppMessagesResponse.FromString,
-        )
-        self._push_task_output = self._channel.unary_unary(
-            "/flwr.proto.Runtime/PushTaskOutput",
-            request_serializer=PushTaskOutputRequest.SerializeToString,
-            response_deserializer=PushTaskOutputResponse.FromString,
-        )
-        self._send_task_heartbeat = self._channel.unary_unary(
-            "/flwr.proto.Runtime/SendTaskHeartbeat",
-            request_serializer=SendTaskHeartbeatRequest.SerializeToString,
-            response_deserializer=SendTaskHeartbeatResponse.FromString,
-        )
-        self._push_object = self._channel.unary_unary(
-            "/flwr.proto.Runtime/PushObject",
-            request_serializer=PushObjectRequest.SerializeToString,
-            response_deserializer=PushObjectResponse.FromString,
-        )
-        self._pull_object = self._channel.unary_unary(
-            "/flwr.proto.Runtime/PullObject",
-            request_serializer=PullObjectRequest.SerializeToString,
-            response_deserializer=PullObjectResponse.FromString,
-        )
-        self._confirm_message_received = self._channel.unary_unary(
-            "/flwr.proto.Runtime/ConfirmMessageReceived",
-            request_serializer=ConfirmMessageReceivedRequest.SerializeToString,
-            response_deserializer=ConfirmMessageReceivedResponse.FromString,
-        )
-        self._pull_task_input = self._channel.unary_unary(
-            "/flwr.proto.Runtime/PullTaskInput",
-            request_serializer=PullTaskInputRequest.SerializeToString,
-            response_deserializer=PullTaskInputResponse.FromString,
-        )
-        self._pull_pending_tasks = self._channel.unary_unary(
-            "/flwr.proto.Runtime/PullPendingTasks",
-            request_serializer=PullPendingTasksRequest.SerializeToString,
-            response_deserializer=PullPendingTasksResponse.FromString,
-        )
-        self._create_task = self._channel.unary_unary(
-            "/flwr.proto.Runtime/CreateTask",
-            request_serializer=CreateTaskRequest.SerializeToString,
-            response_deserializer=CreateTaskResponse.FromString,
-        )
-
-    def tearDown(self) -> None:
-        """Clean up grpc server."""
-        self._server.stop(None)
+        self._auth_task = self.state.get_tasks(task_ids=[auth_task_id])[0]
 
     def _primary_task_id(self, run_id: int) -> int:
         run = self.state.get_run_info(run_ids=[run_id])[0]
@@ -561,7 +341,7 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
             federation_id=NOOP_FEDERATION_ID,
             flwr_aid=NOOP_FLWR_AID,
             start_run_request=StartRunRequest(
-                app_spec="@flwragent/flwr-agent",
+                app_spec="@flwr/demo",
                 federation=NOOP_FEDERATION_ID,
                 series_id=series_id,
             ),
@@ -570,7 +350,24 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
             max_runs=1,
         )
 
-        response = self._pull_pending_tasks(PullPendingTasksRequest())
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
+                return_value=(b"fab", {}, None),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".get_metadata_from_config",
+                return_value=("flwr/demo", "0.1.0"),
+            ),
+        ):
+            response = runtime_handlers.pull_pending_tasks(
+                PullPendingTasksRequest(), self.state
+            )
 
         self.assertEqual(len(response.tasks), 1)
         run = self.state.get_run_info(run_ids=[response.tasks[0].run_id])[0]
@@ -605,8 +402,10 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
 
     def test_create_task_uses_authenticated_run_id(self) -> None:
         """CreateTask should create tasks for the authenticated run."""
-        response = self._create_task(
-            CreateTaskRequest(type=TaskType.MODEL, model_ref="models/abc")
+        response = core_runtime_handlers.create_task(
+            CreateTaskRequest(type=TaskType.MODEL, model_ref="models/abc"),
+            self.state,
+            self._auth_task,
         )
 
         assert response.HasField("task_id")
@@ -618,9 +417,6 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
     def test_start_automation_enriches_connector_refs(self) -> None:
         """Enrich connector refs and delegate automation creation."""
         # Prepare
-        servicer = SuperLinkRuntimeServicer(
-            self.state_factory, self.objectstore_factory
-        )
         request = StartAutomationRequest(
             start_run_request=StartRunRequest(connector_refs=["untrusted"])
         )
@@ -628,14 +424,6 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
 
         # Execute
         with (
-            patch(
-                "flwr.superlink.servicer.runtime.runtime_servicer."
-                "get_authenticated_task",
-                return_value=Task(
-                    run_id=self._auth_run_id,
-                    type=TaskType.SERVER_APP,
-                ),
-            ),
             patch(
                 "flwr.superlink.servicer.runtime.runtime_handlers."
                 "start_control_automation",
@@ -645,7 +433,11 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
                 self.state, "get_run_connector_refs", return_value=["calendar"]
             ),
         ):
-            response = servicer.StartAutomation(request, Mock())
+            response = runtime_handlers.start_automation(
+                request,
+                self.state,
+                Task(run_id=self._auth_run_id, type=TaskType.SERVER_APP),
+            )
 
         # Assert
         assert response is expected
@@ -654,24 +446,13 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
 
     def test_start_automation_rejects_clientapp_task(self) -> None:
         """ClientApp tasks cannot create automations through the Runtime API."""
-        # Prepare
-        servicer = SuperLinkRuntimeServicer(
-            self.state_factory, self.objectstore_factory
-        )
-
         # Execute
-        with (
-            patch(
-                "flwr.superlink.servicer.runtime.runtime_servicer."
-                "get_authenticated_task",
-                return_value=Task(
-                    run_id=self._auth_run_id,
-                    type=TaskType.CLIENT_APP,
-                ),
-            ),
-            self.assertRaises(FlowerError) as error,
-        ):
-            servicer.StartAutomation(StartAutomationRequest(), Mock())
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.start_automation(
+                StartAutomationRequest(),
+                self.state,
+                Task(run_id=self._auth_run_id, type=TaskType.CLIENT_APP),
+            )
 
         # Assert
         self.assertEqual(
@@ -689,11 +470,12 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         )
 
         # Execute
-        response, call = self._push_task_output.with_call(request=request)
+        response = runtime_handlers.push_task_output(
+            request, self.state, self._auth_task
+        )
 
         # Assert
         assert isinstance(response, PushTaskOutputResponse)
-        assert grpc.StatusCode.OK == call.code()
         run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
         assert run.clientapp_runtime == 7.89
 
@@ -716,11 +498,12 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         )
 
         # Execute
-        response, call = self._push_task_output.with_call(request=request)
+        response = runtime_handlers.push_task_output(
+            request, self.state, self._auth_task
+        )
 
         # Assert
         assert isinstance(response, PushTaskOutputResponse)
-        assert grpc.StatusCode.OK == call.code()
         stored_context = self.state.get_run_series_context(run.series_id)
         assert stored_context is not None
         assert stored_context == request_context
@@ -731,11 +514,10 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         request = GetNodesRequest()
 
         # Execute
-        response, call = self._get_nodes.with_call(request=request)
+        response = runtime_handlers.get_nodes(request, self.state, self._auth_task)
 
         # Assert
         assert isinstance(response, GetNodesResponse)
-        assert grpc.StatusCode.OK == call.code()
 
     def test_push_messages_keeps_shared_upload_hint_after_rejection(self) -> None:
         """PushMessages should keep accepted-message upload hints."""
@@ -778,11 +560,12 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
             "store_message_ins",
             side_effect=store_message_ins_and_finish_run,
         ):
-            response, call = self._push_messages.with_call(request=request)
+            response = runtime_handlers.push_messages(
+                request, self.state, self._auth_task
+            )
 
         # Assert
         assert isinstance(response, PushAppMessagesResponse)
-        assert grpc.StatusCode.OK == call.code()
         assert list(response.message_ids) == [message_1.metadata.message_id, ""]
         assert response.session_id
         assert set(response.objects_to_push) == {
@@ -831,11 +614,10 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         request = PullAppMessagesRequest(message_ids=[str(msg_id)])
 
         # Execute
-        response, call = self._pull_messages.with_call(request=request)
+        response = runtime_handlers.pull_messages(request, self.state, self._auth_task)
 
         # Assert
         assert isinstance(response, PullAppMessagesResponse)
-        assert call.code() == grpc.StatusCode.OK
 
         if register_in_store:
             object_tree = response.message_object_trees[0]
@@ -894,11 +676,10 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         request = PullAppMessagesRequest(message_ids=[str(msg_id)])
 
         # Execute
-        response, call = self._pull_messages.with_call(request=request)
+        response = runtime_handlers.pull_messages(request, self.state, self._auth_task)
 
         # Assert
         assert isinstance(response, PullAppMessagesResponse)
-        assert grpc.StatusCode.OK == call.code()
         assert self.state.num_message_ins() == 0
         assert self.state.num_message_res() == 0
 
@@ -925,11 +706,12 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
 
             # Execute
             request = PullAppMessagesRequest(message_ids=[str(msg_id)])
-            response, call = self._pull_messages.with_call(request=request)
+            response = runtime_handlers.pull_messages(
+                request, self.state, self._auth_task
+            )
 
             # Assert
             assert isinstance(response, PullAppMessagesResponse)
-            assert grpc.StatusCode.OK == call.code()
 
             # Assert that objects to pull points to a message carrying an error
             msg_res = message_from_proto(response.messages_list[0])
@@ -941,7 +723,7 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
             # expected a single object id (that of the error message)
             assert list(object_ids_in_response) == [msg_res.object_id]
 
-    def test_push_object_succesful(self) -> None:
+    def test_push_object_successful(self) -> None:
         """Test `PushObject`."""
         # Prepare
         run_id = self._auth_run_id
@@ -960,7 +742,7 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
             object_content=obj_b,
             session_id=session_id,
         )
-        res: PushObjectResponse = self._push_object(request=req)
+        res = runtime_handlers.push_object(req, self.state, self._auth_task)
 
         # Empty response
         assert res.stored
@@ -971,9 +753,9 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
 
         # Node ID isn't recognized
         req = PushObjectRequest(node=Node(node_id=123), run_id=run_id)
-        with self.assertRaises(grpc.RpcError) as e:
-            self._push_object(request=req)
-        assert e.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.push_object(req, self.state, self._auth_task)
+        assert error.exception.code == ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID
 
         # Prepare
         obj = ConfigRecord({"a": 123, "b": [4, 5, 6]})
@@ -988,7 +770,7 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
             object_content=obj_b,
             session_id=session_id,
         )
-        res: PushObjectResponse = self._push_object(request=req)
+        res = runtime_handlers.push_object(req, self.state, self._auth_task)
 
         # Assert: object not inserted
         assert not res.stored
@@ -1008,7 +790,7 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
             object_content=obj_b,
             session_id=session_id,
         )
-        res = self._push_object(request=req)
+        res = runtime_handlers.push_object(req, self.state, self._auth_task)
 
         # Assert: object not inserted
         assert not res.stored
@@ -1027,7 +809,7 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         req = PullObjectRequest(
             node=Node(node_id=SUPERLINK_NODE_ID), run_id=run_id, object_id=obj.object_id
         )
-        res: PullObjectResponse = self._pull_object(req)
+        res = runtime_handlers.pull_object(req, self.state, self._auth_task)
 
         # Assert object content is b"" (it was never pushed)
         assert res.object_found
@@ -1039,7 +821,7 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         req = PullObjectRequest(
             node=Node(node_id=SUPERLINK_NODE_ID), run_id=run_id, object_id=obj.object_id
         )
-        res = self._pull_object(req)
+        res = runtime_handlers.pull_object(req, self.state, self._auth_task)
 
         # Assert, identical object pulled
         assert res.object_found
@@ -1053,15 +835,15 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         # Run is running but node ID isn't recognized
         self._transition_run_status(run_id, 2)
         req = PullObjectRequest(node=Node(node_id=123), run_id=run_id)
-        with self.assertRaises(grpc.RpcError) as e:
-            self._pull_object(request=req)
-        assert e.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.pull_object(req, self.state, self._auth_task)
+        assert error.exception.code == ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID
 
         # Attempt pulling object that doesn't exist
         req = PullObjectRequest(
             node=Node(node_id=SUPERLINK_NODE_ID), run_id=run_id, object_id="1234"
         )
-        res: PullObjectResponse = self._pull_object(req)
+        res = runtime_handlers.pull_object(req, self.state, self._auth_task)
         # Empty response
         assert not res.object_found
 
@@ -1092,11 +874,12 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
             run_id=run_id,
             message_object_id=message_res.object_id,
         )
-        response, call = self._confirm_message_received.with_call(request=request)
+        response = runtime_handlers.confirm_message_received(
+            request, self.state, self._auth_task
+        )
 
         # Assert
         assert isinstance(response, ConfirmMessageReceivedResponse)
-        assert grpc.StatusCode.OK == call.code()
 
         # Assert: Message is removed from LinkState
         assert len(self.store) == 0
@@ -1110,12 +893,10 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
         )
         run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
         task_id = self._primary_task_id(run_id)
-        servicer = SuperLinkRuntimeServicer(
-            self.state_factory, self.objectstore_factory
+        # Claim task to transition the run to STARTING.
+        claim_response = core_runtime_handlers.claim_task(
+            ClaimTaskRequest(task_id=task_id), self.state
         )
-
-        # Claim task through the servicer to transition the run to STARTING.
-        claim_response = servicer.ClaimTask(ClaimTaskRequest(task_id=task_id), Mock())
         assert claim_response.HasField("token")
 
         # Set run series context as if it was persisted by an earlier run.
@@ -1135,12 +916,8 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
 
         # Execute: Pull task input
         request = PullTaskInputRequest()
-        with patch(
-            "flwr.superlink.servicer.runtime.runtime_servicer."
-            "get_authenticated_task",
-            return_value=Mock(task_id=task_id, run_id=run_id),
-        ):
-            response = servicer.PullTaskInput(request, Mock())
+        task = self.state.get_tasks(task_ids=[task_id])[0]
+        response = runtime_handlers.pull_task_input(request, self.state, task)
 
         # Assert: Response is successful and run status is now RUNNING
         assert isinstance(response, PullTaskInputResponse)
@@ -1153,19 +930,13 @@ class TestSuperLinkRuntimeServicer(unittest.TestCase):  # pylint: disable=R0902,
 def test_ha_pull_task_input_claim_is_unique_across_replicas() -> None:
     """Ensure only one replica can claim STARTING -> RUNNING via PullTaskInput."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        _, task_id, state_0, server_0, server_1 = _create_shared_runtime(tmpdir)
-        channel_0 = grpc.insecure_channel(server_0.bound_address)
-        channel_1 = grpc.insecure_channel(server_1.bound_address)
-        try:
-            token = _claim_task(channel_0, task_id)
-            results = _claim_in_parallel(channel_0, channel_1, token)
+        _, task_id, state_0, state_1 = _create_shared_runtime(tmpdir)
+        assert state_0.claim_task(task_id) is not None
+        task = state_0.get_tasks(task_ids=[task_id])[0]
 
-            assert results.count(grpc.StatusCode.OK) == 1
-            assert results.count(grpc.StatusCode.FAILED_PRECONDITION) == 1
-            task_status = state_0.get_tasks(task_ids=[task_id])[0].status
-            assert task_status.status == Status.RUNNING
-        finally:
-            channel_0.close()
-            channel_1.close()
-            server_0.stop(None)
-            server_1.stop(None)
+        results = _activate_in_parallel(state_0, state_1, task)
+
+        assert results.count(True) == 1
+        assert results.count(False) == 1
+        task_status = state_0.get_tasks(task_ids=[task_id])[0].status
+        assert task_status.status == Status.RUNNING

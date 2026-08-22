@@ -22,6 +22,8 @@ from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
+    AddAppRequest,
+    AddAppResponse,
     AddNodeToFederationRequest,
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
@@ -36,8 +38,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
-    DeleteAppRequest,
-    DeleteAppResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -70,6 +70,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RejectInvitationResponse,
     RemoveAccountFromFederationRequest,
     RemoveAccountFromFederationResponse,
+    RemoveAppRequest,
+    RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
@@ -84,8 +86,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
-    StoreAppRequest,
-    StoreAppResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -303,23 +303,24 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             request, _get_account(), self.linkstate_factory.state()
         )
 
-    def StoreApp(
-        self, request: StoreAppRequest, context: grpc.ServicerContext
-    ) -> StoreAppResponse:
-        """Store an app in a federation."""
-        _ = request
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details("StoreApp is not implemented.")
-        raise NotImplementedError("StoreApp is not implemented.")
+    def AddApp(
+        self, request: AddAppRequest, context: grpc.ServicerContext
+    ) -> AddAppResponse:
+        """Add an app to a federation."""
+        return control_handlers.add_app(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            self.fleet_api_type,
+        )
 
-    def DeleteApp(
-        self, request: DeleteAppRequest, context: grpc.ServicerContext
-    ) -> DeleteAppResponse:
-        """Delete an app from a federation."""
-        _ = request
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details("DeleteApp is not implemented.")
-        raise NotImplementedError("DeleteApp is not implemented.")
+    def RemoveApp(
+        self, request: RemoveAppRequest, context: grpc.ServicerContext
+    ) -> RemoveAppResponse:
+        """Remove an app from a federation."""
+        return control_handlers.remove_app(
+            request, _get_account(), self.linkstate_factory.state()
+        )
 
     def ShowFederation(
         self, request: ShowFederationRequest, context: grpc.ServicerContext
