@@ -57,9 +57,7 @@ def test_emit_event_pushes_task_event() -> None:
             events=[
                 TaskEvent(
                     event="response.output_text.delta",
-                    data=(
-                        '{"type":"response.output_text.delta","delta":"Hello"}'
-                    ),
+                    data=('{"type":"response.output_text.delta","delta":"Hello"}'),
                 )
             ]
         )
