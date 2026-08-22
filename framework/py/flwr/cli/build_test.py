@@ -35,11 +35,9 @@ def _make_files(
     **extra_files: bytes,
 ) -> dict[str, bytes | Path]:
     """Build a minimal files dict with the given [tool.flwr.app] fragment."""
-    config = tomli.loads(
-        f'[project]\nname = "app"\nversion = "1.0.0"\n{app_toml}'
-    )
-    app_config = config.setdefault("tool", {}).setdefault("flwr", {}).setdefault(
-        "app", {}
+    config = tomli.loads(f'[project]\nname = "app"\nversion = "1.0.0"\n{app_toml}')
+    app_config = (
+        config.setdefault("tool", {}).setdefault("flwr", {}).setdefault("app", {})
     )
     app_config.setdefault("publisher", "alice")
     app_config.setdefault(
