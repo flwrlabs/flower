@@ -67,6 +67,7 @@ from flwr.cli.constant import (
     CHAT_EXIT_HINT,
     CHAT_EXPERIMENTAL_WARNING,
     CHAT_FAILURE_EVENTS,
+    CHAT_FEDERATION_COMMAND,
     CHAT_FLOWER_LOGO,
     CHAT_HELP_COMMAND,
     CHAT_NEW_COMMAND,
@@ -89,6 +90,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.fab_pb2 import Fab  # pylint: disable=E0611
+from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import (
     APP_ID_PATTERN,
@@ -98,8 +100,13 @@ from flwr.supercore.constant import (
 from flwr.supercore.typing import JSONObject
 
 from ..auth_plugin import CliAuthPlugin, OidcCliPlugin
-from .chat_transcript import MarkdownBlock, render_markdown
 from ..utils import flwr_cli_grpc_exc_handler
+from .chat_federation import (
+    complete_federations,
+    resolve_default_federation,
+    select_federation,
+)
+from .chat_transcript import MarkdownBlock, render_markdown
 
 
 @dataclass
@@ -124,9 +131,15 @@ class _Agent:
 class _ChatCompleter(Completer):
     """Complete slash commands and agents in the prompt."""
 
-    def __init__(self, auth_plugin: CliAuthPlugin, federation: str | None) -> None:
+    def __init__(
+        self,
+        auth_plugin: CliAuthPlugin,
+        federation: str | None,
+        federations: list[Federation] | None = None,
+    ) -> None:
         self.auth_plugin = auth_plugin
         self.federation = federation
+        self.federations = federations or []
         self.agents: list[_Agent] | None = None
         self._agents_lock = Lock()
 
@@ -137,14 +150,30 @@ class _ChatCompleter(Completer):
                 self.agents = fetch_chat_agents(self.auth_plugin, self.federation)
             return self.agents
 
-    def get_completions(
+    def set_federation(self, federation: str) -> None:
+        """Select a federation and clear cached agent completions."""
+        with self._agents_lock:
+            self.federation = federation
+            self.agents = None
+
+    def get_completions(  # pylint: disable=too-many-return-statements,too-many-branches
         self, document: Document, _complete_event: CompleteEvent
     ) -> Iterable[Completion]:
         """Yield matching commands or agents."""
         text = document.text_before_cursor
-        if document.text_after_cursor or any(char.isspace() for char in text):
+        if document.text_after_cursor:
             return
 
+        federation_prefix = f"{CHAT_FEDERATION_COMMAND} "
+        if text.lower().startswith(federation_prefix):
+            query = text[len(federation_prefix) :]
+            if any(char.isspace() for char in query):
+                return
+            yield from complete_federations(query, self.federations)
+            return
+
+        if any(char.isspace() for char in text):
+            return
         if text.startswith("/"):
             command_width = max(len(command) for command in CHAT_COMMANDS)
             for command, description in CHAT_COMMANDS.items():
@@ -195,11 +224,12 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
     def __init__(
         self,
         stub: ControlStub,
-        federation: str | None,
+        federations: list[Federation],
         auth_plugin: CliAuthPlugin,
     ) -> None:
         self.stub = stub
-        self.federation = federation
+        self.federation = resolve_default_federation(federations)
+        self.federations = federations
         self.series_id: int | None = None
         self.run_id: int | None = None
         self.busy = False
@@ -213,7 +243,7 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         self.agent_app_spec = FLOWER_AGENT_APP_ID
         self.agent_fab_hash: str | None = None
         self.agent_name = CHAT_AGENT_NAME
-        self.completer = _ChatCompleter(auth_plugin, federation)
+        self.completer = _ChatCompleter(auth_plugin, self.federation, federations)
         self.input_buffer = Buffer(
             completer=ThreadedCompleter(self.completer),
             complete_while_typing=True,
@@ -403,7 +433,35 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
                 f"{CHAT_NEW_CONVERSATION_MESSAGE}\n\n",
             )
             return True
+        if command == CHAT_FEDERATION_COMMAND or command.startswith(
+            f"{CHAT_FEDERATION_COMMAND} "
+        ):
+            return self._handle_federation_command(event, prompt)
         return False
+
+    def _handle_federation_command(self, event: KeyPressEvent, prompt: str) -> bool:
+        """Show the federation selector or apply its selection."""
+        if prompt.lower() == CHAT_FEDERATION_COMMAND:
+            self.input_buffer.text = f"{CHAT_FEDERATION_COMMAND} "
+            self.input_buffer.cursor_position = len(self.input_buffer.text)
+            self.input_buffer.start_completion(select_first=False)
+            event.app.invalidate()
+            return True
+
+        try:
+            federation_name = select_federation(prompt, self.federations)
+        except click.ClickException as exc:
+            self._append_transcript("class:error", f"{exc.format_message()}\n\n")
+            return True
+
+        self.federation = federation_name
+        self.completer.set_federation(federation_name)
+        self.series_id = None
+        self.transcript.clear()
+        self.follow_transcript = True
+        self.transcript_revision += 1
+        self.application.invalidate()
+        return True
 
     def _interrupt_prompt(self, event: KeyPressEvent) -> None:
         """Exit while idle or stop the active run."""
@@ -616,8 +674,8 @@ class ChatApplication:  # pylint: disable=too-many-instance-attributes
         return [("class:status", f"{frame} {self.status}")]
 
     def _render_agent_name(self) -> StyleAndTextTuples:
-        """Return the currently selected agent label."""
-        return [("class:agent.name", f" ✿ {self.agent_name} ")]
+        """Return the selected agent label with the active federation."""
+        return [("class:agent.name", f" ✿ {self.agent_name} · {self.federation} ")]
 
     def _render_transcript(self) -> StyleAndTextTuples:
         """Return transcript text wrapped to the current terminal width."""

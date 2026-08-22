@@ -47,15 +47,18 @@ FEDERATION_CONFIG_HELP_MESSAGE = CONFIG_HELP_MESSAGE.format(
 )
 
 # Constants for `flwr chat`
+CHAT_DEFAULT_FEDERATION_NAME = "flower-agent-execution"
 CHAT_SUPERGRID_CONNECTION_NAME = "supergrid"
 CHAT_AGENT_INPUT_KEY = "agent.input"
 CHAT_AGENTS_API_PATH = "/user/agents"
 CHAT_HELP_COMMAND = "/help"
 CHAT_EXIT_COMMAND = "/quit"
 CHAT_NEW_COMMAND = "/new"
+CHAT_FEDERATION_COMMAND = "/federation"
 CHAT_COMMANDS = {
     CHAT_HELP_COMMAND: "Show available commands.",
     CHAT_NEW_COMMAND: "Start a new conversation.",
+    CHAT_FEDERATION_COMMAND: "Select a federation.",
     CHAT_EXIT_COMMAND: "Exit Flower Chat.",
 }
 CHAT_REASONING_DELTA_EVENT = "response.reasoning_summary_text.delta"

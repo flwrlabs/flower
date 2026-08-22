@@ -17,7 +17,10 @@
 
 from flwr.cli.constant import CHAT_SUPERGRID_CONNECTION_NAME
 from flwr.cli.flower_config import read_superlink_connection
-from flwr.proto.control_pb2 import ListFederationsRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    ListFederationsRequest,
+    ListFederationsResponse,
+)
 from flwr.proto.control_pb2_grpc import ControlStub
 
 from .chat_app import ChatApplication
@@ -40,7 +43,9 @@ def chat() -> None:
     try:
         # Verify stored credentials before showing the interactive prompt.
         with flwr_cli_grpc_exc_handler():
-            stub.ListFederations(ListFederationsRequest())
-        ChatApplication(stub, superlink_connection.federation, auth_plugin).run()
+            response: ListFederationsResponse = stub.ListFederations(
+                ListFederationsRequest()
+            )
+        ChatApplication(stub, list(response.federations), auth_plugin).run()
     finally:
         channel.close()
