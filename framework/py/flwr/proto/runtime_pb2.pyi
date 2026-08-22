@@ -304,6 +304,7 @@ class PullTaskMessageRequest(google.protobuf.message.Message):
     SRC_TASK_ID_FIELD_NUMBER: builtins.int
     limit: builtins.int
     src_task_id: builtins.int
+    """Filter concurrent exchanges by sender task ID."""
     def __init__(
         self,
         *,

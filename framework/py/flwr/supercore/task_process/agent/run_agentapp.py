@@ -225,6 +225,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
 
         responses = RuntimeAgentResponses(
             stub=grid._runtime_client,
+            token=token,
             run_id=context.run_id,
             task_id=task_id,
             context=context,

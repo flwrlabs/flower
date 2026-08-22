@@ -14,6 +14,13 @@
 # ==============================================================================
 """HTTP client for the Runtime API."""
 
+from __future__ import annotations
+
+import json
+from typing import NoReturn, cast
+
+import httpx
+
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
     StartAutomationResponse,
@@ -61,12 +68,47 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatResponse,
 )
 from flwr.supercore.protobuf.client import ProtobufClient
+from flwr.supercore.typing import JSONObject
+
+_TERMINAL_RESPONSE_EVENTS = frozenset(
+    {"response.completed", "response.failed", "response.incomplete"}
+)
 
 
 # Match the method names defined by the Runtime protobuf service.
 # pylint: disable=invalid-name
 class RuntimeHttpClient(ProtobufClient):
-    """Protobuf-over-HTTP client for the Runtime API."""
+    """HTTP client for the Runtime API."""
+
+    def create_response(
+        self,
+        request: JSONObject,
+        *,
+        token: str,
+        timeout: float,
+    ) -> JSONObject:
+        """Create a model response through the Open Responses endpoint."""
+        headers = {
+            "authorization": f"Bearer {token}",
+            "accept": (
+                "text/event-stream"
+                if request.get("stream") is True
+                else "application/json"
+            ),
+        }
+        with self._client.stream(
+            "POST",
+            f"{self._base_url}/v1/runtime/responses",
+            json=request,
+            headers=headers,
+            timeout=timeout,
+        ) as response:
+            if response.is_error:
+                response.read()
+                _raise_for_response_error(response)
+            if request.get("stream") is True:
+                return _response_from_stream(response)
+            return _ensure_json_object(response.json())
 
     def PullPendingTasks(
         self, request: PullPendingTasksRequest
@@ -252,3 +294,56 @@ class RuntimeHttpClient(ProtobufClient):
             request=request,
             response_type=GetConnectorResponse,
         )
+
+
+def _response_from_stream(response: httpx.Response) -> JSONObject:
+    """Return the response object carried by a terminal SSE event."""
+    for line in response.iter_lines():
+        if not line.startswith("data:"):
+            continue
+        data = line.removeprefix("data:").lstrip()
+        if not data or data == "[DONE]":
+            continue
+        try:
+            event = _ensure_json_object(json.loads(data))
+        except json.JSONDecodeError as exc:
+            raise ValueError("Invalid JSON in Responses event stream.") from exc
+
+        event_type = event.get("type")
+        if event_type in _TERMINAL_RESPONSE_EVENTS:
+            return _ensure_json_object(event.get("response"))
+        if event_type == "error":
+            error = event.get("error")
+            return {
+                "object": "response",
+                "status": "failed",
+                "error": error if isinstance(error, dict) else {},
+                "output": [],
+            }
+
+    raise RuntimeError("Responses stream ended without a terminal event.")
+
+
+def _ensure_json_object(payload: object) -> JSONObject:
+    """Validate and narrow one decoded JSON object."""
+    if not isinstance(payload, dict):
+        raise ValueError("Runtime Responses endpoint returned a non-object payload.")
+    return cast(JSONObject, payload)
+
+
+def _raise_for_response_error(response: httpx.Response) -> NoReturn:
+    """Map an Open Responses HTTP error to the AgentResponses API."""
+    message = "Runtime Responses request failed."
+    try:
+        payload = _ensure_json_object(response.json())
+        error = payload.get("error")
+        if isinstance(error, dict) and isinstance(error.get("message"), str):
+            message = cast(str, error["message"])
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    if response.status_code == httpx.codes.BAD_REQUEST:
+        raise ValueError(message)
+    if response.status_code == httpx.codes.GATEWAY_TIMEOUT:
+        raise TimeoutError(message)
+    raise RuntimeError(message)

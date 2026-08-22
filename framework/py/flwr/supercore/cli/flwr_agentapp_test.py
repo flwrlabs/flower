@@ -136,7 +136,7 @@ def test_flwr_agentapp_exposes_explicit_root_certificates(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Expose the Runtime root certificate file to SDK clients."""
-    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+    monkeypatch.setenv("SSL_CERT_FILE", "inherited-ca.pem")
     certificate_path = tmp_path / "runtime-ca.pem"
     certificate_path.write_bytes(b"root-certificates")
     monkeypatch.chdir(tmp_path)

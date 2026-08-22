@@ -14,8 +14,10 @@
 # ==============================================================================
 """Tests for the Runtime HTTP client."""
 
+import json
 from unittest.mock import Mock, patch
 
+import httpx
 import pytest
 
 from flwr.supercore.protobuf.client import ProtobufClient
@@ -71,3 +73,48 @@ def test_runtime_method(endpoint: str) -> None:
         endpoint, f"{method_name}Response"
     )
     assert call.call_args.kwargs["response_type"].__name__ == expected_response_name
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_create_response(stream: bool) -> None:
+    """Return the final response for JSON and streaming requests."""
+    request_payload = {"model": "model", "input": "hello", "stream": stream}
+    response_payload = {
+        "object": "response",
+        "id": "resp-1",
+        "status": "completed",
+        "output": [],
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url == "http://runtime.example/v1/runtime/responses"
+        assert request.headers["authorization"] == "Bearer task-token"
+        assert json.loads(request.content) == request_payload
+        if stream:
+            completed_event = {
+                "type": "response.completed",
+                "response": response_payload,
+            }
+            return httpx.Response(
+                200,
+                headers={"content-type": "text/event-stream"},
+                text=(
+                    'event: response.created\ndata: {"type":"response.created"}\n\n'
+                    "event: response.completed\n"
+                    f"data: {json.dumps(completed_event)}\n\n"
+                ),
+            )
+        return httpx.Response(200, json=response_payload)
+
+    http_client = httpx.Client(transport=httpx.MockTransport(handler))
+    with patch("flwr.supercore.protobuf.client.httpx.Client", return_value=http_client):
+        client = RuntimeHttpClient("http://runtime.example")
+
+    try:
+        result = client.create_response(
+            request_payload, token="task-token", timeout=300.0
+        )
+    finally:
+        client.close()
+
+    assert result == response_payload
