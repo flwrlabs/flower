@@ -102,12 +102,7 @@ from flwr.supercore.typing import JSONObject
 
 from ..auth_plugin import CliAuthPlugin, OidcCliPlugin
 from ..utils import flwr_cli_grpc_exc_handler
-from .chat_commands import (
-    HistoryBlock,
-    load_conversation,
-    load_history,
-    render_history,
-)
+from .chat_commands import HistoryBlock, load_conversation, load_history, render_history
 from .chat_federation import (
     complete_federations,
     resolve_default_federation,
