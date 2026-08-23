@@ -127,15 +127,15 @@ def test_flwr_agentapp_forwards_cli_args() -> None:
     assert kwargs["log_queue"] is mirror_output_to_queue.call_args.args[0]
     assert kwargs["token"] == "test-token"
     assert kwargs["insecure"] is True
-    assert kwargs["certificates"] is None
+    assert kwargs["certificates_path"] is None
     assert kwargs["parent_pid"] == 321
     assert kwargs["runtime_dependency_install"] is True
 
 
-def test_flwr_agentapp_exposes_explicit_root_certificates(
+def test_flwr_agentapp_forwards_explicit_root_certificates_path(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Expose the Runtime root certificate file to SDK clients."""
+    """Forward the resolved Runtime root certificate path to the runtime."""
     monkeypatch.setenv("SSL_CERT_FILE", "inherited-ca.pem")
     certificate_path = tmp_path / "runtime-ca.pem"
     certificate_path.write_bytes(b"root-certificates")
@@ -162,5 +162,7 @@ def test_flwr_agentapp_exposes_explicit_root_certificates(
     ):
         flwr_agentapp_module.flwr_agentapp()
 
-    assert os.environ["SSL_CERT_FILE"] == str(certificate_path.resolve())
-    assert run_agentapp.call_args.kwargs["certificates"] == b"root-certificates"
+    assert os.environ["SSL_CERT_FILE"] == "inherited-ca.pem"
+    assert run_agentapp.call_args.kwargs["certificates_path"] == str(
+        certificate_path.resolve()
+    )

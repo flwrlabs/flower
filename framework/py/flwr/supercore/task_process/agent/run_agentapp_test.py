@@ -28,9 +28,16 @@ def test_set_runtime_environment(
     """Expose the Runtime Responses base URL and AgentApp task token."""
     monkeypatch.delenv("FLWR_RUNTIME_BASE_URL", raising=False)
     monkeypatch.delenv("FLWR_RUNTIME_API_KEY", raising=False)
-    _set_runtime_environment("runtime.example:9092", "task-token", insecure=insecure)
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+    _set_runtime_environment(
+        "runtime.example:9092",
+        "task-token",
+        insecure=insecure,
+        root_certificates_path="/path/to/runtime-ca.pem",
+    )
 
     assert os.environ["FLWR_RUNTIME_BASE_URL"] == (
         f"{scheme}://runtime.example:9092/v1/runtime"
     )
     assert os.environ["FLWR_RUNTIME_API_KEY"] == "task-token"
+    assert os.environ["SSL_CERT_FILE"] == "/path/to/runtime-ca.pem"
