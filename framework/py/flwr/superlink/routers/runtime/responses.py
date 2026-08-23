@@ -20,17 +20,18 @@ import asyncio
 import json
 import os
 import time
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from logging import ERROR
 from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 from flwr.common.constant import Status, SubStatus
 from flwr.proto.runtime_pb2 import CreateTaskRequest  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.constant import TaskType
@@ -38,6 +39,7 @@ from flwr.supercore.error import FlowerError
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.servicer.runtime import runtime_handlers
 from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_dumps
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
 router = APIRouter(prefix="/v1/runtime", tags=["Runtime"])
@@ -59,7 +61,11 @@ _SUPPORTED_FIELDS = frozenset(
         "text",
     }
 )
+_TERMINAL_EVENTS = frozenset(
+    {"error", "response.completed", "response.failed", "response.incomplete"}
+)
 _POLL_INTERVAL = 0.25
+_TERMINAL_EVENT_GRACE = 1.0
 _DEFAULT_MODEL_RESPONSE_TIMEOUT = 300.0
 _DEFAULT_MODEL_TASK_LAUNCH_TIMEOUT = 300.0
 _MODEL_TASK_LAUNCH_TIMEOUT_ENV = "FLWR_MODEL_TASK_LAUNCH_TIMEOUT"
@@ -71,6 +77,7 @@ class _Exchange:
 
     agent_task_id: int
     model_task_id: int
+    run_id: int
 
 
 class _ResponsesError(Exception):
@@ -94,6 +101,12 @@ async def create_runtime_response(
         payload = await _read_request_payload(request)
         model_request = _model_request_from_payload(payload)
         exchange = await run_in_threadpool(_start_exchange, state, task, model_request)
+        if model_request.payload.get("stream") is True:
+            return StreamingResponse(
+                _stream_response(state, exchange),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
         response = await _wait_for_response(request, state, exchange)
     except _ResponsesError as err:
         return _error_response(err)
@@ -153,12 +166,6 @@ async def _read_request_payload(request: Request) -> JSONObject:
 
 def _model_request_from_payload(payload: JSONObject) -> ModelRequest:
     """Build and validate the task-routed model request."""
-    if payload.get("stream") is True:
-        raise _ResponsesError(
-            400,
-            "Streaming responses are not supported.",
-            "unsupported_parameter",
-        )
     try:
         return ModelRequest.from_payload(dst_task_id=0, payload=payload)
     except (TypeError, ValueError) as err:
@@ -201,6 +208,7 @@ def _start_exchange(
     return _Exchange(
         agent_task_id=task.task_id,
         model_task_id=model_task_id,
+        run_id=task.run_id,
     )
 
 
@@ -237,6 +245,101 @@ async def _wait_for_response(
             await run_in_threadpool(
                 _stop_model_task, state, exchange, "Responses request ended early."
             )
+
+
+async def _stream_response(state: LinkState, exchange: _Exchange) -> AsyncIterator[str]:
+    """Relay correlated child-task events as Server-Sent Events."""
+    started_at = time.monotonic()
+    launch_deadline = started_at + _model_task_launch_timeout()
+    response_deadline = started_at + _DEFAULT_MODEL_RESPONSE_TIMEOUT
+    cursor: int | None = None
+    complete = False
+    response: JSONObject | None = None
+    terminal_event_deadline: float | None = None
+    try:
+        while True:
+            events = await run_in_threadpool(
+                state.get_task_events,
+                run_id=exchange.run_id,
+                task_ids=[exchange.model_task_id],
+                after_task_event_id=cursor,
+            )
+            for event in events:
+                cursor = event.id
+                if event.event in _TERMINAL_EVENTS:
+                    if response is None:
+                        await _wait_for_terminal_reply(
+                            state,
+                            exchange,
+                            launch_deadline,
+                            response_deadline,
+                        )
+                    complete = True
+                    yield _sse_frame(event)
+                    return
+                yield _sse_frame(event)
+
+            if response is None:
+                response = await run_in_threadpool(
+                    _claim_response_or_raise_for_model_task_state,
+                    state,
+                    exchange,
+                    launch_deadline,
+                    response_deadline,
+                )
+                if response is not None:
+                    terminal_event_deadline = min(
+                        response_deadline,
+                        time.monotonic() + _TERMINAL_EVENT_GRACE,
+                    )
+
+            if (
+                response is not None
+                and terminal_event_deadline is not None
+                and time.monotonic() >= terminal_event_deadline
+            ):
+                complete = True
+                yield _stream_error(
+                    (
+                        _response_error_message(response)
+                        if response.get("status") == "failed"
+                        else "Model stream ended before a terminal event."
+                    ),
+                    "model_stream_failed",
+                )
+                return
+
+            await asyncio.sleep(_POLL_INTERVAL)
+    except _ResponsesError as err:
+        yield _stream_error(err.message, err.code)
+    except Exception as err:  # pylint: disable=broad-exception-caught
+        log(ERROR, "Runtime Responses stream failed unexpectedly", exc_info=err)
+        yield _stream_error("Internal server error.", "internal_error")
+    finally:
+        if not complete:
+            await run_in_threadpool(
+                _stop_model_task, state, exchange, "Responses stream ended early."
+            )
+
+
+async def _wait_for_terminal_reply(
+    state: LinkState,
+    exchange: _Exchange,
+    launch_deadline: float,
+    response_deadline: float,
+) -> JSONObject:
+    """Consume the final reply before exposing a terminal stream event."""
+    while True:
+        response = await run_in_threadpool(
+            _claim_response_or_raise_for_model_task_state,
+            state,
+            exchange,
+            launch_deadline,
+            response_deadline,
+        )
+        if response is not None:
+            return response
+        await asyncio.sleep(_POLL_INTERVAL)
 
 
 def _claim_response(state: LinkState, exchange: _Exchange) -> JSONObject | None:
@@ -337,6 +440,20 @@ def _stop_model_task(state: LinkState, exchange: _Exchange, details: str) -> Non
     except _ResponsesError:
         # Cleanup is best-effort; the original request has already ended.
         pass
+
+
+def _sse_frame(event: TaskEvent) -> str:
+    """Encode one stored task event as an SSE frame."""
+    return f"event: {event.event}\ndata: {event.data}\n\n"
+
+
+def _stream_error(message: str, code: str) -> str:
+    """Encode a terminal Responses error event."""
+    data: JSONObject = {
+        "type": "error",
+        "error": {"type": "server_error", "code": code, "message": message},
+    }
+    return f"event: error\ndata: {strict_json_dumps(data, compact=True)}\n\n"
 
 
 def _error_response(error: _ResponsesError) -> JSONResponse:

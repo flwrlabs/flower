@@ -1274,6 +1274,7 @@ class InMemoryCoreState(
         self,
         *,
         run_id: int | None = None,
+        task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
@@ -1287,10 +1288,12 @@ class InMemoryCoreState(
                 ]
             else:
                 events = list(self.task_event_store.get(run_id, []))
+            task_id_set = set(task_ids) if task_ids is not None else None
             return [
                 event
                 for event in sorted(events, key=lambda event: event.id)
                 if event.id > cursor
+                and (task_id_set is None or event.task_id in task_id_set)
             ]
 
     def _cleanup_expired_task_tokens_locked(self) -> None:

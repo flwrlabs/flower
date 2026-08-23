@@ -22,13 +22,19 @@ from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from flwr.common.constant import Status, SubStatus
-from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.model_message import ModelResponse
 from flwr.superlink.dependencies.linkstate import get_linkstate
 
-from .responses import _Exchange, _ResponsesError, _wait_for_response, router
+from .responses import (
+    _Exchange,
+    _ResponsesError,
+    _stream_response,
+    _wait_for_response,
+    router,
+)
 
 
 def _client(state: Mock) -> TestClient:
@@ -58,6 +64,17 @@ def _reply(request_message_id: str) -> ModelResponse:
             "output": [],
         },
         reply_to_message_id=request_message_id,
+    )
+
+
+def _event(event_id: int, event: str, data: str | None = None) -> TaskEvent:
+    """Create one child model task event."""
+    return TaskEvent(
+        id=event_id,
+        run_id=789,
+        task_id=456,
+        event=event,
+        data=data or f'{{"type":"{event}"}}',
     )
 
 
@@ -124,9 +141,16 @@ def test_responses_rejects_unsupported_fields() -> None:
     state.create_task.assert_not_called()
 
 
-def test_responses_rejects_streaming() -> None:
-    """Reject streaming until the AgentApp event flow is defined."""
+def test_responses_streams_only_child_task_events() -> None:
+    """Relay ordered child-task events and consume the final reply."""
     state = _state()
+    state.get_task_events.return_value = [
+        _event(1, "response.created"),
+        _event(2, "response.completed"),
+    ]
+    state.get_task_message.side_effect = lambda **_: [
+        _reply(state.store_task_message.call_args.args[0].metadata.message_id)
+    ]
 
     response = _client(state).post(
         "/v1/runtime/responses",
@@ -134,14 +158,64 @@ def test_responses_rejects_streaming() -> None:
         headers={"Authorization": "Bearer task-token"},
     )
 
-    assert response.status_code == 400
-    assert response.json()["error"] == {
-        "message": "Streaming responses are not supported.",
-        "type": "invalid_request_error",
-        "param": None,
-        "code": "unsupported_parameter",
-    }
-    state.create_task.assert_not_called()
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert response.text == (
+        'event: response.created\ndata: {"type":"response.created"}\n\n'
+        'event: response.completed\ndata: {"type":"response.completed"}\n\n'
+    )
+    state.get_task_events.assert_called_once_with(
+        run_id=789, task_ids=[456], after_task_event_id=None
+    )
+
+
+def test_responses_waits_for_terminal_event_after_reply() -> None:
+    """Do not truncate a terminal event that becomes visible after its reply."""
+    state = _state()
+    state.get_task_events.side_effect = [
+        [
+            _event(
+                1,
+                "response.output_text.delta",
+                '{"type":"response.output_text.delta","delta":"x"}',
+            )
+        ],
+        [_event(2, "response.completed")],
+    ]
+    state.get_task_message.side_effect = lambda **_: [
+        _reply(state.store_task_message.call_args.args[0].metadata.message_id)
+    ]
+
+    with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=0):
+        response = _client(state).post(
+            "/v1/runtime/responses",
+            json={"model": "model", "input": "hello", "stream": True},
+            headers={"Authorization": "Bearer task-token"},
+        )
+
+    assert "event: response.output_text.delta" in response.text
+    assert "event: response.completed" in response.text
+    assert "event: error" not in response.text
+    assert state.get_task_events.call_count == 2
+
+
+def test_responses_reports_missing_terminal_event() -> None:
+    """Fail when the model reply has no matching terminal stream event."""
+    state = _state()
+    state.get_task_events.return_value = []
+    state.get_task_message.side_effect = lambda **_: [
+        _reply(state.store_task_message.call_args.args[0].metadata.message_id)
+    ]
+
+    with patch("flwr.superlink.routers.runtime.responses._TERMINAL_EVENT_GRACE", new=0):
+        response = _client(state).post(
+            "/v1/runtime/responses",
+            json={"model": "model", "input": "hello", "stream": True},
+            headers={"Authorization": "Bearer task-token"},
+        )
+
+    assert "event: error" in response.text
+    assert "Model stream ended before a terminal event." in response.text
 
 
 def test_responses_maps_unexpected_errors() -> None:
@@ -181,6 +255,7 @@ def test_responses_stops_and_drains_when_response_wait_is_cancelled() -> None:
         exchange = _Exchange(
             agent_task_id=123,
             model_task_id=456,
+            run_id=789,
         )
         with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
             response_wait = asyncio.create_task(
@@ -210,6 +285,7 @@ def test_responses_stops_and_drains_when_client_disconnects() -> None:
         exchange = _Exchange(
             agent_task_id=123,
             model_task_id=456,
+            run_id=789,
         )
         with pytest.raises(_ResponsesError) as exc_info:
             await _wait_for_response(request, state, exchange)
@@ -245,6 +321,7 @@ def test_responses_times_out_if_model_task_is_not_launched() -> None:
         exchange = _Exchange(
             agent_task_id=123,
             model_task_id=456,
+            run_id=789,
         )
         with patch(
             "flwr.superlink.routers.runtime.responses._model_task_launch_timeout",
@@ -279,6 +356,7 @@ def test_responses_times_out_if_running_model_task_does_not_respond() -> None:
         exchange = _Exchange(
             agent_task_id=123,
             model_task_id=456,
+            run_id=789,
         )
         with patch(
             "flwr.superlink.routers.runtime.responses._DEFAULT_MODEL_RESPONSE_TIMEOUT",
@@ -294,3 +372,36 @@ def test_responses_times_out_if_running_model_task_does_not_respond() -> None:
     state.finish_task.assert_called_once_with(
         456, SubStatus.STOPPED, "Responses request ended early."
     )
+
+
+def test_responses_stops_and_drains_when_stream_is_cancelled() -> None:
+    """Stop the child task and drain its reply when the stream is cancelled."""
+    state = _state()
+    state.get_task_events.return_value = []
+    state.get_task_message.return_value = []
+    state.get_tasks.return_value = [
+        Task(task_id=456, status=TaskStatus(status=Status.RUNNING))
+    ]
+
+    async def wait_until_polled() -> None:
+        while not state.get_tasks.called:
+            await asyncio.sleep(0)
+
+    async def cancel_stream() -> None:
+        stream = _stream_response(
+            state,
+            _Exchange(agent_task_id=123, model_task_id=456, run_id=789),
+        )
+        with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
+            next_event = asyncio.create_task(anext(stream))
+            await asyncio.wait_for(wait_until_polled(), timeout=1)
+            next_event.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await next_event
+
+    asyncio.run(cancel_stream())
+
+    state.finish_task.assert_called_once_with(
+        456, SubStatus.STOPPED, "Responses stream ended early."
+    )
+    assert state.get_task_message.call_count == 2
