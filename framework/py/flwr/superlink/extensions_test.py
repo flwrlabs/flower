@@ -192,3 +192,19 @@ def test_notify_run_started_isolates_extension_import_failure(
     monkeypatch.setattr(extensions, "_try_import_sgxt", fail_import)
 
     extensions.notify_run_started(run, "unknown")
+
+
+def test_notify_result_delivered_calls_installed_extension(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Forward an accepted server-side result request to an extension."""
+    run = Run.create_empty(42)
+    extension = ModuleType("test_extension")
+    callback = Mock()
+    extension.on_result_delivered = callback  # type: ignore[attr-defined]
+    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: extension)
+
+    extensions.notify_result_delivered(run, "aid-alice", "chat")
+
+    callback.assert_called_once_with(run, "aid-alice", "chat")
+    assert callback.call_args.args[0] is not run

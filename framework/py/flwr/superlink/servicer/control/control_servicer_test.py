@@ -1752,11 +1752,18 @@ class TestControlServicerAuth(unittest.TestCase):
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".extensions.notify_result_delivered"
+            ) as notify_result_delivered,
         ):
             gen = self.servicer.StreamLogs(request, ctx)
             msgs = list(gen)
             mock_get_run_info.assert_called_with(run_ids=[run_id])
             mock_get_task_log.assert_called_once_with(456, 1e-06)
+            notify_result_delivered.assert_called_once_with(
+                mock_run, "user-123", "logs"
+            )
             self.assertEqual(len(msgs), 1)
             self.assertIsInstance(msgs[0], StreamLogsResponse)
             self.assertEqual(msgs[0].log_output, "log1")
@@ -1826,10 +1833,17 @@ class TestControlServicerAuth(unittest.TestCase):
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers"
+                ".extensions.notify_result_delivered"
+            ) as notify_result_delivered,
         ):
             msgs = list(self.servicer.StreamRunEvents(request, ctx))
 
         # Assert
+        notify_result_delivered.assert_called_once_with(
+            mock_run, "user-123", "chat"
+        )
         mock_get_task_events.assert_called_once_with(
             run_id=run_id, after_task_event_id=4
         )
