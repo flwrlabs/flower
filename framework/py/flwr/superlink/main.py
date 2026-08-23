@@ -101,7 +101,7 @@ def _get_middleware() -> list[Middleware]:
     ]
 
 
-def create_app(
+def create_app(  # pylint: disable=too-many-statements
     config: SuperLinkLifespanConfig | None = None,
     superlink_lifespan_class: type[SuperLinkLifespan] | None = None,
 ) -> FastAPI:
