@@ -96,12 +96,7 @@ def start_run(
 ) -> StartRunResponse:
     """Start a run."""
     # Temporary: pass an empty Fleet API type
-    return control_handlers.start_run(
-        request,
-        account,
-        linkstate,
-        "",
-    )
+    return control_handlers.start_run(request, account, linkstate, "")
 
 
 @router.post("/list-runs")
