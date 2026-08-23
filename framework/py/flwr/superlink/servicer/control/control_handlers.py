@@ -469,9 +469,7 @@ def start_run(  # pylint: disable=too-many-arguments,too-many-branches,too-many-
     fleet_api_type: str | None,
     *,
     source: extensions.RunStartSource = "unknown",
-    notify_run_started: Callable[
-        [Run, extensions.RunStartSource], None
-    ] = extensions.notify_run_started,
+    notify_run_started: Callable[[Run, extensions.RunStartSource], None] | None = None,
 ) -> StartRunResponse:
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")
@@ -660,6 +658,8 @@ def start_run(  # pylint: disable=too-many-arguments,too-many-branches,too-many-
     response = StartRunResponse(
         run_id=run_id, note=note, series_id=series_id, federation=run.federation_id
     )
+    if notify_run_started is None:
+        notify_run_started = extensions.notify_run_started
     notify_run_started(run, source)
     return response
 
