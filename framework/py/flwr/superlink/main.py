@@ -14,9 +14,9 @@
 # ==============================================================================
 """SuperLink API."""
 
-
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import AsyncIterator, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
@@ -150,6 +150,7 @@ def create_app(
                 # FastAPI lifespan
                 superlink_lifespan.startup()
 
+            extensions.set_notification_loop(asyncio.get_running_loop())
             lifespan_state: dict[str, object] = {}
             async with AsyncExitStack() as stack:
                 for lifespan_context in extensions.get_lifespan_contexts():
@@ -159,6 +160,7 @@ def create_app(
                     _merge_lifespan_state(lifespan_state, extension_state)
                 yield lifespan_state
         finally:
+            extensions.clear_notification_loop()
             if superlink_lifespan:
                 superlink_lifespan.shutdown()
 

@@ -17,6 +17,7 @@
 from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
 from copy import deepcopy
+from asyncio import AbstractEventLoop
 from importlib import import_module
 from logging import WARNING
 from types import ModuleType
@@ -32,10 +33,11 @@ SuperLinkLifespanContext = Callable[
     [FastAPI], AbstractAsyncContextManager[Mapping[str, Any] | None]
 ]
 # API transport does not identify the caller (CLI and web UI can use either
-# gRPC or HTTP), so only internally scheduled automations have an authoritative
-# source. All API-created runs are reported as unknown.
-RunStartSource = Literal["automation", "unknown"]
+# gRPC or HTTP). API-created runs therefore use ``unknown`` unless a trusted
+# Flower-owned integration supplies a more specific source.
+RunStartSource = Literal["cli", "web_ui", "automation", "unknown"]
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
+_notification_loop: AbstractEventLoop | None = None
 
 
 def _try_import_sgxt() -> ModuleType | None:
@@ -97,12 +99,29 @@ def get_lifespan_contexts() -> tuple[SuperLinkLifespanContext, ...]:
     return get_sgxt_lifespan_contexts()
 
 
-def _notify_extension(
+def set_notification_loop(loop: AbstractEventLoop) -> None:
+    """Set the event loop used to dispatch extension notifications.
+
+    SuperLink owns one FastAPI event loop while its synchronous gRPC handlers
+    run in worker threads. Scheduling onto that loop keeps optional extension
+    work out of both API request paths without creating another worker thread.
+    """
+    global _notification_loop  # pylint: disable=global-statement
+    _notification_loop = loop
+
+
+def clear_notification_loop() -> None:
+    """Clear the event loop used for extension notification dispatch."""
+    global _notification_loop  # pylint: disable=global-statement
+    _notification_loop = None
+
+
+def _invoke_extension(
     callback_name: str,
     callback_args: tuple[Any, ...],
     label: str,
 ) -> None:
-    """Invoke one optional extension callback without affecting the request."""
+    """Discover and invoke one optional extension callback."""
     try:
         sgxt = _try_import_sgxt()
         if sgxt is None:
@@ -120,12 +139,39 @@ def _notify_extension(
         )
 
 
+def _notify_extension(
+    callback_name: str,
+    callback_args: tuple[Any, ...],
+    label: str,
+) -> None:
+    """Dispatch one optional extension callback outside API request handlers."""
+    loop = _notification_loop
+    if loop is not None and loop.is_running():
+        try:
+            loop.call_soon_threadsafe(
+                _invoke_extension, callback_name, callback_args, label
+            )
+            return
+        except RuntimeError:
+            # The service can begin shutdown between checking ``is_running`` and
+            # scheduling. Fall back to the direct path so notifications are not
+            # silently lost during orderly shutdown.
+            pass
+
+    # Direct calls are used by standalone handlers and unit tests which do not
+    # own the combined SuperLink lifespan. The normal service path always has a
+    # loop configured before accepting requests.
+    _invoke_extension(callback_name, callback_args, label)
+
+
 def notify_run_started(run: Run, source: RunStartSource) -> None:
     """Notify an optional extension after a run has been created successfully.
 
-    The callback is intentionally synchronous and must only perform bounded,
-    non-blocking work. It receives a snapshot so it cannot mutate the run stored
-    by SuperLink. Optional extension failures are logged and ignored.
+    In the combined SuperLink service the callback is scheduled on the existing
+    FastAPI event loop, so it does not delay the gRPC or HTTP response. It
+    receives a snapshot so it cannot mutate the run stored by SuperLink.
+    Optional extension failures are logged and ignored. Standalone callers
+    without a configured loop must provide their own non-blocking boundary.
     """
     _notify_extension(
         "on_run_started",

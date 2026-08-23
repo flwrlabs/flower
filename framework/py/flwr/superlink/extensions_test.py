@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for optional SuperLink extensions."""
 
+import asyncio
 from types import ModuleType
 from unittest.mock import Mock
 
@@ -38,6 +39,32 @@ def test_notify_run_started_calls_installed_extension(
 
     callback.assert_called_once_with(run, "automation")
     assert callback.call_args.args[0] is not run
+
+
+def test_notify_run_started_uses_existing_event_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Schedule callbacks on the service loop instead of blocking the caller."""
+    run = Run.create_empty(42)
+    extension = ModuleType("test_extension")
+    callback = Mock()
+    extension.on_run_started = callback  # type: ignore[attr-defined]
+    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: extension)
+    loop = asyncio.new_event_loop()
+    extensions.set_notification_loop(loop)
+
+    try:
+
+        async def notify_from_running_loop() -> None:
+            extensions.notify_run_started(run, "unknown")
+            callback.assert_not_called()
+            await asyncio.sleep(0)
+
+        loop.run_until_complete(notify_from_running_loop())
+        callback.assert_called_once_with(run, "unknown")
+    finally:
+        extensions.clear_notification_loop()
+        loop.close()
 
 
 def test_notify_run_started_isolates_extension_failure(
