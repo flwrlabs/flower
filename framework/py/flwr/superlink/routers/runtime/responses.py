@@ -444,7 +444,16 @@ def _stop_model_task(state: LinkState, exchange: _Exchange, details: str) -> Non
 
 def _sse_frame(event: TaskEvent) -> str:
     """Encode one stored task event as an SSE frame."""
-    return f"event: {event.event}\ndata: {event.data}\n\n"
+    if "\r" in event.event or "\n" in event.event:
+        raise _ResponsesError(
+            502,
+            "Model stream returned an invalid event name.",
+            "invalid_model_event",
+        )
+    data_fields = "".join(
+        f"data: {line}\n" for line in (event.data.splitlines() or [""])
+    )
+    return f"event: {event.event}\n{data_fields}\n"
 
 
 def _stream_error(message: str, code: str) -> str:

@@ -31,6 +31,7 @@ from flwr.superlink.dependencies.linkstate import get_linkstate
 from .responses import (
     _Exchange,
     _ResponsesError,
+    _sse_frame,
     _stream_response,
     _wait_for_response,
     router,
@@ -145,7 +146,7 @@ def test_responses_streams_only_child_task_events() -> None:
     """Relay ordered child-task events and consume the final reply."""
     state = _state()
     state.get_task_events.return_value = [
-        _event(1, "response.created"),
+        _event(1, "response.created", '{\n  "type": "response.created"\n}'),
         _event(2, "response.completed"),
     ]
     state.get_task_message.side_effect = lambda **_: [
@@ -161,12 +162,28 @@ def test_responses_streams_only_child_task_events() -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
     assert response.text == (
-        'event: response.created\ndata: {"type":"response.created"}\n\n'
+        "event: response.created\n"
+        "data: {\n"
+        'data:   "type": "response.created"\n'
+        "data: }\n\n"
         'event: response.completed\ndata: {"type":"response.completed"}\n\n'
     )
     state.get_task_events.assert_called_once_with(
         run_id=789, task_ids=[456], after_task_event_id=None
     )
+
+
+@pytest.mark.parametrize(
+    "event_name",
+    ["response.created\ninjected", "response.created\rinjected"],
+)
+def test_sse_frame_rejects_event_name_line_breaks(event_name: str) -> None:
+    """Reject event names that could inject an SSE field or frame."""
+    with pytest.raises(_ResponsesError) as exc_info:
+        _sse_frame(TaskEvent(event=event_name, data="{}"))
+
+    assert exc_info.value.status_code == 502
+    assert exc_info.value.code == "invalid_model_event"
 
 
 def test_responses_waits_for_terminal_event_after_reply() -> None:
