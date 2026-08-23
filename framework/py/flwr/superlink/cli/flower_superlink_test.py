@@ -253,6 +253,31 @@ def test_flower_superlink_runs_runtime_http_api(
     run_http.assert_called_once_with(lifespan_config=config)
 
 
+def test_superlink_lifespan_shutdown_waits_for_grpc_servers() -> None:
+    """Wait for gRPC termination before extension resources are torn down."""
+    grpc_servers = [Mock(), Mock()]
+    termination_events = [Mock(), Mock()]
+    for grpc_server, termination_event in zip(
+        grpc_servers, termination_events, strict=True
+    ):
+        grpc_server.stop.return_value = termination_event
+        termination_event.wait.return_value = True
+
+    lifespan = object.__new__(app_module.SuperLinkLifespan)
+    lifespan.grpc_servers = grpc_servers
+    lifespan.superexec_process = None
+    lifespan._started = True  # pylint: disable=protected-access
+
+    lifespan.shutdown()
+
+    for grpc_server in grpc_servers:
+        grpc_server.stop.assert_called_once_with(grace=1)
+    for termination_event in termination_events:
+        termination_event.wait.assert_called_once_with(timeout=1.0)
+    assert lifespan.grpc_servers == []
+    assert lifespan._started is False  # pylint: disable=protected-access
+
+
 def test_obtain_superlink_certificates_keeps_runtime_separate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
