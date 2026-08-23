@@ -166,13 +166,13 @@ def create_app(  # pylint: disable=too-many-statements
                         lifespan_context(fastapi_app)
                     )
                     _merge_lifespan_state(lifespan_state, extension_state)
-                if superlink_lifespan:
-                    # Start gRPC only after extension resources are ready, so a
-                    # run-start notification cannot race lifespan initialization.
-                    superlink_startup_attempted = True
-                    superlink_lifespan.startup()
 
                 try:
+                    if superlink_lifespan:
+                        # Start gRPC only after extension resources are ready, so
+                        # a run-start notification cannot race initialization.
+                        superlink_startup_attempted = True
+                        superlink_lifespan.startup()
                     yield lifespan_state
                 finally:
                     shutdown_superlink()
