@@ -34,6 +34,8 @@ from flwr.supercore.run import Run
 SuperLinkLifespanContext = Callable[
     [FastAPI], AbstractAsyncContextManager[Mapping[str, Any] | None]
 ]
+# Advisory caller-controlled metadata for telemetry only. It must never be used
+# for authorization, policy decisions, or other security-sensitive behavior.
 RUN_START_SOURCE_METADATA_KEY = "x-flwr-run-source"
 RunStartSource = Literal["grpc", "http", "web_ui", "automation", "unknown"]
 _RUN_START_SOURCES = frozenset({"grpc", "http", "web_ui", "automation", "unknown"})
@@ -50,7 +52,7 @@ _RUN_STARTED_CALLBACK_SLOTS = threading.BoundedSemaphore(_RUN_STARTED_CALLBACK_C
 def resolve_run_start_source(
     value: str | bytes | None, *, default: RunStartSource
 ) -> RunStartSource:
-    """Resolve an optional caller-provided run source to a closed value set."""
+    """Normalize an advisory caller-provided source to a closed value set."""
     if value is None:
         return default
     if isinstance(value, bytes):
@@ -196,7 +198,11 @@ _RUN_STARTED_DISPATCHER.start()
 
 
 def notify_run_started(run: Run, source: RunStartSource) -> None:
-    """Schedule a bounded notification after a run was created successfully."""
+    """Schedule a bounded notification after a run was created successfully.
+
+    ``source`` can contain advisory caller-provided metadata. Extensions must not
+    use it for authorization, policy, or other security-sensitive behavior.
+    """
     try:
         _RUN_STARTED_NOTIFICATIONS.put_nowait((run, source))
     except queue.Full:
