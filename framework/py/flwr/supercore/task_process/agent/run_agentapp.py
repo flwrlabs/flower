@@ -66,7 +66,12 @@ from flwr.supercore.typing import JSONObject
 from flwr.superlink.grid import HttpGrid
 
 from .context_items import append_items
-from .session import RuntimeAgentConnectors, RuntimeAgentResponses, RuntimeAgentSession
+from .session import (
+    RuntimeAgentConnectors,
+    RuntimeAgentEvents,
+    RuntimeAgentResponses,
+    RuntimeAgentSession,
+)
 
 _AGENT_INPUT_KEY = "agent.input"
 _RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
@@ -244,7 +249,10 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             ),
         )
         connectors = RuntimeAgentConnectors(responses)
-        agent = RuntimeAgentSession(responses=responses, connectors=connectors)
+        events = RuntimeAgentEvents(grid._runtime_client)
+        agent = RuntimeAgentSession(
+            responses=responses, connectors=connectors, events=events
+        )
 
         runtime_root_certificates_path = _set_runtime_environment(
             runtime_api_address, token, insecure, certificates
