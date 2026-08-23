@@ -16,11 +16,9 @@
 
 
 import os
-import ssl
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
-from tempfile import NamedTemporaryFile
 
 import httpx
 
@@ -62,17 +60,22 @@ from flwr.supercore.superexec.dependency_installer import (
     install_app_dependencies,
 )
 from flwr.supercore.telemetry import EventType, event
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.supercore.typing import JSONObject
 from flwr.superlink.grid import HttpGrid
 
 from .context_items import append_items
-from .session import RuntimeAgentConnectors, RuntimeAgentResponses, RuntimeAgentSession
+from .session import (
+    RuntimeAgentConnectors,
+    RuntimeAgentEvents,
+    RuntimeAgentResponses,
+    RuntimeAgentSession,
+)
 
 _AGENT_INPUT_KEY = "agent.input"
 _RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
 _RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
 _SSL_CERT_FILE_ENV = "SSL_CERT_FILE"
-_SSL_CERT_DIR_ENV = "SSL_CERT_DIR"
 
 
 def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
@@ -80,7 +83,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     log_queue: Queue[str | None],
     token: str,
     insecure: bool,
-    certificates: bytes | None = None,
+    certificates_path: str | None = None,
     parent_pid: int | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
@@ -93,7 +96,9 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     grid = HttpGrid(
         runtime_api_address=runtime_api_address,
         insecure=insecure,
-        root_certificates=certificates,
+        root_certificates=validate_and_resolve_root_certificates(
+            certificates_path, insecure
+        ),
         token=token,
     )
 
@@ -104,7 +109,6 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     heartbeat_sender = None
     context: Context | None = None
     runtime_env_dir: Path | None = None
-    runtime_root_certificates_path: Path | None = None
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
@@ -134,8 +138,6 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         grid.close()
 
         cleanup_app_runtime_environment(runtime_env_dir)
-        if runtime_root_certificates_path is not None:
-            runtime_root_certificates_path.unlink(missing_ok=True)
 
     register_signal_handlers(
         event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
@@ -244,10 +246,13 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             ),
         )
         connectors = RuntimeAgentConnectors(responses)
-        agent = RuntimeAgentSession(responses=responses, connectors=connectors)
+        events = RuntimeAgentEvents(grid._runtime_client)
+        agent = RuntimeAgentSession(
+            responses=responses, connectors=connectors, events=events
+        )
 
-        runtime_root_certificates_path = _set_runtime_environment(
-            runtime_api_address, token, insecure, certificates
+        _set_runtime_environment(
+            runtime_api_address, token, insecure, certificates_path
         )
 
         # Load and run the AgentApp
@@ -290,61 +295,12 @@ def _set_runtime_environment(
     runtime_api_address: str,
     token: str,
     insecure: bool,
-    certificates: bytes | None = None,
-) -> Path | None:
+    root_certificates_path: str | None = None,
+) -> None:
     """Expose the Open Responses-compatible Runtime endpoint to the AgentApp."""
     scheme = "http" if insecure else "https"
     address = runtime_api_address.rstrip("/")
     os.environ[_RUNTIME_BASE_URL_ENV] = f"{scheme}://{address}/v1/runtime"
     os.environ[_RUNTIME_API_KEY_ENV] = token
-
-    if certificates is None:
-        return None
-
-    # OpenAI/httpx reads custom CAs from SSL_CERT_FILE, which requires a path.
-    # Extend the public and inherited roots with the Runtime CA for this process.
-    public_ca_context = httpx.create_ssl_context(trust_env=False)
-    trusted_certificates = [
-        *public_ca_context.get_ca_certs(binary_form=True),
-        *_load_inherited_ca_certificates(),
-    ]
-    with NamedTemporaryFile(
-        mode="wb", prefix="flwr-runtime-ca-", suffix=".pem", delete=False
-    ) as certificate_file:
-        for trusted_certificate in dict.fromkeys(trusted_certificates):
-            certificate_file.write(
-                ssl.DER_cert_to_PEM_cert(trusted_certificate).encode("ascii")
-            )
-        certificate_file.write(b"\n")
-        certificate_file.write(certificates)
-    certificate_path = Path(certificate_file.name)
-    os.environ[_SSL_CERT_FILE_ENV] = str(certificate_path)
-    return certificate_path
-
-
-def _load_inherited_ca_certificates() -> list[bytes]:
-    """Load roots configured through the standard OpenSSL environment."""
-    ca_file = os.environ.get(_SSL_CERT_FILE_ENV)
-    ca_dir = os.environ.get(_SSL_CERT_DIR_ENV)
-    if not ca_file and not ca_dir:
-        return []
-
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    if ca_file:
-        context.load_verify_locations(cafile=ca_file)
-    if ca_dir:
-        for directory in ca_dir.split(os.pathsep):
-            if not directory:
-                continue
-            try:
-                ca_paths = sorted(Path(directory).iterdir())
-            except OSError:
-                continue
-            for ca_path in ca_paths:
-                if not ca_path.is_file():
-                    continue
-                try:
-                    context.load_verify_locations(cafile=ca_path)
-                except OSError:
-                    continue
-    return context.get_ca_certs(binary_form=True)
+    if root_certificates_path is not None:
+        os.environ[_SSL_CERT_FILE_ENV] = root_certificates_path
