@@ -33,11 +33,18 @@ def test_notify_run_started_calls_installed_extension(
     run = Run.create_empty(42)
     extension = ModuleType("test_extension")
     callback = Mock()
-    extension.on_run_started = callback  # type: ignore[attr-defined]
+    completed = threading.Event()
+
+    def on_run_started(*args: object) -> None:
+        callback(*args)
+        completed.set()
+
+    extension.on_run_started = on_run_started  # type: ignore[attr-defined]
     monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: extension)
 
     extensions.notify_run_started(run, "automation")
 
+    assert completed.wait(timeout=1)
     callback.assert_called_once_with(run, "automation")
     assert callback.call_args.args[0] is not run
 
@@ -73,6 +80,36 @@ def test_notify_run_started_uses_existing_event_loop(
         loop.run_until_complete(notify_from_running_loop())
         assert completed.is_set()
         callback.assert_called_once_with(run, "unknown")
+    finally:
+        extensions.clear_notification_loop()
+        loop.close()
+
+
+def test_shutdown_drains_submitted_callback_before_clearing_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Run a ready-queue submission before clearing the notification loop."""
+    run = Run.create_empty(42)
+    extension = ModuleType("test_extension")
+    completed = threading.Event()
+
+    def on_run_started(*args: object) -> None:
+        del args
+        completed.set()
+
+    extension.on_run_started = on_run_started  # type: ignore[attr-defined]
+    monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: extension)
+    loop = asyncio.new_event_loop()
+    extensions.set_notification_loop(loop)
+
+    try:
+
+        async def notify_and_shutdown() -> None:
+            extensions.notify_run_started(run, "unknown")
+            await extensions.shutdown_notification_loop()
+
+        loop.run_until_complete(notify_and_shutdown())
+        assert completed.is_set()
     finally:
         extensions.clear_notification_loop()
         loop.close()
@@ -126,12 +163,20 @@ def test_notify_run_started_isolates_extension_failure(
     """Do not fail an already-created run when an extension raises."""
     run = Run.create_empty(42)
     extension = ModuleType("test_extension")
-    callback = Mock(side_effect=RuntimeError)
-    extension.on_run_started = callback  # type: ignore[attr-defined]
+    callback = Mock()
+    completed = threading.Event()
+
+    def fail(*args: object) -> None:
+        callback(*args)
+        completed.set()
+        raise RuntimeError
+
+    extension.on_run_started = fail  # type: ignore[attr-defined]
     monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: extension)
 
     extensions.notify_run_started(run, "unknown")
 
+    assert completed.wait(timeout=1)
     callback.assert_called_once_with(run, "unknown")
 
 

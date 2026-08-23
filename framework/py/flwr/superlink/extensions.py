@@ -48,6 +48,11 @@ _NOTIFICATION_QUEUE_SLOTS = threading.BoundedSemaphore(_NOTIFICATION_TASK_CAPACI
 _NOTIFICATION_CALLBACK_SLOTS: asyncio.Semaphore | None = None
 _NOTIFICATION_CALLBACK_EVENTS: set[threading.Event] = set()
 _NOTIFICATION_CALLBACK_EVENTS_LOCK = threading.Lock()
+_NOTIFICATION_PENDING_SUBMISSIONS = 0
+_NOTIFICATION_PENDING_SUBMISSIONS_LOCK = threading.Lock()
+_NOTIFICATION_STANDALONE_CALLBACK_SLOTS = threading.BoundedSemaphore(
+    _NOTIFICATION_CALLBACK_CAPACITY
+)
 
 
 def _try_import_sgxt() -> ModuleType | None:
@@ -134,6 +139,7 @@ def clear_notification_loop() -> None:
 
 async def shutdown_notification_loop() -> None:
     """Stop dispatching and wait briefly for callback workers to finish."""
+    await _drain_notification_submissions()
     clear_notification_loop()
     loop = asyncio.get_running_loop()
     deadline = loop.time() + _NOTIFICATION_CALLBACK_TIMEOUT_SECONDS
@@ -151,6 +157,21 @@ async def shutdown_notification_loop() -> None:
             )
             return
         await asyncio.sleep(min(0.01, remaining))
+
+
+async def _drain_notification_submissions() -> None:
+    """Let thread-safe loop submissions become tracked tasks before teardown."""
+    had_pending_submission = False
+    while True:
+        with _NOTIFICATION_PENDING_SUBMISSIONS_LOCK:
+            if _NOTIFICATION_PENDING_SUBMISSIONS == 0:
+                break
+            had_pending_submission = True
+        await asyncio.sleep(0)
+    if had_pending_submission:
+        # Give tasks created by the ready-queue submissions one turn to start
+        # before clear_notification_loop cancels queued tasks.
+        await asyncio.sleep(0)
 
 
 def _invoke_extension(
@@ -245,6 +266,9 @@ def _schedule_extension(
     label: str,
 ) -> None:
     """Schedule one bounded extension task on the service event loop."""
+    global _NOTIFICATION_PENDING_SUBMISSIONS  # pylint: disable=global-statement
+    with _NOTIFICATION_PENDING_SUBMISSIONS_LOCK:
+        _NOTIFICATION_PENDING_SUBMISSIONS -= 1
     if _NOTIFICATION_LOOP is not asyncio.get_running_loop():
         _NOTIFICATION_QUEUE_SLOTS.release()
         return
@@ -256,6 +280,37 @@ def _schedule_extension(
         _NOTIFICATION_QUEUE_SLOTS.release()
 
     task.add_done_callback(task_done)
+
+
+def _dispatch_standalone_extension(
+    callback_name: str,
+    callback_args: tuple[Any, ...],
+    label: str,
+) -> None:
+    """Run a callback from a standalone gRPC server without blocking it."""
+    callback_slots = _NOTIFICATION_STANDALONE_CALLBACK_SLOTS
+    if not callback_slots.acquire(  # pylint: disable=consider-using-with
+        blocking=False
+    ):
+        log(WARNING, "%s extension notification queue is full.", label)
+        return
+
+    def invoke_callback() -> None:
+        try:
+            _invoke_extension(callback_name, callback_args, label)
+        finally:
+            callback_slots.release()
+
+    callback_thread = threading.Thread(  # pylint: disable=consider-using-with
+        target=invoke_callback,
+        name="superlink-standalone-extension-callback",
+        daemon=True,
+    )
+    try:
+        callback_thread.start()
+    except Exception:  # pylint: disable=broad-exception-caught
+        callback_slots.release()
+        log(WARNING, "%s extension notification could not start.", label)
 
 
 def _notify_extension(
@@ -271,6 +326,9 @@ def _notify_extension(
         ):
             log(WARNING, "%s extension notification queue is full.", label)
             return
+        global _NOTIFICATION_PENDING_SUBMISSIONS  # pylint: disable=global-statement
+        with _NOTIFICATION_PENDING_SUBMISSIONS_LOCK:
+            _NOTIFICATION_PENDING_SUBMISSIONS += 1
         try:
             loop.call_soon_threadsafe(
                 _schedule_extension, callback_name, callback_args, label
@@ -280,12 +338,14 @@ def _notify_extension(
             # The service can begin shutdown between checking ``is_running`` and
             # scheduling. Fall back to the direct path so notifications are not
             # silently lost during orderly shutdown.
+            with _NOTIFICATION_PENDING_SUBMISSIONS_LOCK:
+                _NOTIFICATION_PENDING_SUBMISSIONS -= 1
             _NOTIFICATION_QUEUE_SLOTS.release()
 
-    # Direct calls are used by standalone handlers and unit tests which do not
-    # own the combined SuperLink lifespan. The normal service path always has a
-    # loop configured before accepting requests.
-    _invoke_extension(callback_name, callback_args, label)
+    # Standalone gRPC handlers do not own the combined FastAPI lifespan. Keep
+    # their completion callbacks non-blocking with the same bounded worker
+    # policy used by the combined service.
+    _dispatch_standalone_extension(callback_name, callback_args, label)
 
 
 def notify_run_started(run: Run, source: RunStartSource) -> None:
