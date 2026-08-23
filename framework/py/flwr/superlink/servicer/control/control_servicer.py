@@ -97,7 +97,6 @@ from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import ObjectStoreFactory
-from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
@@ -128,25 +127,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: StartRunRequest, context: grpc.ServicerContext
     ) -> StartRunResponse:
         """Create run ID."""
-        metadata = context.invocation_metadata()
-        run_source = (
-            next(
-                (
-                    value
-                    for key, value in metadata
-                    if key == extensions.RUN_START_SOURCE_METADATA_KEY
-                ),
-                None,
-            )
-            if isinstance(metadata, (tuple, list))
-            else None
-        )
         return control_handlers.start_run(
             request,
             _get_account(),
             self.linkstate_factory.state(),
             self.fleet_api_type,
-            source=extensions.resolve_run_start_source(run_source, default="grpc"),
         )
 
     def StreamLogs(  # pylint: disable=C0103

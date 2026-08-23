@@ -14,9 +14,6 @@
 # ==============================================================================
 """SuperLink FastAPI extension hooks."""
 
-
-import queue
-import threading
 from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
 from copy import deepcopy
@@ -34,35 +31,11 @@ from flwr.supercore.run import Run
 SuperLinkLifespanContext = Callable[
     [FastAPI], AbstractAsyncContextManager[Mapping[str, Any] | None]
 ]
-# Advisory caller-controlled metadata for telemetry only. It must never be used
-# for authorization, policy decisions, or other security-sensitive behavior.
-RUN_START_SOURCE_METADATA_KEY = "x-flwr-run-source"
-RunStartSource = Literal["grpc", "http", "web_ui", "automation", "unknown"]
-_RUN_START_SOURCES = frozenset({"grpc", "http", "web_ui", "automation", "unknown"})
+# API transport does not identify the caller (CLI and web UI can use either
+# gRPC or HTTP), so only internally scheduled automations have an authoritative
+# source. All API-created runs are reported as unknown.
+RunStartSource = Literal["automation", "unknown"]
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
-_RUN_STARTED_NOTIFICATION_CAPACITY = 1000
-_RUN_STARTED_CALLBACK_CAPACITY = 4
-_RUN_STARTED_CALLBACK_TIMEOUT_SECONDS = 5.0
-_RUN_STARTED_NOTIFICATIONS: queue.Queue[tuple[Run, RunStartSource]] = queue.Queue(
-    maxsize=_RUN_STARTED_NOTIFICATION_CAPACITY
-)
-_RUN_STARTED_CALLBACK_SLOTS = threading.BoundedSemaphore(_RUN_STARTED_CALLBACK_CAPACITY)
-
-
-def resolve_run_start_source(
-    value: str | bytes | None, *, default: RunStartSource
-) -> RunStartSource:
-    """Normalize an advisory caller-provided source to a closed value set."""
-    if value is None:
-        return default
-    if isinstance(value, bytes):
-        try:
-            value = value.decode("ascii")
-        except UnicodeDecodeError:
-            return "unknown"
-    if value not in _RUN_START_SOURCES:
-        return "unknown"
-    return cast(RunStartSource, value)
 
 
 def _try_import_sgxt() -> ModuleType | None:
@@ -124,86 +97,38 @@ def get_lifespan_contexts() -> tuple[SuperLinkLifespanContext, ...]:
     return get_sgxt_lifespan_contexts()
 
 
-def _invoke_run_started(  # pylint: disable=consider-using-with
-    run: Run,
-    source: RunStartSource,
+def _notify_extension(
+    callback_name: str,
+    callback_args: tuple[Any, ...],
+    label: str,
 ) -> None:
-    """Discover and invoke one extension outside the run-creation request path."""
-    if not _RUN_STARTED_CALLBACK_SLOTS.acquire(blocking=False):
-        log(WARNING, "Run-started extension callback capacity is exhausted.")
-        return
-
-    completed = threading.Event()
-
-    def invoke_callback() -> None:
-        try:
-            sgxt = _try_import_sgxt()
-            if sgxt is None:
-                return
-            callback = cast(
-                Callable[[Run, RunStartSource], None] | None,
-                getattr(sgxt, "on_run_started", None),
-            )
-            if callback is not None:
-                # Extensions receive a snapshot so they cannot mutate persisted state.
-                callback(deepcopy(run), source)
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            log(
-                WARNING,
-                "Run-started extension notification failed: %s.",
-                type(exc).__name__,
-                exc_info=exc,
-            )
-        finally:
-            _RUN_STARTED_CALLBACK_SLOTS.release()
-            completed.set()
-
-    callback_thread = threading.Thread(
-        target=invoke_callback,
-        name="run-started-extension-callback",
-        daemon=True,
-    )
+    """Invoke one optional extension callback without affecting the request."""
     try:
-        callback_thread.start()
-    except Exception:  # pylint: disable=broad-exception-caught
-        _RUN_STARTED_CALLBACK_SLOTS.release()
-        raise
-    if not completed.wait(timeout=_RUN_STARTED_CALLBACK_TIMEOUT_SECONDS):
-        log(WARNING, "Run-started extension notification timed out.")
-
-
-def _run_started_dispatcher() -> None:
-    """Dispatch bounded notifications on a daemon worker until process exit."""
-    while True:
-        run, source = _RUN_STARTED_NOTIFICATIONS.get()
-        try:
-            _invoke_run_started(run, source)
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            log(
-                WARNING,
-                "Run-started extension dispatch failed: %s.",
-                type(exc).__name__,
-                exc_info=exc,
-            )
-        finally:
-            _RUN_STARTED_NOTIFICATIONS.task_done()
-
-
-_RUN_STARTED_DISPATCHER = threading.Thread(
-    target=_run_started_dispatcher,
-    name="run-started-extension-dispatcher",
-    daemon=True,
-)
-_RUN_STARTED_DISPATCHER.start()
+        sgxt = _try_import_sgxt()
+        if sgxt is None:
+            return
+        callback = cast(Callable[..., None] | None, getattr(sgxt, callback_name, None))
+        if callback is not None:
+            callback(*callback_args)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        log(
+            WARNING,
+            "%s extension notification failed: %s.",
+            label,
+            type(exc).__name__,
+            exc_info=exc,
+        )
 
 
 def notify_run_started(run: Run, source: RunStartSource) -> None:
-    """Schedule a bounded notification after a run was created successfully.
+    """Notify an optional extension after a run has been created successfully.
 
-    ``source`` can contain advisory caller-provided metadata. Extensions must not
-    use it for authorization, policy, or other security-sensitive behavior.
+    The callback is intentionally synchronous and must only perform bounded,
+    non-blocking work. It receives a snapshot so it cannot mutate the run stored
+    by SuperLink. Optional extension failures are logged and ignored.
     """
-    try:
-        _RUN_STARTED_NOTIFICATIONS.put_nowait((run, source))
-    except queue.Full:
-        log(WARNING, "Run-started extension notification queue is full.")
+    _notify_extension(
+        "on_run_started",
+        (deepcopy(run), source),
+        "Run-started",
+    )

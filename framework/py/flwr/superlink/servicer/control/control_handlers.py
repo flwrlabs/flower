@@ -468,7 +468,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     state: LinkState,
     fleet_api_type: str | None,
     *,
-    source: extensions.RunStartSource = "grpc",
+    source: extensions.RunStartSource = "unknown",
 ) -> StartRunResponse:
     """Create run ID."""
     log(INFO, "ControlServicer.StartRun")
@@ -814,7 +814,9 @@ def start_automation(  # pylint: disable=too-many-locals
     max_runs = (
         request.max_runs
         if request.HasField("max_runs")
-        else 1 if fixed_interval is None else None
+        else 1
+        if fixed_interval is None
+        else None
     )
     if max_runs is not None and max_runs < 1:
         raise FlowerError(
