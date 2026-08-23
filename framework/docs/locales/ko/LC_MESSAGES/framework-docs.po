@@ -30942,7 +30942,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentEvents <flwr.agentapp.AgentEvents>`\\ \\(\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.base.AgentEvents:1 of
@@ -31226,12 +31226,12 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.AgentEvents.rst:2
 #, fuzzy
 msgid "AgentEvents"
-msgstr "빌드 전달인자"
+msgstr ""
 
 #: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`emit <flwr.agentapp.AgentEvents.emit>`\\ \\(event\\)"
-msgstr ":py:obj:`flwr.server <flwr.server>`\\"
+msgstr ""
 
 #: flwr.agentapp.base.AgentEvents.emit:1
 #: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
@@ -31447,7 +31447,7 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`events <flwr.agentapp.AgentSession.events>`\\"
-msgstr ":py:obj:`reason <flwr.common.Error.reason>`\\"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.events:1 of
@@ -32583,7 +32583,7 @@ msgstr "오류 식별자입니다."
 #: ../../source/ref-api/flwr.app.Context.rst:26:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`locked <flwr.app.Context.locked>`\\ \\(\\)"
-msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Context.rst:26:<autosummary>:1
 #: ../../source/ref-api/flwr.common.Context.rst:26:<autosummary>:1
@@ -35416,7 +35416,7 @@ msgstr ":py:obj:`keys <flwr.common.ConfigsRecord.keys>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.common.Context.rst:26:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`locked <flwr.common.Context.locked>`\\ \\(\\)"
-msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
+msgstr ""
 
 #: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
@@ -38296,7 +38296,7 @@ msgstr ":py:obj:`state <flwr.common.Context.state>`\\"
 #: ../../source/ref-api/flwr.server.LegacyContext.rst:26:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`locked <flwr.server.LegacyContext.locked>`\\ \\(\\)"
-msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
+msgstr ""
 
 #: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
@@ -87576,4 +87576,3 @@ msgstr ""
 
 #~ msgid "Alpha: not feature complete, allowed to have known issues"
 #~ msgstr "알파: 기능 미완성, 알려진 문제가 있을 수 있음"
-

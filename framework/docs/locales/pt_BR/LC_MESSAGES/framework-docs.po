@@ -30272,7 +30272,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.AgentEvents.rst:2
 #, fuzzy
 msgid "AgentEvents"
-msgstr "Argumento de compilação"
+msgstr ""
 
 #: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
 msgid ":py:obj:`emit <flwr.agentapp.AgentEvents.emit>`\\ \\(event\\)"
@@ -91173,4 +91173,3 @@ msgstr ""
 
 #~ msgid "Alpha: not feature complete, allowed to have known issues"
 #~ msgstr ""
-

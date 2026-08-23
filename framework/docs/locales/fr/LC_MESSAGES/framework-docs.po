@@ -41008,15 +41008,13 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentEvents <flwr.agentapp.AgentEvents>`\\ \\(\\)"
-msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 #: flwr.agentapp.base.AgentEvents:1 of
 #, fuzzy
 msgid "Abstract base class for AgentApp run events."
 msgstr ""
-"Classe abstraite de base pour les capacités d'exécution en temps réel de "
-"l'agent."
 
 #: ../../source/ref-api/flwr.agentapp.rst:31:<autosummary>:1
 msgid ":py:obj:`AgentResponses <flwr.agentapp.AgentResponses>`\\ \\(\\)"
@@ -41295,7 +41293,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`emit <flwr.agentapp.AgentEvents.emit>`\\ \\(event\\)"
-msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentEvents.emit:1
 #: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1 of
@@ -41509,7 +41507,7 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`events <flwr.agentapp.AgentSession.events>`\\"
-msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.events:1 of
@@ -42679,7 +42677,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.app.Context.rst:26:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`locked <flwr.app.Context.locked>`\\ \\(\\)"
-msgstr ":py:obj:`clear <flwr.app.RecordDict.clear>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.app.Context.rst:26:<autosummary>:1
 #: ../../source/ref-api/flwr.common.Context.rst:26:<autosummary>:1
@@ -45572,7 +45570,7 @@ msgstr ":py:obj:`object_id <flwr.app.ConfigRecord.object_id>`\\"
 #: ../../source/ref-api/flwr.common.Context.rst:26:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`locked <flwr.common.Context.locked>`\\ \\(\\)"
-msgstr ":py:obj:`node_id <flwr.app.Context.node_id>`\\"
+msgstr ""
 
 #: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
@@ -48522,7 +48520,7 @@ msgstr "Bases : :py:class:`~flwr.serverapp.strategy.fedopt.FedOpt`"
 #: ../../source/ref-api/flwr.server.LegacyContext.rst:26:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`locked <flwr.server.LegacyContext.locked>`\\ \\(\\)"
-msgstr ":py:obj:`node_id <flwr.app.Context.node_id>`\\"
+msgstr ""
 
 #: flwr.app.message.context.Context.locked:1:<autosummary>:1 of
 #, fuzzy
@@ -65826,4 +65824,3 @@ msgstr ""
 #~ "Alpha : les fonctionnalités ne sont "
 #~ "pas complètes, les problèmes connus sont"
 #~ " autorisés"
-
