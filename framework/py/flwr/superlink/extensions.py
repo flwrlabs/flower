@@ -14,10 +14,10 @@
 # ==============================================================================
 """SuperLink FastAPI extension hooks."""
 
+from asyncio import AbstractEventLoop
 from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
 from copy import deepcopy
-from asyncio import AbstractEventLoop
 from importlib import import_module
 from logging import WARNING
 from types import ModuleType
