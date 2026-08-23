@@ -16,7 +16,6 @@
 
 
 import argparse
-import os
 from logging import DEBUG, INFO
 from pathlib import Path
 from queue import Queue
@@ -26,7 +25,6 @@ from flwr.supercore import log
 from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 from flwr.supercore.logger import mirror_output_to_queue, restore_output
 from flwr.supercore.task_process import run_agentapp
-from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 
 def flwr_agentapp() -> None:
@@ -44,20 +42,20 @@ def flwr_agentapp() -> None:
         "`flwr-agentapp` will attempt to connect to SuperLink's Runtime API at %s",
         args.runtime_api_address,
     )
-    certificates = validate_and_resolve_root_certificates(
-        args.root_certificates, args.insecure
-    )
-    # Set the custom CA path for OpenAI SDK clients based on httpx
+
+    # Resolve root certificates path if provided
+    root_certificates_path = None
     if args.root_certificates is not None:
-        os.environ["SSL_CERT_FILE"] = str(
+        root_certificates_path = str(
             Path(args.root_certificates).expanduser().resolve()
         )
+
     run_agentapp(
         runtime_api_address=args.runtime_api_address,
         log_queue=log_queue,
         token=token,
         insecure=args.insecure,
-        certificates=certificates,
+        certificates_path=root_certificates_path,
         parent_pid=args.parent_pid,
         runtime_dependency_install=args.runtime_dependency_install,
     )
