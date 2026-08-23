@@ -45,7 +45,8 @@ _NOTIFICATION_CALLBACK_CAPACITY = 4
 _NOTIFICATION_CALLBACK_TIMEOUT_SECONDS = 1.0
 _NOTIFICATION_TASKS: set[asyncio.Task[None]] = set()
 _NOTIFICATION_QUEUE_SLOTS = threading.BoundedSemaphore(_NOTIFICATION_TASK_CAPACITY)
-_NOTIFICATION_CALLBACK_SLOTS = asyncio.Semaphore(_NOTIFICATION_CALLBACK_CAPACITY)
+_NOTIFICATION_CALLBACK_SLOTS: asyncio.Semaphore | None = None
+_NOTIFICATION_CALLBACK_EVENTS: set[asyncio.Event] = set()
 
 
 def _try_import_sgxt() -> ModuleType | None:
@@ -115,17 +116,42 @@ def set_notification_loop(loop: AbstractEventLoop) -> None:
     boundary; synchronous extension callbacks are then isolated in a bounded
     set of daemon callback threads so they cannot block the event loop.
     """
-    global _NOTIFICATION_LOOP  # pylint: disable=global-statement
+    global _NOTIFICATION_LOOP, _NOTIFICATION_CALLBACK_SLOTS  # pylint: disable=global-statement
     _NOTIFICATION_LOOP = loop
+    _NOTIFICATION_CALLBACK_SLOTS = asyncio.Semaphore(_NOTIFICATION_CALLBACK_CAPACITY)
 
 
 def clear_notification_loop() -> None:
     """Clear the event loop used for extension notification dispatch."""
-    global _NOTIFICATION_LOOP  # pylint: disable=global-statement
+    global _NOTIFICATION_LOOP, _NOTIFICATION_CALLBACK_SLOTS  # pylint: disable=global-statement
     _NOTIFICATION_LOOP = None
+    _NOTIFICATION_CALLBACK_SLOTS = None
     for task in _NOTIFICATION_TASKS:
         task.cancel()
     _NOTIFICATION_TASKS.clear()
+
+
+async def shutdown_notification_loop() -> None:
+    """Stop dispatching and wait briefly for callback workers to finish."""
+    clear_notification_loop()
+    if not _NOTIFICATION_CALLBACK_EVENTS:
+        return
+
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(
+                *(
+                    callback_event.wait()
+                    for callback_event in _NOTIFICATION_CALLBACK_EVENTS
+                )
+            ),
+            timeout=_NOTIFICATION_CALLBACK_TIMEOUT_SECONDS,
+        )
+    except TimeoutError:
+        log(
+            WARNING,
+            "Some extension callbacks did not finish during shutdown.",
+        )
 
 
 def _invoke_extension(
@@ -161,7 +187,10 @@ async def _dispatch_extension(
     """Run a synchronous callback without blocking the service event loop."""
     # Pending tasks wait here, up to _NOTIFICATION_TASK_CAPACITY, instead of
     # dropping notifications merely because all callback slots are busy.
-    await _NOTIFICATION_CALLBACK_SLOTS.acquire()
+    callback_slots = _NOTIFICATION_CALLBACK_SLOTS
+    if callback_slots is None:
+        return
+    await callback_slots.acquire()
 
     loop = asyncio.get_running_loop()
     completed = asyncio.Event()
@@ -172,7 +201,8 @@ async def _dispatch_extension(
         finally:
 
             def callback_done() -> None:
-                _NOTIFICATION_CALLBACK_SLOTS.release()
+                callback_slots.release()
+                _NOTIFICATION_CALLBACK_EVENTS.discard(completed)
                 completed.set()
 
             loop.call_soon_threadsafe(callback_done)
@@ -185,9 +215,10 @@ async def _dispatch_extension(
     try:
         callback_thread.start()
     except Exception:  # pylint: disable=broad-exception-caught
-        _NOTIFICATION_CALLBACK_SLOTS.release()
+        callback_slots.release()
         log(WARNING, "%s extension notification could not start.", label)
         return
+    _NOTIFICATION_CALLBACK_EVENTS.add(completed)
 
     try:
         await asyncio.wait_for(

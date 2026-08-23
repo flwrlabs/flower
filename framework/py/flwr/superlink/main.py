@@ -176,12 +176,12 @@ def create_app(  # pylint: disable=too-many-statements
                     yield lifespan_state
                 finally:
                     shutdown_superlink()
-                    extensions.clear_notification_loop()
+                    await extensions.shutdown_notification_loop()
         finally:
             # Also clean up a partially started SuperLink when startup raises
             # before the inner shutdown block is reached.
             shutdown_superlink()
-            extensions.clear_notification_loop()
+            await extensions.shutdown_notification_loop()
             log(INFO, "FastAPI lifespan: shutdown")
 
     fastapi_app = FastAPI(
