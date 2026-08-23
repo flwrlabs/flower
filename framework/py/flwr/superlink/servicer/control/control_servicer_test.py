@@ -77,7 +77,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
-from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
@@ -1788,8 +1788,19 @@ class TestControlServicerAuth(unittest.TestCase):
         self.assertEqual(msgs, [])
         ctx.is_active.assert_called_once_with()
 
-    def test_streamrunevents_yields_events(self) -> None:
-        """Test StreamRunEvents streams task events for an accessible run."""
+    @parameterized.expand(
+        [
+            (TaskType.AGENT_APP, [6], 2),
+            (TaskType.SERVER_APP, [5, 6], 1),
+        ]
+    )
+    def test_streamrunevents_filters_model_events_for_agentapp_runs(
+        self,
+        primary_task_type: TaskType,
+        expected_event_ids: list[int],
+        expected_get_tasks_calls: int,
+    ) -> None:
+        """Hide model events only when the AgentApp controls publication."""
         # Prepare
         run_id = 789
         request = StreamRunEventsRequest(run_id=run_id, after_task_event_id=4)
@@ -1797,12 +1808,13 @@ class TestControlServicerAuth(unittest.TestCase):
         ctx.is_active.return_value = True
         mock_run = Mock(
             federation_id=NOOP_FEDERATION_ID,
+            primary_task_id=123,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
         )
         event_1 = TaskEvent(
             id=5,
             run_id=run_id,
-            task_id=123,
+            task_id=456,
             event="response.output_text.delta",
             data='{"delta":"Hel"}',
         )
@@ -1814,11 +1826,21 @@ class TestControlServicerAuth(unittest.TestCase):
             data='{"type":"response.completed"}',
         )
         mock_get_task_events = Mock(return_value=[event_1, event_2])
+        mock_get_tasks = Mock(
+            side_effect=[
+                [Task(task_id=123, type=primary_task_type)],
+                [
+                    Task(task_id=456, type=TaskType.MODEL),
+                    Task(task_id=123, type=TaskType.AGENT_APP),
+                ],
+            ]
+        )
 
         # Execute
         with (
             patch.object(self.state, "get_run_info", return_value=[mock_run]),
             patch.object(self.state, "get_task_events", new=mock_get_task_events),
+            patch.object(self.state, "get_tasks", new=mock_get_tasks),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
             ),
@@ -1833,14 +1855,13 @@ class TestControlServicerAuth(unittest.TestCase):
         mock_get_task_events.assert_called_once_with(
             run_id=run_id, after_task_event_id=4
         )
-        self.assertEqual(len(msgs), 2)
-        self.assertIsInstance(msgs[0], StreamRunEventsResponse)
-        self.assertEqual(msgs[0].task_event.id, 5)
-        self.assertEqual(msgs[0].task_event.task_id, 123)
-        self.assertEqual(msgs[0].task_event.event, "response.output_text.delta")
-        self.assertEqual(msgs[0].task_event.data, '{"delta":"Hel"}')
-        self.assertEqual(msgs[1].task_event.id, 6)
-        self.assertEqual(msgs[1].task_event.event, "response.completed")
+        self.assertEqual(mock_get_tasks.call_count, expected_get_tasks_calls)
+        self.assertEqual(
+            [message.task_event.id for message in msgs], expected_event_ids
+        )
+        self.assertTrue(
+            all(isinstance(message, StreamRunEventsResponse) for message in msgs)
+        )
 
     def test_streamrunevents_stops_when_grpc_context_is_inactive(self) -> None:
         """Test StreamRunEvents retains gRPC cancellation after delegation."""
@@ -1849,6 +1870,7 @@ class TestControlServicerAuth(unittest.TestCase):
         ctx = self.make_context()
         mock_run = Mock(
             federation_id=NOOP_FEDERATION_ID,
+            primary_task_id=123,
             status=RunStatus(Status.RUNNING, "", ""),
         )
 

@@ -20,11 +20,13 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Sequence
+from queue import Empty, Queue
+from threading import Lock, Thread
 from typing import Literal, cast
 
 from google.protobuf.json_format import ParseDict
 
-from flwr.agentapp import AgentConnectors, AgentResponses, AgentSession
+from flwr.agentapp import AgentConnectors, AgentEvents, AgentResponses, AgentSession
 from flwr.app import Context, Message
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -59,14 +61,122 @@ from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
 _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
+_EVENT_PUBLISH_BATCH_SIZE = 16
+_EVENT_PUBLISH_QUEUE_SIZE = 256
+_EVENT_PUBLISH_BATCH_WAIT = 0.002
+_EVENT_PUBLISH_STOP = object()
+
+
+class RuntimeAgentEvents(AgentEvents):
+    """Publish AgentApp-selected events without blocking response iteration."""
+
+    def __init__(self, stub: RuntimeHttpClient) -> None:
+        self._stub = stub
+        self._queue: Queue[JSONObject | object] = Queue(
+            maxsize=_EVENT_PUBLISH_QUEUE_SIZE
+        )
+        self._error_lock = Lock()
+        self._error: Exception | None = None
+        self._closed = False
+        self._worker = Thread(
+            target=self._run,
+            name="flwr-agent-event-publisher",
+            daemon=True,
+        )
+        self._worker.start()
+
+    def publish(self, event: JSONObject) -> None:
+        """Queue one event for publication to run-event subscribers."""
+        if self._closed:
+            raise RuntimeError("Agent event publisher is closed.")
+        event_type = event.get("type")
+        if not isinstance(event_type, str) or not event_type:
+            raise ValueError("Published events require a non-empty string 'type'.")
+        self._raise_worker_error()
+        self._queue.put(dict(event))
+        self._raise_worker_error()
+
+    def flush(self) -> None:
+        """Wait until all queued events have been persisted."""
+        self._queue.join()
+        self._raise_worker_error()
+
+    def close(self) -> None:
+        """Flush pending events and stop the background publisher."""
+        if self._closed:
+            self._raise_worker_error()
+            return
+        try:
+            self.flush()
+        finally:
+            self._closed = True
+            self._queue.put(_EVENT_PUBLISH_STOP)
+            self._worker.join()
+        self._raise_worker_error()
+
+    def _run(self) -> None:
+        """Upload queued events in small batches."""
+        while True:
+            item = self._queue.get()
+            if item is _EVENT_PUBLISH_STOP:
+                self._queue.task_done()
+                return
+
+            batch = [cast(JSONObject, item)]
+            deadline = time.monotonic() + _EVENT_PUBLISH_BATCH_WAIT
+            stop_after_batch = False
+            while len(batch) < _EVENT_PUBLISH_BATCH_SIZE:
+                try:
+                    next_item = self._queue.get(
+                        timeout=max(0.0, deadline - time.monotonic())
+                    )
+                except Empty:
+                    break
+                if next_item is _EVENT_PUBLISH_STOP:
+                    self._queue.task_done()
+                    stop_after_batch = True
+                    break
+                batch.append(cast(JSONObject, next_item))
+
+            try:
+                task_events = [
+                    TaskEvent(
+                        event=cast(str, event["type"]),
+                        data=strict_json_dumps(event, compact=True),
+                    )
+                    for event in batch
+                ]
+                self._stub.PushTaskEvents(PushTaskEventsRequest(events=task_events))
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                with self._error_lock:
+                    if self._error is None:
+                        self._error = err
+            finally:
+                for _ in batch:
+                    self._queue.task_done()
+            if stop_after_batch:
+                return
+
+    def _raise_worker_error(self) -> None:
+        """Raise a background publication failure in the AgentApp thread."""
+        with self._error_lock:
+            error = self._error
+        if error is not None:
+            raise RuntimeError("Failed to publish AgentApp events.") from error
 
 
 class RuntimeAgentSession(AgentSession):
     """AgentSession bound to one AgentApp task."""
 
-    def __init__(self, responses: AgentResponses, connectors: AgentConnectors) -> None:
+    def __init__(
+        self,
+        responses: AgentResponses,
+        connectors: AgentConnectors,
+        events: AgentEvents,
+    ) -> None:
         self._responses = responses
         self._connectors = connectors
+        self._events = events
 
     @property
     def responses(self) -> AgentResponses:
@@ -77,6 +187,11 @@ class RuntimeAgentSession(AgentSession):
     def connectors(self) -> AgentConnectors:
         """Connector tool schema and execution API."""
         return self._connectors
+
+    @property
+    def events(self) -> AgentEvents:
+        """Frontend-visible run-event publication API."""
+        return self._events
 
 
 class RuntimeAgentConnectors(AgentConnectors):

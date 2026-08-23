@@ -15,6 +15,7 @@
 """Runtime AgentApp session tests."""
 
 
+import json
 from unittest.mock import Mock, patch
 
 from flwr.common.serde import user_config_to_proto
@@ -38,7 +39,25 @@ from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TO
 from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject
 
-from .session import RuntimeAgentConnectors, RuntimeAgentResponses
+from .session import RuntimeAgentConnectors, RuntimeAgentEvents, RuntimeAgentResponses
+
+
+def test_runtime_agent_events_publishes_selected_event() -> None:
+    """Publish only the event explicitly selected by AgentApp code."""
+    stub = Mock()
+    events = RuntimeAgentEvents(stub)
+
+    events.publish({"type": "response.output_text.delta", "delta": "Hello"})
+    events.flush()
+    events.close()
+
+    request = stub.PushTaskEvents.call_args.args[0]
+    assert len(request.events) == 1
+    assert request.events[0].event == "response.output_text.delta"
+    assert json.loads(request.events[0].data) == {
+        "type": "response.output_text.delta",
+        "delta": "Hello",
+    }
 
 
 def test_pull_task_messages_filters_by_child_task() -> None:
