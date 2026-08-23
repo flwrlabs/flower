@@ -1841,9 +1841,7 @@ class TestControlServicerAuth(unittest.TestCase):
             msgs = list(self.servicer.StreamRunEvents(request, ctx))
 
         # Assert
-        notify_result_delivered.assert_called_once_with(
-            mock_run, "user-123", "chat"
-        )
+        notify_result_delivered.assert_called_once_with(mock_run, "user-123", "chat")
         mock_get_task_events.assert_called_once_with(
             run_id=run_id, after_task_event_id=4
         )
