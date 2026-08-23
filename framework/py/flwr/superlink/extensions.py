@@ -44,6 +44,7 @@ _NOTIFICATION_TASK_CAPACITY = 1000
 _NOTIFICATION_CALLBACK_CAPACITY = 4
 _NOTIFICATION_CALLBACK_TIMEOUT_SECONDS = 1.0
 _NOTIFICATION_TASKS: set[asyncio.Task[None]] = set()
+_NOTIFICATION_QUEUE_SLOTS = threading.BoundedSemaphore(_NOTIFICATION_TASK_CAPACITY)
 _NOTIFICATION_CALLBACK_SLOTS = asyncio.Semaphore(_NOTIFICATION_CALLBACK_CAPACITY)
 
 
@@ -207,12 +208,17 @@ def _schedule_extension(
     label: str,
 ) -> None:
     """Schedule one bounded extension task on the service event loop."""
-    if len(_NOTIFICATION_TASKS) >= _NOTIFICATION_TASK_CAPACITY:
-        log(WARNING, "%s extension notification queue is full.", label)
+    if _NOTIFICATION_LOOP is not asyncio.get_running_loop():
+        _NOTIFICATION_QUEUE_SLOTS.release()
         return
     task = asyncio.create_task(_dispatch_extension(callback_name, callback_args, label))
     _NOTIFICATION_TASKS.add(task)
-    task.add_done_callback(_NOTIFICATION_TASKS.discard)
+
+    def task_done(completed_task: asyncio.Task[None]) -> None:
+        _NOTIFICATION_TASKS.discard(completed_task)
+        _NOTIFICATION_QUEUE_SLOTS.release()
+
+    task.add_done_callback(task_done)
 
 
 def _notify_extension(
@@ -223,6 +229,11 @@ def _notify_extension(
     """Dispatch one optional extension callback outside API request handlers."""
     loop = _NOTIFICATION_LOOP
     if loop is not None and loop.is_running():
+        if not _NOTIFICATION_QUEUE_SLOTS.acquire(  # pylint: disable=consider-using-with
+            blocking=False
+        ):
+            log(WARNING, "%s extension notification queue is full.", label)
+            return
         try:
             loop.call_soon_threadsafe(
                 _schedule_extension, callback_name, callback_args, label
@@ -232,7 +243,7 @@ def _notify_extension(
             # The service can begin shutdown between checking ``is_running`` and
             # scheduling. Fall back to the direct path so notifications are not
             # silently lost during orderly shutdown.
-            pass
+            _NOTIFICATION_QUEUE_SLOTS.release()
 
     # Direct calls are used by standalone handlers and unit tests which do not
     # own the combined SuperLink lifespan. The normal service path always has a

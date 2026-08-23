@@ -145,11 +145,6 @@ def create_app(
         log(INFO, "FastAPI lifespan: startup")
 
         try:
-            if superlink_lifespan:
-                # Temporary compatibility path: start the existing gRPC APIs from
-                # FastAPI lifespan
-                superlink_lifespan.startup()
-
             extensions.set_notification_loop(asyncio.get_running_loop())
             lifespan_state: dict[str, object] = {}
             async with AsyncExitStack() as stack:
@@ -158,12 +153,21 @@ def create_app(
                         lifespan_context(fastapi_app)
                     )
                     _merge_lifespan_state(lifespan_state, extension_state)
-                yield lifespan_state
-        finally:
-            extensions.clear_notification_loop()
-            if superlink_lifespan:
-                superlink_lifespan.shutdown()
+                if superlink_lifespan:
+                    # Start gRPC only after extension resources are ready, so a
+                    # run-start notification cannot race lifespan initialization.
+                    superlink_lifespan.startup()
 
+                try:
+                    yield lifespan_state
+                finally:
+                    if superlink_lifespan:
+                        superlink_lifespan.shutdown()
+                    extensions.clear_notification_loop()
+        finally:
+            # Also clear the loop when extension startup itself fails before
+            # the inner shutdown block is reached.
+            extensions.clear_notification_loop()
             log(INFO, "FastAPI lifespan: shutdown")
 
     fastapi_app = FastAPI(
