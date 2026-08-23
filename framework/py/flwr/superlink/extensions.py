@@ -14,6 +14,8 @@
 # ==============================================================================
 """SuperLink FastAPI extension hooks."""
 
+import asyncio
+import threading
 from asyncio import AbstractEventLoop
 from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
@@ -38,6 +40,13 @@ SuperLinkLifespanContext = Callable[
 RunStartSource = Literal["cli", "web_ui", "automation", "unknown"]
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
 _NOTIFICATION_LOOP: AbstractEventLoop | None = None
+_NOTIFICATION_TASK_CAPACITY = 1000
+_NOTIFICATION_CALLBACK_CAPACITY = 4
+_NOTIFICATION_CALLBACK_TIMEOUT_SECONDS = 1.0
+_NOTIFICATION_TASKS: set[asyncio.Task[None]] = set()
+_NOTIFICATION_CALLBACK_SLOTS = threading.BoundedSemaphore(
+    _NOTIFICATION_CALLBACK_CAPACITY
+)
 
 
 def _try_import_sgxt() -> ModuleType | None:
@@ -103,8 +112,9 @@ def set_notification_loop(loop: AbstractEventLoop) -> None:
     """Set the event loop used to dispatch extension notifications.
 
     SuperLink owns one FastAPI event loop while its synchronous gRPC handlers
-    run in worker threads. Scheduling onto that loop keeps optional extension
-    work out of both API request paths without creating another worker thread.
+    run in worker threads. Scheduling onto that loop provides the lifecycle
+    boundary; synchronous extension callbacks are then isolated in a bounded
+    set of daemon callback threads so they cannot block the event loop.
     """
     global _NOTIFICATION_LOOP  # pylint: disable=global-statement
     _NOTIFICATION_LOOP = loop
@@ -114,6 +124,9 @@ def clear_notification_loop() -> None:
     """Clear the event loop used for extension notification dispatch."""
     global _NOTIFICATION_LOOP  # pylint: disable=global-statement
     _NOTIFICATION_LOOP = None
+    for task in _NOTIFICATION_TASKS:
+        task.cancel()
+    _NOTIFICATION_TASKS.clear()
 
 
 def _invoke_extension(
@@ -128,7 +141,9 @@ def _invoke_extension(
             return
         callback = cast(Callable[..., None] | None, getattr(sgxt, callback_name, None))
         if callback is not None:
-            callback(*callback_args)
+            # Take the snapshot at the final dispatch boundary so importing an
+            # extension and copying a mutable Run never happens on an API path.
+            callback(*deepcopy(callback_args))
     except Exception as exc:  # pylint: disable=broad-exception-caught
         log(
             WARNING,
@@ -137,6 +152,65 @@ def _invoke_extension(
             type(exc).__name__,
             exc_info=exc,
         )
+
+
+async def _dispatch_extension(
+    callback_name: str,
+    callback_args: tuple[Any, ...],
+    label: str,
+) -> None:
+    """Run a synchronous callback without blocking the service event loop."""
+    if not _NOTIFICATION_CALLBACK_SLOTS.acquire(blocking=False):
+        log(WARNING, "%s extension notification capacity is exhausted.", label)
+        return
+
+    loop = asyncio.get_running_loop()
+    completed = asyncio.Event()
+
+    def invoke_callback() -> None:
+        try:
+            _invoke_extension(callback_name, callback_args, label)
+        finally:
+            _NOTIFICATION_CALLBACK_SLOTS.release()
+            loop.call_soon_threadsafe(completed.set)
+
+    callback_thread = threading.Thread(  # pylint: disable=consider-using-with
+        target=invoke_callback,
+        name="superlink-extension-callback",
+        daemon=True,
+    )
+    try:
+        callback_thread.start()
+    except Exception:  # pylint: disable=broad-exception-caught
+        _NOTIFICATION_CALLBACK_SLOTS.release()
+        log(WARNING, "%s extension notification could not start.", label)
+        return
+
+    try:
+        await asyncio.wait_for(
+            completed.wait(), timeout=_NOTIFICATION_CALLBACK_TIMEOUT_SECONDS
+        )
+    except TimeoutError:
+        log(
+            WARNING,
+            "%s extension notification timed out after %.1f seconds.",
+            label,
+            _NOTIFICATION_CALLBACK_TIMEOUT_SECONDS,
+        )
+
+
+def _schedule_extension(
+    callback_name: str,
+    callback_args: tuple[Any, ...],
+    label: str,
+) -> None:
+    """Schedule one bounded extension task on the service event loop."""
+    if len(_NOTIFICATION_TASKS) >= _NOTIFICATION_TASK_CAPACITY:
+        log(WARNING, "%s extension notification queue is full.", label)
+        return
+    task = asyncio.create_task(_dispatch_extension(callback_name, callback_args, label))
+    _NOTIFICATION_TASKS.add(task)
+    task.add_done_callback(_NOTIFICATION_TASKS.discard)
 
 
 def _notify_extension(
@@ -149,7 +223,7 @@ def _notify_extension(
     if loop is not None and loop.is_running():
         try:
             loop.call_soon_threadsafe(
-                _invoke_extension, callback_name, callback_args, label
+                _schedule_extension, callback_name, callback_args, label
             )
             return
         except RuntimeError:
@@ -173,8 +247,4 @@ def notify_run_started(run: Run, source: RunStartSource) -> None:
     Optional extension failures are logged and ignored. Standalone callers
     without a configured loop must provide their own non-blocking boundary.
     """
-    _notify_extension(
-        "on_run_started",
-        (deepcopy(run), source),
-        "Run-started",
-    )
+    _notify_extension("on_run_started", (run, source), "Run-started")

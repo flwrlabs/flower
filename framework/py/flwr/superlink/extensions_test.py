@@ -15,6 +15,7 @@
 """Tests for optional SuperLink extensions."""
 
 import asyncio
+import threading
 from types import ModuleType
 from unittest.mock import Mock
 
@@ -48,7 +49,13 @@ def test_notify_run_started_uses_existing_event_loop(
     run = Run.create_empty(42)
     extension = ModuleType("test_extension")
     callback = Mock()
-    extension.on_run_started = callback  # type: ignore[attr-defined]
+    completed = threading.Event()
+
+    def on_run_started(*args: object) -> None:
+        callback(*args)
+        completed.set()
+
+    extension.on_run_started = on_run_started  # type: ignore[attr-defined]
     monkeypatch.setattr(extensions, "_try_import_sgxt", lambda: extension)
     loop = asyncio.new_event_loop()
     extensions.set_notification_loop(loop)
@@ -58,9 +65,13 @@ def test_notify_run_started_uses_existing_event_loop(
         async def notify_from_running_loop() -> None:
             extensions.notify_run_started(run, "unknown")
             callback.assert_not_called()
-            await asyncio.sleep(0)
+            for _ in range(100):
+                if completed.is_set():
+                    break
+                await asyncio.sleep(0.01)
 
         loop.run_until_complete(notify_from_running_loop())
+        assert completed.is_set()
         callback.assert_called_once_with(run, "unknown")
     finally:
         extensions.clear_notification_loop()
