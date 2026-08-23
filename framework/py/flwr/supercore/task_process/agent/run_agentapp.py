@@ -300,7 +300,7 @@ def _set_runtime_environment(
     runtime_api_address: str,
     token: str,
     insecure: bool,
-    root_certificates_path: str | None = None,
+    root_certificates_path: str | None,
 ) -> None:
     """Expose the Open Responses-compatible Runtime endpoint to the AgentApp."""
     scheme = "http" if insecure else "https"

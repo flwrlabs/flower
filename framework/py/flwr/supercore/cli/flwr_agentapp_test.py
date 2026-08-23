@@ -16,6 +16,7 @@
 
 
 import importlib
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -134,7 +135,8 @@ def test_flwr_agentapp_forwards_cli_args() -> None:
 def test_flwr_agentapp_forwards_explicit_root_certificates_path(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Forward the resolved Runtime root certificate path."""
+    """Forward the resolved Runtime root certificate path to the runtime."""
+    monkeypatch.setenv("SSL_CERT_FILE", "inherited-ca.pem")
     certificate_path = tmp_path / "runtime-ca.pem"
     certificate_path.write_bytes(b"root-certificates")
     monkeypatch.chdir(tmp_path)
@@ -160,6 +162,7 @@ def test_flwr_agentapp_forwards_explicit_root_certificates_path(
     ):
         flwr_agentapp_module.flwr_agentapp()
 
+    assert os.environ["SSL_CERT_FILE"] == "inherited-ca.pem"
     assert run_agentapp.call_args.kwargs["certificates_path"] == str(
         certificate_path.resolve()
     )
