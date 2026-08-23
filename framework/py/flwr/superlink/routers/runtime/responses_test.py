@@ -393,7 +393,7 @@ def test_responses_stops_and_drains_when_stream_is_cancelled() -> None:
             _Exchange(agent_task_id=123, model_task_id=456, run_id=789),
         )
         with patch("flwr.superlink.routers.runtime.responses._POLL_INTERVAL", new=10):
-            next_event = asyncio.create_task(anext(stream))
+            next_event = asyncio.ensure_future(anext(stream))
             await asyncio.wait_for(wait_until_polled(), timeout=1)
             next_event.cancel()
             with pytest.raises(asyncio.CancelledError):
