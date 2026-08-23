@@ -160,7 +160,9 @@ async def _dispatch_extension(
     label: str,
 ) -> None:
     """Run a synchronous callback without blocking the service event loop."""
-    if not _NOTIFICATION_CALLBACK_SLOTS.acquire(blocking=False):
+    if not _NOTIFICATION_CALLBACK_SLOTS.acquire(  # pylint: disable=consider-using-with
+        blocking=False
+    ):
         log(WARNING, "%s extension notification capacity is exhausted.", label)
         return
 
