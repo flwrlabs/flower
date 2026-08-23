@@ -38,6 +38,7 @@ SuperLinkLifespanContext = Callable[
 # gRPC or HTTP). API-created runs therefore use ``unknown`` unless a trusted
 # Flower-owned integration supplies a more specific source.
 RunStartSource = Literal["cli", "web_ui", "automation", "unknown"]
+ResultDeliveryChannel = Literal["logs", "chat"]
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
 _NOTIFICATION_LOOP: AbstractEventLoop | None = None
 _NOTIFICATION_TASK_CAPACITY = 1000
@@ -358,3 +359,19 @@ def notify_run_started(run: Run, source: RunStartSource) -> None:
     without a configured loop must provide their own non-blocking boundary.
     """
     _notify_extension("on_run_started", (run, source), "Run-started")
+
+
+def notify_result_delivered(
+    run: Run,
+    flwr_aid: str,
+    channel: ResultDeliveryChannel,
+) -> None:
+    """Notify an optional extension after a result request is accepted.
+
+    In the combined SuperLink service this uses the same event-loop dispatch as
+    run-start notifications. It records a server-side request boundary, not
+    client rendering or acknowledgement.
+    """
+    _notify_extension(
+        "on_result_delivered", (run, flwr_aid, channel), "Result-delivered"
+    )
