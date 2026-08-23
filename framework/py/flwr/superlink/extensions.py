@@ -37,7 +37,7 @@ SuperLinkLifespanContext = Callable[
 # Flower-owned integration supplies a more specific source.
 RunStartSource = Literal["cli", "web_ui", "automation", "unknown"]
 _SGXT_MODULE = "flwr.ee.superlink.extensions"
-_notification_loop: AbstractEventLoop | None = None
+_NOTIFICATION_LOOP: AbstractEventLoop | None = None
 
 
 def _try_import_sgxt() -> ModuleType | None:
@@ -106,14 +106,14 @@ def set_notification_loop(loop: AbstractEventLoop) -> None:
     run in worker threads. Scheduling onto that loop keeps optional extension
     work out of both API request paths without creating another worker thread.
     """
-    global _notification_loop  # pylint: disable=global-statement
-    _notification_loop = loop
+    global _NOTIFICATION_LOOP  # pylint: disable=global-statement
+    _NOTIFICATION_LOOP = loop
 
 
 def clear_notification_loop() -> None:
     """Clear the event loop used for extension notification dispatch."""
-    global _notification_loop  # pylint: disable=global-statement
-    _notification_loop = None
+    global _NOTIFICATION_LOOP  # pylint: disable=global-statement
+    _NOTIFICATION_LOOP = None
 
 
 def _invoke_extension(
@@ -145,7 +145,7 @@ def _notify_extension(
     label: str,
 ) -> None:
     """Dispatch one optional extension callback outside API request handlers."""
-    loop = _notification_loop
+    loop = _NOTIFICATION_LOOP
     if loop is not None and loop.is_running():
         try:
             loop.call_soon_threadsafe(
