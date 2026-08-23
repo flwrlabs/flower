@@ -1805,6 +1805,7 @@ class TestControlServicerAuth(unittest.TestCase):
         mock_run = Mock(
             federation_id=NOOP_FEDERATION_ID,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
+            primary_task_type=TaskType.AGENT_APP,
         )
         event_1 = TaskEvent(
             id=5,
