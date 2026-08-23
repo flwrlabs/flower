@@ -143,6 +143,19 @@ def create_app(
     async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[dict[str, object]]:
         """Own process-lifetime resources for the combined SuperLink service."""
         log(INFO, "FastAPI lifespan: startup")
+        superlink_startup_attempted = False
+        superlink_shutdown = False
+
+        def shutdown_superlink() -> None:
+            """Shut down resources even when startup only partially succeeds."""
+            nonlocal superlink_shutdown
+            if (
+                superlink_lifespan
+                and superlink_startup_attempted
+                and not superlink_shutdown
+            ):
+                superlink_lifespan.shutdown()
+                superlink_shutdown = True
 
         try:
             extensions.set_notification_loop(asyncio.get_running_loop())
@@ -156,17 +169,18 @@ def create_app(
                 if superlink_lifespan:
                     # Start gRPC only after extension resources are ready, so a
                     # run-start notification cannot race lifespan initialization.
+                    superlink_startup_attempted = True
                     superlink_lifespan.startup()
 
                 try:
                     yield lifespan_state
                 finally:
-                    if superlink_lifespan:
-                        superlink_lifespan.shutdown()
+                    shutdown_superlink()
                     extensions.clear_notification_loop()
         finally:
-            # Also clear the loop when extension startup itself fails before
-            # the inner shutdown block is reached.
+            # Also clean up a partially started SuperLink when startup raises
+            # before the inner shutdown block is reached.
+            shutdown_superlink()
             extensions.clear_notification_loop()
             log(INFO, "FastAPI lifespan: shutdown")
 
