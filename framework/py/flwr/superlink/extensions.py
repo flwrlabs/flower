@@ -44,9 +44,7 @@ _NOTIFICATION_TASK_CAPACITY = 1000
 _NOTIFICATION_CALLBACK_CAPACITY = 4
 _NOTIFICATION_CALLBACK_TIMEOUT_SECONDS = 1.0
 _NOTIFICATION_TASKS: set[asyncio.Task[None]] = set()
-_NOTIFICATION_CALLBACK_SLOTS = threading.BoundedSemaphore(
-    _NOTIFICATION_CALLBACK_CAPACITY
-)
+_NOTIFICATION_CALLBACK_SLOTS = asyncio.Semaphore(_NOTIFICATION_CALLBACK_CAPACITY)
 
 
 def _try_import_sgxt() -> ModuleType | None:
@@ -160,11 +158,9 @@ async def _dispatch_extension(
     label: str,
 ) -> None:
     """Run a synchronous callback without blocking the service event loop."""
-    if not _NOTIFICATION_CALLBACK_SLOTS.acquire(  # pylint: disable=consider-using-with
-        blocking=False
-    ):
-        log(WARNING, "%s extension notification capacity is exhausted.", label)
-        return
+    # Pending tasks wait here, up to _NOTIFICATION_TASK_CAPACITY, instead of
+    # dropping notifications merely because all callback slots are busy.
+    await _NOTIFICATION_CALLBACK_SLOTS.acquire()
 
     loop = asyncio.get_running_loop()
     completed = asyncio.Event()
@@ -173,8 +169,12 @@ async def _dispatch_extension(
         try:
             _invoke_extension(callback_name, callback_args, label)
         finally:
-            _NOTIFICATION_CALLBACK_SLOTS.release()
-            loop.call_soon_threadsafe(completed.set)
+
+            def callback_done() -> None:
+                _NOTIFICATION_CALLBACK_SLOTS.release()
+                completed.set()
+
+            loop.call_soon_threadsafe(callback_done)
 
     callback_thread = threading.Thread(  # pylint: disable=consider-using-with
         target=invoke_callback,
