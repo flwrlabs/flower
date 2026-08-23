@@ -173,7 +173,12 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         ]
         for termination_event in termination_events:
             if not termination_event.wait(timeout=1.0):
-                log(WARN, "A SuperLink gRPC server did not terminate within 1 second.")
+                log(
+                    WARN,
+                    "A SuperLink gRPC server did not terminate within 1 second; "
+                    "waiting for termination before teardown.",
+                )
+                termination_event.wait()
 
         if self.superexec_process is not None:
             self.superexec_process.terminate()
