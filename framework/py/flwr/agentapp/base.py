@@ -43,18 +43,6 @@ class AgentResponses(ABC):
         """
 
 
-class AgentEvents(ABC):
-    """AgentApp-controlled publication of frontend-visible run events."""
-
-    @abstractmethod
-    def publish(self, event: JSONObject) -> None:
-        """Queue one event for publication to run-event subscribers."""
-
-    @abstractmethod
-    def flush(self) -> None:
-        """Wait until all queued events have been persisted."""
-
-
 class AgentConnectors(ABC):
     """Abstract base class for AgentApp connector execution."""
 
@@ -65,6 +53,14 @@ class AgentConnectors(ABC):
     @abstractmethod
     def call(self, tool_call: JSONObject) -> JSONObject:
         """Execute one model function_call and return a function_call_output item."""
+
+
+class AgentEvents(ABC):
+    """Abstract base class for AgentApp run events."""
+
+    @abstractmethod
+    def emit(self, event: JSONObject) -> None:
+        """Emit one structured run event."""
 
 
 class AgentSession(ABC):
@@ -83,7 +79,7 @@ class AgentSession(ABC):
     @property
     @abstractmethod
     def events(self) -> AgentEvents:
-        """Frontend-visible run-event publication API."""
+        """Frontend-visible structured run event API."""
 
 
 AgentAppCallable = Callable[[AgentSession, Context], None]

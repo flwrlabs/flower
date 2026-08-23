@@ -85,13 +85,13 @@ class RuntimeAgentEvents(AgentEvents):
         )
         self._worker.start()
 
-    def publish(self, event: JSONObject) -> None:
+    def emit(self, event: JSONObject) -> None:
         """Queue one event for publication to run-event subscribers."""
         if self._closed:
             raise RuntimeError("Agent event publisher is closed.")
         event_type = event.get("type")
         if not isinstance(event_type, str) or not event_type:
-            raise ValueError("Published events require a non-empty string 'type'.")
+            raise ValueError("Run event requires a non-empty string 'type' field.")
         self._raise_worker_error()
         self._queue.put(dict(event))
         self._raise_worker_error()
@@ -190,7 +190,7 @@ class RuntimeAgentSession(AgentSession):
 
     @property
     def events(self) -> AgentEvents:
-        """Frontend-visible run-event publication API."""
+        """Frontend-visible structured run event API."""
         return self._events
 
 

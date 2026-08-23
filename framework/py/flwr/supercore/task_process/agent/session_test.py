@@ -15,8 +15,9 @@
 """Runtime AgentApp session tests."""
 
 
-import json
 from unittest.mock import Mock, patch
+
+import pytest
 
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -29,7 +30,9 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
+    PushTaskEventsRequest,
 )
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
@@ -42,22 +45,33 @@ from flwr.supercore.typing import JSONObject
 from .session import RuntimeAgentConnectors, RuntimeAgentEvents, RuntimeAgentResponses
 
 
-def test_runtime_agent_events_publishes_selected_event() -> None:
-    """Publish only the event explicitly selected by AgentApp code."""
+def test_emit_event_pushes_task_event() -> None:
+    """Emit should translate a structured run event to the Runtime API."""
     stub = Mock()
     events = RuntimeAgentEvents(stub)
 
-    events.publish({"type": "response.output_text.delta", "delta": "Hello"})
-    events.flush()
+    events.emit({"type": "response.output_text.delta", "delta": "Hello"})
     events.close()
 
-    request = stub.PushTaskEvents.call_args.args[0]
-    assert len(request.events) == 1
-    assert request.events[0].event == "response.output_text.delta"
-    assert json.loads(request.events[0].data) == {
-        "type": "response.output_text.delta",
-        "delta": "Hello",
-    }
+    event = TaskEvent(
+        event="response.output_text.delta",
+        data=('{"type":"response.output_text.delta","delta":"Hello"}'),
+    )
+    stub.PushTaskEvents.assert_called_once_with(PushTaskEventsRequest(events=[event]))
+
+
+def test_emit_event_requires_type() -> None:
+    """Emit should reject events without a valid type."""
+    stub = Mock()
+    events = RuntimeAgentEvents(stub)
+
+    with pytest.raises(
+        ValueError, match="Run event requires a non-empty string 'type' field"
+    ):
+        events.emit({"message": "Hello"})
+    events.close()
+
+    stub.PushTaskEvents.assert_not_called()
 
 
 def test_pull_task_messages_filters_by_child_task() -> None:

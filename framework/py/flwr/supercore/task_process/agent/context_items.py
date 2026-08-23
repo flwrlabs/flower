@@ -29,9 +29,10 @@ JSON_KEY = "json"
 
 def append_items(context: Context, new_items: list[JSONObject]) -> None:
     """Append OpenResponses items to ``context.state``."""
-    # Initialize the items storage if it doesn't exist yet
-    record = context.state.setdefault(ITEMS_KEY, ConfigRecord({JSON_KEY: []}))
-    items = cast(list[str], record[JSON_KEY])
+    with context.locked():
+        # Initialize the items storage if it doesn't exist yet
+        record = context.state.setdefault(ITEMS_KEY, ConfigRecord({JSON_KEY: []}))
+        items = cast(list[str], record[JSON_KEY])
 
-    # Add the new items to the list
-    items.extend(strict_json_dumps(item, compact=True) for item in new_items)
+        # Add the new items to the list
+        items.extend(strict_json_dumps(item, compact=True) for item in new_items)
