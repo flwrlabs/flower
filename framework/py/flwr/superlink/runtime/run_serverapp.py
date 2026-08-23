@@ -19,7 +19,7 @@ from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
 
-import grpc
+import httpx
 
 from flwr.app.exception import AppExitException
 from flwr.app.message import Context, RecordDict
@@ -32,7 +32,6 @@ from flwr.common.config import (
     get_project_dir,
 )
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
-from flwr.common.logger import flush_logs, log, start_log_uploader, stop_log_uploader
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -45,16 +44,18 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputRequest,
 )
 from flwr.server.run_serverapp import run as run_
+from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
+from flwr.supercore.logger import flush_logs, start_log_uploader, stop_log_uploader
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
 from flwr.supercore.telemetry import EventType, event
-from flwr.superlink.grid import GrpcGrid
+from flwr.superlink.grid import HttpGrid
 
 
 def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
@@ -71,8 +72,8 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
 
-    # Initialize the GrpcGrid
-    grid = GrpcGrid(
+    # Initialize the Runtime HTTP Grid
+    grid = HttpGrid(
         runtime_api_address=runtime_api_address,
         insecure=insecure,
         root_certificates=certificates,
@@ -93,7 +94,7 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     def on_exit() -> None:
         log(DEBUG, "[flwr-serverapp] Will push ServerApp task output")
 
-        # Set Grpc max retries to 1 to avoid blocking on exit
+        # Limit Runtime HTTP retries to avoid blocking on exit
         grid._retry_invoker.max_tries = 1
 
         # Upload any remaining logs before pushing final output
@@ -107,8 +108,8 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             details=details,
         )
         try:
-            grid._stub.PushTaskOutput(pushoutput_req)
-        except grpc.RpcError as err:
+            grid._runtime_client.PushTaskOutput(pushoutput_req)
+        except httpx.HTTPError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
 
         # Stop log uploader for this run and upload final logs
@@ -119,7 +120,7 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         if heartbeat_sender and heartbeat_sender.is_running:
             heartbeat_sender.stop()
 
-        # Close the Grpc connection
+        # Close the Runtime HTTP connection
         grid.close()
 
         # Clean up run-scoped runtime environment, if any.
@@ -134,13 +135,15 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
 
     try:
         # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(grid._stub))
+        heartbeat_sender = HeartbeatSender(
+            make_task_heartbeat_fn_http(grid._runtime_client)
+        )
         heartbeat_sender.start()
 
         # Pull task input from SuperLink
         log(DEBUG, "[flwr-serverapp] Pull task input")
         req = PullTaskInputRequest()
-        res: PullTaskInputResponse = grid._stub.PullTaskInput(req)
+        res: PullTaskInputResponse = grid._runtime_client.PullTaskInput(req)
 
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
@@ -155,7 +158,7 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             log_queue=log_queue,
             node_id=0,
             run_id=run.run_id,
-            stub=grid._stub,
+            client=grid._runtime_client,
         )
 
         log(DEBUG, "[flwr-serverapp] Start FAB installation.")

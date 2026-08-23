@@ -30,7 +30,7 @@ import tomli
 import tomli_w
 import typer
 
-from flwr.common.config import check_pattern_list_value
+from flwr.common.config import check_pattern_list_value, validate_config
 from flwr.common.constant import (
     FAB_CONFIG_FILE,
     FAB_DATE,
@@ -49,6 +49,7 @@ from flwr.supercore.fab_format_version import (
 
 from .config_utils import load_and_validate
 from .utils import (
+    AppPathDepthError,
     build_pathspec,
     collect_files,
     filter_paths_for_publish,
@@ -162,6 +163,8 @@ def build(
     # Build FAB
     try:
         fab_bytes = build_fab_from_disk(app)
+    except AppPathDepthError as err:
+        raise err.to_click_exception() from None
     except ValueError as e:
         raise click.ClickException(str(e)) from None
 
@@ -263,6 +266,12 @@ def build_fab_from_files(
     pyproject_content = _to_bytes(files[FAB_CONFIG_FILE])
     config = tomli.loads(pyproject_content.decode("utf-8"))
     validate_project_name(_get_project_name(config), "The Flower App [project].name")
+    is_valid, errors, _ = validate_config(config, check_module=False)
+    if not is_valid:
+        raise ValueError(
+            "Invalid Flower App configuration:\n"
+            + "\n".join([f"- {line}" for line in errors])
+        )
     metadata = normalize_and_validate_fab_format(config)
 
     # Remove the 'federations' field if it exists

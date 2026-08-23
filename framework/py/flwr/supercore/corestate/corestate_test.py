@@ -45,6 +45,7 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorRecord
 
 from . import CoreState
@@ -85,6 +86,79 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         mock_datetime.now.side_effect = timestamps
         return stack
+
+    def test_store_list_and_delete_apps(self) -> None:
+        """Federation apps can be stored, listed, limited, and deleted."""
+        state = self.state_factory()
+
+        server_hash = state.store_app(
+            fab=Fab("", b"server", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-a",
+        )
+        agent_hash = state.store_app(
+            fab=Fab("", b"agent", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/z-agent",
+            app_type=TaskType.AGENT_APP,
+            added_by="account-a",
+        )
+        state.store_app(
+            fab=Fab("", b"other", {}),
+            federation_id="@me/fed-b",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-b",
+        )
+
+        apps = state.list_apps("@me/fed-a")
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type) for app in apps],
+            [
+                ("@me/z-agent", agent_hash, TaskType.AGENT_APP),
+                ("@me/server", server_hash, TaskType.SERVER_APP),
+            ],
+        )
+        self.assertEqual(
+            state.get_app("@me/fed-a", "@me/server", server_hash),
+            Fab(server_hash, b"server", {}),
+        )
+        self.assertIsNone(state.get_app("@me/fed-b", "@me/server", server_hash))
+        self.assertIsNone(state.get_app("@me/fed-a", "@me/z-agent", server_hash))
+        self.assertEqual(
+            [app.app_id for app in state.list_apps("@me/fed-a", limit=1)],
+            ["@me/z-agent"],
+        )
+        self.assertEqual(state.list_apps("@me/fed-a", limit=0), [])
+        with self.assertRaises(AssertionError):
+            state.list_apps("@me/fed-a", limit=-1)
+
+        updated_hash = state.store_app(
+            fab=Fab("", b"updated", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-c",
+        )
+        updated = state.list_apps("@me/fed-a")
+        self.assertEqual(len(updated), 2)
+        self.assertEqual(updated[1].fab_hash, updated_hash)
+        self.assertIsNone(state.get_app("@me/fed-a", "@me/server", server_hash))
+        self.assertIsNotNone(state.get_app("@me/fed-a", "@me/server", updated_hash))
+
+        self.assertTrue(state.delete_app("@me/fed-a", "@me/server"))
+        self.assertFalse(state.delete_app("@me/fed-a", "@me/server"))
+        self.assertEqual(
+            [app.app_id for app in state.list_apps("@me/fed-a")],
+            ["@me/z-agent"],
+        )
+        self.assertEqual(
+            [app.app_id for app in state.list_apps("@me/fed-b")],
+            ["@me/server"],
+        )
+        self.assertIsNotNone(state.get_fab(updated_hash))
 
     def test_connector_upsert_get_and_delete(self) -> None:
         """A connector can be created, updated, retrieved, and deleted."""
@@ -526,6 +600,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         series_id = state.store_run_in_series(
             run_id=123,
             federation_id="@me/fed-a",
+            is_agent=True,
             series_id=None,
             description="Initial description",
         )
@@ -537,6 +612,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state.store_run_in_series(
                 run_id=456,
                 federation_id="@me/fed-a",
+                is_agent=False,
                 series_id=series_id,
                 description="Replacement description",
             ),
@@ -544,6 +620,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         run_series = state.get_run_series(series_ids=[series_id])
         self.assertEqual(run_series[0].description, "Initial description")
+        self.assertEqual(state.get_run_series(is_agent=True), run_series)
+        self.assertEqual(state.get_run_series(is_agent=False), [])
 
     def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
         """Unknown caller-provided run series IDs return None."""
@@ -553,6 +631,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             series_id = state.store_run_in_series(
                 run_id=123,
                 federation_id="@me/fed-a",
+                is_agent=False,
                 series_id=123,
             )
 
@@ -563,13 +642,17 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Storing the same run ID twice should return None."""
         state = self.state_factory()
         series_id = state.store_run_in_series(
-            run_id=123, federation_id="@me/fed-a", series_id=None
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=False,
+            series_id=None,
         )
         assert series_id is not None
 
         stored = state.store_run_in_series(
             run_id=123,
             federation_id="@me/fed-a",
+            is_agent=False,
             series_id=series_id,
         )
 
@@ -579,13 +662,22 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """RunSeries lookup should filter by series IDs and federation IDs."""
         state = self.state_factory()
         series_id_a = state.store_run_in_series(
-            run_id=123, federation_id="@me/fed-a", series_id=None
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=False,
+            series_id=None,
         )
         series_id_b = state.store_run_in_series(
-            run_id=456, federation_id="@me/fed-b", series_id=None
+            run_id=456,
+            federation_id="@me/fed-b",
+            is_agent=False,
+            series_id=None,
         )
         series_id_c = state.store_run_in_series(
-            run_id=789, federation_id="@me/fed-a", series_id=None
+            run_id=789,
+            federation_id="@me/fed-a",
+            is_agent=False,
+            series_id=None,
         )
         assert series_id_a is not None
         assert series_id_b is not None
@@ -1627,6 +1719,39 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(pulled_next), 1)
         self.assertEqual(pulled[0].metadata.message_id, msg_1.metadata.message_id)
         self.assertEqual(pulled_next[0].metadata.message_id, msg_2.metadata.message_id)
+
+    def test_get_task_message_filters_by_source_task(self) -> None:
+        """A source-specific claim should not consume another task's message."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        src_task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert (
+            src_task_id_1 is not None
+            and src_task_id_2 is not None
+            and dst_task_id is not None
+        )
+        reply_1 = create_task_message(src_task_id_1, dst_task_id, run_id)
+        reply_2 = create_task_message(src_task_id_2, dst_task_id, run_id)
+        self.assertTrue(state.store_task_message(reply_1))
+        self.assertTrue(state.store_task_message(reply_2))
+
+        pulled_2 = state.get_task_message(
+            dst_task_ids=[dst_task_id],
+            src_task_ids=[src_task_id_2],
+            limit=1,
+            order_by="created_at",
+        )
+        pulled_1 = state.get_task_message(
+            dst_task_ids=[dst_task_id],
+            src_task_ids=[src_task_id_1],
+            limit=1,
+            order_by="created_at",
+        )
+
+        self.assertEqual(pulled_2[0].metadata.message_id, reply_2.metadata.message_id)
+        self.assertEqual(pulled_1[0].metadata.message_id, reply_1.metadata.message_id)
 
     def test_store_and_get_task_events(self) -> None:
         """Task events should round-trip in assigned ID order."""

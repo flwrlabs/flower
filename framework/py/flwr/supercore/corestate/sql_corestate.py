@@ -54,10 +54,13 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.logger import log
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
-from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AppInfo,
+    Automation,
+    StartRunRequest,
+)
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
@@ -70,6 +73,7 @@ from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskStatus,
     TaskUsage,
 )
+from flwr.supercore import log
 from flwr.supercore.constant import OBJECT_PUSH_SESSION_TTL_SECONDS, AutomationStatus
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
@@ -80,6 +84,9 @@ from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.corestate_models import (
+    FederationApp as FederationAppModel,
+)
 from flwr.supercore.state.schema.corestate_models import NonceStore as NonceStoreModel
 from flwr.supercore.state.schema.corestate_models import (
     ObjectPushSession as ObjectPushSessionModel,
@@ -409,6 +416,61 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             session.execute(stmt)
         return fab_hash
 
+    def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        fab: Fab,
+        federation_id: str,
+        app_id: str,
+        app_type: str,
+        added_by: str,
+    ) -> str:
+        """Atomically store a FAB and associate its app with a federation."""
+        if not all((federation_id, app_id, app_type, added_by)):
+            raise ValueError(
+                "Federation ID, app ID, app type, and added by are required"
+            )
+        fab_hash = hashlib.sha256(fab.content).hexdigest()
+        if fab.hash_str and fab.hash_str != fab_hash:
+            raise ValueError(
+                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+            )
+        # Keep launch behavior: last write wins for metadata under the same
+        # content hash.
+        fab_stmt = self.dialect_insert(FabModel).values(
+            fab_hash=fab_hash,
+            content=fab.content,
+            verifications=json.dumps(fab.verifications),
+        )
+        fab_stmt = fab_stmt.on_conflict_do_update(
+            index_elements=[FabModel.fab_hash],
+            set_={
+                "content": fab_stmt.excluded.content,
+                "verifications": fab_stmt.excluded.verifications,
+            },
+        )
+        app_stmt = self.dialect_insert(FederationAppModel).values(
+            federation_id=federation_id,
+            app_id=app_id,
+            fab_hash=fab_hash,
+            app_type=app_type,
+            added_by=added_by,
+            added_at=now(),
+        )
+        app_stmt = app_stmt.on_conflict_do_update(
+            index_elements=[
+                FederationAppModel.federation_id,
+                FederationAppModel.app_id,
+            ],
+            set_={
+                "fab_hash": app_stmt.excluded.fab_hash,
+                "app_type": app_stmt.excluded.app_type,
+            },
+        )
+        with self.session() as session:
+            session.execute(fab_stmt)
+            session.execute(app_stmt)
+        return fab_hash
+
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
         with self.session() as session:
@@ -422,6 +484,80 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 content=row.content,
                 verifications=json.loads(row.verifications),
             )
+
+    def get_app(self, federation_id: str, app_id: str, fab_hash: str) -> Fab | None:
+        """Return a FAB only when it matches the federation-app association."""
+        if not all((federation_id, app_id, fab_hash)):
+            return None
+        query = (
+            select(FabModel)
+            .join(
+                FederationAppModel,
+                FederationAppModel.fab_hash == FabModel.fab_hash,
+            )
+            .where(
+                FederationAppModel.federation_id == federation_id,
+                FederationAppModel.app_id == app_id,
+                FederationAppModel.fab_hash == fab_hash,
+            )
+        )
+        with self.session() as session:
+            row = session.scalar(query.execution_options(populate_existing=True))
+            if row is None:
+                return None
+            return Fab(
+                hash_str=row.fab_hash,
+                content=row.content,
+                verifications=json.loads(row.verifications),
+            )
+
+    def list_apps(
+        self, federation_id: str, limit: int | None = None
+    ) -> Sequence[AppInfo]:
+        """List apps associated with a federation, newest first."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if not federation_id or limit == 0:
+            return []
+        query = (
+            select(
+                FederationAppModel.app_id,
+                FederationAppModel.fab_hash,
+                FederationAppModel.app_type,
+            )
+            .where(FederationAppModel.federation_id == federation_id)
+            .order_by(
+                FederationAppModel.added_at.desc(),
+                FederationAppModel.app_id.desc(),
+            )
+        )
+        if limit is not None:
+            query = query.limit(limit)
+        with self.session() as session:
+            apps = session.execute(query).all()
+            return [
+                AppInfo(
+                    app_id=app.app_id,
+                    fab_hash=app.fab_hash,
+                    app_type=app.app_type,
+                )
+                for app in apps
+            ]
+
+    def delete_app(self, federation_id: str, app_id: str) -> bool:
+        """Delete one federation-app association; its FAB remains in state."""
+        if not federation_id or not app_id:
+            return False
+        with self.session() as session:
+            deleted_app_id = session.scalar(
+                delete(FederationAppModel)
+                .where(
+                    FederationAppModel.federation_id == federation_id,
+                    FederationAppModel.app_id == app_id,
+                )
+                .returning(FederationAppModel.app_id)
+            )
+            return deleted_app_id is not None
 
     def upsert_connector(
         self,
@@ -592,11 +728,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return updated_oauth_session_id is not None
 
-    def get_run_series(  # pylint: disable=R0914
+    def get_run_series(  # pylint: disable=R0913,R0914
         self,
         *,
         series_ids: Sequence[int] | None = None,
         federation_ids: Sequence[str] | None = None,
+        is_agent: bool | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
@@ -621,6 +758,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             page_query = page_query.where(
                 RunSeriesModel.federation_id.in_(federation_ids)
             )
+        if is_agent is not None:
+            page_query = page_query.where(RunSeriesModel.is_agent.is_(is_agent))
         if updated_before is not None:
             page_query = page_query.where(
                 RunSeriesModel.updated_at < datetime.fromisoformat(updated_before)
@@ -685,10 +824,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             session.execute(stmt)
 
-    def store_run_in_series(
+    def store_run_in_series(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         run_id: int,
         federation_id: str,
+        is_agent: bool,
         series_id: int | None,
         description: str | None = None,
     ) -> int | None:
@@ -704,6 +844,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         .values(
                             series_id=uint64_to_int64(candidate),
                             federation_id=federation_id,
+                            is_agent=is_agent,
                             description=description,
                             created_at=timestamp,
                             updated_at=timestamp,
@@ -1395,6 +1536,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
+        src_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
         order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
@@ -1407,11 +1549,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return []
         if dst_task_ids is not None and not dst_task_ids:
             return []
+        if src_task_ids is not None and not src_task_ids:
+            return []
 
         with self.session():
             self._cleanup_expired_task_tokens()
             self._cleanup_invalid_task_messages()
-            rows = self._claim_task_message_models(dst_task_ids, order_by, limit)
+            rows = self._claim_task_message_models(
+                dst_task_ids, src_task_ids, order_by, limit
+            )
             snapshots = [_task_message_snapshot_from_model(row) for row in rows]
         return [_task_message_from_snapshot(row) for row in snapshots]
 
@@ -1461,7 +1607,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         if run_id is not None:
             query = query.where(TaskEventModel.run_id == uint64_to_int64(run_id))
-
         with self.session() as session:
             rows = session.scalars(query).all()
             return [_task_event_from_model(row) for row in rows]
@@ -1469,6 +1614,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def _claim_task_message_models(
         self,
         dst_task_ids: Sequence[int] | None,
+        src_task_ids: Sequence[int] | None,
         order_by: Literal["created_at"] | None,
         limit: int | None,
     ) -> list[TaskMessageModel]:
@@ -1479,6 +1625,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if dst_task_ids is not None:
             sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
             query = query.where(TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids))
+        if src_task_ids is not None:
+            sint64_src_task_ids = [uint64_to_int64(t) for t in src_task_ids]
+            query = query.where(TaskMessageModel.src_task_id.in_(sint64_src_task_ids))
         if order_by is not None:
             query = query.order_by(TaskMessageModel.created_at.asc())
         if limit is not None:
@@ -1504,6 +1653,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
                 delete_query = delete_query.where(
                     TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids)
+                )
+            if src_task_ids is not None:
+                sint64_src_task_ids = [uint64_to_int64(t) for t in src_task_ids]
+                delete_query = delete_query.where(
+                    TaskMessageModel.src_task_id.in_(sint64_src_task_ids)
                 )
 
         returning_query = delete_query.returning(TaskMessageModel)

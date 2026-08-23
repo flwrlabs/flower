@@ -24,7 +24,7 @@ from typing import Literal, cast
 
 from google.protobuf.json_format import ParseDict
 
-from flwr.agentapp import AgentConnectors, AgentResponses, AgentSession
+from flwr.agentapp import AgentConnectors, AgentEvents, AgentResponses, AgentSession
 from flwr.app import Context, Message
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -37,7 +37,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskEventsRequest,
     PushTaskMessageRequest,
 )
-from flwr.proto.runtime_pb2_grpc import RuntimeStub  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
@@ -45,6 +44,7 @@ from flwr.supercore.json_message.connector_message import (
     ConnectorResponse,
 )
 from flwr.supercore.json_message.model_message import ModelRequest, ModelResponse
+from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
@@ -64,9 +64,15 @@ _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
 class RuntimeAgentSession(AgentSession):
     """AgentSession bound to one AgentApp task."""
 
-    def __init__(self, responses: AgentResponses, connectors: AgentConnectors) -> None:
+    def __init__(
+        self,
+        responses: AgentResponses,
+        connectors: AgentConnectors,
+        events: AgentEvents,
+    ) -> None:
         self._responses = responses
         self._connectors = connectors
+        self._events = events
 
     @property
     def responses(self) -> AgentResponses:
@@ -77,6 +83,29 @@ class RuntimeAgentSession(AgentSession):
     def connectors(self) -> AgentConnectors:
         """Connector tool schema and execution API."""
         return self._connectors
+
+    @property
+    def events(self) -> AgentEvents:
+        """Structured run event API."""
+        return self._events
+
+
+class RuntimeAgentEvents(AgentEvents):
+    """AgentEvents implementation backed by Runtime task events."""
+
+    def __init__(self, stub: RuntimeHttpClient) -> None:
+        self._stub = stub
+
+    def emit(self, event: JSONObject) -> None:
+        """Emit one structured run event."""
+        event_type = event.get("type")
+        if not isinstance(event_type, str) or not event_type:
+            raise ValueError("Run event requires a non-empty string 'type' field.")
+        task_event = TaskEvent(
+            event=event_type,
+            data=strict_json_dumps(event, compact=True),
+        )
+        self._stub.PushTaskEvents(PushTaskEventsRequest(events=[task_event]))
 
 
 class RuntimeAgentConnectors(AgentConnectors):
@@ -117,7 +146,7 @@ class RuntimeAgentResponses(AgentResponses):
     def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
-        stub: RuntimeStub,
+        stub: RuntimeHttpClient,
         run_id: int,
         task_id: int,
         context: Context,
@@ -359,17 +388,23 @@ class RuntimeAgentResponses(AgentResponses):
             PushTaskMessageRequest(message=message_to_proto(message))
         )
 
-    def _pull_task_messages(self) -> list[Message]:
-        """Pull pending task messages."""
-        res = self._stub.PullTaskMessage(PullTaskMessageRequest(limit=1))
+    def _pull_task_messages(self, src_task_id: int) -> list[Message]:
+        """Pull pending task messages from one child task."""
+        res = self._stub.PullTaskMessage(
+            PullTaskMessageRequest(limit=1, src_task_id=src_task_id)
+        )
         return [message_from_proto(msg) for msg in res.messages]
 
     def _send_and_receive(self, message: Message) -> Message:
-        """Send one message and wait for its direct reply.
+        """Send one message and wait for its destination child task's direct reply.
 
         For now, `flwr-agentapp` expects a strict one-request-one-reply exchange with
         child tasks, so any non-matching pulled message is treated as an error.
         """
+        child_task_id = message.metadata.dst_task_id
+        if child_task_id is None:
+            raise ValueError("Task message requires a destination task ID.")
+
         # Push the message to the child task
         self._push_task_message(message)
         message_id = message.metadata.message_id
@@ -377,7 +412,8 @@ class RuntimeAgentResponses(AgentResponses):
         # Pull until a message arrives that replies to the pushed message, or timeout
         deadline = time.monotonic() + _DEFAULT_MODEL_REPLY_TIMEOUT
         while True:
-            for pulled_msg in self._pull_task_messages():
+            # The request destination becomes the source of its reply.
+            for pulled_msg in self._pull_task_messages(src_task_id=child_task_id):
                 if pulled_msg.metadata.reply_to_message_id != message_id:
                     raise RuntimeError(
                         "Received a message that does not reply to the request."

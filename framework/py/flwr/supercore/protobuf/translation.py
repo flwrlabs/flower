@@ -19,19 +19,21 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import cast
 
-from fastapi import Request
+from fastapi import Depends, Request
 from fastapi.responses import Response, StreamingResponse
 from google.protobuf.message import DecodeError, Message
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
+    AddAppRequest,
     AddNodeToFederationRequest,
     ArchiveFederationRequest,
     ConfigureSimulationFederationRequest,
     CreateFederationRequest,
     CreateInvitationRequest,
     GetRunSeriesRequest,
+    ListAppsRequest,
     ListAutomationsRequest,
     ListFederationsRequest,
     ListInvitationsRequest,
@@ -41,6 +43,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RegisterNodeRequest,
     RejectInvitationRequest,
     RemoveAccountFromFederationRequest,
+    RemoveAppRequest,
     RemoveNodeFromFederationRequest,
     RevokeInvitationRequest,
     ShowFederationRequest,
@@ -56,7 +59,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectRequest,
     PushObjectRequest,
 )
-from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     CreateTaskRequest,
@@ -94,6 +96,9 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/register-node"): RegisterNodeRequest,
     ("POST", "/v1/control/unregister-node"): UnregisterNodeRequest,
     ("POST", "/v1/control/list-nodes"): ListNodesRequest,
+    ("POST", "/v1/control/list-apps"): ListAppsRequest,
+    ("POST", "/v1/control/add-app"): AddAppRequest,
+    ("POST", "/v1/control/remove-app"): RemoveAppRequest,
     ("POST", "/v1/control/list-federations"): ListFederationsRequest,
     ("POST", "/v1/control/show-federation"): ShowFederationRequest,
     ("POST", "/v1/control/create-federation"): CreateFederationRequest,
@@ -118,7 +123,6 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ): ConfigureSimulationFederationRequest,
     ("POST", "/v1/runtime/pull-pending-tasks"): PullPendingTasksRequest,
     ("POST", "/v1/runtime/claim-task"): ClaimTaskRequest,
-    ("POST", "/v1/runtime/get-run"): GetRunRequest,
     ("POST", "/v1/runtime/send-task-heartbeat"): SendTaskHeartbeatRequest,
     ("POST", "/v1/runtime/pull-task-input"): PullTaskInputRequest,
     ("POST", "/v1/runtime/push-task-output"): PushTaskOutputRequest,
@@ -159,6 +163,18 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             # Continue for unrecognized requests
             return await call_next(request)
         response = await call_next(request)
+
+        # Only completed JSON errors can bypass protobuf response translation.
+        if response.status_code >= 400:
+            content_type = response.headers.get("content-type", "")
+            media_type = content_type.partition(";")[0].strip().lower()
+            if media_type == "application/json" or media_type.endswith("+json"):
+                return response
+            raise FlowerError(
+                ApiErrorCode.INVALID_PROTOBUF_RESPONSE,
+                "Protobuf route returned a non-JSON HTTP error response with "
+                f"Content-Type {content_type!r}.",
+            )
 
         if not hasattr(request.state, "protobuf_response"):
             raise FlowerError(
@@ -236,3 +252,6 @@ def get_protobuf_request(request: Request) -> Message:
             f"Message, got {type(protobuf_request).__name__}.",
         )
     return protobuf_request
+
+
+PROTOBUF_REQUEST_DEPENDENCY = Depends(get_protobuf_request)

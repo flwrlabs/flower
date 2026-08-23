@@ -19,7 +19,7 @@ from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
 
-import grpc
+import httpx
 
 from flwr.agentapp import AgentApp, LoadAgentAppError
 from flwr.app import Context
@@ -33,7 +33,6 @@ from flwr.common.config import (
     get_project_dir,
 )
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
-from flwr.common.logger import flush_logs, log, start_log_uploader, stop_log_uploader
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -48,9 +47,11 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputResponse,
     PushTaskOutputRequest,
 )
+from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
+from flwr.supercore.logger import flush_logs, start_log_uploader, stop_log_uploader
 from flwr.supercore.object_ref import load_app
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
@@ -59,10 +60,15 @@ from flwr.supercore.superexec.dependency_installer import (
 )
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.typing import JSONObject
-from flwr.superlink.grid import GrpcGrid
+from flwr.superlink.grid import HttpGrid
 
 from .context_items import append_items
-from .session import RuntimeAgentConnectors, RuntimeAgentResponses, RuntimeAgentSession
+from .session import (
+    RuntimeAgentConnectors,
+    RuntimeAgentEvents,
+    RuntimeAgentResponses,
+    RuntimeAgentSession,
+)
 
 _AGENT_INPUT_KEY = "agent.input"
 
@@ -82,7 +88,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         start_parent_process_monitor(parent_pid)
 
     # Initialize the Runtime API connection.
-    grid = GrpcGrid(
+    grid = HttpGrid(
         runtime_api_address=runtime_api_address,
         insecure=insecure,
         root_certificates=certificates,
@@ -112,8 +118,8 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             details=details,
         )
         try:
-            grid._stub.PushTaskOutput(pushoutput_req)
-        except grpc.RpcError as err:
+            grid._runtime_client.PushTaskOutput(pushoutput_req)
+        except httpx.HTTPError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
 
         if log_uploader:
@@ -133,11 +139,15 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     )
 
     try:
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(grid._stub))
+        heartbeat_sender = HeartbeatSender(
+            make_task_heartbeat_fn_http(grid._runtime_client)
+        )
         heartbeat_sender.start()
 
         log(DEBUG, "[flwr-agentapp] Pull task input")
-        res: PullTaskInputResponse = grid._stub.PullTaskInput(PullTaskInputRequest())
+        res: PullTaskInputResponse = grid._runtime_client.PullTaskInput(
+            PullTaskInputRequest()
+        )
 
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
@@ -152,7 +162,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             log_queue=log_queue,
             node_id=0,
             run_id=run.run_id,
-            stub=grid._stub,
+            client=grid._runtime_client,
         )
 
         log(DEBUG, "[flwr-agentapp] Start FAB installation.")
@@ -216,7 +226,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         )
 
         responses = RuntimeAgentResponses(
-            stub=grid._stub,
+            stub=grid._runtime_client,
             run_id=context.run_id,
             task_id=task_id,
             context=context,
@@ -229,7 +239,10 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             ),
         )
         connectors = RuntimeAgentConnectors(responses)
-        agent = RuntimeAgentSession(responses=responses, connectors=connectors)
+        events = RuntimeAgentEvents(grid._runtime_client)
+        agent = RuntimeAgentSession(
+            responses=responses, connectors=connectors, events=events
+        )
 
         # Load and run the AgentApp
         agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)

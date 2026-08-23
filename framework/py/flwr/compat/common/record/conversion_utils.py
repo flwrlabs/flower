@@ -17,7 +17,7 @@
 
 from flwr.app.message import Array
 from flwr.common import NDArray
-from flwr.common.logger import warn_deprecated_feature
+from flwr.supercore.logger import warn_deprecated_feature
 
 WARN_DEPRECATED_MESSAGE = (
     "`array_from_numpy` is deprecated. Instead, use the `Array(ndarray)` class "

@@ -61,14 +61,14 @@ wait_for_port "$sl_pid" 9092 "SuperLink"
 
 # Start two SuperNodes and wait until their ClientApp APIs are ready.
 flower-supernode --insecure --superlink 127.0.0.1:9092 \
-    --clientappio-api-address localhost:9094 \
+    --host localhost --port 9094 \
     --max-retries 0 &
 cl1_pid=$!
 background_pids+=("$cl1_pid")
 wait_for_port "$cl1_pid" 9094 "SuperNode 1"
 
 flower-supernode --insecure --superlink 127.0.0.1:9092 \
-    --clientappio-api-address localhost:9095 \
+    --host localhost --port 9095 \
     --max-retries 0 &
 cl2_pid=$!
 background_pids+=("$cl2_pid")

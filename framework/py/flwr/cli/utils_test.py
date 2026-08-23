@@ -36,11 +36,11 @@ from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
 from flwr.common.constant import FLWR_DIR
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 
 from .utils import (
+    AppPathDepthError,
     _format_flower_error,
     build_pathspec,
     cli_output_handler,
@@ -55,29 +55,6 @@ from .utils import (
     validate_federation_name,
     wait_for_control_api_channel,
 )
-
-
-class _GrpcErrorWithDetails:
-    """Test helper object carrying a gRPC-like details string."""
-
-    def __init__(self, details: str) -> None:
-        self._details = details
-
-    def details(self) -> str:
-        """Return the stored gRPC details string."""
-        return self._details
-
-
-def _grpc_error_with_details(details: str) -> grpc.RpcError:
-    """Return a grpc.RpcError-compatible test helper with a details method."""
-    return cast(grpc.RpcError, _GrpcErrorWithDetails(details))
-
-
-def _flower_error_details(code: ApiErrorCode, public_details: str | None = None) -> str:
-    """Return serialized FlowerError details as sent through gRPC."""
-    return FlowerError(code, "internal details", public_details).to_json(
-        API_ERROR_MAP[code].public_message
-    )
 
 
 class TestGetSHA256Hash(unittest.TestCase):
@@ -449,6 +426,7 @@ def test_filter_paths_for_publish_include(
     [
         "__pycache__/mod.py",
         ".flwr/creds.json",
+        ".venv/" + "/".join(["d"] * (MAX_DIR_DEPTH + 1)) + "/mod.py",
     ],
 )
 @pytest.mark.parametrize("use_paths", [False, True], ids=["bytes", "path"])
@@ -490,7 +468,7 @@ def test_filter_paths_for_publish_respects_gitignore(
 def test_filter_paths_for_publish_max_depth_exceeded(
     use_paths: bool, tmp_path: Path
 ) -> None:
-    """ValueError is raised when a file exceeds MAX_DIR_DEPTH."""
+    """A specific error is raised when a file exceeds MAX_DIR_DEPTH."""
     # Prepare
     deep = "/".join(["d"] * (MAX_DIR_DEPTH + 1)) + "/f.py"
     raw: dict[str, bytes] = {deep: b""}
@@ -498,8 +476,12 @@ def test_filter_paths_for_publish_max_depth_exceeded(
         dict[str, Path | bytes], _to_path_files(raw, tmp_path) if use_paths else raw
     )
     # Execute & assert
-    with pytest.raises(ValueError, match="exceeds the maximum directory depth"):
+    with pytest.raises(
+        AppPathDepthError, match="exceeds the maximum directory depth"
+    ) as exc_info:
         filter_paths_for_publish(files)
+    assert exc_info.value.path == deep
+    assert exc_info.value.max_depth == MAX_DIR_DEPTH
 
 
 def test_filter_paths_for_publish_empty() -> None:

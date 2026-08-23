@@ -139,6 +139,16 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.ListAppsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.ListAppsResponse.FromString,
                 _registered_method=True)
+        self.AddApp = channel.unary_unary(
+                '/flwr.proto.Control/AddApp',
+                request_serializer=flwr_dot_proto_dot_control__pb2.AddAppRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.AddAppResponse.FromString,
+                _registered_method=True)
+        self.RemoveApp = channel.unary_unary(
+                '/flwr.proto.Control/RemoveApp',
+                request_serializer=flwr_dot_proto_dot_control__pb2.RemoveAppRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.RemoveAppResponse.FromString,
+                _registered_method=True)
         self.ShowFederation = channel.unary_unary(
                 '/flwr.proto.Control/ShowFederation',
                 request_serializer=flwr_dot_proto_dot_control__pb2.ShowFederationRequest.SerializeToString,
@@ -356,6 +366,20 @@ class ControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def AddApp(self, request, context):
+        """Add App to a Federation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RemoveApp(self, request, context):
+        """Remove App from a Federation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def ShowFederation(self, request, context):
         """Show Federation
         """
@@ -558,6 +582,16 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.ListApps,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ListAppsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.ListAppsResponse.SerializeToString,
+            ),
+            'AddApp': grpc.unary_unary_rpc_method_handler(
+                    servicer.AddApp,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.AddAppRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.AddAppResponse.SerializeToString,
+            ),
+            'RemoveApp': grpc.unary_unary_rpc_method_handler(
+                    servicer.RemoveApp,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.RemoveAppRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.RemoveAppResponse.SerializeToString,
             ),
             'ShowFederation': grpc.unary_unary_rpc_method_handler(
                     servicer.ShowFederation,
@@ -1192,6 +1226,60 @@ class Control(object):
             '/flwr.proto.Control/ListApps',
             flwr_dot_proto_dot_control__pb2.ListAppsRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.ListAppsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AddApp(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/AddApp',
+            flwr_dot_proto_dot_control__pb2.AddAppRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.AddAppResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RemoveApp(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/RemoveApp',
+            flwr_dot_proto_dot_control__pb2.RemoveAppRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.RemoveAppResponse.FromString,
             options,
             channel_credentials,
             insecure,
