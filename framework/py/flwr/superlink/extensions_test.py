@@ -113,8 +113,11 @@ def test_callback_completion_does_not_require_closed_event_loop(
 
     callback_release.set()
     assert callback_done.wait(timeout=1)
+    # pylint: disable=protected-access
     with extensions._NOTIFICATION_CALLBACK_EVENTS_LOCK:
-        assert not extensions._NOTIFICATION_CALLBACK_EVENTS
+        assert (
+            not extensions._NOTIFICATION_CALLBACK_EVENTS
+        )  # pylint: disable=protected-access
 
 
 def test_notify_run_started_isolates_extension_failure(
