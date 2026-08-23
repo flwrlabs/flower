@@ -190,8 +190,10 @@ def pull_task_message(
     log(DEBUG, "Runtime.PullTaskMessage")
 
     limit = request.limit if request.HasField("limit") else None
+    src_task_ids = [request.src_task_id] if request.HasField("src_task_id") else None
     messages = state.get_task_message(
         dst_task_ids=[task.task_id],
+        src_task_ids=src_task_ids,
         limit=limit,
         order_by="created_at",
     )

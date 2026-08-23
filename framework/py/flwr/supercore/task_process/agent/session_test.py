@@ -17,6 +17,8 @@
 
 from unittest.mock import Mock, patch
 
+import pytest
+
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
@@ -26,7 +28,11 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     CreateTaskResponse,
+    PullTaskMessageRequest,
+    PullTaskMessageResponse,
+    PushTaskEventsRequest,
 )
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.json_message.connector_message import (
     ConnectorRequest,
@@ -36,7 +42,52 @@ from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TO
 from flwr.supercore.task_process.connector.registry import get_builtin_connector_tool
 from flwr.supercore.typing import JSONObject
 
-from .session import RuntimeAgentConnectors, RuntimeAgentResponses
+from .session import RuntimeAgentConnectors, RuntimeAgentEvents, RuntimeAgentResponses
+
+
+def test_emit_event_pushes_task_event() -> None:
+    """Emit should translate a structured run event to the Runtime API."""
+    stub = Mock()
+    events = RuntimeAgentEvents(stub)
+
+    events.emit({"type": "response.output_text.delta", "delta": "Hello"})
+
+    event = TaskEvent(
+        event="response.output_text.delta",
+        data=('{"type":"response.output_text.delta","delta":"Hello"}'),
+    )
+    stub.PushTaskEvents.assert_called_once_with(PushTaskEventsRequest(events=[event]))
+
+
+def test_emit_event_requires_type() -> None:
+    """Emit should reject events without a valid type."""
+    stub = Mock()
+    events = RuntimeAgentEvents(stub)
+
+    with pytest.raises(
+        ValueError, match="Run event requires a non-empty string 'type' field"
+    ):
+        events.emit({"message": "Hello"})
+
+    stub.PushTaskEvents.assert_not_called()
+
+
+def test_pull_task_messages_filters_by_child_task() -> None:
+    """Claim only messages sent by the expected child task."""
+    stub = Mock()
+    stub.PullTaskMessage.return_value = PullTaskMessageResponse()
+    responses = RuntimeAgentResponses(
+        stub=stub,
+        run_id=123,
+        task_id=789,
+        context=Mock(),
+        start_run_request=StartRunRequest(),
+    )
+
+    assert responses._pull_task_messages(456) == []  # pylint: disable=W0212
+    stub.PullTaskMessage.assert_called_once_with(
+        PullTaskMessageRequest(limit=1, src_task_id=456)
+    )
 
 
 def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
